@@ -35,6 +35,7 @@ from instrument.retrieval import (
     resolve_fallback_mode,
     rrf_base,
     select_evidence,
+    retrieve,
     _dense_filter,
 )
 
@@ -464,3 +465,98 @@ def test_build_evidence_cards_is_deterministic():
 def test_candidate_citation_format():
     c = _cand("k1", locator="symbol:foo", commit_sha="abc")
     assert c.citation() == "[K:k1@abc:symbol:foo]"
+
+
+# ── Graph-expansion leg wiring (real seed score × weight × decay) ──
+
+class _FakeDenseStore:
+    """Minimal dense store returning a single seed hit."""
+
+    def __init__(self, hits):
+        self._hits = hits
+
+    def search(self, query, *, top_k=40, where=None):
+        return list(self._hits)
+
+
+class _FakeGraph:
+    """Minimal graph client recording expansion and returning scripted nodes."""
+
+    def __init__(self, expanded):
+        self._expanded = expanded
+        self.expand_seeds = None
+
+    def search_fulltext(self, index, query, *, limit=10, commit=None):
+        return []  # lexical leg contributes nothing in these tests
+
+    def expand_candidates(self, seeds, **kwargs):
+        self.expand_seeds = list(seeds)
+        return list(self._expanded)
+
+
+def _seed_hit():
+    return {
+        "id": "k_seed",
+        "document": "seed document about websocket reload protocol",
+        "metadata": {"authority": "source", "content_hash": "hash_seed"},
+        "distance": 0.1,
+    }
+
+
+def _expanded_node(origin, *, rel_type="DEFINES", depth=1, cid="k_expanded"):
+    return {
+        "id": "elem:expanded",
+        "canonical_id": cid,
+        "labels": ["Knowledge"],
+        "properties": {
+            "text": "expanded neighbor text",
+            "authority": "source",
+            "content_hash": "hash_expanded",
+        },
+        "rel_type": rel_type,
+        "depth": depth,
+        "path": [origin, cid],
+        "origin_seed": origin,
+    }
+
+
+def test_retrieve_expansion_scores_with_real_seed_and_rel_type():
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([_seed_hit()]),
+        graph_client=_FakeGraph([_expanded_node("k_seed")]),
+    )
+
+    seed = next(c for c in attempt.candidates if c.id == "k_seed")
+    expanded = next(c for c in attempt.candidates if c.id == "k_expanded")
+
+    # The expansion hop is scored with the seed's REAL fused score (not a hardcoded
+    # 1.0), the traversed relationship weight, and the decay at the returned depth.
+    expected = seed.fused_score * RELATIONSHIP_WEIGHTS["DEFINES"] * (0.7 ** 1)
+    assert expanded.fused_score == pytest.approx(expected)
+    assert expanded.graph_depth == 1
+    assert expanded.graph_path == ["k_seed", "k_expanded"]
+    assert expanded.relationship_weight == RELATIONSHIP_WEIGHTS["DEFINES"]
+
+
+def test_retrieve_expansion_uses_canonical_id_not_element_id():
+    # The expanded node's canonical_id (not its elementId) keys the candidate.
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([_seed_hit()]),
+        graph_client=_FakeGraph([_expanded_node("k_seed")]),
+    )
+    ids = {c.id for c in attempt.candidates}
+    assert "k_expanded" in ids
+    assert "elem:expanded" not in ids
+
+
+def test_retrieve_expansion_skips_orphan_origin():
+    # An expanded node whose origin seed is not in the fused set is skipped cleanly,
+    # never emitted as a zero-score candidate.
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([_seed_hit()]),
+        graph_client=_FakeGraph([_expanded_node("unknown_seed")]),
+    )
+    assert all(c.id != "k_expanded" for c in attempt.candidates)

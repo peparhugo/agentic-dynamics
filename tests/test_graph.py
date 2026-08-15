@@ -340,6 +340,55 @@ class TestExpandCandidates(_Neo4jTestBase):
             "PRODUCED_BY", "PRECEDES", "SUPERSEDES", "CONTRADICTS",
         }
 
+    def test_expand_returns_rel_type_depth_path_and_origin(self):
+        self._build_star()
+        seed = self._seed_element_id("a")
+        nodes = self.client.expand_candidates([seed], max_depth=2)
+        by_name = {n["properties"]["name"]: n for n in nodes}
+
+        # Seed is depth 0, no traversed relationship, path is just itself.
+        a = by_name["a"]
+        assert a["depth"] == 0
+        assert a["rel_type"] == ""
+        assert a["path"] == [a["canonical_id"]]
+        assert a["origin_seed"] == seed
+
+        # Depth-1 neighbors carry the DEFINES relationship and the seed path.
+        b = by_name["b"]
+        assert b["depth"] == 1
+        assert b["rel_type"] == "DEFINES"
+        assert b["path"] == [a["canonical_id"], b["canonical_id"]]
+        assert b["origin_seed"] == seed
+
+        # Depth-2 (a → c → e) still originates from the same seed.
+        e = by_name["e"]
+        assert e["depth"] == 2
+        assert e["rel_type"] == "DEFINES"
+        assert e["path"] == [a["canonical_id"], by_name["c"]["canonical_id"], e["canonical_id"]]
+        assert e["origin_seed"] == seed
+
+        # MENTIONS is not on the allowlist → d absent.
+        assert "d" not in by_name
+
+    def test_expand_resolves_canonical_id_over_element_id(self):
+        # Seed by canonical doc_id; the returned node must carry that canonical id
+        # (not the opaque elementId), and the origin seed must round-trip.
+        self.client._run(
+            "CREATE (s:__TestExpand {name: 'cid', doc_id: 'doc_42', step_id: 'st_42'})"
+        )
+        nodes = self.client.expand_candidates(["doc_42"], max_depth=0)
+        assert len(nodes) == 1
+        node = nodes[0]
+        assert node["canonical_id"] == "doc_42"  # doc_id preferred over step_id/elementId
+        assert node["origin_seed"] == "doc_42"
+        assert node["properties"]["doc_id"] == "doc_42"
+
+    def test_expand_skips_unresolvable_seed(self):
+        # A canonical id with no matching node is skipped cleanly — not emitted as
+        # a zero-score hit.
+        nodes = self.client.expand_candidates(["no_such_id"], max_depth=1)
+        assert nodes == []
+
 
 class TestSearchHelpers(_Neo4jTestBase):
     """Exact-property + full-text search (typed, no hand-written Cypher)."""

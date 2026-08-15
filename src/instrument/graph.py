@@ -72,6 +72,20 @@ def _validate_identifier(name: str, kind: str) -> None:
         raise ValueError(f"invalid {kind} identifier: {name!r}")
 
 
+def _canonical_id(properties: dict[str, Any], fallback: str) -> str:
+    """Resolve the canonical cross-store id from a node's properties.
+
+    Prefers ``knowledge_id`` / ``doc_id`` / ``step_id`` / ``entity_id`` — the same
+    order the retrieval leg uses to key candidates — and falls back to the Neo4j
+    ``elementId`` when none is present, so nodes without a canonical property (e.g.
+    ad-hoc test labels) still get a stable identity for expansion bookkeeping.
+    """
+    for key in ("knowledge_id", "doc_id", "step_id", "entity_id"):
+        if properties.get(key):
+            return str(properties[key])
+    return fallback
+
+
 class _BufferedResult:
     def __init__(self, records):
         self._records = records
@@ -672,12 +686,21 @@ class Neo4jClient:
             out["score"] = record["score"]
         return out
 
-    def _get_node(self, node_id: str) -> dict[str, Any] | None:
-        """Return a single node by ``elementId``, or None if absent."""
+    def _resolve_node(self, node_ref: str) -> dict[str, Any] | None:
+        """Resolve a node by canonical id (or ``elementId``) — not elementId alone.
+
+        The retrieval leg seeds expansion with canonical cross-store ids
+        (``knowledge_id`` / ``doc_id`` / ``step_id`` / ``entity_id``), so seed
+        lookup must match on those properties; ``elementId`` is kept as a fallback
+        for callers that still pass an elementId. Returns ``None`` when
+        unresolvable so the caller can skip the seed cleanly (never a zero-score
+        hit).
+        """
         rec = self._run_value(
-            "MATCH (n) WHERE elementId(n) = $id "
+            "MATCH (n) WHERE n.knowledge_id = $id OR n.doc_id = $id "
+            "OR n.step_id = $id OR n.entity_id = $id OR elementId(n) = $id "
             "RETURN elementId(n) AS node_id, labels(n) AS labels, properties(n) AS properties",
-            {"id": node_id},
+            {"id": node_ref},
         )
         if rec is None:
             return None
@@ -688,15 +711,17 @@ class Neo4jClient:
         }
 
     def _neighbors(self, node_id: str, rels: str, limit: int) -> list[dict[str, Any]]:
-        """Return up to ``limit`` neighbors of ``node_id`` over ``rels`` (allowlist).
+        """Return up to ``limit`` neighbors of ``node_id`` (elementId) over ``rels``.
 
         ``rels`` is a ``|``-joined allowlist built from ``ALLOWED_EXPANSION_RELS``
         (fixed, safe identifiers), so it is safe to interpolate into the pattern.
+        Each neighbor carries the traversed relationship type (``type(r)``) so the
+        caller can score the hop with the correct relationship weight.
         """
         records = self._run(
             f"MATCH (n)-[r:{rels}]-(m) WHERE elementId(n) = $id "
             "RETURN DISTINCT elementId(m) AS node_id, labels(m) AS labels, "
-            "properties(m) AS properties LIMIT $limit",
+            "properties(m) AS properties, type(r) AS rel_type LIMIT $limit",
             {"id": node_id, "limit": limit},
         )
         return [
@@ -704,6 +729,7 @@ class Neo4jClient:
                 "id": rec["node_id"],
                 "labels": list(rec["labels"]),
                 "properties": dict(rec["properties"]),
+                "rel_type": rec["rel_type"],
             }
             for rec in records
         ]
@@ -722,33 +748,68 @@ class Neo4jClient:
         BFS over ``ALLOWED_EXPANSION_RELS`` only, bounded by depth
         (<= ``max_depth``), neighbors per node per hop (<= ``max_neighbors``),
         total nodes (<= ``max_nodes``), and wall-clock time (<= ``timeout_ms``).
-        ``seed_ids`` are Neo4j ``elementId`` values (as returned by
-        ``find_exact`` / ``search_fulltext``). Returns visited nodes as
-        ``{"id", "labels", "properties"}`` dicts, seeds first. Pure read.
+        ``seed_ids`` are canonical cross-store ids (knowledge_id / doc_id /
+        step_id / entity_id); a seed that cannot be resolved is skipped cleanly.
+
+        Each returned node carries its canonical id (property-derived, elementId
+        fallback), the traversed relationship type, the BFS depth, the path of
+        canonical ids from its origin seed, and the origin seed's canonical id —
+        everything the retrieval leg needs to score the hop as
+        ``seed_score * weight * 0.7**depth``. Seeds first (depth 0), then
+        breadth-first. Pure read.
         """
         rels = "|".join(sorted(ALLOWED_EXPANSION_RELS))
         deadline = time.monotonic() + timeout_ms / 1000.0
 
-        visited: dict[str, dict[str, Any]] = {}
+        visited: dict[str, dict[str, Any]] = {}  # keyed by elementId (insertion-ordered)
+        frontier: list[str] = []
+
         for seed in seed_ids:
             if len(visited) >= max_nodes:
                 break
-            node = self._get_node(seed)
-            if node is not None:
-                visited[seed] = node
+            node = self._resolve_node(seed)
+            if node is None:
+                continue  # unresolvable seed → skipped cleanly, never a zero-score hit
+            elem = node["id"]
+            if elem in visited:
+                continue
+            cid = _canonical_id(node["properties"], elem)
+            visited[elem] = {
+                "id": elem,
+                "canonical_id": cid,
+                "labels": node["labels"],
+                "properties": node["properties"],
+                "rel_type": "",
+                "depth": 0,
+                "path": [cid],
+                "origin_seed": seed,
+            }
+            frontier.append(elem)
 
-        frontier = list(visited.keys())
-        for _ in range(max_depth):
+        for depth in range(1, max_depth + 1):
             if time.monotonic() > deadline or len(visited) >= max_nodes:
                 break
             next_frontier: list[str] = []
-            for node_id in frontier:
+            for elem in frontier:
                 if time.monotonic() > deadline or len(visited) >= max_nodes:
                     break
-                for neighbor in self._neighbors(node_id, rels, max_neighbors):
-                    if neighbor["id"] not in visited:
-                        visited[neighbor["id"]] = neighbor
-                        next_frontier.append(neighbor["id"])
+                parent = visited[elem]
+                for neighbor in self._neighbors(elem, rels, max_neighbors):
+                    n_elem = neighbor["id"]
+                    if n_elem in visited:
+                        continue
+                    n_cid = _canonical_id(neighbor["properties"], n_elem)
+                    visited[n_elem] = {
+                        "id": n_elem,
+                        "canonical_id": n_cid,
+                        "labels": neighbor["labels"],
+                        "properties": neighbor["properties"],
+                        "rel_type": neighbor["rel_type"],
+                        "depth": depth,
+                        "path": parent["path"] + [n_cid],
+                        "origin_seed": parent["origin_seed"],
+                    }
+                    next_frontier.append(n_elem)
                     if len(visited) >= max_nodes:
                         break
             frontier = next_frontier

@@ -848,17 +848,30 @@ def retrieve(
     if graph_client is not None and fused:
         try:
             seeds = [c.id for c in fused[:seed_count]]
+            # Seed canonical id → real fused score, for scoring expanded hops below.
+            seed_scores = {c.id: c.fused_score for c in fused[:seed_count]}
             expanded = graph_client.expand_candidates(
                 seeds, max_depth=2, max_neighbors=8, max_nodes=40, timeout_ms=300
             )
-            # map elementId → canonical id (the expanded node's own properties)
+            fused_ids = {c.id for c in fused}
             for node in expanded:
                 props = node.get("properties") or {}
-                cid = _canonical_id(props, node.get("id", ""))
-                if cid in {c.id for c in fused}:
+                # Prefer the canonical id the graph leg already resolved; fall back to
+                # deriving it from properties (elementId last) for resilience.
+                cid = node.get("canonical_id") or _canonical_id(props, node.get("id", ""))
+                if cid in fused_ids:
+                    continue  # already a direct seed candidate — never re-added
+                origin = node.get("origin_seed") or ""
+                seed_score = seed_scores.get(origin)
+                if seed_score is None or seed_score <= 0:
+                    # Origin seed unresolvable/zero-scored → skip cleanly, never a
+                    # zero-score hit.
                     continue
-                # best seed score × relationship weight × decay — the boost, not a peer
-                boost = graph_boost(1.0, 1, props.get("__relationship__", "DEFINES"))
+                depth = int(node.get("depth", 0))
+                rel_type = str(node.get("rel_type") or "")
+                weight = RELATIONSHIP_WEIGHTS.get(rel_type, 0.0)
+                # Real seed score × relationship weight × decay — the boost, not a peer.
+                boost = graph_boost(seed_score, depth, rel_type)
                 fused.append(
                     Candidate(
                         id=cid,
@@ -868,8 +881,9 @@ def retrieve(
                         locator=props.get("logical_locator", cid),
                         commit_sha=props.get("commit_sha", commit_sha),
                         observed_at=props.get("observed_at"),
-                        graph_depth=1,
-                        graph_path=node.get("graph_path", []),
+                        graph_depth=depth,
+                        graph_path=list(node.get("path", [])),
+                        relationship_weight=weight,
                         token_count=_estimate_tokens(props.get("text", "")),
                         fused_score=boost,
                     )
