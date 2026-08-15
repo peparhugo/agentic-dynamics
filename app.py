@@ -12,9 +12,19 @@ import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from celery_tasks import send_notification_email
 from repositories import TaskRepository, UserRepository
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Rate limiter configuration
+limiter = Limiter(
+    app=app,
+    key_func=lambda: _get_rate_limit_key(),
+    default_limits=["100 per minute"],
+    storage_uri="memory://"
+)
 
 # Storage configuration
 STORAGE_DIR = os.environ.get("STORAGE_DIR", "./data")
@@ -32,6 +42,14 @@ def _get_storage_dir():
 # Initialize repositories
 task_repo = TaskRepository(_get_storage_dir)
 user_repo = UserRepository(_get_storage_dir)
+
+
+def _get_rate_limit_key():
+    """Get rate limit key based on authenticated user or remote IP."""
+    user = _get_auth_user()
+    if user is not None:
+        return f"user:{user['id']}"
+    return get_remote_address()
 
 
 # ── Storage Layer (delegating to repositories) ────────────────────────────────────────────────
@@ -185,6 +203,7 @@ def _migrate_tasks_to_add_owner():
 # ── Endpoints ────────────────────────────────────────────────────
 
 @app.route('/auth/register', methods=['POST'])
+@limiter.limit("100 per minute")
 def register():
     """Register a new user. Expects JSON: {username: str, password: str, email?: str}"""
     data = request.get_json(silent=True) or {}
@@ -214,6 +233,7 @@ def register():
 
 
 @app.route('/auth/login', methods=['POST'])
+@limiter.limit("100 per minute")
 def login():
     """Login and get JWT token. Expects JSON: {username: str, password: str}"""
     data = request.get_json(silent=True) or {}
@@ -233,6 +253,7 @@ def login():
 
 @app.route('/tasks', methods=['POST'])
 @_require_auth
+@limiter.limit("100 per minute")
 def create_task(user):
     """Create a new task. Expects JSON: {title: str}"""
     data = request.get_json(silent=True) or {}
@@ -255,15 +276,47 @@ def create_task(user):
 
 @app.route('/tasks', methods=['GET'])
 @_require_auth
+@limiter.limit("100 per minute")
 def list_tasks(user):
-    """List tasks for current user ordered by created_at descending."""
+    """List tasks with cursor-based pagination."""
+    cursor = request.args.get('cursor', None)
+    limit = request.args.get('limit', '20')
+
+    try:
+        limit = int(limit)
+        if limit <= 0 or limit > 100:
+            limit = 20
+    except (ValueError, TypeError):
+        limit = 20
+
     user_tasks = task_repo.get_by_owner(user['id'])
     sorted_tasks = sorted(user_tasks, key=lambda x: x['created_at'], reverse=True)
-    return jsonify(sorted_tasks)
+
+    start_idx = 0
+    if cursor is not None:
+        cursor_id = int(cursor)
+        for i, task in enumerate(sorted_tasks):
+            if task['id'] == cursor_id:
+                start_idx = i + 1
+                break
+
+    end_idx = start_idx + limit
+    page_tasks = sorted_tasks[start_idx:end_idx]
+
+    next_cursor = None
+    if end_idx < len(sorted_tasks):
+        next_cursor = str(page_tasks[-1]['id']) if page_tasks else None
+
+    return jsonify({
+        'data': page_tasks,
+        'next_cursor': next_cursor,
+        'total': len(sorted_tasks)
+    })
 
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 @_require_auth
+@limiter.limit("100 per minute")
 def get_task(user, task_id):
     """Get a single task by ID."""
     task = task_repo.get_by_id(task_id)
@@ -279,6 +332,7 @@ def get_task(user, task_id):
 
 @app.route('/tasks/<int:task_id>', methods=['PUT'])
 @_require_auth
+@limiter.limit("100 per minute")
 def update_task(user, task_id):
     """Update task title and/or status."""
     data = request.get_json(silent=True) or {}
@@ -313,9 +367,16 @@ def update_task(user, task_id):
 
 
 @app.route('/health', methods=['GET'])
+@limiter.limit("100 per minute")
 def health():
     """Health check endpoint."""
     return jsonify({"status": "ok"})
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Handle rate limit exceeded."""
+    return jsonify({"error": "rate limit exceeded"}), 429
 
 
 if __name__ == '__main__':

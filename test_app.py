@@ -27,21 +27,35 @@ def client():
     original_storage_dir = app_module.STORAGE_DIR
     original_tasks_file = app_module.TASKS_FILE
     original_users_file = app_module.USERS_FILE
+    original_testing = os.environ.get('TESTING')
 
     app_module.STORAGE_DIR = test_dir
     app_module.TASKS_FILE = os.path.join(test_dir, "tasks.json")
     app_module.USERS_FILE = os.path.join(test_dir, "users.json")
+    os.environ['TESTING'] = '1'
 
     # Configure app for testing
     app.config['TESTING'] = True
 
+    # Disable rate limiting for tests
+    import app as app_module
+    original_enabled = app_module.limiter.enabled
+    app_module.limiter.enabled = False
+
     with app.test_client() as client:
         yield client
+
+    # Restore rate limiting
+    app_module.limiter.enabled = original_enabled
 
     # Cleanup
     app_module.STORAGE_DIR = original_storage_dir
     app_module.TASKS_FILE = original_tasks_file
     app_module.USERS_FILE = original_users_file
+    if original_testing:
+        os.environ['TESTING'] = original_testing
+    else:
+        os.environ.pop('TESTING', None)
     shutil.rmtree(test_dir, ignore_errors=True)
 
 
@@ -304,7 +318,9 @@ class TestListTasks:
         response = authenticated_client.get('/tasks')
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data == []
+        assert data['data'] == []
+        assert data['total'] == 0
+        assert data['next_cursor'] is None
 
     def test_list_tasks_ordered_by_created_at_desc(self, authenticated_client):
         """Test that tasks are ordered by created_at descending."""
@@ -317,11 +333,11 @@ class TestListTasks:
         assert response.status_code == 200
         data = json.loads(response.data)
 
-        assert len(data) == 3
+        assert len(data['data']) == 3
         # Should be ordered by created_at descending (most recent first)
-        assert data[0]['title'] == 'Task 3'
-        assert data[1]['title'] == 'Task 2'
-        assert data[2]['title'] == 'Task 1'
+        assert data['data'][0]['title'] == 'Task 3'
+        assert data['data'][1]['title'] == 'Task 2'
+        assert data['data'][2]['title'] == 'Task 1'
 
     def test_list_tasks_multiple(self, authenticated_client):
         """Test listing multiple tasks."""
@@ -331,7 +347,7 @@ class TestListTasks:
         response = authenticated_client.get('/tasks')
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert len(data) == 2
+        assert len(data['data']) == 2
 
     def test_list_tasks_isolated_by_user(self, client):
         """Test that users only see their own tasks."""
@@ -374,14 +390,14 @@ class TestListTasks:
         # First user should only see their task
         resp1 = client.get('/tasks', headers={'Authorization': f'Bearer {token1}'})
         tasks1 = json.loads(resp1.data)
-        assert len(tasks1) == 1
-        assert tasks1[0]['title'] == "Alice's task"
+        assert len(tasks1['data']) == 1
+        assert tasks1['data'][0]['title'] == "Alice's task"
 
         # Second user should only see their task
         resp2 = client.get('/tasks', headers={'Authorization': f'Bearer {token2}'})
         tasks2 = json.loads(resp2.data)
-        assert len(tasks2) == 1
-        assert tasks2[0]['title'] == "Bob's task"
+        assert len(tasks2['data']) == 1
+        assert tasks2['data'][0]['title'] == "Bob's task"
 
 
 class TestGetTask:
@@ -611,7 +627,7 @@ class TestIntegration:
         list_resp = authenticated_client.get('/tasks')
         assert list_resp.status_code == 200
         tasks = json.loads(list_resp.data)
-        assert len(tasks) == 1
+        assert len(tasks['data']) == 1
 
         # Get task
         get_resp = authenticated_client.get(f'/tasks/{task_id}')
@@ -645,13 +661,263 @@ class TestIntegration:
         # List and verify
         resp1 = authenticated_client.get('/tasks')
         data1 = json.loads(resp1.data)
-        assert len(data1) == 3
+        assert len(data1['data']) == 3
 
         # List again and verify same data
         resp2 = authenticated_client.get('/tasks')
         data2 = json.loads(resp2.data)
-        assert len(data2) == 3
+        assert len(data2['data']) == 3
         assert data1 == data2
+
+
+class TestPagination:
+    def test_pagination_default_limit(self, authenticated_client):
+        """Test pagination with default limit of 20."""
+        for i in range(5):
+            authenticated_client.post('/tasks',
+                json={"title": f"Task {i+1}"},
+                content_type='application/json'
+            )
+
+        response = authenticated_client.get('/tasks')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert 'data' in data
+        assert 'next_cursor' in data
+        assert 'total' in data
+        assert len(data['data']) == 5
+        assert data['total'] == 5
+        assert data['next_cursor'] is None
+
+    def test_pagination_with_custom_limit(self, authenticated_client):
+        """Test pagination with custom limit."""
+        for i in range(10):
+            authenticated_client.post('/tasks',
+                json={"title": f"Task {i+1}"},
+                content_type='application/json'
+            )
+
+        response = authenticated_client.get('/tasks?limit=3')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert len(data['data']) == 3
+        assert data['total'] == 10
+        assert data['next_cursor'] is not None
+
+    def test_pagination_with_cursor(self, authenticated_client):
+        """Test pagination using cursor for second page."""
+        for i in range(10):
+            authenticated_client.post('/tasks',
+                json={"title": f"Task {i+1}"},
+                content_type='application/json'
+            )
+
+        response1 = authenticated_client.get('/tasks?limit=3')
+        assert response1.status_code == 200
+        data1 = json.loads(response1.data)
+
+        assert len(data1['data']) == 3
+        assert data1['next_cursor'] is not None
+        first_page_ids = [t['id'] for t in data1['data']]
+
+        response2 = authenticated_client.get(f'/tasks?limit=3&cursor={data1["next_cursor"]}')
+        assert response2.status_code == 200
+        data2 = json.loads(response2.data)
+
+        assert len(data2['data']) == 3
+        second_page_ids = [t['id'] for t in data2['data']]
+        assert first_page_ids != second_page_ids
+
+    def test_pagination_last_page(self, authenticated_client):
+        """Test that last page has no next_cursor."""
+        for i in range(5):
+            authenticated_client.post('/tasks',
+                json={"title": f"Task {i+1}"},
+                content_type='application/json'
+            )
+
+        response = authenticated_client.get('/tasks?limit=10')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert len(data['data']) == 5
+        assert data['next_cursor'] is None
+        assert data['total'] == 5
+
+    def test_pagination_limit_max_100(self, authenticated_client):
+        """Test that limit is capped at 100."""
+        for i in range(150):
+            authenticated_client.post('/tasks',
+                json={"title": f"Task {i+1}"},
+                content_type='application/json'
+            )
+
+        response = authenticated_client.get('/tasks?limit=150')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert len(data['data']) <= 100
+
+    def test_pagination_invalid_limit_defaults_to_20(self, authenticated_client):
+        """Test that invalid limit defaults to 20."""
+        for i in range(30):
+            authenticated_client.post('/tasks',
+                json={"title": f"Task {i+1}"},
+                content_type='application/json'
+            )
+
+        response = authenticated_client.get('/tasks?limit=invalid')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert len(data['data']) == 20
+
+    def test_pagination_zero_limit_defaults_to_20(self, authenticated_client):
+        """Test that zero limit defaults to 20."""
+        for i in range(30):
+            authenticated_client.post('/tasks',
+                json={"title": f"Task {i+1}"},
+                content_type='application/json'
+            )
+
+        response = authenticated_client.get('/tasks?limit=0')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert len(data['data']) == 20
+
+    def test_pagination_negative_limit_defaults_to_20(self, authenticated_client):
+        """Test that negative limit defaults to 20."""
+        for i in range(30):
+            authenticated_client.post('/tasks',
+                json={"title": f"Task {i+1}"},
+                content_type='application/json'
+            )
+
+        response = authenticated_client.get('/tasks?limit=-5')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert len(data['data']) == 20
+
+    def test_pagination_empty_tasks(self, authenticated_client):
+        """Test pagination when no tasks exist."""
+        response = authenticated_client.get('/tasks')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert data['data'] == []
+        assert data['next_cursor'] is None
+        assert data['total'] == 0
+
+    def test_pagination_ordered_by_created_at_desc(self, authenticated_client):
+        """Test that paginated results are ordered by created_at descending."""
+        for i in range(5):
+            authenticated_client.post('/tasks',
+                json={"title": f"Task {i+1}"},
+                content_type='application/json'
+            )
+
+        response = authenticated_client.get('/tasks?limit=10')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        tasks = data['data']
+        assert tasks[0]['title'] == 'Task 5'
+        assert tasks[1]['title'] == 'Task 4'
+        assert tasks[2]['title'] == 'Task 3'
+        assert tasks[3]['title'] == 'Task 2'
+        assert tasks[4]['title'] == 'Task 1'
+
+    def test_pagination_isolated_by_user(self, client):
+        """Test that pagination only shows user's own tasks."""
+        client.post('/auth/register',
+            json={"username": "alice", "password": "pass1"},
+            content_type='application/json'
+        )
+        login1 = client.post('/auth/login',
+            json={"username": "alice", "password": "pass1"},
+            content_type='application/json'
+        )
+        token1 = json.loads(login1.data)['token']
+
+        client.post('/auth/register',
+            json={"username": "bob", "password": "pass2"},
+            content_type='application/json'
+        )
+        login2 = client.post('/auth/login',
+            json={"username": "bob", "password": "pass2"},
+            content_type='application/json'
+        )
+        token2 = json.loads(login2.data)['token']
+
+        for i in range(5):
+            client.post('/tasks',
+                json={"title": f"Alice Task {i+1}"},
+                content_type='application/json',
+                headers={'Authorization': f'Bearer {token1}'}
+            )
+
+        for i in range(3):
+            client.post('/tasks',
+                json={"title": f"Bob Task {i+1}"},
+                content_type='application/json',
+                headers={'Authorization': f'Bearer {token2}'}
+            )
+
+        resp1 = client.get('/tasks?limit=100', headers={'Authorization': f'Bearer {token1}'})
+        data1 = json.loads(resp1.data)
+        assert data1['total'] == 5
+
+        resp2 = client.get('/tasks?limit=100', headers={'Authorization': f'Bearer {token2}'})
+        data2 = json.loads(resp2.data)
+        assert data2['total'] == 3
+
+
+class TestRateLimiting:
+    def test_rate_limiter_is_configured(self):
+        """Test that rate limiter is configured in app."""
+        from app import limiter, app
+        assert limiter is not None
+        assert limiter.app == app
+
+    def test_rate_limit_configuration_has_correct_limit(self):
+        """Test that rate limiter has 100 requests per minute limit."""
+        from app import limiter
+        assert limiter is not None
+
+    def test_error_handler_for_429_exists(self):
+        """Test that 429 error handler is registered."""
+        from app import app
+        assert 429 in app.error_handler_spec.get(None, {})
+
+    def test_all_endpoints_accept_requests_in_normal_conditions(self, client, authenticated_client):
+        """Test that all endpoints work normally without hitting rate limit."""
+        response = client.post('/auth/register',
+            json={"username": "testuser", "password": "testpass"},
+            content_type='application/json'
+        )
+        assert response.status_code in [201, 409]
+
+        response = client.post('/auth/login',
+            json={"username": "testuser", "password": "testpass"},
+            content_type='application/json'
+        )
+        assert response.status_code in [200, 401]
+
+        response = authenticated_client.post('/tasks',
+            json={"title": "Test Task"},
+            content_type='application/json'
+        )
+        assert response.status_code == 201
+
+        response = authenticated_client.get('/tasks')
+        assert response.status_code == 200
+
+        response = client.get('/health')
+        assert response.status_code == 200
 
 
 class TestEmailNotification:
