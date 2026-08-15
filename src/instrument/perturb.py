@@ -681,23 +681,25 @@ def perturbation_class_for(operator: str) -> str:
 
 
 def derive_seed(*parts: object) -> int:
-    """Derive a stable integer seed from a cell's identity fields.
+    """Derive a stable, order-independent integer seed from a cell's identity.
 
-    Unlike the builtin ``hash()`` (which is salted per-interpreter via
-    ``PYTHONHASHSEED``), this hashes the canonical string form of the parts
-    with SHA-256, so the same cell yields the same seed across processes and
-    Python versions. Callers should pass every factor that identifies a cell
-    (operator, strength, model, story, condition, repetition) so that reordering
-    or inserting cells never shifts another cell's seed — the fragility called
-    out in the audit's determinism section (``42 + run_idx`` was order-dependent).
+    The seed is a pure function of the cell's identity fields: the canonical
+    string form ``"|".join(str(p) for p in parts)`` is SHA-256-hashed and the
+    first 8 hex digits are read as an integer — i.e.
+    ``int(sha256(f"{task}|{operator}|{strength}|{repetition}")[:8], 16)``.
+
+    Because the seed ignores loop order, model, and slot position, the same
+    cell always perturbs identically — and different models receive the
+    identical perturbed prompt, so cross-model drift is attributable to the
+    model, not to the perturbation. (This replaces the order-dependent
+    ``42 + run_idx`` that the audit's determinism section flagged.)
 
     Example:
-        derive_seed("invert_constraint", 0.5, "deepseek/deepseek-v4-pro",
-                    "task_manager_api", "bad_seed", 0)
+        derive_seed(task, "invert_constraint", 0.5, 0)
     """
     canonical = "|".join(str(p) for p in parts)
-    digest = hashlib.sha256(canonical.encode("utf-8")).digest()
-    return int.from_bytes(digest[:8], "big") % (2 ** 31)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
 
 
 def perturb_prompt(

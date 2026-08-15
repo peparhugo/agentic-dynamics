@@ -9,6 +9,7 @@ Produces:
     experiments/results/{name}_comparison.md   — multi-model comparison table
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -18,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from instrument import (
-    build_operators, perturb_prompt,
+    build_operators, perturb_prompt, derive_seed,
     evaluate_solution, compute_efficiency,
     classify_strategy, measure_basin_escape,
     BasinMetrics, GameReport,
@@ -96,7 +97,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
                                    output_token_limit=output_token_limit,
                                    silent_mode=silent_mode,
                                    standardize=standardize, enforce_pytest=enforce_pytest,
-                                   backend=backend)
+                                   backend=backend, rep=rep)
                 all_runs.append(r)
                 time.sleep(2)
 
@@ -178,9 +179,14 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
                    ops, model_id, run_idx, total, timeout, exp_name="exp",
                    thinking_effort="", thinking_budget_tokens=0,
                    output_token_limit=0, silent_mode=None,
-                   standardize=True, enforce_pytest=True, backend="auto"):
+                   standardize=True, enforce_pytest=True, backend="auto",
+                   rep=0):
     pert_class = ops[op_name].perturbation_class if op_name in ops else "?"
-    perturbed, _ = perturb_prompt(task, op_name, strength=strength, rng_seed=42 + run_idx)
+    # Seed is a pure function of the cell (task|operator|strength|repetition),
+    # independent of loop order/model/run_idx — see derive_seed in perturb.py.
+    seed = derive_seed(task, op_name, strength, rep)
+    perturbed, _ = perturb_prompt(task, op_name, strength=strength, rng_seed=seed)
+    perturbed_prompt_sha256 = hashlib.sha256(perturbed.encode("utf-8")).hexdigest()
 
     print(f"[{run_idx}/{total}] {op_name} s={strength} ({pert_class})...",
           end=" ", flush=True)
@@ -243,6 +249,9 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
     return {
         "type": "perturbed", "model": model_id,
         "operator": op_name, "perturbation_class": pert_class, "strength": strength,
+        "rng_seed": seed,
+        "perturbed_prompt": perturbed,
+        "perturbed_prompt_sha256": perturbed_prompt_sha256,
         "correctness": sol.correctness_score,
         "actual_correctness": actual_correctness,
         "tests_passed": r.tests_passed,

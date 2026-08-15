@@ -39,6 +39,24 @@ despite the docstring advertising "Seed for reproducibility" (`perturb.py:703`).
 hash, e.g. `seed = stable_int(f"{operator}|{strength}|{model}|{story}|{condition}|{rep}")`, so
 the seed is invariant to cell order and to how many other cells ran.
 
+**RESOLVED — new seed contract (seed phase):** the seed is now a pure function of the cell.
+`derive_seed(*parts)` in `perturb.py` returns
+`int(sha256(f"{task}|{operator}|{strength}|{repetition}")[:8], 16)`, so the same
+`(task, operator, strength, repetition)` always yields the same seed — invariant to loop order,
+model, and `run_idx` slot. Callers updated:
+
+- `scripts/run.py` — `_run_perturbed` derives `seed = derive_seed(task, op_name, strength, rep)`
+  and persists `rng_seed`, `perturbed_prompt`, and `perturbed_prompt_sha256` into every result
+  dict, so cross-model prompt drift is verifiable after the fact. `run_idx` is retained for
+  display only.
+- `scripts/sweep_silent_mode.py` — `derive_seed(TASK, op_name, 0.5, 0)` (repetition 0, single run),
+  and `perturbed_prompt_sha256` added to each perturbed row.
+- `src/instrument/experiment.py` (deprecated) — `derive_seed(config.task, op_name, strength, rep)`.
+
+The seed intentionally excludes `model`, so every model in a `multi_model_compare` run receives the
+identical perturbed prompt — cross-model differences are attributable to the model, not the
+perturbation.
+
 ---
 
 ## 2. Operator-by-operator table
