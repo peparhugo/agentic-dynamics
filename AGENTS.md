@@ -48,7 +48,7 @@ firebase deploy --only hosting --project agentic-dynamics  # mirror site — dep
 - `firebase/CONTEXT.md` — website documentation
 - `docs/supervisor_design.md` — Control Room / supervisor subsystem (flag-only rail: observe, never steer); see also `docs/spec.md`, `docs/scope.md` for the fuller design cluster.
 
-Both `src/instrument/experiment_spec.py` and `src/instrument/compile_experiment.py` are **written** — see `src/instrument/CONTEXT.md` for the module table and the ledger's still-unmeasured fields.
+Both `src/instrument/experiment_spec.py` and `src/instrument/compile_experiment.py` are **written** — see `src/instrument/CONTEXT.md` for the module table and the ledger (the four formerly-missing fields are now measured).
 
 ## Skills (load when entering a domain)
 

@@ -34,6 +34,7 @@ from .mutation import (
     compile_mutation,
 )
 from .opencode import AgenticResult
+from .test_runner import run_suite, suite_succeeded
 
 # ── Perturbation Condition ─────────────────────────────────────
 
@@ -45,6 +46,14 @@ class PerturbationCondition(str, Enum):
     BAD_SEED = "bad_seed"  # Codebase degraded before session 1
     EARLY_DEGRADE = "early_degrade"  # Session 1 spec corrupted only
     LATE_DEGRADE = "late_degrade"  # Session 4 spec corrupted only (v1.5)
+
+
+# Canonical mutation strength for the degrading conditions (BAD_SEED / EARLY_DEGRADE /
+# LATE_DEGRADE). The strength axis is a first-class ledger field: CLEAN maps to
+# s = 0.0 (the unperturbed baseline) and every degrading condition to this value,
+# so a story result carries a numeric ``perturbation_strength``, not just the
+# categorical ``perturbation_condition`` string.
+CONDITION_STRENGTH = 0.5
 
 
 def condition_to_mutations(
@@ -89,7 +98,7 @@ def condition_to_mutations(
                 mutation_id="bad_seed_pregen",
                 operator="bad_seed",
                 operator_class="codebase",
-                strength=0.5,
+                strength=CONDITION_STRENGTH,
                 original_spec="Pre-generated bad variant",
                 codebase_patch=f"Using pre-generated variant at {bad_path}",
             ), {}
@@ -101,7 +110,7 @@ def condition_to_mutations(
         artifact = compile_mutation(
             specification=story_specs[0],
             operator="inject_false_premise",
-            strength=0.5,
+            strength=CONDITION_STRENGTH,
             model=compiler_model,
             cache_dir=cache,
         )
@@ -113,7 +122,7 @@ def condition_to_mutations(
         artifact = compile_mutation(
             specification=story_specs[3],
             operator="remove_constraint",
-            strength=0.5,
+            strength=CONDITION_STRENGTH,
             model=compiler_model,
             cache_dir=cache,
         )
@@ -219,6 +228,10 @@ class SessionResult:
     test_count: int = 0
     test_lines: int = 0
     code_lines: int = 0
+    # Instrumented ledger fields (attempt-level).
+    confidence: float | None = None  # [H] execution-confidence signal (opencode.AgenticResult.confidence)
+    answer_tokens: int = 0  # output tokens → deliverable (tool-call steps)
+    explanation_tokens: int = 0  # output tokens → prose narration
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -240,6 +253,9 @@ class SessionResult:
             "test_count": self.test_count,
             "test_lines": self.test_lines,
             "code_lines": self.code_lines,
+            "confidence": self.confidence,
+            "answer_tokens": self.answer_tokens,
+            "explanation_tokens": self.explanation_tokens,
         }
         if self.agentic:
             d["agentic"] = {
@@ -252,12 +268,15 @@ class SessionResult:
                 "prompt_tokens": self.agentic.prompt_tokens,
                 "completion_tokens": self.agentic.completion_tokens,
                 "reasoning_tokens": self.agentic.reasoning_tokens,
+                "answer_tokens": self.agentic.answer_tokens,
+                "explanation_tokens": self.agentic.explanation_tokens,
                 "total_tokens": self.agentic.total_tokens,
                 "estimated_cost_usd": self.agentic.estimated_cost_usd,
                 "cache_read_tokens": self.agentic.cache_read_tokens,
                 "cache_write_tokens": self.agentic.cache_write_tokens,
                 "context_tokens": self.agentic.context_tokens,
                 "cache_hit_rate": round(self.agentic.cache_hit_rate, 3),
+                "confidence": self.agentic.confidence,
             }
         return d
 
@@ -278,6 +297,9 @@ class StoryResult:
     worktree: str = ""
     sessions: list[SessionResult] = field(default_factory=list)
     error: str = ""
+    # Instrumented ledger fields (cell-level).
+    perturbation_strength: float = 0.0  # the numeric strength axis (0.0 = CLEAN)
+    test_executed_success: bool | None = None  # independently verified (test_runner), never self-report
 
     @property
     def total_cost(self) -> float:
@@ -385,6 +407,8 @@ class StoryResult:
             "completed_at": self.completed_at,
             "worktree": self.worktree,
             "error": self.error,
+            "perturbation_strength": self.perturbation_strength,
+            "test_executed_success": self.test_executed_success,
             "summary": {
                 "total_cost": self.total_cost,
                 "total_continuation_cost": self.total_continuation_cost,
@@ -490,6 +514,7 @@ def run_story(
         model=model,
         mutation_id="",
         perturbation_condition=condition.value,
+        perturbation_strength=0.0 if condition == PerturbationCondition.CLEAN else CONDITION_STRENGTH,
         started_at=datetime.now(timezone.utc).isoformat(),
         worktree=str(worktree),
     )
@@ -540,6 +565,17 @@ def run_story(
         result.error = str(e)
     finally:
         result.completed_at = datetime.now(timezone.utc).isoformat()
+
+    # Independently verify the story's tests against the final worktree state.
+    # ``test_executed_success`` is measured by the harness (test_runner.run_suite),
+    # never the model's self-reported tests_passed/tests_total. It runs even when a
+    # session errored — a failed story simply fails its suite — so every cell
+    # records a verified bool.
+    try:
+        suite = run_suite(worktree, result.language or "python")
+        result.test_executed_success = suite_succeeded(suite)
+    except Exception:
+        result.test_executed_success = False
 
     return result
 
@@ -748,6 +784,9 @@ def _run_session(
         test_count=test_count,
         test_lines=test_lines,
         code_lines=code_lines,
+        confidence=agentic.confidence if agentic else None,
+        answer_tokens=agentic.answer_tokens if agentic else 0,
+        explanation_tokens=agentic.explanation_tokens if agentic else 0,
     )
 
 
@@ -925,17 +964,19 @@ def load_story_result(path: Path) -> StoryResult:
         completed_at=d.get("completed_at", ""),
         worktree=d.get("worktree", ""),
         error=d.get("error", ""),
+        perturbation_strength=d.get("perturbation_strength", 0.0),
+        test_executed_success=d.get("test_executed_success"),
     )
     for s in d.get("sessions", []):
         # Rebuild AgenticResult from JSON if present
         agentic = None
         if "agentic" in s and s["agentic"]:
-            from .opencode import AgenticResult
-
             a = s["agentic"]
             agentic = AgenticResult(
                 tests_passed=a.get("tests_passed", 0),
                 tests_total=a.get("tests_total", 0),
+                answer_tokens=a.get("answer_tokens", 0),
+                explanation_tokens=a.get("explanation_tokens", 0),
             )
         result.sessions.append(
             SessionResult(
@@ -955,6 +996,9 @@ def load_story_result(path: Path) -> StoryResult:
                 subagent_cost_usd=s.get("subagent_cost_usd", 0.0),
                 subagent_sessions=s.get("subagent_sessions", 0),
                 agentic=agentic,
+                confidence=s.get("confidence"),
+                answer_tokens=s.get("answer_tokens", 0),
+                explanation_tokens=s.get("explanation_tokens", 0),
             )
         )
     return result

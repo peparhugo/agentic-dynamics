@@ -263,9 +263,10 @@ def grit(attempts: list[dict[str, Any]]) -> RuleResult:
     recovery_premium = C(successful_perturbed) / C(successful_baseline)
 
     Requires each attempt to carry ``perturbation_strength`` and ``test_executed_success``
-    (and ``cost`` for the premium). If those fields are absent — the ledger is not
-    instrumented yet — returns an explicit "unmeasured" result (NaN, uncertainty 1.0).
-    It never substitutes a proxy like "fraction of attempts completed."
+    (and ``cost`` for the premium) — both are now ledger-measured. If a specific
+    attempts list lacks those fields, it returns an explicit "unmeasured" result
+    (NaN, uncertainty 1.0). It never substitutes a proxy like "fraction of attempts
+    completed."
     """
     if not attempts or not all(
         "perturbation_strength" in a and "test_executed_success" in a for a in attempts
@@ -333,10 +334,10 @@ MEASUREMENT_RULES: dict[str, Callable[..., RuleResult]] = {
     "first_pass_quality": first_pass_quality,
     "grit": grit,
 }
-# ``grit`` is registered but *gated*: it returns an unmeasured result until the ledger
-# instruments ``perturbation_strength`` and ``test_executed_success`` (step 3). The
-# validator refuses any spec whose grit rule requires those fields before then — the
-# "instrument before measure" analogue of "measure before policy."
+# ``grit`` is re-admitted: ``perturbation_strength`` and ``test_executed_success`` are
+# now ledger-measured (LEDGER_FIELDS), so the validator accepts a spec whose grit rule
+# requires them. The evaluator still returns an unmeasured result if a concrete attempts
+# list omits the fields — it never fabricates a "completed/n" proxy.
 
 
 def evaluate_rules(

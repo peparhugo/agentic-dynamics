@@ -67,6 +67,7 @@ class PhaseResult:
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
     final_response: str = ""
+    confidence: float | None = None  # [H] execution-confidence signal (agent phases)
     # test phases
     test_executed_success: bool | None = None
     tests_passed: int = 0
@@ -89,6 +90,7 @@ class PhaseResult:
             "session_id": self.session_id,
             "files_created": self.files_created,
             "files_modified": self.files_modified,
+            "confidence": self.confidence,
             "test_executed_success": self.test_executed_success,
             "tests_passed": self.tests_passed,
             "tests_total": self.tests_total,
@@ -379,9 +381,12 @@ def run_workflow(
                     "in": getattr(ar, "prompt_tokens", 0),
                     "out": getattr(ar, "completion_tokens", 0),
                     "reasoning": getattr(ar, "reasoning_tokens", 0),
+                    "answer": getattr(ar, "answer_tokens", 0),
+                    "explanation": getattr(ar, "explanation_tokens", 0),
                     "total": getattr(ar, "total_tokens", 0),
                 }
                 pr.cost_usd = getattr(ar, "estimated_cost_usd", 0.0)
+                pr.confidence = getattr(ar, "confidence", None)
                 pr.cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
                 pr.cache_write_tokens = getattr(ar, "cache_write_tokens", 0)
                 pr.cache_hit_rate = round(getattr(ar, "cache_hit_rate", 0.0), 4)

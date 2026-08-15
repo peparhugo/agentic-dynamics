@@ -124,7 +124,7 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 | `experiment_spec.py` | **written** | Spec dataclasses + YAML loader + requires/produces validator | `ExperimentSpec`, `Workflow`, `Factor`, `RuleSpec`, `MetricSpec`, `ComparisonSpec`, `WriteupSpec`, `StopSpec`, `AdaptSpec`, `LEDGER_FIELDS`, `load_spec`, `validate_rules`, `validate_spec` |
 | `compile_experiment.py` | **written** | spec → DAG; generalizes `_gen_matrix_cells` + `simulate_strategies` | `compile_spec()`, `validate_rules()`, `RuleResult` |
 
-### The rule/ledger interface (schema written; UNMEASURED fields below are the open instrumentation gap)
+### The rule/ledger interface (schema written; the four formerly-missing fields are now MEASURED)
 
 ```
 RuleSpec(name, plane, evidence_class, requires, produces)
@@ -132,8 +132,8 @@ RuleSpec(name, plane, evidence_class, requires, produces)
   evidence_class: [M] [C] [H] [P]
 RuleResult(rule, metric, evidence_class, uncertainty, produces)
 first_pass_quality(attempts) -> RuleResult   # measurement (produces)
-grit(attempts) -> RuleResult                 # measurement — gated until strength+success exist
-model_cascade(attempts, state) -> RuleResult # control (consumes confidence)
+grit(attempts) -> RuleResult                 # measurement — admitted (strength+success measured)
+model_cascade(attempts, state) -> RuleResult # control (consumes confidence) — admitted
 
 JobRecord:    factors{model,condition,policy,seed}, policy_arm, policy_id, budget,
               due_at, forecast_cost, forecast_latency, status
@@ -141,18 +141,20 @@ AttemptRecord: attempt_number, retry_reason, escalation_from/to, model,
               queued/leased/started/first_token/ended timestamps,
               tokens{in,out,reasoning,answer,explanation}, cache_hit, tool_calls,
               completed, first_pass, accepted, evaluator_independent,
-              confidence: float | None            # ← UNMEASURED; model_cascade needs it
-              perturbation_strength: float | None # ← UNMEASURED; grit needs it (the s axis)
-              test_executed_success: bool | None  # ← UNMEASURED; grit needs it (verified success)
+              confidence: float | None            # MEASURED [H] — AgenticResult.confidence
+              perturbation_strength: float | None # MEASURED — StoryResult/run.py (s=0.0 baseline)
+              test_executed_success: bool | None  # MEASURED — test_runner.run_suite, never self-report
               cost{inference, orchestration}, rework_cost, reuse_value
 ```
 
-The `confidence` field is the concrete gap for policy: it is what the `model_cascade`/`dynamics`
-arms require and the ledger does not emit yet. `perturbation_strength` + `test_executed_success`
-are the gap for `grit` — its operational definition (basin.py) is a retention curve over
-strength conditioned on verified success, not a "completed/n" proxy. Instrument all of them
-(plus the `answer`/`explanation` token split and attempt/timestamp fields) before authoring the
-arms that consume them.
+Instrumentation step 3 is complete: `confidence` ([H] execution-confidence, derived in
+`opencode.AgenticResult.confidence` from correctness / tool-call success), `perturbation_strength`
+(first-class on `StoryResult` and `scripts/run.py` result dicts), `test_executed_success`
+(independent `test_runner.run_suite` wired into `run_story` and `run.py`), and the
+`answer`/`explanation` token split (step-granularity heuristic in `opencode._parse_session_output`).
+All four are in `LEDGER_FIELDS`, so `validate_rules` now admits the `grit` rule and the
+`model_cascade`/`dynamics` control arms. The `answer`/`explanation` split unlocks the Explanation
+Tax decomposition (silent vs verbose mode).
 
 ## Which Scripts Consume Which Modules
 

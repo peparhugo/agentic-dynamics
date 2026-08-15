@@ -45,7 +45,8 @@ ERROR: policy arm "dynamics" requires [confidence, first_pass, deadline_slack]
 
 **Consequence for implementation order — instrument `confidence` FIRST** (plus attempt/timestamp
 fields and the `answer`/`explanation` token split), then author the `model_cascade`/`dynamics`
-control arms. `confidence` is currently UNMEASURED in the ledger.
+control arms. `confidence` (and `perturbation_strength`, `test_executed_success`, the
+`answer`/`explanation` split) are now MEASURED in the ledger (instrumentation step 3 done).
 
 **Reuse map (no new transport):** `experiment_matrix` generalizes `_gen_matrix_cells`
 (`pipeline.py:394`); `experiment_run` = existing enqueue+worker+run_story; `evaluate_rules` =

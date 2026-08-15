@@ -81,8 +81,9 @@ ERROR: policy arm "dynamics" requires [confidence, first_pass, deadline_slack]
 **Consequence for implementation order: instrument `confidence` (for
 `model_cascade`/`dynamics`), `perturbation_strength` + `test_executed_success` (for
 `grit`), and attempt/timestamp fields + `answer`/`explanation` token split BEFORE
-authoring the arms that consume them.** Those fields are currently UNMEASURED — see the
-ledger below. The `answer`/`explanation` split unlocks the Explanation Tax decomposition.
+authoring the arms that consume them.** Those fields are now MEASURED (instrumentation
+step 3 done) — see the ledger below. The `answer`/`explanation` split unlocks the
+Explanation Tax decomposition.
 
 ### Reuse map (no new transport machinery)
 
@@ -175,7 +176,7 @@ first_pass_quality(attempts) -> RuleResult   # measurement (produces)
 model_cascade(attempts, state) -> RuleResult # control (consumes confidence)
 ```
 
-### Ledger (the data model rules consume) — schema WRITTEN; fields below marked UNMEASURED are the open instrumentation gap
+### Ledger (the data model rules consume) — schema WRITTEN; the four formerly-missing fields are now MEASURED
 
 ```
 JobRecord:    job_id, spec_id, workflow, factors{model,condition,policy,seed},
@@ -188,7 +189,9 @@ AttemptRecord: attempt_id, job_id, parent_attempt_id, attempt_number, retry_reas
               tokens{in,out,reasoning,answer,explanation}, cache_hit, tool_calls,
               queue_wait_ms, service_time_ms, completed, first_pass, accepted,
               evaluator_independent,
-              confidence: float | None   # ← UNMEASURED TODAY; model_cascade needs it
+              confidence: float | None            # MEASURED [H] — AgenticResult.confidence
+              perturbation_strength: float | None # MEASURED — StoryResult / run.py
+              test_executed_success: bool | None  # MEASURED — test_runner.run_suite
               cost{inference, orchestration}, rework_cost, reuse_value
 ```
 

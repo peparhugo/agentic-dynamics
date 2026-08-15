@@ -23,8 +23,10 @@ from instrument import (
     classify_strategy, measure_basin_escape,
     BasinMetrics, GameReport,
     detect_constraints,
+    run_suite, suite_succeeded,
 )
 from instrument.backends import run_agentic
+from instrument.language import detect_language
 
 
 def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
@@ -161,6 +163,9 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
     return {
         "type": "baseline", "model": model_id,
         "operator": "baseline", "perturbation_class": "baseline",
+        "strength": 0.0,
+        "perturbation_strength": 0.0,
+        "test_executed_success": _verify_tests(r.workdir),
         "correctness": sol.correctness_score,
         "constraints_met": sol.constraints_met,
         "constraints_total": sol.constraints_total,
@@ -171,6 +176,9 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
         "prompt_tokens": r.prompt_tokens,
         "completion_tokens": r.completion_tokens,
         "reasoning_tokens": r.reasoning_tokens,
+        "answer_tokens": r.answer_tokens,
+        "explanation_tokens": r.explanation_tokens,
+        "confidence": r.confidence,
         "thinking_ratio": eff.thinking_ratio,
         "cost_usd": r.estimated_cost_usd,
         "energy_j": eff.total_energy_j,
@@ -264,6 +272,7 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
     return {
         "type": "perturbed", "model": model_id,
         "operator": op_name, "perturbation_class": pert_class, "strength": strength,
+        "perturbation_strength": strength,
         "seed_variant": seed_variant,
         "repetition": rep,
         "perturbation_mode": perturbation_mode,
@@ -274,6 +283,7 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
         "actual_correctness": actual_correctness,
         "tests_passed": r.tests_passed,
         "tests_total": r.tests_total,
+        "test_executed_success": _verify_tests(r.workdir),
         "constraints_met": sol.constraints_met,
         "constraints_total": sol.constraints_total,
         "lines_of_code": sol.lines_of_code,
@@ -285,6 +295,9 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
         "prompt_tokens": r.prompt_tokens,
         "completion_tokens": r.completion_tokens,
         "reasoning_tokens": r.reasoning_tokens,
+        "answer_tokens": r.answer_tokens,
+        "explanation_tokens": r.explanation_tokens,
+        "confidence": r.confidence,
         "thinking_ratio": eff.thinking_ratio,
         "cost_usd": r.estimated_cost_usd,
         "energy_j": eff.total_energy_j,
@@ -487,6 +500,24 @@ def multi_model_compare(config_path, model_ids, timeout=200):
 _SOURCE_EXTS = {'.py', '.js', '.ts', '.tsx', '.jsx', '.go', '.rs', '.java', '.rb',
                 '.json', '.yaml', '.yml', '.toml', '.proto', '.prisma', '.sql',
                 '.css', '.scss', '.html', '.hbs', '.md', '.mjs', '.cjs'}
+
+
+def _verify_tests(workdir: str) -> bool | None:
+    """Run the independent test suite against a completed run's workdir.
+
+    ``test_executed_success`` is measured by the harness (``test_runner.run_suite``),
+    never the model's self-reported ``tests_passed``/``tests_total``. Returns the
+    verified bool, or ``None`` when the workdir is missing/unrunnable (no signal).
+    """
+    try:
+        if not workdir or not os.path.isdir(workdir):
+            return None
+        profile = detect_language(Path(workdir))
+        language = profile.name if profile else "python"
+        suite = run_suite(Path(workdir), language)
+        return suite_succeeded(suite)
+    except Exception:
+        return None
 
 def _collect_code(result) -> dict[str, str] | None:
     """Collect code file contents from an AgenticResult's workdir."""

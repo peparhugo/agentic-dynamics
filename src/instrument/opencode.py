@@ -73,6 +73,14 @@ class AgenticResult:
     reasoning_tokens: int = 0
     total_tokens: int = 0
 
+    # Token split — the completion/output stream is partitioned into the "answer"
+    # (tokens spent writing the deliverable via tool calls) and "explanation"
+    # (tokens spent on prose narration). This is the decomposition the
+    # Explanation Tax (silent vs verbose mode) needs. Invariant:
+    # answer_tokens + explanation_tokens == completion_tokens.
+    answer_tokens: int = 0
+    explanation_tokens: int = 0
+
     # Cache (context tokens not re-sent to provider — "free" reads)
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
@@ -99,6 +107,34 @@ class AgenticResult:
         if self.tests_total == 0:
             return 0.0
         return self.tests_passed / self.tests_total
+
+    @property
+    def confidence(self) -> float | None:
+        """Per-attempt execution-confidence signal, tagged [H].
+
+        Derivation (documented heuristic — NOT the model's self-reported pass/fail):
+          1. If the session errored (non-empty ``error``), confidence is 0.0.
+          2. Else if any tests ran, confidence is measured correctness
+             (``tests_passed / tests_total``) — an outcome-grounded signal.
+          3. Else confidence is the tool-call success fraction
+             (``1 - error_count / total_tool_calls``) — did the agent's actions
+             succeed without retry/error churn?
+          4. With no signal at all (no error, no tests, no tool calls), ``None``.
+
+        This is the ``confidence`` the ``model_cascade``/``dynamics`` control arms
+        consume. It tracks *outcome* (correctness / action success), not narration:
+        a model that narrates "I'm confident" while failing tests gets 0.0. A
+        property (not a stored field) so it always reflects the final run state —
+        ``error`` is assigned after the transcript is parsed.
+        """
+        if self.error:
+            return 0.0
+        if self.tests_total > 0:
+            return round(self.tests_passed / self.tests_total, 4)
+        if self.total_tool_calls > 0:
+            ok_calls = max(self.total_tool_calls - self.error_count, 0)
+            return round(ok_calls / self.total_tool_calls, 4)
+        return None
 
     @property
     def text(self) -> str:
@@ -440,6 +476,9 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
     retry_count = 0
     last_was_error = False
     _step_costs: list[float] = []
+    # Whether the current step produced tool calls (wrote/edited the deliverable)
+    # vs was prose-only. Drives the answer/explanation token split at step_finish.
+    step_has_tool = False
 
     for line in stdout.splitlines():
         line = line.strip()
@@ -461,6 +500,7 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
 
         # Tool calls
         if etype == "tool_use":
+            step_has_tool = True
             tool_name = part.get("tool", "")
             state = part.get("state", {})
             if not isinstance(state, dict):
@@ -498,6 +538,11 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
         elif etype in ("tool_result", "step_follow"):
             current_depth = max(0, current_depth - 1)
 
+        # Step boundary — reset the answer/explanation attribution flag. A fresh
+        # step starts with no tool activity; the next tool_use (if any) re-marks it.
+        elif etype == "step_start":
+            step_has_tool = False
+
         # Model text response
         elif etype == "text":
             text_content = part.get("text", "")
@@ -508,11 +553,24 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
         elif etype == "step_finish":
             current_depth = max(0, current_depth - 1)
             tokens = part.get("tokens", {})
+            # Capture and reset the step's answer/explanation flag before the token
+            # dict is read, so a missing tokens dict can't leak the flag into the
+            # next step's attribution.
+            was_tool_step = step_has_tool
+            step_has_tool = False
             if isinstance(tokens, dict):
                 # Token counts are per-step deltas, sum across steps
                 result.prompt_tokens += tokens.get("input", 0) or 0
                 result.completion_tokens += tokens.get("output", 0) or 0
                 result.reasoning_tokens += tokens.get("reasoning", 0) or 0
+                # Answer/explanation split [H]: a step that wrote code (tool calls)
+                # is counted as "answer"; a prose-only step is "explanation". This
+                # is a step-granularity heuristic, not a per-token attribution.
+                out_tokens = tokens.get("output", 0) or 0
+                if was_tool_step:
+                    result.answer_tokens += out_tokens
+                else:
+                    result.explanation_tokens += out_tokens
                 cache = tokens.get("cache", {})
                 if isinstance(cache, dict):
                     result.cache_read_tokens += cache.get("read", 0) or 0
