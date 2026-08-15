@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { run } from '../src/cli';
+import { createCli, run } from '../src/cli';
 
 function makeTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -73,5 +73,22 @@ Hello from the CLI test.
     } finally {
       fs.rmSync(templatesDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('ssg serve CLI', () => {
+  it('registers a serve command with content, output, templates, and port options', () => {
+    const program = createCli();
+    const serveCommand = program.commands.find((cmd) => cmd.name() === 'serve');
+
+    expect(serveCommand).toBeDefined();
+
+    const optionFlags = serveCommand!.options.map((opt) => opt.long);
+    expect(optionFlags).toEqual(
+      expect.arrayContaining(['--content', '--output', '--templates', '--port'])
+    );
+
+    const portOption = serveCommand!.options.find((opt) => opt.long === '--port');
+    expect(portOption?.defaultValue).toBe('3000');
   });
 });

@@ -1,5 +1,7 @@
 export { build } from './generator';
 export type { BuildOptions, BuildResult } from './generator';
+export { serve } from './serve';
+export type { ServeOptions, ServeHandle } from './serve';
 export { parseFrontmatter } from './frontmatter';
 export type { FrontmatterData, ParsedMarkdown } from './frontmatter';
 export { renderMarkdown, renderIndexBodyHtml } from './render';
