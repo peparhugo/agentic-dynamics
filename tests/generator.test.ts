@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildSite, parseYamlFrontmatter } from '../src/generator';
+import { Plugin } from '../src/plugin';
 
 describe('static site generator', () => {
   let directory: string;
@@ -63,5 +64,38 @@ describe('static site generator', () => {
     await buildSite({ contentDir: content, outputDir: output, templateDir: templates });
 
     expect(await readFile(join(output, 'page.html'), 'utf8')).toContain('<shell><main>Defaulted <article>');
+  });
+
+  it('runs plugin hooks in order around every page', async () => {
+    const content = join(directory, 'content');
+    const output = join(directory, 'public');
+    const calls: string[] = [];
+    const plugin: Plugin = {
+      onStart: () => calls.push('start'),
+      beforeBuild: () => calls.push('before'),
+      onFile: (page) => { calls.push(`file:${page.title}`); page.title = 'Changed'; },
+      afterBuild: () => calls.push('after'),
+      onEnd: () => calls.push('end'),
+    };
+    await mkdir(content, { recursive: true });
+    await writeFile(join(content, 'page.md'), '---\ntitle: Original\n---\nBody');
+
+    await buildSite({ contentDir: content, outputDir: output, plugins: [plugin] });
+
+    expect(calls).toEqual(['start', 'before', 'file:Original', 'after', 'end']);
+    expect(await readFile(join(output, 'page.html'), 'utf8')).toContain('<h1>Changed</h1>');
+  });
+
+  it('loads plugins from a TypeScript config file', async () => {
+    const content = join(directory, 'content');
+    const output = join(directory, 'public');
+    const config = join(directory, 'ssg.config.ts');
+    await mkdir(content, { recursive: true });
+    await writeFile(join(content, 'page.md'), '---\ntitle: Original\n---\nBody');
+    await writeFile(config, 'export default { plugins: [{ onFile(page: { title: string }) { page.title = "Configured"; } }] };');
+
+    await buildSite({ contentDir: content, outputDir: output, configFile: config });
+
+    expect(await readFile(join(output, 'page.html'), 'utf8')).toContain('<h1>Configured</h1>');
   });
 });
