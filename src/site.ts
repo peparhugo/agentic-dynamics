@@ -1,11 +1,16 @@
 import fs from 'fs';
 import path from 'path';
 
+import matter from 'gray-matter';
+
+import { CachedPage, CacheManifest, defaultCacheFile, loadManifest, saveManifest } from './cache';
 import { loadPlugins } from './config';
+import { hashString } from './hash';
 import { Page, Plugin } from './plugin';
 import { MarkdownPlugin } from './plugins/markdown-plugin';
 import { TemplatePlugin } from './plugins/template-plugin';
 import { renderIndex } from './render';
+import { templateFingerprint } from './templates';
 import { Post } from './types';
 
 export interface BuildOptions {
@@ -16,12 +21,28 @@ export interface BuildOptions {
   plugins?: Plugin[];
   /** Directory searched for `ssg.config.ts`. Defaults to `process.cwd()`. */
   configDir?: string;
+  /** Rebuild only pages whose source or template changed. */
+  incremental?: boolean;
+  /** Ignore any existing cache and force a full rebuild. */
+  clean?: boolean;
+  /** Override the location of the `.ssg-cache.json` manifest. */
+  cacheFile?: string;
+}
+
+export interface BuildStats {
+  /** Number of pages that ran the full plugin pipeline. */
+  pagesBuilt: number;
+  /** Number of pages reused from the cache. */
+  pagesSkipped: number;
+  /** Estimated time saved by skipping unchanged pages, in milliseconds. */
+  timeSavedMs: number;
 }
 
 export interface BuildResult {
   posts: Post[];
   filesWritten: string[];
   outputDir: string;
+  stats?: BuildStats;
 }
 
 function listMarkdownFiles(dir: string): string[] {
@@ -109,6 +130,9 @@ export function buildSite(options: BuildOptions): BuildResult {
   const { contentDir, outputDir } = options;
   const templatesDir = options.templatesDir ?? path.join(process.cwd(), 'templates');
   const configDir = options.configDir ?? process.cwd();
+  const incremental = options.incremental ?? false;
+  const clean = options.clean ?? false;
+  const cacheFile = options.cacheFile ?? defaultCacheFile(outputDir);
 
   const plugins: Plugin[] = [
     new MarkdownPlugin(),
@@ -121,10 +145,58 @@ export function buildSite(options: BuildOptions): BuildResult {
   runHooksSync(plugins, 'beforeBuild');
 
   const markdownFiles = listMarkdownFiles(contentDir);
-  const pages: Page[] = markdownFiles.map((filePath) => {
+
+  let manifest: CacheManifest = { version: 1, pages: {} };
+  if (incremental && !clean) {
+    manifest = loadManifest(cacheFile);
+  } else if (clean && fs.existsSync(cacheFile)) {
+    fs.rmSync(cacheFile, { force: true });
+  }
+
+  const pages: Page[] = [];
+  const nextManifest: CacheManifest = { version: 1, pages: {} };
+  let pagesBuilt = 0;
+  let pagesSkipped = 0;
+  let builtTimeMs = 0;
+
+  for (const filePath of markdownFiles) {
     const slug = slugForFile(filePath, contentDir);
     const source = fs.readFileSync(filePath, 'utf-8');
-    return {
+    const sourceHash = hashString(source);
+
+    // Determine the template fingerprint. Only the template name needs to be
+    // read from the frontmatter; the full Markdown parse is deferred.
+    const { data } = matter(source);
+    const templateName =
+      typeof data.template === 'string' && data.template.trim().length > 0
+        ? data.template.trim()
+        : undefined;
+    const templateHash = templateFingerprint(templatesDir, templateName);
+
+    const cached = manifest.pages[slug];
+    if (
+      incremental &&
+      cached &&
+      cached.sourceHash === sourceHash &&
+      cached.templateHash === templateHash
+    ) {
+      pagesSkipped += 1;
+      pages.push({
+        slug,
+        title: cached.title,
+        date: cached.date,
+        tags: cached.tags,
+        template: cached.template,
+        content: cached.content,
+        html: cached.html,
+        rendered: cached.rendered,
+      });
+      nextManifest.pages[slug] = cached;
+      continue;
+    }
+
+    const started = Date.now();
+    const page: Page = {
       slug,
       title: '',
       date: undefined,
@@ -133,10 +205,24 @@ export function buildSite(options: BuildOptions): BuildResult {
       content: source,
       html: '',
     };
-  });
-
-  for (const page of pages) {
     runFileHooksSync(plugins, page);
+    builtTimeMs += Date.now() - started;
+    pagesBuilt += 1;
+
+    const entry: CachedPage = {
+      slug,
+      sourceHash,
+      templateHash,
+      title: page.title,
+      date: page.date,
+      tags: page.tags,
+      template: page.template,
+      content: page.content,
+      html: page.html,
+      rendered: page.rendered ?? '',
+    };
+    nextManifest.pages[slug] = entry;
+    pages.push(page);
   }
 
   sortPosts(pages);
@@ -159,6 +245,8 @@ export function buildSite(options: BuildOptions): BuildResult {
   runHooksSync(plugins, 'afterBuild');
   runHooksSync(plugins, 'onEnd');
 
+  saveManifest(cacheFile, nextManifest);
+
   const posts: Post[] = pages.map((page) => ({
     slug: page.slug,
     title: page.title,
@@ -169,5 +257,13 @@ export function buildSite(options: BuildOptions): BuildResult {
     html: page.html,
   }));
 
-  return { posts, filesWritten, outputDir };
+  const timeSavedMs =
+    pagesBuilt > 0 ? Math.round((builtTimeMs / pagesBuilt) * pagesSkipped) : 0;
+
+  return {
+    posts,
+    filesWritten,
+    outputDir,
+    stats: { pagesBuilt, pagesSkipped, timeSavedMs },
+  };
 }

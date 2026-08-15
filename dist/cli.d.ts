@@ -7,6 +7,8 @@ export interface CliOptions {
     output?: string;
     templates?: string;
     port?: number;
+    incremental?: boolean;
+    clean?: boolean;
 }
 export declare function parseArgs(argv: string[]): CliOptions;
 export declare function run(argv: string[]): BuildResult | Promise<ServeHandle>;

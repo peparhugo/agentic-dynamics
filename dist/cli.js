@@ -38,6 +38,12 @@ function parseArgs(argv) {
         else if (arg.startsWith('--port=')) {
             options.port = Number(arg.slice('--port='.length));
         }
+        else if (arg === '--incremental') {
+            options.incremental = true;
+        }
+        else if (arg === '--clean') {
+            options.clean = true;
+        }
         else if (!arg.startsWith('-')) {
             options.command = arg;
         }
@@ -64,6 +70,8 @@ function run(argv) {
         contentDir: options.content || './content',
         outputDir: options.output || './dist',
         templatesDir: options.templates,
+        incremental: options.incremental,
+        clean: options.clean,
     });
 }
 function main(argv = process.argv) {
@@ -90,8 +98,16 @@ function main(argv = process.argv) {
         contentDir: options.content || './content',
         outputDir: options.output || './dist',
         templatesDir: options.templates,
+        incremental: options.incremental,
+        clean: options.clean,
     });
-    console.log(`Built ${result.posts.length} page(s) into ${options.output || './dist'}`);
+    const output = options.output || './dist';
+    const stats = result.stats ?? {
+        pagesBuilt: result.posts.length,
+        pagesSkipped: 0,
+        timeSavedMs: 0,
+    };
+    console.log(`Built ${stats.pagesBuilt} page(s), skipped ${stats.pagesSkipped}, saved ${stats.timeSavedMs}ms into ${output}`);
 }
 if (require.main === module) {
     main();

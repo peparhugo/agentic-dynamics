@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import Handlebars from 'handlebars';
 
+import { hashFile, hashString } from './hash';
+
 export interface PageContext {
   title: string;
   date?: string;
@@ -39,12 +41,54 @@ function templateName(filePath: string, rootDir: string): string {
   return withoutExtension.split(path.sep).join('/');
 }
 
-function normalizeTemplateName(name: string): string {
+export function normalizeTemplateName(name: string): string {
   let normalized = name.trim();
   normalized = normalized.replace(/^\.?\//, '');
   normalized = normalized.replace(/^layouts\//, '');
   normalized = normalized.replace(/\.hbs$/i, '');
   return normalized.split(/[\\/]/).join('/');
+}
+
+/**
+ * Computes a stable fingerprint for the template output a page resolves to.
+ *
+ * It hashes the resolved layout file (honouring the page's `template` name and
+ * the `default` fallback) plus every registered partial. This mirrors the
+ * resolution performed by {@link TemplateEngine.render} so the fingerprint only
+ * changes when the actual rendered template would change.
+ */
+export function templateFingerprint(templatesDir: string, requestedTemplate: string | undefined): string {
+  const parts: string[] = [];
+
+  const layoutsDir = path.join(templatesDir, LAYOUTS_DIR);
+  const layoutFiles = listTemplateFiles(layoutsDir);
+
+  const candidates: string[] = [];
+  if (requestedTemplate) {
+    candidates.push(normalizeTemplateName(requestedTemplate));
+  }
+  candidates.push(DEFAULT_LAYOUT);
+
+  let matched = false;
+  for (const name of candidates) {
+    const file = layoutFiles.find((candidate) => templateName(candidate, layoutsDir) === name);
+    if (file) {
+      parts.push(`layout:${name}:${hashFile(file)}`);
+      matched = true;
+      break;
+    }
+  }
+
+  // Partials only affect output when a layout is actually rendered; the
+  // built-in fallback renderer ignores them.
+  if (matched) {
+    const partialsDir = path.join(templatesDir, PARTIALS_DIR);
+    for (const file of listTemplateFiles(partialsDir)) {
+      parts.push(`partial:${templateName(file, partialsDir)}:${hashFile(file)}`);
+    }
+  }
+
+  return hashString(parts.join('\n'));
 }
 
 /**

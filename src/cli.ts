@@ -8,6 +8,8 @@ export interface CliOptions {
   output?: string;
   templates?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -35,6 +37,10 @@ export function parseArgs(argv: string[]): CliOptions {
       options.templates = arg.slice('--templates='.length);
     } else if (arg.startsWith('--port=')) {
       options.port = Number(arg.slice('--port='.length));
+    } else if (arg === '--incremental') {
+      options.incremental = true;
+    } else if (arg === '--clean') {
+      options.clean = true;
     } else if (!arg.startsWith('-')) {
       options.command = arg;
     }
@@ -64,6 +70,8 @@ export function run(argv: string[]): BuildResult | Promise<ServeHandle> {
     contentDir: options.content || './content',
     outputDir: options.output || './dist',
     templatesDir: options.templates,
+    incremental: options.incremental,
+    clean: options.clean,
   });
 }
 
@@ -91,8 +99,18 @@ export function main(argv: string[] = process.argv): void {
     contentDir: options.content || './content',
     outputDir: options.output || './dist',
     templatesDir: options.templates,
+    incremental: options.incremental,
+    clean: options.clean,
   });
-  console.log(`Built ${result.posts.length} page(s) into ${options.output || './dist'}`);
+  const output = options.output || './dist';
+  const stats = result.stats ?? {
+    pagesBuilt: result.posts.length,
+    pagesSkipped: 0,
+    timeSavedMs: 0,
+  };
+  console.log(
+    `Built ${stats.pagesBuilt} page(s), skipped ${stats.pagesSkipped}, saved ${stats.timeSavedMs}ms into ${output}`,
+  );
 }
 
 if (require.main === module) {

@@ -7,6 +7,16 @@ export interface PageContext {
     body: string;
     [key: string]: unknown;
 }
+export declare function normalizeTemplateName(name: string): string;
+/**
+ * Computes a stable fingerprint for the template output a page resolves to.
+ *
+ * It hashes the resolved layout file (honouring the page's `template` name and
+ * the `default` fallback) plus every registered partial. This mirrors the
+ * resolution performed by {@link TemplateEngine.render} so the fingerprint only
+ * changes when the actual rendered template would change.
+ */
+export declare function templateFingerprint(templatesDir: string, requestedTemplate: string | undefined): string;
 /**
  * A Handlebars-based template engine scoped to a single `templates` directory.
  *

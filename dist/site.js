@@ -6,10 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildSite = buildSite;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const gray_matter_1 = __importDefault(require("gray-matter"));
+const cache_1 = require("./cache");
 const config_1 = require("./config");
+const hash_1 = require("./hash");
 const markdown_plugin_1 = require("./plugins/markdown-plugin");
 const template_plugin_1 = require("./plugins/template-plugin");
 const render_1 = require("./render");
+const templates_1 = require("./templates");
 function listMarkdownFiles(dir) {
     const files = [];
     if (!fs_1.default.existsSync(dir)) {
@@ -85,6 +89,9 @@ function buildSite(options) {
     const { contentDir, outputDir } = options;
     const templatesDir = options.templatesDir ?? path_1.default.join(process.cwd(), 'templates');
     const configDir = options.configDir ?? process.cwd();
+    const incremental = options.incremental ?? false;
+    const clean = options.clean ?? false;
+    const cacheFile = options.cacheFile ?? (0, cache_1.defaultCacheFile)(outputDir);
     const plugins = [
         new markdown_plugin_1.MarkdownPlugin(),
         new template_plugin_1.TemplatePlugin(templatesDir),
@@ -94,10 +101,50 @@ function buildSite(options) {
     runHooksSync(plugins, 'onStart');
     runHooksSync(plugins, 'beforeBuild');
     const markdownFiles = listMarkdownFiles(contentDir);
-    const pages = markdownFiles.map((filePath) => {
+    let manifest = { version: 1, pages: {} };
+    if (incremental && !clean) {
+        manifest = (0, cache_1.loadManifest)(cacheFile);
+    }
+    else if (clean && fs_1.default.existsSync(cacheFile)) {
+        fs_1.default.rmSync(cacheFile, { force: true });
+    }
+    const pages = [];
+    const nextManifest = { version: 1, pages: {} };
+    let pagesBuilt = 0;
+    let pagesSkipped = 0;
+    let builtTimeMs = 0;
+    for (const filePath of markdownFiles) {
         const slug = slugForFile(filePath, contentDir);
         const source = fs_1.default.readFileSync(filePath, 'utf-8');
-        return {
+        const sourceHash = (0, hash_1.hashString)(source);
+        // Determine the template fingerprint. Only the template name needs to be
+        // read from the frontmatter; the full Markdown parse is deferred.
+        const { data } = (0, gray_matter_1.default)(source);
+        const templateName = typeof data.template === 'string' && data.template.trim().length > 0
+            ? data.template.trim()
+            : undefined;
+        const templateHash = (0, templates_1.templateFingerprint)(templatesDir, templateName);
+        const cached = manifest.pages[slug];
+        if (incremental &&
+            cached &&
+            cached.sourceHash === sourceHash &&
+            cached.templateHash === templateHash) {
+            pagesSkipped += 1;
+            pages.push({
+                slug,
+                title: cached.title,
+                date: cached.date,
+                tags: cached.tags,
+                template: cached.template,
+                content: cached.content,
+                html: cached.html,
+                rendered: cached.rendered,
+            });
+            nextManifest.pages[slug] = cached;
+            continue;
+        }
+        const started = Date.now();
+        const page = {
             slug,
             title: '',
             date: undefined,
@@ -106,9 +153,23 @@ function buildSite(options) {
             content: source,
             html: '',
         };
-    });
-    for (const page of pages) {
         runFileHooksSync(plugins, page);
+        builtTimeMs += Date.now() - started;
+        pagesBuilt += 1;
+        const entry = {
+            slug,
+            sourceHash,
+            templateHash,
+            title: page.title,
+            date: page.date,
+            tags: page.tags,
+            template: page.template,
+            content: page.content,
+            html: page.html,
+            rendered: page.rendered ?? '',
+        };
+        nextManifest.pages[slug] = entry;
+        pages.push(page);
     }
     sortPosts(pages);
     fs_1.default.mkdirSync(outputDir, { recursive: true });
@@ -124,6 +185,7 @@ function buildSite(options) {
     }
     runHooksSync(plugins, 'afterBuild');
     runHooksSync(plugins, 'onEnd');
+    (0, cache_1.saveManifest)(cacheFile, nextManifest);
     const posts = pages.map((page) => ({
         slug: page.slug,
         title: page.title,
@@ -133,5 +195,11 @@ function buildSite(options) {
         content: page.content,
         html: page.html,
     }));
-    return { posts, filesWritten, outputDir };
+    const timeSavedMs = pagesBuilt > 0 ? Math.round((builtTimeMs / pagesBuilt) * pagesSkipped) : 0;
+    return {
+        posts,
+        filesWritten,
+        outputDir,
+        stats: { pagesBuilt, pagesSkipped, timeSavedMs },
+    };
 }
