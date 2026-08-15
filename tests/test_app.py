@@ -4,6 +4,7 @@ import os
 import sqlite3
 import tempfile
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 from app import app, init_db, DATABASE
 
 
@@ -36,7 +37,7 @@ def auth_user(client):
     """Register and return auth token for a test user."""
     response = client.post(
         "/auth/register",
-        json={"username": "testuser", "password": "testpass"},
+        json={"username": "testuser", "password": "testpass", "email": "testuser@example.com"},
         content_type="application/json",
     )
     assert response.status_code == 201
@@ -723,6 +724,170 @@ class TestDataPersistence:
         )
         data = response.get_json()
         assert data["status"] == "pending"
+
+
+class TestNotificationSystem:
+    @patch("app.send_task_notification_email")
+    def test_notification_sent_when_status_changes_to_done(self, mock_send_notification, client, auth_user, sample_task):
+        task_id = sample_task["id"]
+
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "done"},
+            content_type="application/json",
+            headers=auth_user["headers"],
+        )
+
+        assert response.status_code == 200
+        # Verify the task was updated to done
+        data = response.get_json()
+        assert data["status"] == "done"
+
+        # Verify notification was sent
+        mock_send_notification.assert_called_once_with("testuser@example.com", "Test Task")
+
+    @patch("app.send_task_notification_email")
+    def test_notification_sent_with_user_email(self, mock_send_notification, client):
+        # Register user with email
+        register_response = client.post(
+            "/auth/register",
+            json={"username": "emailuser", "password": "testpass", "email": "user@example.com"},
+            content_type="application/json",
+        )
+        assert register_response.status_code == 201
+
+        # Login
+        login_response = client.post(
+            "/auth/login",
+            json={"username": "emailuser", "password": "testpass"},
+            content_type="application/json",
+        )
+        token = login_response.get_json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Create task
+        task_response = client.post(
+            "/tasks",
+            json={"title": "Important Task"},
+            content_type="application/json",
+            headers=headers,
+        )
+        task_id = task_response.get_json()["id"]
+
+        # Update status to done
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "done"},
+            content_type="application/json",
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+
+        # Verify notification was sent with correct arguments
+        mock_send_notification.assert_called_once_with("user@example.com", "Important Task")
+
+    @patch("app.send_task_notification_email")
+    def test_notification_not_sent_when_status_not_changed(self, mock_send_notification, client, auth_user, sample_task):
+        task_id = sample_task["id"]
+
+        # Update to done first time
+        response1 = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "done"},
+            content_type="application/json",
+            headers=auth_user["headers"],
+        )
+        assert response1.status_code == 200
+        assert mock_send_notification.call_count == 1
+
+        # Update again to done (no status change)
+        mock_send_notification.reset_mock()
+        response2 = client.put(
+            f"/tasks/{task_id}",
+            json={"title": "New Title"},
+            content_type="application/json",
+            headers=auth_user["headers"],
+        )
+        assert response2.status_code == 200
+        # Should not send notification since status didn't change
+        mock_send_notification.assert_not_called()
+
+    @patch("app.send_task_notification_email")
+    def test_notification_not_sent_when_changing_back_from_done(self, mock_send_notification, client, auth_user, sample_task):
+        task_id = sample_task["id"]
+
+        # Update to done
+        response1 = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "done"},
+            content_type="application/json",
+            headers=auth_user["headers"],
+        )
+        assert response1.status_code == 200
+
+        # Reset mock for next assertion
+        mock_send_notification.reset_mock()
+
+        # Change back to pending
+        response2 = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "pending"},
+            content_type="application/json",
+            headers=auth_user["headers"],
+        )
+        assert response2.status_code == 200
+        # Should not send notification
+        mock_send_notification.assert_not_called()
+
+    @patch("app.send_task_notification_email")
+    def test_notification_only_sent_once_per_transition(self, mock_send_notification, client):
+        # Register user with email
+        register_response = client.post(
+            "/auth/register",
+            json={"username": "testuser1", "password": "pass", "email": "test@example.com"},
+            content_type="application/json",
+        )
+        user_id = register_response.get_json()["id"]
+
+        login_response = client.post(
+            "/auth/login",
+            json={"username": "testuser1", "password": "pass"},
+            content_type="application/json",
+        )
+        token = login_response.get_json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Create task
+        task_response = client.post(
+            "/tasks",
+            json={"title": "Test Task"},
+            content_type="application/json",
+            headers=headers,
+        )
+        task_id = task_response.get_json()["id"]
+
+        # First update to done
+        response1 = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "done"},
+            content_type="application/json",
+            headers=headers,
+        )
+        assert response1.status_code == 200
+        call_count_after_first = mock_send_notification.call_count
+        assert call_count_after_first == 1
+
+        # Second update to done (no change)
+        response2 = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "done"},
+            content_type="application/json",
+            headers=headers,
+        )
+        assert response2.status_code == 200
+        # Call count should still be 1
+        assert mock_send_notification.call_count == call_count_after_first
 
 
 if __name__ == "__main__":

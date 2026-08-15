@@ -18,6 +18,14 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
+# Initialize Celery for async tasks
+celery_app = None
+try:
+    from celery_tasks import celery_app as _celery_app
+    celery_app = _celery_app
+except Exception:
+    pass
+
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
@@ -31,7 +39,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT UNIQUE NOT NULL,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -49,7 +58,7 @@ def init_db():
 
 # ── Auth Models ───────────────────────────────────────────────
 
-def register_user(username: str, password: str) -> dict | tuple:
+def register_user(username: str, password: str, email: str | None = None) -> dict | tuple:
     """Register a new user. Returns user dict or (error, message) tuple."""
     if not username or not password:
         return ("validation_error", "username and password required")
@@ -57,13 +66,14 @@ def register_user(username: str, password: str) -> dict | tuple:
         try:
             password_hash = generate_password_hash(password)
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
             return {
                 "id": cursor.lastrowid,
                 "username": username,
+                "email": email,
             }
         except sqlite3.IntegrityError:
             return ("conflict_error", "username already exists")
@@ -77,7 +87,11 @@ def authenticate_user(username: str, password: str) -> dict | None:
             (username,),
         ).fetchone()
         if row and check_password_hash(row["password_hash"], password):
-            return {"id": row["id"], "username": row["username"]}
+            try:
+                email = row["email"]
+            except IndexError:
+                email = None
+            return {"id": row["id"], "username": row["username"], "email": email}
     return None
 
 
@@ -156,6 +170,26 @@ def get_task(task_id: int, owner_id: int) -> dict | None:
         return dict(row) if row else None
 
 
+def get_user_email(user_id: int) -> str | None:
+    """Get user email by user_id."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT email FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        return row["email"] if row else None
+
+
+def send_task_notification_email(user_email: str, task_title: str):
+    """Send async email notification via Celery."""
+    if celery_app is not None:
+        celery_app.send_task(
+            "celery_tasks.send_notification_email",
+            args=(user_email, task_title),
+            queue="notifications"
+        )
+
+
 def is_valid_status(status: str) -> bool:
     return status in ("pending", "done")
 
@@ -181,7 +215,15 @@ def update_task(task_id: int, owner_id: int, title: str | None = None, status: s
                 f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
             )
             conn.commit()
-    return get_task(task_id, owner_id)
+    updated_task = get_task(task_id, owner_id)
+
+    # Trigger email notification if status changed to "done"
+    if status == "done" and task.get("status") != "done":
+        user_email = get_user_email(owner_id)
+        if user_email:
+            send_task_notification_email(user_email, task.get("title"))
+
+    return updated_task
 
 
 # ── Routes ─────────────────────────────────────────────────────
@@ -191,9 +233,10 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
+    email = data.get("email", "").strip() if data.get("email") else None
     if not username or not password:
         return jsonify({"error": "username and password required"}), 400
-    result = register_user(username, password)
+    result = register_user(username, password, email)
     if isinstance(result, tuple):
         error_type, message = result
         if error_type == "conflict_error":
