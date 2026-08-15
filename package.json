@@ -2,9 +2,9 @@
   "name": "ssg",
   "version": "1.0.0",
   "description": "A static site generator CLI built with TypeScript",
-  "main": "dist/ssg.js",
+  "main": "dist/src/index.js",
   "bin": {
-    "ssg": "dist/cli.entry.js"
+    "ssg": "dist/src/cli.entry.js"
   },
   "files": [
     "dist"

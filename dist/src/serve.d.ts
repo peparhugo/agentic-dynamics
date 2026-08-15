@@ -1,24 +1,16 @@
 import type { Server } from 'http';
 import type { WebSocketServer } from 'ws';
-import { loadConfig } from './config';
-import { loadPlugins } from './loader';
-import { SsgEngine } from './engine';
-import { DevServerPlugin } from '../plugins/devserver';
 import { BuildOptions } from './types';
-
 export { injectReloadScript, reloadClientScript } from './livereload';
-
 export interface ServeOptions extends BuildOptions {
-  port?: number;
+    port?: number;
 }
-
 export interface DevServer {
-  server: Server;
-  wss: WebSocketServer;
-  port: number;
-  close(): Promise<void>;
+    server: Server;
+    wss: WebSocketServer;
+    port: number;
+    close(): Promise<void>;
 }
-
 /**
  * Start a live-reload development server.
  *
@@ -27,10 +19,4 @@ export interface DevServer {
  * `contentDir` and `templatesDir` for changes, rebuilds on change, and tells
  * connected browsers to reload once a rebuild finishes.
  */
-export async function startDevServer(options: ServeOptions): Promise<DevServer> {
-  const config = await loadConfig();
-  const plugins = await loadPlugins(config);
-  plugins.push(new DevServerPlugin());
-  const engine = new SsgEngine(plugins, options, config);
-  return (await engine.serve()) as DevServer;
-}
+export declare function startDevServer(options: ServeOptions): Promise<DevServer>;
