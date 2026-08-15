@@ -148,3 +148,55 @@ Just content.`;
     expect(result.content).toContain('<h1>No Frontmatter</h1>');
   });
 });
+
+describe('template and layout metadata', () => {
+  it('parses template metadata', async () => {
+    const content = `---
+title: Test
+template: custom.hbs
+---
+Content`;
+
+    const result = await parseMarkdownWithYaml(content);
+
+    expect(result.metadata.template).toBe('custom.hbs');
+  });
+
+  it('parses layout metadata', async () => {
+    const content = `---
+title: Test
+layout: page.hbs
+---
+Content`;
+
+    const result = await parseMarkdownWithYaml(content);
+
+    expect(result.metadata.layout).toBe('page.hbs');
+  });
+
+  it('parses both template and layout together', async () => {
+    const content = `---
+title: Test
+template: custom.hbs
+layout: page.hbs
+---
+Content`;
+
+    const result = await parseMarkdownWithYaml(content);
+
+    expect(result.metadata.template).toBe('custom.hbs');
+    expect(result.metadata.layout).toBe('page.hbs');
+  });
+
+  it('returns undefined for missing template and layout', async () => {
+    const content = `---
+title: Test
+---
+Content`;
+
+    const result = await parseMarkdownWithYaml(content);
+
+    expect(result.metadata.template).toBeUndefined();
+    expect(result.metadata.layout).toBeUndefined();
+  });
+});

@@ -236,4 +236,152 @@ Content`);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('2 page(s)'));
     logSpy.mockRestore();
   });
+
+  it('uses template if templates directory exists', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    const layoutsDir = path.join(templatesDir, 'layouts');
+    const partialsDir = path.join(templatesDir, 'partials');
+
+    fs.mkdirSync(layoutsDir, { recursive: true });
+    fs.mkdirSync(partialsDir, { recursive: true });
+
+    const customLayout = `<html><body><h1>{{title}}</h1>{{{body}}}</body></html>`;
+    fs.writeFileSync(path.join(layoutsDir, 'default.hbs'), customLayout);
+
+    const navPartial = `<nav>Custom Nav</nav>`;
+    fs.writeFileSync(path.join(partialsDir, 'nav.hbs'), navPartial);
+
+    const indexLayout = `<html><body>{{#each pages}}<p>{{title}}</p>{{/each}}</body></html>`;
+    fs.writeFileSync(path.join(layoutsDir, 'index.hbs'), indexLayout);
+
+    const indexTemplate = `{{{body}}}`;
+    fs.writeFileSync(path.join(templatesDir, 'index.hbs'), indexTemplate);
+
+    fs.writeFileSync(path.join(contentDir, 'test.md'), `---
+title: Test Page
+---
+# Heading
+Content`);
+
+    await generate({
+      contentDir,
+      outputDir,
+      templatesDir,
+      layoutsDir,
+      partialsDir
+    });
+
+    const html = fs.readFileSync(path.join(outputDir, 'test.html'), 'utf-8');
+    expect(html).toContain('<h1>Test Page</h1>');
+    expect(html).toContain('Heading');
+  });
+
+  it('supports custom layout in frontmatter', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    const layoutsDir = path.join(templatesDir, 'layouts');
+    const partialsDir = path.join(templatesDir, 'partials');
+
+    fs.mkdirSync(layoutsDir, { recursive: true });
+    fs.mkdirSync(partialsDir, { recursive: true });
+
+    const defaultLayout = `<div>DEFAULT: {{{body}}}</div>`;
+    const customLayout = `<div>CUSTOM: {{{body}}}</div>`;
+
+    fs.writeFileSync(path.join(layoutsDir, 'default.hbs'), defaultLayout);
+    fs.writeFileSync(path.join(layoutsDir, 'custom.hbs'), customLayout);
+
+    fs.writeFileSync(path.join(partialsDir, 'nav.hbs'), '<nav></nav>');
+
+    const indexLayout = `<html><body>{{{body}}}</body></html>`;
+    const indexTemplate = `{{{body}}}`;
+    fs.writeFileSync(path.join(layoutsDir, 'index.hbs'), indexLayout);
+    fs.writeFileSync(path.join(templatesDir, 'index.hbs'), indexTemplate);
+
+    fs.writeFileSync(path.join(contentDir, 'default-page.md'), `---
+title: Default
+---
+Content`);
+
+    fs.writeFileSync(path.join(contentDir, 'custom-page.md'), `---
+title: Custom
+layout: custom.hbs
+---
+Content`);
+
+    await generate({
+      contentDir,
+      outputDir,
+      templatesDir,
+      layoutsDir,
+      partialsDir
+    });
+
+    const defaultHtml = fs.readFileSync(path.join(outputDir, 'default-page.html'), 'utf-8');
+    const customHtml = fs.readFileSync(path.join(outputDir, 'custom-page.html'), 'utf-8');
+
+    expect(defaultHtml).toContain('DEFAULT:');
+    expect(customHtml).toContain('CUSTOM:');
+  });
+
+  it('creates default templates if they do not exist', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    const layoutsDir = path.join(templatesDir, 'layouts');
+    const partialsDir = path.join(templatesDir, 'partials');
+
+    fs.mkdirSync(templatesDir, { recursive: true });
+
+    fs.writeFileSync(path.join(contentDir, 'test.md'), `---
+title: Test
+---
+Content`);
+
+    await generate({
+      contentDir,
+      outputDir,
+      templatesDir,
+      layoutsDir,
+      partialsDir
+    });
+
+    expect(fs.existsSync(path.join(layoutsDir, 'default.hbs'))).toBe(true);
+    expect(fs.existsSync(path.join(layoutsDir, 'index.hbs'))).toBe(true);
+    expect(fs.existsSync(path.join(templatesDir, 'index.hbs'))).toBe(true);
+    expect(fs.existsSync(path.join(partialsDir, 'nav.hbs'))).toBe(true);
+  });
+
+  it('handles templates with metadata properties', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    const layoutsDir = path.join(templatesDir, 'layouts');
+    const partialsDir = path.join(templatesDir, 'partials');
+
+    fs.mkdirSync(layoutsDir, { recursive: true });
+    fs.mkdirSync(partialsDir, { recursive: true });
+
+    const layout = `<html><body><h1>{{title}}</h1><p>Author: {{author}}</p>{{{body}}}</body></html>`;
+    fs.writeFileSync(path.join(layoutsDir, 'default.hbs'), layout);
+    fs.writeFileSync(path.join(partialsDir, 'nav.hbs'), '<nav></nav>');
+
+    const indexLayout = `<html><body></body></html>`;
+    const indexTemplate = `{{{body}}}`;
+    fs.writeFileSync(path.join(layoutsDir, 'index.hbs'), indexLayout);
+    fs.writeFileSync(path.join(templatesDir, 'index.hbs'), indexTemplate);
+
+    fs.writeFileSync(path.join(contentDir, 'test.md'), `---
+title: Test Page
+author: John Doe
+---
+Content`);
+
+    await generate({
+      contentDir,
+      outputDir,
+      templatesDir,
+      layoutsDir,
+      partialsDir
+    });
+
+    const html = fs.readFileSync(path.join(outputDir, 'test.html'), 'utf-8');
+    expect(html).toContain('Test Page');
+    expect(html).toContain('Author: John Doe');
+  });
 });

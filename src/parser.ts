@@ -5,6 +5,8 @@ export interface PageMetadata {
   title?: string;
   date?: string;
   tags?: string[];
+  template?: string;
+  layout?: string;
   [key: string]: string | string[] | undefined;
 }
 
