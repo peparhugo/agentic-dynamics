@@ -115,6 +115,29 @@ class TaskRepository(BaseRepository):
         )
         return [dict(row) for row in rows]
 
+    def list_for_owner_paginated(self, owner_id, cursor=None, limit=20):
+        conditions = ["owner_id = ?"]
+        parameters = [owner_id]
+        if cursor is not None:
+            conditions.append("id < ?")
+            parameters.append(cursor)
+        parameters.append(limit + 1)
+        rows = self._execute(
+            "SELECT id, title, status, created_at FROM tasks "
+            f"WHERE {' AND '.join(conditions)} ORDER BY id DESC LIMIT ?",
+            parameters,
+        )
+        has_next = len(rows) > limit
+        items = [dict(row) for row in rows[:limit]]
+        total = self._execute(
+            "SELECT COUNT(*) AS total FROM tasks WHERE owner_id = ?", (owner_id,)
+        )[0]["total"]
+        return {
+            "data": items,
+            "next_cursor": str(items[-1]["id"]) if has_next else None,
+            "total": total,
+        }
+
     def get_for_owner(self, task_id, owner_id):
         rows = self._execute(
             "SELECT id, title, status, created_at FROM tasks WHERE id = ? AND owner_id = ?",

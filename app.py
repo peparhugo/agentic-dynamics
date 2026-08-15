@@ -1,6 +1,7 @@
 """Minimal Flask Todo API."""
 
 from flask import Flask, request, jsonify, g
+from flask_limiter import Limiter
 from datetime import datetime
 from functools import wraps
 import base64
@@ -19,6 +20,27 @@ DATABASE = os.environ.get("DATABASE", "todos.db")
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_LIFETIME_SECONDS = 3600
 VALID_STATUSES = {"pending", "done", "completed"}
+
+
+def rate_limit_key():
+    """Use the authenticated user when possible, otherwise the client address."""
+    authorization = request.headers.get("Authorization", "")
+    if authorization.startswith("Bearer "):
+        try:
+            return f"user:{DATABASE}:{decode_token(authorization[7:].strip())}"
+        except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeDecodeError, binascii.Error):
+            pass
+    return f"ip:{request.remote_addr or 'unknown'}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    application_limits=["100 per minute"],
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"),
+    in_memory_fallback=["100 per minute"],
+    headers_enabled=True,
+)
 
 
 def get_db():
@@ -96,8 +118,8 @@ def create_task(title: str, owner_id: int) -> dict:
     return TaskRepository(DATABASE).create_for_owner(title, owner_id)
 
 
-def get_tasks(owner_id: int):
-    return TaskRepository(DATABASE).list_for_owner(owner_id)
+def get_tasks(owner_id: int, cursor: int | None = None, limit: int = 20):
+    return TaskRepository(DATABASE).list_for_owner_paginated(owner_id, cursor, limit)
 
 
 def get_task(task_id: int, owner_id: int) -> dict | None:
@@ -147,7 +169,27 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(g.user["id"]))
+    raw_limit = request.args.get("limit", "20")
+    try:
+        limit = int(raw_limit)
+    except ValueError:
+        return jsonify({"error": "limit must be an integer"}), 400
+    if limit < 1 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    raw_cursor = request.args.get("cursor")
+    if raw_cursor is None:
+        cursor = None
+    else:
+        try:
+            cursor = int(raw_cursor)
+        except ValueError:
+            return jsonify({"error": "cursor must be an integer"}), 400
+        if cursor < 1:
+            return jsonify({"error": "cursor must be a positive integer"}), 400
+
+    page = get_tasks(g.user["id"], cursor, limit)
+    return jsonify(page)
 
 
 @app.route("/tasks", methods=["POST"])
