@@ -3,12 +3,13 @@ from unittest.mock import patch
 
 import pytest
 
-from app import app, init_storage
+from app import app, init_storage, limiter
 
 
 @pytest.fixture()
 def client(tmp_path):
     app.config.update(TESTING=True, TASKS_FILE=str(tmp_path / "tasks.json"), JWT_SECRET="test-secret")
+    limiter.reset()
     init_storage()
     with app.test_client() as test_client:
         yield test_client
@@ -76,8 +77,11 @@ def test_list_tasks_is_newest_first_and_isolated_by_owner(client):
     second = client.post("/tasks", json={"title": "Second"}, headers=alice).get_json()
     bob = register_and_login(client, "bob")
 
-    assert [task["id"] for task in client.get("/tasks", headers=alice).get_json()] == [second["id"], first["id"]]
-    assert client.get("/tasks", headers=bob).get_json() == []
+    page = client.get("/tasks", headers=alice).get_json()
+    assert [task["id"] for task in page["data"]] == [second["id"], first["id"]]
+    assert page["next_cursor"] is None
+    assert page["total"] == 2
+    assert client.get("/tasks", headers=bob).get_json() == {"data": [], "next_cursor": None, "total": 0}
     assert client.get(f"/tasks/{first['id']}", headers=bob).status_code == 404
     assert client.put(f"/tasks/{first['id']}", json={"status": "done"}, headers=bob).status_code == 404
 
@@ -127,3 +131,40 @@ def test_init_storage_migrates_legacy_tasks_without_data_loss(tmp_path):
     app.config["TASKS_FILE"] = str(path)
     init_storage()
     assert json.loads(path.read_text(encoding="utf-8")) == {"users": [], "tasks": [{**legacy_task, "owner_id": None}]}
+
+
+def test_list_tasks_uses_cursor_pagination(client):
+    headers = register_and_login(client)
+    created = [client.post("/tasks", json={"title": f"Task {index}"}, headers=headers).get_json() for index in range(3)]
+
+    first_page = client.get("/tasks?limit=2", headers=headers)
+    assert first_page.status_code == 200
+    assert first_page.get_json() == {
+        "data": [created[2], created[1]],
+        "next_cursor": str(created[1]["id"]),
+        "total": 3,
+    }
+
+    second_page = client.get(f"/tasks?cursor={created[1]['id']}&limit=2", headers=headers)
+    assert second_page.get_json() == {"data": [created[0]], "next_cursor": None, "total": 3}
+    assert client.get("/tasks?limit=101", headers=headers).status_code == 400
+    assert client.get("/tasks?cursor=999", headers=headers).status_code == 400
+
+
+def test_rate_limit_applies_to_authenticated_requests(client):
+    headers = register_and_login(client)
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+
+    response = client.get("/tasks", headers=headers)
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for _ in range(100):
+        assert client.post("/auth/register", json={}).status_code == 400
+
+    response = client.post("/auth/register", json={})
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]

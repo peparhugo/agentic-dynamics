@@ -14,6 +14,7 @@ from threading import Lock
 from typing import Any
 
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -24,6 +25,7 @@ app = Flask(__name__)
 app.config["TASKS_FILE"] = os.environ.get("TASKS_FILE", "tasks.json")
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
 app.config["JWT_EXPIRATION_HOURS"] = 24
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0")
 _storage_lock = Lock()
 
 
@@ -142,6 +144,24 @@ def _require_user() -> tuple[int | None, Any | None]:
     return user_id, None
 
 
+def _rate_limit_key() -> str:
+    """Use a user-wide quota once a request carries a valid token."""
+    user_id = _authenticated_user_id()
+    return f"user:{user_id}" if user_id is not None else f"ip:{request.remote_addr}"
+
+
+limiter = Limiter(
+    _rate_limit_key,
+    app=app,
+    application_limits=["100 per minute"],
+    headers_enabled=True,
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    # Keep the API usable if Redis is temporarily unavailable.
+    in_memory_fallback_enabled=True,
+    in_memory_fallback=["100 per minute"],
+)
+
+
 def _repositories() -> tuple[TaskRepository, UserRepository]:
     return (
         TaskRepository(_read_data, _write_data, _storage_lock),
@@ -206,9 +226,28 @@ def list_tasks():
     user_id, error = _require_user()
     if error:
         return error
+    cursor = request.args.get("cursor")
+    if cursor is not None:
+        try:
+            cursor_id = int(cursor)
+            if cursor_id < 1:
+                raise ValueError
+        except ValueError:
+            return jsonify(error="cursor must be a positive integer"), 400
+    else:
+        cursor_id = None
+    try:
+        limit = int(request.args.get("limit", 20))
+        if not 1 <= limit <= 100:
+            raise ValueError
+    except ValueError:
+        return jsonify(error="limit must be between 1 and 100"), 400
+
     tasks, _ = _repositories()
-    tasks = tasks.list_for_owner(user_id)
-    return jsonify(sorted(tasks, key=lambda task: task["created_at"], reverse=True))
+    page, next_cursor, total = tasks.list_page_for_owner(user_id, cursor_id, limit)
+    if cursor_id is not None and page is None:
+        return jsonify(error="cursor not found"), 400
+    return jsonify(data=page, next_cursor=next_cursor, total=total)
 
 
 @app.get("/tasks/<int:task_id>")

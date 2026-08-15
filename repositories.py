@@ -83,6 +83,26 @@ class TaskRepository(BaseRepository):
     def list_for_owner(self, owner_id: int) -> list[dict[str, Any]]:
         return [task for task in self.get_all() if task.get("owner_id") == owner_id]
 
+    def list_page_for_owner(
+        self, owner_id: int, cursor_id: int | None, limit: int
+    ) -> tuple[list[dict[str, Any]] | None, str | None, int]:
+        """Return a stable newest-first page, starting after ``cursor_id``."""
+        tasks = sorted(
+            self.list_for_owner(owner_id), key=lambda task: task["created_at"], reverse=True
+        )
+        total = len(tasks)
+        start = 0
+        if cursor_id is not None:
+            cursor_index = next(
+                (index for index, task in enumerate(tasks) if task.get("id") == cursor_id), None
+            )
+            if cursor_index is None:
+                return None, None, total
+            start = cursor_index + 1
+        page = tasks[start : start + limit]
+        next_cursor = str(page[-1]["id"]) if start + limit < total else None
+        return page, next_cursor, total
+
     def get_for_owner(self, task_id: int, owner_id: int) -> dict[str, Any] | None:
         with self._storage_lock:
             task = self._find_by_id(self._read_data()[self.collection_name], task_id)
