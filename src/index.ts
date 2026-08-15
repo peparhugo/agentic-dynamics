@@ -5,12 +5,14 @@ import { SiteGenerator } from './generator.js';
 import { DevServer } from './dev-server.js';
 import { loadConfig } from './config-loader.js';
 
-function parseArgs(args: string[]): { command: string; contentDir: string; outputDir: string; templatesDir: string; port: number } {
+function parseArgs(args: string[]): { command: string; contentDir: string; outputDir: string; templatesDir: string; port: number; incremental: boolean; clean: boolean } {
   let command = 'build';
   let contentDir = './content';
   let outputDir = './dist';
   let templatesDir = './templates';
   let port = 3000;
+  let incremental = false;
+  let clean = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -28,15 +30,19 @@ function parseArgs(args: string[]): { command: string; contentDir: string; outpu
       templatesDir = args[++i];
     } else if (arg === '--port' && i + 1 < args.length) {
       port = parseInt(args[++i], 10);
+    } else if (arg === '--incremental') {
+      incremental = true;
+    } else if (arg === '--clean') {
+      clean = true;
     }
   }
 
-  return { command, contentDir, outputDir, templatesDir, port };
+  return { command, contentDir, outputDir, templatesDir, port, incremental, clean };
 }
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const { command, contentDir, outputDir, templatesDir, port } = parseArgs(args);
+  const { command, contentDir, outputDir, templatesDir, port, incremental, clean } = parseArgs(args);
 
   const resolvedContentDir = path.resolve(contentDir);
   const resolvedOutputDir = path.resolve(outputDir);
@@ -51,6 +57,8 @@ async function main(): Promise<void> {
           contentDir: resolvedContentDir,
           outputDir: resolvedOutputDir,
           templatesDir: resolvedTemplatesDir,
+          incremental,
+          clean,
         },
         plugins
       );

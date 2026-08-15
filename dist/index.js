@@ -9,6 +9,8 @@ function parseArgs(args) {
     let outputDir = './dist';
     let templatesDir = './templates';
     let port = 3000;
+    let incremental = false;
+    let clean = false;
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
         if (!arg.startsWith('-')) {
@@ -27,12 +29,18 @@ function parseArgs(args) {
         else if (arg === '--port' && i + 1 < args.length) {
             port = parseInt(args[++i], 10);
         }
+        else if (arg === '--incremental') {
+            incremental = true;
+        }
+        else if (arg === '--clean') {
+            clean = true;
+        }
     }
-    return { command, contentDir, outputDir, templatesDir, port };
+    return { command, contentDir, outputDir, templatesDir, port, incremental, clean };
 }
 async function main() {
     const args = process.argv.slice(2);
-    const { command, contentDir, outputDir, templatesDir, port } = parseArgs(args);
+    const { command, contentDir, outputDir, templatesDir, port, incremental, clean } = parseArgs(args);
     const resolvedContentDir = path.resolve(contentDir);
     const resolvedOutputDir = path.resolve(outputDir);
     const resolvedTemplatesDir = path.resolve(templatesDir);
@@ -43,6 +51,8 @@ async function main() {
                 contentDir: resolvedContentDir,
                 outputDir: resolvedOutputDir,
                 templatesDir: resolvedTemplatesDir,
+                incremental,
+                clean,
             }, plugins);
             await generator.build();
         }

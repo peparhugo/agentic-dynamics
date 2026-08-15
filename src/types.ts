@@ -27,4 +27,6 @@ export interface BuildOptions {
   contentDir: string;
   outputDir: string;
   templatesDir?: string;
+  incremental?: boolean;
+  clean?: boolean;
 }
