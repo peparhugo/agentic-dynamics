@@ -13,6 +13,8 @@ from typing import Any, Callable
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 class TaskStore:
     """A small, thread-safe JSON file store for tasks."""
@@ -127,7 +129,9 @@ class UserStore:
             os.fsync(file.fileno())
         os.replace(temporary_path, self.path)
 
-    def create(self, username: str, password: str) -> dict[str, Any] | None:
+    def create(
+        self, username: str, password: str, email: str | None = None
+    ) -> dict[str, Any] | None:
         with self._lock:
             users = self._read()
             if any(user["username"] == username for user in users):
@@ -135,6 +139,7 @@ class UserStore:
             user = {
                 "id": max((user["id"] for user in users), default=0) + 1,
                 "username": username,
+                "email": email or username,
                 "password_hash": generate_password_hash(password),
             }
             users.append(user)
@@ -145,6 +150,12 @@ class UserStore:
         with self._lock:
             return next(
                 (user for user in self._read() if user["username"] == username), None
+            )
+
+    def get(self, user_id: int) -> dict[str, Any] | None:
+        with self._lock:
+            return next(
+                (user for user in self._read() if user["id"] == user_id), None
             )
 
 
@@ -258,12 +269,17 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         data = request.get_json(silent=True)
         username = data.get("username") if isinstance(data, dict) else None
         password = data.get("password") if isinstance(data, dict) else None
+        email = data.get("email") if isinstance(data, dict) else None
         if not isinstance(username, str) or not username.strip():
             return jsonify(error="username is required"), 400
         if not isinstance(password, str) or not password:
             return jsonify(error="password is required"), 400
+        if email is not None and (not isinstance(email, str) or not email.strip()):
+            return jsonify(error="email must be a non-empty string"), 400
 
-        user = user_store.create(username.strip(), password)
+        user = user_store.create(
+            username.strip(), password, email.strip() if email is not None else None
+        )
         if user is None:
             return jsonify(error="username already exists"), 409
         return jsonify(id=user["id"], username=user["username"]), 201
@@ -328,9 +344,25 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         if not changes:
             return jsonify(error="title or status is required"), 400
 
+        existing_task = task_store.get(task_id, g.user_id)
         task = task_store.update(task_id, g.user_id, changes)
         if task is None:
             return jsonify(error="task not found"), 404
+        if (
+            existing_task is not None
+            and existing_task["status"] != "completed"
+            and task["status"] == "completed"
+        ):
+            owner = user_store.get(g.user_id)
+            if owner is not None:
+                try:
+                    send_notification_email.delay(
+                        owner.get("email", owner["username"]), task["title"]
+                    )
+                except Exception:
+                    app.logger.exception(
+                        "Could not enqueue completion notification for task %s", task_id
+                    )
         return jsonify(task)
 
     return app

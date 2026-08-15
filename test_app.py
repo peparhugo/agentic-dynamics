@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -201,6 +202,68 @@ def test_update_one_field_preserves_the_other(client, auth_headers):
     assert response.status_code == 200
     assert response.json["title"] == "Keep"
     assert response.json["status"] == "done"
+
+
+def test_completed_status_transition_enqueues_notification(client, auth_headers):
+    task = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=auth_headers
+    ).json
+
+    with patch("app.send_notification_email.delay") as enqueue:
+        response = client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 200
+    enqueue.assert_called_once_with("alice", "Ship release")
+
+
+def test_completed_task_is_not_notified_twice(client, auth_headers):
+    task = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=auth_headers
+    ).json
+    client.put(
+        f"/tasks/{task['id']}",
+        json={"status": "completed"},
+        headers=auth_headers,
+    )
+
+    with patch("app.send_notification_email.delay") as enqueue:
+        response = client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 200
+    enqueue.assert_not_called()
+
+
+def test_notification_uses_registered_email(client):
+    client.post(
+        "/auth/register",
+        json={
+            "username": "alice",
+            "password": "secret",
+            "email": "alice@example.com",
+        },
+    )
+    token = client.post(
+        "/auth/login", json={"username": "alice", "password": "secret"}
+    ).json["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    task = client.post("/tasks", json={"title": "Notify me"}, headers=headers).json
+
+    with patch("app.send_notification_email.delay") as enqueue:
+        client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=headers,
+        )
+
+    enqueue.assert_called_once_with("alice@example.com", "Notify me")
 
 
 @pytest.mark.parametrize(
