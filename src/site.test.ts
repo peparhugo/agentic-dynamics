@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import WebSocket from 'ws';
 import { buildSite, parsePage } from './site';
+import type { Plugin } from './plugin';
 import { startDevServer } from './server';
 
 describe('parsePage', () => {
@@ -20,6 +21,41 @@ describe('parsePage', () => {
 });
 
 describe('buildSite', () => {
+  it('runs configured plugin hooks in order and lets plugins modify pages before rendering', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-plugin-'));
+    const content = join(root, 'content');
+    const output = join(root, 'output');
+    const calls: string[] = [];
+    const plugin: Plugin = {
+      onStart: () => { calls.push('start'); },
+      beforeBuild: () => { calls.push('before'); },
+      onFile: (context) => { calls.push('file'); if (context.page) context.page.title = 'Modified'; },
+      afterBuild: () => { calls.push('after'); },
+      onEnd: () => { calls.push('end'); },
+    };
+    await mkdir(content);
+    await writeFile(join(content, 'page.md'), '# Page');
+
+    await buildSite({ contentDir: content, outputDir: output, plugins: [plugin] });
+
+    expect(calls).toEqual(['start', 'before', 'file', 'after', 'end']);
+    await expect(readFile(join(output, 'page.html'), 'utf8')).resolves.toContain('<h1>Modified</h1>');
+  });
+
+  it('loads plugins from ssg.config.ts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-config-'));
+    const content = join(root, 'content');
+    const output = join(root, 'output');
+    const config = join(root, 'ssg.config.ts');
+    await mkdir(content);
+    await writeFile(join(content, 'page.md'), '# Page');
+    await writeFile(config, 'export default { plugins: [{ onFile(context: { page?: { title: string } }) { if (context.page) context.page.title = "Configured"; } }] };');
+
+    await buildSite({ contentDir: content, outputDir: output, configFile: config });
+
+    await expect(readFile(join(output, 'page.html'), 'utf8')).resolves.toContain('<h1>Configured</h1>');
+  });
+
   it('creates a page HTML file and an index', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ssg-'));
     const content = join(root, 'content');
