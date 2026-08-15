@@ -27,6 +27,8 @@ import jwt
 from flask import Flask, Response, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 SOAP_11 = "http://schemas.xmlsoap.org/soap/envelope/"
 SOAP_12 = "http://www.w3.org/2003/05/soap-envelope"
 SERVICE_NS = "urn:tasks"
@@ -49,7 +51,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -66,24 +69,30 @@ def init_db():
         cols = [r["name"] for r in conn.execute("PRAGMA table_info(tasks)").fetchall()]
         if "owner_id" not in cols:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
+        # Migration: add email to pre-existing user tables.
+        user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "email" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.commit()
 
 
 # ── Auth helpers ────────────────────────────────────────────────
 
-def create_user(username: str, password: str):
+def create_user(username: str, password: str, email: str = None):
     with get_db() as conn:
         existing = conn.execute(
             "SELECT id FROM users WHERE username = ?", (username,)
         ).fetchone()
         if existing is not None:
             return None, "username already exists"
+        if email is None:
+            email = f"{username}@example.com"
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, generate_password_hash(password)),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, generate_password_hash(password), email),
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "username": username}, None
+        return {"id": cursor.lastrowid, "username": username, "email": email}, None
 
 
 def authenticate(username: str, password: str):
@@ -116,6 +125,12 @@ def current_user():
         user_id = int(payload["sub"])
     except (KeyError, TypeError, ValueError):
         return None
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def get_user(user_id: int):
     with get_db() as conn:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     return dict(row) if row else None
@@ -278,9 +293,19 @@ def _handle_update(soap_ns, op_elem, owner_id):
         title = None
     if status == "":
         status = None
+    previous = get_task(task_id, owner_id)
     task = update_task(task_id, owner_id, title=title, status=status)
     if task is None:
         return _fault_response(soap_ns, "task not found", 404)
+    if (
+        status == "completed"
+        and previous is not None
+        and previous.get("status") != "completed"
+    ):
+        owner = get_user(owner_id)
+        if owner is not None:
+            user_email = owner.get("email") or f"{owner['username']}@example.com"
+            send_notification_email.delay(user_email, task["title"])
     return _soap_response(soap_ns, _task_xml("UpdateTaskResponse", task))
 
 
@@ -291,9 +316,10 @@ def register():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
+    email = (data.get("email") or "").strip() or None
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user, err = create_user(username, password)
+    user, err = create_user(username, password, email)
     if err:
         return jsonify({"error": err}), 409
     return jsonify(user), 201

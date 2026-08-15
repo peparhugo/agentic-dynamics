@@ -1,3 +1,5 @@
 flask>=3.0
 pytest>=8.0
 PyJWT>=2.0
+celery>=5.3
+redis>=5.0

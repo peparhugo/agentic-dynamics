@@ -1,5 +1,6 @@
 import time
 import xml.etree.ElementTree as ET
+from unittest import mock
 
 import pytest
 
@@ -257,3 +258,63 @@ def test_unknown_operation_returns_400(client, auth):
     resp = soap(client, "DeleteTask", headers=auth, id="1")
     assert resp.status_code == 400
     assert "unknown operation" in fault_string(resp)
+
+
+# ── Notification trigger ────────────────────────────────────────
+
+@pytest.fixture()
+def email_task(monkeypatch):
+    fake = mock.MagicMock(name="send_notification_email")
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+    return fake
+
+
+def test_update_to_completed_triggers_notification(client, auth, email_task):
+    soap(client, "CreateTask", headers=auth, title="Buy milk")
+    resp = soap(client, "UpdateTask", headers=auth, id="1", status="completed")
+    assert resp.status_code == 200
+    assert response_task(resp)["status"] == "completed"
+    email_task.delay.assert_called_once_with("alice@example.com", "Buy milk")
+
+
+def test_update_to_completed_uses_custom_email(client, monkeypatch):
+    email_task = mock.MagicMock(name="send_notification_email")
+    monkeypatch.setattr(app_module, "send_notification_email", email_task)
+    client.post(
+        "/auth/register",
+        json={"username": "dave", "password": "x", "email": "dave@corp.com"},
+    )
+    dave = {"Authorization": f"Bearer {login(client, 'dave', 'x').get_json()['token']}"}
+    soap(client, "CreateTask", headers=dave, title="Ship it")
+    soap(client, "UpdateTask", headers=dave, id="1", status="completed")
+    email_task.delay.assert_called_once_with("dave@corp.com", "Ship it")
+
+
+def test_update_to_other_status_does_not_trigger(client, auth, email_task):
+    soap(client, "CreateTask", headers=auth, title="Buy milk")
+    resp = soap(client, "UpdateTask", headers=auth, id="1", status="done")
+    assert resp.status_code == 200
+    email_task.delay.assert_not_called()
+
+
+def test_update_title_only_does_not_trigger(client, auth, email_task):
+    soap(client, "CreateTask", headers=auth, title="Buy milk")
+    resp = soap(client, "UpdateTask", headers=auth, id="1", title="new")
+    assert resp.status_code == 200
+    email_task.delay.assert_not_called()
+
+
+def test_completing_an_already_completed_task_does_not_trigger_again(client, auth, email_task):
+    soap(client, "CreateTask", headers=auth, title="Buy milk")
+    soap(client, "UpdateTask", headers=auth, id="1", status="completed")
+    email_task.delay.assert_called_once()
+    email_task.reset_mock()
+    resp = soap(client, "UpdateTask", headers=auth, id="1", status="completed")
+    assert resp.status_code == 200
+    email_task.delay.assert_not_called()
+
+
+def test_notification_task_emails_owner(capsys):
+    result = app_module.send_notification_email("alice@example.com", "Buy milk")
+    assert result == {"to": "alice@example.com", "title": "Buy milk"}
+    assert "alice@example.com" in capsys.readouterr().out
