@@ -74,9 +74,10 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Awaitable, Callable, Optional
 from urllib.parse import unquote, urlsplit, parse_qsl
 
@@ -91,6 +92,28 @@ SUPPORTED_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
 # ── Configuration ─────────────────────────────────────────────
 REDIS_URL = os.environ.get("REDIS_URL")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
+
+DEFAULT_RATE_LIMIT = 100
+DEFAULT_MESSAGE_TTL_DAYS = 7
+CLEANUP_INTERVAL_SECONDS = 3600
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+#: Per-client message rate limit (messages per minute), read from ``RATE_LIMIT``.
+RATE_LIMIT = _env_int("RATE_LIMIT", DEFAULT_RATE_LIMIT)
+
+#: Age (in days) after which persisted messages are cleaned up, from
+#: ``MESSAGE_TTL_DAYS``.
+MESSAGE_TTL_DAYS = _env_int("MESSAGE_TTL_DAYS", DEFAULT_MESSAGE_TTL_DAYS)
 
 # Name of the env var used to select the active transport, and the fallback
 # transport name when it is unset. The value is read dynamically at server
@@ -111,6 +134,19 @@ DEFAULT_LIMIT = 50
 def utc_now() -> str:
     """Return the current UTC timestamp as an ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_timestamp(value: str) -> Optional[datetime]:
+    """Parse an ISO-8601 timestamp, treating naive values as UTC."""
+    if value is None:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def encode_frame(message: dict) -> str:
@@ -202,6 +238,83 @@ class MessageStore:
                 item["payload"] = {}
             result.append(item)
         return result
+
+    def history(
+        self,
+        channel: Optional[str] = None,
+        since: Optional[str] = None,
+        limit: int = DEFAULT_LIMIT,
+    ) -> tuple[list[dict], bool]:
+        """Return messages for a channel/time range in chronological order.
+
+        ``since`` is an inclusive ISO-8601 timestamp lower bound. Returns a
+        ``(messages, has_more)`` tuple where ``has_more`` is ``True`` when more
+        than ``limit`` matching messages exist (so callers can paginate).
+        """
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = DEFAULT_LIMIT
+        limit = max(1, limit)
+
+        query = "SELECT id, channel, type, payload, timestamp FROM messages"
+        clauses: list[str] = []
+        params: list[Any] = []
+        if channel is not None:
+            clauses.append("channel = ?")
+            params.append(channel)
+        if since is not None:
+            clauses.append("timestamp >= ?")
+            params.append(since)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY timestamp ASC, id ASC LIMIT ?"
+        params.append(limit + 1)
+
+        conn = self._connect()
+        try:
+            rows = conn.execute(query, params).fetchall()
+        finally:
+            conn.close()
+
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["payload"] = json.loads(item["payload"])
+            except (TypeError, ValueError):
+                item["payload"] = {}
+            result.append(item)
+        return result, has_more
+
+    def delete_older_than(self, cutoff: str) -> int:
+        """Delete messages whose timestamp is strictly before ``cutoff``.
+
+        Returns the number of deleted rows.
+        """
+        cutoff_dt = _parse_timestamp(cutoff)
+        if cutoff_dt is None:
+            return 0
+        conn = self._connect()
+        try:
+            with self._lock:
+                rows = conn.execute("SELECT id, timestamp FROM messages").fetchall()
+                stale_ids = []
+                for row in rows:
+                    ts_dt = _parse_timestamp(row["timestamp"])
+                    if ts_dt is not None and ts_dt < cutoff_dt:
+                        stale_ids.append(row["id"])
+                if stale_ids:
+                    conn.executemany(
+                        "DELETE FROM messages WHERE id = ?",
+                        [(i,) for i in stale_ids],
+                    )
+                    conn.commit()
+                return len(stale_ids)
+        finally:
+            conn.close()
 
 
 class ClientRegistry:
@@ -477,6 +590,8 @@ class NotificationServer:
         database_url: Optional[str] = None,
         redis_client: Any = None,
         transport: Any = None,
+        rate_limit: Optional[int] = None,
+        message_ttl_days: Optional[int] = None,
     ) -> None:
         self.transport = resolve_transport(transport)
         self.transport.server = self
@@ -489,7 +604,14 @@ class NotificationServer:
         self._redis: Any = None
         self._pubsub: Any = None
         self._worker_task: Optional[asyncio.Task] = None
+        self._cleanup_task: Optional[asyncio.Task] = None
         self._redis_connected = False
+        self.rate_limit = rate_limit if rate_limit is not None else RATE_LIMIT
+        self.message_ttl_days = (
+            message_ttl_days if message_ttl_days is not None else MESSAGE_TTL_DAYS
+        )
+        self._rate_counters: dict[str, list[float]] = {}
+        self._rate_lock = threading.Lock()
 
     # ── Lifecycle ──────────────────────────────────────────────
 
@@ -503,24 +625,37 @@ class NotificationServer:
         return self.transport.handler
 
     async def start(self) -> None:
-        """Connect to Redis (if configured) and start the delivery worker."""
-        if self._redis_connected:
-            return
-        if self._redis_client is not None:
-            self._redis = self._redis_client
-            self._redis_connected = True
-        elif self.redis_url:
-            from redis import asyncio as aioredis
+        """Connect to Redis (if configured) and start the delivery worker.
 
-            self._redis = aioredis.from_url(self.redis_url, decode_responses=True)
-            self._redis_connected = True
-        if self._redis_connected:
-            self._pubsub = self._redis.pubsub()
-            await self._pubsub.psubscribe(REDIS_SUBSCRIBE_PATTERN)
-            self._worker_task = asyncio.create_task(self._run_worker())
+        Also performs an initial message-expiry cleanup pass and schedules a
+        background cleanup task.
+        """
+        if not self._redis_connected:
+            if self._redis_client is not None:
+                self._redis = self._redis_client
+                self._redis_connected = True
+            elif self.redis_url:
+                from redis import asyncio as aioredis
+
+                self._redis = aioredis.from_url(self.redis_url, decode_responses=True)
+                self._redis_connected = True
+            if self._redis_connected:
+                self._pubsub = self._redis.pubsub()
+                await self._pubsub.psubscribe(REDIS_SUBSCRIBE_PATTERN)
+                self._worker_task = asyncio.create_task(self._run_worker())
+        self.cleanup_expired()
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._run_cleanup())
 
     async def stop(self) -> None:
         """Stop the worker and close the Redis connection."""
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._cleanup_task = None
         if self._worker_task is not None:
             self._worker_task.cancel()
             try:
@@ -603,6 +738,51 @@ class NotificationServer:
     async def _redis_unsubscribe(self, client_id: str, channel: str) -> None:
         await self._redis.srem(REDIS_PREFIX + "subscribers:" + channel, client_id)
 
+    # ── Rate limiting ──────────────────────────────────────────
+
+    async def _check_rate_limit(self, client_id: str) -> bool:
+        """Return ``True`` if the client is allowed to send another message.
+
+        Enforces a per-client message-per-minute limit using Redis counters
+        when a Redis backend is connected, falling back to an in-memory sliding
+        window otherwise.
+        """
+        if not self.rate_limit or self.rate_limit <= 0:
+            return True
+        if self._redis_connected:
+            bucket = int(time.time() // 60)
+            key = f"{REDIS_PREFIX}ratelimit:{client_id}:{bucket}"
+            current = await self._redis.incr(key)
+            if current == 1:
+                await self._redis.expire(key, 60)
+            return current <= self.rate_limit
+
+        now = time.time()
+        with self._rate_lock:
+            window = [t for t in self._rate_counters.get(client_id, []) if now - t < 60]
+            if len(window) >= self.rate_limit:
+                self._rate_counters[client_id] = window
+                return False
+            window.append(now)
+            self._rate_counters[client_id] = window
+            return True
+
+    # ── Message expiry ─────────────────────────────────────────
+
+    def cleanup_expired(self) -> int:
+        """Delete persisted messages older than the configured TTL."""
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)
+        return self.store.delete_older_than(cutoff.isoformat())
+
+    async def _run_cleanup(self) -> None:
+        """Periodically delete expired messages."""
+        while True:
+            await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+            try:
+                self.cleanup_expired()
+            except Exception:
+                pass
+
     def _persist(self, outgoing: dict) -> None:
         msg_type = outgoing.get("type") or ""
         channel = outgoing.get("channel") or ""
@@ -639,6 +819,19 @@ class NotificationServer:
     # ── Inbound handling ───────────────────────────────────────
 
     async def _handle_message(self, sender_id: str, message: dict) -> None:
+        if not await self._check_rate_limit(sender_id):
+            await self.send_to(
+                sender_id,
+                {
+                    "type": "system",
+                    "payload": {
+                        "error": "rate limit exceeded",
+                    },
+                    "timestamp": utc_now(),
+                },
+            )
+            return
+
         msg_type = message.get("type")
         payload = message.get("payload") if isinstance(message.get("payload"), dict) else {}
 
@@ -790,7 +983,34 @@ class NotificationServer:
                 connection, 200, self.store.list(limit=limit, offset=offset)
             )
 
+        if route_path == "/history":
+            params = self._parse_query(urlsplit(path).query)
+            channel = params.get("channel")
+            since = params.get("since")
+            try:
+                limit = int(params.get("limit", DEFAULT_LIMIT))
+            except (TypeError, ValueError):
+                limit = DEFAULT_LIMIT
+            messages, has_more = self.store.history(
+                channel=channel, since=since, limit=limit
+            )
+            return self._json_response(
+                connection, 200, {"messages": messages, "has_more": has_more}
+            )
+
         return None
+
+    @staticmethod
+    def _parse_query(query: str) -> dict[str, str]:
+        """Parse a query string, preserving ``+`` (unlike ``parse_qsl``)."""
+        result: dict[str, str] = {}
+        if not query:
+            return result
+        for part in query.split("&"):
+            if "=" in part:
+                key, _, value = part.partition("=")
+                result[unquote(key)] = unquote(value)
+        return result
 
 
 def create_server(
