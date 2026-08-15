@@ -6,7 +6,8 @@ import asyncio
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -52,7 +53,17 @@ class NotificationServer:
         self.redis: Redis | None = None
         self.redis_pubsub: Any = None
         self.redis_task: asyncio.Task[None] | None = None
+        self.cleanup_task: asyncio.Task[None] | None = None
         self._redis_enabled = False
+        try:
+            self.rate_limit = max(0, int(os.getenv("RATE_LIMIT", "100")))
+        except ValueError:
+            self.rate_limit = 100
+        try:
+            self.message_ttl_days = max(0, float(os.getenv("MESSAGE_TTL_DAYS", "7")))
+        except ValueError:
+            self.message_ttl_days = 7
+        self._local_rate_limits: dict[str, tuple[int, float]] = {}
         self._database = self._open_database(self.database_url)
 
     @staticmethod
@@ -96,6 +107,40 @@ class NotificationServer:
         self.redis_pubsub = self.redis.pubsub()
         await self.redis_pubsub.subscribe("notifications")
         self.redis_task = asyncio.create_task(self._redis_listener())
+
+    def _cleanup_expired(self) -> None:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+        self._database.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+        self._database.commit()
+
+    async def _expiry_loop(self) -> None:
+        try:
+            while True:
+                self._cleanup_expired()
+                await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            return
+
+    async def _check_rate_limit(self, client_id: str) -> bool:
+        if self.rate_limit == 0:
+            return False
+        if self._redis_enabled and self.redis is not None:
+            key = f"notification:rate:{client_id}"
+            try:
+                count = int(await self.redis.incr(key))
+                if count == 1:
+                    await self.redis.expire(key, 60)
+                return count > self.rate_limit
+            except (RedisError, OSError, asyncio.TimeoutError):
+                pass
+
+        now = time.monotonic()
+        count, started = self._local_rate_limits.get(client_id, (0, now))
+        if now - started >= 60:
+            count, started = 0, now
+        count += 1
+        self._local_rate_limits[client_id] = (count, started)
+        return count > self.rate_limit
 
     async def _redis_listener(self) -> None:
         assert self.redis_pubsub is not None
@@ -197,6 +242,9 @@ class NotificationServer:
     async def _handle_message(self, client_id: str, data: Any) -> None:
         client = self.clients.get(client_id)
         if client is None:
+            return
+        if await self._check_rate_limit(client_id):
+            await self._send_system(client_id, {"error": "rate limit exceeded"})
             return
         if not isinstance(data, dict):
             await self._send_system(client_id, {"error": "message must be a JSON object"})
@@ -327,6 +375,42 @@ class NotificationServer:
             messages.append(message)
         return web.json_response({"messages": messages})
 
+    async def history(self, request: web.Request) -> web.Response:
+        channel = request.query.get("channel")
+        if not channel:
+            raise web.HTTPBadRequest(text="channel is required")
+        try:
+            limit = max(1, min(int(request.query.get("limit", "50")), 1000))
+        except ValueError:
+            raise web.HTTPBadRequest(text="limit must be an integer")
+        since = request.query.get("since")
+        if since:
+            try:
+                parsed_since = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                if parsed_since.tzinfo is None:
+                    raise ValueError
+                since = parsed_since.astimezone(timezone.utc).isoformat()
+            except ValueError:
+                raise web.HTTPBadRequest(text="since must be an ISO timestamp")
+        query = (
+            "SELECT id, channel, type, payload, timestamp FROM messages "
+            "WHERE channel = ? "
+        )
+        parameters: list[Any] = [channel]
+        if since:
+            query += "AND timestamp > ? "
+            parameters.append(since)
+        query += "ORDER BY timestamp ASC, rowid ASC LIMIT ?"
+        parameters.append(limit + 1)
+        rows = self._database.execute(query, parameters).fetchall()
+        has_more = len(rows) > limit
+        messages = []
+        for row in rows[:limit]:
+            message = dict(row)
+            message["payload"] = json.loads(message["payload"])
+            messages.append(message)
+        return web.json_response({"messages": messages, "has_more": has_more})
+
     async def start(
         self,
         websocket_host: str = "127.0.0.1",
@@ -341,12 +425,14 @@ class NotificationServer:
         if server is not None:
             self.websocket_port = server.sockets[0].getsockname()[1]
         await self._connect_redis()
+        self.cleanup_task = asyncio.create_task(self._expiry_loop())
 
         health_app = web.Application()
         health_app.router.add_get("/health", self.health)
         health_app.router.add_get("/channels", self.list_channels)
         health_app.router.add_get("/channels/{name}/subscribers", self.list_subscribers)
         health_app.router.add_get("/messages", self.list_messages)
+        health_app.router.add_get("/history", self.history)
         self.health_runner = web.AppRunner(health_app)
         await self.health_runner.setup()
         site = web.TCPSite(self.health_runner, health_host, health_port)
@@ -354,6 +440,10 @@ class NotificationServer:
         self.health_port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
 
     async def stop(self) -> None:
+        if self.cleanup_task is not None:
+            self.cleanup_task.cancel()
+            await asyncio.gather(self.cleanup_task, return_exceptions=True)
+            self.cleanup_task = None
         if self.redis_task is not None:
             self.redis_task.cancel()
             await asyncio.gather(self.redis_task, return_exceptions=True)
