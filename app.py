@@ -18,6 +18,8 @@ import secrets
 import time
 import jwt
 
+from notifications import send_notification_email
+
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
@@ -42,6 +44,7 @@ def init_db():
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'user',
+                email TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS tasks (
@@ -49,11 +52,13 @@ def init_db():
                 owner_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
                 description TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (owner_id) REFERENCES users(id)
             );
         """)
     _migrate_legacy_schema()
+    _migrate_add_columns()
 
 
 def _migrate_legacy_schema():
@@ -80,6 +85,22 @@ def _migrate_legacy_schema():
 
         if "tokens" in tables:
             conn.execute("DROP TABLE tokens")
+
+        conn.commit()
+
+
+def _migrate_add_columns():
+    """Add columns introduced after the initial schema (email, status) to
+    pre-existing databases. Safe to run repeatedly."""
+    with get_db() as conn:
+        user_cols = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+        if "email" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
+            conn.execute("UPDATE users SET email = username || '@example.com' WHERE email = ''")
+
+        task_cols = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()}
+        if "status" not in task_cols:
+            conn.execute("ALTER TABLE tasks ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
 
         conn.commit()
 
@@ -150,6 +171,7 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    email = data.get("email", "").strip() or f"{username}@example.com"
     if not username or not password:
         return jsonify({"error": "username and password required"}), 400
     if len(password) < 8:
@@ -162,9 +184,9 @@ def register():
             return jsonify({"error": "username already taken"}), 409
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) "
-            "VALUES (?, ?, 'user', ?)",
-            (username, hash_password(password), now),
+            "INSERT INTO users (username, password_hash, role, email, created_at) "
+            "VALUES (?, ?, 'user', ?, ?)",
+            (username, hash_password(password), email, now),
         )
         conn.commit()
     return jsonify({"message": "user registered", "username": username}), 201
@@ -232,6 +254,7 @@ def create_task(user: dict):
             "id": cursor.lastrowid,
             "name": name,
             "description": data.get("description", ""),
+            "status": "pending",
             "created_at": now,
         }), 201
 
@@ -247,6 +270,35 @@ def get_task(user: dict, task_id: int):
     if row is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(dict(row))
+
+
+@tasks_bp.route("/<int:task_id>", methods=["PUT"])
+@require_auth
+def update_task(user: dict, task_id: int):
+    data = request.get_json(silent=True) or {}
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
+            (task_id, user["id"]),
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "task not found"}), 404
+
+        name = data.get("name", row["name"])
+        description = data.get("description", row["description"])
+        status = data.get("status", row["status"])
+
+        conn.execute(
+            "UPDATE tasks SET name = ?, description = ?, status = ? WHERE id = ?",
+            (name, description, status, task_id),
+        )
+        conn.commit()
+        updated = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+
+    if status == "completed" and row["status"] != "completed":
+        send_notification_email.delay(user["email"], updated["name"])
+
+    return jsonify(dict(updated))
 
 
 @tasks_bp.route("/<int:task_id>", methods=["DELETE"])

@@ -1,5 +1,6 @@
 import os
 import tempfile
+from unittest.mock import patch
 
 import jwt
 import pytest
@@ -276,3 +277,144 @@ def test_migration_preserves_legacy_items_and_password_hash(client):
             "SELECT password_hash FROM users WHERE username = 'legacy_user'"
         ).fetchone()
     assert row["password_hash"].startswith(("pbkdf2:", "scrypt:"))
+
+
+# ── Task update (PUT /tasks/{id}) ───────────────────────────────
+
+def test_update_task_status(client):
+    register(client)
+    token = login(client).get_json()["token"]
+    created = client.post("/tasks", json={"name": "Task 1"}, headers=auth_header(token)).get_json()
+
+    resp = client.put(
+        f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=auth_header(token)
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "in_progress"
+
+
+def test_new_task_defaults_to_pending_status(client):
+    register(client)
+    token = login(client).get_json()["token"]
+    resp = client.post("/tasks", json={"name": "Task 1"}, headers=auth_header(token))
+    assert resp.get_json()["status"] == "pending"
+
+
+def test_update_task_not_found(client):
+    register(client)
+    token = login(client).get_json()["token"]
+    resp = client.put("/tasks/999", json={"status": "completed"}, headers=auth_header(token))
+    assert resp.status_code == 404
+
+
+def test_update_task_requires_auth(client):
+    resp = client.put("/tasks/1", json={"status": "completed"})
+    assert resp.status_code == 401
+
+
+def test_update_task_cannot_update_other_users_task(client):
+    register(client, username="alice")
+    register(client, username="bob")
+    alice_token = login(client, username="alice").get_json()["token"]
+    bob_token = login(client, username="bob").get_json()["token"]
+    created = client.post(
+        "/tasks", json={"name": "Alice task"}, headers=auth_header(alice_token)
+    ).get_json()
+
+    resp = client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_header(bob_token)
+    )
+    assert resp.status_code == 404
+
+
+# ── Completion notification trigger ─────────────────────────────
+
+@patch("app.send_notification_email.delay")
+def test_completing_task_triggers_notification(mock_delay, client):
+    register(client, username="alice")
+    token = login(client, username="alice").get_json()["token"]
+    created = client.post(
+        "/tasks", json={"name": "Ship feature"}, headers=auth_header(token)
+    ).get_json()
+
+    resp = client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_header(token)
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+    mock_delay.assert_called_once_with("alice@example.com", "Ship feature")
+
+
+@patch("app.send_notification_email.delay")
+def test_non_completed_status_change_does_not_trigger_notification(mock_delay, client):
+    register(client)
+    token = login(client).get_json()["token"]
+    created = client.post("/tasks", json={"name": "Task 1"}, headers=auth_header(token)).get_json()
+
+    resp = client.put(
+        f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=auth_header(token)
+    )
+
+    assert resp.status_code == 200
+    mock_delay.assert_not_called()
+
+
+@patch("app.send_notification_email.delay")
+def test_already_completed_task_does_not_retrigger_notification(mock_delay, client):
+    register(client)
+    token = login(client).get_json()["token"]
+    created = client.post("/tasks", json={"name": "Task 1"}, headers=auth_header(token)).get_json()
+
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_header(token))
+    mock_delay.reset_mock()
+    resp = client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_header(token)
+    )
+
+    assert resp.status_code == 200
+    mock_delay.assert_not_called()
+
+
+@patch("app.send_notification_email.delay")
+def test_updating_name_only_does_not_trigger_notification(mock_delay, client):
+    register(client)
+    token = login(client).get_json()["token"]
+    created = client.post("/tasks", json={"name": "Task 1"}, headers=auth_header(token)).get_json()
+
+    resp = client.put(
+        f"/tasks/{created['id']}", json={"name": "Renamed"}, headers=auth_header(token)
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json()["name"] == "Renamed"
+    mock_delay.assert_not_called()
+
+
+def test_register_with_custom_email_used_for_notification(client):
+    client.post(
+        "/auth/register",
+        json={"username": "alice", "password": "password123", "email": "custom@corp.com"},
+    )
+    token = login(client).get_json()["token"]
+    created = client.post("/tasks", json={"name": "Task 1"}, headers=auth_header(token)).get_json()
+
+    with patch("app.send_notification_email.delay") as mock_delay:
+        client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_header(token)
+        )
+        mock_delay.assert_called_once_with("custom@corp.com", "Task 1")
+
+
+# ── Notification task logic ─────────────────────────────────────
+
+def test_send_notification_email_task_logic(capsys):
+    from notifications import send_notification_email
+
+    result = send_notification_email("alice@example.com", "Ship feature")
+    captured = capsys.readouterr()
+
+    assert "alice@example.com" in captured.out
+    assert "Ship feature" in captured.out
+    assert "alice@example.com" in result
+    assert "Ship feature" in result
