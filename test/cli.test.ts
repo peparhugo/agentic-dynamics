@@ -42,4 +42,29 @@ describe('parseArgs', () => {
       templates: 'tpl',
     });
   });
+
+  it('parses the serve command with defaults', () => {
+    expect(parseArgs(['node', 'cli.js', 'serve'])).toEqual({ command: 'serve' });
+  });
+
+  it('parses --port for the serve command', () => {
+    expect(parseArgs(['node', 'cli.js', 'serve', '--port', '8080'])).toEqual({
+      command: 'serve',
+      port: 8080,
+    });
+  });
+
+  it('parses --port= for the serve command', () => {
+    expect(parseArgs(['node', 'cli.js', 'serve', '--port=8080'])).toEqual({
+      command: 'serve',
+      port: 8080,
+    });
+  });
+
+  it('parses a short -p port flag', () => {
+    expect(parseArgs(['node', 'cli.js', 'serve', '-p', '9000'])).toEqual({
+      command: 'serve',
+      port: 9000,
+    });
+  });
 });
