@@ -141,6 +141,37 @@ def _source_revision(entry: dict[str, Any]) -> str:
     return _git_sha(entry) or RESULT_VERSION
 
 
+#: Field names probed on a results entry for a per-run *observation* timestamp. The current
+#: ``_results_summary.json`` schema has **none** of these — its only timestamp is the batch
+#: ``_meta.generated_at`` — so :func:`_observed_at` falls back to the producer ``now`` in
+#: practice. The probe is kept explicit (rather than assuming a field exists) so a future
+#: producer that stamps a per-entry timestamp is honored without fabricating one today.
+_TIMESTAMP_FIELDS = (
+    "ended_at",
+    "observed_at",
+    "timestamp",
+    "run_at",
+    "finished_at",
+    "created_at",
+    "started_at",
+)
+
+
+def _observed_at(entry: dict[str, Any], *, now: datetime | None = None) -> str:
+    """Return the entry's run timestamp when present, else the producer ``now``.
+
+    Only a non-empty *string* value is accepted (a per-entry ISO timestamp); anything else
+    (missing, numeric epoch, empty) falls back to ``now`` — we never fabricate a timestamp
+    the summary does not actually carry. ``valid_from``/``indexed_at`` stay the producer
+    ``now`` regardless (they describe *this* derivation/indexing pass, not the measurement).
+    """
+    for key in _TIMESTAMP_FIELDS:
+        value = entry.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return _now_iso(now)
+
+
 def _yields_finding(entry: dict[str, Any]) -> bool:
     """Return True when the entry should become a trusted finding.
 
@@ -216,9 +247,11 @@ def build_record(
       ``entity_id`` holds.
 
     ``authority`` is ``MEASURED`` (a raw attempt measurement supports an outcome claim) and
-    ``evidence_class`` is ``"[M]"``. ``confidence`` and ``perturbation_strength`` are carried
-    through the rendered ``text`` (the :class:`KnowledgeRecord` schema has no fields for them);
-    ``test_executed_success`` and ``outcome_id`` map to the record's explicit fields.
+    ``evidence_class`` is ``"[M]"``. The three ledger signals are carried **structurally** on the
+    record — ``confidence`` [H] and ``perturbation_strength`` [M] as ``float | None`` (measured or
+    ``None``, never a fabricated ``0.0``) and ``test_executed_success`` [M] as ``bool | None`` —
+    *and* through the rendered ``text`` (which stays the human-readable rendering with its
+    ``"confidence —"`` placeholder when absent). ``outcome_id`` also maps to an explicit field.
 
     Raises ``ValueError`` when the entry would be skipped by ``build_evidence_cards`` (a
     flailed or unmeasured run must not become a trusted finding) — callers that need the
@@ -265,7 +298,9 @@ def build_record(
         authority=Authority.MEASURED,
         valid_from=ts,
         valid_to=None,
-        observed_at=ts,
+        # observed_at prefers the entry's own run timestamp (when the summary stamps one);
+        # valid_from/indexed_at stay the producer now — they describe *this* pass, not the run.
+        observed_at=_observed_at(entry, now=now),
         indexed_at=ts,
         acl_scope=ACL_SCOPE,
         contains_sensitive_data=False,
@@ -276,6 +311,10 @@ def build_record(
         outcome_id=str(entry.get("outcome_id") or ""),
         test_executed_success=card.test_executed_success,
         evidence_class="[M]",
+        # Structured ledger signals — measured-or-None, in lockstep with the rendered text
+        # (build_evidence_cards already derived them via _finite_float, so absent stays None).
+        confidence=card.confidence,
+        perturbation_strength=card.perturbation_strength,
     )
     content_hash = _sha256_bytes(record_to_artifact(record))
     knowledge_id = compute_knowledge_id(
@@ -297,7 +336,9 @@ def record_to_event(
     ``sha256(record_to_artifact(record))``. The ``source_revision`` is recovered from
     ``record.commit_sha`` (which stores the revision folded into ``knowledge_id``), so a replay
     reproduces the exact id. ``occurred_at`` is the producer timestamp used to measure
-    end-to-end lag.
+    end-to-end lag. ``event_id`` is set to ``record.knowledge_id`` as a deterministic tracing
+    id — it is **not** the idempotence key (``knowledge_id`` is; ``event_id`` is only a
+    correlation handle, so a re-emitted event traces back to the same logical record).
     """
     return KnowledgeEvent(
         knowledge_id=record.knowledge_id,
@@ -308,7 +349,7 @@ def record_to_event(
         content_hash=_sha256_bytes(record_to_artifact(record)),
         occurred_at=_now_iso(now),
         schema_version=SCHEMA_VERSION,
-        event_id="",
+        event_id=record.knowledge_id,
     )
 
 
@@ -321,8 +362,9 @@ def extract_record(event: KnowledgeEvent, artifact_bytes: bytes) -> KnowledgeRec
     JSON from :func:`record_to_artifact`, which serializes the two derived identities
     (``knowledge_id`` and ``content_hash``) as empty strings so the artifact bytes are
     hash-independent. Their real values travel in the pointer event and are reattached here;
-    every other field — including ``authority=MEASURED`` — is restored via
-    ``KnowledgeRecord.from_dict``.
+    every other field — including ``authority=MEASURED`` and the structured ledger signals
+    ``confidence``/``perturbation_strength``/``test_executed_success`` — is restored via
+    ``KnowledgeRecord.from_dict`` (those three are measured-or-``None``, never a fabricated 0.0).
     """
     data = json.loads(artifact_bytes.decode("utf-8"))
     record = KnowledgeRecord.from_dict(data)

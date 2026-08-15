@@ -223,6 +223,8 @@ class KnowledgeRecord:
     outcome_id: str
     test_executed_success: bool | None  # None = not independently verified.
     evidence_class: str  # [M] [C] [H] [P] [X].
+    confidence: float | None = None            # [H] execution-confidence; None = unmeasured.
+    perturbation_strength: float | None = None # [M] strength axis (0.0 = baseline); None = unmeasured.
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict, encoding ``authority`` as its enum name."""
@@ -253,6 +255,8 @@ class KnowledgeRecord:
             "outcome_id": self.outcome_id,
             "test_executed_success": self.test_executed_success,
             "evidence_class": self.evidence_class,
+            "confidence": self.confidence,
+            "perturbation_strength": self.perturbation_strength,
         }
 
     @classmethod
@@ -285,4 +289,6 @@ class KnowledgeRecord:
             outcome_id=d["outcome_id"],
             test_executed_success=d.get("test_executed_success"),
             evidence_class=d["evidence_class"],
+            confidence=d.get("confidence"),
+            perturbation_strength=d.get("perturbation_strength"),
         )

@@ -186,6 +186,51 @@ def test_confidence_absent_renders_em_dash_not_zero():
     assert "confidence 0.00" not in record.text
 
 
+def test_confidence_and_perturbation_strength_are_structured():
+    record = build_record(_entry(confidence=0.82, perturbation_strength=0.5))
+    # The ledger signals are now structural fields on the record — not only the prose.
+    assert record.confidence == 0.82
+    assert record.perturbation_strength == 0.5
+
+
+def test_absent_signals_stay_none_not_zero():
+    record = build_record(_entry())
+    # Unmeasured stays None (never a fabricated 0.0), mirroring test_executed_success.
+    assert record.confidence is None
+    assert record.perturbation_strength is None
+
+
+def test_non_finite_signals_coerce_to_none():
+    record = build_record(_entry(confidence=float("nan"), perturbation_strength=float("inf")))
+    assert record.confidence is None
+    assert record.perturbation_strength is None
+
+
+def test_structured_signals_round_trip_to_dict_from_dict_and_artifact():
+    record = build_record(_entry(confidence=0.82, perturbation_strength=0.5))
+    # to_dict / from_dict round-trips the two new fields.
+    restored = KnowledgeRecord.from_dict(record.to_dict())
+    assert restored.confidence == 0.82
+    assert restored.perturbation_strength == 0.5
+    assert restored == record
+    # The durable artifact carries them too, so extract_record reconstructs them.
+    event = record_to_event(record)
+    artifact = record_to_artifact(record)
+    extracted = extract_record(event, artifact)
+    assert extracted.confidence == 0.82
+    assert extracted.perturbation_strength == 0.5
+    assert extracted == record
+
+
+def test_absent_signals_round_trip_stay_none_through_artifact():
+    record = build_record(_entry())
+    assert record.confidence is None and record.perturbation_strength is None
+    restored = KnowledgeRecord.from_dict(record.to_dict())
+    assert restored.confidence is None and restored.perturbation_strength is None
+    extracted = extract_record(record_to_event(record), record_to_artifact(record))
+    assert extracted.confidence is None and extracted.perturbation_strength is None
+
+
 def test_test_executed_success_carried_through():
     record_true = build_record(_entry(test_executed_success=True))
     assert record_true.test_executed_success is True
@@ -250,7 +295,8 @@ def test_event_carries_identity_and_pointers():
     assert event.content_hash == record.content_hash
     assert event.schema_version == SCHEMA_VERSION
     assert event.occurred_at  # producer timestamp is set
-    assert event.event_id == ""
+    # event_id is a deterministic tracing id (NOT the idempotence key — knowledge_id is).
+    assert event.event_id == record.knowledge_id
 
 
 def test_event_occurred_at_respects_injected_now():
@@ -260,6 +306,21 @@ def test_event_occurred_at_respects_injected_now():
     record = build_record(_entry(), now=pinned)
     event = record_to_event(record, now=pinned)
     assert event.occurred_at == pinned.isoformat()
+
+
+def test_observed_at_prefers_entry_timestamp_else_falls_back_to_now():
+    from datetime import datetime, timezone
+
+    pinned = datetime(2026, 8, 15, 12, 0, 0, tzinfo=timezone.utc)
+    # The real _results_summary.json has no per-entry timestamp → fall back to producer now.
+    record = build_record(_entry(), now=pinned)
+    assert record.observed_at == pinned.isoformat()
+    # A stamped entry timestamp is honored verbatim (not fabricated, not reclocked).
+    record = build_record(_entry(ended_at="2026-08-14T09:30:00+00:00"), now=pinned)
+    assert record.observed_at == "2026-08-14T09:30:00+00:00"
+    # valid_from / indexed_at describe *this* derivation pass, so they stay the producer now.
+    assert record.valid_from == pinned.isoformat()
+    assert record.indexed_at == pinned.isoformat()
 
 
 # ── Batch derivation filters like build_evidence_cards ──────────
