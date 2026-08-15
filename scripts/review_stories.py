@@ -12,8 +12,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from instrument.story import load_story_result
 from instrument.review import review_commit, review_story
+from instrument.story import load_story_result
 
 
 def main():
@@ -56,9 +56,9 @@ def main():
             ["git", "-C", str(worktree), "log", "--reverse", "--format=%H %s"],
             capture_output=True, text=True
         ).stdout
-        commits = [l.split(" ", 1) for l in log.strip().splitlines() if "Session" in l]
+        commits = [line.split(" ", 1) for line in log.strip().splitlines() if "Session" in line]
 
-        for i, (ch, cm) in enumerate(commits):
+        for i, (ch, _cm) in enumerate(commits):
             print(f"    Reviewing commit {i+1}/{len(commits)}: {ch[:8]}")
             review = review_commit(
                 worktree, ch,
@@ -68,7 +68,7 @@ def main():
             commit_reviews.append(review.to_dict())
 
         # Story review with DeepSeek V4 Pro (better coherence analysis)
-        print(f"    Reviewing full story with DeepSeek V4 Pro...")
+        print("    Reviewing full story with DeepSeek V4 Pro...")
         story_review = review_story(worktree, story.story_name, model="deepseek/deepseek-v4-pro")
 
         # Save

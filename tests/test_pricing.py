@@ -1,5 +1,6 @@
 import pytest
-from instrument.efficiency import get_pricing, PROVIDER_PRICING, compute_cost_estimate
+
+from instrument.efficiency import compute_cost_estimate, get_pricing
 
 
 def test_get_pricing_deepseek():

@@ -1,12 +1,12 @@
-# AI FinOps Dynamics — Reproduction Environment
+# Agentic Dynamics — Reproduction Environment
 # 
-# Build:  docker build -t ai-finops-dynamics .
+# Build:  docker build -t agentic-dynamics .
 # Run:    docker run --rm \
 #           -v ~/.opencode/bin/opencode:/usr/local/bin/opencode \
 #           -v ~/.local/share/opencode/opencode.db:/root/.local/share/opencode/opencode.db \
 #           -v $(pwd)/experiments/results:/app/experiments/results \
 #           -e FINOPS_WORKTREE_ROOT=/app/experiments/results/artifacts \
-#           ai-finops-dynamics
+#           agentic-dynamics
 
 FROM python:3.10-slim
 

@@ -138,7 +138,7 @@ def main() -> None:
     else:
         print(f"Enqueued {total_jobs} review jobs ({stories_with_worktrees} stories)")
         print(f"Queue: {r.llen(QUEUE_KEY)} pending")
-        print(f"Start workers: nohup python3 scripts/review_worker.py &")
+        print("Start workers: nohup python3 scripts/review_worker.py &")
 
 
 if __name__ == "__main__":

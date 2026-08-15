@@ -35,7 +35,7 @@ class ReviewProblem:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ReviewProblem":
+    def from_dict(cls, d: dict[str, Any]) -> ReviewProblem:
         return cls(
             category=d.get("category", "other"),
             severity=d.get("severity", "info"),

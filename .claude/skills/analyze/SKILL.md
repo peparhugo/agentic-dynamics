@@ -194,8 +194,9 @@ python scripts/analyze_trajectories.py
 python scripts/sync_data.py
 # 5. Build website data:
 python scripts/build_data.py
-# 6. Deploy:
+# 6. Deploy (BOTH hosts):
 firebase deploy --only hosting
+firebase deploy --only hosting --project agentic-dynamics
 ```
 
 ## Measure / Compare / Writeup (written — spec-driven)

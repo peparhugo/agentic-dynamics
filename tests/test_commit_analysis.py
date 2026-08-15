@@ -3,18 +3,14 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from instrument.commit_analysis import (
     CommitAnalysis,
     StoryAnalysis,
-    ConventionRules,
-    get_convention_rules,
-    compute_ast_diff,
-    score_conventions,
-    analyze_commit,
-    analyze_story_worktree,
     _run_git,
+    analyze_story_worktree,
+    compute_ast_diff,
+    get_convention_rules,
+    score_conventions,
 )
 
 

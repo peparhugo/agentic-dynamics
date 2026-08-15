@@ -37,7 +37,7 @@ def _worse_rate(story_id: str) -> tuple[int, int]:
         sid = r.get("story_id", "")
         if sid and sid != story_id:
             continue
-        if sid == story_id or True:
+        if True:
             total += 1
             if r.get("better_or_worse") == "worse":
                 worse += 1

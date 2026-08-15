@@ -19,7 +19,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from instrument.story import load_story_result, save_story_result, StoryResult, SessionResult
+from instrument.story import load_story_result, save_story_result
 
 OPENCODE_BIN = Path.home() / ".opencode/bin/opencode"
 
@@ -147,7 +147,7 @@ def recover_cell(cell: dict[str, Any]) -> bool:
                  f"[story] Session {failed_session}: {cell['task_type']} (continued)"],
                 capture_output=True,
             )
-            print(f"    Committed changes")
+            print("    Committed changes")
 
         # Save continuation log
         log_dir = RESULTS_DIR / "logs"

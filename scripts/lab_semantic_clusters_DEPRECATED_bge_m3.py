@@ -10,7 +10,7 @@ Output: experiments/results/lab_semantic_clusters.json
 
 import json
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent

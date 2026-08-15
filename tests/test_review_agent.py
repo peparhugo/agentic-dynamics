@@ -1,9 +1,6 @@
 """Tests for agent review system."""
 
 import json
-from pathlib import Path
-
-import pytest
 
 from instrument.review import (
     CommitReview,

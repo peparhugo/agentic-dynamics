@@ -1,6 +1,4 @@
-import pytest
-from instrument.adapter import InstrumentedAdapter, InvokeTimeoutError
-from instrument.trajectory import TrajectoryStep
+from instrument.adapter import InstrumentedAdapter
 
 
 class FakeResult:

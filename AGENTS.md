@@ -28,13 +28,15 @@ python scripts/build_data.py
 python admin/server.py               # SSE dashboard (default 8000 = ChromaDB; use FINOPS_PORT) — now the Control Room portal (matrix/status/flags/design-sessions/claude-agents), see docs/supervisor_design.md
 pytest tests/
 pytest tests/test_<module>.py -v
-firebase deploy --only hosting       # deploy = inventory -> sync -> build -> deploy
+firebase deploy --only hosting                       # canonical site (ai-finops-rulebook)
+firebase deploy --only hosting --project agentic-dynamics  # mirror site — deploy BOTH
 ```
 
 ## Operational notes
 
 - **Redis isolation (two instances):** the framework queue lives in `finops-queue` on port **6380** (`FINOPS_REDIS_PORT` default 6380). Story agents build Flask/Celery apps against `finops-redis` on **6379** and call `flushdb()`/`flushall()` while testing — since they hardcode 6379, they can never reach the framework queue. Never run the queue on 6379.
 - **Models in use:** `deepseek/deepseek-v4-flash`, `deepseek/deepseek-v4-pro`, `anthropic/claude-haiku-4-5`, `anthropic/claude-sonnet-5`, `openai/gpt-5.6-luna`, `openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`.
+- **Firebase dual-host (keep both synced):** the site is served from **two** Firebase projects — `ai-finops-rulebook` (canonical; the URL already shared with peers — never change or retire it) and `agentic-dynamics` (mirror, forward-looking identity). Every deploy must target BOTH: `firebase deploy --only hosting` and `firebase deploy --only hosting --project agentic-dynamics`. Both serve the same `firebase/public/` — never let them drift. If the `agentic-dynamics` project ID is unavailable, STOP and ask before choosing a fallback.
 
 ## Key files (read on demand, not preemptively)
 

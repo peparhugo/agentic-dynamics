@@ -9,16 +9,15 @@ Output: experiments/results/lab_claude_audit.json
 """
 
 import json
-import sys
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_PATH = ROOT / "experiments" / "results" / "_trajectory_aggregate.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_claude_audit.json"
 
-from _constants import MODEL_LABELS, normalize_task
+from _constants import normalize_task
 
 DEEPSEEK_ID = "deepseek/deepseek-v4-pro"
 CLAUDE_ID = "anthropic/claude-fable-5"
@@ -173,7 +172,7 @@ def main():
     cb = data["cost_breakdown"]["claude"]
     ca = data["correctness_adjusted_cost"]
 
-    print(f"=== LAB BOOK 1: THE CLAUDE AUDIT ===\n")
+    print("=== LAB BOOK 1: THE CLAUDE AUDIT ===\n")
     print(f"Overlapping tasks: {m['overlapping_tasks']}")
     print(f"DeepSeek entries: {m['total_ds_entries']}  |  Claude entries: {m['total_cl_entries']}\n")
 
@@ -183,7 +182,7 @@ def main():
     for t in data["per_task"]:
         print(f"{t['task']:<30} ${t['ds_cost']:>7.4f} ${t['cl_cost']:>7.4f} {t['ds_correctness']:>6.0%} {t['cl_correctness']:>6.0%} {t['correctness_delta']:>+6.0%} {t['cost_ratio']:>6.1f}x {t['winner']:<10}")
 
-    print(f"\nAGGREGATE:")
+    print("\nAGGREGATE:")
     print(f"  DeepSeek avg cost:      ${agg['deepseek_avg_cost']:.4f}/session")
     print(f"  Claude avg cost:        ${agg['claude_avg_cost']:.4f}/session")
     print(f"  DeepSeek avg correctness: {agg['deepseek_avg_correctness']:.0%}")
@@ -191,19 +190,19 @@ def main():
     print(f"  Cost ratio:              {agg['cost_ratio']:.0f}×")
     print(f"  Claude wins: {agg['claude_wins']}  |  DeepSeek wins: {agg['deepseek_wins']}  |  Ties: {agg['ties']}")
 
-    print(f"\nCLAUDE COST BREAKDOWN:")
+    print("\nCLAUDE COST BREAKDOWN:")
     print(f"  Output tokens:   ${cb['output']:.2f} ({cb['output']/max(cb['total'],0.01)*100:.0f}%)")
     print(f"  Cache:           ${cb['cache']:.2f} ({cb['cache']/max(cb['total'],0.01)*100:.0f}%)")
     print(f"  Input tokens:    ${cb['input']:.2f} ({cb['input']/max(cb['total'],0.01)*100:.0f}%)")
     print(f"  Reasoning:       ${cb['reasoning']:.2f} ({cb['reasoning']/max(cb['total'],0.01)*100:.0f}%)")
     print(f"  TOTAL:           ${cb['total']:.2f}")
 
-    print(f"\nCORRECTNESS-ADJUSTED COST (dollars per percentage point of correctness):")
+    print("\nCORRECTNESS-ADJUSTED COST (dollars per percentage point of correctness):")
     print(f"  DeepSeek: ${ca['deepseek_cost_per_correct_point']:.4f}")
     print(f"  Claude:   ${ca['claude_cost_per_correct_point']:.4f}")
     print(f"  Ratio:    {ca['ratio']:.0f}×")
 
-    print(f"\nFINDING: ", end="")
+    print("\nFINDING: ", end="")
     if agg["claude_wins"] <= 1:
         print(f"Claude leads on {agg['claude_wins']}/{agg['claude_wins']+agg['deepseek_wins']+agg['ties']} overlapping tasks. The 69× premium does not buy general correctness improvement.")
     else:

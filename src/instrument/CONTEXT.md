@@ -2,7 +2,7 @@
 
 40 Python modules (+ `__init__.py`) that form the core library. Measures search dynamics (not
 outputs): basin escape rates, recovery cost, attractor strength, strategy classification.
-Pip-installable as `ai-finops-dynamics`.
+Pip-installable as `agentic-dynamics`.
 
 Two modules form the spec/compiler layer (see `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`). `experiment_spec.py` and `compile_experiment.py` are both **written**. Together they turn the library from a linear pipeline into a cycle: `spec → DAG → cells → jobs → attempts → information → policy → grid → campaign`.
 

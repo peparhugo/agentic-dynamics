@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Generate data_manifest.json — schema version, hashes, pipeline audit trail."""
-import json, hashlib, subprocess, os
-from pathlib import Path
+import hashlib
+import json
+import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"

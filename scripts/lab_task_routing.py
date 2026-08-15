@@ -8,8 +8,8 @@ Output: experiments/results/lab_task_routing.json
 """
 
 import json
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
@@ -89,7 +89,7 @@ def compute():
         if ds_stats and cl_stats:
             cl_delta = cl_stats.get("avg_correctness", 0) - ds_stats.get("avg_correctness", 0)
             if cl_delta > 0.05:
-                recommendation = "Claude escalation (leads by {:.0%} correctness)".format(cl_delta)
+                recommendation = f"Claude escalation (leads by {cl_delta:.0%} correctness)"
                 routing = "escalate_to_claude"
             else:
                 recommendation = "DeepSeek (default)"
@@ -199,7 +199,7 @@ def main():
     data = compute()
     m = data["_meta"]
 
-    print(f"=== LAB BOOK 6: TASK-OPTIMAL ROUTING ===\n")
+    print("=== LAB BOOK 6: TASK-OPTIMAL ROUTING ===\n")
     print(f"Tasks analyzed: {m['tasks_analyzed']}\n")
 
     print("PER-TASK RECOMMENDATIONS:")
@@ -209,7 +209,7 @@ def main():
         routing_short = "DS" if t["routing"] == "deepseek_default" else "CL"
         print(f"{t['task']:<35} {routing_short:<10} {t['best_efficiency_model']:<22} {t['best_correctness_model']:<22}")
 
-    print(f"\nSTRATEGY COMPARISON:")
+    print("\nSTRATEGY COMPARISON:")
     print(f"{'Strategy':<18} {'N':>5} {'Total Cost':>12} {'Avg Cost':>10} {'Avg Correct':>12} {'Cost/Correct':>13}")
     print("-" * 75)
     for name, s in data["strategies"].items():
@@ -222,7 +222,7 @@ def main():
     ds = data["strategies"]["deepseek_only"]
     cl = data["strategies"]["claude_only"]
     gr = data["strategies"]["grit_routed"]
-    print(f"\nWINNER: ", end="")
+    print("\nWINNER: ", end="")
     if gr["avg_correctness"] >= ds["avg_correctness"] and gr["avg_cost"] < cl["avg_cost"] * 0.1:
         print("Grit-routed strategy — highest correctness at near-DeepSeek cost.")
     elif ds["avg_cost"] < cl["avg_cost"] and ds["avg_correctness"] >= cl["avg_correctness"]:

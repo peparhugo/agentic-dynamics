@@ -28,18 +28,26 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
-from _constants import WORKTREE_GLOB
-
-from instrument import (
-    evaluate_solution, compute_efficiency, measure_basin_escape,
-    classify_strategy, GameReport, SolutionMetrics, EfficiencyMetrics, BasinMetrics,
-    StrategyReport, analyze_ast,
-    run_sonar_analysis, compute_sonar_diff, sonar_quality_score,
-    build_operators, perturbation_class_for,
+from _constants import (
+    EXPERIMENT_SESSION_PATTERNS,
+    WORKTREE_GLOB,
+    bootstrap_ci,
+    probe_session_schema,
 )
 
-from _constants import EXPERIMENT_SESSION_PATTERNS, bootstrap_ci, probe_session_schema
-
+from instrument import (
+    GameReport,
+    analyze_ast,
+    build_operators,
+    classify_strategy,
+    compute_efficiency,
+    compute_sonar_diff,
+    evaluate_solution,
+    measure_basin_escape,
+    perturbation_class_for,
+    run_sonar_analysis,
+    sonar_quality_score,
+)
 from instrument.solution import COMPOSITE_WEIGHTS, COMPOSITE_WEIGHTS_SONAR
 
 OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
@@ -246,7 +254,7 @@ def load_config_constraints(config_name: str) -> list[str]:
 
 def read_worktree_code(worktree_path: str) -> str:
     """Concatenate project code files in a worktree.
-    
+
     Reads .py files first. Falls back to .ts/.tsx if no Python found.
     """
     p = Path(worktree_path)
@@ -335,7 +343,7 @@ def infer_constraints(worktree_path: str, title: str = "") -> list[str]:
 
 def parse_session_title_info(title: str) -> dict:
     """Extract experiment and model metadata from session title.
-    
+
     Returns: {experiment, operator, silent_mode, model_short}
     """
     info = {"experiment": "", "operator": "baseline", "silent_mode": "natural",
@@ -440,15 +448,16 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
             non_python_files += 1
             try:
                 content = f.read_text(errors="replace")
-                lines = [l for l in content.split("\n") if l.strip()]
+                lines = [line for line in content.split("\n") if line.strip()]
                 real_code_lines += len(lines)
-            except: pass
+            except Exception:
+                pass
         elif f.suffix == ".py":
             total_code_files += 1
             try:
                 content = f.read_text(errors="replace")
-                lines = [l for l in content.split("\n") if l.strip() 
-                        and not l.strip().startswith("#")]
+                lines = [line for line in content.split("\n") if line.strip()
+                        and not line.strip().startswith("#")]
                 real_code_lines += len(lines)
                 tree = ast.parse(content)
                 for node in ast.walk(tree):
@@ -562,9 +571,8 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
 
     # ── AST Profiling ──
     ast_profile = ast_profile_worktree(worktree_path)
-    ast_comparison = None
     if baseline_code and code:
-        ast_comparison = analyze_ast(baseline_code, code,
+        analyze_ast(baseline_code, code,
                                      operator=info.get("operator", ""),
                                      perturbation_class=pert_class)
 
@@ -607,8 +615,8 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     no_baseline = not baseline_code
     self_comparison = bool(baseline_code) and baseline_code == code
     if no_baseline or self_comparison:
-        from instrument.basin import BasinMetrics as _BM
-        basin = _BM(
+        from instrument.basin import BasinMetrics
+        basin = BasinMetrics(
             perturbation_operator=info.get("operator", "baseline"),
             perturbation_class=pert_class,
             perturbation_strength=actual_strength,
@@ -634,8 +642,8 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     else:
         sonar_diff_data = None
         if baseline_sm and baseline_sm.analyzed and solution.sonar_analyzed:
-            from instrument.sonar import SonarMetrics as _SM
-            perturbed_sm = _SM(
+            from instrument.sonar import SonarMetrics
+            perturbed_sm = SonarMetrics(
                 analyzed=True, bugs=solution.sonar_bugs,
                 vulnerabilities=solution.sonar_vulnerabilities,
                 code_smells=solution.sonar_code_smells,
@@ -791,14 +799,14 @@ def discover_worktrees(sessions_by_dir: dict) -> list[dict]:
 
 def ast_profile_worktree(worktree_path: str) -> dict:
     """Comprehensive analysis of a worktree's generated code.
-    
+
     Analyzes Python files with AST. Counts TypeScript/JS files for multi-language worktrees.
     """
     import ast
     p = Path(worktree_path)
     skip = {"__pycache__", ".git", "venv", ".venv", "site-packages",
             "node_modules", ".mypy_cache", ".pytest_cache", "Lib", "lib"}
-    
+
     metrics = {
         "py_files": 0, "total_lines": 0, "total_functions": 0,
         "total_classes": 0, "type_hints": 0, "docstrings": 0,
@@ -806,10 +814,10 @@ def ast_profile_worktree(worktree_path: str) -> dict:
         "test_files": 0, "parse_errors": 0, "has_tests": False,
         "ts_files": 0, "tsx_files": 0, "js_files": 0, "ts_total_lines": 0,
     }
-    
+
     py_files = [f for f in sorted(p.rglob("*.py")) if not (skip & set(f.parts))]
     metrics["py_files"] = len(py_files)
-    
+
     # Count TypeScript and JavaScript files
     for ext, key in [(".ts", "ts_files"), (".tsx", "tsx_files"), (".js", "js_files")]:
         ts_list = [f for f in sorted(p.rglob(f"*{ext}")) if not (skip & set(f.parts))]
@@ -817,48 +825,50 @@ def ast_profile_worktree(worktree_path: str) -> dict:
         for f in ts_list:
             try:
                 content = f.read_text(errors="replace")
-                lines = [l for l in content.split("\n") if l.strip() and not l.strip().startswith("//")]
+                lines = [line for line in content.split("\n") if line.strip() and not line.strip().startswith("//")]
                 metrics["ts_total_lines"] += len(lines)
             except Exception:
                 pass
-    
+
     for f in py_files:
         rel = str(f.name)
         if "test" in rel.lower():
             metrics["test_files"] += 1
         try:
             code = f.read_text(errors="replace")
-            lines = [l for l in code.split("\n") if l.strip() and not l.strip().startswith("#")]
+            lines = [line for line in code.split("\n") if line.strip() and not line.strip().startswith("#")]
             metrics["total_lines"] += len(lines)
-            
+
             tree = ast.parse(code)
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     metrics["total_functions"] += 1
-                    if node.returns: metrics["type_hints"] += 1
+                    if node.returns:
+                        metrics["type_hints"] += 1
                     if (node.body and isinstance(node.body[0], ast.Expr)
                             and isinstance(node.body[0].value, ast.Constant)):
                         metrics["docstrings"] += 1
                     for arg in node.args.args:
-                        if arg.annotation: metrics["type_hints"] += 1
+                        if arg.annotation:
+                            metrics["type_hints"] += 1
                     # Check for error handler patterns
                     for dec in node.decorator_list:
                         metrics["decorators"] += 1
                         dec_str = ast.unparse(dec) if hasattr(ast, 'unparse') else str(dec)
                         if "error" in dec_str.lower():
                             metrics["error_handlers"] += 1
-                
+
                 if isinstance(node, ast.ClassDef):
                     metrics["total_classes"] += 1
-                
+
                 if isinstance(node, (ast.Import, ast.ImportFrom)):
                     metrics["imports"] += 1
-                
+
                 if isinstance(node, ast.Try):
                     metrics["error_handlers"] += 1
         except Exception:
             metrics["parse_errors"] += 1
-    
+
     metrics["has_tests"] = metrics["test_files"] > 0
     if metrics["py_files"] > 0:
         metrics["functions_per_file"] = round(metrics["total_functions"] / metrics["py_files"], 1)
@@ -871,13 +881,13 @@ def ast_profile_worktree(worktree_path: str) -> dict:
         metrics.update({"functions_per_file": 0, "classes_per_file": 0,
                         "avg_lines_per_file": 0, "type_hint_pct": 0,
                         "docstring_pct": 0, "test_rate": 0})
-    
+
     return metrics
 
 
 def code_fingerprint(workdir: str) -> dict:
     """Extract structural fingerprint: modules, routes, classes.
-    
+
     Two worktrees with similar fingerprints were given the same instructions.
     """
     import ast
@@ -888,14 +898,18 @@ def code_fingerprint(workdir: str) -> dict:
             "node_modules", ".mypy_cache", ".pytest_cache", "Lib", "lib"}
     py_files = []
     for f in sorted(p.rglob("*.py")):
-        if skip & set(f.parts): continue
+        if skip & set(f.parts):
+            continue
         try:
             code = f.read_text(errors="replace")
             if len(code) > 20:
                 py_files.append((f.relative_to(p), code))
-        except: pass
-        if len(py_files) > 30: break
-    if not py_files: return {}
+        except Exception:
+            pass
+        if len(py_files) > 30:
+            break
+    if not py_files:
+        return {}
     modules = sorted(set(str(f).replace("/", ".").replace(".py", "") for f, _ in py_files))
     routes = set()
     classes = set()
@@ -906,7 +920,8 @@ def code_fingerprint(workdir: str) -> dict:
             for node in ast.walk(ast.parse(code)):
                 if isinstance(node, ast.ClassDef) and not node.name.startswith("Test"):
                     classes.add(node.name)
-        except: pass
+        except Exception:
+            pass
     return {"modules": sorted(modules), "routes": sorted(routes), "classes": sorted(classes)}
 
 
@@ -928,7 +943,7 @@ def fingerprint_score(fp_a: dict, fp_b: dict) -> float:
 
 def build_baseline_index(worktrees: list[dict]) -> dict:
     """Index baselines by key -> {code, fingerprint, path}.
-    
+
     Keys: experiment|model_short and experiment|provider/model_id
     """
     index = {}
@@ -938,11 +953,15 @@ def build_baseline_index(worktrees: list[dict]) -> dict:
         info = parse_session_title_info(title)
         if info["operator"] != "baseline":
             continue
-        exp = info["experiment"]; ms = info["model_short"]
-        prov = s.get("provider", ""); mid = s.get("model_id", "")
+        exp = info["experiment"]
+        ms = info["model_short"]
+        prov = s.get("provider", "")
+        mid = s.get("model_id", "")
         keys = []
-        if exp and ms: keys.append(f"{exp}|{ms}")
-        if exp and prov and mid: keys.append(f"{exp}|{prov}/{mid}")
+        if exp and ms:
+            keys.append(f"{exp}|{ms}")
+        if exp and prov and mid:
+            keys.append(f"{exp}|{prov}/{mid}")
         for key in keys:
             if key not in index:
                 code = read_worktree_code(wt["path"])
@@ -966,8 +985,10 @@ def find_baseline_code(worktree_title: str, session: dict,
     if info["operator"] == "baseline":
         return ""
 
-    ms = info["model_short"]; exp = info["experiment"]
-    prov = session.get("provider", ""); mid = session.get("model_id", "")
+    ms = info["model_short"]
+    exp = info["experiment"]
+    prov = session.get("provider", "")
+    mid = session.get("model_id", "")
 
     # ── Priority 1: fingerprint match ──
     if worktree_path:
@@ -975,7 +996,7 @@ def find_baseline_code(worktree_title: str, session: dict,
         if pert_fp:
             best_score = 0.0
             best_code = ""
-            for key, entry in baseline_index.items():
+            for entry in baseline_index.values():
                 base_fp = entry.get("fp")
                 if not base_fp:
                     continue
@@ -992,10 +1013,12 @@ def find_baseline_code(worktree_title: str, session: dict,
     # ── Priority 2: exact experiment+model match ──
     if exp and ms:
         entry = baseline_index.get(f"{exp}|{ms}")
-        if entry: return entry["code"]
+        if entry:
+            return entry["code"]
     if exp and prov and mid:
         entry = baseline_index.get(f"{exp}|{prov}/{mid}")
-        if entry: return entry["code"]
+        if entry:
+            return entry["code"]
 
     # ── Priority 3: fuzzy model_short within same experiment ──
     if exp and ms:
@@ -1221,9 +1244,9 @@ def main():
                     md += f"| {label} | {val_str} |\n"
 
             if metrics.get("narration_penalty", 0) > 0:
-                md += f"\n## Narration Assessment\n\n"
+                md += "\n## Narration Assessment\n\n"
                 md += f"**Narration penalty:** {metrics['narration_penalty']:.0%}\n\n"
-                md += f"| Metric | Value |\n|--------|-------|\n"
+                md += "| Metric | Value |\n|--------|-------|\n"
                 md += f"| Output tokens | {s.get('tokens_output', 0):,} |\n"
                 md += f"| Python files | {ast.get('py_files', 0)} |\n"
                 md += f"| Non-Python files | {metrics.get('non_python_files', 0)} |\n"
@@ -1233,14 +1256,14 @@ def main():
                 elif metrics.get("is_frontend"):
                     md += f"| **Verdict** | **FRONTEND WORKTREE — {metrics.get('non_python_files',0)} HTML/JS files, no Python** |\n"
                 else:
-                    md += f"| **Assessment** | Low code density — narration exceeded code output |\n"
+                    md += "| **Assessment** | Low code density — narration exceeded code output |\n"
                 md += "\n"
 
             # Test results section
             tr = metrics.get("test_results")
             if tr and tr.get("ok"):
                 md += "\n\n---\n\n## Pytest Results\n\n"
-                md += f"| Metric | Value |\n|--------|-------|\n"
+                md += "| Metric | Value |\n|--------|-------|\n"
                 md += f"| Passed | {tr['passed']} |\n"
                 md += f"| Failed | {tr['failed']} |\n"
                 md += f"| Errors | {tr['errors']} |\n"
@@ -1349,7 +1372,7 @@ def main():
                     agg[f"{f}_n"] = len(vals)
             return agg
 
-        NUM_FIELDS = ["cost", "cost_input_usd", "cost_output_usd", "cost_reasoning_usd",
+        NUM_FIELDS = ["cost", "cost_input_usd", "cost_output_usd", "cost_reasoning_usd",  # noqa: N806
                       "cost_cache_usd", "code_lines", "tokens", "tokens_input", "tokens_output",
                       "tokens_reasoning", "tokens_cache_read", "tokens_cache_write",
                       "energy_total_j", "thinking_ratio", "correctness", "escape",

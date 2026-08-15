@@ -1,5 +1,4 @@
-import pytest
-from instrument.recovery import classify_trajectory_segments, SegmentClass
+from instrument.recovery import SegmentClass, classify_trajectory_segments
 from instrument.trajectory import ReasoningTrajectory, TrajectoryStep
 
 

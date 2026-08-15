@@ -14,6 +14,7 @@ To run the steps manually (or when Redis is unavailable), load the "analyze" ski
 4. `python scripts/analyze_trajectories.py`
 5. `python scripts/build_data.py`
 6. `firebase deploy --only hosting`
+7. `firebase deploy --only hosting --project agentic-dynamics`  (mirror — deploy BOTH)
 
 Report each step's output and any errors encountered.
 

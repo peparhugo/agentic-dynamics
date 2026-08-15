@@ -48,6 +48,6 @@ python3 scripts/generate_manifest.py
 echo ""
 echo "============================================"
 echo " Done — firebase/public/data.js is ready"
-echo " Deploy: cd firebase && firebase deploy --only hosting"
+ echo " Deploy (BOTH hosts): cd firebase && firebase deploy --only hosting && firebase deploy --only hosting --project agentic-dynamics"
 echo " Manifest: experiments/data_manifest.json"
 echo "============================================"

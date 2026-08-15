@@ -88,13 +88,13 @@ def print_status(status: dict, clear_screen: bool = True) -> None:
     failed = status["failed"]
     timeout = status["timeout"]
     completed = status["completed"]
-    remaining = total - completed
+    total - completed
 
     bar_width = 40
     done_width = int(bar_width * completed / total) if total > 0 else 0
     bar = "█" * done_width + "░" * (bar_width - done_width)
 
-    print(f"  AI FinOps Dynamics — Experiment Monitor")
+    print("  AI FinOps Dynamics — Experiment Monitor")
     print(f"  {'='*50}")
     print(f"  Progress: [{bar}] {completed}/{total} ({100*completed//total if total else 0}%)")
     print(f"  Done: {done}  |  Failed: {failed}  |  Timeout: {timeout}")

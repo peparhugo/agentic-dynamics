@@ -8,8 +8,8 @@ Output: experiments/results/lab_grit_matrix.json
 """
 
 import json
+from collections import Counter, defaultdict
 from pathlib import Path
-from collections import defaultdict, Counter
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
@@ -143,7 +143,7 @@ def _build_chart_datasets(points):
 
     datasets = []
     for label, pts in sorted(by_model.items()):
-        mid = next((m for m, l in MODEL_LABELS.items() if l == label), None)
+        mid = next((m for m, lbl in MODEL_LABELS.items() if lbl == label), None)
         color = MODEL_COLORS.get(mid, "rgba(161,161,170,0.75)")
         datasets.append({
             "label": label,
@@ -169,7 +169,7 @@ def main():
     data = compute()
     m = data["_meta"]
 
-    print(f"=== LAB BOOK 2: THE GRIT MATRIX ===\n")
+    print("=== LAB BOOK 2: THE GRIT MATRIX ===\n")
     print(f"Total points: {m['total_points']} across {m['models']} models")
     print(f"Quadrant boundaries: escape={m['quadrant_boundaries']['escape_median']}, correctness={m['quadrant_boundaries']['correctness_median']}\n")
 
@@ -178,13 +178,13 @@ def main():
         label = m["quadrant_labels"][q]
         print(f"  {q}: {count} entries — {label}")
 
-    print(f"\nPER-MODEL QUADRANT PERCENTAGES:")
+    print("\nPER-MODEL QUADRANT PERCENTAGES:")
     print(f"{'Model':<22} {'High Grit':>10} {'Explorative':>12} {'Consv Fail':>12} {'Wasteful':>10}")
     print("-" * 70)
     for label, pct in sorted(data["model_quadrant_percentages"].items()):
         print(f"{label:<22} {pct['high_grit_pct']:>9.1f}% {pct['explorative_pct']:>11.1f}% {pct['conservative_fail_pct']:>11.1f}% {pct['wasteful_pct']:>9.1f}%")
 
-    print(f"\nPERTURBATION CLASS QUADRANTS:")
+    print("\nPERTURBATION CLASS QUADRANTS:")
     for pc, counts in data["perturbation_class_quadrants"].items():
         total = sum(counts.values())
         print(f"  {pc}: {total} entries — ", end="")
@@ -192,10 +192,10 @@ def main():
         print(", ".join(parts))
 
     print(f"\nCHART DATA: {len(data['chart_data']['datasets'])} datasets ready for Chart.js bubble chart")
-    print(f"  X-axis: escape rate (0-1)")
-    print(f"  Y-axis: correctness (0-1)")
-    print(f"  Bubble radius: cost ($0.001–$2.49 scaled ×15)")
-    print(f"  Colors: DeepSeek=green, Claude=cyan, GPT-5.6=blue, nano=red, GPT-5=amber")
+    print("  X-axis: escape rate (0-1)")
+    print("  Y-axis: correctness (0-1)")
+    print("  Bubble radius: cost ($0.001–$2.49 scaled ×15)")
+    print("  Colors: DeepSeek=green, Claude=cyan, GPT-5.6=blue, nano=red, GPT-5=amber")
 
     print(f"\nOutput: {OUTPUT_PATH}")
 

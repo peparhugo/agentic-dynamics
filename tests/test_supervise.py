@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from scripts import supervise
 from instrument.supervisor import SUPERVISOR_FLAGS_KEY
+from scripts import supervise
 
 
 class FakeRedis:

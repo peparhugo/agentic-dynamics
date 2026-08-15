@@ -9,8 +9,8 @@ Output: experiments/results/lab_tool_archetypes.json
 """
 
 import json
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
@@ -123,7 +123,7 @@ def main():
     data = compute()
     m = data["_meta"]
 
-    print(f"=== LAB BOOK 5: TOOL-CHOICE ARCHETYPES ===\n")
+    print("=== LAB BOOK 5: TOOL-CHOICE ARCHETYPES ===\n")
     print(f"Valid entries: {m['total_valid_entries']}\n")
 
     print("BY ARCHETYPE:")
@@ -133,7 +133,7 @@ def main():
         models_str = ", ".join(d["models"][:3])
         print(f"{arch:<20} {d['n']:>5} {d['avg_correctness']:>7.0%} ${d['avg_cost']:>8.4f} {d['avg_loc']:>6} {d['avg_code_quality']:>8.2f} {d['avg_cyclomatic_complexity']:>8.1f} {d['avg_escape']:>7.2f} {models_str:<30}")
 
-    print(f"\nBY MODEL — TOOL PROFILES:")
+    print("\nBY MODEL — TOOL PROFILES:")
     print(f"{'Model':<22} {'Write%':>7} {'Read%':>6} {'Bash%':>6} {'Archetype':<16} {'Steps':>6} {'Tokens':>9} {'Cost':>9} {'N':>4} {'Correct':>8} {'LOC':>5}")
     print("-" * 100)
     for label, d in sorted(data["by_model"].items()):

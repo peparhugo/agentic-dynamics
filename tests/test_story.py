@@ -6,22 +6,22 @@ from pathlib import Path
 import pytest
 
 from instrument.story import (
+    BUILTIN_STORIES,
+    PerturbationCondition,
+    SessionResult,
+    SessionSpec,
     StoryConfig,
     StoryResult,
-    SessionSpec,
-    SessionResult,
+    _detect_or_use,
+    _git,
+    _prepare_worktree,
+    condition_to_mutations,
+    load_story_result,
+    notification_service_story,
     run_story,
     save_story_result,
-    load_story_result,
-    BUILTIN_STORIES,
-    task_manager_story,
     static_site_gen_story,
-    notification_service_story,
-    PerturbationCondition,
-    condition_to_mutations,
-    _prepare_worktree,
-    _git,
-    _detect_or_use,
+    task_manager_story,
 )
 
 
@@ -215,7 +215,7 @@ class TestBuiltinStories:
                 assert len(s.prompt) > 50, f"{name} session {s.session_number} prompt too short"
 
     def test_yaml_export_import(self):
-        for name, story in BUILTIN_STORIES.items():
+        for _name, story in BUILTIN_STORIES.items():
             d = story.to_dict()
             reloaded = StoryConfig.from_dict(d)
             assert reloaded.name == story.name

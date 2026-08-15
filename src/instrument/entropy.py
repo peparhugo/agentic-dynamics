@@ -17,14 +17,17 @@ Five dimensions:
 from __future__ import annotations
 
 import math
-from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .language import detect_language, parse_codebase, LanguageProfile, CodebaseAST
-from .language import collect_functions, _should_skip
-
+from .language import (
+    LanguageProfile,
+    _should_skip,
+    collect_functions,
+    detect_language,
+    parse_codebase,
+)
 
 # ── Data Structures ────────────────────────────────────────────
 

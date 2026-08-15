@@ -119,7 +119,7 @@ def compute():
 
     # Per-position aggregate (average distance across all model pairs)
     all_pos_dists: dict[int, list[float]] = defaultdict(list)
-    for key, positions in position_pairs.items():
+    for positions in position_pairs.values():
         for pos, info in positions.items():
             all_pos_dists[pos].append(info["distance"])
 

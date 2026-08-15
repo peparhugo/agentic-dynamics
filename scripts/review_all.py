@@ -81,7 +81,7 @@ def _review_one_story(result_file: Path) -> tuple[str, str]:
     # Commit reviews
     existing = {cr.get("session_number"): cr for cr in data.get("commit_reviews", [])}
     commit_reviews = []
-    for ch, cm, sn in commits:
+    for ch, _cm, sn in commits:
         if sn in existing and existing[sn]:
             commit_reviews.append(existing[sn])  # reuse already-done review
             continue

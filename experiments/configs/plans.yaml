@@ -33,9 +33,11 @@ plans:
         cmd: [python, scripts/build_data.py]
         depends_on: [sync]
       - id: deploy
-        kind: shell
-        cmd: [firebase, deploy, --only, hosting]
+        kind: pipeline
         depends_on: [build]
+        steps:
+          - [firebase, deploy, --only, hosting]
+          - [firebase, deploy, --only, hosting, --project, agentic-dynamics]
 
   full_matrix:
     description: "DS baseline → Luna → analyze → reviews → regenerate → deploy"
@@ -79,9 +81,11 @@ plans:
           - [python, scripts/build_data.py]
           - [python, scripts/lab_story_review.py]
       - id: deploy
-        kind: shell
+        kind: pipeline
         depends_on: [regenerate]
-        cmd: [firebase, deploy, --only, hosting]
+        steps:
+          - [firebase, deploy, --only, hosting]
+          - [firebase, deploy, --only, hosting, --project, agentic-dynamics]
 
   cross_models:
     description: "Flash → Haiku → Sonnet → Sol → Terra → analyze → reviews → regenerate → deploy"
@@ -133,9 +137,11 @@ plans:
           - [python, scripts/build_data.py]
           - [python, scripts/lab_story_review.py]
       - id: deploy
-        kind: shell
+        kind: pipeline
         depends_on: [regenerate]
-        cmd: [firebase, deploy, --only, hosting]
+        steps:
+          - [firebase, deploy, --only, hosting]
+          - [firebase, deploy, --only, hosting, --project, agentic-dynamics]
 
   feature:
     description: "Spec → implement → lint → test → review → ship"

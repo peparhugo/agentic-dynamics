@@ -27,16 +27,13 @@ from typing import Any
 import yaml
 
 from .backends import run_agentic
-from .opencode import AgenticResult
-from .language import detect_language, parse_codebase, LanguageProfile
+from .language import detect_language
 from .mutation import (
     MutationArtifact,
     apply_mutation,
     compile_mutation,
-    CODEBASE_OPERATORS,
-    SPECIFICATION_OPERATORS,
 )
-
+from .opencode import AgenticResult
 
 # ── Perturbation Condition ─────────────────────────────────────
 
@@ -146,7 +143,7 @@ class SessionSpec:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "SessionSpec":
+    def from_dict(cls, d: dict[str, Any]) -> SessionSpec:
         missing = [k for k in ("session_number", "prompt") if k not in d]
         if missing:
             raise ValueError(f"SessionSpec missing required fields: {missing}")
@@ -181,7 +178,7 @@ class StoryConfig:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "StoryConfig":
+    def from_dict(cls, d: dict[str, Any]) -> StoryConfig:
         return cls(
             name=d["name"],
             description=d.get("description", ""),
@@ -191,7 +188,7 @@ class StoryConfig:
         )
 
     @classmethod
-    def from_yaml(cls, path: Path) -> "StoryConfig":
+    def from_yaml(cls, path: Path) -> StoryConfig:
         with open(path) as f:
             return cls.from_dict(yaml.safe_load(f))
 
@@ -352,7 +349,7 @@ class StoryResult:
         if first_correctness >= last_correctness:
             return False
         # Find the session where correctness stabilized
-        for i, s in enumerate(self.sessions):
+        for _i, s in enumerate(self.sessions):
             if s.agentic and s.agentic.correctness > first_correctness:
                 return True
         return None

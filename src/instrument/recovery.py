@@ -14,11 +14,11 @@ territory. The recovery ratio quantifies this difference.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from .trajectory import ReasoningTrajectory, TrajectoryStep
+from .trajectory import ReasoningTrajectory
 
 
 class SegmentClass(str, Enum):
@@ -84,7 +84,7 @@ def classify_trajectory_segments(
     """
     markers = recovery_markers or _default_recovery_markers()
     baseline_tools_set = set(baseline.tool_call_sequence())
-    baseline_tool_seq = baseline.tool_call_sequence()
+    baseline.tool_call_sequence()
     perturbed_tool_seq = perturbed.tool_call_sequence()
 
     # Build index maps: for each step index, what position in the filtered tool sequence?
@@ -263,7 +263,6 @@ def _extract_tech_terms(text: str) -> set[str]:
 
 def _extract_patterns(text: str) -> set[str]:
     """Extract structural patterns from text (headers, prefixes, code markers)."""
-    import re
     patterns = set()
     # Markdown headers
     for match in re.finditer(r'^#{1,4}\s+(.+)$', text, re.MULTILINE):

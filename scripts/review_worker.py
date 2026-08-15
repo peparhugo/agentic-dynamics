@@ -126,7 +126,7 @@ def main() -> None:
                 except Exception:
                     remaining = 0
                 if remaining == 0:
-                    log(f"Queue empty. Exiting.")
+                    log("Queue empty. Exiting.")
                     break
                 empty_polls = 0
             continue

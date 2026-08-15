@@ -223,7 +223,7 @@ class ReviewPhase(Phase):
 
         results_dir = ROOT / "experiments" / "results" / "stories"
         reviews_dir = ROOT / "experiments" / "results" / "reviews"
-        MODEL = "deepseek/deepseek-v4-flash"
+        MODEL = "deepseek/deepseek-v4-flash"  # noqa: N806
 
         jobs = []
         for rf in sorted(results_dir.glob("*.json")):
@@ -328,13 +328,14 @@ def _spawn_workers(phase: Phase) -> list[subprocess.Popen]:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     for i in range(phase.worker_count):
         log_file = LOG_DIR / f"worker_{phase.id}_{i + 1}.log"
-        p = subprocess.Popen(
-            ["nohup", sys.executable, phase.worker_script],
-            stdout=open(log_file, "w"),
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        procs.append(p)
+        with open(log_file, "w") as f:
+            p = subprocess.Popen(
+                ["nohup", sys.executable, phase.worker_script],
+                stdout=f,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            procs.append(p)
     return procs
 
 
@@ -435,7 +436,7 @@ def run_plan(plan, start_from=None, dry_run=False, reset=False):
         print("Plan state reset.")
 
     skip = start_from
-    current = r.get(PLAN_PHASE_KEY) or ""
+    r.get(PLAN_PHASE_KEY) or ""
     worker_pids: list = []
 
     for phase in plan.phases:
@@ -451,10 +452,10 @@ def run_plan(plan, start_from=None, dry_run=False, reset=False):
         if phase.worker_count == 0:
             # Skip if already done (idempotency for restarts)
             if _get_state(r, phase.id)["status"] == "done":
-                print(f"  Already done.")
+                print("  Already done.")
                 continue
             if isinstance(phase, AnalyzePhase):
-                print(f"  Running analyze_stories.py...")
+                print("  Running analyze_stories.py...")
                 if not dry_run:
                     subprocess.run(
                         [sys.executable, "scripts/analyze_stories.py"],
@@ -462,7 +463,7 @@ def run_plan(plan, start_from=None, dry_run=False, reset=False):
                     )
                 _set_state(r, phase.id, status="done")
             elif isinstance(phase, RegeneratePhase):
-                print(f"  Running backfill → sync → build → lab...")
+                print("  Running backfill → sync → build → lab...")
                 if not dry_run:
                     for script in [
                         "scripts/backfill_costs.py",
@@ -476,7 +477,7 @@ def run_plan(plan, start_from=None, dry_run=False, reset=False):
                             cwd=str(ROOT), timeout=300,
                         )
                 _set_state(r, phase.id, status="done")
-                print(f"  Done.")
+                print("  Done.")
             continue
 
         r.set(PLAN_PHASE_KEY, phase.id)

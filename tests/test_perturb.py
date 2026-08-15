@@ -1,11 +1,13 @@
-import pytest
 import random
+
+import pytest
+
+from instrument.basin import BasinMetrics
 from instrument.perturb import (
-    build_operators,
     PERTURBATION_CLASSES,
+    build_operators,
     perturbation_class_for,
 )
-from instrument.basin import BasinMetrics
 
 
 def test_remove_critical_constraint_removes_constraint():

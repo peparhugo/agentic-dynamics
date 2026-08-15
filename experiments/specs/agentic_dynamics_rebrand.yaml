@@ -1,4 +1,7 @@
 name: agentic_dynamics_rebrand
+# SUPERSEDED (2026-08-15): the "keep the existing Firebase host, no new domain" constraint below
+# is reversed. The site is dual-hosted: ai-finops-rulebook (canonical) + agentic-dynamics (mirror).
+# See AGENTS.md -> "Firebase dual-host (keep both synced)".
 question: "Can sol rebrand the repository and public website around the field of Agentic Dynamics without changing the instrument or its evidence?"
 version: "0.1"
 workflow:

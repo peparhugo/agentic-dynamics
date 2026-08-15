@@ -17,8 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .language import detect_language, parse_codebase, LanguageProfile, CodebaseAST, _should_skip
-
+from .language import LanguageProfile, _should_skip, detect_language, parse_codebase
 
 # ── Data Structures ────────────────────────────────────────────
 
@@ -268,9 +267,7 @@ def _extract_imports(
                     text = child.text.decode().strip("\"'")
                     if text:
                         result.append(text)
-                elif child.type == "import_clause":
-                    walk(child)
-                elif child.type == "named_imports":
+                elif child.type == "import_clause" or child.type == "named_imports":
                     walk(child)
         for child in node.children:
             walk(child)

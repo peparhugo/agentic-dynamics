@@ -15,7 +15,7 @@ from typing import Any
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning)
     import tree_sitter_languages
-    from tree_sitter import Language, Node, Parser, Tree
+    from tree_sitter import Node, Parser, Tree
 
 
 @dataclass

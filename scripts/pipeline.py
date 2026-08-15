@@ -183,7 +183,7 @@ def validate_plan(plan: PlanDefinition) -> list[str]:
 
 def _detect_cycles(plan: PlanDefinition) -> list[str] | None:
     adj = {p.id: list(p.depends_on) for p in plan.phases}
-    WHITE, GRAY, BLACK = 0, 1, 2
+    WHITE, GRAY, BLACK = 0, 1, 2  # noqa: N806
     color = {p.id: WHITE for p in plan.phases}
 
     def dfs(node: str, path: list[str]) -> list[str] | None:
@@ -310,13 +310,14 @@ def _spawn_workers(worker_script: str, count: int, log_tag: str) -> list[subproc
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     for i in range(count):
         log_file = LOG_DIR / f"worker_{log_tag}_{i + 1}.log"
-        p = subprocess.Popen(
-            ["nohup", sys.executable, worker_script],
-            stdout=open(log_file, "w"),
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        procs.append(p)
+        with open(log_file, "w") as f:
+            p = subprocess.Popen(
+                ["nohup", sys.executable, worker_script],
+                stdout=f,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            procs.append(p)
     return procs
 
 
@@ -498,7 +499,6 @@ def _execute_matrix(phase: PlanPhase, context: dict) -> bool:
 
 
 def _execute_review(phase: PlanPhase, context: dict) -> bool:
-    from instrument.story import load_story_result
 
     rdb = _r()
     plan_name = context.get("plan_name", "review")
@@ -661,7 +661,7 @@ def _execute_ship(phase: PlanPhase, context: dict) -> bool:
         subprocess.run(["git", "checkout", branch], cwd=cwd, timeout=10)
         return False
 
-    commit_result = subprocess.run(
+    subprocess.run(
         ["git", "commit", "-m", phase.kind_params.get("message", f"Merge {branch}")],
         cwd=cwd, timeout=30,
     )
@@ -843,7 +843,7 @@ def _execute_conflict_detect(phase: PlanPhase, context: dict) -> bool:
             conflicts.append((name, branch, pair))
 
     if conflicts:
-        print(f"  Conflicts detected:")
+        print("  Conflicts detected:")
         for name, branch, files in conflicts:
             print(f"    {name} ({branch}): {', '.join(files)}")
         return False
@@ -1123,10 +1123,7 @@ def run_plan(plan: PlanDefinition, *, from_phase: str | None = None,
 def show_graph(plan: PlanDefinition) -> None:
     levels = topological_order(plan)
     for i, level in enumerate(levels):
-        if i == 0:
-            prefix = "▶"
-        else:
-            prefix = " ├─"
+        prefix = "▶" if i == 0 else " ├─"
         ids = ", ".join(level)
         print(f"  {prefix} {ids}")
 

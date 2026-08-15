@@ -1,6 +1,7 @@
 import sys
-import pytest
 from pathlib import Path
+
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -55,3 +56,10 @@ def requires_chroma(request):
 def requires_opencode(request):
     if not (Path.home() / ".opencode" / "bin" / "opencode").exists():
         pytest.skip("opencode binary not available")
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "external: tests requiring external services (opencode, Ollama, ChromaDB, Neo4j)",
+    )

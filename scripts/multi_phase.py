@@ -5,18 +5,14 @@ cost, correctness, and compounding effects across iterations.
 Exposes the real cost differential of session-based pricing.
 """
 
-import json
-import os
-import shutil
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from instrument import evaluate_solution
 from instrument.opencode import run_opencode_agentic
-from instrument import perturb_prompt, evaluate_solution, compute_efficiency
-
 
 PHASES = [
     ("build", "Build a team collaboration platform with Python/Flask and SQLite. "
@@ -70,7 +66,7 @@ def run_multi_phase(model_id: str, label: str, timeout: int = 300):
         cumulative_tokens += r.total_tokens
 
         has_tests = any("test" in f.lower() for f in r.files_created)
-        sol = evaluate_solution(r.final_response, [])
+        evaluate_solution(r.final_response, [])
 
         print(f"tok={r.total_tokens:,} ${r.estimated_cost_usd:.4f} "
               f"tools={r.total_tool_calls} tests={'YES' if has_tests else 'no'} "

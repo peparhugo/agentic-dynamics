@@ -24,11 +24,11 @@ Produces:
     experiments/results/_trajectory_aggregate.json — per-model comparable aggregates
 """
 
+import argparse
 import json
 import sys
-import argparse
-from pathlib import Path
 from collections import Counter, defaultdict
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -333,8 +333,9 @@ def enrich_with_embeddings(results, model_map):
     try:
         import sys
         sys.path.insert(0, str(ROOT / "src"))
-        from instrument.embeddings import ChromaStore
         import numpy as np
+
+        from instrument.embeddings import ChromaStore
 
         store = ChromaStore()
         chroma = store.collection.get(include=["embeddings", "metadatas"])

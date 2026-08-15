@@ -43,9 +43,10 @@ All metrics provenance-tagged [M]/[C]/[H]/[X]. Consumed by 8 HTML pages via app.
 
 ### Website (firebase/)
 ```bash
-firebase deploy --only hosting
+firebase deploy --only hosting                          # canonical (ai-finops-rulebook)
+firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy BOTH
 ```
-Site: https://ai-finops-rulebook.web.app
+Site: https://ai-finops-rulebook.web.app (canonical, already shared with peers) + https://agentic-dynamics.web.app (mirror)
 Pages: index, framework, evidence, story, methodology, accelerator, databricks, glossary
 Config: firebase.json (hosting source: public/)
 
@@ -133,7 +134,7 @@ docker run -d --name sonarqube -p 9000:9000 sonarqube:community
 - Redis queue needs Docker running; check with `docker ps`
 - Backfill scripts copy code from /tmp (ephemeral) to experiments/results/ (persistent)
 - opencode.db is the primary session store — never delete it without backup
-- Firebase config: project `ai-finops-rulebook`, hosting source `public/`
+- Firebase config: TWO projects serve the same `public/` — `ai-finops-rulebook` (canonical) + `agentic-dynamics` (mirror). Deploy BOTH; never let them drift.
 - Full conventions at `.claude/rules/conventions.md`
 
 ### When Working

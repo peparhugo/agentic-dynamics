@@ -7,13 +7,13 @@ import pytest
 
 from instrument.entropy import (
     EntropyProfile,
+    _classify_name,
+    _dict_entropy,
+    _histogram,
+    _shannon_entropy,
     compute_entropy,
     entropy_delta,
     entropy_delta_detailed,
-    _shannon_entropy,
-    _dict_entropy,
-    _histogram,
-    _classify_name,
 )
 
 

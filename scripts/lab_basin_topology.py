@@ -13,7 +13,6 @@ Output: experiments/results/lab_basin_topology.json
 
 import json
 from pathlib import Path
-from collections import defaultdict
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
@@ -126,7 +125,7 @@ def compute():
             overall_correctness = round(sum(e.get("correctness", 0) for e in all_valid) / len(all_valid), 2)
             overall_cost = round(sum(e.get("cost", 0) for e in all_valid) / len(all_valid), 4)
             overall_recovery = round(overall_cost / max(all([compute_recovery_multiplier(all_entries, mid, pc) for pc in ["semantic", "manifold"] if compute_recovery_multiplier(all_entries, mid, pc)] or [1.0]), 0.001), 3)
-            overall_volume = round((1 - overall_escape) * overall_correctness / max(overall_recovery, 0.001), 3)
+            round((1 - overall_escape) * overall_correctness / max(overall_recovery, 0.001), 3)
 
         model_profiles[label] = {
             "model_id": mid,
@@ -175,7 +174,7 @@ def main():
     data = compute()
     m = data["_meta"]
 
-    print(f"=== LAB BOOK 7: ATTRACTOR BASIN TOPOLOGY PROFILE ===\n")
+    print("=== LAB BOOK 7: ATTRACTOR BASIN TOPOLOGY PROFILE ===\n")
     print(f"Reference: {m['reference']}")
     print(f"Method: {m['method']}")
     print(f"Volume formula: {m['basin_volume_formula']}\n")
@@ -188,11 +187,11 @@ def main():
         for pc, bp in sorted(p.get("basin_profiles", {}).items()):
             print(f"{label:<22} {pc:<10} {bp['basin_type']:<16} {bp['escape']:>7.2f} {bp['correctness']:>7.0%} {bp['recovery_multiplier']:>7.2f}x {bp['basin_volume']:>7.3f} {flail:>5.1f}%")
 
-    print(f"\nBASIN VOLUME RANKING (semantic):")
+    print("\nBASIN VOLUME RANKING (semantic):")
     for i, r in enumerate(data["basin_volume_ranking"]):
         print(f"  {i+1}. {r['model']}: {r['basin_volume']:.3f}")
 
-    print(f"\nBASIN TYPE DISTRIBUTION:")
+    print("\nBASIN TYPE DISTRIBUTION:")
     type_counts = {}
     for p in data["model_profiles"].values():
         for bp in p.get("basin_profiles", {}).values():

@@ -6,13 +6,13 @@ perturbation operators, strategies, and basin topologies.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 from pathlib import Path
 from typing import Any
 
 from neo4j import GraphDatabase
-
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -66,10 +66,8 @@ class Neo4jClient:
             "CREATE CONSTRAINT strategy_name_unique IF NOT EXISTS FOR (s:StrategyArchetype) REQUIRE s.name IS UNIQUE",
         ]
         for c in constraints:
-            try:
+            with contextlib.suppress(Exception):
                 self._run(c)
-            except Exception:
-                pass
 
     def clear_all(self) -> None:
         self._run("MATCH (n) DETACH DELETE n")
@@ -281,10 +279,8 @@ class Neo4jClient:
             "MERGE (r)-[:CLASSIFIED_AS]->(s)",
         ]
         for query in queries:
-            try:
+            with contextlib.suppress(Exception):
                 self._run(query)
-            except Exception:
-                pass
 
     def load_basin_topology(self, basin_path: Path | None = None) -> None:
         if basin_path is None:
@@ -452,7 +448,6 @@ class Neo4jClient:
         avoiding ChromaDB dependency. Each step becomes a :Step node with
         :HAS_STEP and :NEXT relationships.
         """
-        from pathlib import Path
         sys.path.insert(0, str(PROJECT_ROOT / "src"))
         from instrument.embeddings import extract_session_steps
 

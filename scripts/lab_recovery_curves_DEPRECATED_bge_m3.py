@@ -339,7 +339,7 @@ if __name__ == "__main__":
     print("\n=== Per-Model Divergence Curves (from cross-model consensus) ===")
     print(f"{'Model':<20} {'Shape':<3} {'RecStep':<8} {'TermDist':<8} {'Slope':<10} {'Steps'}")
     print("-" * 65)
-    for model, c in results["by_model"].items():
+    for _model, c in results["by_model"].items():
         label = c["label"]
         shape = c["curve_shape"]
         rec = str(c.get("recovery_point_step", "-"))
@@ -348,10 +348,10 @@ if __name__ == "__main__":
         ns = c["num_steps"]
         print(f"{label:<20} {shape:<3} {rec:<8} {term:<8} {sp:<10} {ns}")
 
-    print(f"\n=== Perturbation Gaps ===")
+    print("\n=== Perturbation Gaps ===")
     print(f"{'Model':<20} {'bb_mean':<8} {'bp_mean':<8} {'gap':<8} {'ratio':<8} {'quality'}")
     print("-" * 75)
-    for model, info in results["perturbation_gaps"].items():
+    for _model, info in results["perturbation_gaps"].items():
         bb = f"{info['baseline_baseline_mean_distance']:.4f}" if info["baseline_baseline_mean_distance"] else "-"
         bp = f"{info['baseline_perturbed_mean_distance']:.4f}" if info["baseline_perturbed_mean_distance"] else "-"
         gap = f"{info['perturbation_gap']:+.4f}" if info['perturbation_gap'] is not None else "-"
@@ -359,7 +359,7 @@ if __name__ == "__main__":
         q = info["recovery_quality"]
         print(f"{info['label']:<20} {bb:<8} {bp:<8} {gap:<8} {ratio:<8} {q}")
 
-    print(f"\n=== By Perturbation Class ===")
+    print("\n=== By Perturbation Class ===")
     for cls_name, cls_data in results["by_perturbation_class"].items():
         print(f"  {cls_name}: dominant={cls_data['dominant_shape']}, "
               f"mean_gap_ratio={cls_data['mean_gap_ratio']}, "

@@ -17,12 +17,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+import contextlib
+
 from instrument import (
-    build_operators, perturb_prompt,
-    evaluate_solution, compute_efficiency,
-    classify_strategy, measure_basin_escape,
-    BasinMetrics, GameReport,
+    BasinMetrics,
+    GameReport,
+    build_operators,
+    classify_strategy,
+    compute_efficiency,
     detect_constraints,
+    evaluate_solution,
+    measure_basin_escape,
+    perturb_prompt,
 )
 from instrument.backends import run_agentic
 
@@ -87,7 +93,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     total_perturbed = len(operators) * len(strengths) * repetitions
     for op_name in operators:
         for s in strengths:
-            for rep in range(repetitions):
+            for _rep in range(repetitions):
                 run_idx += 1
                 r = _run_perturbed(task, constraints, op_name, s, base,
                                    ops, model_id, run_idx, total_perturbed, timeout, name,
@@ -101,7 +107,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
                 time.sleep(2)
 
     # Aggregation
-    perturbed = [r for r in all_runs if r["type"] == "perturbed"]
+    [r for r in all_runs if r["type"] == "perturbed"]
     _print_summary(all_runs, name, model_label)
     _save_results(all_runs, name, model_label, results_dir)
     _generate_game_reports(all_runs, name, model_label, constraints, results_dir)
@@ -113,7 +119,7 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
                   thinking_effort="", thinking_budget_tokens=0,
                   output_token_limit=0, silent_mode=None,
                   standardize=True, enforce_pytest=True, backend="auto"):
-    print(f"[baseline] Running...", end=" ", flush=True)
+    print("[baseline] Running...", end=" ", flush=True)
     t0 = time.monotonic()
     r = run_agentic(task, model=model_id, timeout=timeout,
                     thinking_effort=thinking_effort or None,
@@ -138,7 +144,7 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
     if code_files:
         # Re-evaluate with code files for richer constraint matching
         sol = evaluate_solution(r.final_response, constraints, code_files=code_files)
-    det = detect_constraints(r.final_response, constraints, code_files=code_files)
+    detect_constraints(r.final_response, constraints, code_files=code_files)
 
     print(f"correct={sol.correctness_score:.0%} tok={r.total_tokens:,} "
           f"${r.estimated_cost_usd:.4f} tools={r.total_tool_calls} "
@@ -343,7 +349,6 @@ def _save_results(runs, name, model_label, results_dir):
 def _generate_game_reports(runs, name, model_label, constraints, results_dir):
     """Generate individual game reports in markdown with artifacts."""
     import shutil
-    import os
 
     model_slug = model_label.replace(" ", "_").lower()
     reports_dir = results_dir / "reports"
@@ -437,7 +442,7 @@ def multi_model_compare(config_path, model_ids, timeout=200):
 
     # Comparison table
     print(f"\n{'='*100}")
-    print(f"MULTI-MODEL COMPARISON")
+    print("MULTI-MODEL COMPARISON")
     print(f"{'='*100}")
     print(f"{'Model':<20} {'Baseline $':>10} {'Avg Pert $':>10} {'Avg Correct':>12} {'Avg Tok':>10} {'Avg Tools':>10} {'Avg Retries':>10} {'Avg Q/$':>10}")
     print("-" * 100)
@@ -463,7 +468,6 @@ _SOURCE_EXTS = {'.py', '.js', '.ts', '.tsx', '.jsx', '.go', '.rs', '.java', '.rb
 
 def _collect_code(result) -> dict[str, str] | None:
     """Collect code file contents from an AgenticResult's workdir."""
-    import os, glob
     wd = getattr(result, 'workdir', '')
     if not wd or not os.path.isdir(wd):
         return None
@@ -475,14 +479,14 @@ def _collect_code(result) -> dict[str, str] | None:
             ext = os.path.splitext(f)[1].lower()
             if ext in _SOURCE_EXTS and not f.startswith('.'):
                 fpath = os.path.join(root, f)
-                try:
-                    code[os.path.relpath(fpath, wd)] = open(fpath).read()
-                except: pass
+                with contextlib.suppress(BaseException), open(fpath) as fh:
+                    code[os.path.relpath(fpath, wd)] = fh.read()
     return code if code else None
 
 
 if __name__ == "__main__":
-    import argparse, yaml
+    import argparse
+
 
     parser = argparse.ArgumentParser()
     parser.add_argument("config", help="YAML config path")

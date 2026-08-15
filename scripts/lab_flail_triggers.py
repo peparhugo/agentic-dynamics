@@ -8,8 +8,8 @@ Output: experiments/results/lab_flail_triggers.json
 """
 
 import json
+from collections import Counter
 from pathlib import Path
-from collections import defaultdict, Counter
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
@@ -151,7 +151,7 @@ def main():
     data = compute()
     m = data["_meta"]
 
-    print(f"=== LAB BOOK 4: WHAT MAKES A MODEL FLAIL? ===\n")
+    print("=== LAB BOOK 4: WHAT MAKES A MODEL FLAIL? ===\n")
     print(f"Total entries: {m['total_entries']}  |  Flail: {m['flail_entries']}  |  Valid: {m['valid_entries']}")
     print(f"Overall flail rate: {m['overall_flail_rate']}%\n")
 
@@ -161,11 +161,11 @@ def main():
     for label, d in sorted(data["by_model"].items(), key=lambda x: x[1]["flail_rate"], reverse=True):
         print(f"{label:<22} {d['total']:>6} {d['flail_count']:>6} {d['flail_rate']:>6.1f}% ${d['avg_cost_when_flailing']:>13.4f}")
 
-    print(f"\nFLAIL RATE BY PERTURBATION CLASS:")
+    print("\nFLAIL RATE BY PERTURBATION CLASS:")
     for pc, d in sorted(data["by_perturbation_class"].items(), key=lambda x: x[1]["flail_rate"], reverse=True):
         print(f"  {pc}: {d['flail_count']}/{d['total']} = {d['flail_rate']:.1f}%")
 
-    print(f"\nTOP TASK TYPES BY FLAIL RATE:")
+    print("\nTOP TASK TYPES BY FLAIL RATE:")
     for task, d in sorted(data["by_task_type"].items(), key=lambda x: x[1]["flail_rate"], reverse=True)[:8]:
         print(f"  {task:<40} {d['flail_count']}/{d['total']} = {d['flail_rate']:.1f}%")
 

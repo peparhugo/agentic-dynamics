@@ -16,7 +16,10 @@ try:
 except Exception:
     _OLLAMA_OK = False
 
-pytestmark = pytest.mark.skipif(not _OLLAMA_OK, reason="Ollama not available on localhost:11434")
+pytestmark = [
+    pytest.mark.external,
+    pytest.mark.skipif(not _OLLAMA_OK, reason="Ollama not available on localhost:11434"),
+]
 
 
 class TestOllamaAnalyzer:

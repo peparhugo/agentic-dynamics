@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from instrument.commit_analysis import compute_deep_metrics, agentic_token_dicts
+from instrument.commit_analysis import agentic_token_dicts, compute_deep_metrics
 from instrument.story import load_story_result
 
 RESULTS_DIR = ROOT / "experiments" / "results" / "stories"

@@ -14,7 +14,6 @@ Usage:
 
 import json
 import subprocess
-import sys
 import time
 import urllib.request
 from base64 import b64encode
@@ -91,9 +90,13 @@ def _find_project_root(code_dir: Path) -> Path:
         return code_dir
     # Look for a subdirectory that looks like a project
     for child in sorted(code_dir.iterdir()):
-        if child.is_dir() and not child.name.startswith(".") and child.name not in ("node_modules",):
-            if any(child.glob("*.py")) or any(child.glob("*.ts")) or (child / "src").exists():
-                return child
+        if (
+            child.is_dir()
+            and not child.name.startswith(".")
+            and child.name not in ("node_modules",)
+            and (any(child.glob("*.py")) or any(child.glob("*.ts")) or (child / "src").exists())
+        ):
+            return child
     return code_dir
 
 
@@ -139,7 +142,7 @@ def backfill(limit: int = 0, dry_run: bool = False):
     analyzed = 0
     skipped = 0
 
-    for i, entry in enumerate(entries):
+    for _i, entry in enumerate(entries):
         wt = entry.get("worktree_name", "")
         if not wt:
             continue

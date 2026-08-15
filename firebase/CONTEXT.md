@@ -1,12 +1,12 @@
 # `firebase/` — Public Website
 
-Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app). Firebase static hosting.
+Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) (canonical, already shared with peers) and mirrored at [agentic-dynamics.web.app](https://agentic-dynamics.web.app). Firebase static hosting.
 
 ## Config Files
 
 | File | Purpose |
 |------|---------|
-| `.firebaserc` | Project: `ai-finops-rulebook` |
+| `.firebaserc` | Projects: `ai-finops-rulebook` (default) + `agentic-dynamics` (mirror) |
 | `firebase.json` | Hosting config (source: `public/`) |
 
 ## `public/` — 8 Pages + 3 Assets
@@ -40,5 +40,8 @@ python scripts/generate_manifest.py       # generate data_manifest.json
 ## Deploy
 
 ```bash
-firebase deploy --only hosting
+firebase deploy --only hosting                          # canonical (ai-finops-rulebook)
+firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy BOTH
 ```
+
+Both projects serve the same `public/` — never let them drift.

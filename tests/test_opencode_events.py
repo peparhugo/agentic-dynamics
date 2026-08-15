@@ -4,14 +4,10 @@ Verifies that normalize_opencode_event correctly handles both v1 (historical)
 and v2 (current) opencode event formats, producing a canonical representation.
 """
 
-import json
 import subprocess
 from pathlib import Path
 
-import pytest
-
 from instrument.opencode import _init_git_workdir, normalize_opencode_event
-
 
 # ── v1 format (historical — flat structure, no "part" key) ───────────────────
 
@@ -197,7 +193,7 @@ def test_v2_tool_use_recognized_by_trajectory_parser():
     if ev["type"] == "tool":
         tool = ev.get("tool", "unknown")
         assert tool == "bash"
-        assert "read_calls" or "write_calls" or "bash_calls"  # would be counted
+        assert True  # would be counted
 
 
 def test_both_formats_produce_same_canonical_tool_signature():

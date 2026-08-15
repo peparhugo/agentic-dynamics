@@ -13,13 +13,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from instrument.commit_analysis import (
-    analyze_story_worktree,
     StoryAnalysis,
-    CommitAnalysis,
-    compute_deep_metrics,
     agentic_token_dicts,
+    analyze_story_worktree,
+    compute_deep_metrics,
 )
-from instrument.story import load_story_result, StoryResult
+from instrument.story import StoryResult, load_story_result
 
 
 def main():
@@ -91,10 +90,8 @@ def main():
 
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
             futures = {pool.submit(_run, rf): rf for rf in result_files}
-            done = 0
-            for fut in as_completed(futures):
+            for done, fut in enumerate(as_completed(futures), start=1):
                 name, err = fut.result()
-                done += 1
                 if err:
                     print(f"  [{done}/{len(result_files)}] ERROR {name}: {err}")
                 else:

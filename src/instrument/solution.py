@@ -7,10 +7,8 @@ structural novelty compared to baseline.
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
-
 
 # Composite-score weights — single source of truth (P2-3). The non-sonar and
 # sonar sets were previously duplicated across solution.py, analyze_worktrees.py,
@@ -145,7 +143,7 @@ def evaluate_solution(
     m.constraint_score = m.constraints_met / max(m.constraints_total, 1)
 
     # ── Code quality ──
-    lines = [l for l in full_text.split("\n") if l.strip() and not l.strip().startswith("#")]
+    lines = [line for line in full_text.split("\n") if line.strip() and not line.strip().startswith("#")]
     m.lines_of_code = len(lines)
     m.cyclomatic_complexity = _estimate_complexity(full_text)
     m.comment_ratio = _comment_ratio(full_text)
@@ -209,7 +207,7 @@ def _check_constraint(code: str, constraint: str, code_files: dict[str, str] | N
     Uses domain-specific keyword expansions (shared with constraint_detection.py)
     and checks both response text and generated source files.
     """
-    from .constraint_detection import _constraint_keywords, _is_code_context
+    from .constraint_detection import _constraint_keywords
     keywords = _constraint_keywords(constraint)
     if not keywords:
         keywords = [w for w in constraint.lower().split() if len(w) > 3]
@@ -240,12 +238,12 @@ def _comment_ratio(code: str) -> float:
     if not lines:
         return 0.0
     comment_lines = sum(
-        1 for l in lines
-        if l.strip().startswith("#")
-        or l.strip().startswith("//")
-        or l.strip().startswith("--")
-        or l.strip().startswith("/*")
-        or l.strip().startswith("*")
+        1 for line in lines
+        if line.strip().startswith("#")
+        or line.strip().startswith("//")
+        or line.strip().startswith("--")
+        or line.strip().startswith("/*")
+        or line.strip().startswith("*")
     )
     return comment_lines / len(lines)
 

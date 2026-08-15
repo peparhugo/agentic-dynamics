@@ -64,7 +64,7 @@ def main():
         files_written = {}
         transcript_lines = []
 
-        for (data_str, ts) in parts:
+        for (data_str, _ts) in parts:
             obj = json.loads(data_str)
 
             # Collect transcript lines (filter to interesting types)
@@ -144,7 +144,7 @@ def main():
     db.close()
 
     print(f"\n{'='*60}")
-    print(f"RECONSTRUCTION COMPLETE")
+    print("RECONSTRUCTION COMPLETE")
     print(f"  Sessions with code: {success_count}")
     print(f"  Empty sessions:      {empty_count}")
     print(f"  Total files written: {total_files}")

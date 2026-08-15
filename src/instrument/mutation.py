@@ -8,19 +8,17 @@ ensuring all sessions in that cell see the same input.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import subprocess
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from .language import detect_language
-
 
 # ── Operator Registry ──────────────────────────────────────────
 
@@ -139,21 +137,21 @@ class MutationArtifact:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "MutationArtifact":
+    def from_dict(cls, d: dict[str, Any]) -> MutationArtifact:
         return cls(**d)
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2)
 
     @classmethod
-    def from_json(cls, s: str) -> "MutationArtifact":
+    def from_json(cls, s: str) -> MutationArtifact:
         return cls.from_dict(json.loads(s))
 
     def save(self, path: Path) -> None:
         path.write_text(self.to_json())
 
     @classmethod
-    def load(cls, path: Path) -> "MutationArtifact":
+    def load(cls, path: Path) -> MutationArtifact:
         return cls.from_json(path.read_text())
 
     def would_produce_changes(self) -> bool:
@@ -369,8 +367,8 @@ def _call_opencode(
         # Strip ANSI escape codes
         output = re.sub(r'\x1b\[[0-9;]*m', '', output)
         # Strip opencode header lines ("> build · model" etc)
-        lines = [l for l in output.splitlines()
-                 if l.strip() and not l.strip().startswith(">")]
+        lines = [line for line in output.splitlines()
+                 if line.strip() and not line.strip().startswith(">")]
         return "\n".join(lines).strip() or None
 
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:
@@ -406,7 +404,6 @@ def apply_mutation(
         no longer silently ignored — P1-2).
     """
     import subprocess as sp
-    import tempfile
 
     if artifact.operator_class == "specification" and artifact.mutated_spec:
         target = worktree_path / (spec_path or "specification.txt")
@@ -430,9 +427,7 @@ def apply_mutation(
             )
             return proc.returncode == 0
         finally:
-            try:
+            with contextlib.suppress(OSError):
                 Path(patch_file).unlink()
-            except OSError:
-                pass
 
     return False

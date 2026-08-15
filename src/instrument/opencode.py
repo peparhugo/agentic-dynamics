@@ -225,7 +225,6 @@ def run_opencode_agentic(
     Returns:
         AgenticResult with complete execution trace.
     """
-    import tempfile
 
     t0 = time.monotonic()
     result = AgenticResult(
@@ -567,10 +566,9 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
             result.estimated_cost_usd = sum(_step_costs)  # per-step delta
 
     # Estimate correctness from test results if not directly parsed
-    if result.tests_total == 0:
-        if "passed" in str(result.test_output).lower():
-            result.tests_total = max(result.tests_total, 1)
-            result.tests_passed = max(result.tests_passed, 1)
+    if result.tests_total == 0 and "passed" in str(result.test_output).lower():
+        result.tests_total = max(result.tests_total, 1)
+        result.tests_passed = max(result.tests_passed, 1)
 
 
 def normalize_opencode_event(event: dict, schema_version: int | None = None) -> dict:

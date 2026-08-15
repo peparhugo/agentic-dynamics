@@ -4,9 +4,10 @@ Extracts baseline cost, perturbed cost, and recovery cost for each
 operator×strength combination from the opencode session database.
 """
 
-import sqlite3, json, sys
-from pathlib import Path
+import sqlite3
+import sys
 from collections import defaultdict
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from instrument.perturb import perturbation_class_for
@@ -23,7 +24,7 @@ def main():
                s.cost, s.tokens_input, s.tokens_output, s.tokens_reasoning,
                s.tokens_cache_write, s.title
         FROM session s WHERE s.cost > 0
-        AND s.title LIKE '%REST API%' OR s.title LIKE '%task manager%' 
+        AND s.title LIKE '%REST API%' OR s.title LIKE '%task manager%'
         OR s.title LIKE '%URL shortener%' OR s.title LIKE '%collaboration%'
         ORDER BY prov, s.time_created
     ''')
