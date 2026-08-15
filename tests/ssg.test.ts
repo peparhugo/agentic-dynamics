@@ -75,13 +75,62 @@ describe('buildSite', () => {
     expect(index).toContain('href="guides/start.html"');
     expect(index.indexOf('New post')).toBeLessThan(index.indexOf('Start here'));
   });
+
+  it('renders default templates, layouts, and partials', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'site');
+    const templatesDir = path.join(temporaryDirectory, 'templates');
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.mkdir(path.join(templatesDir, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templatesDir, 'partials', 'shared'), { recursive: true });
+    await fs.writeFile(path.join(contentDir, 'hello.md'), '---\ntitle: A & B\nshowNav: true\n---\n**Welcome**');
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '{{> shared/nav}}<article><h1>{{title}}</h1>{{{content}}}</article>');
+    await fs.writeFile(path.join(templatesDir, 'layouts', 'default.hbs'), '<!doctype html><body>{{{body}}}{{> footer}}</body>');
+    await fs.writeFile(path.join(templatesDir, 'partials', 'shared', 'nav.hbs'), '{{#if showNav}}<nav>{{title}}</nav>{{/if}}');
+    await fs.writeFile(path.join(templatesDir, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = await fs.readFile(path.join(outputDir, 'hello.html'), 'utf8');
+    expect(html).toContain('<nav>A &amp; B</nav>');
+    expect(html).toContain('<h1>A &amp; B</h1><p><strong>Welcome</strong></p>');
+    expect(html).toContain('<footer>Footer</footer>');
+  });
+
+  it('supports per-page templates and layouts', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'site');
+    const templatesDir = path.join(temporaryDirectory, 'templates');
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.mkdir(path.join(templatesDir, 'layouts'), { recursive: true });
+    await fs.writeFile(path.join(contentDir, 'post.md'), '---\ntitle: Post\ntemplate: post\nlayout: article\ntags: [one, two]\n---\nBody');
+    await fs.writeFile(path.join(templatesDir, 'post.hbs'), '<section>{{#each tags}}<b>{{this}}</b>{{/each}}{{{html}}}</section>');
+    await fs.writeFile(path.join(templatesDir, 'layouts', 'article.hbs'), '<main data-title="{{title}}">{{{body}}}</main>');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+
+    await expect(fs.readFile(path.join(outputDir, 'post.html'), 'utf8')).resolves.toBe(
+      '<main data-title="Post"><section><b>one</b><b>two</b><p>Body</p>\n</section></main>',
+    );
+  });
+
+  it('reports an explicitly requested template that does not exist', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'site');
+    const templatesDir = path.join(temporaryDirectory, 'templates');
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.writeFile(path.join(contentDir, 'post.md'), '---\ntemplate: missing\n---\nBody');
+
+    await expect(buildSite({ contentDir, outputDir, templatesDir })).rejects.toThrow('Template not found: missing');
+  });
 });
 
 describe('parseArguments', () => {
   it('accepts build paths', () => {
-    expect(parseArguments(['build', '--content', 'articles', '--output', 'public'])).toEqual({
+    expect(parseArguments(['build', '--content', 'articles', '--output', 'public', '--templates', 'views'])).toEqual({
       contentDir: 'articles',
       outputDir: 'public',
+      templatesDir: 'views',
     });
   });
 
