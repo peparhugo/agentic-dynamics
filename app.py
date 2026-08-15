@@ -6,8 +6,6 @@ import hashlib
 import hmac
 import json
 import os
-from pathlib import Path
-from tempfile import NamedTemporaryFile
 from threading import Lock
 
 from functools import wraps
@@ -16,6 +14,7 @@ from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
+from repositories import TaskRepository, UserRepository, initialize_store
 
 
 app = Flask(__name__)
@@ -26,55 +25,17 @@ app.config["JWT_EXPIRATION_MINUTES"] = 60
 _storage_lock = Lock()
 
 
-def _empty_store():
-    return {"next_id": 1, "next_user_id": 1, "tasks": [], "users": []}
-
-
 def init_db():
     """Initialize the flat-file schema and migrate pre-auth task records."""
-    path = Path(app.config["TASKS_FILE"])
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        _write_store(_empty_store())
-    else:
-        store = _read_store()
-        store["next_user_id"] = max(
-            store["next_user_id"],
-            max((user.get("id", 0) for user in store["users"]), default=0) + 1,
-        )
-        _write_store(store)
+    initialize_store(app.config["TASKS_FILE"])
 
 
-def _read_store():
-    path = Path(app.config["TASKS_FILE"])
-    try:
-        with path.open(encoding="utf-8") as file:
-            store = json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        store = _empty_store()
-    store.setdefault("next_id", 1)
-    store.setdefault("next_user_id", 1)
-    store.setdefault("tasks", [])
-    store.setdefault("users", [])
-    # The owner_id field is the flat-file migration for stores created before auth.
-    for task in store["tasks"]:
-        task.setdefault("owner_id", None)
-    return store
+def _task_repository():
+    return TaskRepository(app.config["TASKS_FILE"], _storage_lock)
 
 
-def _write_store(store):
-    path = Path(app.config["TASKS_FILE"])
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Replace the file atomically so a request cannot observe a partial JSON file.
-    with NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as file:
-        json.dump(store, file)
-        file.write("\n")
-        temporary_path = Path(file.name)
-    temporary_path.replace(path)
-
-
-def _find_task(store, task_id):
-    return next((task for task in store["tasks"] if task["id"] == task_id), None)
+def _user_repository():
+    return UserRepository(app.config["TASKS_FILE"], _storage_lock)
 
 
 def _not_found():
@@ -122,8 +83,7 @@ def _current_user_from_token():
         return None
     if not isinstance(payload.get("exp"), (int, float)) or payload["exp"] < datetime.now(timezone.utc).timestamp():
         return None
-    with _storage_lock:
-        return next((user for user in _read_store()["users"] if user["id"] == payload.get("sub")), None)
+    return _user_repository().find_by_id(payload.get("sub"))
 
 
 def jwt_required(view):
@@ -145,20 +105,17 @@ def register():
     if not isinstance(username, str) or not username.strip() or not isinstance(password, str) or not password:
         return jsonify({"error": "username and password are required"}), 400
     username = username.strip()
-    with _storage_lock:
-        store = _read_store()
-        if any(user["username"] == username for user in store["users"]):
-            return jsonify({"error": "username already exists"}), 409
-        user = {
-            "id": store["next_user_id"],
-            "username": username,
-            "password_hash": generate_password_hash(password),
-        }
-        if isinstance(data.get("email"), str) and data["email"].strip():
-            user["email"] = data["email"].strip()
-        store["next_user_id"] += 1
-        store["users"].append(user)
-        _write_store(store)
+    user_repository = _user_repository()
+    if user_repository.find_by_username(username):
+        return jsonify({"error": "username already exists"}), 409
+    email = None
+    if isinstance(data.get("email"), str) and data["email"].strip():
+        email = data["email"].strip()
+    user = user_repository.create_user(
+        username,
+        generate_password_hash(password),
+        email,
+    )
     return jsonify({"id": user["id"], "username": user["username"]}), 201
 
 
@@ -167,8 +124,7 @@ def login():
     data = request.get_json(silent=True)
     username = data.get("username") if isinstance(data, dict) else None
     password = data.get("password") if isinstance(data, dict) else None
-    with _storage_lock:
-        user = next((user for user in _read_store()["users"] if user["username"] == username), None)
+    user = _user_repository().find_by_username(username)
     if user is None or not isinstance(password, str) or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": _make_token(user)})
@@ -182,36 +138,25 @@ def create_task():
     if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
 
-    with _storage_lock:
-        store = _read_store()
-        task = {
-            "id": store["next_id"],
-            "title": title.strip(),
-            "status": "pending",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "owner_id": g.current_user["id"],
-        }
-        store["next_id"] += 1
-        store["tasks"].append(task)
-        _write_store(store)
+    task = _task_repository().create_task(
+        title.strip(),
+        g.current_user["id"],
+        datetime.now(timezone.utc).isoformat(),
+    )
     return jsonify(task), 201
 
 
 @app.get("/tasks")
 @jwt_required
 def list_tasks():
-    with _storage_lock:
-        tasks = [task for task in _read_store()["tasks"] if task.get("owner_id") == g.current_user["id"]]
-    tasks.sort(key=lambda task: (task["created_at"], task["id"]), reverse=True)
+    tasks = _task_repository().list_for_owner(g.current_user["id"])
     return jsonify(tasks)
 
 
 @app.get("/tasks/<int:task_id>")
 @jwt_required
 def get_task(task_id):
-    with _storage_lock:
-        task = next((task for task in _read_store()["tasks"]
-                     if task["id"] == task_id and task.get("owner_id") == g.current_user["id"]), None)
+    task = _task_repository().get_for_owner(task_id, g.current_user["id"])
     return jsonify(task) if task else _not_found()
 
 
@@ -222,27 +167,23 @@ def update_task(task_id):
     if not isinstance(data, dict):
         return jsonify({"error": "request body must be a JSON object"}), 400
 
-    with _storage_lock:
-        store = _read_store()
-        task = next((task for task in store["tasks"]
-                     if task["id"] == task_id and task.get("owner_id") == g.current_user["id"]), None)
-        if task is None:
-            return _not_found()
-        was_completed = task.get("status") == "completed"
-        if "title" in data:
-            if not isinstance(data["title"], str) or not data["title"].strip():
-                return jsonify({"error": "title must be a non-empty string"}), 400
-            task["title"] = data["title"].strip()
-        if "status" in data:
-            if not isinstance(data["status"], str) or not data["status"].strip():
-                return jsonify({"error": "status must be a non-empty string"}), 400
-            task["status"] = data["status"].strip()
-        became_completed = task["status"] == "completed" and not was_completed
-        _write_store(store)
-        owner = next(
-            (user for user in store["users"] if user["id"] == task.get("owner_id")),
-            None,
-        )
+    task_repository = _task_repository()
+    task = task_repository.get_for_owner(task_id, g.current_user["id"])
+    if task is None:
+        return _not_found()
+    was_completed = task.get("status") == "completed"
+    changes = {}
+    if "title" in data:
+        if not isinstance(data["title"], str) or not data["title"].strip():
+            return jsonify({"error": "title must be a non-empty string"}), 400
+        changes["title"] = data["title"].strip()
+    if "status" in data:
+        if not isinstance(data["status"], str) or not data["status"].strip():
+            return jsonify({"error": "status must be a non-empty string"}), 400
+        changes["status"] = data["status"].strip()
+    task = task_repository.update_for_owner(task_id, g.current_user["id"], changes)
+    became_completed = task["status"] == "completed" and not was_completed
+    owner = _user_repository().find_by_id(task.get("owner_id"))
     if became_completed:
         user_email = (owner or {}).get("email") or (owner or {}).get("username")
         try:
