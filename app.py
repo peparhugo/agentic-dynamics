@@ -1,11 +1,6 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+"""A small SQLite-backed task management API."""
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
-
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 from datetime import datetime
 import sqlite3
 import os
@@ -25,33 +20,25 @@ def init_db():
     with get_db() as conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  id INTEGER PRIMARY KEY,"
             "  title TEXT NOT NULL,"
             "  status TEXT NOT NULL DEFAULT 'pending',"
             "  created_at TEXT NOT NULL"
             ")"
         )
-
-
-# ── Models ────────────────────────────────────────────────────
-
-
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
+        conn.commit()
 
 
 def create_task(title: str) -> dict:
     with get_db() as conn:
         now = datetime.utcnow().isoformat()
+        # SQLite rowids start at one; allocate explicitly so the API is zero-based.
+        next_id = conn.execute(
+            "SELECT COALESCE(MAX(id) + 1, 0) FROM tasks"
+        ).fetchone()[0]
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
-            (title, now),
+            "INSERT INTO tasks (id, title, status, created_at) VALUES (?, ?, 'pending', ?)",
+            (next_id, title, now),
         )
         conn.commit()
         return {
@@ -74,9 +61,8 @@ def get_task(task_id: int) -> dict | None:
         return dict(row) if row else None
 
 
-
 def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
+    """Compatibility alias for callers using the original helper name."""
     return get_task(task_id)
 
 
@@ -103,8 +89,6 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
     return get_task(task_id)
 
 
-# ── Routes ─────────────────────────────────────────────────────
-
 @app.route("/tasks", methods=["GET"])
 def list_tasks():
     return jsonify(get_tasks())
@@ -113,10 +97,12 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
+    if not isinstance(data, dict):
+        return jsonify({"error": "request body must be a JSON object"}), 400
+    title = data.get("title")
+    if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
+    task = create_task(title.strip())
     return jsonify(task), 201
 
 
@@ -131,6 +117,8 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "request body must be a JSON object"}), 400
     task = update_task(
         task_id,
         title=data.get("title"),
@@ -141,6 +129,9 @@ def edit_task(task_id: int):
     return jsonify(task)
 
 
+# Initialize the schema when the application module is loaded by a WSGI server.
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
