@@ -2,6 +2,7 @@ export interface CliArgs {
   command: string;
   contentDir: string;
   outputDir: string;
+  port?: number;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -18,8 +19,12 @@ export function parseArgs(argv: string[]): CliArgs {
       args.contentDir = argv[++i];
     } else if (arg === '--output' && i + 1 < argv.length) {
       args.outputDir = argv[++i];
+    } else if (arg === '--port' && i + 1 < argv.length) {
+      args.port = parseInt(argv[++i], 10);
     } else if (arg === 'build') {
       args.command = 'build';
+    } else if (arg === 'serve') {
+      args.command = 'serve';
     }
   }
 

@@ -75,4 +75,38 @@ describe('parseArgs', () => {
     expect(args.contentDir).toBe('../../content');
     expect(args.outputDir).toBe('../dist');
   });
+
+  it('parses serve command', () => {
+    const args = parseArgs(['serve']);
+
+    expect(args.command).toBe('serve');
+  });
+
+  it('parses --port option', () => {
+    const args = parseArgs(['serve', '--port', '8000']);
+
+    expect(args.command).toBe('serve');
+    expect(args.port).toBe(8000);
+  });
+
+  it('parses serve with multiple options', () => {
+    const args = parseArgs(['serve', '--port', '5000', '--content', './pages', '--output', './public']);
+
+    expect(args.command).toBe('serve');
+    expect(args.port).toBe(5000);
+    expect(args.contentDir).toBe('./pages');
+    expect(args.outputDir).toBe('./public');
+  });
+
+  it('defaults to port 3000 if not specified', () => {
+    const args = parseArgs(['serve']);
+
+    expect(args.port).toBeUndefined();
+  });
+
+  it('handles non-numeric port gracefully', () => {
+    const args = parseArgs(['serve', '--port', 'invalid']);
+
+    expect(isNaN(args.port!)).toBe(true);
+  });
 });
