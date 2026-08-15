@@ -13,11 +13,40 @@ import os
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from repositories import UserRepository, TaskRepository
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from redis import Redis
 
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+
+# Initialize rate limiter with Redis backend
+def get_rate_limit_key():
+    """Get rate limit key based on user_id if authenticated, otherwise IP address."""
+    user_id = get_current_user()
+    if user_id:
+        return f"user:{user_id}"
+    return get_remote_address()
+
+try:
+    redis_client = Redis(host="localhost", port=6379, db=0, decode_responses=True)
+    redis_client.ping()
+    use_redis = True
+except Exception:
+    use_redis = False
+    redis_client = None
+
+if use_redis and not app.config.get("TESTING"):
+    limiter = Limiter(
+        app=app,
+        key_func=get_rate_limit_key,
+        storage_uri="redis://localhost:6379/0",
+        default_limits=["100 per minute"],
+    )
+else:
+    limiter = None
 
 # Initialize Celery for async tasks
 celery_app = None
@@ -118,10 +147,31 @@ def require_auth(f):
     return decorated_function
 
 
+def apply_rate_limit(f):
+    """Decorator to apply rate limiting to an endpoint (disabled in testing)."""
+    # Just return the function as-is; rate limiting is applied during request handling if available
+    if limiter:
+        return limiter.limit("100 per minute")(f)
+    return f
+
+
 # ── Models ────────────────────────────────────────────────────
 
 def create_task(title: str, owner_id: int) -> dict:
     return task_repo.create(title, owner_id)
+
+
+def get_tasks_paginated(owner_id: int, cursor: str | None = None, limit: int = 20):
+    """Get tasks with cursor-based pagination.
+
+    Returns: {data: [...], next_cursor: str|None, total: int}
+    """
+    if limit < 1:
+        limit = 1
+    if limit > 100:
+        limit = 100
+
+    return task_repo.find_paginated_by_owner(owner_id, cursor, limit)
 
 
 def get_tasks(owner_id: int):
@@ -171,6 +221,7 @@ def update_task(task_id: int, owner_id: int, title: str | None = None, status: s
 # ── Routes ─────────────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
+@apply_rate_limit
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -188,6 +239,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@apply_rate_limit
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -203,13 +255,22 @@ def login():
 
 @app.route("/tasks", methods=["GET"])
 @require_auth
+@apply_rate_limit
 def list_tasks():
     user_id = get_current_user()
-    return jsonify(get_tasks(user_id))
+    cursor = request.args.get("cursor")
+    try:
+        limit = int(request.args.get("limit", 20))
+    except (ValueError, TypeError):
+        limit = 20
+
+    result = get_tasks_paginated(user_id, cursor, limit)
+    return jsonify(result)
 
 
 @app.route("/tasks", methods=["POST"])
 @require_auth
+@apply_rate_limit
 def add_task():
     user_id = get_current_user()
     data = request.get_json(silent=True) or {}
@@ -222,6 +283,7 @@ def add_task():
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @require_auth
+@apply_rate_limit
 def show_task(task_id: int):
     user_id = get_current_user()
     task = get_task(task_id, user_id)
@@ -232,6 +294,7 @@ def show_task(task_id: int):
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @require_auth
+@apply_rate_limit
 def edit_task(task_id: int):
     user_id = get_current_user()
     data = request.get_json(silent=True) or {}

@@ -112,6 +112,44 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def find_paginated_by_owner(self, owner_id: int, cursor: str | None = None, limit: int = 20) -> dict:
+        """Find tasks with cursor-based pagination.
+
+        Returns: {data: [...], next_cursor: str|None, total: int}
+        Cursor is the id of the last item from the previous page.
+        """
+        with self._get_db() as conn:
+            # Get total count
+            total_row = conn.execute(
+                "SELECT COUNT(*) as count FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()
+            total = total_row["count"] if total_row else 0
+
+            # Fetch one extra to determine if there's a next page
+            fetch_limit = limit + 1
+            if cursor:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, fetch_limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, fetch_limit),
+                ).fetchall()
+
+            data = [dict(r) for r in rows[:limit]]
+            next_cursor = None
+            if len(rows) > limit:
+                next_cursor = str(rows[limit]["id"])
+
+            return {
+                "data": data,
+                "next_cursor": next_cursor,
+                "total": total,
+            }
+
     def create(self, title: str, owner_id: int) -> dict:
         """Create a new task."""
         with self._get_db() as conn:
