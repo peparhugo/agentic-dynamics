@@ -43,6 +43,7 @@ firebase deploy --only hosting --project agentic-dynamics  # mirror site — dep
 - `.opencode/instructions/mental-model.md` — architecture, signatures, module map, dependencies
 - `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md` — ExperimentSpec + compiler design (the roadmap)
 - `src/instrument/CONTEXT.md` — instrument module reference (incl. operator/metric authoring)
+- `src/instrument/CONTEXT.md` (Runtime RAG / Knowledge Base section) — the merged KB (`knowledge.py` / `retrieval.py` / `prompt_constructor.py` / `knowledge_stream.py`); wired into `run_workflow()` as `rag_augment`, default OFF.
 - `scripts/CONTEXT.md` — script reference
 - `experiments/CONTEXT.md` — experiment ecosystem
 - `firebase/CONTEXT.md` — website documentation

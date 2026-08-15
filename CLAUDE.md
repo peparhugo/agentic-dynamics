@@ -11,6 +11,10 @@ future opencode change. Keep both surfaces in sync by hand — there is no build
 
 - `.claude/rules/mental-model.md`, `.claude/rules/conventions.md` — load unconditionally
   (no `paths:` frontmatter), same content as `.opencode/instructions/*.md`.
+- RAG layer (default OFF) — the merged knowledge base (`knowledge.py` / `retrieval.py` /
+  `prompt_constructor.py` / `knowledge_stream.py`) is in both mental-model files' module maps and
+  in AGENTS.md's Key files (loaded here via `@AGENTS.md`); it wires into `run_workflow()` as
+  `rag_augment`, off by default.
 - `.claude/agents/*.md` — the 3 opencode subagents (`data-analysis`, `instrument-dev`,
   `pipeline-ops`), ported. Their opencode `model: deepseek/deepseek-v4-flash` has no Claude
   Code equivalent — Claude subagents only select Claude models — see the port doc.

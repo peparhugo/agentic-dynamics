@@ -173,6 +173,32 @@ first_pass_quality(attempts) -> RuleResult   # measurement (produces)
 model_cascade(attempts, state) -> RuleResult # control (consumes confidence)
 ```
 
+### Runtime RAG / Knowledge Base (v1.0 — merged; default OFF)
+
+```
+# knowledge.py — canonical identity + authority contract (two sha256 ids, ordered Authority)
+Authority, KnowledgeRecord, KnowledgeEvent
+compute_entity_id(), compute_knowledge_id(), compute_content_hash()
+
+# retrieval.py — deterministic retrieval (dense Chroma + lexical Neo4j full-text → RRF fusion)
+QueryPlan, Candidate, RetrievalAttempt, FallbackMode
+build_query_plan(), retrieve(), select_evidence(), build_evidence_cards()
+
+# prompt_constructor.py — typed prompt-constructor (one flash-model call + validator)
+PromptConstructor, ModelPromptConstructor, PromptPlan, AugmentedPrompt, render_prompt()
+
+# knowledge_stream.py — durable Redis Streams ingestion (DB 2 on 6380)
+connect(), publish_event(), process_entry(), reconcile_missing()
+  CONSUMER_GROUPS: kb-chroma-v1 | kb-neo4j-v1 | kb-ledger-v1
+
+# workflow_runner.py — the rag_augment seam (default OFF)
+run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=None,
+             construct_fn=None, rag_params=None) -> WorkflowRunResult
+
+# one agent phase (only when rag_augment enabled):
+route_step ──▶ retrieve ──▶ construct ──▶ render ──▶ run_agent
+```
+
 ### Ledger (the data model rules consume) — schema WRITTEN; the four formerly-missing fields are now MEASURED
 
 ```

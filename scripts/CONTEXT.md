@@ -74,8 +74,8 @@
 | `batch_analyze_ts_ssg.py` | 159 | Runs `analyze_worktrees` on just the typescript_ssg worktrees. |
 | `recovery_cost_table.py` | 87 | Extracts baseline vs perturbed cost by operator×strength from DB. |
 | `enqueue.py` | 209 | Fills Redis `story_jobs` queue (30 cells) + seeds `story_status` hash. |
-| `worker.py` | 196 | `BRPOP` worker: runs `run_story.py`, sets `FINOPS_CELL_ID`, publishes status transitions to Redis. |
-| `kb_worker.py` | 218 | Knowledge-base ingestion worker — runs a named consumer group (`kb-chroma-v1` / `kb-neo4j-v1` / `kb-ledger-v1`) against the Redis Streams change plane (`kb:v1:changes`, DB 2 on 6380), structurally parallel to `worker.py`. Reclaims stale messages, XACKs only after the destination confirms the idempotent upsert keyed by `knowledge_id`, dead-letters after capped retries. |
+| `worker.py` | 193 | `BRPOP` worker: runs `run_story.py`, sets `FINOPS_CELL_ID`, publishes status transitions to Redis. |
+| `kb_worker.py` | 204 | Knowledge-base ingestion worker — runs a named consumer group (`kb-chroma-v1` / `kb-neo4j-v1` / `kb-ledger-v1`) against the Redis Streams change plane (`kb:v1:changes`, DB 2 on 6380), structurally parallel to `worker.py`. Reclaims stale messages, XACKs only after the destination confirms the idempotent upsert keyed by `knowledge_id`, dead-letters after capped retries. |
 | `monitor.py` | 144 | Redis queue dashboard. `--watch` live, `--json` machine output (used by `admin/` dashboard). |
 | `supervise.py` | 378 | Supervises running opencode sessions via a dedicated flash monitor session — flag-only, never steers. CLI for `src/instrument/supervisor.py`'s Redis contracts. |
 | `claude_agents_supervisor.py` | 260 | Supervises `claude --bg` background sessions — roster + owned-session relay only, structurally parallel to `supervise.py` but simpler. |
