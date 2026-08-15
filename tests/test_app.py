@@ -174,3 +174,66 @@ async def test_messages_endpoint_returns_sqlite_history(tmp_path):
     assert history["messages"][0]["type"] == "broadcast"
     assert history["messages"][0]["payload"] == {"text": "saved"}
     assert history["messages"][0]["channel"] is None
+
+
+async def test_rate_limit_returns_error_for_client(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    server = NotificationServer(redis_url="memory://")
+    async with serve(server.handler, "127.0.0.1", 0) as listener:
+        port = listener.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{port}") as client:
+            await receive_json(client)
+            for number in range(2):
+                await client.send(json.dumps({"type": "broadcast", "payload": {"number": number}}))
+                assert (await receive_json(client))["type"] == "broadcast"
+
+            await client.send(json.dumps({"type": "broadcast", "payload": {"number": 3}}))
+            error = await receive_json(client)
+
+    await server.close()
+    assert error["type"] == "system"
+    assert error["payload"] == {"event": "error", "message": "rate limit exceeded"}
+
+
+async def test_history_filters_channel_returns_chronological_pages(tmp_path):
+    database = tmp_path / "history.db"
+    server = NotificationServer(redis_url="memory://", database_url=str(database))
+    async with serve(server.handler, "127.0.0.1", 0, process_request=server.health_response) as listener:
+        port = listener.sockets[0].getsockname()[1]
+        uri = f"ws://127.0.0.1:{port}"
+        async with connect(uri) as client:
+            await receive_json(client)
+            for channel, text in (("alerts", "first"), ("other", "ignored"), ("alerts", "second")):
+                await client.send(json.dumps({"type": "broadcast", "channel": channel, "payload": {"text": text}}))
+
+        first_page = await get_json(uri, "/history?channel=alerts&limit=1")
+        second_page = await get_json(uri, "/history?channel=alerts&limit=1&offset=1")
+
+    await server.close()
+    first_history = json.loads(first_page.split(b"\r\n\r\n", 1)[1])
+    second_history = json.loads(second_page.split(b"\r\n\r\n", 1)[1])
+    assert [message["payload"]["text"] for message in first_history["messages"]] == ["first"]
+    assert first_history["has_more"] is True
+    assert [message["payload"]["text"] for message in second_history["messages"]] == ["second"]
+    assert second_history["has_more"] is False
+
+
+async def test_startup_cleanup_removes_expired_messages(monkeypatch, tmp_path):
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "1")
+    server = NotificationServer(redis_url="memory://", database_url=str(tmp_path / "expiry.db"))
+    server._store.save(
+        {
+            "type": "broadcast",
+            "channel": "alerts",
+            "payload": {"text": "old"},
+            "timestamp": "2000-01-01T00:00:00+00:00",
+        }
+    )
+
+    await server.start()
+    await asyncio.sleep(0)
+    messages, has_more = server._store.history("alerts", None, 50, 0)
+    await server.close()
+
+    assert messages == []
+    assert has_more is False

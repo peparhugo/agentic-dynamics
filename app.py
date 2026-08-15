@@ -10,10 +10,10 @@ import threading
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from websockets.exceptions import ConnectionClosed
 from websockets.legacy.server import WebSocketServerProtocol, serve
@@ -120,6 +120,9 @@ class MessageStore:
                 "(id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, type TEXT NOT NULL, "
                 "payload TEXT NOT NULL, timestamp TEXT NOT NULL)"
             )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS messages_channel_timestamp ON messages (channel, timestamp, id)"
+            )
 
     def save(self, message: dict[str, Any]) -> None:
         with self._lock, self._connection:
@@ -139,6 +142,32 @@ class MessageStore:
             for row in rows
         ]
 
+    def history(self, channel: str, since: str | None, limit: int, offset: int) -> tuple[list[dict[str, Any]], bool]:
+        conditions = ["channel = ?"]
+        parameters: list[Any] = [channel]
+        if since is not None:
+            conditions.append("timestamp >= ?")
+            parameters.append(since)
+        where = " AND ".join(conditions)
+        with self._lock:
+            rows = self._connection.execute(
+                f"SELECT id, channel, type, payload, timestamp FROM messages WHERE {where} "
+                "ORDER BY timestamp ASC, id ASC LIMIT ? OFFSET ?",
+                (*parameters, limit + 1, offset),
+            ).fetchall()
+        has_more = len(rows) > limit
+        return (
+            [
+                {"id": row[0], "channel": row[1], "type": row[2], "payload": json.loads(row[3]), "timestamp": row[4]}
+                for row in rows[:limit]
+            ],
+            has_more,
+        )
+
+    def delete_older_than(self, cutoff: datetime) -> None:
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM messages WHERE datetime(timestamp) < datetime(?)", (cutoff.isoformat(),))
+
 
 class InMemoryBroker:
     """Fallback broker for development when REDIS_URL cannot be reached."""
@@ -146,6 +175,7 @@ class InMemoryBroker:
     subscribers: dict[Any, asyncio.AbstractEventLoop] = {}
     clients: dict[str, str] = {}
     channel_members: dict[str, set[str]] = {}
+    rate_limits: dict[str, tuple[int, float]] = {}
 
     async def start(self, callback: Any) -> None:
         self.callback = callback
@@ -177,6 +207,15 @@ class InMemoryBroker:
 
     async def unsubscribe_client(self, channel: str, client_id: str) -> None:
         self.channel_members.get(channel, set()).discard(client_id)
+
+    async def increment_rate_limit(self, client_id: str, window_seconds: int) -> int:
+        now = asyncio.get_running_loop().time()
+        count, expires_at = self.rate_limits.get(client_id, (0, now + window_seconds))
+        if expires_at <= now:
+            count, expires_at = 0, now + window_seconds
+        count += 1
+        self.rate_limits[client_id] = (count, expires_at)
+        return count
 
 
 class RedisBroker:
@@ -285,6 +324,15 @@ class RedisBroker:
         else:
             await self._execute("SREM", f"notifications:channel:{channel}", client_id)
 
+    async def increment_rate_limit(self, client_id: str, window_seconds: int) -> int:
+        if self._fallback:
+            return await self._fallback.increment_rate_limit(client_id, window_seconds)
+        key = f"notifications:rate:{client_id}"
+        count = await self._execute("INCR", key)
+        if count == 1:
+            await self._execute("EXPIRE", key, str(window_seconds))
+        return int(count)
+
 
 class NotificationServer:
     """Manage connected clients and route JSON notification messages."""
@@ -303,6 +351,17 @@ class NotificationServer:
         self._broker_started = False
         self._broker_lock = asyncio.Lock()
         self._store = MessageStore(database_url or os.getenv("DATABASE_URL", ":memory:"))
+        self._rate_limit = self._environment_positive_int("RATE_LIMIT", 100)
+        self._message_ttl_days = self._environment_positive_int("MESSAGE_TTL_DAYS", 7)
+        self._cleanup_task: asyncio.Task[None] | None = None
+
+    @staticmethod
+    def _environment_positive_int(name: str, default: int) -> int:
+        try:
+            value = int(os.getenv(name, str(default)))
+            return value if value > 0 else default
+        except ValueError:
+            return default
 
     @staticmethod
     def _create_transport(name: str) -> BaseTransport:
@@ -316,6 +375,26 @@ class NotificationServer:
                 if not self._broker_started:
                     await self._broker.start(self._deliver_published)
                     self._broker_started = True
+
+    async def start(self) -> None:
+        """Start broker and periodic history expiry maintenance."""
+        await self._start_broker()
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_expired_messages())
+
+    async def close(self) -> None:
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
+
+    async def _cleanup_expired_messages(self) -> None:
+        while True:
+            self._store.delete_older_than(datetime.now(timezone.utc) - timedelta(days=self._message_ttl_days))
+            await asyncio.sleep(24 * 60 * 60)
 
     @property
     def client_count(self) -> int:
@@ -344,7 +423,7 @@ class NotificationServer:
         await self._transport.handler(self, websocket, _path)
 
     async def _connected(self, client_id: str, connection: Any) -> None:
-        await self._start_broker()
+        await self.start()
         await self._transport.on_connect(client_id, connection)
         await self._broker.add_client(client_id, self._instance_id)
         await self.send_to_client(
@@ -359,6 +438,13 @@ class NotificationServer:
         await self._broker.remove_client(client_id)
 
     async def _handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
+        if await self._broker.increment_rate_limit(sender_id, 60) > self._rate_limit:
+            await self.send_to_client(
+                sender_id,
+                self._message("system", {"event": "error", "message": "rate limit exceeded"}),
+            )
+            return
+
         if isinstance(raw_message, bytes):
             await self.send_to_client(
                 sender_id,
@@ -474,14 +560,31 @@ class NotificationServer:
         elif parsed_path.path == "/channels":
             body = json.dumps({"channels": self.channels}).encode("utf-8")
         elif parsed_path.path == "/messages":
-            params = dict(part.split("=", 1) for part in parsed_path.query.split("&") if "=" in part)
+            params = parse_qs(parsed_path.query)
             try:
-                limit, offset = int(params.get("limit", "50")), int(params.get("offset", "0"))
+                limit, offset = int(params.get("limit", ["50"])[0]), int(params.get("offset", ["0"])[0])
                 if not 0 <= offset or not 1 <= limit <= 1000:
                     raise ValueError
             except ValueError:
                 return self._json_response(HTTPStatus.BAD_REQUEST, {"error": "invalid pagination"})
             body = json.dumps({"messages": self._store.list(limit, offset)}).encode("utf-8")
+        elif parsed_path.path == "/history":
+            params = parse_qs(parsed_path.query)
+            channel = params.get("channel", [None])[0]
+            since = params.get("since", [None])[0]
+            try:
+                limit, offset = int(params.get("limit", ["50"])[0]), int(params.get("offset", ["0"])[0])
+                if not isinstance(channel, str) or not channel or not 0 <= offset or not 1 <= limit <= 1000:
+                    raise ValueError
+                if since is not None:
+                    parsed_since = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                    if parsed_since.tzinfo is None:
+                        raise ValueError
+                    since = parsed_since.astimezone(timezone.utc).isoformat()
+            except ValueError:
+                return self._json_response(HTTPStatus.BAD_REQUEST, {"error": "invalid history query"})
+            messages, has_more = self._store.history(channel, since, limit, offset)
+            body = json.dumps({"messages": messages, "has_more": has_more}).encode("utf-8")
         elif parsed_path.path.startswith("/channels/") and parsed_path.path.endswith("/subscribers"):
             channel = unquote(parsed_path.path.removeprefix("/channels/").removesuffix("/subscribers").rstrip("/"))
             subscribers = self.channel_subscribers(channel)
@@ -516,13 +619,17 @@ class NotificationServer:
 async def run_server(host: str = "127.0.0.1", port: int = 8765) -> None:
     """Run the notification service until cancelled."""
     notification_server = NotificationServer()
-    async with serve(
-        notification_server.handler,
-        host,
-        port,
-        process_request=notification_server.health_response,
-    ):
-        await asyncio.Future()
+    await notification_server.start()
+    try:
+        async with serve(
+            notification_server.handler,
+            host,
+            port,
+            process_request=notification_server.health_response,
+        ):
+            await asyncio.Future()
+    finally:
+        await notification_server.close()
 
 
 if __name__ == "__main__":
