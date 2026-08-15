@@ -425,3 +425,107 @@ wasteful 3` (the story-side `wasteful 7 → 0` reclassification from §4.1 carri
   was the first tranche). `analyze_worktrees.py` was deliberately **not** re-run: it would
   overwrite the 227-entry corpus with 126 worktrees, ~88 of them `meta_batch_*` sessions.
 - `lab_sonar_quality` and the single-task `strategy_distribution` inherit that staleness.
+
+---
+
+## 7. Re-admit the gated policy arms — validation + grid writeup
+
+The load-bearing rule is now satisfied end-to-end: the four formerly-missing ledger
+fields are measured, so the `grit` rule and the `model_cascade`/`dynamics` control arms
+compile. The flagship spec materialized here is `experiments/specs/routing_regret_under_degradation.yaml`
+(canonical form previously only in `tests/test_experiment_spec.py:16` `FLAGSHIP_YAML`).
+
+### 7.1 Validation output (exact)
+
+```
+$ python3 -c "from instrument.experiment_spec import validate_rules; print(validate_rules.__name__)"
+validate_rules
+
+$ python3 -c "from instrument.experiment_spec import load_spec, validate_rules, validate_spec; \
+  s = load_spec('experiments/specs/routing_regret_under_degradation.yaml'); \
+  print('validate_rules:', validate_rules(s)); print('validate_spec:', validate_spec(s))"
+validate_rules: []
+validate_spec: []
+```
+
+- `validate_rules` returns `[]` — every `requires` is ledger-produced. Specifically:
+  `grit` (`perturbation_strength`, `test_executed_success`, `condition`), `model_cascade`
+  (`confidence`), and the `dynamics`/`quality_cascade` control arms are **admissible**.
+- `compile_spec` emits the DAG: `validate → cells → execute → measure → compare → writeup → adapt`,
+  with feedback edge `adapt → cells` (the campaign loop). No `SpecError`.
+
+### 7.2 Grid — 112 cells, and why it is not queueable as-is
+
+`experiment_matrix(spec)` produces **112 cells** = `model`(7) × `condition`(4) × `policy`(4):
+
+| Factor | Levels | In standard `enqueue.py` matrix? |
+|---|---|---|
+| model | flash · luna · pro · haiku · terra · sonnet · sol | ✅ (via `--model`, full provider/model ids) |
+| condition | clean · bad_seed · early_degrade · **late_degrade** | ⚠️ `late_degrade` **absent** (matrix has clean/bad_seed/early_degrade only) |
+| policy | cheapest · premium_static · quality_cascade · dynamics | ❌ **no policy factor** at all |
+
+The standard story matrix is `story × tier × quality × condition` (30 cells/model); the
+routing_regret grid is `model × condition × policy` (no tier/quality, adds policy +
+late_degrade). The two are different grids, so:
+
+- **`policy`-arm cells (4 arms) and `late_degrade` cells (21) are not representable by
+  `enqueue.py`** — they need the `experiment_matrix` → `experiment_run` transport (the
+  reuse-map item generalizing `enqueue.py`'s hardcoded matrix + `worker.py`'s BRPOP
+  transport). **This is the item still to be built** — flagged here rather than shoehorned
+  into the wrong grid.
+- The representable slice (`model` × clean/bad_seed/early_degrade) is already drained by
+  the prior phases' matrix runs; `enqueue.py --missing-only` finds nothing new.
+
+### 7.3 Arm regret — computed on the drained, instrumented results
+
+**`grit` (re-admitted measurement rule) on the single-task re-run** (49 measured attempts,
+7 baseline + 42 perturbed across 7 models — the only drained corpus with both
+`perturbation_strength` and `test_executed_success`):
+
+```
+grit_auc = 0.5083      (uncertainty 0.0)
+G(0.0) = 0.7143   G(0.5) = 0.7381
+retention(0.5) = 1.0333     → perturbed cells do NOT degrade under s=0.5
+recovery_premium = 0.9057   → successful perturbed runs are 9% cheaper than successful baseline
+```
+
+On the story corpus `grit` correctly returns **unmeasured** (NaN, uncertainty 1.0): only
+14 re-run `early_degrade` cells carry the fields, and there is no measured `s=0.0` baseline
+yet (the clean cells predate instrumentation). The rule refuses to fabricate — the exact
+behaviour that was gated until now.
+
+**`compare_arms` (arm_factor=`model`, the representable proxy for `policy`)** over the same
+49 attempts, `loss = {cost: 1.0, quality: -5.0}`:
+
+| arm | regret | n | avg cost | avg correctness |
+|---|---|---|---|---|
+| openai/gpt-5.6-luna | **0.0000** (best) | 7 | $0.0173 | 1.000 |
+| deepseek/deepseek-v4-pro | +0.0148 | 7 | $0.0194 | 0.997 |
+| anthropic/claude-haiku-4-5 | +0.0269 | 7 | $0.0442 | 1.000 |
+| openai/gpt-5.6-sol | +0.4651 | 7 | $0.4824 | 1.000 |
+| anthropic/claude-sonnet-5 | +0.5964 | 7 | $0.1851 | 0.914 |
+| deepseek/deepseek-v4-flash | +0.5965 | 7 | $0.0096 | 0.879 |
+| openai/gpt-5.6-terra | +0.5982 | 7 | $0.1869 | 0.914 |
+
+**`compute_routing` / `simulate_strategies`** (the machinery `compare_arms` generalizes),
+over `_results_summary.json` (201 valid entries, 17 tasks → 8 default / 9 escalate):
+
+```
+grit_routed  n=41  avg_cost=$0.2627  avg_correctness=0.971
+deepseek-pro n=109 avg_cost=$0.0158  avg_correctness=0.896
+```
+
+The dynamics arm (grit-routed) buys +7.5pt correctness over the cheapest single-model arm
+at ~17× the per-cell cost — the exact trade-off the `routing_regret` comparison is built
+to quantify once the `policy` factor is runnable.
+
+### 7.4 Conclusion
+
+- **Admissibility: achieved.** `grit`, `model_cascade`, and the `dynamics` control arm all
+  validate against the measured ledger. The gate that refused "to make policies, we need
+  information" is open.
+- **Execution: blocked on one reuse-map item.** The `policy` factor (4 arms) and
+  `late_degrade` condition are not representable by the standard story matrix; running them
+  requires `experiment_matrix`/`experiment_run` (the `enqueue.py`+`worker.py` generalization).
+  No cells were run inline. The prior phase's story re-run continues to drain in background
+  (3 workers), and `enqueue.py --missing-only` confirms the representable slice is already covered.

@@ -1,0 +1,39 @@
+name: routing_regret_under_degradation
+question: >-
+  Does a dynamics controller that escalates on measured confidence beat
+  static cheapest/premium policies in accepted-cost-per-outcome?
+version: "0.2"
+workflow:
+  kind: story
+  params: {stories: [task_manager_api, static_site_gen, notification_service]}
+factors:
+  - {name: model, levels: [flash, luna, pro, haiku, terra, sonnet, sol]}
+  - {name: condition, levels: [clean, bad_seed, early_degrade, late_degrade]}
+  - {name: policy, levels: [cheapest, premium_static, quality_cascade, dynamics]}
+design: factorial
+rules:
+  - {name: first_pass_quality, plane: measurement, evidence_class: "[M]",
+     requires: [attempt_number, accepted, evaluator_independent],
+     produces: [first_pass_rate, accepted_outcome]}
+  - {name: grit, plane: measurement, evidence_class: "[M]",
+     requires: [perturbation_strength, test_executed_success, condition],
+     produces: [grit, retention, grit_auc, recovery_premium]}
+  - {name: outcome_multiplier, plane: measurement, evidence_class: "[P]",
+     requires: [value, rework_cost, reuse_value],
+     produces: [net_value]}
+  - {name: model_cascade, plane: control, evidence_class: "[H]",
+     requires: [confidence],
+     produces: [escalation_decision]}
+  - {name: budget_ceiling, plane: control, evidence_class: "[P]",
+     requires: [budget, forecast_cost, actual_cost],
+     produces: [admit_or_halt]}
+metrics:
+  - {name: cost_per_accepted_outcome, agg: mean, over: outcome}
+  - {name: first_pass_rate, agg: ratio, over: job}
+comparison:
+  kind: routing_regret
+  arm_factor: policy
+  loss: {cost: 1.0, quality: 5.0, sla: 2.0, value: -3.0}
+writeup: {format: lab_book, sections: [hypothesis, method, results, interpretation]}
+stop: {budget_usd: 40.0, uncertainty_threshold: 0.05}
+adapt: {strategy: coordinate_descent, selection: highest_regret}
