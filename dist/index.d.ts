@@ -1,4 +1,6 @@
 export { build } from './build';
+export { serve, injectLiveReload, liveReloadScript } from './serve';
+export type { ServeOptions, DevServer } from './serve';
 export { parseFrontmatter, normalizeTags } from './frontmatter';
 export { markdownToHtml } from './markdown';
 export { renderIndex, renderPage } from './render';
