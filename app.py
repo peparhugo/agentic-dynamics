@@ -5,17 +5,21 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
+import redis.asyncio as redis
 import websockets
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.http11 import Headers, Request, Response
 
 
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
+REDIS_CHANNEL = "notification-server:messages"
 
 
 def _timestamp() -> str:
@@ -36,13 +40,84 @@ def _message(message_type: str, payload: dict[str, Any], channel: str | None = N
 class NotificationServer:
     """Manage WebSocket clients and route notification messages."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 8765) -> None:
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8765,
+        redis_url: str | None = None,
+        database_url: str | None = None,
+    ) -> None:
         self.host = host
         self.port = port
         self.clients: dict[str, ServerConnection] = {}
         self.channels: dict[str, set[str]] = {}
         self._client_channels: dict[str, set[str]] = {}
         self._server: Server | None = None
+        self.redis_url = redis_url if redis_url is not None else os.getenv("REDIS_URL")
+        self.database_url = database_url or os.getenv("DATABASE_URL", "messages.db")
+        self._redis: redis.Redis | None = None
+        self._pubsub: redis.client.PubSub | None = None
+        self._redis_task: asyncio.Task[None] | None = None
+        self._server_id = str(uuid.uuid4())
+        self._database = self._sqlite_path(self.database_url)
+        self._init_database()
+
+    @staticmethod
+    def _sqlite_path(database_url: str) -> str:
+        if database_url.startswith("sqlite:///"):
+            return database_url[9:]
+        if database_url.startswith("sqlite://"):
+            return database_url[9:]
+        return database_url
+
+    def _init_database(self) -> None:
+        with sqlite3.connect(self._database) as connection:
+            connection.execute(
+                """CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel TEXT,
+                    type TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    timestamp TEXT NOT NULL
+                )"""
+            )
+
+    async def _save_message(self, message: dict[str, Any]) -> None:
+        await asyncio.to_thread(self._save_message_sync, message)
+
+    def _save_message_sync(self, message: dict[str, Any]) -> None:
+        with sqlite3.connect(self._database) as connection:
+            connection.execute(
+                "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+                (
+                    message.get("channel"),
+                    message["type"],
+                    json.dumps(message["payload"]),
+                    message["timestamp"],
+                ),
+            )
+
+    async def _get_messages(self, limit: int, offset: int) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self._get_messages_sync, limit, offset)
+
+    def _get_messages_sync(self, limit: int, offset: int) -> list[dict[str, Any]]:
+        with sqlite3.connect(self._database) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages "
+                "ORDER BY id LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+        return [
+            {
+                "id": row["id"],
+                "channel": row["channel"],
+                "type": row["type"],
+                "payload": json.loads(row["payload"]),
+                "timestamp": row["timestamp"],
+            }
+            for row in rows
+        ]
 
     @property
     def client_count(self) -> int:
@@ -63,6 +138,14 @@ class NotificationServer:
             body = json.dumps(
                 {"channel": name, "subscribers": sorted(self.channels.get(name, set()))}
             ).encode()
+        elif path == "/messages":
+            query = dict(part.split("=", 1) for part in urlsplit(request.path).query.split("&") if "=" in part)
+            try:
+                limit = max(0, min(1000, int(query.get("limit", "50"))))
+                offset = max(0, int(query.get("offset", "0")))
+            except ValueError:
+                return Response(400, "Bad Request", Headers(), b"invalid limit or offset")
+            body = json.dumps({"messages": await self._get_messages(limit, offset)}).encode()
         else:
             return None
         return Response(
@@ -95,6 +178,32 @@ class NotificationServer:
                 disconnected.append(client_id)
         for client_id in disconnected:
             self._remove_client(client_id)
+
+    async def _deliver_redis(self, event: dict[str, Any]) -> None:
+        if event.get("kind") == "broadcast":
+            await self._broadcast(event["message"], event.get("channel"))
+        elif event.get("kind") == "direct":
+            target = self.clients.get(event.get("target_client_id"))
+            if target is not None:
+                try:
+                    await target.send(event["message"])
+                except websockets.exceptions.ConnectionClosed:
+                    self._remove_client(event["target_client_id"])
+
+    async def _redis_listener(self) -> None:
+        assert self._pubsub is not None
+        async for item in self._pubsub.listen():
+            if item["type"] == "message":
+                event = json.loads(item["data"])
+                if event.get("server_id") != self._server_id:
+                    await self._deliver_redis(event)
+
+    async def _publish_or_deliver(self, event: dict[str, Any]) -> None:
+        if self._redis is None:
+            await self._deliver_redis(event)
+        else:
+            await self._deliver_redis(event)
+            await self._redis.publish(REDIS_CHANNEL, json.dumps(event))
 
     def _remove_client(self, client_id: str) -> None:
         self.clients.pop(client_id, None)
@@ -145,6 +254,11 @@ class NotificationServer:
                 await self._send_error(websocket, "channel must be a non-empty string")
                 return
             self._set_subscription(client_id, channel, message_type == "subscribe")
+            if self._redis is not None:
+                await self._redis.hset(
+                    f"notification-server:client:{client_id}",
+                    mapping={"server_id": self._server_id, "channels": json.dumps(sorted(self._client_channels.get(client_id, set())))},
+                )
             return
 
         if channel is not None and not isinstance(channel, str):
@@ -152,32 +266,45 @@ class NotificationServer:
             return
 
         outgoing = _message(message_type, payload, channel)
+        outgoing_data = json.loads(outgoing)
+        await self._save_message(outgoing_data)
         if message_type in {"broadcast", "system"}:
-            await self._broadcast(outgoing, channel)
+            await self._publish_or_deliver({"kind": "broadcast", "server_id": self._server_id, "channel": channel, "message": outgoing})
             return
 
         target_id = payload.get("client_id", payload.get("target_client_id"))
-        target = self.clients.get(target_id)
-        if target is None:
+        target_exists = target_id in self.clients
+        if not target_exists and self._redis is not None:
+            target_exists = bool(await self._redis.exists(f"notification-server:client:{target_id}"))
+        if not target_exists:
             await self._send_error(websocket, "target client not found")
             return
-        try:
-            await target.send(outgoing)
-        except websockets.exceptions.ConnectionClosed:
-            self.clients.pop(target_id, None)
-            await self._send_error(websocket, "target client not found")
+        await self._publish_or_deliver({"kind": "direct", "server_id": self._server_id, "target_client_id": target_id, "message": outgoing})
 
     async def _handler(self, websocket: ServerConnection) -> None:
         client_id = str(uuid.uuid4())
         self.clients[client_id] = websocket
+        if self._redis is not None:
+            await self._redis.hset(
+                f"notification-server:client:{client_id}",
+                mapping={"server_id": self._server_id, "channels": "[]"},
+            )
         try:
             async for raw in websocket:
                 await self._handle_message(client_id, websocket, raw)
         finally:
             self._remove_client(client_id)
+            if self._redis is not None:
+                await self._redis.delete(f"notification-server:client:{client_id}")
 
     async def start(self) -> None:
         """Start serving. The returned server runs until :meth:`stop` is called."""
+        if self.redis_url:
+            self._redis = redis.from_url(self.redis_url, decode_responses=True)
+            await self._redis.ping()
+            self._pubsub = self._redis.pubsub()
+            await self._pubsub.subscribe(REDIS_CHANNEL)
+            self._redis_task = asyncio.create_task(self._redis_listener())
         self._server = await serve(
             self._handler,
             self.host,
@@ -193,6 +320,16 @@ class NotificationServer:
             self._server.close()
             await self._server.wait_closed()
             self._server = None
+        if self._redis_task is not None:
+            self._redis_task.cancel()
+            await asyncio.gather(self._redis_task, return_exceptions=True)
+            self._redis_task = None
+        if self._pubsub is not None:
+            await self._pubsub.close()
+            self._pubsub = None
+        if self._redis is not None:
+            await self._redis.close()
+            self._redis = None
         self.clients.clear()
         self.channels.clear()
         self._client_channels.clear()
@@ -205,9 +342,9 @@ class NotificationServer:
         await self.stop()
 
 
-async def create_server(host: str = "127.0.0.1", port: int = 8765) -> NotificationServer:
+async def create_server(host: str = "127.0.0.1", port: int = 8765, **kwargs: Any) -> NotificationServer:
     """Create and start a notification server, useful for application embedding."""
-    server = NotificationServer(host, port)
+    server = NotificationServer(host, port, **kwargs)
     await server.start()
     return server
 
