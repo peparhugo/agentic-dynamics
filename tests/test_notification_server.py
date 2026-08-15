@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 import json
 
 import pytest
@@ -147,6 +148,58 @@ async def test_messages_endpoint_persists_published_messages(tmp_path):
         assert message["payload"]["message"] == "saved"
         assert message["id"]
         assert message["timestamp"]
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_after_configured_message_limit(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    fakeredis = pytest.importorskip("fakeredis.aioredis")
+    redis = fakeredis.FakeRedis()
+    server = NotificationServer(broker=RedisBroker(redis))
+    await server.start(port=0)
+    try:
+        uri = f"ws://127.0.0.1:{server.port}"
+        async with connect(uri) as client:
+            await receive_json(client)
+            message = json.dumps({"type": "broadcast", "payload": {"message": "allowed"}})
+            await client.send(message)
+            assert (await receive_json(client))["type"] == "broadcast"
+            await client.send(message)
+            assert (await receive_json(client))["type"] == "broadcast"
+            await client.send(message)
+            error = await receive_json(client)
+            assert error["payload"] == {"event": "error", "message": "rate limit exceeded"}
+    finally:
+        await server.stop()
+        await redis.aclose()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_time_and_reports_pagination(tmp_path):
+    server = NotificationServer(database_url=f"sqlite:///{tmp_path / 'history.sqlite'}")
+    await server.start(port=0)
+    try:
+        uri = f"ws://127.0.0.1:{server.port}"
+        async with connect(uri) as client:
+            await receive_json(client)
+            await client.send(json.dumps({"type": "subscribe", "payload": {"channel": "audit"}}))
+            await receive_json(client)
+            for message in ("first", "second", "third"):
+                await client.send(json.dumps({"type": "broadcast", "payload": {"channel": "audit", "message": message}}))
+                await receive_json(client)
+        await server.broadcast({"channel": "other", "message": "ignored"})
+
+        since = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+        first_page = await get_json(server, f"/history?channel=audit&since={since}&limit=2")
+        second_page = await get_json(server, f"/history?channel=audit&since={since}&limit=2&offset=2")
+
+        assert [message["payload"]["message"] for message in first_page["messages"]] == ["first", "second"]
+        assert first_page["has_more"] is True
+        assert [message["payload"]["message"] for message in second_page["messages"]] == ["third"]
+        assert second_page["has_more"] is False
+        assert [message["timestamp"] for message in first_page["messages"]] == sorted(message["timestamp"] for message in first_page["messages"])
     finally:
         await server.stop()
 
