@@ -16,6 +16,7 @@ export class TemplatePlugin implements Plugin {
   onFile(page: Page, context: PluginContext): Page {
     const html = this.requireEngine().renderPage(page, context.pages);
     fs.writeFileSync(path.join(context.outputDir, `${page.slug}.html`), html, 'utf-8');
+    context.cache?.setHtml(page.slug, html);
     return page;
   }
 

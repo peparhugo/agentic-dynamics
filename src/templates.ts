@@ -166,6 +166,64 @@ export class TemplateEngine {
   }
 }
 
+function firstExisting(files: string[]): string | null {
+  for (const file of files) {
+    if (fs.existsSync(file)) return file;
+  }
+  return null;
+}
+
+export function pageTemplateSources(templatesDir: string, page: Page): string {
+  const templateName = page.template || DEFAULT_TEMPLATE_NAME;
+  const layoutName = page.layout || DEFAULT_LAYOUT_NAME;
+
+  const templateFile = firstExisting([
+    path.join(templatesDir, `${templateName}.hbs`),
+    path.join(templatesDir, `${templateName}.handlebars`),
+  ]);
+  const templateSource = templateFile
+    ? fs.readFileSync(templateFile, 'utf-8')
+    : templateName === DEFAULT_TEMPLATE_NAME
+    ? DEFAULT_PAGE_TEMPLATE
+    : '';
+
+  const layoutFile = firstExisting([
+    path.join(templatesDir, 'layouts', `${layoutName}.hbs`),
+    path.join(templatesDir, 'layouts', `${layoutName}.handlebars`),
+  ]);
+  const layoutSource = layoutFile
+    ? fs.readFileSync(layoutFile, 'utf-8')
+    : layoutName === DEFAULT_LAYOUT_NAME
+    ? DEFAULT_LAYOUT
+    : '';
+
+  const parts: string[] = [templateName, templateSource, layoutName, layoutSource];
+
+  const builtinPartials: Array<[string, string]> = [
+    ['header', DEFAULT_HEADER],
+    ['footer', DEFAULT_FOOTER],
+    ['nav', DEFAULT_NAV],
+  ];
+  const partialsDir = path.join(templatesDir, 'partials');
+  for (const [name, fallback] of builtinPartials) {
+    const file = firstExisting([
+      path.join(partialsDir, `${name}.hbs`),
+      path.join(partialsDir, `${name}.handlebars`),
+    ]);
+    parts.push(name, file ? fs.readFileSync(file, 'utf-8') : fallback);
+  }
+
+  if (fs.existsSync(partialsDir)) {
+    for (const entry of fs.readdirSync(partialsDir).sort()) {
+      if (entry.endsWith('.hbs') || entry.endsWith('.handlebars')) {
+        parts.push(entry, fs.readFileSync(path.join(partialsDir, entry), 'utf-8'));
+      }
+    }
+  }
+
+  return parts.join('\n');
+}
+
 export function renderPage(page: Page, pages: Page[]): string {
   return new TemplateEngine('./templates').renderPage(page, pages);
 }

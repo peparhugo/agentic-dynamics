@@ -50,6 +50,28 @@ export function sortByDate(pages: Page[]): Page[] {
   return [...pages].sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
+export function pageToFrontmatter(page: Page): Frontmatter {
+  return {
+    title: page.title,
+    date: page.date,
+    tags: page.tags,
+    template: page.template,
+    layout: page.layout,
+  };
+}
+
+export function pageFromCache(slug: string, frontmatter: Frontmatter, bodyHtml: string): Page {
+  return {
+    slug,
+    title: typeof frontmatter.title === 'string' ? frontmatter.title : slug,
+    date: toDate(frontmatter.date),
+    tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.map(String) : [],
+    html: bodyHtml,
+    template: typeof frontmatter.template === 'string' ? frontmatter.template : undefined,
+    layout: typeof frontmatter.layout === 'string' ? frontmatter.layout : undefined,
+  };
+}
+
 export function loadPages(contentDir: string): Page[] {
   const files = readMarkdownFiles(contentDir);
   const pages = files.map((file) => {

@@ -14,10 +14,27 @@ export interface Page {
   html: string;
   template?: string;
   layout?: string;
+  sourcePath?: string;
+  sourceHash?: string;
 }
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
   templatesDir?: string;
+  incremental?: boolean;
+  clean?: boolean;
+  cacheFile?: string;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  totalPages: number;
+  timeSavedMs: number;
+}
+
+export interface BuildResult {
+  pages: Page[];
+  stats: BuildStats;
 }

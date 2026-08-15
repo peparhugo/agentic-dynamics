@@ -38,6 +38,18 @@ describe('parseArgs', () => {
     const opts = parseArgs(['node', 'ssg', 'serve']);
     expect(opts.port).toBe(3000);
   });
+
+  it('parses --incremental and --clean flags', () => {
+    const opts = parseArgs(['node', 'ssg', 'build', '--incremental', '--clean']);
+    expect(opts.incremental).toBe(true);
+    expect(opts.clean).toBe(true);
+  });
+
+  it('defaults incremental and clean to false', () => {
+    const opts = parseArgs(['node', 'ssg', 'build']);
+    expect(opts.incremental).toBe(false);
+    expect(opts.clean).toBe(false);
+  });
 });
 
 describe('run', () => {
@@ -66,5 +78,25 @@ describe('run', () => {
   it('returns 1 when content directory is missing', () => {
     const code = run(['node', 'ssg', 'build', '--content', '/does/not/exist']);
     expect(code).toBe(1);
+  });
+
+  it('runs an incremental build via the CLI', () => {
+    const content = fs.mkdtempSync(path.join(os.tmpdir(), 'ssg-cli-content-'));
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'ssg-cli-out-'));
+    fs.writeFileSync(
+      path.join(content, 'hello.md'),
+      '---\ntitle: Hello\ndate: 2024-01-01\n---\n# Hello\n'
+    );
+
+    const first = run(['node', 'ssg', 'build', '--incremental', '--content', content, '--output', out]);
+    expect(first).toBe(0);
+    expect(fs.existsSync(path.join(out, 'hello.html'))).toBe(true);
+
+    const second = run(['node', 'ssg', 'build', '--incremental', '--content', content, '--output', out]);
+    expect(second).toBe(0);
+    expect(fs.existsSync(path.join(out, '.ssg-cache.json'))).toBe(true);
+
+    fs.rmSync(content, { recursive: true, force: true });
+    fs.rmSync(out, { recursive: true, force: true });
   });
 });

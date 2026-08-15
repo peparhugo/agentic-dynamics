@@ -1,10 +1,14 @@
 import { BuildOptions, Page } from './types';
+import type { BuildCache } from './cache';
 
 export interface PluginContext {
   contentDir: string;
   outputDir: string;
   templatesDir: string;
   pages: Page[];
+  cache?: BuildCache;
+  incremental?: boolean;
+  clean?: boolean;
   [key: string]: unknown;
 }
 
