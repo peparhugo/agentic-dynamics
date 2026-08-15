@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite, injectLiveReload, parseArgs, parseMarkdown } from '../index';
+import { buildSite, injectLiveReload, parseArgs, parseMarkdown, type Plugin } from '../index';
 
 describe('markdown parsing', () => {
   it('parses simple YAML frontmatter and merges it with gray-matter output', () => {
@@ -60,6 +60,20 @@ describe('buildSite', () => {
     const output = path.join(root, 'public');
     await buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates });
     expect(await fs.readFile(path.join(output, 'notes', 'second.html'), 'utf8')).toContain('<main>Second <h1>Second</h1>');
+  });
+
+  it('runs plugin lifecycle hooks in plugin order', async () => {
+    const events: string[] = [];
+    const plugin: Plugin = {
+      onStart: () => events.push('start'),
+      beforeBuild: () => events.push('before'),
+      onFile: (page) => { events.push(`file:${page.sourcePath}`); page.title = 'Changed'; },
+      afterBuild: () => events.push('after'),
+      onEnd: () => events.push('end'),
+    };
+    await buildSite({ contentDir: path.join(root, 'content'), outputDir: path.join(root, 'public'), plugins: [plugin] });
+    expect(events).toEqual(['start', 'before', 'file:first.md', 'file:notes/second.markdown', 'after', 'end']);
+    expect(await fs.readFile(path.join(root, 'public', 'first.html'), 'utf8')).toContain('<h1>Changed</h1>');
   });
 });
 

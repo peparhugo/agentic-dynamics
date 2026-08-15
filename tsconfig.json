@@ -9,5 +9,5 @@
     "outDir": "dist",
     "declaration": true
   },
-  "include": ["index.ts", "tests/**/*.ts"]
+  "include": ["index.ts", "plugins/**/*.ts", "tests/**/*.ts"]
 }
