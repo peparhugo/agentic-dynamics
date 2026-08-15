@@ -1,5 +1,6 @@
 import os
 import tempfile
+from unittest import mock
 
 import pytest
 
@@ -154,6 +155,73 @@ def test_update_task(client):
     assert data["title"] == "New title"
     assert data["status"] == "done"
     assert data["id"] == created["id"]
+
+
+# ── Notification trigger ────────────────────────────────────────
+
+
+def test_update_task_to_completed_triggers_notification(client):
+    token = register_and_login(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=auth(token)
+    ).get_json()
+    with mock.patch.object(task_app.send_notification_email, "delay") as delay:
+        resp = client.put(
+            f"/tasks/{created['id']}",
+            json={"status": "completed"},
+            headers=auth(token),
+        )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+    delay.assert_called_once_with("alice", "Ship feature")
+
+
+def test_update_task_not_completed_does_not_trigger_notification(client):
+    token = register_and_login(client)
+    created = client.post(
+        "/tasks", json={"title": "Keep working"}, headers=auth(token)
+    ).get_json()
+    with mock.patch.object(task_app.send_notification_email, "delay") as delay:
+        resp = client.put(
+            f"/tasks/{created['id']}",
+            json={"status": "in_progress"},
+            headers=auth(token),
+        )
+    assert resp.status_code == 200
+    delay.assert_not_called()
+
+
+def test_completing_already_completed_task_does_not_retrigger(client):
+    token = register_and_login(client)
+    created = client.post(
+        "/tasks", json={"title": "Done deal"}, headers=auth(token)
+    ).get_json()
+    with mock.patch.object(task_app.send_notification_email, "delay") as delay:
+        client.put(
+            f"/tasks/{created['id']}",
+            json={"status": "completed"},
+            headers=auth(token),
+        )
+        delay.reset_mock()
+        resp = client.put(
+            f"/tasks/{created['id']}",
+            json={"status": "completed"},
+            headers=auth(token),
+        )
+    assert resp.status_code == 200
+    delay.assert_not_called()
+
+
+def test_update_task_not_found_does_not_trigger_notification(client):
+    token = register_and_login(client)
+    with mock.patch.object(task_app.send_notification_email, "delay") as delay:
+        resp = client.put(
+            "/tasks/9999",
+            json={"status": "completed"},
+            headers=auth(token),
+        )
+    assert resp.status_code == 404
+    delay.assert_not_called()
 
 
 def test_update_task_partial(client):

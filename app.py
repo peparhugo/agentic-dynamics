@@ -15,6 +15,8 @@ import jwt
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from celery_app import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -57,13 +59,21 @@ def init_db():
 
 def migrate(conn):
     """Idempotent migration: add owner_id to existing tasks tables and
-    preserve pre-existing data by assigning it to a legacy owner."""
-    columns = {
+    preserve pre-existing data by assigning it to a legacy owner. Also
+    add an optional email column to users for notifications."""
+    task_columns = {
         row["name"]
         for row in conn.execute("PRAGMA table_info(tasks)").fetchall()
     }
-    if "owner_id" not in columns:
+    if "owner_id" not in task_columns:
         conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        conn.commit()
+    user_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(users)").fetchall()
+    }
+    if "email" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.commit()
     with conn:
         orphans = conn.execute(
@@ -139,6 +149,7 @@ def register():
     password = data.get("password", "")
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
+    email = (data.get("email") or "").strip() or None
     with get_db() as conn:
         existing = conn.execute(
             "SELECT id FROM users WHERE username = ?", (username,)
@@ -146,8 +157,8 @@ def register():
         if existing:
             return jsonify({"error": "username already taken"}), 409
         conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, generate_password_hash(password)),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, generate_password_hash(password), email),
         )
         conn.commit()
     return jsonify({"message": "user registered", "username": username}), 201
@@ -241,6 +252,14 @@ def update_task(user, task_id):
         updated = conn.execute(
             "SELECT * FROM tasks WHERE id = ?", (task_id,)
         ).fetchone()
+    if status == "completed" and row["status"] != "completed":
+        user_email = user.get("email") or user["username"]
+        try:
+            send_notification_email.delay(user_email, title)
+        except Exception:
+            app.logger.exception(
+                "Failed to enqueue completion notification for task %s", task_id
+            )
     return jsonify(task_to_dict(updated))
 
 
