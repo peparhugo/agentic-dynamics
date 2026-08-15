@@ -194,6 +194,19 @@ from .prompt_constructor import (
     validate_plan,
 )
 
+# v1.0: producer-side measured-finding derivation (richer extractor over the summary)
+from .knowledge_ingestion import (
+    ACL_SCOPE,
+    EXTRACTOR_VERSION,
+    REPOSITORY_ID,
+    RESULT_VERSION,
+    SOURCE_TYPE,
+    SOURCE_URI,
+    build_record,
+    derive_records,
+    record_to_event,
+)
+
 # v1.0: durable ingestion over Redis Streams (DB 2, pointer-only events)
 from .knowledge_stream import (
     CONSUMER_GROUPS,
@@ -365,6 +378,10 @@ __all__ = [
     "claim_pending", "dead_letter", "decode_event", "default_extract",
     "process_entry", "read_artifact", "verify_content_hash", "reconcile_missing",
     "CONSUMER_GROUPS", "STREAM_KEY", "DEAD_LETTER_KEY",
+    # v1.0 producer-side measured-finding derivation
+    "build_record", "record_to_event", "derive_records",
+    "EXTRACTOR_VERSION", "RESULT_VERSION", "SOURCE_URI", "SOURCE_TYPE",
+    "REPOSITORY_ID", "ACL_SCOPE",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",
