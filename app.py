@@ -1,8 +1,8 @@
 """
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+Flask task management API with SQLite storage.
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
+Models: Task (id, title, status, created_at)
+Status values: 'pending' (default) or 'done'
 """
 
 from flask import Flask, request, jsonify
@@ -12,7 +12,8 @@ import os
 
 app = Flask(__name__)
 
-DATABASE = os.environ.get("DATABASE", "todos.db")
+DATABASE = os.environ.get("DATABASE", "tasks.db")
+VALID_STATUSES = {"pending", "done"}
 
 
 def get_db():
@@ -31,27 +32,15 @@ def init_db():
             "  created_at TEXT NOT NULL"
             ")"
         )
-
-
-# ── Models ────────────────────────────────────────────────────
-
-
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
+        conn.commit()
 
 
 def create_task(title: str) -> dict:
     with get_db() as conn:
         now = datetime.utcnow().isoformat()
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
-            (title, now),
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, ?, ?)",
+            (title, "pending", now),
         )
         conn.commit()
         return {
@@ -68,23 +57,20 @@ def get_tasks():
         return [dict(r) for r in rows]
 
 
-def get_task(task_id: int) -> dict | None:
+def get_task(task_id: int):
     with get_db() as conn:
         row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return dict(row) if row else None
 
 
-
-def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
-    return get_task(task_id)
-
-
-
-def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
+def update_task(task_id: int, title: str | None = None, status: str | None = None):
     task = get_task(task_id)
     if task is None:
         return None
+
+    if status is not None and status not in VALID_STATUSES:
+        raise ValueError(f"Invalid status: {status}")
+
     with get_db() as conn:
         updates = []
         params = []
@@ -102,8 +88,6 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
             conn.commit()
     return get_task(task_id)
 
-
-# ── Routes ─────────────────────────────────────────────────────
 
 @app.route("/tasks", methods=["GET"])
 def list_tasks():
@@ -130,15 +114,21 @@ def show_task(task_id: int):
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
+    task = get_task(task_id)
+    if task is None:
+        return jsonify({"error": "task not found"}), 404
+
     data = request.get_json(silent=True) or {}
-    task = update_task(
+
+    if "status" in data and data["status"] not in VALID_STATUSES:
+        return jsonify({"error": f"Invalid status: {data['status']}"}), 422
+
+    updated_task = update_task(
         task_id,
         title=data.get("title"),
         status=data.get("status"),
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
+    return jsonify(updated_task)
 
 
 if __name__ == "__main__":
