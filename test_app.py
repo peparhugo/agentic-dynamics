@@ -212,6 +212,40 @@ def test_update_single_field_preserves_other_values(client):
     assert response.get_json()["status"] == "active"
 
 
+def test_completing_task_queues_owner_notification(client, monkeypatch):
+    headers = auth_headers(client, username="owner@example.com")
+    task = client.post("/tasks", json={"title": "Ship release"}, headers=headers).get_json()
+    queued_notifications = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *arguments: queued_notifications.append(arguments),
+    )
+
+    response = client.put(
+        f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert queued_notifications == [("owner@example.com", "Ship release")]
+
+
+def test_completed_task_is_not_notified_twice(client, monkeypatch):
+    headers = auth_headers(client, username="owner@example.com")
+    task = client.post("/tasks", json={"title": "Ship release"}, headers=headers).get_json()
+    queued_notifications = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *arguments: queued_notifications.append(arguments),
+    )
+
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+
+    assert queued_notifications == [("owner@example.com", "Ship release")]
+
+
 @pytest.mark.parametrize("method", ["get", "put"])
 def test_missing_task_returns_json_404(client, method):
     kwargs = {"json": {"status": "done"}} if method == "put" else {}
