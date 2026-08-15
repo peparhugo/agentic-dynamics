@@ -1,0 +1,320 @@
+name: remediation_data_integrity
+question: >-
+  Can we repair the measurement-integrity flaws documented in the 2026-08-13 architecture
+  review without re-running the whole corpus — by (a) instrumenting the four still-unmeasured
+  ledger fields (confidence, perturbation_strength, test_executed_success, answer/explanation
+  split), (b) recomputing all derived metrics from the existing worktrees and DB, (c) re-running
+  only the genuinely contaminated cells, and (d) re-admitting the gated policy arms only once
+  their inputs exist?
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool:
+      - deepseek/deepseek-v4-pro
+      - deepseek/deepseek-v4-flash
+    context:
+      remediation_source: >-
+        Fix plan derived from code_reviews/2026-08-13_architecture-hardening-review.md
+        (P0-P2 findings, 3 conflicting pricing sources, fabricated 100% pass rate, absolute-$
+        strategy thresholds, dead 2-way taxonomy, silent clean-cell on mutation failure,
+        baseline cross-contamination, convention-rubric gap, regex "AST" diff, [M] overclaim,
+        errors dropped from denominator) and code_reviews/2026-08-13_phase1-remediation.md
+        (what is fixed in code vs still stale in data).
+      data_staleness: >-
+        experiments/results/_results_summary.json is dated 2026-08-09, BEFORE the remediation
+        (2026-08-13). The fixes landed in src/ and scripts/ but the data was never regenerated.
+        analysis/*.json still store pre-fix strategy labels. Story pass rates are ~100% because
+        tests are agent-authored (binary-correctness limitation), not independently verified.
+      load_bearing_rule: >-
+        experiment_spec.LEDGER_FIELDS does NOT include confidence, perturbation_strength,
+        test_executed_success, answer, or explanation. The validate_rules gate refuses any
+        control rule whose requires touch these until a measurement rule produces them. The
+        instrument phases below add them to the ledger AND to LEDGER_FIELDS so the grit /
+        model_cascade / dynamics arms become admissible only AFTER instrumentation lands.
+    phases:
+      - name: scope
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Assess the current remediation state and write docs/remediation_plan.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - code_reviews/2026-08-13_architecture-hardening-review.md  (the P0/P1/P2 findings)
+          - code_reviews/2026-08-13_phase1-remediation.md            (what is fixed vs deferred)
+          - src/instrument/experiment_spec.py                        (LEDGER_FIELDS, validate_rules)
+          - src/instrument/perturb.py                                (PERTURBATION_CLASSES — 3-way now)
+          - src/instrument/basin.py                                  (get_verdict branches)
+          - src/instrument/strategy.py                               (classify_strategy — behavioral now)
+          - src/instrument/workflow_runner.py + test_runner.py       (the ONLY place test_executed_success exists)
+          - src/instrument/story.py, opencode.py, trajectory.py      (the paths that do NOT yet record confidence / test_executed_success / answer/explanation)
+
+          REQUIREMENTS:
+          - Produce a definitive table: for each P0/P1/P2 finding, mark it FIXED-IN-CODE,
+            STALE-IN-DATA, or OPEN, with the exact file:line evidence for the current state.
+            Do NOT assume the review is still accurate — several P0s are already fixed.
+          - Determine which of the four missing ledger fields (confidence,
+            perturbation_strength, test_executed_success, answer/explanation split) are (a)
+            recorded anywhere today, (b) recorded but not on the story/single-task path, or
+            (c) entirely absent. Name the exact functions that must change.
+          - Enumerate the contaminated cells that need a genuine re-run (manifold n=16 under
+            the new taxonomy, P0-7 silent-clean fallbacks, P0-8 wrong-baseline cells) and how
+            to identify them from the existing results/DB.
+
+          DELIVER exactly one file: docs/remediation_plan.md with the state table, the
+          instrumentation gap analysis, and the re-run inventory. Do not modify code.
+      - name: instrument
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement the four missing ledger fields and re-open the gated policy arms.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/remediation_plan.md (produced by the scope phase)
+          - src/instrument/experiment_spec.py  (LEDGER_FIELDS, validate_rules — the gate)
+          - src/instrument/workflow_runner.py  (PhaseResult.test_executed_success — prior art)
+          - src/instrument/test_runner.py      (run_suite / suite_succeeded — sole truth for success)
+          - src/instrument/story.py            (StoryResult / run_story — must start recording)
+          - src/instrument/opencode.py         (AgenticResult — token accounting lives here)
+          - src/instrument/constraint_detection.py (detection_confidence — candidate source for confidence)
+          - src/instrument/trajectory.py       (TrajectoryStep — where per-step fields go)
+
+          REQUIRED OUTCOME:
+          - test_executed_success: wire the independent test runner (test_runner.run_suite)
+            into the story/single-task completion path so every cell records an independently
+            verified pass/fail bool, never the model's self-report. Store it on the result.
+          - perturbation_strength: ensure the strength axis is a first-class field on every
+            attempt/story result (it already exists on GameReport/BasinMetrics — promote it to
+            the ledger record, not just the report).
+          - confidence: derive a per-attempt confidence signal (e.g. from
+            constraint_detection.detection_confidence, or a documented self-assessment marker),
+            tagged [H], stored on the attempt record. Document the derivation in a docstring.
+          - answer/explanation token split: split output tokens into answer vs explanation (and
+            reasoning) from the opencode usage stream, so the Explanation Tax can be computed.
+          - Add all four to experiment_spec.LEDGER_FIELDS so validate_rules admits them as
+            ledger-produced; update src/instrument/CONTEXT.md and the ledger table to mark them
+            measured (remove the UNMEASURED comments).
+          - Add regression tests under tests/ for each new field (test_data_integrity.py or new).
+
+          EDITING CONSTRAINTS:
+          - Follow repo conventions: snake_case, PascalCase classes, type hints, dataclasses.
+          - Do not touch pricing (efficiency.get_pricing is the single source of truth) or the
+            taxonomy (3-way, already correct).
+          - Never run bare pytest — enumerate test files explicitly.
+
+          DELIVER the implementation plus tests.
+      - name: recompute
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Recompute all derived metrics from the existing worktrees and DB (no new LLM runs).
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/analyze_worktrees.py   (solution/basin/efficiency/strategy/game_report)
+          - scripts/analyze_stories.py     (story post-hoc analysis)
+          - scripts/validate_session.py    (independent pytest on session worktrees)
+          - scripts/verify_tests.py        (sole source of truth for test_executed_success)
+          - code_reviews/2026-08-13_phase1-remediation.md (notes that analysis/*.json holds pre-fix labels)
+
+          REQUIRED OUTCOME:
+          - Re-run analyze_worktrees.py and analyze_stories.py over the EXISTING /tmp worktrees
+            and the opencode DB to propagate: corrected behavioral strategy labels (P0-4), the
+            3-way basin verdicts (P0-5), fixed convention scores (P0-9), Go/Rust AST counts
+            (P0-10), [M]→[H] tag correction for agent-authored tests (P0-11), and the
+            errors-in-denominator fix (P0-12).
+          - Run verify_tests.py / validate_session.py on every existing story and single-task
+            worktree to produce honest independent test_executed_success (fills the field the
+            instrument phase just added).
+          - Record the recompute summary (n cells reclassified, n strategy-label changes, n
+            pass-rate corrections) in docs/remediation_plan.md under a "recompute results"
+            section.
+
+          DELIVER the regenerated analysis artifacts plus the summary numbers.
+      - name: rerun_contaminated
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Re-run only the genuinely contaminated cells — via the queue, NOT inline.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/remediation_plan.md (the re-run inventory from the scope phase)
+          - scripts/enqueue.py / worker.py / monitor.py  (queue lifecycle: enqueue → worker → monitor)
+          - src/instrument/perturb.py (current 3-way taxonomy the re-runs must use)
+
+          REQUIRED OUTCOME:
+          - Identify from the existing results/DB the contaminated cells: (1) manifold
+            perturbations (n≈16) — single-task, run under the now-obsolete 2-way taxonomy;
+            (2) story cells whose mutation compilation silently fell back to clean (P0-7);
+            (3) single-task cells matched to a wrong baseline (P0-8).
+          - QUEUE, DO NOT RUN INLINE:
+            * Story cells (P0-7): enqueue with `python scripts/enqueue.py --missing-only`
+              (framework Redis on port 6380, NEVER 6379), then start N parallel workers
+              (`python scripts/worker.py &` × N), then poll `python scripts/monitor.py --json`
+              until queued and running both hit 0.
+            * Single-task cells (manifold n≈16, P0-8): NOT story-queueable — run them in
+              parallel via `python scripts/batch_run.py` (or the sweep runner), never one-by-one
+              inline.
+          - Report: which cells were enqueued vs batched, how many workers were spawned, the
+            final drained queue state, and the before/after delta on the affected metrics.
+
+          DELIVER the enqueue/worker record plus a delta table appended to docs/remediation_plan.md.
+      - name: regenerate
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Regenerate the derived data artifacts and the website data from the corrected corpus.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/sync_data.py        (stories -> parquet)
+          - scripts/build_data.py       (data.js; must not fabricate 100% pass rate)
+          - scripts/generate_manifest.py
+          - code_reviews/2026-08-13_phase1-remediation.md (P0-1/P0-2/P0-3 fixes to verify)
+
+          REQUIRED OUTCOME:
+          - Re-run all active lab_*.py against the regenerated _results_summary.json so the
+            twenty lab books reflect corrected strategy/basin/convention/pass-rate numbers.
+          - Run sync_data then build_data. Verify in the emitted data.js: no fabricated 100%
+            pass rate (P0-1), a single pricing source (P0-2), no resurrected 500B/37B arch
+            constants (P0-3), correct [M]/[C]/[H]/[X] provenance (P0-11).
+          - Regenerate data_manifest.json with the new git_sha and dataset_hash.
+
+          DELIVER the regenerated data.js + manifest + a provenance spot-check report.
+      - name: run_policy_grid
+        kind: agent
+        timeout: 14400
+        prompt: |
+          Re-admit and run the gated policy arms — via the queue, NOT inline.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - src/instrument/compile_experiment.py (compile_spec, SpecError)
+          - experiments/specs/routing_regret_under_degradation.yaml (a story grid; admissible
+            once the instrument phase landed the four fields)
+          - src/instrument/routing.py (simulate_strategies / recommend_route)
+          - scripts/enqueue.py / worker.py / monitor.py  (queue lifecycle: enqueue → worker → monitor)
+
+          REQUIRED OUTCOME:
+          - Confirm `python3 -c "from instrument.experiment_spec import validate_rules"` passes
+            for the routing_regret spec (grit / model_cascade / dynamics admissible now that
+            confidence, perturbation_strength, and test_executed_success are ledger fields).
+            Record the exact validation output.
+          - QUEUE the grid (it is a story grid): enqueue its story cells and start workers;
+            poll `python scripts/monitor.py --json` to drained. Do NOT run cells inline. If a
+            policy-arm cell is not representable by the standard story matrix, note it in the
+            writeup as the experiment_matrix/experiment_run reuse-map item still to be built.
+          - Compute the comparison (arm regret) from the drained results and write it up.
+
+          DELIVER the validation output plus the grid writeup.
+      - name: verify
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Verify the whole remediation and write docs/remediation_verify.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - Run ONLY the remediation-relevant tests explicitly (e.g.
+            tests/test_data_integrity.py, tests/test_strategy.py, tests/test_commit_analysis.py,
+            tests/test_workflow_runner.py, tests/test_experiment_spec.py,
+            tests/test_compile_experiment.py) — never a bare suite — and report exact commands
+            and results. Fix any failure introduced by this work before reporting PASS.
+          - Confirm the four fields (confidence, perturbation_strength, test_executed_success,
+            answer/explanation) are present in the ledger schema and populated on new results.
+          - Confirm validate_rules now admits the grit/model_cascade/dynamics arms and still
+            refuses any rule requiring a truly-unmeasured field.
+          - Confirm data.js has no fabricated 100% pass rate, no resurrected arch constants,
+            and a single pricing source.
+          - Confirm the recompute changed the strategy/basin/pass-rate numbers in the direction
+            the review predicted, and list any headline that flipped.
+
+          DELIVER exactly one file: docs/remediation_verify.md with PASS/FAIL per check,
+          commands run, changed-file summary, and the list of flipped conclusions.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: instrument_confidence
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [confidence]
+  - name: instrument_grit_inputs
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [perturbation_strength, test_executed_success]
+  - name: instrument_token_split
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [answer, explanation]
+  - name: grit
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [perturbation_strength, test_executed_success]
+    produces: [grit]
+  - name: explanation_tax
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [answer, explanation, cost_inference]
+    produces: [explanation_tax]
+  - name: model_cascade
+    plane: control
+    evidence_class: "[P]"
+    requires: [confidence, first_pass]
+    produces: [escalation_decision]
+  - name: dynamics
+    plane: control
+    evidence_class: "[P]"
+    requires: [confidence, first_pass, deadline_slack]
+    produces: [admit_or_halt]
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: attempt}
+  - {name: cells_reclassified, agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, remediation_state, instrumented_fields, recompute_results, rerun_scope, policy_grid, verification]
+stop: {budget_usd: 40.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -1,0 +1,30 @@
+name: process_perturbation_resample
+question: >-
+  Does re-sampling the undersampled process_perturbation operators (formerly the "manifold"
+  class, n=16 under the obsolete 2-way taxonomy) under the current 3-way taxonomy change the
+  "zero high-grit under manifold" conclusion and the basin-topology drift estimates?
+version: "0.1"
+workflow:
+  kind: task
+  params:
+    tasks: [task_manager, url_shortener, static_site_gen]
+    operators: [inject_alien_vocab, shift_framing, reverse_causality, force_abandonment]
+    strengths: [0.5]
+factors:
+  - {name: model,    levels: [deepseek/deepseek-v4-pro, anthropic/claude-fable-5, openai/gpt-5.6]}
+  - {name: operator, levels: [inject_alien_vocab, shift_framing, reverse_causality, force_abandonment]}
+  - {name: strength, levels: ["0.5"]}
+design: factorial
+rules:
+  - {name: instrument_grit_inputs, plane: measurement, evidence_class: "[M]", requires: [], produces: [perturbation_strength, test_executed_success]}
+  - {name: grit,                   plane: measurement, evidence_class: "[M]", requires: [perturbation_strength, test_executed_success], produces: [grit, grit_auc]}
+  - {name: basin_escape,           plane: measurement, evidence_class: "[C]", requires: [], produces: [escape]}
+  - {name: basin_verdict,          plane: measurement, evidence_class: "[C]", requires: [escape], produces: [basin_type]}
+metrics:
+  - {name: escape,     agg: mean, over: cell}
+  - {name: grit_auc,   agg: mean, over: cell}
+  - {name: correctness, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: operator, loss: {cost: 1.0, quality: -5.0}}
+writeup: {format: lab_book, sections: [hypothesis, method, results, interpretation]}
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
