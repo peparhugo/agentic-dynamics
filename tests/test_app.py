@@ -20,6 +20,20 @@ async def receive_json(client):
     return json.loads(await client.recv())
 
 
+async def get_json(port, path):
+    reader, writer = await asyncio.open_connection("127.0.0.1", int(port))
+    writer.write(
+        f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode()
+    )
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    headers, body = response.split(b"\r\n\r\n", 1)
+    assert b"200 OK" in headers
+    return json.loads(body)
+
+
 @pytest.mark.asyncio
 async def test_connection_receives_unique_system_identifier(notification_server):
     server, uri = notification_server
@@ -96,3 +110,77 @@ async def test_health_returns_connected_client_count(notification_server):
     headers, body = response.split(b"\r\n\r\n", 1)
     assert b"200 OK" in headers
     assert json.loads(body) == {"connected_clients": 1}
+
+
+@pytest.mark.asyncio
+async def test_channel_messages_reach_only_subscribers(notification_server):
+    server, uri = notification_server
+    async with connect(uri) as first, connect(uri) as second, connect(uri) as third:
+        await receive_json(first)
+        await receive_json(second)
+        await receive_json(third)
+        await first.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await second.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await second.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        await third.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        for _ in range(20):
+            if {name: len(subscribers) for name, subscribers in server.channels.items()} == {
+                "alerts": 2,
+                "chat": 2,
+            }:
+                break
+            await asyncio.sleep(0.01)
+        assert {name: len(subscribers) for name, subscribers in server.channels.items()} == {
+            "alerts": 2,
+            "chat": 2,
+        }
+
+        await first.send(
+            json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "urgent"}})
+        )
+
+        first_message = await receive_json(first)
+        second_message = await receive_json(second)
+        assert first_message["channel"] == second_message["channel"] == "alerts"
+        assert first_message["payload"] == second_message["payload"] == {"text": "urgent"}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(third.recv(), timeout=0.05)
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_and_channel_endpoints(notification_server):
+    server, uri = notification_server
+    port = uri.rsplit(":", 1)[1]
+    async with connect(uri) as first, connect(uri) as second:
+        first_id = (await receive_json(first))["payload"]["client_id"]
+        second_id = (await receive_json(second))["payload"]["client_id"]
+        await first.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await second.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        for _ in range(20):
+            if len(server.channels.get("alerts", set())) == 2:
+                break
+            await asyncio.sleep(0.01)
+
+        assert await get_json(port, "/channels") == {
+            "channels": [{"name": "alerts", "subscriber_count": 2}]
+        }
+        assert await get_json(port, "/channels/alerts/subscribers") == {
+            "channel": "alerts",
+            "subscribers": sorted([first_id, second_id]),
+        }
+
+        await second.send(json.dumps({"type": "unsubscribe", "channel": "alerts"}))
+        for _ in range(20):
+            if len(server.channels.get("alerts", set())) == 1:
+                break
+            await asyncio.sleep(0.01)
+        await first.send(
+            json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "only first"}})
+        )
+        assert (await receive_json(first))["payload"] == {"text": "only first"}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(second.recv(), timeout=0.05)
+        assert await get_json(port, "/channels/alerts/subscribers") == {
+            "channel": "alerts",
+            "subscribers": [first_id],
+        }
