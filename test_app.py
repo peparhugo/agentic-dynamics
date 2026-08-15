@@ -7,6 +7,7 @@ import os
 import sqlite3
 import jwt
 from datetime import datetime, timedelta
+from unittest.mock import patch, MagicMock
 import app as app_module
 from app import app, init_db
 
@@ -28,10 +29,13 @@ def client(monkeypatch, tmp_path):
 @pytest.fixture
 def auth_headers(client):
     """Helper to create a user and return auth headers."""
-    def _create_auth(username="testuser", password="testpass"):
+    def _create_auth(username="testuser", password="testpass", email=None):
+        data = {"username": username, "password": password}
+        if email:
+            data["email"] = email
         response = client.post(
             "/auth/register",
-            json={"username": username, "password": password}
+            json=data
         )
         assert response.status_code == 201
 
@@ -426,6 +430,131 @@ class TestDateFormat:
         # Try to parse it to verify format
         from datetime import datetime
         datetime.fromisoformat(created_at)
+
+
+class TestEmailNotification:
+    def test_email_notification_sent_on_status_change_to_done(self, client, auth_headers, mocker):
+        """PUT /tasks/{id} should trigger email notification when status changes to 'done'."""
+        mock_send_email = mocker.patch("app.send_notification_email")
+        headers = auth_headers("testuser_notify", email="notify@test.com")
+        # Create task
+        created = client.post("/tasks", json={"title": "Important Task"}, headers=headers).get_json()
+        task_id = created["id"]
+
+        # Update status to done
+        response = client.put(
+            f"/tasks/{task_id}", json={"status": "done"}, headers=headers
+        )
+        assert response.status_code == 200
+        # Verify Celery task was called
+        mock_send_email.delay.assert_called_once()
+
+    def test_email_notification_not_sent_on_status_pending(self, client, auth_headers, mocker):
+        """PUT /tasks/{id} should NOT trigger email notification when status is 'pending'."""
+        mock_send_email = mocker.patch("app.send_notification_email")
+        headers = auth_headers("testuser_pending")
+        # Create task (default status is pending)
+        created = client.post("/tasks", json={"title": "Task"}, headers=headers).get_json()
+        task_id = created["id"]
+
+        # Update title only
+        response = client.put(
+            f"/tasks/{task_id}", json={"title": "Updated"}, headers=headers
+        )
+        assert response.status_code == 200
+        # Verify Celery task was NOT called
+        mock_send_email.delay.assert_not_called()
+
+    def test_email_notification_not_sent_when_already_done(self, client, auth_headers, mocker):
+        """PUT /tasks/{id} should NOT trigger email notification if already done."""
+        mock_send_email = mocker.patch("app.send_notification_email")
+        headers = auth_headers("testuser_already_done", email="already@test.com")
+        # Create task
+        created = client.post("/tasks", json={"title": "Task"}, headers=headers).get_json()
+        task_id = created["id"]
+
+        # Change to done
+        client.put(f"/tasks/{task_id}", json={"status": "done"}, headers=headers)
+
+        # Reset the mock to track new calls
+        mock_send_email.delay.reset_mock()
+
+        # Try to change to done again
+        response = client.put(
+            f"/tasks/{task_id}", json={"status": "done"}, headers=headers
+        )
+        assert response.status_code == 200
+        # Verify Celery task was NOT called
+        mock_send_email.delay.assert_not_called()
+
+    def test_email_notification_with_correct_parameters(self, client, auth_headers, mocker):
+        """Email notification should include task title and user email."""
+        mock_send_email = mocker.patch("app.send_notification_email")
+        headers = auth_headers("emailuser", email="emailuser@test.com")
+        # Create task
+        task_title = "Buy groceries"
+        created = client.post("/tasks", json={"title": task_title}, headers=headers).get_json()
+        task_id = created["id"]
+
+        # Update status to done
+        response = client.put(
+            f"/tasks/{task_id}", json={"status": "done"}, headers=headers
+        )
+        assert response.status_code == 200
+
+    def test_user_registration_with_email(self, client):
+        """POST /auth/register should accept email and store it."""
+        response = client.post(
+            "/auth/register",
+            json={"username": "emailuser", "password": "pass123", "email": "user@example.com"}
+        )
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data["email"] == "user@example.com"
+
+    def test_user_registration_without_email(self, client):
+        """POST /auth/register should work without email (optional)."""
+        response = client.post(
+            "/auth/register",
+            json={"username": "noemailuser", "password": "pass123"}
+        )
+        assert response.status_code == 201
+        data = response.get_json()
+        assert "email" in data
+
+    def test_user_login_returns_email(self, client):
+        """POST /auth/login should return email if available."""
+        # Register with email
+        client.post(
+            "/auth/register",
+            json={"username": "logintest", "password": "pass123", "email": "test@example.com"}
+        )
+        # Login
+        response = client.post(
+            "/auth/login",
+            json={"username": "logintest", "password": "pass123"}
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "token" in data
+
+    def test_no_notification_if_no_email(self, client, auth_headers, mocker):
+        """Email notification should not trigger if user has no email."""
+        mock_send_email = mocker.patch("app.send_notification_email")
+        # Register user without email
+        headers = auth_headers("noemailuser")
+
+        # Create task
+        created = client.post("/tasks", json={"title": "Task"}, headers=headers).get_json()
+        task_id = created["id"]
+
+        # Update status to done (should not send notification without email)
+        response = client.put(
+            f"/tasks/{task_id}", json={"status": "done"}, headers=headers
+        )
+        assert response.status_code == 200
+        # Verify Celery task was NOT called
+        mock_send_email.delay.assert_not_called()
 
 
 class TestIntegration:

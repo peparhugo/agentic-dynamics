@@ -1,7 +1,7 @@
 """
 Flask task management API with SQLite storage.
 
-Models: User (id, username, password_hash), Task (id, title, status, created_at, owner_id)
+Models: User (id, username, password_hash, email), Task (id, title, status, created_at, owner_id)
 Status values: 'pending' (default) or 'done'
 """
 
@@ -12,6 +12,7 @@ import sqlite3
 import os
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from celery_tasks import send_notification_email
 
 app = Flask(__name__)
 
@@ -32,7 +33,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT UNIQUE NOT NULL,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -47,6 +49,7 @@ def init_db():
         )
         conn.commit()
         migrate_tasks_add_owner()
+        migrate_users_add_email()
 
 
 def migrate_tasks_add_owner():
@@ -56,6 +59,16 @@ def migrate_tasks_add_owner():
         columns = [row[1] for row in cursor.fetchall()]
         if "owner_id" not in columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+            conn.commit()
+
+
+def migrate_users_add_email():
+    """Migrate existing users without email to have email = NULL."""
+    with get_db() as conn:
+        cursor = conn.execute("PRAGMA table_info(users)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "email" not in columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
             conn.commit()
 
 
@@ -88,16 +101,16 @@ def token_required(f):
     return decorated
 
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str | None = None) -> dict | None:
     password_hash = generate_password_hash(password)
     try:
         with get_db() as conn:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
-            return {"id": cursor.lastrowid, "username": username}
+            return {"id": cursor.lastrowid, "username": username, "email": email}
     except sqlite3.IntegrityError:
         return None
 
@@ -108,7 +121,7 @@ def verify_user(username: str, password: str) -> dict | None:
             "SELECT * FROM users WHERE username = ?", (username,)
         ).fetchone()
         if row and check_password_hash(row["password_hash"], password):
-            return {"id": row["id"], "username": row["username"]}
+            return {"id": row["id"], "username": row["username"], "email": row["email"]}
     return None
 
 
@@ -147,6 +160,14 @@ def get_task(task_id: int, owner_id: int):
         return dict(row) if row else None
 
 
+def get_user_email(user_id: int) -> str | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT email FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        return row["email"] if row else None
+
+
 def update_task(task_id: int, owner_id: int, title: str | None = None, status: str | None = None):
     task = get_task(task_id, owner_id)
     if task is None:
@@ -154,6 +175,10 @@ def update_task(task_id: int, owner_id: int, title: str | None = None, status: s
 
     if status is not None and status not in VALID_STATUSES:
         raise ValueError(f"Invalid status: {status}")
+
+    # Check if status is changing to 'done' to trigger notification
+    old_status = task.get("status")
+    should_notify = status is not None and status == "done" and old_status != "done"
 
     with get_db() as conn:
         updates = []
@@ -170,7 +195,16 @@ def update_task(task_id: int, owner_id: int, title: str | None = None, status: s
                 f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
             )
             conn.commit()
-    return get_task(task_id, owner_id)
+
+    updated_task = get_task(task_id, owner_id)
+
+    # Trigger email notification asynchronously
+    if should_notify:
+        user_email = get_user_email(owner_id)
+        if user_email:
+            send_notification_email.delay(user_email, task["title"])
+
+    return updated_task
 
 
 @app.route("/auth/register", methods=["POST"])
@@ -178,11 +212,12 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
+    email = data.get("email", "").strip() if data.get("email") else None
 
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    user = create_user(username, password)
+    user = create_user(username, password, email)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify(user), 201
