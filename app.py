@@ -7,6 +7,7 @@ from functools import wraps
 
 import jwt
 from flask import Flask, g, request, jsonify
+from flask_limiter import Limiter, RateLimitExceeded
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_config import send_notification_email
@@ -16,6 +17,42 @@ app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+
+
+def _rate_limit_key():
+    auth = request.headers.get("Authorization")
+    if auth:
+        parts = auth.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            try:
+                payload = jwt.decode(parts[1], SECRET_KEY, algorithms=["HS256"])
+                return "user:" + str(payload["sub"])
+            except Exception:
+                pass
+    return "ip:" + (request.remote_addr or "anonymous")
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    default_limits=[RATE_LIMIT],
+    storage_uri=REDIS_URL,
+)
+limiter.init_app(app)
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    retry_after = "60"
+    if isinstance(e, RateLimitExceeded):
+        try:
+            retry_after = str(int(e.limit.limit.get_expiry()))
+        except Exception:
+            retry_after = "60"
+    response = jsonify({"error": "rate limit exceeded"})
+    response.headers["Retry-After"] = retry_after
+    return response, 429
 
 
 def get_db():
@@ -170,11 +207,35 @@ def create_task():
 @app.route("/tasks", methods=["GET"])
 @token_required
 def list_tasks():
+    limit = request.args.get("limit", "20")
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid limit"}), 400
+    if limit < 1:
+        return jsonify({"error": "invalid limit"}), 400
+    limit = min(limit, 100)
+
+    cursor = request.args.get("cursor")
+    if cursor is not None:
+        try:
+            cursor = int(cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid cursor"}), 400
+
     conn = get_db()
     tasks = TaskRepository(conn)
-    rows = tasks.find_by_owner(g.user_id)
+    rows = tasks.find_by_owner_paginated(g.user_id, cursor, limit)
+    total = tasks.count_by_owner(g.user_id)
     conn.close()
-    return jsonify([task_to_dict(r) for r in rows])
+
+    has_more = len(rows) > limit
+    page_rows = rows[:limit]
+    data = [task_to_dict(r) for r in page_rows]
+    next_cursor = None
+    if has_more and page_rows:
+        next_cursor = str(page_rows[-1]["id"])
+    return jsonify({"data": data, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])

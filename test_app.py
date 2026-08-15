@@ -1,19 +1,27 @@
 import time
 
+import fakeredis
 import pytest
+import redis
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
     monkeypatch.setenv("DATABASE", str(db_path))
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setattr(
+        redis, "from_url", lambda url, **opts: fakeredis.FakeStrictRedis()
+    )
     import app as app_module
 
     app_module.DATABASE = str(db_path)
     app_module.init_db()
     app_module.app.config["TESTING"] = True
+    app_module.limiter.reset()
     with app_module.app.test_client() as c:
         yield c
+    app_module.limiter.reset()
 
 
 def register(client, username="alice", password="secret"):
@@ -109,7 +117,7 @@ def test_list_tasks_ordered_desc(client):
     client.post("/tasks", json={"title": "b"}, headers=headers)
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    data = resp.get_json()
+    data = resp.get_json()["data"]
     assert [t["title"] for t in data] == ["b", "a"]
 
 
@@ -153,10 +161,10 @@ def test_users_only_see_their_own_tasks(client):
 
     resp = client.get("/tasks", headers=alice)
     assert resp.status_code == 200
-    assert [t["title"] for t in resp.get_json()] == ["alice task"]
+    assert [t["title"] for t in resp.get_json()["data"]] == ["alice task"]
 
     resp = client.get("/tasks", headers=bob)
-    assert [t["title"] for t in resp.get_json()] == ["bob task"]
+    assert [t["title"] for t in resp.get_json()["data"]] == ["bob task"]
 
     assert client.get("/tasks/2", headers=alice).status_code == 404
     assert client.get("/tasks/2", headers=bob).status_code == 200
@@ -242,3 +250,91 @@ def test_notification_uses_registered_email(client, monkeypatch):
 
     assert resp.status_code == 200
     assert sent == [("carol@corp.com", "email me")]
+
+
+def _seed_tasks(owner_id, count):
+    import app as app_module
+
+    conn = app_module.get_db()
+    tasks = app_module.TaskRepository(conn)
+    now = int(time.time())
+    for i in range(count):
+        tasks.create_task(f"task {i}", now, owner_id)
+    conn.close()
+
+
+def test_list_tasks_pagination(client):
+    headers = auth_headers(client)
+    _seed_tasks(1, 5)
+
+    resp = client.get("/tasks?limit=2", headers=headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["total"] == 5
+    assert [t["id"] for t in body["data"]] == [5, 4]
+    assert body["next_cursor"] == "4"
+
+    resp = client.get("/tasks?limit=2&cursor=4", headers=headers)
+    body = resp.get_json()
+    assert [t["id"] for t in body["data"]] == [3, 2]
+    assert body["next_cursor"] == "2"
+    assert body["total"] == 5
+
+    resp = client.get("/tasks?limit=2&cursor=2", headers=headers)
+    body = resp.get_json()
+    assert [t["id"] for t in body["data"]] == [1]
+    assert body["next_cursor"] is None
+    assert body["total"] == 5
+
+
+def test_list_tasks_pagination_default_limit(client):
+    headers = auth_headers(client)
+    _seed_tasks(1, 25)
+    resp = client.get("/tasks", headers=headers)
+    body = resp.get_json()
+    assert len(body["data"]) == 20
+    assert body["next_cursor"] is not None
+    assert body["total"] == 25
+
+
+def test_list_tasks_pagination_limit_capped(client):
+    headers = auth_headers(client)
+    _seed_tasks(1, 120)
+    resp = client.get("/tasks?limit=500", headers=headers)
+    body = resp.get_json()
+    assert len(body["data"]) == 100
+    assert body["next_cursor"] is not None
+    assert body["total"] == 120
+
+
+def test_list_tasks_invalid_limit(client):
+    headers = auth_headers(client)
+    resp = client.get("/tasks?limit=abc", headers=headers)
+    assert resp.status_code == 400
+
+
+def test_list_tasks_invalid_cursor(client):
+    headers = auth_headers(client)
+    resp = client.get("/tasks?cursor=xyz", headers=headers)
+    assert resp.status_code == 400
+
+
+def test_rate_limiting_returns_429(client):
+    headers = auth_headers(client)
+    statuses = []
+    for _ in range(105):
+        resp = client.get("/tasks", headers=headers)
+        statuses.append(resp.status_code)
+    assert statuses.count(429) >= 1
+    last = client.get("/tasks", headers=headers)
+    assert last.status_code == 429
+    assert "Retry-After" in last.headers
+
+
+def test_rate_limit_is_per_user(client):
+    alice = auth_headers(client, "alice", "pw1")
+    bob = auth_headers(client, "bob", "pw2")
+    for _ in range(100):
+        assert client.get("/tasks", headers=alice).status_code == 200
+    assert client.get("/tasks", headers=alice).status_code == 429
+    assert client.get("/tasks", headers=bob).status_code == 200
