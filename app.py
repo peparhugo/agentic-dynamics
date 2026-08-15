@@ -1,7 +1,6 @@
 """A small Flask API for managing tasks.
 
-Tasks are persisted in a JSON file.  The explicit flat-file storage
-requirement means this service does not use a database.
+Tasks are persisted in a JSON file.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -12,7 +11,6 @@ import hmac
 import json
 import os
 from pathlib import Path
-import tempfile
 from threading import Lock
 
 from functools import wraps
@@ -21,6 +19,7 @@ from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 
 app = Flask(__name__)
@@ -30,62 +29,12 @@ JWT_LIFETIME = timedelta(hours=1)
 _file_lock = Lock()
 
 
+def _repositories():
+    return UserRepository(DATA_FILE, _file_lock), TaskRepository(DATA_FILE, _file_lock)
+
+
 def init_storage():
-    """Create the flat-file storage and its initial document if needed."""
-    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    if not DATA_FILE.exists():
-        _write_data({"next_id": 1, "next_user_id": 1, "users": [], "tasks": []})
-
-
-def _read_data():
-    init_storage()
-    try:
-        with DATA_FILE.open("r", encoding="utf-8") as data_file:
-            data = json.load(data_file)
-    except (OSError, json.JSONDecodeError):
-        data = {"next_id": 1, "tasks": []}
-    migrated = False
-    if "next_id" not in data:
-        data["next_id"] = 1
-        migrated = True
-    if "next_user_id" not in data:
-        data["next_user_id"] = 1
-        migrated = True
-    if "users" not in data:
-        data["users"] = []
-        migrated = True
-    if "tasks" not in data:
-        data["tasks"] = []
-        migrated = True
-    # Migration for files created before authentication was introduced.
-    for task in data["tasks"]:
-        if "owner_id" not in task:
-            task["owner_id"] = None
-            migrated = True
-    if migrated:
-        _write_data(data)
-    return data
-
-
-def _write_data(data):
-    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    file_descriptor, temporary_name = tempfile.mkstemp(
-        dir=DATA_FILE.parent, prefix=f".{DATA_FILE.name}.", suffix=".tmp"
-    )
-    try:
-        with os.fdopen(file_descriptor, "w", encoding="utf-8") as temporary_file:
-            json.dump(data, temporary_file, indent=2)
-            temporary_file.write("\n")
-            temporary_file.flush()
-            os.fsync(temporary_file.fileno())
-        os.replace(temporary_name, DATA_FILE)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
-
-
-def _now():
-    return datetime.now(timezone.utc).isoformat()
+    UserRepository(DATA_FILE, _file_lock).initialize()
 
 
 def _task_response(task):
@@ -133,8 +82,8 @@ def _current_user():
         user_id = int(claims["sub"])
     except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeDecodeError, binascii.Error, OverflowError):
         return None
-    with _file_lock:
-        return next((user for user in _read_data()["users"] if user["id"] == user_id), None)
+    user_repository, _ = _repositories()
+    return user_repository.get(user_id)
 
 
 def require_auth(view):
@@ -158,19 +107,14 @@ def register():
         return jsonify({"error": "username and password are required"}), 400
     username = username.strip()
     email = data.get("email") if isinstance(data.get("email"), str) else username
-    with _file_lock:
-        storage = _read_data()
-        if any(user["username"] == username for user in storage["users"]):
-            return jsonify({"error": "username already exists"}), 409
-        user = {
-            "id": storage["next_user_id"],
-            "username": username,
-            "email": email,
-            "password_hash": generate_password_hash(password),
-        }
-        storage["next_user_id"] += 1
-        storage["users"].append(user)
-        _write_data(storage)
+    user_repository, _ = _repositories()
+    if user_repository.find_by_username(username) is not None:
+        return jsonify({"error": "username already exists"}), 409
+    user = user_repository.create({
+        "username": username,
+        "email": email,
+        "password_hash": generate_password_hash(password),
+    })
     return jsonify({"id": user["id"], "username": user["username"], "email": user["email"]}), 201
 
 
@@ -179,8 +123,8 @@ def login():
     data = request.get_json(silent=True)
     username = data.get("username") if isinstance(data, dict) else None
     password = data.get("password") if isinstance(data, dict) else None
-    with _file_lock:
-        user = next((user for user in _read_data()["users"] if user["username"] == username), None)
+    user_repository, _ = _repositories()
+    user = user_repository.find_by_username(username)
     if user is None or not isinstance(password, str) or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": _create_token(user)})
@@ -193,35 +137,24 @@ def create_task():
     if not isinstance(data, dict) or not isinstance(data.get("title"), str) or not data["title"].strip():
         return jsonify({"error": "title is required"}), 400
 
-    with _file_lock:
-        storage = _read_data()
-        task = {
-            "id": storage["next_id"],
-            "title": data["title"].strip(),
-            "status": "pending",
-            "created_at": _now(),
-            "owner_id": g.user["id"],
-        }
-        storage["next_id"] += 1
-        storage["tasks"].append(task)
-        _write_data(storage)
+    _, task_repository = _repositories()
+    task = task_repository.create_for_user(data["title"].strip(), g.user["id"])
     return _task_response(task), 201
 
 
 @app.get("/tasks")
 @require_auth
 def list_tasks():
-    with _file_lock:
-        tasks = [task for task in _read_data()["tasks"] if task.get("owner_id") == g.user["id"]]
-    tasks.sort(key=lambda task: (task.get("created_at", ""), task.get("id", 0)), reverse=True)
+    _, task_repository = _repositories()
+    tasks = task_repository.list_for_user(g.user["id"])
     return jsonify(tasks)
 
 
 @app.get("/tasks/<int:task_id>")
 @require_auth
 def get_task(task_id):
-    with _file_lock:
-        task = next((task for task in _read_data()["tasks"] if task["id"] == task_id and task.get("owner_id") == g.user["id"]), None)
+    _, task_repository = _repositories()
+    task = task_repository.get_for_user(task_id, g.user["id"])
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return _task_response(task)
@@ -241,17 +174,16 @@ def update_task(task_id):
     if not ("title" in data or "status" in data):
         return jsonify({"error": "title or status is required"}), 400
 
-    with _file_lock:
-        storage = _read_data()
-        task = next((task for task in storage["tasks"] if task["id"] == task_id and task.get("owner_id") == g.user["id"]), None)
-        if task is None:
-            return jsonify({"error": "task not found"}), 404
-        previous_status = task.get("status")
-        if "title" in data:
-            task["title"] = data["title"].strip()
-        if "status" in data:
-            task["status"] = data["status"]
-        _write_data(storage)
+    _, task_repository = _repositories()
+    values = {}
+    if "title" in data:
+        values["title"] = data["title"].strip()
+    if "status" in data:
+        values["status"] = data["status"]
+    result = task_repository.update_for_user(task_id, g.user["id"], values)
+    if result is None:
+        return jsonify({"error": "task not found"}), 404
+    task, previous_status = result
     if data.get("status") == "completed" and previous_status != "completed":
         send_notification_email.delay(g.user.get("email", g.user["username"]), task["title"])
     return _task_response(task)
