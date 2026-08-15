@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { build } from './ssg';
+import { startDevServer } from './server';
 
 export interface CliOptions {
   command: string;
   contentDir: string;
   outputDir: string;
   templatesDir: string;
+  port: number;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -14,6 +16,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let contentDir = './content';
   let outputDir = './dist';
   let templatesDir = './templates';
+  let port = 3000;
   const positionals: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -24,12 +27,18 @@ export function parseArgs(argv: string[]): CliOptions {
       outputDir = args[++i] ?? outputDir;
     } else if (arg === '--templates' || arg === '-t') {
       templatesDir = args[++i] ?? templatesDir;
+    } else if (arg === '--port' || arg === '-p') {
+      const value = args[++i];
+      if (value !== undefined && value !== '') port = Number(value);
     } else if (arg.startsWith('--content=')) {
       contentDir = arg.slice('--content='.length);
     } else if (arg.startsWith('--output=')) {
       outputDir = arg.slice('--output='.length);
     } else if (arg.startsWith('--templates=')) {
       templatesDir = arg.slice('--templates='.length);
+    } else if (arg.startsWith('--port=')) {
+      const value = arg.slice('--port='.length);
+      if (value !== '') port = Number(value);
     } else if (!arg.startsWith('-')) {
       positionals.push(arg);
     }
@@ -39,31 +48,61 @@ export function parseArgs(argv: string[]): CliOptions {
     command = positionals[0];
   }
 
-  return { command, contentDir, outputDir, templatesDir };
+  return { command, contentDir, outputDir, templatesDir, port };
 }
 
-export function run(argv: string[]): number {
+export function run(argv: string[]): number | Promise<number> {
   const opts = parseArgs(argv);
 
-  if (opts.command !== 'build') {
-    console.error(`Unknown command: ${opts.command}`);
-    return 1;
+  if (opts.command === 'build') {
+    try {
+      const result = build({
+        contentDir: opts.contentDir,
+        outputDir: opts.outputDir,
+        templatesDir: opts.templatesDir,
+      });
+      console.log(`Generated ${result.pages.length} page(s) in ${opts.outputDir}`);
+      return 0;
+    } catch (err) {
+      console.error((err as Error).message);
+      return 1;
+    }
   }
 
-  try {
-    const result = build({
+  if (opts.command === 'serve') {
+    return startDevServer({
       contentDir: opts.contentDir,
       outputDir: opts.outputDir,
       templatesDir: opts.templatesDir,
-    });
-    console.log(`Generated ${result.pages.length} page(s) in ${opts.outputDir}`);
-    return 0;
-  } catch (err) {
-    console.error((err as Error).message);
-    return 1;
+      port: opts.port,
+    })
+      .then((server) => {
+        console.log(`Serving ${opts.outputDir} at ${server.url}`);
+        return new Promise<number>((resolve) => {
+          const shutdown = (signal: string) => {
+            console.log(`\n[ssg] ${signal} received, shutting down`);
+            server.close().then(() => resolve(0));
+          };
+          process.once('SIGINT', () => shutdown('SIGINT'));
+          process.once('SIGTERM', () => shutdown('SIGTERM'));
+        });
+      })
+      .catch((err) => {
+        console.error((err as Error).message);
+        return 1;
+      });
   }
+
+  console.error(`Unknown command: ${opts.command}`);
+  return 1;
 }
 
 if (require.main === module) {
-  process.exit(run(process.argv));
+  Promise.resolve(run(process.argv)).then(
+    (code) => process.exit(code),
+    (err) => {
+      console.error((err as Error).message);
+      process.exit(1);
+    }
+  );
 }

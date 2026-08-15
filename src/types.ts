@@ -28,3 +28,11 @@ export interface BuildResult {
   pages: Page[];
   outputDir: string;
 }
+
+export interface ServeOptions {
+  contentDir: string;
+  outputDir: string;
+  templatesDir?: string;
+  port?: number;
+  host?: string;
+}
