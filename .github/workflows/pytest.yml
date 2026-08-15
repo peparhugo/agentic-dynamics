@@ -21,6 +21,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Configure git identity (tests commit in temp worktrees)
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@localhost"
+
       - name: Install core dependencies
         run: |
           python -m pip install --upgrade pip
