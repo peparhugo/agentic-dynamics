@@ -1,7 +1,7 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildSite, parsePage } from '../src/generator';
+import { buildSite, createBuildPipeline, parsePage } from '../src/generator';
 
 describe('parsePage', () => {
   it('merges simple YAML frontmatter and renders Markdown', () => {
@@ -70,5 +70,59 @@ describe('buildSite', () => {
     buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
 
     expect(readFileSync(join(output, 'post.html'), 'utf8')).toBe('<main><section data-slug="post">Custom: <p>Body</p>\n</section></main>');
+  });
+
+  it('skips unchanged pages during an incremental build', () => {
+    const content = join(root, 'content');
+    const output = join(root, 'site');
+    mkdirSync(content);
+    writeFileSync(join(content, 'first.md'), '# First');
+    writeFileSync(join(content, 'second.md'), '# Second');
+
+    buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const pipeline = createBuildPipeline({ contentDir: content, outputDir: output, incremental: true });
+    pipeline.build();
+
+    expect(pipeline.context.stats).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+    expect(readFileSync(join(output, '.ssg-cache.json'), 'utf8')).toContain('first');
+  });
+
+  it('rebuilds only a changed source page and invalidates all pages when templates change', () => {
+    const content = join(root, 'content');
+    const output = join(root, 'site');
+    const templates = join(root, 'templates');
+    mkdirSync(content);
+    mkdirSync(templates);
+    writeFileSync(join(content, 'first.md'), '# First');
+    writeFileSync(join(content, 'second.md'), '# Second');
+    writeFileSync(join(templates, 'default.hbs'), '<article>{{{content}}}</article>');
+
+    buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    writeFileSync(join(content, 'first.md'), '# Changed');
+    let pipeline = createBuildPipeline({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    pipeline.build();
+    expect(pipeline.context.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    expect(readFileSync(join(output, 'first.html'), 'utf8')).toContain('Changed');
+
+    writeFileSync(join(templates, 'default.hbs'), '<main>{{{content}}}</main>');
+    pipeline = createBuildPipeline({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    pipeline.build();
+    expect(pipeline.context.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    expect(readFileSync(join(output, 'second.html'), 'utf8')).toContain('<main>');
+  });
+
+  it('performs a clean build when requested', () => {
+    const content = join(root, 'content');
+    const output = join(root, 'site');
+    mkdirSync(content);
+    writeFileSync(join(content, 'post.md'), '# Post');
+    buildSite({ contentDir: content, outputDir: output, incremental: true });
+    writeFileSync(join(output, 'stale.txt'), 'stale');
+
+    const pipeline = createBuildPipeline({ contentDir: content, outputDir: output, incremental: true, clean: true });
+    pipeline.build();
+
+    expect(pipeline.context.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 0 });
+    expect(existsSync(join(output, 'stale.txt'))).toBe(false);
   });
 });

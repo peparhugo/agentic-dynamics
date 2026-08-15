@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { buildSite } from './generator';
+import { createBuildPipeline } from './generator';
 import { startServer } from './server';
 
 function optionValue(args: string[], option: string): string | undefined {
@@ -22,14 +22,18 @@ function main(args: string[]): void {
     contentDir: optionValue(args, '--content'),
     outputDir: optionValue(args, '--output'),
     templatesDir: optionValue(args, '--templates'),
+    incremental: args.includes('--incremental'),
+    clean: args.includes('--clean'),
   };
   if (args[0] === 'serve') {
     startServer({ ...options, port: portValue(args) });
     return;
   }
-  if (args[0] !== 'build') throw new Error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]\n       ssg serve [--port <port>] [--content <dir>] [--output <dir>] [--templates <dir>]');
-  const pages = buildSite(options);
-  console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
+  if (args[0] !== 'build') throw new Error('Usage: ssg build [--incremental] [--clean] [--content <dir>] [--output <dir>] [--templates <dir>]\n       ssg serve [--port <port>] [--content <dir>] [--output <dir>] [--templates <dir>]');
+  const pipeline = createBuildPipeline(options);
+  const pages = pipeline.build();
+  const { pagesBuilt, pagesSkipped, timeSaved } = pipeline.context.stats;
+  console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}: ${pagesBuilt} built, ${pagesSkipped} skipped, ${timeSaved}ms saved.`);
 }
 
 try {

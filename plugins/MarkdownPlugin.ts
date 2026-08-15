@@ -5,6 +5,7 @@ import type { Page } from '../src/generator';
 import type { Plugin } from '../src/plugin';
 
 type Frontmatter = Record<string, string | string[]>;
+const parsedPages = new Map<string, Page>();
 
 /** Parse the deliberately small YAML subset supported by this generator. */
 function parseYaml(block: string): Frontmatter {
@@ -27,6 +28,9 @@ function extractYaml(source: string): Frontmatter {
 }
 
 export function parsePage(source: string, filePath: string): Page {
+  const cacheKey = `${filePath}\0${source}`;
+  const cached = parsedPages.get(cacheKey);
+  if (cached) return { ...cached, tags: [...cached.tags] };
   const parsed = matter(source);
   const data = { ...parsed.data, ...extractYaml(source) } as Frontmatter;
   const name = basename(filePath, extname(filePath));
@@ -34,7 +38,7 @@ export function parsePage(source: string, filePath: string): Page {
     ? data.tags
     : data.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
 
-  return {
+  const page = {
     title: typeof data.title === 'string' ? data.title : name,
     date: typeof data.date === 'string' ? data.date : undefined,
     tags,
@@ -43,6 +47,8 @@ export function parsePage(source: string, filePath: string): Page {
     template: typeof data.template === 'string' ? data.template : undefined,
     layout: typeof data.layout === 'string' ? data.layout : undefined,
   };
+  parsedPages.set(cacheKey, page);
+  return { ...page, tags: [...page.tags] };
 }
 
 export const MarkdownPlugin: Plugin = {

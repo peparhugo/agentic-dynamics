@@ -7,11 +7,18 @@ export interface BuildOptions {
   port?: number;
 }
 
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSaved: number;
+}
+
 export interface PluginContext {
   options: BuildOptions;
   command: 'build' | 'serve';
   pages: Page[];
-  file?: { path: string; source: string; outputPath: string };
+  file?: { path: string; source: string; outputPath: string; cacheHit?: boolean };
+  stats: BuildStats;
   rebuild(): Page[];
   addCleanup(cleanup: () => Promise<void> | void): void;
 }

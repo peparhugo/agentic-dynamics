@@ -59,6 +59,7 @@ export const TemplatePlugin: Plugin = {
   },
   onFile(page, context) {
     if (!context.file) return;
+    if (context.file.cacheHit) return;
     mkdirSync(join(context.file.outputPath, '..'), { recursive: true });
     writeFileSync(context.file.outputPath, renderTemplatedPage(page, context.options.templatesDir));
   },
