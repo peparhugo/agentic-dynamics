@@ -10,6 +10,7 @@ from celery_config import celery_app
 def client(tmp_path, monkeypatch):
     data_file = tmp_path / "tasks.json"
     monkeypatch.setattr(task_app, "DATA_FILE", data_file)
+    task_app.limiter.reset()
     task_app.init_storage()
     return task_app.app.test_client()
 
@@ -28,7 +29,10 @@ def test_create_task_defaults_status_and_lists_newest_first(auth_client):
 
     assert first.status_code == 201
     assert first.json["status"] == "pending"
-    assert [task["title"] for task in auth_client.get("/tasks").json] == ["Second", "First"]
+    response = auth_client.get("/tasks")
+    assert [task["title"] for task in response.json["data"]] == ["Second", "First"]
+    assert response.json["next_cursor"] is None
+    assert response.json["total"] == 2
 
 
 def test_create_requires_title(auth_client):
@@ -115,7 +119,7 @@ def test_users_only_see_their_own_tasks(client):
     client.post("/auth/register", json={"username": "bob", "password": "secret"})
     bob_token = client.post("/auth/login", json={"username": "bob", "password": "secret"}).json["token"]
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {bob_token}"
-    assert client.get("/tasks").json == []
+    assert client.get("/tasks").json == {"data": [], "next_cursor": None, "total": 0}
     assert client.get(f"/tasks/{task['id']}").status_code == 404
 
 
@@ -126,3 +130,42 @@ def test_register_login_and_duplicate_username(client):
     assert client.post("/auth/register", json={"username": "alice", "password": "other"}).status_code == 409
     assert client.post("/auth/login", json={"username": "alice", "password": "wrong"}).status_code == 401
     assert "token" in client.post("/auth/login", json={"username": "alice", "password": "secret"}).json
+
+
+def test_tasks_are_cursor_paginated(auth_client):
+    for title in ("First", "Second", "Third"):
+        auth_client.post("/tasks", json={"title": title})
+
+    first_page = auth_client.get("/tasks?limit=2")
+    assert first_page.status_code == 200
+    assert [task["title"] for task in first_page.json["data"]] == ["Third", "Second"]
+    assert first_page.json["next_cursor"] == str(first_page.json["data"][-1]["id"])
+    assert first_page.json["total"] == 3
+
+    second_page = auth_client.get(f"/tasks?cursor={first_page.json['next_cursor']}&limit=2")
+    assert [task["title"] for task in second_page.json["data"]] == ["First"]
+    assert second_page.json == {
+        "data": second_page.json["data"],
+        "next_cursor": None,
+        "total": 3,
+    }
+
+
+def test_pagination_validates_cursor_and_limit(auth_client):
+    assert auth_client.get("/tasks?limit=0").status_code == 400
+    assert auth_client.get("/tasks?limit=101").status_code == 400
+    assert auth_client.get("/tasks?limit=invalid").status_code == 400
+    assert auth_client.get("/tasks?cursor=invalid").status_code == 400
+    assert auth_client.get("/tasks?cursor=999").status_code == 400
+
+
+def test_rate_limit_returns_retry_after(client):
+    task_app.limiter.reset()
+    client.post("/auth/register", json={"username": "limited", "password": "secret"})
+    for _ in range(100):
+        response = client.post("/auth/login", json={"username": "limited", "password": "secret"})
+        assert response.status_code == 200
+    response = client.post("/auth/login", json={"username": "limited", "password": "secret"})
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
+    assert response.json == {"error": "rate limit exceeded"}

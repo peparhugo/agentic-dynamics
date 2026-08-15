@@ -144,6 +144,18 @@ class TaskRepository(BaseRepository):
         tasks = [task for task in self.list() if task.get("owner_id") == owner_id]
         return sorted(tasks, key=lambda task: (task.get("created_at", ""), task.get("id", 0)), reverse=True)
 
+    def paginate_for_user(self, owner_id, cursor=None, limit=20):
+        tasks = self.list_for_user(owner_id)
+        start = 0
+        if cursor is not None:
+            cursor_index = next((index for index, task in enumerate(tasks) if task["id"] == cursor), None)
+            if cursor_index is None:
+                return None, len(tasks), None
+            start = cursor_index + 1
+        page = tasks[start:start + limit]
+        next_cursor = str(page[-1]["id"]) if start + len(page) < len(tasks) else None
+        return page, len(tasks), next_cursor
+
     def get_for_user(self, task_id, owner_id):
         task = self.get(task_id)
         return task if task is not None and task.get("owner_id") == owner_id else None

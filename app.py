@@ -16,6 +16,8 @@ from threading import Lock
 from functools import wraps
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
@@ -25,6 +27,9 @@ from repositories import TaskRepository, UserRepository
 app = Flask(__name__)
 DATA_FILE = Path(os.environ.get("TASKS_FILE", "tasks.json"))
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "development-secret-change-me")
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"
+)
 JWT_LIFETIME = timedelta(hours=1)
 _file_lock = Lock()
 
@@ -84,6 +89,22 @@ def _current_user():
         return None
     user_repository, _ = _repositories()
     return user_repository.get(user_id)
+
+
+def _rate_limit_key():
+    """Identify authenticated callers by user and unauthenticated callers by IP."""
+    user = _current_user()
+    return f"user:{user['id']}" if user is not None else f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    in_memory_fallback_enabled=True,
+    headers_enabled=True,
+)
 
 
 def require_auth(view):
@@ -146,8 +167,28 @@ def create_task():
 @require_auth
 def list_tasks():
     _, task_repository = _repositories()
-    tasks = task_repository.list_for_user(g.user["id"])
-    return jsonify(tasks)
+    cursor_value = request.args.get("cursor")
+    if cursor_value is not None:
+        try:
+            cursor = int(cursor_value)
+        except (TypeError, ValueError):
+            return jsonify({"error": "cursor must be an integer"}), 400
+    else:
+        cursor = None
+
+    limit_value = request.args.get("limit", "20")
+    try:
+        limit = int(limit_value)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer"}), 400
+    if not 1 <= limit <= 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    result = task_repository.paginate_for_user(g.user["id"], cursor, limit)
+    tasks, total, next_cursor = result
+    if tasks is None:
+        return jsonify({"error": "cursor not found"}), 400
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.get("/tasks/<int:task_id>")
@@ -197,6 +238,15 @@ def not_found(_error):
 @app.errorhandler(405)
 def method_not_allowed(_error):
     return jsonify({"error": "method not allowed"}), 405
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(error):
+    response = jsonify({"error": "rate limit exceeded"})
+    retry_after = error.get_response().headers.get("Retry-After")
+    if retry_after is not None:
+        response.headers["Retry-After"] = retry_after
+    return response, 429
 
 
 init_storage()
