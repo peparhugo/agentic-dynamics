@@ -15,6 +15,7 @@ from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import storage
+from repositories import TaskRepository, UserRepository
 from tasks import send_notification_email
 
 JWT_ALGORITHM = "HS256"
@@ -24,6 +25,9 @@ JWT_EXP_HOURS = 24
 def create_app():
     app = Flask(__name__)
     storage.init_storage()
+
+    task_repo = TaskRepository()
+    user_repo = UserRepository()
 
     app.config["JWT_SECRET_KEY"] = os.environ.get(
         "JWT_SECRET_KEY", "dev-secret-key-change-in-production-32bytes-min"
@@ -83,7 +87,7 @@ def create_app():
             return jsonify({"error": "password is required"}), 400
 
         password_hash = generate_password_hash(password)
-        user = storage.create_user(username.strip(), password_hash)
+        user = user_repo.create(username.strip(), password_hash)
         if user is None:
             return jsonify({"error": "username already exists"}), 409
 
@@ -100,7 +104,7 @@ def create_app():
         if not isinstance(password, str) or not password:
             return jsonify({"error": "password is required"}), 400
 
-        user = storage.get_user_by_username(username.strip())
+        user = user_repo.get_by_username(username.strip())
         if user is None or not check_password_hash(user["password_hash"], password):
             return jsonify({"error": "invalid username or password"}), 401
 
@@ -114,18 +118,18 @@ def create_app():
         title = data.get("title")
         if not isinstance(title, str) or not title.strip():
             return jsonify({"error": "title is required"}), 400
-        task = storage.create_task(title.strip(), g.user_id)
+        task = task_repo.create(title.strip(), g.user_id)
         return jsonify(task), 201
 
     @app.route("/tasks", methods=["GET"])
     @require_auth
     def list_tasks():
-        return jsonify(storage.list_tasks(g.user_id)), 200
+        return jsonify(task_repo.list_all(g.user_id)), 200
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
     @require_auth
     def get_task(task_id):
-        task = storage.get_task(task_id)
+        task = task_repo.get_by_id(task_id)
         if task is None or task.get("owner_id") != g.user_id:
             return jsonify({"error": "Task not found"}), 404
         return jsonify(task), 200
@@ -133,7 +137,7 @@ def create_app():
     @app.route("/tasks/<int:task_id>", methods=["PUT"])
     @require_auth
     def update_task(task_id):
-        existing = storage.get_task(task_id)
+        existing = task_repo.get_by_id(task_id)
         if existing is None or existing.get("owner_id") != g.user_id:
             return jsonify({"error": "Task not found"}), 404
 
@@ -151,7 +155,7 @@ def create_app():
         if has_status and (not isinstance(status, str) or not status.strip()):
             return jsonify({"error": "status must be a non-empty string"}), 400
 
-        task = storage.update_task(
+        task = task_repo.update(
             task_id,
             title=title.strip() if has_title else None,
             status=status.strip() if has_status else None,
@@ -163,7 +167,7 @@ def create_app():
             and existing.get("status") != "completed"
         )
         if newly_completed:
-            owner = storage.get_user_by_id(task["owner_id"])
+            owner = user_repo.get_by_id(task["owner_id"])
             if owner is not None:
                 owner_email = owner.get("email") or f"{owner['username']}@example.com"
                 try:
