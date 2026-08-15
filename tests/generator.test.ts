@@ -32,4 +32,36 @@ describe('static site generator', () => {
     expect(index).toContain('href="welcome.html"');
     expect(index).toContain('href="guides/start.html"');
   });
+
+  it('renders a selected Handlebars template inside its layout and partials', async () => {
+    const content = join(directory, 'content');
+    const output = join(directory, 'public');
+    const templates = join(directory, 'templates');
+    await mkdir(join(templates, 'layouts'), { recursive: true });
+    await mkdir(join(templates, 'partials'), { recursive: true });
+    await writeFile(join(content, 'post.md'), '---\ntitle: Fish & Chips\ntemplate: post\nlayout: site\n---\nBody');
+    await writeFile(join(templates, 'post.hbs'), '<main>{{title}} {{{html}}}</main>');
+    await writeFile(join(templates, 'layouts', 'site.hbs'), '<!doctype html><body>{{> header}}{{{body}}}{{> footer}}</body>');
+    await writeFile(join(templates, 'partials', 'header.hbs'), '<header>{{title}}</header>');
+    await writeFile(join(templates, 'partials', 'footer.hbs'), '<footer>Copyright</footer>');
+
+    await buildSite({ contentDir: content, outputDir: output, templateDir: templates });
+
+    const page = await readFile(join(output, 'post.html'), 'utf8');
+    expect(page).toBe('<!doctype html><body><header>Fish &amp; Chips</header><main>Fish &amp; Chips <p>Body</p>\n</main><footer>Copyright</footer></body>');
+  });
+
+  it('uses the default template and layout when a page does not specify them', async () => {
+    const content = join(directory, 'content');
+    const output = join(directory, 'public');
+    const templates = join(directory, 'templates');
+    await mkdir(join(templates, 'layouts'), { recursive: true });
+    await writeFile(join(content, 'page.md'), '---\ntitle: Defaulted\n---\nContent');
+    await writeFile(join(templates, 'default.hbs'), '<main>{{title}} {{{body}}}</main>');
+    await writeFile(join(templates, 'layouts', 'default.hbs'), '<shell>{{{body}}}</shell>');
+
+    await buildSite({ contentDir: content, outputDir: output, templateDir: templates });
+
+    expect(await readFile(join(output, 'page.html'), 'utf8')).toContain('<shell><main>Defaulted <article>');
+  });
 });
