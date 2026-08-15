@@ -17,6 +17,8 @@ from datetime import datetime
 import sqlite3
 import os
 
+from celery_tasks import send_notification_email
+
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = os.environ.get(
     "JWT_SECRET_KEY", "dev-secret-change-me-0123456789abcdef"
@@ -48,15 +50,25 @@ def _tasks_has_owner_id(conn) -> bool:
     return any(r["name"] == "owner_id" for r in rows)
 
 
+def _users_has_email(conn) -> bool:
+    rows = conn.execute("PRAGMA table_info(users)").fetchall()
+    return any(r["name"] == "email" for r in rows)
+
+
 def init_db():
     with get_db() as conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
+        # Migration: add email to a pre-existing users table without
+        # destroying existing rows.
+        if not _users_has_email(conn):
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tasks ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -76,16 +88,17 @@ def init_db():
 # ── Models ────────────────────────────────────────────────────
 
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str | None = None) -> dict | None:
     password_hash = generate_password_hash(password)
+    email = (email or "").strip() or f"{username}@example.com"
     with get_db() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
-            return {"id": cursor.lastrowid, "username": username}
+            return {"id": cursor.lastrowid, "username": username, "email": email}
         except sqlite3.IntegrityError:
             return None
 
@@ -94,6 +107,14 @@ def find_user(username: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def find_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
         ).fetchone()
         return dict(row) if row else None
 
@@ -194,6 +215,15 @@ def current_user_id() -> int:
     return user["id"] if user else None
 
 
+def _trigger_completion_notification(owner_id: int, task_title: str):
+    """Asynchronously notify a task owner that their task was completed."""
+    user = find_user_by_id(owner_id)
+    if user is None:
+        return
+    user_email = user.get("email") or f"{user['username']}@example.com"
+    send_notification_email.delay(user_email, task_title)
+
+
 # ── Routes ─────────────────────────────────────────────────────
 
 
@@ -206,7 +236,7 @@ def register():
         return jsonify({"error": "username is required"}), 400
     if not password:
         return jsonify({"error": "password is required"}), 400
-    user = create_user(username, password)
+    user = create_user(username, password, data.get("email"))
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify(user), 201
@@ -254,14 +284,20 @@ def show_task(task_id: int):
 @jwt_required()
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    owner_id = current_user_id()
+    before = get_task(task_id, owner_id)
     task = update_task(
         task_id,
-        current_user_id(),
+        owner_id,
         title=data.get("title"),
         status=data.get("status"),
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if task["status"] == "completed" and (
+        before is None or before.get("status") != "completed"
+    ):
+        _trigger_completion_notification(owner_id, task["title"])
     return jsonify(task)
 
 

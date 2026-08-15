@@ -15,6 +15,10 @@ def client():
     app_module.DATABASE = db_path
     app_module.app.config["TESTING"] = True
     app_module.app.config["JWT_SECRET_KEY"] = "test-secret-0123456789abcdef-0123456789"
+    app_module.send_notification_email.app.conf.update(
+        task_always_eager=True,
+        task_eager_propagates=True,
+    )
     with app_module.app.app_context():
         app_module.init_db()
     with app_module.app.test_client() as client:
@@ -246,3 +250,83 @@ def test_user_cannot_access_other_users_task(client):
 
     assert client.get(f"/tasks/{task_id}", headers=bob).status_code == 404
     assert client.put(f"/tasks/{task_id}", json={"title": "hijack"}, headers=bob).status_code == 404
+
+
+# ── Notification trigger tests ────────────────────────────────
+
+
+def test_completion_triggers_notification(client, monkeypatch):
+    headers = auth_headers(client)
+    task_id = client.post("/tasks", json={"title": "Send report"}, headers=headers).get_json()["id"]
+
+    calls = []
+    monkeypatch.setattr(
+        app_module.send_notification_email,
+        "delay",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    resp = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+    assert resp.status_code == 200
+
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert args == ("alice@example.com", "Send report")
+    assert kwargs == {}
+
+
+def test_non_completion_does_not_trigger_notification(client, monkeypatch):
+    headers = auth_headers(client)
+    task_id = client.post("/tasks", json={"title": "Still working"}, headers=headers).get_json()["id"]
+
+    calls = []
+    monkeypatch.setattr(
+        app_module.send_notification_email,
+        "delay",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    resp = client.put(f"/tasks/{task_id}", json={"status": "in_progress"}, headers=headers)
+    assert resp.status_code == 200
+    assert calls == []
+
+    resp = client.put(f"/tasks/{task_id}", json={"title": "New name"}, headers=headers)
+    assert resp.status_code == 200
+    assert calls == []
+
+
+def test_completing_again_does_not_retrigger_notification(client, monkeypatch):
+    headers = auth_headers(client)
+    task_id = client.post("/tasks", json={"title": "Twice done"}, headers=headers).get_json()["id"]
+
+    calls = []
+    monkeypatch.setattr(
+        app_module.send_notification_email,
+        "delay",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    assert client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers).status_code == 200
+    assert client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers).status_code == 200
+    assert len(calls) == 1
+
+
+def test_completion_uses_registered_email(client, monkeypatch):
+    headers = auth_headers(client)
+    client.post("/auth/register", json={"username": "carol", "password": "secret", "email": "carol@corp.com"})
+    login = client.post("/auth/login", json={"username": "carol", "password": "secret"})
+    token = login.get_json()["access_token"]
+    carol_headers = {"Authorization": f"Bearer {token}"}
+
+    task_id = client.post("/tasks", json={"title": "Email me"}, headers=carol_headers).get_json()["id"]
+
+    calls = []
+    monkeypatch.setattr(
+        app_module.send_notification_email,
+        "delay",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=carol_headers)
+    assert calls[0][0] == ("carol@corp.com", "Email me")
+
