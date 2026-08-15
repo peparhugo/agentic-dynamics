@@ -8,19 +8,46 @@ def client(tmp_path):
     app_module.app.config["DATABASE"] = str(tmp_path / "tasks.db")
     app_module.app.config["TESTING"] = True
     app_module.init_db()
+    app_module.migrate()
     with app_module.app.test_client() as client:
         yield client
 
 
-def create_task(client, title, status=None):
+@pytest.fixture()
+def auth_headers(client):
+    client.post(
+        "/auth/register",
+        json={"username": "alice", "password": "password123"},
+    )
+    resp = client.post(
+        "/auth/login",
+        json={"username": "alice", "password": "password123"},
+    )
+    token = resp.get_json()["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def register(client, username, password):
+    return client.post(
+        "/auth/register", json={"username": username, "password": password}
+    )
+
+
+def login(client, username, password):
+    return client.post(
+        "/auth/login", json={"username": username, "password": password}
+    )
+
+
+def create_task(client, headers, title, status=None):
     payload = {"title": title}
     if status is not None:
         payload["status"] = status
-    return client.post("/tasks", json=payload)
+    return client.post("/tasks", json=payload, headers=headers)
 
 
-def test_create_task_defaults_to_pending(client):
-    resp = create_task(client, "Buy milk")
+def test_create_task_defaults_to_pending(client, auth_headers):
+    resp = create_task(client, auth_headers, "Buy milk")
     assert resp.status_code == 201
     body = resp.get_json()
     assert body["id"] == 1
@@ -29,80 +56,182 @@ def test_create_task_defaults_to_pending(client):
     assert body["created_at"]
 
 
-def test_create_task_missing_title_returns_400(client):
-    resp = client.post("/tasks", json={})
+def test_create_task_missing_title_returns_400(client, auth_headers):
+    resp = client.post("/tasks", json={}, headers=auth_headers)
     assert resp.status_code == 400
     assert "error" in resp.get_json()
 
 
-def test_create_task_blank_title_returns_400(client):
-    resp = create_task(client, "   ")
+def test_create_task_blank_title_returns_400(client, auth_headers):
+    resp = create_task(client, auth_headers, "   ")
     assert resp.status_code == 400
 
 
-def test_create_task_with_status_done(client):
-    resp = create_task(client, "Ship package", status="done")
+def test_create_task_with_status_done(client, auth_headers):
+    resp = create_task(client, auth_headers, "Ship package", status="done")
     assert resp.status_code == 201
     assert resp.get_json()["status"] == "done"
 
 
-def test_create_task_invalid_status_returns_422(client):
-    resp = create_task(client, "Do thing", status="archived")
+def test_create_task_invalid_status_returns_422(client, auth_headers):
+    resp = create_task(client, auth_headers, "Do thing", status="archived")
     assert resp.status_code == 422
 
 
-def test_list_tasks_orders_by_created_at_desc(client):
-    create_task(client, "First")
-    create_task(client, "Second")
-    create_task(client, "Third")
-    resp = client.get("/tasks")
+def test_list_tasks_orders_by_created_at_desc(client, auth_headers):
+    create_task(client, auth_headers, "First")
+    create_task(client, auth_headers, "Second")
+    create_task(client, auth_headers, "Third")
+    resp = client.get("/tasks", headers=auth_headers)
     assert resp.status_code == 200
     titles = [t["title"] for t in resp.get_json()]
     assert titles == ["Third", "Second", "First"]
 
 
-def test_get_task(client):
-    create_task(client, "Read book")
-    resp = client.get("/tasks/1")
+def test_get_task(client, auth_headers):
+    create_task(client, auth_headers, "Read book")
+    resp = client.get("/tasks/1", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.get_json()["title"] == "Read book"
 
 
-def test_get_task_not_found_returns_404(client):
-    resp = client.get("/tasks/999")
+def test_get_task_not_found_returns_404(client, auth_headers):
+    resp = client.get("/tasks/999", headers=auth_headers)
     assert resp.status_code == 404
     assert "error" in resp.get_json()
 
 
-def test_update_task_title(client):
-    create_task(client, "Old title")
-    resp = client.put("/tasks/1", json={"title": "New title"})
+def test_update_task_title(client, auth_headers):
+    create_task(client, auth_headers, "Old title")
+    resp = client.put("/tasks/1", json={"title": "New title"}, headers=auth_headers)
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["title"] == "New title"
     assert body["status"] == "pending"
 
 
-def test_update_task_status(client):
-    create_task(client, "Task")
-    resp = client.put("/tasks/1", json={"status": "done"})
+def test_update_task_status(client, auth_headers):
+    create_task(client, auth_headers, "Task")
+    resp = client.put("/tasks/1", json={"status": "done"}, headers=auth_headers)
     assert resp.status_code == 200
     assert resp.get_json()["status"] == "done"
 
 
-def test_update_task_invalid_status_returns_422(client):
-    create_task(client, "Task")
-    resp = client.put("/tasks/1", json={"status": "in-progress"})
+def test_update_task_invalid_status_returns_422(client, auth_headers):
+    create_task(client, auth_headers, "Task")
+    resp = client.put(
+        "/tasks/1", json={"status": "in-progress"}, headers=auth_headers
+    )
     assert resp.status_code == 422
 
 
-def test_update_task_not_found_returns_404(client):
-    resp = client.put("/tasks/999", json={"title": "x"})
+def test_update_task_not_found_returns_404(client, auth_headers):
+    resp = client.put("/tasks/999", json={"title": "x"}, headers=auth_headers)
     assert resp.status_code == 404
 
 
-def test_created_at_is_iso8601_text(client):
-    create_task(client, "Stored datetime")
+def test_created_at_is_iso8601_text(client, auth_headers):
+    create_task(client, auth_headers, "Stored datetime")
     with app_module.get_db() as conn:
         row = conn.execute("SELECT created_at FROM tasks WHERE id = 1").fetchone()
     assert isinstance(row["created_at"], str)
+
+
+# ── Auth tests ──────────────────────────────────────────────────
+
+def test_register_creates_user(client):
+    resp = register(client, "bob", "secret123")
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["username"] == "bob"
+    assert body["id"] == 1
+
+
+def test_register_duplicate_username_returns_409(client):
+    register(client, "bob", "secret123")
+    resp = register(client, "bob", "other456")
+    assert resp.status_code == 409
+
+
+def test_register_missing_password_returns_400(client):
+    resp = client.post("/auth/register", json={"username": "bob"})
+    assert resp.status_code == 400
+
+
+def test_register_missing_username_returns_400(client):
+    resp = client.post("/auth/register", json={"password": "secret123"})
+    assert resp.status_code == 400
+
+
+def test_login_returns_token(client):
+    register(client, "bob", "secret123")
+    resp = login(client, "bob", "secret123")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["token"]
+    assert body["username"] == "bob"
+
+
+def test_login_wrong_password_returns_401(client):
+    register(client, "bob", "secret123")
+    resp = login(client, "bob", "wrongpass")
+    assert resp.status_code == 401
+
+
+def test_login_unknown_user_returns_401(client):
+    resp = login(client, "nobody", "secret123")
+    assert resp.status_code == 401
+
+
+def test_login_missing_fields_returns_400(client):
+    resp = client.post("/auth/login", json={"username": "bob"})
+    assert resp.status_code == 400
+
+
+def test_passwords_are_hashed(client):
+    register(client, "bob", "secret123")
+    with app_module.get_db() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM users WHERE username = 'bob'"
+        ).fetchone()
+    assert row["password_hash"] != "secret123"
+
+
+def test_tasks_require_auth(client):
+    assert client.get("/tasks").status_code == 401
+    assert client.post("/tasks", json={"title": "x"}).status_code == 401
+    assert client.get("/tasks/1").status_code == 401
+    assert client.put("/tasks/1", json={"title": "x"}).status_code == 401
+
+
+def test_tasks_reject_invalid_token(client):
+    headers = {"Authorization": "Bearer not-a-real-token"}
+    assert client.get("/tasks", headers=headers).status_code == 401
+
+
+def test_tasks_reject_missing_bearer_scheme(client):
+    headers = {"Authorization": "Basic abc123"}
+    assert client.get("/tasks", headers=headers).status_code == 401
+
+
+def test_user_sees_only_own_tasks(client, auth_headers):
+    create_task(client, auth_headers, "Alice task")
+    register(client, "bob", "secret123")
+    bob_resp = login(client, "bob", "secret123")
+    bob_headers = {"Authorization": f"Bearer {bob_resp.get_json()['token']}"}
+    create_task(client, bob_headers, "Bob task")
+
+    alice_resp = client.get("/tasks", headers=auth_headers)
+    assert [t["title"] for t in alice_resp.get_json()] == ["Alice task"]
+
+    bob_resp = client.get("/tasks", headers=bob_headers)
+    assert [t["title"] for t in bob_resp.get_json()] == ["Bob task"]
+
+
+def test_cannot_access_other_users_task(client, auth_headers):
+    create_task(client, auth_headers, "Alice task")
+    register(client, "bob", "secret123")
+    bob_resp = login(client, "bob", "secret123")
+    bob_headers = {"Authorization": f"Bearer {bob_resp.get_json()['token']}"}
+    resp = client.get("/tasks/1", headers=bob_headers)
+    assert resp.status_code == 404
