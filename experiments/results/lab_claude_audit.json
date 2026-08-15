@@ -4,7 +4,7 @@
     "overlapping_tasks": 15,
     "total_ds_entries": 73,
     "total_cl_entries": 29,
-    "rounding_note": "Correctness delta thresholds: >0.05 = Claude wins, <-0.05 = DeepSeek wins, else Tie"
+    "tie_threshold_note": "Correctness delta thresholds: >0.05 = Claude leads, <-0.05 = DeepSeek leads, else Tie. 0.05 is a practical delta threshold (5 percentage points), not a statistical significance test."
   },
   "per_task": [
     {
@@ -14,14 +14,14 @@
       "ds_cost": 0.0221,
       "cl_cost": 2.4895,
       "ds_correctness": 1.0,
-      "cl_correctness": 0.7,
-      "correctness_delta": -0.3,
+      "cl_correctness": 1.0,
+      "correctness_delta": 0.0,
       "ds_loc": 1227,
       "cl_loc": 1074,
       "ds_narration_rate": 0.0,
       "cl_narration_rate": 1.0,
       "cost_ratio": 112.7,
-      "winner": "DeepSeek"
+      "winner": "Tie"
     },
     {
       "task": "data_table",
@@ -45,9 +45,9 @@
       "cl_n": 1,
       "ds_cost": 0.0191,
       "cl_cost": 2.0222,
-      "ds_correctness": 1.0,
+      "ds_correctness": 0.98,
       "cl_correctness": 0.7,
-      "correctness_delta": -0.3,
+      "correctness_delta": -0.28,
       "ds_loc": 1068,
       "cl_loc": 1093,
       "ds_narration_rate": 0.0,
@@ -62,14 +62,14 @@
       "ds_cost": 0.0157,
       "cl_cost": 1.482,
       "ds_correctness": 0.87,
-      "cl_correctness": 0.9,
-      "correctness_delta": 0.03,
+      "cl_correctness": 1.0,
+      "correctness_delta": 0.13,
       "ds_loc": 791,
       "cl_loc": 960,
       "ds_narration_rate": 0.0,
       "cl_narration_rate": 0.0,
       "cost_ratio": 94.2,
-      "winner": "Tie"
+      "winner": "Claude"
     },
     {
       "task": "remove_critical_constraint_s0.5",
@@ -94,14 +94,14 @@
       "ds_cost": 0.0206,
       "cl_cost": 1.7208,
       "ds_correctness": 0.92,
-      "cl_correctness": 0.9,
-      "correctness_delta": -0.02,
+      "cl_correctness": 1.0,
+      "correctness_delta": 0.08,
       "ds_loc": 713,
       "cl_loc": 958,
       "ds_narration_rate": 0.0,
       "cl_narration_rate": 0.0,
       "cost_ratio": 83.6,
-      "winner": "Tie"
+      "winner": "Claude"
     },
     {
       "task": "inject_alien_vocab",
@@ -157,15 +157,15 @@
       "cl_n": 8,
       "ds_cost": 0.0083,
       "cl_cost": 0.5137,
-      "ds_correctness": 0.97,
-      "cl_correctness": 0.81,
-      "correctness_delta": -0.15,
+      "ds_correctness": 0.9,
+      "cl_correctness": 0.98,
+      "correctness_delta": 0.09,
       "ds_loc": 253,
       "cl_loc": 206,
       "ds_narration_rate": 0.05,
       "cl_narration_rate": 0.62,
       "cost_ratio": 61.6,
-      "winner": "DeepSeek"
+      "winner": "Claude"
     },
     {
       "task": "invert_constraint",
@@ -173,9 +173,9 @@
       "cl_n": 2,
       "ds_cost": 0.0182,
       "cl_cost": 1.0468,
-      "ds_correctness": 0.72,
+      "ds_correctness": 0.76,
       "cl_correctness": 1.0,
-      "correctness_delta": 0.28,
+      "correctness_delta": 0.24,
       "ds_loc": 578,
       "cl_loc": 616,
       "ds_narration_rate": 0.0,
@@ -190,14 +190,14 @@
       "ds_cost": 0.0194,
       "cl_cost": 1.0918,
       "ds_correctness": 0.88,
-      "cl_correctness": 0.8,
-      "correctness_delta": -0.08,
+      "cl_correctness": 0.9,
+      "correctness_delta": 0.02,
       "ds_loc": 753,
       "cl_loc": 780,
       "ds_narration_rate": 0.0,
       "cl_narration_rate": 0.0,
       "cost_ratio": 56.2,
-      "winner": "DeepSeek"
+      "winner": "Tie"
     },
     {
       "task": "standardized_build",
@@ -206,14 +206,14 @@
       "ds_cost": 0.02,
       "cl_cost": 1.1104,
       "ds_correctness": 1.0,
-      "cl_correctness": 0.7,
-      "correctness_delta": -0.3,
+      "cl_correctness": 1.0,
+      "correctness_delta": 0.0,
       "ds_loc": 558,
       "cl_loc": 600,
       "ds_narration_rate": 0.0,
       "cl_narration_rate": 1.0,
       "cost_ratio": 55.4,
-      "winner": "DeepSeek"
+      "winner": "Tie"
     },
     {
       "task": "perturbed",
@@ -221,15 +221,15 @@
       "cl_n": 1,
       "ds_cost": 0.0169,
       "cl_cost": 0.3609,
-      "ds_correctness": 1.0,
+      "ds_correctness": 0.93,
       "cl_correctness": 1.0,
-      "correctness_delta": 0.0,
+      "correctness_delta": 0.07,
       "ds_loc": 709,
       "cl_loc": 230,
       "ds_narration_rate": 0.0,
       "cl_narration_rate": 0.0,
       "cost_ratio": 21.4,
-      "winner": "Tie"
+      "winner": "Claude"
     },
     {
       "task": "baseline",
@@ -251,13 +251,13 @@
   "aggregate": {
     "deepseek_avg_cost": 0.0148,
     "claude_avg_cost": 1.0839,
-    "deepseek_avg_correctness": 0.91,
-    "claude_avg_correctness": 0.86,
+    "deepseek_avg_correctness": 0.89,
+    "claude_avg_correctness": 0.94,
     "deepseek_total_cost": 1.08,
     "claude_total_cost": 31.43,
     "cost_ratio": 73.4,
-    "claude_wins": 3,
-    "deepseek_wins": 7,
+    "claude_wins": 7,
+    "deepseek_wins": 3,
     "ties": 5
   },
   "cost_breakdown": {
@@ -272,8 +272,8 @@
     "deepseek_cache": 1.15
   },
   "correctness_adjusted_cost": {
-    "deepseek_cost_per_correct_point": 0.0163,
-    "claude_cost_per_correct_point": 1.2674,
-    "ratio": 77.8
+    "deepseek_cost_per_correct_point": 0.0167,
+    "claude_cost_per_correct_point": 1.1482,
+    "ratio": 68.8
   }
 }

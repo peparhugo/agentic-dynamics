@@ -370,3 +370,58 @@ After the story queue drains: `scripts/sync_data.py` → `scripts/build_data.py`
 `generate_manifest.py`, and re-run `analyze_worktrees.py` to fold the re-run worktrees
 into `_results_summary.json` (replacing the stale `manifold`/`semantic` labels and the
 cross-matched basin numbers).
+
+---
+
+## 6. Regenerate — derived artifacts, website data, provenance spot-check
+
+Regenerated the derived artifacts and website data from the corrected corpus, then
+spot-checked the four P0 data-integrity invariants in the emitted `data.js`.
+
+### 6.1 Lab books re-run (18/19 active)
+
+Re-ran every active `lab_*.py` against the corrected corpus (recompute-phase
+`analysis/*.json` + re-synced `stories.parquet` + `_results_summary.json`):
+
+| Lab | Status |
+|---|---|
+| basin_topology, cache_economics, claude_audit, condition_effects, correctness_premium, flail_triggers, grit_matrix, quality_frontier, story_arc, story_review, survival_horizon, task_routing, think_do_coupling, tool_archetypes, verification_frontier, verification_value, basin_topology_neo4j | **re-generated** (fresh output) |
+| sonar_quality | **no output** — `_results_summary.json` has 0 `sonar_analyzed=True` entries (Sonar backfill never ran) |
+| opencode_meta_analysis | **skipped** — spawns 6 real `deepseek-v4-flash` analysis sessions (meta-experiment, not a numeric aggregation) |
+
+`strategy_distribution` in `data.js` now reads `conservative 141 · exploratory 59 ·
+wasteful 3` (the story-side `wasteful 7 → 0` reclassification from §4.1 carries through
+`analysis/*.json`; the residual 3 are stale single-task labels — see §6.4).
+
+### 6.2 `sync_data.py` → `build_data.py`
+
+- `sync_data.py`: **787 sessions, 159 story cells** → `experiments/data/{sessions,stories}.parquet`
+  (reflects the re-run `early_degrade` cells + genuinely-mutated cells; the 77
+  contaminated results remain in `_remediation_contaminated/` pending queue drain).
+- `build_data.py`: emitted `firebase/public/data.js` (178,878 bytes).
+
+### 6.3 Provenance spot-check — the four P0 invariants
+
+| Check | Verdict | Evidence |
+|---|---|---|
+| **P0-1** no fabricated 100% pass rate | ✅ | `overall_pass_rate = "100.0% (8076/8079) [tests]"` — measured from `sessions.parquet`, not fabricated. `_honest_pass_rate` returns `"unknown"` when `run <= 0`. The old fabricated marker `10412` is absent. |
+| **P0-2** single pricing source | ✅ | `PROVIDER_PRICING` defined **only** in `src/instrument/efficiency.py` (grep across `scripts/`+`src/`). `_constants.py` carries only the "do not re-add" comment. |
+| **P0-3** no resurrected arch constants | ✅ | `energy_model_available: {value:false, provenance:"X"}`; `deepseek_active_params: {value:"49e9", provenance:"X"}`. No `claude_active_params`, no `500B`/`500e9`, no `37B`/`37e9`. |
+| **P0-11** correct provenance tags | ✅ | `game_report.py:159` tags correctness `[M]` only when `evaluator_independent`, else `[H]`. `pass_rate` uses `[tests]` (measured) / `[H]` (heuristic) / `"unknown"`. Arch/energy values tagged `[X]` (externally sourced). |
+
+### 6.4 Regenerated manifest
+
+`experiments/data_manifest.json` (first generation):
+
+- `git_commit`: `8db06078` (rerun_contaminated HEAD — the runner advances this on phase commit)
+- `data.js` sha256: `ae04b7648a3b…` (dataset hash)
+- `inventory.json` sha256: `a2aa4974de23…` · `_results_summary.json`: `5c5fa588d310…` · `_trajectory_aggregate.json`: `2a13a3e2c633…`
+
+### 6.5 Residual staleness (honest accounting)
+
+- `_results_summary.json` single-task corpus still carries `"semantic"` × 187 /
+  `"manifold"` × 16 labels and pre-P0-8 basin numbers — its worktrees are gone, so a
+  clean regeneration needs the **full** single-task matrix re-run (`task_manager.yaml`
+  was the first tranche). `analyze_worktrees.py` was deliberately **not** re-run: it would
+  overwrite the 227-entry corpus with 126 worktrees, ~88 of them `meta_batch_*` sessions.
+- `lab_sonar_quality` and the single-task `strategy_distribution` inherit that staleness.

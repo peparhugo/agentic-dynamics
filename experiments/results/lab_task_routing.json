@@ -29,9 +29,9 @@
         },
         "GPT-5-mini": {
           "n": 2,
-          "avg_correctness": 0.7,
+          "avg_correctness": 0.88,
           "avg_cost": 0.0433,
-          "efficiency": 16.2,
+          "efficiency": 20.2,
           "avg_loc": 284
         },
         "Claude Fable 5": {
@@ -46,16 +46,16 @@
     {
       "task": "collaborative_editor",
       "models_tested": 3,
-      "best_correctness_model": "GPT-5.6",
+      "best_correctness_model": "Claude Fable 5",
       "best_efficiency_model": "DeepSeek v4 Pro",
       "recommendation": "DeepSeek (default)",
       "routing": "deepseek_default",
       "models": {
         "Claude Fable 5": {
           "n": 1,
-          "avg_correctness": 0.7,
+          "avg_correctness": 1.0,
           "avg_cost": 2.4895,
-          "efficiency": 0.3,
+          "efficiency": 0.4,
           "avg_loc": 1074
         },
         "GPT-5.6": {
@@ -91,9 +91,9 @@
         },
         "GPT-5.6": {
           "n": 2,
-          "avg_correctness": 0.7,
+          "avg_correctness": 1.0,
           "avg_cost": 0.7296,
-          "efficiency": 1.0,
+          "efficiency": 1.4,
           "avg_loc": 40
         },
         "DeepSeek v4 Pro": {
@@ -108,7 +108,7 @@
     {
       "task": "inject_alien_vocab",
       "models_tested": 3,
-      "best_correctness_model": "Claude Fable 5",
+      "best_correctness_model": "GPT-5",
       "best_efficiency_model": "DeepSeek v4 Pro",
       "recommendation": "Claude escalation (leads by 16% correctness)",
       "routing": "escalate_to_claude",
@@ -129,9 +129,9 @@
         },
         "GPT-5": {
           "n": 1,
-          "avg_correctness": 0.8,
+          "avg_correctness": 1.0,
           "avg_cost": 0.1685,
-          "efficiency": 4.7,
+          "efficiency": 5.9,
           "avg_loc": 473
         }
       }
@@ -141,8 +141,8 @@
       "models_tested": 3,
       "best_correctness_model": "GPT-5",
       "best_efficiency_model": "DeepSeek v4 Pro",
-      "recommendation": "DeepSeek (default)",
-      "routing": "deepseek_default",
+      "recommendation": "Claude escalation (leads by 13% correctness)",
+      "routing": "escalate_to_claude",
       "models": {
         "DeepSeek v4 Pro": {
           "n": 3,
@@ -160,9 +160,9 @@
         },
         "Claude Fable 5": {
           "n": 2,
-          "avg_correctness": 0.9,
+          "avg_correctness": 1.0,
           "avg_cost": 1.482,
-          "efficiency": 0.6,
+          "efficiency": 0.7,
           "avg_loc": 960
         }
       }
@@ -170,10 +170,10 @@
     {
       "task": "inject_phantom_success",
       "models_tested": 4,
-      "best_correctness_model": "DeepSeek v4 Pro",
+      "best_correctness_model": "GPT-5",
       "best_efficiency_model": "GPT-5-nano",
-      "recommendation": "DeepSeek (default)",
-      "routing": "deepseek_default",
+      "recommendation": "Claude escalation (leads by 8% correctness)",
+      "routing": "escalate_to_claude",
       "models": {
         "DeepSeek v4 Pro": {
           "n": 5,
@@ -191,16 +191,16 @@
         },
         "GPT-5": {
           "n": 1,
-          "avg_correctness": 0.8,
+          "avg_correctness": 1.0,
           "avg_cost": 0.1477,
-          "efficiency": 5.4,
+          "efficiency": 6.8,
           "avg_loc": 475
         },
         "Claude Fable 5": {
           "n": 2,
-          "avg_correctness": 0.9,
+          "avg_correctness": 1.0,
           "avg_cost": 1.7208,
-          "efficiency": 0.5,
+          "efficiency": 0.6,
           "avg_loc": 958
         }
       }
@@ -229,9 +229,9 @@
         },
         "GPT-5-mini": {
           "n": 2,
-          "avg_correctness": 0.85,
+          "avg_correctness": 1.0,
           "avg_cost": 0.0178,
-          "efficiency": 47.6,
+          "efficiency": 56.1,
           "avg_loc": 218
         },
         "GPT-5.5": {
@@ -276,7 +276,7 @@
       "models_tested": 3,
       "best_correctness_model": "Claude Fable 5",
       "best_efficiency_model": "DeepSeek v4 Pro",
-      "recommendation": "Claude escalation (leads by 28% correctness)",
+      "recommendation": "Claude escalation (leads by 24% correctness)",
       "routing": "escalate_to_claude",
       "models": {
         "Claude Fable 5": {
@@ -288,16 +288,16 @@
         },
         "DeepSeek v4 Pro": {
           "n": 5,
-          "avg_correctness": 0.72,
+          "avg_correctness": 0.76,
           "avg_cost": 0.0182,
-          "efficiency": 39.6,
+          "efficiency": 41.8,
           "avg_loc": 578
         },
         "GPT-5": {
           "n": 1,
-          "avg_correctness": 0.8,
+          "avg_correctness": 1.0,
           "avg_cost": 0.1849,
-          "efficiency": 4.3,
+          "efficiency": 5.4,
           "avg_loc": 476
         }
       }
@@ -305,16 +305,16 @@
     {
       "task": "perturbed",
       "models_tested": 4,
-      "best_correctness_model": "DeepSeek v4 Pro",
+      "best_correctness_model": "GPT-5.6",
       "best_efficiency_model": "DeepSeek v4 Pro",
-      "recommendation": "DeepSeek (default)",
-      "routing": "deepseek_default",
+      "recommendation": "Claude escalation (leads by 7% correctness)",
+      "routing": "escalate_to_claude",
       "models": {
         "DeepSeek v4 Pro": {
           "n": 3,
-          "avg_correctness": 1.0,
+          "avg_correctness": 0.93,
           "avg_cost": 0.0169,
-          "efficiency": 59.2,
+          "efficiency": 55.1,
           "avg_loc": 709
         },
         "GPT-5.6": {
@@ -326,9 +326,9 @@
         },
         "GPT-5-mini": {
           "n": 2,
-          "avg_correctness": 0.85,
+          "avg_correctness": 0.88,
           "avg_cost": 0.0303,
-          "efficiency": 28.0,
+          "efficiency": 28.8,
           "avg_loc": 312
         },
         "Claude Fable 5": {
@@ -343,7 +343,7 @@
     {
       "task": "remove_critical_constraint",
       "models_tested": 5,
-      "best_correctness_model": "DeepSeek v4 Pro",
+      "best_correctness_model": "GPT-5",
       "best_efficiency_model": "GPT-5-nano",
       "recommendation": "DeepSeek (default)",
       "routing": "deepseek_default",
@@ -357,30 +357,30 @@
         },
         "GPT-5": {
           "n": 1,
-          "avg_correctness": 0.8,
+          "avg_correctness": 1.0,
           "avg_cost": 0.2067,
-          "efficiency": 3.9,
+          "efficiency": 4.8,
           "avg_loc": 525
         },
         "Claude Fable 5": {
           "n": 2,
-          "avg_correctness": 0.8,
+          "avg_correctness": 0.9,
           "avg_cost": 1.0918,
-          "efficiency": 0.7,
+          "efficiency": 0.8,
           "avg_loc": 780
         },
         "GPT-5.6": {
           "n": 1,
-          "avg_correctness": 0.7,
+          "avg_correctness": 1.0,
           "avg_cost": 0.374,
-          "efficiency": 1.9,
+          "efficiency": 2.7,
           "avg_loc": 323
         },
         "GPT-5-nano": {
           "n": 1,
-          "avg_correctness": 0.7,
+          "avg_correctness": 0.75,
           "avg_cost": 0.0064,
-          "efficiency": 109.8,
+          "efficiency": 117.6,
           "avg_loc": 240
         }
       }
@@ -430,9 +430,9 @@
         },
         "GPT-5-mini": {
           "n": 2,
-          "avg_correctness": 0.85,
+          "avg_correctness": 1.0,
           "avg_cost": 0.0244,
-          "efficiency": 34.9,
+          "efficiency": 41.0,
           "avg_loc": 276
         },
         "Claude Fable 5": {
@@ -499,9 +499,9 @@
         },
         "Claude Fable 5": {
           "n": 1,
-          "avg_correctness": 0.7,
+          "avg_correctness": 1.0,
           "avg_cost": 1.1104,
-          "efficiency": 0.6,
+          "efficiency": 0.9,
           "avg_loc": 600
         }
       }
@@ -540,16 +540,16 @@
     {
       "task": "std_final",
       "models_tested": 4,
-      "best_correctness_model": "GPT-5.6-fast",
+      "best_correctness_model": "GPT-5-nano",
       "best_efficiency_model": "GPT-5-nano",
       "recommendation": "DeepSeek (default)",
       "routing": "deepseek_default",
       "models": {
         "GPT-5-nano": {
           "n": 1,
-          "avg_correctness": 0.7,
+          "avg_correctness": 1.0,
           "avg_cost": 0.0059,
-          "efficiency": 119.2,
+          "efficiency": 170.3,
           "avg_loc": 216
         },
         "GPT-5.6-fast": {
@@ -578,16 +578,16 @@
     {
       "task": "task_manager",
       "models_tested": 4,
-      "best_correctness_model": "DeepSeek v4 Pro",
+      "best_correctness_model": "GPT-5.6",
       "best_efficiency_model": "DeepSeek v4 Pro",
       "recommendation": "DeepSeek (default)",
       "routing": "deepseek_default",
       "models": {
         "DeepSeek v4 Pro": {
           "n": 5,
-          "avg_correctness": 1.0,
+          "avg_correctness": 0.98,
           "avg_cost": 0.0191,
-          "efficiency": 52.3,
+          "efficiency": 51.4,
           "avg_loc": 1068
         },
         "Claude Fable 5": {
@@ -616,23 +616,23 @@
     {
       "task": "url_shortener",
       "models_tested": 2,
-      "best_correctness_model": "DeepSeek v4 Pro",
+      "best_correctness_model": "Claude Fable 5",
       "best_efficiency_model": "DeepSeek v4 Pro",
-      "recommendation": "DeepSeek (default)",
-      "routing": "deepseek_default",
+      "recommendation": "Claude escalation (leads by 8% correctness)",
+      "routing": "escalate_to_claude",
       "models": {
         "Claude Fable 5": {
           "n": 8,
-          "avg_correctness": 0.81,
+          "avg_correctness": 0.98,
           "avg_cost": 0.5137,
-          "efficiency": 1.6,
+          "efficiency": 1.9,
           "avg_loc": 206
         },
         "DeepSeek v4 Pro": {
           "n": 21,
-          "avg_correctness": 0.97,
+          "avg_correctness": 0.9,
           "avg_cost": 0.0083,
-          "efficiency": 116.0,
+          "efficiency": 107.5,
           "avg_loc": 253
         }
       }
@@ -643,30 +643,30 @@
       "n": 39,
       "total_cost": 42.3,
       "avg_cost": 1.0847,
-      "avg_correctness": 0.88,
-      "cost_per_correct_point": 1.2333
+      "avg_correctness": 0.95,
+      "cost_per_correct_point": 1.1472
     },
     "deepseek_only": {
       "n": 109,
       "total_cost": 1.72,
       "avg_cost": 0.0158,
-      "avg_correctness": 0.92,
-      "cost_per_correct_point": 0.0172
+      "avg_correctness": 0.9,
+      "cost_per_correct_point": 0.0176
     },
     "grit_routed": {
-      "n": 67,
-      "total_cost": 7.88,
-      "avg_cost": 0.1177,
-      "avg_correctness": 0.95,
-      "cost_per_correct_point": 0.1238,
+      "n": 48,
+      "total_cost": 18.38,
+      "avg_cost": 0.383,
+      "avg_correctness": 0.96,
+      "cost_per_correct_point": 0.3998,
       "routing_distribution": {
-        "DeepSeek": 62,
-        "Claude": 5
+        "DeepSeek": 30,
+        "Claude": 18
       }
     }
   },
   "routing_distribution": {
-    "deepseek_default": 14,
-    "escalate_to_claude": 3
+    "deepseek_default": 10,
+    "escalate_to_claude": 7
   }
 }

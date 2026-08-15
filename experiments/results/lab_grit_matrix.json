@@ -4,7 +4,7 @@
     "total_points": 201,
     "models": 8,
     "quadrant_boundaries": {
-      "escape_median": 0.0,
+      "escape_median": NaN,
       "correctness_median": 1.0
     },
     "quadrant_labels": {
@@ -41,21 +41,21 @@
       "loc": 407,
       "thinking_ratio": 0.03,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 0.8,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.0241,
       "perturbation_class": "semantic",
       "task": "exp_0s36_d3n",
       "loc": 1008,
       "thinking_ratio": 0.11,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -69,7 +69,7 @@
       "loc": 960,
       "thinking_ratio": 0.51,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
@@ -83,21 +83,21 @@
       "loc": 407,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.76,
       "cost": 0.0214,
       "perturbation_class": "semantic",
       "task": "exp_1erxln69",
       "loc": 1266,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -111,14 +111,14 @@
       "loc": 485,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-nano",
       "label": "GPT-5-nano",
       "color": "rgba(239,68,68,0.75)",
       "escape": 0.43,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 0.0059,
       "perturbation_class": "semantic",
       "task": "std_final",
@@ -131,7 +131,7 @@
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 2.2412,
       "perturbation_class": "semantic",
@@ -139,13 +139,13 @@
       "loc": 1327,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.751,
       "perturbation_class": "semantic",
@@ -153,21 +153,21 @@
       "loc": 436,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.4696,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 159,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -209,27 +209,27 @@
       "loc": 1275,
       "thinking_ratio": 0.12,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.94,
       "cost": 0.0087,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 211,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0104,
       "perturbation_class": "semantic",
@@ -237,13 +237,13 @@
       "loc": 207,
       "thinking_ratio": 0.09,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0217,
       "perturbation_class": "semantic",
@@ -251,13 +251,13 @@
       "loc": 796,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 1.2564,
       "perturbation_class": "semantic",
@@ -265,13 +265,13 @@
       "loc": 581,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.8723,
       "perturbation_class": "semantic",
@@ -279,27 +279,27 @@
       "loc": 463,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.89,
       "cost": 0.0163,
       "perturbation_class": "semantic",
       "task": "exp_3zxicj_v",
       "loc": 840,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0237,
       "perturbation_class": "semantic",
@@ -307,7 +307,7 @@
       "loc": 1446,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6-fast",
@@ -321,7 +321,7 @@
       "loc": 305,
       "thinking_ratio": 0.04,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -335,7 +335,7 @@
       "loc": 1052,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -355,7 +355,7 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.017,
       "perturbation_class": "semantic",
@@ -363,13 +363,13 @@
       "loc": 748,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-nano",
       "label": "GPT-5-nano",
       "color": "rgba(239,68,68,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.7,
       "cost": 0.0037,
       "perturbation_class": "semantic",
@@ -377,7 +377,7 @@
       "loc": 182,
       "thinking_ratio": 0.15,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-nano",
@@ -405,7 +405,7 @@
       "loc": 292,
       "thinking_ratio": 0.09,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -419,21 +419,21 @@
       "loc": 562,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.3907,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 126,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -461,7 +461,7 @@
       "loc": 202,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -503,13 +503,13 @@
       "loc": 453,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0059,
       "perturbation_class": "semantic",
@@ -517,7 +517,7 @@
       "loc": 92,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -538,7 +538,7 @@
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
       "escape": 0.72,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.2067,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5",
@@ -551,7 +551,7 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0214,
       "perturbation_class": "semantic",
@@ -559,7 +559,7 @@
       "loc": 1030,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -579,15 +579,15 @@
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.4122,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 133,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -615,13 +615,13 @@
       "loc": 364,
       "thinking_ratio": 0.05,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0104,
       "perturbation_class": "semantic",
@@ -629,7 +629,7 @@
       "loc": 385,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.5",
@@ -643,7 +643,7 @@
       "loc": 251,
       "thinking_ratio": 0.01,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6-fast",
@@ -657,13 +657,13 @@
       "loc": 322,
       "thinking_ratio": 0.09,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0337,
       "perturbation_class": "semantic",
@@ -671,7 +671,7 @@
       "loc": 910,
       "thinking_ratio": 0.31,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.5",
@@ -685,27 +685,27 @@
       "loc": 247,
       "thinking_ratio": 0.02,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.79,
       "cost": 0.0142,
       "perturbation_class": "semantic",
       "task": "perturbed",
       "loc": 706,
       "thinking_ratio": 0.13,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.8,
       "cost": 0.0217,
       "perturbation_class": "semantic",
@@ -713,13 +713,13 @@
       "loc": 1220,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.2,
       "cost": 0.0185,
       "perturbation_class": "semantic",
@@ -727,7 +727,7 @@
       "loc": 4,
       "thinking_ratio": 0.75,
       "strategy": "wasteful",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -755,13 +755,13 @@
       "loc": 330,
       "thinking_ratio": 0.05,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.7,
       "cost": 1.3795,
       "perturbation_class": "semantic",
@@ -769,13 +769,13 @@
       "loc": 729,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0047,
       "perturbation_class": "semantic",
@@ -783,14 +783,14 @@
       "loc": 95,
       "thinking_ratio": 0.02,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
       "escape": 0.24,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 0.0309,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5_r2",
@@ -803,35 +803,35 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.98,
       "cost": 0.018,
       "perturbation_class": "semantic",
       "task": "autocomplete_search",
       "loc": 1186,
       "thinking_ratio": 0.16,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 2.4895,
       "perturbation_class": "semantic",
       "task": "collaborative_editor",
       "loc": 1074,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.7001,
       "perturbation_class": "semantic",
@@ -839,13 +839,13 @@
       "loc": 40,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 2.0531,
       "perturbation_class": "semantic",
@@ -853,27 +853,27 @@
       "loc": 313,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
-      "correctness": 0.8,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.7978,
       "perturbation_class": "semantic",
       "task": "data_table",
       "loc": 52,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.7,
       "cost": 2.0222,
       "perturbation_class": "semantic",
@@ -881,13 +881,13 @@
       "loc": 1093,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.4985,
       "perturbation_class": "semantic",
@@ -895,13 +895,13 @@
       "loc": 602,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0198,
       "perturbation_class": "semantic",
@@ -909,13 +909,13 @@
       "loc": 386,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0221,
       "perturbation_class": "semantic",
@@ -923,27 +923,27 @@
       "loc": 1227,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
-      "correctness": 0.6,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.6613,
       "perturbation_class": "semantic",
       "task": "data_table",
       "loc": 29,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.6,
       "cost": 0.0194,
       "perturbation_class": "semantic",
@@ -951,27 +951,27 @@
       "loc": 839,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.92,
       "cost": 0.0215,
       "perturbation_class": "semantic",
       "task": "factorial_compound",
       "loc": 1537,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0303,
       "perturbation_class": "semantic",
@@ -979,13 +979,13 @@
       "loc": 3021,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.8,
       "cost": 0.0203,
       "perturbation_class": "semantic",
@@ -993,13 +993,13 @@
       "loc": 405,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0175,
       "perturbation_class": "semantic",
@@ -1007,13 +1007,13 @@
       "loc": 1530,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.6,
       "cost": 0.0089,
       "perturbation_class": "semantic",
@@ -1021,13 +1021,13 @@
       "loc": 120,
       "thinking_ratio": 0.18,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0177,
       "perturbation_class": "semantic",
@@ -1035,55 +1035,55 @@
       "loc": 1239,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.98,
       "cost": 0.013,
       "perturbation_class": "semantic",
       "task": "social_graph",
       "loc": 1333,
       "thinking_ratio": 0.11,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.93,
       "cost": 0.01,
       "perturbation_class": "semantic",
       "task": "task_manager",
       "loc": 533,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.94,
       "cost": 0.0095,
       "perturbation_class": "semantic",
       "task": "twitter_timeline",
       "loc": 439,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0116,
       "perturbation_class": "semantic",
@@ -1091,14 +1091,14 @@
       "loc": 320,
       "thinking_ratio": 0.21,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
       "escape": 0.7,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.1477,
       "perturbation_class": "semantic",
       "task": "inject_phantom_success_s0.5",
@@ -1112,7 +1112,7 @@
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
       "escape": 0.68,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.1849,
       "perturbation_class": "semantic",
       "task": "invert_constraint_s0.5",
@@ -1126,7 +1126,7 @@
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
       "escape": 0.75,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.0243,
       "perturbation_class": "semantic",
       "task": "invert_constraint_s0.5",
@@ -1139,7 +1139,7 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.8,
       "cost": 0.0098,
       "perturbation_class": "semantic",
@@ -1147,7 +1147,7 @@
       "loc": 146,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1161,13 +1161,13 @@
       "loc": 702,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.8,
       "cost": 0.0126,
       "perturbation_class": "semantic",
@@ -1175,7 +1175,7 @@
       "loc": 227,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
@@ -1189,7 +1189,7 @@
       "loc": 469,
       "thinking_ratio": 0.05,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1217,7 +1217,7 @@
       "loc": 310,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6-fast",
@@ -1231,7 +1231,7 @@
       "loc": 441,
       "thinking_ratio": 0.08,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1259,13 +1259,13 @@
       "loc": 799,
       "thinking_ratio": 0.07,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.9975,
       "perturbation_class": "semantic",
@@ -1273,7 +1273,7 @@
       "loc": 459,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1287,13 +1287,13 @@
       "loc": 615,
       "thinking_ratio": 0.04,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.9377,
       "perturbation_class": "semantic",
@@ -1301,14 +1301,14 @@
       "loc": 456,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
       "escape": 0.38,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 0.0211,
       "perturbation_class": "semantic",
       "task": "inject_phantom_success_s0.5_r1",
@@ -1321,29 +1321,29 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.0044,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 62,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.97,
       "cost": 0.0191,
       "perturbation_class": "semantic",
       "task": "exp_er1n2rx3",
       "loc": 945,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
@@ -1363,7 +1363,7 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0156,
       "perturbation_class": "semantic",
@@ -1371,13 +1371,13 @@
       "loc": 838,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0167,
       "perturbation_class": "semantic",
@@ -1385,7 +1385,7 @@
       "loc": 1178,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -1399,13 +1399,13 @@
       "loc": 1015,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.011,
       "perturbation_class": "semantic",
@@ -1413,13 +1413,13 @@
       "loc": 551,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.4637,
       "perturbation_class": "semantic",
@@ -1427,7 +1427,7 @@
       "loc": 638,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1441,14 +1441,14 @@
       "loc": 947,
       "thinking_ratio": 0.25,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.67,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 1.3343,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5",
@@ -1469,7 +1469,7 @@
       "loc": 558,
       "thinking_ratio": 0.11,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1483,7 +1483,7 @@
       "loc": 1133,
       "thinking_ratio": 0.09,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1503,35 +1503,35 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.78,
       "cost": 0.021,
       "perturbation_class": "semantic",
       "task": "exp_hcnattl6",
       "loc": 1070,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.4972,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 161,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0159,
       "perturbation_class": "semantic",
@@ -1539,7 +1539,7 @@
       "loc": 726,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -1553,7 +1553,7 @@
       "loc": 747,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1567,13 +1567,13 @@
       "loc": 415,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0053,
       "perturbation_class": "semantic",
@@ -1581,7 +1581,7 @@
       "loc": 63,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1623,13 +1623,13 @@
       "loc": 369,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.9687,
       "perturbation_class": "semantic",
@@ -1637,27 +1637,27 @@
       "loc": 432,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.96,
       "cost": 0.0109,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 444,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0081,
       "perturbation_class": "semantic",
@@ -1665,7 +1665,7 @@
       "loc": 281,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
@@ -1679,7 +1679,7 @@
       "loc": 268,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1699,7 +1699,7 @@
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.8868,
       "perturbation_class": "semantic",
@@ -1707,7 +1707,7 @@
       "loc": 387,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-nano",
@@ -1728,7 +1728,7 @@
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.66,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 1.6062,
       "perturbation_class": "semantic",
       "task": "inject_competing_goal_s0.5",
@@ -1749,13 +1749,13 @@
       "loc": 203,
       "thinking_ratio": 0.06,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0169,
       "perturbation_class": "semantic",
@@ -1763,13 +1763,13 @@
       "loc": 891,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0056,
       "perturbation_class": "semantic",
@@ -1777,13 +1777,13 @@
       "loc": 111,
       "thinking_ratio": 0.02,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0145,
       "perturbation_class": "semantic",
@@ -1791,13 +1791,13 @@
       "loc": 697,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0148,
       "perturbation_class": "semantic",
@@ -1805,13 +1805,13 @@
       "loc": 756,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0081,
       "perturbation_class": "semantic",
@@ -1819,7 +1819,7 @@
       "loc": 221,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1839,7 +1839,7 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0206,
       "perturbation_class": "semantic",
@@ -1847,7 +1847,7 @@
       "loc": 694,
       "thinking_ratio": 0.32,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
@@ -1861,13 +1861,13 @@
       "loc": 241,
       "thinking_ratio": 0.04,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.8,
       "cost": 0.0126,
       "perturbation_class": "semantic",
@@ -1875,7 +1875,7 @@
       "loc": 472,
       "thinking_ratio": 0.12,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1889,7 +1889,7 @@
       "loc": 504,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6-fast",
@@ -1903,28 +1903,28 @@
       "loc": 407,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.63,
       "cost": 0.0104,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 386,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.44,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 1.1104,
       "perturbation_class": "semantic",
       "task": "standardized_build",
@@ -1945,7 +1945,7 @@
       "loc": 245,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -1959,7 +1959,7 @@
       "loc": 1212,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -1979,7 +1979,7 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0229,
       "perturbation_class": "semantic",
@@ -1987,13 +1987,13 @@
       "loc": 607,
       "thinking_ratio": 0.25,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.7,
       "cost": 0.1773,
       "perturbation_class": "semantic",
@@ -2001,14 +2001,14 @@
       "loc": 327,
       "thinking_ratio": 0.13,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.61,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 1.5805,
       "perturbation_class": "semantic",
       "task": "inject_phantom_success_s0.5",
@@ -2043,13 +2043,13 @@
       "loc": 1005,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.6456,
       "perturbation_class": "semantic",
@@ -2057,7 +2057,7 @@
       "loc": 267,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2071,13 +2071,13 @@
       "loc": 948,
       "thinking_ratio": 0.06,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0197,
       "perturbation_class": "semantic",
@@ -2085,13 +2085,13 @@
       "loc": 925,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0097,
       "perturbation_class": "semantic",
@@ -2099,13 +2099,13 @@
       "loc": 391,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.8,
       "cost": 0.9408,
       "perturbation_class": "semantic",
@@ -2113,7 +2113,7 @@
       "loc": 562,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2127,7 +2127,7 @@
       "loc": 770,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2141,13 +2141,13 @@
       "loc": 782,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.1924,
       "perturbation_class": "semantic",
@@ -2155,7 +2155,7 @@
       "loc": 397,
       "thinking_ratio": 0.09,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2169,13 +2169,13 @@
       "loc": 758,
       "thinking_ratio": 0.15,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0203,
       "perturbation_class": "semantic",
@@ -2183,13 +2183,13 @@
       "loc": 1139,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0167,
       "perturbation_class": "semantic",
@@ -2197,7 +2197,7 @@
       "loc": 899,
       "thinking_ratio": 0.02,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.5",
@@ -2211,7 +2211,7 @@
       "loc": 288,
       "thinking_ratio": 0.03,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
@@ -2225,13 +2225,13 @@
       "loc": 221,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.3088,
       "perturbation_class": "semantic",
@@ -2239,13 +2239,13 @@
       "loc": 427,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.3937,
       "perturbation_class": "semantic",
@@ -2253,13 +2253,13 @@
       "loc": 477,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.4235,
       "perturbation_class": "semantic",
@@ -2267,27 +2267,27 @@
       "loc": 618,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.0271,
       "perturbation_class": "semantic",
       "task": "baseline",
       "loc": 227,
       "thinking_ratio": 0.1,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0323,
       "perturbation_class": "semantic",
@@ -2295,41 +2295,41 @@
       "loc": 281,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 0.75,
       "cost": 0.0595,
       "perturbation_class": "semantic",
       "task": "baseline",
       "loc": 342,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 0.75,
       "cost": 0.0284,
       "perturbation_class": "semantic",
       "task": "perturbed",
       "loc": 342,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.1629,
       "perturbation_class": "semantic",
@@ -2337,13 +2337,13 @@
       "loc": 48,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.3609,
       "perturbation_class": "semantic",
@@ -2351,27 +2351,27 @@
       "loc": 230,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.38,
       "cost": 0.0064,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 227,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0158,
       "perturbation_class": "semantic",
@@ -2379,7 +2379,7 @@
       "loc": 903,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -2399,15 +2399,15 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.8,
       "cost": 0.0213,
       "perturbation_class": "semantic",
       "task": "exp_u9zvdibz",
       "loc": 1127,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2421,13 +2421,13 @@
       "loc": 372,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.4089,
       "perturbation_class": "semantic",
@@ -2435,13 +2435,13 @@
       "loc": 455,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.005,
       "perturbation_class": "semantic",
@@ -2449,14 +2449,14 @@
       "loc": 141,
       "thinking_ratio": 0.01,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
       "escape": 0.37,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 0.374,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5",
@@ -2470,7 +2470,7 @@
       "label": "GPT-5-nano",
       "color": "rgba(239,68,68,0.75)",
       "escape": 0.38,
-      "correctness": 0.7,
+      "correctness": 0.75,
       "cost": 0.0064,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5",
@@ -2483,15 +2483,15 @@
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": NaN,
+      "correctness": 1.0,
       "cost": 0.4021,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 130,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2533,27 +2533,27 @@
       "loc": 291,
       "thinking_ratio": 0.04,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.88,
       "cost": 0.3002,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 117,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0103,
       "perturbation_class": "semantic",
@@ -2561,7 +2561,7 @@
       "loc": 527,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2575,28 +2575,28 @@
       "loc": 962,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.98,
       "cost": 0.0219,
       "perturbation_class": "semantic",
       "task": "task_manager",
       "loc": 1295,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
       "escape": 0.7,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.1685,
       "perturbation_class": "manifold",
       "task": "inject_alien_vocab_s0.5",
@@ -2609,15 +2609,15 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.98,
       "cost": 0.0157,
       "perturbation_class": "semantic",
       "task": "exp_wkclt_vt",
       "loc": 853,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2637,7 +2637,7 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0145,
       "perturbation_class": "semantic",
@@ -2645,13 +2645,13 @@
       "loc": 750,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.6322,
       "perturbation_class": "semantic",
@@ -2659,13 +2659,13 @@
       "loc": 298,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.8,
       "cost": 0.0185,
       "perturbation_class": "semantic",
@@ -2673,13 +2673,13 @@
       "loc": 883,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.7,
       "cost": 0.018,
       "perturbation_class": "semantic",
@@ -2687,13 +2687,13 @@
       "loc": 187,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0142,
       "perturbation_class": "semantic",
@@ -2701,7 +2701,7 @@
       "loc": 809,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -2729,13 +2729,13 @@
       "loc": 634,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0073,
       "perturbation_class": "semantic",
@@ -2743,21 +2743,21 @@
       "loc": 169,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": NaN,
+      "correctness": 0.32,
       "cost": 0.01,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 375,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2777,7 +2777,7 @@
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 1.0,
       "cost": 0.0165,
       "perturbation_class": "semantic",
@@ -2785,7 +2785,7 @@
       "loc": 885,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2799,13 +2799,13 @@
       "loc": 314,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
-      "escape": 0.0,
+      "escape": NaN,
       "correctness": 0.8,
       "cost": 0.2201,
       "perturbation_class": "semantic",
@@ -2813,7 +2813,7 @@
       "loc": 514,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2827,141 +2827,137 @@
       "loc": 484,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     }
   ],
   "quadrants": {
-    "high_grit": 80,
-    "explorative": 49,
-    "conservative_fail": 29,
-    "wasteful": 43
+    "high_grit": 0,
+    "explorative": 0,
+    "conservative_fail": 0,
+    "wasteful": 201
   },
   "model_quadrants": {
     "DeepSeek v4 Pro": {
-      "high_grit": 56,
-      "explorative": 21,
-      "conservative_fail": 11,
-      "wasteful": 21,
+      "high_grit": 0,
+      "explorative": 0,
+      "conservative_fail": 0,
+      "wasteful": 109,
       "total": 109
     },
     "GPT-5.6": {
-      "high_grit": 7,
-      "explorative": 5,
-      "conservative_fail": 2,
-      "wasteful": 1,
+      "high_grit": 0,
+      "explorative": 0,
+      "conservative_fail": 0,
+      "wasteful": 15,
       "total": 15
     },
     "Claude Fable 5": {
-      "high_grit": 14,
-      "explorative": 7,
-      "conservative_fail": 9,
-      "wasteful": 9,
+      "high_grit": 0,
+      "explorative": 0,
+      "conservative_fail": 0,
+      "wasteful": 39,
       "total": 39
     },
     "GPT-5-nano": {
       "high_grit": 0,
       "explorative": 0,
-      "conservative_fail": 1,
-      "wasteful": 5,
+      "conservative_fail": 0,
+      "wasteful": 6,
       "total": 6
     },
     "GPT-5.6-fast": {
       "high_grit": 0,
-      "explorative": 6,
+      "explorative": 0,
       "conservative_fail": 0,
-      "wasteful": 0,
+      "wasteful": 6,
       "total": 6
     },
     "GPT-5-mini": {
-      "high_grit": 2,
-      "explorative": 3,
-      "conservative_fail": 4,
-      "wasteful": 3,
+      "high_grit": 0,
+      "explorative": 0,
+      "conservative_fail": 0,
+      "wasteful": 12,
       "total": 12
     },
     "GPT-5": {
-      "high_grit": 1,
-      "explorative": 4,
-      "conservative_fail": 2,
-      "wasteful": 4,
+      "high_grit": 0,
+      "explorative": 0,
+      "conservative_fail": 0,
+      "wasteful": 11,
       "total": 11
     },
     "GPT-5.5": {
       "high_grit": 0,
-      "explorative": 3,
+      "explorative": 0,
       "conservative_fail": 0,
-      "wasteful": 0,
+      "wasteful": 3,
       "total": 3
     }
   },
   "model_quadrant_percentages": {
     "DeepSeek v4 Pro": {
-      "high_grit_pct": 51.4,
-      "explorative_pct": 19.3,
-      "conservative_fail_pct": 10.1,
-      "wasteful_pct": 19.3,
+      "high_grit_pct": 0.0,
+      "explorative_pct": 0.0,
+      "conservative_fail_pct": 0.0,
+      "wasteful_pct": 100.0,
       "total": 109
     },
     "GPT-5.6": {
-      "high_grit_pct": 46.7,
-      "explorative_pct": 33.3,
-      "conservative_fail_pct": 13.3,
-      "wasteful_pct": 6.7,
+      "high_grit_pct": 0.0,
+      "explorative_pct": 0.0,
+      "conservative_fail_pct": 0.0,
+      "wasteful_pct": 100.0,
       "total": 15
     },
     "Claude Fable 5": {
-      "high_grit_pct": 35.9,
-      "explorative_pct": 17.9,
-      "conservative_fail_pct": 23.1,
-      "wasteful_pct": 23.1,
+      "high_grit_pct": 0.0,
+      "explorative_pct": 0.0,
+      "conservative_fail_pct": 0.0,
+      "wasteful_pct": 100.0,
       "total": 39
     },
     "GPT-5-nano": {
       "high_grit_pct": 0.0,
       "explorative_pct": 0.0,
-      "conservative_fail_pct": 16.7,
-      "wasteful_pct": 83.3,
+      "conservative_fail_pct": 0.0,
+      "wasteful_pct": 100.0,
       "total": 6
     },
     "GPT-5.6-fast": {
       "high_grit_pct": 0.0,
-      "explorative_pct": 100.0,
+      "explorative_pct": 0.0,
       "conservative_fail_pct": 0.0,
-      "wasteful_pct": 0.0,
+      "wasteful_pct": 100.0,
       "total": 6
     },
     "GPT-5-mini": {
-      "high_grit_pct": 16.7,
-      "explorative_pct": 25.0,
-      "conservative_fail_pct": 33.3,
-      "wasteful_pct": 25.0,
+      "high_grit_pct": 0.0,
+      "explorative_pct": 0.0,
+      "conservative_fail_pct": 0.0,
+      "wasteful_pct": 100.0,
       "total": 12
     },
     "GPT-5": {
-      "high_grit_pct": 9.1,
-      "explorative_pct": 36.4,
-      "conservative_fail_pct": 18.2,
-      "wasteful_pct": 36.4,
+      "high_grit_pct": 0.0,
+      "explorative_pct": 0.0,
+      "conservative_fail_pct": 0.0,
+      "wasteful_pct": 100.0,
       "total": 11
     },
     "GPT-5.5": {
       "high_grit_pct": 0.0,
-      "explorative_pct": 100.0,
+      "explorative_pct": 0.0,
       "conservative_fail_pct": 0.0,
-      "wasteful_pct": 0.0,
+      "wasteful_pct": 100.0,
       "total": 3
     }
   },
   "perturbation_class_quadrants": {
     "semantic": {
-      "wasteful": 30,
-      "explorative": 46,
-      "conservative_fail": 29,
-      "high_grit": 80
+      "wasteful": 185
     },
     "manifold": {
-      "wasteful": 13,
-      "explorative": 3
+      "wasteful": 16
     }
   },
   "chart_data": {
@@ -2981,10 +2977,10 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 485,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 33.618,
             "cost": 2.2412,
@@ -2992,10 +2988,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1327,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 11.265,
             "cost": 0.751,
@@ -3003,21 +2999,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 436,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 1.0,
             "r": 7.0440000000000005,
             "cost": 0.4696,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 159,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 18.846,
             "cost": 1.2564,
@@ -3025,10 +3021,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 581,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 13.0845,
             "cost": 0.8723,
@@ -3036,7 +3032,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 463,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.37,
@@ -3047,18 +3043,18 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 562,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 1.0,
             "r": 5.8605,
             "cost": 0.3907,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 126,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.63,
@@ -3083,18 +3079,18 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 1.0,
             "r": 6.183,
             "cost": 0.4122,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 133,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.7,
             "r": 20.6925,
             "cost": 1.3795,
@@ -3102,21 +3098,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 729,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 1.0,
             "r": 37.3425,
             "cost": 2.4895,
             "task": "collaborative_editor",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1074,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 30.7965,
             "cost": 2.0531,
@@ -3124,10 +3120,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 313,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.7,
             "r": 30.333000000000002,
             "cost": 2.0222,
@@ -3135,10 +3131,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1093,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 14.9625,
             "cost": 0.9975,
@@ -3146,10 +3142,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 459,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 14.0655,
             "cost": 0.9377,
@@ -3157,7 +3153,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 456,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.62,
@@ -3168,11 +3164,11 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 1015,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.67,
-            "y": 0.8,
+            "y": 1.0,
             "r": 20.0145,
             "cost": 1.3343,
             "task": "remove_critical_constraint_s0.5",
@@ -3182,15 +3178,15 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 1.0,
             "r": 7.457999999999999,
             "cost": 0.4972,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 161,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.65,
@@ -3201,10 +3197,10 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 747,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 14.5305,
             "cost": 0.9687,
@@ -3212,10 +3208,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 432,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 13.302,
             "cost": 0.8868,
@@ -3223,11 +3219,11 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 387,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.66,
-            "y": 0.8,
+            "y": 1.0,
             "r": 24.093,
             "cost": 1.6062,
             "task": "inject_competing_goal_s0.5",
@@ -3238,7 +3234,7 @@
           },
           {
             "x": 0.44,
-            "y": 0.7,
+            "y": 1.0,
             "r": 16.656000000000002,
             "cost": 1.1104,
             "task": "standardized_build",
@@ -3256,11 +3252,11 @@
             "perturbation_class": "manifold",
             "strategy": "exploratory",
             "loc": 1212,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.61,
-            "y": 0.8,
+            "y": 1.0,
             "r": 23.7075,
             "cost": 1.5805,
             "task": "inject_phantom_success_s0.5",
@@ -3289,10 +3285,10 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 1005,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 9.684,
             "cost": 0.6456,
@@ -3300,10 +3296,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 267,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.8,
             "r": 14.112,
             "cost": 0.9408,
@@ -3311,10 +3307,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 562,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.1629,
@@ -3322,10 +3318,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 48,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 5.4135,
             "cost": 0.3609,
@@ -3333,7 +3329,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 230,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.59,
@@ -3347,29 +3343,29 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 1.0,
             "r": 6.0315,
             "cost": 0.4021,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 130,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.88,
             "r": 4.503,
             "cost": 0.3002,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 117,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 9.483,
             "cost": 0.6322,
@@ -3377,7 +3373,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 298,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.6,
@@ -3399,7 +3395,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 634,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           }
         ]
       },
@@ -3421,15 +3417,15 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.8,
+            "x": NaN,
+            "y": 1.0,
             "r": 3,
             "cost": 0.0241,
             "task": "exp_0s36_d3n",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1008,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.75,
@@ -3440,18 +3436,18 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 960,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.76,
             "r": 3,
             "cost": 0.0214,
             "task": "exp_1erxln69",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1266,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 1.0,
@@ -3473,21 +3469,21 @@
             "perturbation_class": "manifold",
             "strategy": "exploratory",
             "loc": 1275,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.94,
             "r": 3,
             "cost": 0.0087,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 211,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0104,
@@ -3495,10 +3491,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 207,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0217,
@@ -3506,21 +3502,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 796,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.89,
             "r": 3,
             "cost": 0.0163,
             "task": "exp_3zxicj_v",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 840,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0237,
@@ -3528,7 +3524,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1446,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.37,
@@ -3539,7 +3535,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1052,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.74,
@@ -3553,7 +3549,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.017,
@@ -3561,7 +3557,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 748,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.73,
@@ -3586,7 +3582,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0059,
@@ -3594,7 +3590,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 92,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.74,
@@ -3608,7 +3604,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0214,
@@ -3616,7 +3612,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1030,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.75,
@@ -3638,10 +3634,10 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 364,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0104,
@@ -3649,10 +3645,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 385,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0337,
@@ -3660,21 +3656,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 910,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.79,
             "r": 3,
             "cost": 0.0142,
             "task": "perturbed",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 706,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.8,
             "r": 3,
             "cost": 0.0217,
@@ -3682,10 +3678,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1220,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.2,
             "r": 3,
             "cost": 0.0185,
@@ -3693,7 +3689,7 @@
             "perturbation_class": "semantic",
             "strategy": "wasteful",
             "loc": 4,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.73,
@@ -3707,7 +3703,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0047,
@@ -3715,21 +3711,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 95,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.98,
             "r": 3,
             "cost": 0.018,
             "task": "autocomplete_search",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1186,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0221,
@@ -3737,10 +3733,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1227,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.6,
             "r": 3,
             "cost": 0.0194,
@@ -3748,21 +3744,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 839,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.92,
             "r": 3,
             "cost": 0.0215,
             "task": "factorial_compound",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1537,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0303,
@@ -3770,10 +3766,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 3021,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.8,
             "r": 3,
             "cost": 0.0203,
@@ -3781,10 +3777,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 405,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0175,
@@ -3792,10 +3788,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1530,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.6,
             "r": 3,
             "cost": 0.0089,
@@ -3803,10 +3799,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 120,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0177,
@@ -3814,43 +3810,43 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1239,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.98,
             "r": 3,
             "cost": 0.013,
             "task": "social_graph",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1333,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.93,
             "r": 3,
             "cost": 0.01,
             "task": "task_manager",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 533,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.94,
             "r": 3,
             "cost": 0.0095,
             "task": "twitter_timeline",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 439,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0116,
@@ -3858,11 +3854,11 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 320,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.75,
-            "y": 0.8,
+            "y": 1.0,
             "r": 3,
             "cost": 0.0243,
             "task": "invert_constraint_s0.5",
@@ -3872,7 +3868,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.8,
             "r": 3,
             "cost": 0.0098,
@@ -3880,7 +3876,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 146,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.33,
@@ -3891,10 +3887,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 702,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.8,
             "r": 3,
             "cost": 0.0126,
@@ -3902,7 +3898,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 227,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.7,
@@ -3935,7 +3931,7 @@
             "perturbation_class": "manifold",
             "strategy": "exploratory",
             "loc": 799,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.72,
@@ -3946,32 +3942,32 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 615,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 1.0,
             "r": 3,
             "cost": 0.0044,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 62,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.97,
             "r": 3,
             "cost": 0.0191,
             "task": "exp_er1n2rx3",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 945,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0156,
@@ -3979,10 +3975,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 838,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0167,
@@ -3990,10 +3986,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1178,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.011,
@@ -4001,7 +3997,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 551,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.77,
@@ -4012,7 +4008,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 947,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.5,
@@ -4023,7 +4019,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 558,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.75,
@@ -4034,7 +4030,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 1133,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.73,
@@ -4048,18 +4044,18 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.78,
             "r": 3,
             "cost": 0.021,
             "task": "exp_hcnattl6",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1070,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0159,
@@ -4067,7 +4063,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 726,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.37,
@@ -4078,10 +4074,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 415,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0053,
@@ -4089,7 +4085,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 63,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.72,
@@ -4122,21 +4118,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 369,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.96,
             "r": 3,
             "cost": 0.0109,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 444,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0081,
@@ -4144,7 +4140,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 281,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.82,
@@ -4158,7 +4154,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0169,
@@ -4166,10 +4162,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 891,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0056,
@@ -4177,10 +4173,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 111,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0145,
@@ -4188,10 +4184,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 697,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0148,
@@ -4199,10 +4195,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 756,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0081,
@@ -4210,7 +4206,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 221,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.72,
@@ -4224,7 +4220,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0206,
@@ -4232,10 +4228,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 694,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.8,
             "r": 3,
             "cost": 0.0126,
@@ -4243,7 +4239,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 472,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.37,
@@ -4254,18 +4250,18 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 504,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.63,
             "r": 3,
             "cost": 0.0104,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 386,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.72,
@@ -4279,7 +4275,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0229,
@@ -4287,7 +4283,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 607,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.74,
@@ -4298,10 +4294,10 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 948,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0197,
@@ -4309,10 +4305,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 925,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0097,
@@ -4320,7 +4316,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 391,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.31,
@@ -4331,7 +4327,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 770,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.29,
@@ -4342,7 +4338,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 782,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.73,
@@ -4353,10 +4349,10 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 758,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0203,
@@ -4364,10 +4360,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1139,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0167,
@@ -4375,21 +4371,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 899,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.38,
             "r": 3,
             "cost": 0.0064,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 227,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0158,
@@ -4397,18 +4393,18 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 903,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.8,
             "r": 3,
             "cost": 0.0213,
             "task": "exp_u9zvdibz",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1127,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.43,
@@ -4419,10 +4415,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 372,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.005,
@@ -4430,7 +4426,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 141,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.72,
@@ -4455,7 +4451,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0103,
@@ -4463,7 +4459,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 527,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.35,
@@ -4474,29 +4470,29 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 962,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.98,
             "r": 3,
             "cost": 0.0219,
             "task": "task_manager",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 1295,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.98,
             "r": 3,
             "cost": 0.0157,
             "task": "exp_wkclt_vt",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 853,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.74,
@@ -4510,7 +4506,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0145,
@@ -4518,10 +4514,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 750,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.8,
             "r": 3,
             "cost": 0.0185,
@@ -4529,10 +4525,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 883,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0142,
@@ -4540,10 +4536,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 809,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0073,
@@ -4551,18 +4547,18 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 169,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 1.0,
+            "x": NaN,
+            "y": 0.32,
             "r": 3,
             "cost": 0.01,
             "task": "url_shortener",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 375,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.73,
@@ -4576,7 +4572,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0165,
@@ -4584,7 +4580,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 885,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.32,
@@ -4595,7 +4591,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 314,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.42,
@@ -4606,7 +4602,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 484,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           }
         ]
       },
@@ -4618,7 +4614,7 @@
         "data": [
           {
             "x": 0.72,
-            "y": 0.8,
+            "y": 1.0,
             "r": 3.1005,
             "cost": 0.2067,
             "task": "remove_critical_constraint_s0.5",
@@ -4636,11 +4632,11 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 330,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.7,
-            "y": 0.8,
+            "y": 1.0,
             "r": 3,
             "cost": 0.1477,
             "task": "inject_phantom_success_s0.5",
@@ -4651,7 +4647,7 @@
           },
           {
             "x": 0.68,
-            "y": 0.8,
+            "y": 1.0,
             "r": 3,
             "cost": 0.1849,
             "task": "invert_constraint_s0.5",
@@ -4669,7 +4665,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 469,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.73,
@@ -4680,7 +4676,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 203,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.71,
@@ -4691,10 +4687,10 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 241,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.7,
             "r": 3,
             "cost": 0.1773,
@@ -4702,10 +4698,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 327,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.1924,
@@ -4713,11 +4709,11 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 397,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.7,
-            "y": 0.8,
+            "y": 1.0,
             "r": 3,
             "cost": 0.1685,
             "task": "inject_alien_vocab_s0.5",
@@ -4727,7 +4723,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.8,
             "r": 3.3015,
             "cost": 0.2201,
@@ -4735,7 +4731,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 514,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           }
         ]
       },
@@ -4754,11 +4750,11 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 202,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.24,
-            "y": 0.7,
+            "y": 1.0,
             "r": 3,
             "cost": 0.0309,
             "task": "remove_critical_constraint_s0.5_r2",
@@ -4768,7 +4764,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0198,
@@ -4776,11 +4772,11 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 386,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.38,
-            "y": 0.7,
+            "y": 1.0,
             "r": 3,
             "cost": 0.0211,
             "task": "inject_phantom_success_s0.5_r1",
@@ -4809,7 +4805,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 245,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.42,
@@ -4820,21 +4816,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 221,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 1.0,
             "r": 3,
             "cost": 0.0271,
             "task": "baseline",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 227,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 3,
             "cost": 0.0323,
@@ -4842,32 +4838,32 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 281,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 0.75,
             "r": 3,
             "cost": 0.0595,
             "task": "baseline",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 342,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.7,
+            "x": NaN,
+            "y": 0.75,
             "r": 3,
             "cost": 0.0284,
             "task": "perturbed",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 342,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.7,
             "r": 3,
             "cost": 0.018,
@@ -4875,7 +4871,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 187,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           }
         ]
       },
@@ -4887,7 +4883,7 @@
         "data": [
           {
             "x": 0.43,
-            "y": 0.7,
+            "y": 1.0,
             "r": 3,
             "cost": 0.0059,
             "task": "std_final",
@@ -4908,7 +4904,7 @@
             "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 0.7,
             "r": 3,
             "cost": 0.0037,
@@ -4916,7 +4912,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 182,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.68,
@@ -4942,7 +4938,7 @@
           },
           {
             "x": 0.38,
-            "y": 0.7,
+            "y": 0.75,
             "r": 3,
             "cost": 0.0064,
             "task": "remove_critical_constraint_s0.5",
@@ -4968,7 +4964,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 251,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.73,
@@ -4979,7 +4975,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 247,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.71,
@@ -4990,7 +4986,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 288,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           }
         ]
       },
@@ -5009,7 +5005,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 407,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.25,
@@ -5020,7 +5016,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 407,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.27,
@@ -5031,10 +5027,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 453,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 10.5015,
             "cost": 0.7001,
@@ -5042,21 +5038,21 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 40,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.8,
+            "x": NaN,
+            "y": 1.0,
             "r": 11.966999999999999,
             "cost": 0.7978,
             "task": "data_table",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 52,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 7.4775,
             "cost": 0.4985,
@@ -5064,18 +5060,18 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 602,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
-            "y": 0.6,
+            "x": NaN,
+            "y": 1.0,
             "r": 9.9195,
             "cost": 0.6613,
             "task": "data_table",
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 29,
-            "quadrant": "conservative_fail"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.35,
@@ -5086,10 +5082,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 310,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 6.9555,
             "cost": 0.4637,
@@ -5097,7 +5093,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 638,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.46,
@@ -5108,10 +5104,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 268,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 4.632000000000001,
             "cost": 0.3088,
@@ -5119,10 +5115,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 427,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 5.9055,
             "cost": 0.3937,
@@ -5130,10 +5126,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 477,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 6.3525,
             "cost": 0.4235,
@@ -5141,10 +5137,10 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 618,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
-            "x": 0.0,
+            "x": NaN,
             "y": 1.0,
             "r": 6.1335,
             "cost": 0.4089,
@@ -5152,11 +5148,11 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 455,
-            "quadrant": "high_grit"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.37,
-            "y": 0.7,
+            "y": 1.0,
             "r": 5.61,
             "cost": 0.374,
             "task": "remove_critical_constraint_s0.5",
@@ -5182,7 +5178,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 305,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.75,
@@ -5193,7 +5189,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 292,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.45,
@@ -5204,7 +5200,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 322,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.74,
@@ -5215,7 +5211,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 441,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.29,
@@ -5226,7 +5222,7 @@
             "perturbation_class": "semantic",
             "strategy": "conservative",
             "loc": 407,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           },
           {
             "x": 0.55,
@@ -5237,7 +5233,7 @@
             "perturbation_class": "semantic",
             "strategy": "exploratory",
             "loc": 291,
-            "quadrant": "explorative"
+            "quadrant": "wasteful"
           }
         ]
       }

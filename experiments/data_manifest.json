@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-08-15T20:17:50.939814+00:00",
+  "opencode_version": "unknown",
+  "git_commit": "8db06078",
+  "files": {
+    "inventory.json": {
+      "sha256": "a2aa4974de23c094533ddb4c5d6d593c96a5208bb3bf80495782f4115058746c",
+      "size_bytes": 330169
+    },
+    "_results_summary.json": {
+      "sha256": "5c5fa588d31029fadf45d85ff3c4e3f3026386fe58f9e434e3f9a648ded966de",
+      "size_bytes": 802270
+    },
+    "_trajectory_aggregate.json": {
+      "sha256": "2a13a3e2c63353be1874ddfa76e38704c318c21129991793ee4f132625eb22e8",
+      "size_bytes": 1748
+    },
+    "data.js": {
+      "sha256": "ae04b7648a3bfc263f1e5b29d923a9c372726a1795c2b1a869b2095e4d343bbb",
+      "size_bytes": 178878
+    }
+  },
+  "pipeline_steps": [
+    "inventory",
+    "analyze_worktrees",
+    "analyze_trajectories",
+    "build_data"
+  ],
+  "known_limitations": [
+    "116 of 227 sessions use heuristic correctness (keyword-based, no pytest executed)",
+    "Per-cell n < 5 for 17 operator\u00d7model combinations \u2014 shaded on evidence page",
+    "Rules 6-9 are modeled, not experimentally validated \u2014 batch/cascade/SLA experiments not executed",
+    "Per-model session counts are imbalanced: DeepSeek 119, Claude 44, GPT variants 6-18 each"
+  ]
+}
