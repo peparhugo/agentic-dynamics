@@ -1,4 +1,4 @@
-"""Async WebSocket notification server with a small health endpoint."""
+"""Async notification server with a pluggable transport and health endpoint."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from uuid import uuid4
 from aiohttp import web
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
-from websockets.asyncio.server import Server, ServerConnection, serve
+from transport import BaseTransport, WebSocketTransport
 
 
 MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
@@ -27,11 +27,22 @@ def timestamp() -> str:
 class NotificationServer:
     """Own WebSocket clients and route JSON notification messages."""
 
-    def __init__(self, redis_url: str | None = None, database_url: str | None = None) -> None:
+    def __init__(
+        self,
+        redis_url: str | None = None,
+        database_url: str | None = None,
+        transport: BaseTransport | None = None,
+    ) -> None:
         # All access happens on the asyncio event loop; no lock is needed.
-        self.clients: dict[str, ServerConnection] = {}
+        transport_name = os.getenv("TRANSPORT", "websocket").lower()
+        if transport is None:
+            if transport_name != "websocket":
+                raise ValueError(f"unsupported transport: {transport_name}")
+            transport = WebSocketTransport()
+        self.transport = transport
+        self.clients = transport.clients
         self.channels: dict[str, set[str]] = {}
-        self.websocket_server: Server | None = None
+        self.websocket_server: Any = None
         self.health_runner: web.AppRunner | None = None
         self.websocket_port: int | None = None
         self.health_port: int | None = None
@@ -129,9 +140,8 @@ class NotificationServer:
     async def _deliver_message(self, message: dict[str, Any], target_id: str | None = None) -> None:
         channel = message.get("channel")
         if target_id is not None:
-            client = self.clients.get(target_id)
-            if client is not None:
-                await client.send(json.dumps(message))
+            if target_id in self.clients:
+                await self.transport.send_message(target_id, json.dumps(message))
             return
         await self._broadcast(json.dumps(message), channel)
 
@@ -151,26 +161,12 @@ class NotificationServer:
             message["channel"] = channel
         return json.dumps(message)
 
-    async def _send_system(self, client: ServerConnection, payload: dict[str, Any]) -> None:
-        await client.send(self._message("system", payload))
+    async def _send_system(self, client_id: str, payload: dict[str, Any]) -> None:
+        await self.transport.send_message(client_id, self._message("system", payload))
 
     async def _broadcast(self, message: str, channel: str | None = None) -> None:
-        if channel is None:
-            clients = tuple(self.clients.values())
-        else:
-            clients = tuple(
-                self.clients[client_id]
-                for client_id in self.channels.get(channel, ())
-                if client_id in self.clients
-            )
-        if not clients:
-            return
-        results = await asyncio.gather(
-            *(client.send(message) for client in clients), return_exceptions=True
-        )
-        # A failed send is cleaned up by that connection's finally block. This
-        # also keeps one stale client from preventing delivery to the others.
-        del results
+        client_ids = self.clients if channel is None else self.channels.get(channel, ())
+        await self.transport.broadcast(message, client_ids)
 
     @staticmethod
     def _channel_from(data: dict[str, Any]) -> str | None:
@@ -196,14 +192,14 @@ class NotificationServer:
         client = self.clients.get(client_id)
         if client is not None:
             action = "subscribed" if subscribe else "unsubscribed"
-            await self._send_system(client, {action: channel})
+            await self._send_system(client_id, {action: channel})
 
     async def _handle_message(self, client_id: str, data: Any) -> None:
         client = self.clients.get(client_id)
         if client is None:
             return
         if not isinstance(data, dict):
-            await self._send_system(client, {"error": "message must be a JSON object"})
+            await self._send_system(client_id, {"error": "message must be a JSON object"})
             return
 
         message_type = data.get("type")
@@ -213,7 +209,7 @@ class NotificationServer:
             and not isinstance(payload, dict)
         ):
             await self._send_system(
-                client,
+                client_id,
                 {"error": "message requires a supported type and object payload"},
             )
             return
@@ -221,7 +217,7 @@ class NotificationServer:
         if message_type in {"subscribe", "unsubscribe"}:
             channel = self._channel_from(data)
             if channel is None:
-                await self._send_system(client, {"error": "channel is required"})
+                await self._send_system(client_id, {"error": "channel is required"})
                 return
             await self._change_subscription(
                 client_id, channel, subscribe=message_type == "subscribe"
@@ -235,17 +231,17 @@ class NotificationServer:
             if self._redis_enabled and self.redis is not None and isinstance(target_id, str):
                 target_exists = bool(await self.redis.sismember("notification:clients", target_id))
             if not isinstance(target_id, str) or not target_exists:
-                await self._send_system(client, {"error": "target client not found"})
+                await self._send_system(client_id, {"error": "target client not found"})
                 return
             subscribed = target_id in self.channels.get(channel, ())
             if self._redis_enabled and self.redis is not None and channel is not None:
                 subscribed = bool(await self.redis.sismember(f"notification:channel:{channel}", target_id))
             if channel is not None and not subscribed:
-                await self._send_system(client, {"error": "target is not subscribed"})
+                await self._send_system(client_id, {"error": "target is not subscribed"})
                 return
             target_payload = payload.get("message", payload)
             if not isinstance(target_payload, dict):
-                await self._send_system(client, {"error": "direct message must be an object"})
+                await self._send_system(client_id, {"error": "direct message must be an object"})
                 return
             message = self._message_dict("direct", target_payload, channel)
             self._persist(message)
@@ -269,22 +265,22 @@ class NotificationServer:
             message["channel"] = channel
         return message
 
-    async def handler(self, websocket: ServerConnection) -> None:
+    async def handler(self, websocket: Any) -> None:
         client_id = uuid4().hex
-        self.clients[client_id] = websocket
+        await self.transport.on_connect(client_id, websocket)
         if self._redis_enabled and self.redis is not None:
             await self.redis.sadd("notification:clients", client_id)
         try:
-            await self._send_system(websocket, {"client_id": client_id})
+            await self._send_system(client_id, {"client_id": client_id})
             async for raw_message in websocket:
                 try:
                     data = json.loads(raw_message)
                 except (TypeError, json.JSONDecodeError):
-                    await self._send_system(websocket, {"error": "message must be valid JSON"})
+                    await self._send_system(client_id, {"error": "message must be valid JSON"})
                     continue
                 await self._handle_message(client_id, data)
         finally:
-            self.clients.pop(client_id, None)
+            await self.transport.on_disconnect(client_id)
             if self._redis_enabled and self.redis is not None:
                 await self.redis.srem("notification:clients", client_id)
             for channel, subscribers in tuple(self.channels.items()):
@@ -339,8 +335,11 @@ class NotificationServer:
         health_port: int = 8080,
     ) -> None:
         """Start both listeners. Use ``stop`` to release their sockets."""
-        self.websocket_server = await serve(self.handler, websocket_host, websocket_port)
-        self.websocket_port = self.websocket_server.sockets[0].getsockname()[1]
+        await self.transport.start(self.handler, websocket_host, websocket_port)
+        server = getattr(self.transport, "server", None)
+        self.websocket_server = server
+        if server is not None:
+            self.websocket_port = server.sockets[0].getsockname()[1]
         await self._connect_redis()
 
         health_app = web.Application()
@@ -366,10 +365,8 @@ class NotificationServer:
             await self.redis.aclose()
             self.redis = None
             self._redis_enabled = False
-        if self.websocket_server is not None:
-            self.websocket_server.close()
-            await self.websocket_server.wait_closed()
-            self.websocket_server = None
+        await self.transport.stop()
+        self.websocket_server = None
         if self.health_runner is not None:
             await self.health_runner.cleanup()
             self.health_runner = None
