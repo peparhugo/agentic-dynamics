@@ -1,0 +1,6 @@
+<main>
+<h1>{{title}}</h1>
+{{#if date}}<time datetime="{{date}}">{{date}}</time>{{/if}}
+{{#if tags.length}}<p>Tags: {{#each tags}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+{{{content}}}
+</main>

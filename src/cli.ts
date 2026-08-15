@@ -2,18 +2,19 @@
 import { buildSite } from './site';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>]';
+  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]';
 }
 
-function parseArguments(args: string[]): { contentDir?: string; outputDir?: string } {
-  const options: { contentDir?: string; outputDir?: string } = {};
+function parseArguments(args: string[]): { contentDir?: string; outputDir?: string; templateDir?: string } {
+  const options: { contentDir?: string; outputDir?: string; templateDir?: string } = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === '--content' || argument === '--output') {
+    if (argument === '--content' || argument === '--output' || argument === '--templates') {
       const value = args[index + 1];
       if (!value) throw new Error(`Missing value for ${argument}`);
       if (argument === '--content') options.contentDir = value;
-      else options.outputDir = value;
+      else if (argument === '--output') options.outputDir = value;
+      else options.templateDir = value;
       index += 1;
     } else {
       throw new Error(`Unknown option: ${argument}`);
