@@ -134,6 +134,29 @@ class TaskRepository(BaseRepository):
                 ).fetchall()
             return [dict(row) for row in rows]
 
+    def list_tasks_page(
+        self, owner_id: int | None, cursor: int | None, limit: int
+    ) -> tuple[list[dict], int]:
+        """Return one id-descending page and the owner's total task count."""
+        with self._connect() as connection:
+            if owner_id is None:
+                total = connection.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+                query = "SELECT * FROM tasks"
+                params = []
+            else:
+                total = connection.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+                ).fetchone()[0]
+                query = "SELECT * FROM tasks WHERE owner_id = ?"
+                params = [owner_id]
+            if cursor is not None:
+                query += " AND id < ?" if params else " WHERE id < ?"
+                params.append(cursor)
+            query += " ORDER BY id DESC LIMIT ?"
+            params.append(limit)
+            rows = connection.execute(query, params).fetchall()
+            return [dict(row) for row in rows], total
+
     def get_task(self, task_id: int, owner_id: int | None = None) -> dict | None:
         with self._connect() as connection:
             if owner_id is None:

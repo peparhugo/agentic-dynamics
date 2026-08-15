@@ -10,6 +10,8 @@ import os
 import sqlite3
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 from notifications import send_notification_email
 from repositories import TaskRepository, UserRepository
@@ -19,6 +21,25 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
 TOKEN_LIFETIME = timedelta(hours=24)
+
+
+def rate_limit_key() -> str:
+    """Use the authenticated identity when available, otherwise the client IP."""
+    authorization = request.headers.get("Authorization", "")
+    if authorization.startswith("Bearer "):
+        user_id = decode_token(authorization[7:].strip())
+        if user_id is not None:
+            return f"user:{user_id}"
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"),
+    headers_enabled=True,
+)
 
 
 def init_db():
@@ -89,6 +110,10 @@ def get_tasks(owner_id: int | None = None):
     return TaskRepository(DATABASE).list_tasks(owner_id)
 
 
+def get_task_page(owner_id: int, cursor: int | None, limit: int):
+    return TaskRepository(DATABASE).list_tasks_page(owner_id, cursor, limit)
+
+
 def get_task(task_id: int, owner_id: int | None = None) -> dict | None:
     return TaskRepository(DATABASE).get_task(task_id, owner_id)
 
@@ -135,7 +160,22 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @authenticated
 def list_tasks():
-    return jsonify(get_tasks(g.current_user["id"]))
+    raw_limit = request.args.get("limit", "20")
+    cursor_value = request.args.get("cursor")
+    try:
+        limit = int(raw_limit)
+        cursor = int(cursor_value) if cursor_value is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "cursor and limit must be integers"}), 400
+    if limit < 1 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+    if cursor is not None and cursor < 0:
+        return jsonify({"error": "cursor must be a non-negative integer"}), 400
+    tasks, total = get_task_page(g.current_user["id"], cursor, limit + 1)
+    has_next_page = len(tasks) > limit
+    tasks = tasks[:limit]
+    next_cursor = str(tasks[-1]["id"]) if has_next_page else None
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
