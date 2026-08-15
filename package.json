@@ -4,7 +4,7 @@
   "private": true,
   "description": "A small Markdown static site generator",
   "bin": {
-    "ssg": "dist/cli.js"
+    "ssg": "dist/src/cli.js"
   },
   "scripts": {
     "build": "tsc",
