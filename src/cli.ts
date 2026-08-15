@@ -8,6 +8,8 @@ export interface CliOptions {
   outputDir: string;
   templatesDir: string;
   port: number;
+  incremental: boolean;
+  clean: boolean;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -17,6 +19,8 @@ export function parseArgs(argv: string[]): CliOptions {
   let outputDir = './dist';
   let templatesDir = './templates';
   let port = 3000;
+  let incremental = false;
+  let clean = false;
   const positionals: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -30,6 +34,10 @@ export function parseArgs(argv: string[]): CliOptions {
     } else if (arg === '--port' || arg === '-p') {
       const value = args[++i];
       if (value !== undefined && value !== '') port = Number(value);
+    } else if (arg === '--incremental') {
+      incremental = true;
+    } else if (arg === '--clean') {
+      clean = true;
     } else if (arg.startsWith('--content=')) {
       contentDir = arg.slice('--content='.length);
     } else if (arg.startsWith('--output=')) {
@@ -48,7 +56,7 @@ export function parseArgs(argv: string[]): CliOptions {
     command = positionals[0];
   }
 
-  return { command, contentDir, outputDir, templatesDir, port };
+  return { command, contentDir, outputDir, templatesDir, port, incremental, clean };
 }
 
 export function run(argv: string[]): number | Promise<number> {
@@ -60,8 +68,18 @@ export function run(argv: string[]): number | Promise<number> {
         contentDir: opts.contentDir,
         outputDir: opts.outputDir,
         templatesDir: opts.templatesDir,
+        incremental: opts.incremental,
+        clean: opts.clean,
       });
-      console.log(`Generated ${result.pages.length} page(s) in ${opts.outputDir}`);
+      if (opts.incremental) {
+        const stats = result.stats;
+        console.log(
+          `Generated ${result.pages.length} page(s) in ${opts.outputDir} ` +
+            `(built ${stats.pagesBuilt}, skipped ${stats.pagesSkipped}, saved ${stats.timeSavedMs}ms)`
+        );
+      } else {
+        console.log(`Generated ${result.pages.length} page(s) in ${opts.outputDir}`);
+      }
       return 0;
     } catch (err) {
       console.error((err as Error).message);

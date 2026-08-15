@@ -1,4 +1,5 @@
 import type { BuildOptions, Page } from './types';
+import type { BuildCache } from './cache';
 
 /**
  * Shared, mutable state threaded through a single build. Plugins read and
@@ -8,6 +9,10 @@ export interface PluginContext {
   options: BuildOptions;
   pages: Page[];
   outputDir: string;
+  /** Present during incremental builds; lets plugins consult cached output. */
+  cache?: BuildCache;
+  /** Hash of the templates directory, present during incremental builds. */
+  templateHash?: string;
 }
 
 /**

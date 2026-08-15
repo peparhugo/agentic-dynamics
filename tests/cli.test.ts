@@ -8,17 +8,19 @@ describe('parseArgs', () => {
       outputDir: './dist',
       templatesDir: './templates',
       port: 3000,
+      incremental: false,
+      clean: false,
     });
   });
 
   it('parses --content and --output as separate arguments', () => {
     const opts = parseArgs(['node', 'ssg', 'build', '--content', 'posts', '--output', 'site']);
-    expect(opts).toEqual({ command: 'build', contentDir: 'posts', outputDir: 'site', templatesDir: './templates', port: 3000 });
+    expect(opts).toEqual({ command: 'build', contentDir: 'posts', outputDir: 'site', templatesDir: './templates', port: 3000, incremental: false, clean: false });
   });
 
   it('parses --content= and --output= syntax', () => {
     const opts = parseArgs(['node', 'ssg', 'build', '--content=posts', '--output=site']);
-    expect(opts).toEqual({ command: 'build', contentDir: 'posts', outputDir: 'site', templatesDir: './templates', port: 3000 });
+    expect(opts).toEqual({ command: 'build', contentDir: 'posts', outputDir: 'site', templatesDir: './templates', port: 3000, incremental: false, clean: false });
   });
 
   it('parses --templates and --templates= syntax', () => {
@@ -28,6 +30,8 @@ describe('parseArgs', () => {
       outputDir: './dist',
       templatesDir: 'layouts',
       port: 3000,
+      incremental: false,
+      clean: false,
     });
     expect(parseArgs(['node', 'ssg', 'build', '--templates=layouts'])).toEqual({
       command: 'build',
@@ -35,6 +39,8 @@ describe('parseArgs', () => {
       outputDir: './dist',
       templatesDir: 'layouts',
       port: 3000,
+      incremental: false,
+      clean: false,
     });
   });
 
@@ -60,5 +66,21 @@ describe('parseArgs', () => {
 
   it('defaults the port to 3000 for the serve command', () => {
     expect(parseArgs(['node', 'ssg', 'serve']).port).toBe(3000);
+  });
+
+  it('parses the --incremental flag', () => {
+    expect(parseArgs(['node', 'ssg', 'build', '--incremental']).incremental).toBe(true);
+  });
+
+  it('parses the --clean flag', () => {
+    expect(parseArgs(['node', 'ssg', 'build', '--incremental', '--clean'])).toEqual({
+      command: 'build',
+      contentDir: './content',
+      outputDir: './dist',
+      templatesDir: './templates',
+      port: 3000,
+      incremental: true,
+      clean: true,
+    });
   });
 });

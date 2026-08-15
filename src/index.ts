@@ -5,7 +5,16 @@ export { startDevServer, injectLiveReloadScript, LIVE_RELOAD_PATH, DevServerPlug
 export { MarkdownPlugin } from './plugins/markdown';
 export { TemplatePlugin } from './plugins/template';
 export { loadPlugins, createBuiltInPlugins } from './config';
+export {
+  BuildCache,
+  CACHE_FILENAME,
+  CACHE_VERSION,
+  computeTemplateHash,
+  hashContent,
+  hashFile,
+} from './cache';
+export type { CachedPage, CacheManifest } from './cache';
 export type { DevServerHandle } from './server';
 export type { TemplateContext } from './templates';
 export type { Plugin, PluginContext, PluginLifecycleHook } from './plugin';
-export type { Frontmatter, Page, BuildOptions, BuildResult, ServeOptions } from './types';
+export type { Frontmatter, Page, BuildOptions, BuildResult, BuildStats, ServeOptions } from './types';
