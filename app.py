@@ -6,6 +6,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from celery_config import make_celery
 from celery_tasks import send_notification_email
 from repositories import TaskRepository, UserRepository
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'test-secret-key-change-in-production'
@@ -17,6 +19,18 @@ USERS_FILE = 'users.json'
 
 task_repository = TaskRepository(STORAGE_FILE)
 user_repository = UserRepository(USERS_FILE)
+
+limiter = Limiter(
+    app=app,
+    key_func=lambda: request.headers.get('Authorization', 'anonymous'),
+    storage_uri='memory://',
+    strategy='moving-window',
+    in_memory_fallback_enabled=True
+)
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({'error': 'Rate limit exceeded'}), 429
 
 def token_required(f):
     @wraps(f)
@@ -45,6 +59,7 @@ def token_required(f):
     return decorated
 
 @app.route('/auth/register', methods=['POST'])
+@limiter.limit("100/minute")
 def register():
     data = request.get_json()
 
@@ -75,6 +90,7 @@ def register():
     }), 201
 
 @app.route('/auth/login', methods=['POST'])
+@limiter.limit("100/minute")
 def login():
     data = request.get_json()
 
@@ -98,6 +114,7 @@ def login():
     return jsonify({'token': token}), 200
 
 @app.route('/tasks', methods=['POST'])
+@limiter.limit("100/minute")
 @token_required
 def create_task(current_user_id):
     data = request.get_json()
@@ -114,12 +131,40 @@ def create_task(current_user_id):
     return jsonify(new_task), 201
 
 @app.route('/tasks', methods=['GET'])
+@limiter.limit("100/minute")
 @token_required
 def list_tasks(current_user_id):
+    cursor = request.args.get('cursor', default=None, type=str)
+    limit = request.args.get('limit', default=20, type=int)
+
+    if limit < 1 or limit > 100:
+        limit = 20
+
     user_tasks = task_repository.get_by_owner(current_user_id)
-    return jsonify(user_tasks), 200
+    total = len(user_tasks)
+
+    start_index = 0
+    if cursor:
+        for i, task in enumerate(user_tasks):
+            if str(task['id']) == cursor:
+                start_index = i + 1
+                break
+
+    end_index = start_index + limit
+    page_tasks = user_tasks[start_index:end_index]
+
+    next_cursor = None
+    if end_index < total:
+        next_cursor = str(page_tasks[-1]['id']) if page_tasks else None
+
+    return jsonify({
+        'data': page_tasks,
+        'next_cursor': next_cursor,
+        'total': total
+    }), 200
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
+@limiter.limit("100/minute")
 @token_required
 def get_task(current_user_id, task_id):
     task = task_repository.get_by_id(task_id)
@@ -133,6 +178,7 @@ def get_task(current_user_id, task_id):
     return jsonify(task), 200
 
 @app.route('/tasks/<int:task_id>', methods=['PUT'])
+@limiter.limit("100/minute")
 @token_required
 def update_task(current_user_id, task_id):
     task = task_repository.get_by_id(task_id)

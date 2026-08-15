@@ -189,7 +189,9 @@ def test_list_tasks_empty(client, cleanup, auth_headers):
     response = client.get('/tasks', headers=headers)
     assert response.status_code == 200
     data = response.get_json()
-    assert data == []
+    assert data['data'] == []
+    assert data['total'] == 0
+    assert data['next_cursor'] is None
 
 def test_list_tasks_missing_token(client, cleanup):
     response = client.get('/tasks')
@@ -206,10 +208,11 @@ def test_list_tasks_ordered_by_created_at_desc(client, cleanup, auth_headers):
     response = client.get('/tasks', headers=headers)
     assert response.status_code == 200
     data = response.get_json()
-    assert len(data) == 3
-    assert data[0]['title'] == 'Task 3'
-    assert data[1]['title'] == 'Task 2'
-    assert data[2]['title'] == 'Task 1'
+    assert len(data['data']) == 3
+    assert data['total'] == 3
+    assert data['data'][0]['title'] == 'Task 3'
+    assert data['data'][1]['title'] == 'Task 2'
+    assert data['data'][2]['title'] == 'Task 1'
 
 def test_list_tasks_user_isolation(client, cleanup, auth_headers):
     headers1 = auth_headers('user1', 'pass1')
@@ -221,13 +224,13 @@ def test_list_tasks_user_isolation(client, cleanup, auth_headers):
 
     response1 = client.get('/tasks', headers=headers1)
     data1 = response1.get_json()
-    assert len(data1) == 2
-    assert all(t['owner_id'] == 1 for t in data1)
+    assert len(data1['data']) == 2
+    assert all(t['owner_id'] == 1 for t in data1['data'])
 
     response2 = client.get('/tasks', headers=headers2)
     data2 = response2.get_json()
-    assert len(data2) == 1
-    assert all(t['owner_id'] == 2 for t in data2)
+    assert len(data2['data']) == 1
+    assert all(t['owner_id'] == 2 for t in data2['data'])
 
 def test_get_task_success(client, cleanup, auth_headers):
     headers = auth_headers('user1', 'pass1')
@@ -519,3 +522,212 @@ def test_notification_with_status_and_title_update(mock_send_email, client, clea
     assert data['status'] == 'completed'
 
     mock_send_email.assert_called_once_with('user1@example.com', 'Updated Title')
+
+
+# Pagination Tests
+def test_pagination_default_limit(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    for i in range(25):
+        client.post('/tasks', json={'title': f'Task {i+1}'}, content_type='application/json', headers=headers)
+
+    response = client.get('/tasks', headers=headers)
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data['data']) == 20
+    assert data['total'] == 25
+    assert data['next_cursor'] is not None
+
+
+def test_pagination_custom_limit(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    for i in range(15):
+        client.post('/tasks', json={'title': f'Task {i+1}'}, content_type='application/json', headers=headers)
+
+    response = client.get('/tasks?limit=5', headers=headers)
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data['data']) == 5
+    assert data['total'] == 15
+    assert data['next_cursor'] is not None
+
+
+def test_pagination_limit_max_exceeded(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    for i in range(50):
+        client.post('/tasks', json={'title': f'Task {i+1}'}, content_type='application/json', headers=headers)
+
+    response = client.get('/tasks?limit=150', headers=headers)
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data['data']) == 20
+    assert data['total'] == 50
+
+
+def test_pagination_with_cursor(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    for i in range(25):
+        client.post('/tasks', json={'title': f'Task {i+1}'}, content_type='application/json', headers=headers)
+
+    first_page = client.get('/tasks?limit=10', headers=headers)
+    first_data = first_page.get_json()
+    assert len(first_data['data']) == 10
+    assert first_data['next_cursor'] is not None
+
+    first_last_id = first_data['data'][-1]['id']
+    second_page = client.get(f'/tasks?cursor={first_last_id}&limit=10', headers=headers)
+    second_data = second_page.get_json()
+    assert len(second_data['data']) == 10
+    assert second_data['next_cursor'] is not None
+
+    second_last_id = second_data['data'][-1]['id']
+    third_page = client.get(f'/tasks?cursor={second_last_id}&limit=10', headers=headers)
+    third_data = third_page.get_json()
+    assert len(third_data['data']) == 5
+    assert third_data['next_cursor'] is None
+
+
+def test_pagination_response_format(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    client.post('/tasks', json={'title': 'Task 1'}, content_type='application/json', headers=headers)
+    client.post('/tasks', json={'title': 'Task 2'}, content_type='application/json', headers=headers)
+
+    response = client.get('/tasks', headers=headers)
+    assert response.status_code == 200
+    data = response.get_json()
+    assert 'data' in data
+    assert 'next_cursor' in data
+    assert 'total' in data
+    assert isinstance(data['data'], list)
+    assert isinstance(data['total'], int)
+
+
+def test_pagination_no_next_cursor_on_last_page(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    for i in range(5):
+        client.post('/tasks', json={'title': f'Task {i+1}'}, content_type='application/json', headers=headers)
+
+    response = client.get('/tasks?limit=10', headers=headers)
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data['data']) == 5
+    assert data['total'] == 5
+    assert data['next_cursor'] is None
+
+
+def test_pagination_invalid_limit_defaults_to_20(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    for i in range(50):
+        client.post('/tasks', json={'title': f'Task {i+1}'}, content_type='application/json', headers=headers)
+
+    response = client.get('/tasks?limit=0', headers=headers)
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data['data']) == 20
+
+
+def test_pagination_maintains_sort_order(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    for i in range(25):
+        client.post('/tasks', json={'title': f'Task {i+1}'}, content_type='application/json', headers=headers)
+
+    response1 = client.get('/tasks?limit=10', headers=headers)
+    data1 = response1.get_json()
+    first_page_ids = [t['id'] for t in data1['data']]
+
+    response2 = client.get(f'/tasks?cursor={data1["next_cursor"]}&limit=10', headers=headers)
+    data2 = response2.get_json()
+    second_page_ids = [t['id'] for t in data2['data']]
+
+    assert first_page_ids == sorted(first_page_ids, reverse=True)
+    assert second_page_ids == sorted(second_page_ids, reverse=True)
+    assert all(id1 < id2 for id1 in second_page_ids for id2 in first_page_ids)
+
+
+# Rate Limiting Tests
+def test_rate_limiting_register_endpoint(client, cleanup):
+    headers_dict = {'Authorization': 'test-user-1'}
+    for i in range(100):
+        response = client.post('/auth/register',
+            json={'username': f'user_{i}', 'password': 'pass123', 'email': f'user{i}@example.com'},
+            content_type='application/json',
+            headers=headers_dict
+        )
+        assert response.status_code == 201
+
+    response = client.post('/auth/register',
+        json={'username': 'excess_user', 'password': 'pass123', 'email': 'excess@example.com'},
+        content_type='application/json',
+        headers=headers_dict
+    )
+    assert response.status_code == 429
+    data = response.get_json()
+    assert 'error' in data
+
+
+def test_rate_limiting_login_endpoint(client, cleanup):
+    headers_dict = {'Authorization': 'test-user-login'}
+    for i in range(100):
+        response = client.post('/auth/login',
+            json={'username': f'nouser_{i}', 'password': 'pass123'},
+            content_type='application/json',
+            headers=headers_dict
+        )
+        assert response.status_code == 401
+
+    response = client.post('/auth/login',
+        json={'username': 'nouser_excess', 'password': 'pass123'},
+        content_type='application/json',
+        headers=headers_dict
+    )
+    assert response.status_code == 429
+    data = response.get_json()
+    assert 'error' in data
+
+
+def test_rate_limiting_post_tasks_endpoint(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    for i in range(100):
+        response = client.post('/tasks',
+            json={'title': f'Task {i}'},
+            content_type='application/json',
+            headers=headers
+        )
+        assert response.status_code == 201
+
+    response = client.post('/tasks',
+        json={'title': 'Excess Task'},
+        content_type='application/json',
+        headers=headers
+    )
+    assert response.status_code == 429
+    data = response.get_json()
+    assert 'error' in data
+
+
+def test_rate_limiting_get_tasks_endpoint(client, cleanup, auth_headers):
+    headers = auth_headers('user1', 'pass1')
+    for i in range(100):
+        response = client.get('/tasks', headers=headers)
+        assert response.status_code == 200
+
+    response = client.get('/tasks', headers=headers)
+    assert response.status_code == 429
+    data = response.get_json()
+    assert 'error' in data
+
+
+def test_rate_limiting_per_user(client, cleanup, auth_headers):
+    headers1 = auth_headers('testuser_rate1', 'pass1')
+    headers2 = auth_headers('testuser_rate2', 'pass2')
+
+    responses1 = []
+    responses2 = []
+
+    for i in range(20):
+        response1 = client.get('/tasks', headers=headers1)
+        response2 = client.get('/tasks', headers=headers2)
+        responses1.append(response1.status_code)
+        responses2.append(response2.status_code)
+
+    assert 200 in responses1
+    assert 200 in responses2
