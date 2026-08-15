@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -143,6 +144,45 @@ def test_update_title_and_status(client):
     assert response.status_code == 200
     assert response.get_json()["title"] == "New"
     assert response.get_json()["status"] == "done"
+
+
+def test_completing_task_queues_owner_notification(client):
+    headers = auth_headers(client, username="alice@example.com")
+    task = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=headers
+    ).get_json()
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    delay.assert_called_once_with("alice@example.com", "Ship release")
+
+
+def test_notification_is_only_queued_on_transition_to_completed(client):
+    headers = auth_headers(client)
+    task = client.post("/tasks", json={"title": "One time"}, headers=headers).get_json()
+
+    with patch("app.send_notification_email.delay") as delay:
+        client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=headers,
+        )
+        client.put(
+            f"/tasks/{task['id']}", json={"title": "Renamed"}, headers=headers
+        )
+        client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=headers,
+        )
+
+    delay.assert_called_once_with("alice", "One time")
 
 
 def test_missing_tasks_return_json_404(client):

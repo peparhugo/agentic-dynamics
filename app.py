@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -11,8 +12,11 @@ from flask import Flask, g, jsonify, request
 from jwt import InvalidTokenError
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 app.config.update(
     DATA_FILE=os.environ.get("TASKS_FILE", "tasks.json"),
     USER_DATA_FILE=os.environ.get("USERS_FILE"),
@@ -122,6 +126,10 @@ def authenticate_user(username: str, password: str) -> dict | None:
     if user is None or not check_password_hash(user["password_hash"], password):
         return None
     return user
+
+
+def get_user(user_id: int) -> dict | None:
+    return next((user for user in _read_users() if user["id"] == user_id), None)
 
 
 def _issue_token(user_id: int) -> str:
@@ -286,7 +294,8 @@ def show_task(task_id: int):
 @app.put("/tasks/<int:task_id>")
 @require_auth
 def edit_task(task_id: int):
-    if get_task(task_id, g.user_id) is None:
+    existing_task = get_task(task_id, g.user_id)
+    if existing_task is None:
         return jsonify({"error": "task not found"}), 404
 
     data = _json_body()
@@ -303,6 +312,12 @@ def edit_task(task_id: int):
     task = update_task(
         task_id, g.user_id, title=title, status=data.get("status")
     )
+    if existing_task["status"] != "completed" and task["status"] == "completed":
+        owner = get_user(g.user_id)
+        try:
+            send_notification_email.delay(owner["username"], task["title"])
+        except Exception:
+            logger.exception("Could not queue completion notification for task %s", task_id)
     return jsonify(task)
 
 
