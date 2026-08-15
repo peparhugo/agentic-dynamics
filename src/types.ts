@@ -9,4 +9,6 @@ export interface Page {
   /** Path to the source Markdown file, relative to the content directory. */
   sourcePath: string;
   outputFile: string;
+  /** Name of the layout template (from templates/layouts/) to render this page with, from frontmatter. Falls back to the default layout when omitted. */
+  layout?: string;
 }

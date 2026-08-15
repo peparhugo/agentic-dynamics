@@ -15,10 +15,12 @@ export function createCli(): Command {
     .description('Generate the static site')
     .option('--content <dir>', 'content directory to read Markdown files from', './content')
     .option('--output <dir>', 'output directory to write the generated site to', './dist')
-    .action((opts: { content: string; output: string }) => {
+    .option('--templates <dir>', 'templates directory containing layouts/ and partials/', './templates')
+    .action((opts: { content: string; output: string; templates: string }) => {
       const contentDir = path.resolve(process.cwd(), opts.content);
       const outputDir = path.resolve(process.cwd(), opts.output);
-      const result = build({ contentDir, outputDir });
+      const templatesDir = path.resolve(process.cwd(), opts.templates);
+      const result = build({ contentDir, outputDir, templatesDir });
       // eslint-disable-next-line no-console
       console.log(`Built ${result.pages.length} page(s) into ${result.outputDir}`);
     });

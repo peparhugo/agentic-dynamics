@@ -46,4 +46,32 @@ Hello from the CLI test.
     expect(pageHtml).toContain('Hello CLI');
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Built 1 page(s)'));
   });
+
+  it('builds the site using a custom --templates directory', () => {
+    const templatesDir = makeTempDir('ssg-cli-templates-');
+    fs.mkdirSync(path.join(templatesDir, 'layouts'), { recursive: true });
+    fs.writeFileSync(
+      path.join(templatesDir, 'layouts', 'default.hbs'),
+      '<html data-marker="custom-cli-template"><body>{{{body}}}</body></html>'
+    );
+
+    try {
+      run([
+        'node',
+        'ssg',
+        'build',
+        '--content',
+        contentDir,
+        '--output',
+        outputDir,
+        '--templates',
+        templatesDir,
+      ]);
+
+      const pageHtml = fs.readFileSync(path.join(outputDir, 'hello.html'), 'utf8');
+      expect(pageHtml).toContain('data-marker="custom-cli-template"');
+    } finally {
+      fs.rmSync(templatesDir, { recursive: true, force: true });
+    }
+  });
 });

@@ -19,29 +19,12 @@ function renderTags(tags: string[]): string {
   return `<div class="tags">${items}</div>`;
 }
 
-export function renderPageHtml(page: Page): string {
-  const dateHtml = page.date ? `<p class="date">${escapeHtml(page.date)}</p>` : '';
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(page.title)}</title>
-</head>
-<body>
-  <nav><a href="index.html">&larr; Back to index</a></nav>
-  <article>
-    <h1>${escapeHtml(page.title)}</h1>
-    ${dateHtml}
-    ${renderTags(page.tags)}
-    ${page.html}
-  </article>
-</body>
-</html>
-`;
-}
-
-export function renderIndexHtml(pages: Page[]): string {
+/**
+ * Builds the inner listing markup for the generated index page. This is
+ * injected into the `index` (or `default`) layout's `{{{body}}}` placeholder
+ * by the template engine, so it is plain HTML rather than a full document.
+ */
+export function renderIndexBodyHtml(pages: Page[]): string {
   const items = pages
     .map((page) => {
       const dateHtml = page.date ? ` <span class="date">${escapeHtml(page.date)}</span>` : '';
@@ -52,19 +35,7 @@ export function renderIndexHtml(pages: Page[]): string {
     })
     .join('\n');
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Home</title>
-</head>
-<body>
-  <h1>All Pages</h1>
-  <ul>
+  return `<ul>
 ${items}
-  </ul>
-</body>
-</html>
-`;
+  </ul>`;
 }

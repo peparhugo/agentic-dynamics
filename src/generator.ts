@@ -1,12 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseFrontmatter } from './frontmatter';
-import { renderMarkdown, renderPageHtml, renderIndexHtml } from './render';
+import { renderMarkdown, renderIndexBodyHtml } from './render';
+import { TemplateEngine } from './templates';
 import type { Page } from './types';
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  /** Directory containing layouts/ and partials/ subdirectories. Defaults to ./templates relative to the current working directory. */
+  templatesDir?: string;
 }
 
 export interface BuildResult {
@@ -14,12 +17,17 @@ export interface BuildResult {
   outputDir: string;
 }
 
+const INDEX_LAYOUT_NAME = 'index';
+
 export function build(options: BuildOptions): BuildResult {
   const { contentDir, outputDir } = options;
+  const templatesDir = options.templatesDir ?? path.resolve(process.cwd(), 'templates');
 
   if (!fs.existsSync(contentDir) || !fs.statSync(contentDir).isDirectory()) {
     throw new Error(`Content directory not found: ${contentDir}`);
   }
+
+  const engine = new TemplateEngine(templatesDir);
 
   const markdownFiles = findMarkdownFiles(contentDir);
   const pages = markdownFiles.map((filePath) => buildPage(filePath, contentDir));
@@ -30,10 +38,22 @@ export function build(options: BuildOptions): BuildResult {
   for (const page of pages) {
     const outPath = path.join(outputDir, page.outputFile);
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
-    fs.writeFileSync(outPath, renderPageHtml(page), 'utf8');
+    const html = engine.render(page.layout, {
+      title: page.title,
+      date: page.date,
+      tags: page.tags,
+      body: page.html,
+    });
+    fs.writeFileSync(outPath, html, 'utf8');
   }
 
-  fs.writeFileSync(path.join(outputDir, 'index.html'), renderIndexHtml(pages), 'utf8');
+  const indexLayout = engine.hasLayout(INDEX_LAYOUT_NAME) ? INDEX_LAYOUT_NAME : undefined;
+  const indexHtml = engine.render(indexLayout, {
+    title: 'All Pages',
+    tags: [],
+    body: renderIndexBodyHtml(pages),
+  });
+  fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml, 'utf8');
 
   return { pages, outputDir };
 }
@@ -71,6 +91,7 @@ function buildPage(filePath: string, contentDir: string): Page {
   const title = typeof data.title === 'string' && data.title.trim() ? data.title : slug;
   const date = typeof data.date === 'string' && data.date.trim() ? data.date : undefined;
   const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
+  const layout = typeof data.layout === 'string' && data.layout.trim() ? data.layout.trim() : undefined;
 
   return {
     slug,
@@ -80,6 +101,7 @@ function buildPage(filePath: string, contentDir: string): Page {
     html,
     sourcePath: relativePath,
     outputFile: `${slug}.html`,
+    layout,
   };
 }
 

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} | Post</title>
+</head>
+<body class="layout-post">
+  {{> nav}}
+  <article class="post">
+    {{> header}}
+    {{#if date}}<time class="date">{{date}}</time>{{/if}}
+    {{#if tags.length}}<div class="tags">{{#each tags}}<span class="tag">{{this}}</span> {{/each}}</div>{{/if}}
+    {{{body}}}
+  </article>
+  {{> footer}}
+</body>
+</html>
