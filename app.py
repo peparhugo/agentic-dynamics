@@ -9,6 +9,8 @@ import time
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from tasks import send_notification_email
@@ -91,6 +93,25 @@ def decode_token(token):
         return None
 
 
+def rate_limit_key():
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1].strip()
+        user_id = decode_token(token)
+        if user_id is not None:
+            return f"user:{user_id}"
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    default_limits=[os.environ.get("RATE_LIMIT", "100 per minute")],
+    storage_uri=os.environ.get("RATE_LIMIT_STORAGE_URI", "redis://localhost:6379/0"),
+    headers_enabled=True,
+)
+limiter.init_app(app)
+
+
 def require_auth(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -160,8 +181,25 @@ def create_task():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    rows = task_repo.get_by_owner(g.user_id)
-    return jsonify([task_to_dict(r) for r in rows])
+    cursor = request.args.get("cursor")
+    if cursor is not None:
+        try:
+            cursor = int(cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid cursor"}), 400
+
+    limit = request.args.get("limit", 20)
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid limit"}), 400
+    limit = max(1, min(limit, 100))
+
+    rows, has_more = task_repo.get_page_by_owner(g.user_id, cursor=cursor, limit=limit)
+    data = [task_to_dict(r) for r in rows]
+    next_cursor = str(data[-1]["id"]) if has_more else None
+    total = task_repo.count_by_owner(g.user_id)
+    return jsonify({"data": data, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])

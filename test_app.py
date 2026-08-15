@@ -1,5 +1,9 @@
 from unittest.mock import patch
 
+import os
+
+os.environ["RATE_LIMIT_STORAGE_URI"] = "memory://"
+
 import pytest
 
 import app as app_module
@@ -11,6 +15,7 @@ def client(tmp_path):
     app_module.app.config["TESTING"] = True
     app_module.init_db()
     app_module.migrate()
+    app_module.limiter.reset()
     with app_module.app.test_client() as client:
         yield client
 
@@ -86,7 +91,7 @@ def test_list_tasks_orders_by_created_at_desc(client, auth_headers):
     create_task(client, auth_headers, "Third")
     resp = client.get("/tasks", headers=auth_headers)
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    titles = [t["title"] for t in resp.get_json()["data"]]
     assert titles == ["Third", "Second", "First"]
 
 
@@ -224,10 +229,10 @@ def test_user_sees_only_own_tasks(client, auth_headers):
     create_task(client, bob_headers, "Bob task")
 
     alice_resp = client.get("/tasks", headers=auth_headers)
-    assert [t["title"] for t in alice_resp.get_json()] == ["Alice task"]
+    assert [t["title"] for t in alice_resp.get_json()["data"]] == ["Alice task"]
 
     bob_resp = client.get("/tasks", headers=bob_headers)
-    assert [t["title"] for t in bob_resp.get_json()] == ["Bob task"]
+    assert [t["title"] for t in bob_resp.get_json()["data"]] == ["Bob task"]
 
 
 def test_cannot_access_other_users_task(client, auth_headers):
@@ -291,3 +296,133 @@ def test_send_notification_email_task_executes(capsys):
     assert "Finish report" in captured
     assert result["email"] == "alice@example.com"
     assert result["task_title"] == "Finish report"
+
+
+# ── Pagination tests ────────────────────────────────────────────
+
+def test_list_tasks_returns_paginated_shape(client, auth_headers):
+    create_task(client, auth_headers, "Buy milk")
+    resp = client.get("/tasks", headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert set(body.keys()) == {"data", "next_cursor", "total"}
+    assert body["total"] == 1
+    assert body["next_cursor"] is None
+    assert body["data"][0]["title"] == "Buy milk"
+
+
+def test_list_tasks_pagination_cursor(client, auth_headers):
+    for i in range(25):
+        create_task(client, auth_headers, f"Task {i}")
+
+    resp = client.get("/tasks?limit=20", headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["total"] == 25
+    assert len(body["data"]) == 20
+    assert body["next_cursor"] is not None
+    titles = [t["title"] for t in body["data"]]
+    assert titles[0] == "Task 24"
+    assert titles[-1] == "Task 5"
+
+    cursor = body["next_cursor"]
+    resp2 = client.get(f"/tasks?cursor={cursor}&limit=20", headers=auth_headers)
+    assert resp2.status_code == 200
+    body2 = resp2.get_json()
+    assert body2["total"] == 25
+    assert len(body2["data"]) == 5
+    assert body2["next_cursor"] is None
+    titles2 = [t["title"] for t in body2["data"]]
+    assert titles2[0] == "Task 4"
+    assert titles2[-1] == "Task 0"
+
+
+def test_list_tasks_default_limit_20(client, auth_headers):
+    for i in range(21):
+        create_task(client, auth_headers, f"Task {i}")
+    resp = client.get("/tasks", headers=auth_headers)
+    body = resp.get_json()
+    assert len(body["data"]) == 20
+    assert body["next_cursor"] is not None
+    assert body["total"] == 21
+
+
+def test_list_tasks_limit_clamped_to_100(client):
+    register(client, "dave", "secret123")
+    resp = login(client, "dave", "secret123")
+    headers = {"Authorization": f"Bearer {resp.get_json()['token']}"}
+    owner_id = app_module.user_repo.find_by_username("dave")["id"]
+    with app_module.get_db() as conn:
+        for i in range(105):
+            conn.execute(
+                "INSERT INTO tasks (title, status, created_at, owner_id)"
+                " VALUES (?, 'pending', ?, ?)",
+                (f"Task {i}", app_module.now_iso(), owner_id),
+            )
+        conn.commit()
+
+    resp = client.get("/tasks?limit=1000", headers=headers)
+    body = resp.get_json()
+    assert body["total"] == 105
+    assert len(body["data"]) == 100
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_invalid_limit_returns_400(client, auth_headers):
+    resp = client.get("/tasks?limit=abc", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+def test_list_tasks_invalid_cursor_returns_400(client, auth_headers):
+    resp = client.get("/tasks?cursor=abc", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+# ── Rate limiting tests ─────────────────────────────────────────
+
+def test_rate_limit_returns_429_with_retry_after(client):
+    register(client, "carol", "secret123")
+    resp = login(client, "carol", "secret123")
+    headers = {"Authorization": f"Bearer {resp.get_json()['token']}"}
+
+    for _ in range(100):
+        r = client.get("/tasks", headers=headers)
+        assert r.status_code == 200
+
+    r = client.get("/tasks", headers=headers)
+    assert r.status_code == 429
+    assert "Retry-After" in r.headers
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for _ in range(100):
+        r = client.post(
+            "/auth/login", json={"username": "nobody", "password": "secret123"}
+        )
+        assert r.status_code == 401
+
+    r = client.post(
+        "/auth/login", json={"username": "nobody", "password": "secret123"}
+    )
+    assert r.status_code == 429
+
+
+def test_rate_limit_is_per_user(client):
+    register(client, "carol", "secret123")
+    carol = client.post(
+        "/auth/login", json={"username": "carol", "password": "secret123"}
+    ).get_json()["token"]
+    register(client, "dave", "secret123")
+    dave = client.post(
+        "/auth/login", json={"username": "dave", "password": "secret123"}
+    ).get_json()["token"]
+
+    carol_headers = {"Authorization": f"Bearer {carol}"}
+    dave_headers = {"Authorization": f"Bearer {dave}"}
+
+    for _ in range(100):
+        r = client.get("/tasks", headers=carol_headers)
+        assert r.status_code == 200
+
+    assert client.get("/tasks", headers=carol_headers).status_code == 429
+    assert client.get("/tasks", headers=dave_headers).status_code == 200

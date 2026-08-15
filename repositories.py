@@ -74,6 +74,31 @@ class TaskRepository(BaseRepository):
             ).fetchall()
         return rows
 
+    def get_page_by_owner(self, owner_id, cursor=None, limit=20):
+        fetch_limit = limit + 1
+        with self._connect() as conn:
+            if cursor is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, fetch_limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ?"
+                    " ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, fetch_limit),
+                ).fetchall()
+        has_more = len(rows) > limit
+        return rows[:limit], has_more
+
+    def count_by_owner(self, owner_id):
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS count FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()
+        return row["count"]
+
     def get_all(self):
         with self._connect() as conn:
             return conn.execute("SELECT * FROM tasks").fetchall()
