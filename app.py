@@ -13,6 +13,7 @@ import os
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
+VALID_STATUSES = {"pending", "done"}
 
 
 def get_db():
@@ -27,7 +28,7 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS tasks ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
+            "  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done')),"
             "  created_at TEXT NOT NULL"
             ")"
         )
@@ -85,6 +86,9 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
     return get_task(task_id)
 
 
+init_db()
+
+
 # ── Routes ─────────────────────────────────────────────────────
 
 @app.route("/tasks", methods=["GET"])
@@ -95,10 +99,10 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
+    title = data.get("title") if isinstance(data, dict) else None
+    if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
+    task = create_task(title.strip())
     return jsonify(task), 201
 
 
@@ -113,13 +117,19 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "request body must be a JSON object"}), 400
+    if get_task(task_id) is None:
+        return jsonify({"error": "task not found"}), 404
+    if "status" in data and data["status"] not in VALID_STATUSES:
+        return jsonify({"error": "invalid status"}), 422
+    if "title" in data and not isinstance(data["title"], str):
+        return jsonify({"error": "title must be a string"}), 400
     task = update_task(
         task_id,
         title=data.get("title"),
         status=data.get("status"),
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
     return jsonify(task)
 
 
