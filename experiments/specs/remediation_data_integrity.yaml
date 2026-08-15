@@ -170,10 +170,11 @@ workflow:
             (2) story cells whose mutation compilation silently fell back to clean (P0-7);
             (3) single-task cells matched to a wrong baseline (P0-8).
           - QUEUE, DO NOT RUN INLINE:
-            * Story cells (P0-7): enqueue with `python scripts/enqueue.py --missing-only`
-              (framework Redis on port 6380, NEVER 6379), then start N parallel workers
-              (`python scripts/worker.py &` × N), then poll `python scripts/monitor.py --json`
-              until queued and running both hit 0.
+            * Story cells (P0-7): enqueue with `python scripts/enqueue.py --interleave
+              --missing-only` (framework Redis on port 6380, NEVER 6379) so cells round-robin
+              across providers — never a single-provider block. Start no more workers than
+              distinct providers (`python scripts/worker.py &`), then poll
+              `python scripts/monitor.py --json` until queued and running both hit 0.
             * Single-task cells (manifold n≈16, P0-8): NOT story-queueable — run them in
               parallel via `python scripts/batch_run.py` (or the sweep runner), never one-by-one
               inline.
