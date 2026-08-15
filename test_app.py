@@ -5,6 +5,8 @@ Test suite for Flask task management API.
 import pytest
 import os
 import sqlite3
+import jwt
+from datetime import datetime, timedelta
 import app as app_module
 from app import app, init_db
 
@@ -23,57 +25,182 @@ def client(monkeypatch, tmp_path):
         yield test_client
 
 
+@pytest.fixture
+def auth_headers(client):
+    """Helper to create a user and return auth headers."""
+    def _create_auth(username="testuser", password="testpass"):
+        response = client.post(
+            "/auth/register",
+            json={"username": username, "password": password}
+        )
+        assert response.status_code == 201
+
+        login_response = client.post(
+            "/auth/login",
+            json={"username": username, "password": password}
+        )
+        assert login_response.status_code == 200
+        token = login_response.get_json()["token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    return _create_auth
+
+
+class TestAuthentication:
+    def test_register_success(self, client):
+        """POST /auth/register with valid credentials should create user."""
+        response = client.post(
+            "/auth/register",
+            json={"username": "newuser", "password": "password123"}
+        )
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data["username"] == "newuser"
+        assert "id" in data
+
+    def test_register_missing_username(self, client):
+        """POST /auth/register without username should return 400."""
+        response = client.post(
+            "/auth/register",
+            json={"password": "password123"}
+        )
+        assert response.status_code == 400
+        assert "username and password are required" in response.get_json()["error"]
+
+    def test_register_missing_password(self, client):
+        """POST /auth/register without password should return 400."""
+        response = client.post(
+            "/auth/register",
+            json={"username": "user"}
+        )
+        assert response.status_code == 400
+        assert "username and password are required" in response.get_json()["error"]
+
+    def test_register_duplicate_username(self, client):
+        """POST /auth/register with duplicate username should return 409."""
+        client.post(
+            "/auth/register",
+            json={"username": "duplicate", "password": "pass123"}
+        )
+        response = client.post(
+            "/auth/register",
+            json={"username": "duplicate", "password": "pass456"}
+        )
+        assert response.status_code == 409
+        assert "username already exists" in response.get_json()["error"]
+
+    def test_login_success(self, client):
+        """POST /auth/login with valid credentials should return token."""
+        client.post(
+            "/auth/register",
+            json={"username": "user1", "password": "pass123"}
+        )
+        response = client.post(
+            "/auth/login",
+            json={"username": "user1", "password": "pass123"}
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "token" in data
+
+    def test_login_invalid_password(self, client):
+        """POST /auth/login with invalid password should return 401."""
+        client.post(
+            "/auth/register",
+            json={"username": "user2", "password": "correct"}
+        )
+        response = client.post(
+            "/auth/login",
+            json={"username": "user2", "password": "wrong"}
+        )
+        assert response.status_code == 401
+        assert "invalid username or password" in response.get_json()["error"]
+
+    def test_login_nonexistent_user(self, client):
+        """POST /auth/login with nonexistent user should return 401."""
+        response = client.post(
+            "/auth/login",
+            json={"username": "nonexistent", "password": "pass"}
+        )
+        assert response.status_code == 401
+        assert "invalid username or password" in response.get_json()["error"]
+
+
 class TestCreateTask:
-    def test_create_task_success(self, client):
+    def test_create_task_success(self, client, auth_headers):
         """POST /tasks with valid title should create task with 'pending' status."""
-        response = client.post("/tasks", json={"title": "Buy milk"})
+        headers = auth_headers("user1")
+        response = client.post("/tasks", json={"title": "Buy milk"}, headers=headers)
         assert response.status_code == 201
         data = response.get_json()
         assert data["title"] == "Buy milk"
         assert data["status"] == "pending"
         assert "id" in data
         assert "created_at" in data
+        assert "owner_id" in data
 
-    def test_create_task_missing_title(self, client):
+    def test_create_task_missing_title(self, client, auth_headers):
         """POST /tasks without title should return 400."""
-        response = client.post("/tasks", json={})
+        headers = auth_headers("user2")
+        response = client.post("/tasks", json={}, headers=headers)
         assert response.status_code == 400
         assert response.get_json()["error"] == "title is required"
 
-    def test_create_task_empty_title(self, client):
+    def test_create_task_empty_title(self, client, auth_headers):
         """POST /tasks with empty title should return 400."""
-        response = client.post("/tasks", json={"title": ""})
+        headers = auth_headers("user3")
+        response = client.post("/tasks", json={"title": ""}, headers=headers)
         assert response.status_code == 400
         assert response.get_json()["error"] == "title is required"
 
-    def test_create_task_whitespace_title(self, client):
+    def test_create_task_whitespace_title(self, client, auth_headers):
         """POST /tasks with whitespace-only title should return 400."""
-        response = client.post("/tasks", json={"title": "   "})
+        headers = auth_headers("user4")
+        response = client.post("/tasks", json={"title": "   "}, headers=headers)
         assert response.status_code == 400
         assert response.get_json()["error"] == "title is required"
 
-    def test_create_task_no_json(self, client):
+    def test_create_task_no_json(self, client, auth_headers):
         """POST /tasks with no JSON body should return 400."""
-        response = client.post("/tasks")
+        headers = auth_headers("user5")
+        response = client.post("/tasks", headers=headers)
         assert response.status_code == 400
         assert response.get_json()["error"] == "title is required"
+
+    def test_create_task_missing_token(self, client):
+        """POST /tasks without token should return 401."""
+        response = client.post("/tasks", json={"title": "Task"})
+        assert response.status_code == 401
+        assert "Missing token" in response.get_json()["error"]
+
+    def test_create_task_invalid_token(self, client):
+        """POST /tasks with invalid token should return 401."""
+        response = client.post(
+            "/tasks",
+            json={"title": "Task"},
+            headers={"Authorization": "Bearer invalid.token.here"}
+        )
+        assert response.status_code == 401
+        assert "Invalid token" in response.get_json()["error"]
 
 
 class TestListTasks:
-    def test_list_tasks_empty(self, client):
+    def test_list_tasks_empty(self, client, auth_headers):
         """GET /tasks should return empty list initially."""
-        response = client.get("/tasks")
+        headers = auth_headers("user6")
+        response = client.get("/tasks", headers=headers)
         assert response.status_code == 200
         assert response.get_json() == []
 
-    def test_list_tasks_multiple(self, client):
+    def test_list_tasks_multiple(self, client, auth_headers):
         """GET /tasks should return all tasks ordered by created_at desc."""
+        headers = auth_headers("user7")
         # Create three tasks
-        t1 = client.post("/tasks", json={"title": "Task 1"}).get_json()
-        t2 = client.post("/tasks", json={"title": "Task 2"}).get_json()
-        t3 = client.post("/tasks", json={"title": "Task 3"}).get_json()
+        t1 = client.post("/tasks", json={"title": "Task 1"}, headers=headers).get_json()
+        t2 = client.post("/tasks", json={"title": "Task 2"}, headers=headers).get_json()
+        t3 = client.post("/tasks", json={"title": "Task 3"}, headers=headers).get_json()
 
-        response = client.get("/tasks")
+        response = client.get("/tasks", headers=headers)
         assert response.status_code == 200
         tasks = response.get_json()
         assert len(tasks) == 3
@@ -82,35 +209,88 @@ class TestListTasks:
         assert tasks[1]["id"] == t2["id"]
         assert tasks[2]["id"] == t1["id"]
 
+    def test_list_tasks_user_isolation(self, client, auth_headers):
+        """GET /tasks should only return tasks owned by authenticated user."""
+        headers1 = auth_headers("user8")
+        headers2 = auth_headers("user9")
+
+        # User 1 creates 2 tasks
+        t1 = client.post("/tasks", json={"title": "User 1 Task 1"}, headers=headers1).get_json()
+        t2 = client.post("/tasks", json={"title": "User 1 Task 2"}, headers=headers1).get_json()
+
+        # User 2 creates 1 task
+        t3 = client.post("/tasks", json={"title": "User 2 Task"}, headers=headers2).get_json()
+
+        # User 1 should only see their 2 tasks
+        response1 = client.get("/tasks", headers=headers1)
+        tasks1 = response1.get_json()
+        assert len(tasks1) == 2
+        assert all(t["owner_id"] == t1["owner_id"] for t in tasks1)
+
+        # User 2 should only see their 1 task
+        response2 = client.get("/tasks", headers=headers2)
+        tasks2 = response2.get_json()
+        assert len(tasks2) == 1
+        assert tasks2[0]["id"] == t3["id"]
+
+    def test_list_tasks_missing_token(self, client):
+        """GET /tasks without token should return 401."""
+        response = client.get("/tasks")
+        assert response.status_code == 401
+        assert "Missing token" in response.get_json()["error"]
+
 
 class TestGetTask:
-    def test_get_task_success(self, client):
+    def test_get_task_success(self, client, auth_headers):
         """GET /tasks/{id} should return the task."""
-        created = client.post("/tasks", json={"title": "Test task"}).get_json()
+        headers = auth_headers("user10")
+        created = client.post("/tasks", json={"title": "Test task"}, headers=headers).get_json()
         task_id = created["id"]
 
-        response = client.get(f"/tasks/{task_id}")
+        response = client.get(f"/tasks/{task_id}", headers=headers)
         assert response.status_code == 200
         data = response.get_json()
         assert data["id"] == task_id
         assert data["title"] == "Test task"
         assert data["status"] == "pending"
 
-    def test_get_task_not_found(self, client):
+    def test_get_task_not_found(self, client, auth_headers):
         """GET /tasks/{id} for non-existent task should return 404."""
-        response = client.get("/tasks/999")
+        headers = auth_headers("user11")
+        response = client.get("/tasks/999", headers=headers)
         assert response.status_code == 404
         assert response.get_json()["error"] == "task not found"
 
+    def test_get_task_access_denied(self, client, auth_headers):
+        """GET /tasks/{id} should deny access to other user's task."""
+        headers1 = auth_headers("user12")
+        headers2 = auth_headers("user13")
+
+        # User 1 creates a task
+        created = client.post("/tasks", json={"title": "User 1 Task"}, headers=headers1).get_json()
+        task_id = created["id"]
+
+        # User 2 tries to access User 1's task
+        response = client.get(f"/tasks/{task_id}", headers=headers2)
+        assert response.status_code == 404
+        assert response.get_json()["error"] == "task not found"
+
+    def test_get_task_missing_token(self, client):
+        """GET /tasks/{id} without token should return 401."""
+        response = client.get("/tasks/1")
+        assert response.status_code == 401
+        assert "Missing token" in response.get_json()["error"]
+
 
 class TestUpdateTask:
-    def test_update_task_title(self, client):
+    def test_update_task_title(self, client, auth_headers):
         """PUT /tasks/{id} should update title."""
-        created = client.post("/tasks", json={"title": "Old title"}).get_json()
+        headers = auth_headers("user14")
+        created = client.post("/tasks", json={"title": "Old title"}, headers=headers).get_json()
         task_id = created["id"]
 
         response = client.put(
-            f"/tasks/{task_id}", json={"title": "New title"}
+            f"/tasks/{task_id}", json={"title": "New title"}, headers=headers
         )
         assert response.status_code == 200
         data = response.get_json()
@@ -118,94 +298,127 @@ class TestUpdateTask:
         assert data["title"] == "New title"
         assert data["status"] == "pending"
 
-    def test_update_task_status_to_done(self, client):
+    def test_update_task_status_to_done(self, client, auth_headers):
         """PUT /tasks/{id} should update status to 'done'."""
-        created = client.post("/tasks", json={"title": "Task"}).get_json()
+        headers = auth_headers("user15")
+        created = client.post("/tasks", json={"title": "Task"}, headers=headers).get_json()
         task_id = created["id"]
 
         response = client.put(
-            f"/tasks/{task_id}", json={"status": "done"}
+            f"/tasks/{task_id}", json={"status": "done"}, headers=headers
         )
         assert response.status_code == 200
         data = response.get_json()
         assert data["id"] == task_id
         assert data["status"] == "done"
 
-    def test_update_task_status_to_pending(self, client):
+    def test_update_task_status_to_pending(self, client, auth_headers):
         """PUT /tasks/{id} should update status to 'pending'."""
-        created = client.post("/tasks", json={"title": "Task"}).get_json()
+        headers = auth_headers("user16")
+        created = client.post("/tasks", json={"title": "Task"}, headers=headers).get_json()
         task_id = created["id"]
         # First change to done
-        client.put(f"/tasks/{task_id}", json={"status": "done"})
+        client.put(f"/tasks/{task_id}", json={"status": "done"}, headers=headers)
         # Then change back to pending
         response = client.put(
-            f"/tasks/{task_id}", json={"status": "pending"}
+            f"/tasks/{task_id}", json={"status": "pending"}, headers=headers
         )
         assert response.status_code == 200
         data = response.get_json()
         assert data["status"] == "pending"
 
-    def test_update_task_invalid_status(self, client):
+    def test_update_task_invalid_status(self, client, auth_headers):
         """PUT /tasks/{id} with invalid status should return 422."""
-        created = client.post("/tasks", json={"title": "Task"}).get_json()
+        headers = auth_headers("user17")
+        created = client.post("/tasks", json={"title": "Task"}, headers=headers).get_json()
         task_id = created["id"]
 
         response = client.put(
-            f"/tasks/{task_id}", json={"status": "invalid"}
+            f"/tasks/{task_id}", json={"status": "invalid"}, headers=headers
         )
         assert response.status_code == 422
         error = response.get_json()["error"]
         assert "Invalid status" in error
 
-    def test_update_task_title_and_status(self, client):
+    def test_update_task_title_and_status(self, client, auth_headers):
         """PUT /tasks/{id} should update both title and status."""
-        created = client.post("/tasks", json={"title": "Original"}).get_json()
+        headers = auth_headers("user18")
+        created = client.post("/tasks", json={"title": "Original"}, headers=headers).get_json()
         task_id = created["id"]
 
         response = client.put(
             f"/tasks/{task_id}",
-            json={"title": "Updated", "status": "done"}
+            json={"title": "Updated", "status": "done"},
+            headers=headers
         )
         assert response.status_code == 200
         data = response.get_json()
         assert data["title"] == "Updated"
         assert data["status"] == "done"
 
-    def test_update_task_not_found(self, client):
+    def test_update_task_not_found(self, client, auth_headers):
         """PUT /tasks/{id} for non-existent task should return 404."""
-        response = client.put("/tasks/999", json={"title": "New title"})
+        headers = auth_headers("user19")
+        response = client.put("/tasks/999", json={"title": "New title"}, headers=headers)
         assert response.status_code == 404
         assert response.get_json()["error"] == "task not found"
 
-    def test_update_task_no_changes(self, client):
+    def test_update_task_no_changes(self, client, auth_headers):
         """PUT /tasks/{id} with no fields should return task unchanged."""
-        created = client.post("/tasks", json={"title": "Task"}).get_json()
+        headers = auth_headers("user20")
+        created = client.post("/tasks", json={"title": "Task"}, headers=headers).get_json()
         task_id = created["id"]
 
-        response = client.put(f"/tasks/{task_id}", json={})
+        response = client.put(f"/tasks/{task_id}", json={}, headers=headers)
         assert response.status_code == 200
         data = response.get_json()
         assert data["id"] == task_id
         assert data["title"] == "Task"
         assert data["status"] == "pending"
 
-    def test_update_task_various_invalid_statuses(self, client):
+    def test_update_task_various_invalid_statuses(self, client, auth_headers):
         """PUT /tasks/{id} should reject various invalid status values."""
-        created = client.post("/tasks", json={"title": "Task"}).get_json()
+        headers = auth_headers("user21")
+        created = client.post("/tasks", json={"title": "Task"}, headers=headers).get_json()
         task_id = created["id"]
 
         invalid_statuses = ["in_progress", "todo", "completed", "DONE", "Pending", ""]
         for invalid_status in invalid_statuses:
             response = client.put(
-                f"/tasks/{task_id}", json={"status": invalid_status}
+                f"/tasks/{task_id}", json={"status": invalid_status}, headers=headers
             )
             assert response.status_code == 422, f"Expected 422 for status '{invalid_status}'"
 
+    def test_update_task_access_denied(self, client, auth_headers):
+        """PUT /tasks/{id} should deny access to other user's task."""
+        headers1 = auth_headers("user22")
+        headers2 = auth_headers("user23")
+
+        # User 1 creates a task
+        created = client.post("/tasks", json={"title": "User 1 Task"}, headers=headers1).get_json()
+        task_id = created["id"]
+
+        # User 2 tries to update User 1's task
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"title": "Hacked"},
+            headers=headers2
+        )
+        assert response.status_code == 404
+        assert response.get_json()["error"] == "task not found"
+
+    def test_update_task_missing_token(self, client):
+        """PUT /tasks/{id} without token should return 401."""
+        response = client.put("/tasks/1", json={"title": "New title"})
+        assert response.status_code == 401
+        assert "Missing token" in response.get_json()["error"]
+
 
 class TestDateFormat:
-    def test_created_at_is_iso8601(self, client):
+    def test_created_at_is_iso8601(self, client, auth_headers):
         """Task created_at should be ISO-8601 formatted."""
-        response = client.post("/tasks", json={"title": "Task"})
+        headers = auth_headers("user24")
+        response = client.post("/tasks", json={"title": "Task"}, headers=headers)
         data = response.get_json()
         created_at = data["created_at"]
         # ISO-8601 format: YYYY-MM-DDTHH:MM:SS.ffffff
@@ -216,23 +429,25 @@ class TestDateFormat:
 
 
 class TestIntegration:
-    def test_full_workflow(self, client):
-        """Test a complete workflow: create, list, get, update."""
+    def test_full_workflow(self, client, auth_headers):
+        """Test a complete workflow: register, login, create, list, get, update."""
+        headers = auth_headers("user25")
+
         # Create a task
-        create_response = client.post("/tasks", json={"title": "Buy groceries"})
+        create_response = client.post("/tasks", json={"title": "Buy groceries"}, headers=headers)
         assert create_response.status_code == 201
         task = create_response.get_json()
         task_id = task["id"]
         assert task["status"] == "pending"
 
         # List tasks
-        list_response = client.get("/tasks")
+        list_response = client.get("/tasks", headers=headers)
         assert list_response.status_code == 200
         tasks = list_response.get_json()
         assert len(tasks) == 1
 
         # Get single task
-        get_response = client.get(f"/tasks/{task_id}")
+        get_response = client.get(f"/tasks/{task_id}", headers=headers)
         assert get_response.status_code == 200
         retrieved_task = get_response.get_json()
         assert retrieved_task["id"] == task_id
@@ -240,13 +455,44 @@ class TestIntegration:
 
         # Update task to done
         update_response = client.put(
-            f"/tasks/{task_id}", json={"status": "done"}
+            f"/tasks/{task_id}", json={"status": "done"}, headers=headers
         )
         assert update_response.status_code == 200
         updated_task = update_response.get_json()
         assert updated_task["status"] == "done"
 
         # Verify update persisted
-        final_response = client.get(f"/tasks/{task_id}")
+        final_response = client.get(f"/tasks/{task_id}", headers=headers)
         final_task = final_response.get_json()
         assert final_task["status"] == "done"
+
+    def test_auth_then_task_creation(self, client):
+        """Test full auth flow: register, login, create task."""
+        # Register
+        reg_response = client.post(
+            "/auth/register",
+            json={"username": "newuser", "password": "mypass"}
+        )
+        assert reg_response.status_code == 201
+        user = reg_response.get_json()
+        assert user["username"] == "newuser"
+
+        # Login
+        login_response = client.post(
+            "/auth/login",
+            json={"username": "newuser", "password": "mypass"}
+        )
+        assert login_response.status_code == 200
+        token = login_response.get_json()["token"]
+
+        # Create task with token
+        headers = {"Authorization": f"Bearer {token}"}
+        task_response = client.post(
+            "/tasks",
+            json={"title": "New task"},
+            headers=headers
+        )
+        assert task_response.status_code == 201
+        task = task_response.get_json()
+        assert task["title"] == "New task"
+        assert task["owner_id"] == user["id"]
