@@ -17,25 +17,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import contextlib
-
 from instrument import (
-    BasinMetrics,
-    GameReport,
-    build_operators,
-    classify_strategy,
-    compute_efficiency,
+    build_operators, resolve_perturbed_prompt,
+    evaluate_solution, compute_efficiency,
+    classify_strategy, measure_basin_escape,
+    BasinMetrics, GameReport,
     detect_constraints,
-    evaluate_solution,
-    measure_basin_escape,
-    perturb_prompt,
 )
 from instrument.backends import run_agentic
 
 
 def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
                    timeout: int = 200, repetitions: int = 1,
-                   thinking_effort: str = "", backend: str = "auto"):
+                   thinking_effort: str = "", backend: str = "auto",
+                   seed_variant: int | None = None):
     """Run a complete experiment from a YAML config file."""
     import yaml
 
@@ -49,6 +44,16 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     if limit:
         operators = operators[:limit]
     strengths = cfg["strengths"]
+    # Starting-point variants: each variant is a DIFFERENT perturbation ("deviated
+    # starting point") measured against the same baseline; repetition re-measures the
+    # SAME variant (model variance only). seed_variant (singular) overrides the list.
+    seed_variants = cfg.get("seed_variants", [0])
+    if seed_variant is not None:
+        seed_variants = [seed_variant]
+    # Perturbation source: "deterministic" (seeded operators) or "flash" (a cheap model
+    # authors the perturbation and it is pinned as a reusable, variant-indexed artifact).
+    perturbation_mode = cfg.get("perturbation_mode", "deterministic")
+    perturbation_cache_dir = Path(cfg.get("perturbation_cache_dir", "experiments/results/perturbations"))
     model_id = model_override or cfg.get("model_id", "deepseek/deepseek-v4-pro")
     if model_override:
         model_label = model_override.split("/")[-1].replace(" ", "_").lower()
@@ -68,12 +73,12 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     results_dir = Path("experiments/results")
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    total = 1 + (len(operators) * len(strengths) * repetitions)
+    total = 1 + (len(operators) * len(strengths) * len(seed_variants) * repetitions)
     te_str = f" think={thinking_effort}" if thinking_effort else ""
     print(f"\n{'='*80}")
     print(f"Experiment: {name}  |  Model: {model_id}{te_str}")
     print(f"Task: {task[:100]}...")
-    print(f"Constraints: {len(constraints)}  |  Operators: {len(operators)} × {len(strengths)} strengths × {repetitions} reps")
+    print(f"Constraints: {len(constraints)}  |  Operators: {len(operators)} × {len(strengths)} strengths × {len(seed_variants)} variants × {repetitions} reps")
     if thinking_budget_tokens:
         print(f"Thinking budget: {thinking_budget_tokens}tok  |  Output limit: {output_token_limit or 'none'}  |  Standardized: {standardize}")
     print(f"Estimated runs: {total}  |  Timeout per run: {timeout}s")
@@ -90,24 +95,27 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     all_runs.append(base)
 
     run_idx = 0
-    total_perturbed = len(operators) * len(strengths) * repetitions
+    total_perturbed = len(operators) * len(strengths) * len(seed_variants) * repetitions
     for op_name in operators:
         for s in strengths:
-            for _rep in range(repetitions):
-                run_idx += 1
-                r = _run_perturbed(task, constraints, op_name, s, base,
-                                   ops, model_id, run_idx, total_perturbed, timeout, name,
-                                   thinking_effort=thinking_effort,
-                                   thinking_budget_tokens=thinking_budget_tokens,
-                                   output_token_limit=output_token_limit,
-                                   silent_mode=silent_mode,
-                                   standardize=standardize, enforce_pytest=enforce_pytest,
-                                   backend=backend)
-                all_runs.append(r)
-                time.sleep(2)
+            for variant in seed_variants:
+                for rep in range(repetitions):
+                    run_idx += 1
+                    r = _run_perturbed(task, constraints, op_name, s, base,
+                                       ops, model_id, run_idx, total_perturbed, timeout, name,
+                                       thinking_effort=thinking_effort,
+                                       thinking_budget_tokens=thinking_budget_tokens,
+                                       output_token_limit=output_token_limit,
+                                       silent_mode=silent_mode,
+                                       standardize=standardize, enforce_pytest=enforce_pytest,
+                                       backend=backend, rep=rep, seed_variant=variant,
+                                       perturbation_mode=perturbation_mode,
+                                       perturbation_cache_dir=perturbation_cache_dir)
+                    all_runs.append(r)
+                    time.sleep(2)
 
     # Aggregation
-    [r for r in all_runs if r["type"] == "perturbed"]
+    perturbed = [r for r in all_runs if r["type"] == "perturbed"]
     _print_summary(all_runs, name, model_label)
     _save_results(all_runs, name, model_label, results_dir)
     _generate_game_reports(all_runs, name, model_label, constraints, results_dir)
@@ -119,7 +127,7 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
                   thinking_effort="", thinking_budget_tokens=0,
                   output_token_limit=0, silent_mode=None,
                   standardize=True, enforce_pytest=True, backend="auto"):
-    print("[baseline] Running...", end=" ", flush=True)
+    print(f"[baseline] Running...", end=" ", flush=True)
     t0 = time.monotonic()
     r = run_agentic(task, model=model_id, timeout=timeout,
                     thinking_effort=thinking_effort or None,
@@ -144,7 +152,7 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
     if code_files:
         # Re-evaluate with code files for richer constraint matching
         sol = evaluate_solution(r.final_response, constraints, code_files=code_files)
-    detect_constraints(r.final_response, constraints, code_files=code_files)
+    det = detect_constraints(r.final_response, constraints, code_files=code_files)
 
     print(f"correct={sol.correctness_score:.0%} tok={r.total_tokens:,} "
           f"${r.estimated_cost_usd:.4f} tools={r.total_tool_calls} "
@@ -184,9 +192,16 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
                    ops, model_id, run_idx, total, timeout, exp_name="exp",
                    thinking_effort="", thinking_budget_tokens=0,
                    output_token_limit=0, silent_mode=None,
-                   standardize=True, enforce_pytest=True, backend="auto"):
+                   standardize=True, enforce_pytest=True, backend="auto",
+                   rep=0, seed_variant=0, perturbation_mode="deterministic",
+                   perturbation_cache_dir=None):
     pert_class = ops[op_name].perturbation_class if op_name in ops else "?"
-    perturbed, _ = perturb_prompt(task, op_name, strength=strength, rng_seed=42 + run_idx)
+    # The starting point is either a deterministic seeded draw (derive_seed + operator)
+    # or a flash-authored, pinned artifact — same (prompt, sha256, provenance) contract.
+    perturbed, perturbed_prompt_sha256, provenance = resolve_perturbed_prompt(
+        task, op_name, strength, seed_variant=seed_variant, mode=perturbation_mode,
+        cache_dir=perturbation_cache_dir,
+    )
 
     print(f"[{run_idx}/{total}] {op_name} s={strength} ({pert_class})...",
           end=" ", flush=True)
@@ -249,6 +264,12 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
     return {
         "type": "perturbed", "model": model_id,
         "operator": op_name, "perturbation_class": pert_class, "strength": strength,
+        "seed_variant": seed_variant,
+        "repetition": rep,
+        "perturbation_mode": perturbation_mode,
+        "provenance": provenance,
+        "perturbed_prompt": perturbed,
+        "perturbed_prompt_sha256": perturbed_prompt_sha256,
         "correctness": sol.correctness_score,
         "actual_correctness": actual_correctness,
         "tests_passed": r.tests_passed,
@@ -349,6 +370,7 @@ def _save_results(runs, name, model_label, results_dir):
 def _generate_game_reports(runs, name, model_label, constraints, results_dir):
     """Generate individual game reports in markdown with artifacts."""
     import shutil
+    import os
 
     model_slug = model_label.replace(" ", "_").lower()
     reports_dir = results_dir / "reports"
@@ -442,7 +464,7 @@ def multi_model_compare(config_path, model_ids, timeout=200):
 
     # Comparison table
     print(f"\n{'='*100}")
-    print("MULTI-MODEL COMPARISON")
+    print(f"MULTI-MODEL COMPARISON")
     print(f"{'='*100}")
     print(f"{'Model':<20} {'Baseline $':>10} {'Avg Pert $':>10} {'Avg Correct':>12} {'Avg Tok':>10} {'Avg Tools':>10} {'Avg Retries':>10} {'Avg Q/$':>10}")
     print("-" * 100)
@@ -468,6 +490,7 @@ _SOURCE_EXTS = {'.py', '.js', '.ts', '.tsx', '.jsx', '.go', '.rs', '.java', '.rb
 
 def _collect_code(result) -> dict[str, str] | None:
     """Collect code file contents from an AgenticResult's workdir."""
+    import os, glob
     wd = getattr(result, 'workdir', '')
     if not wd or not os.path.isdir(wd):
         return None
@@ -479,14 +502,14 @@ def _collect_code(result) -> dict[str, str] | None:
             ext = os.path.splitext(f)[1].lower()
             if ext in _SOURCE_EXTS and not f.startswith('.'):
                 fpath = os.path.join(root, f)
-                with contextlib.suppress(BaseException), open(fpath) as fh:
-                    code[os.path.relpath(fpath, wd)] = fh.read()
+                try:
+                    code[os.path.relpath(fpath, wd)] = open(fpath).read()
+                except: pass
     return code if code else None
 
 
 if __name__ == "__main__":
-    import argparse
-
+    import argparse, yaml
 
     parser = argparse.ArgumentParser()
     parser.add_argument("config", help="YAML config path")
@@ -495,6 +518,8 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--timeout", type=int, default=200)
     parser.add_argument("--repetitions", type=int, default=1)
+    parser.add_argument("--seed-variant", type=int, default=None,
+                        help="override the starting-point variant (repetitions re-measure it)")
     parser.add_argument("--backend", choices=["auto", "opencode", "claude_cli"], default="auto",
                         help="Backend to execute runs (auto routes anthropic/* to claude_cli)")
     args = parser.parse_args()
@@ -503,4 +528,4 @@ if __name__ == "__main__":
         multi_model_compare(args.config, args.compare, args.timeout)
     else:
         run_experiment(args.config, args.model or "", args.limit, args.timeout, args.repetitions,
-                       backend=args.backend)
+                       backend=args.backend, seed_variant=args.seed_variant)

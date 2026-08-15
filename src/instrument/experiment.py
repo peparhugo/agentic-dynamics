@@ -9,25 +9,25 @@ The research question: does perturbation class predict correctness/cost variance
 
 from __future__ import annotations
 
-import json
-import time
 import warnings
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
-
-from .basin import BasinMetrics, measure_basin_escape
-from .efficiency import EfficiencyMetrics, compute_efficiency
-from .perturb import Perturbation, build_operators, perturb_prompt
-from .solution import SolutionMetrics, evaluate_solution
-from .strategy import StrategyReport, classify_strategy
-
 warnings.warn(
     "instrument.experiment is deprecated. The current pipeline uses "
     "scripts/run.py with instrument.opencode.run_opencode_agentic directly.",
-    DeprecationWarning, stacklevel=2,
+    DeprecationWarning, stacklevel=2
 )
+
+import json
+import math
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable
+
+from .perturb import Perturbation, build_operators, derive_seed, perturb_prompt
+from .basin import BasinMetrics, measure_basin_escape
+from .solution import SolutionMetrics, evaluate_solution
+from .efficiency import EfficiencyMetrics, compute_efficiency
+from .strategy import StrategyReport, classify_strategy
 
 
 @dataclass
@@ -230,7 +230,9 @@ def run_experiment(
 
                 perturbed_prompt, record = perturb_prompt(
                     config.task, op_name, strength=strength,
-                    rng_seed=config.rng_seed + run_idx,
+                    # seed_variant=0: repetition re-measures the SAME starting point
+                    # (consistent with scripts/run.py); variant would deviate it.
+                    rng_seed=derive_seed(config.task, op_name, strength, 0),
                 )
 
                 t0 = time.monotonic()

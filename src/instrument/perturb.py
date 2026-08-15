@@ -13,9 +13,10 @@ returns a perturbed version. Operators are pure functions with a
 
 from __future__ import annotations
 
+import hashlib
 import random
-from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any, Callable
 
 # ── Alien vocabularies — cross-domain word sets for directional noise ──
 
@@ -126,69 +127,66 @@ def _inject_alien_vocab(prompt: str, strength: float, rng: random.Random) -> tup
     """Replace domain terminology with cross-domain vocabulary as directional noise.
 
     Alien words act as directional noise — they substitute unfamiliar
-    cross-domain terms for domain terminology, forcing the model to
-    re-derive meaning under lexical disruption.
+    cross-domain terms (biology, music, architecture, ...) for the prompt's own
+    software/tech terminology, forcing the model to re-derive meaning under
+    lexical disruption.
 
-    At low strength (0.2): 2-3 domain terms replaced.
-    At high strength (0.8): 6-8 domain terms replaced.
+    At low strength (0.2): ~2-3 domain terms replaced.
+    At high strength (0.8): ~6-8 domain terms replaced.
+
+    Returns ``(perturbed_prompt, injected_tokens, vocab_domain)`` where
+    ``injected_tokens`` records the alien words actually substituted (or the
+    fallback directive's words when no tech terms are present), so the metadata
+    reflects what was truly injected.
     """
     import re
 
-    # Common software/tech domain terms that can be replaced
-    tech_terms: dict[str, list[str]] = {
-        "api": ["interface", "gateway", "portal", "conduit", "membrane"],
-        "endpoint": ["terminus", "junction", "node", "contact-point", "port"],
-        "database": ["repository", "archive", "library", "vault", "storehouse"],
-        "server": ["host", "orchestrator", "conductor", "coordinator", "hub"],
-        "cache": ["buffer", "reservoir", "staging", "antechamber", "vestibule"],
-        "request": ["petition", "inquiry", "entreaty", "solicitation", "call"],
-        "response": ["reply", "answer", "rejoinder", "transmission", "echo"],
-        "authentication": ["identification", "recognition", "attestation", "validation-rite", "credential-check"],
-        "authorization": ["permission", "clearance", "sanction", "entitlement", "grant"],
-        "encryption": ["scrambling", "ciphering", "encoding", "obfuscation", "shrouding"],
-        "middleware": ["intermediary", "conduit-layer", "bridge", "mediator", "translator"],
-        "router": ["dispatcher", "director", "switchboard", "navigator", "traffic-controller"],
-        "microservice": ["cell", "module-organ", "specialized-unit", "tissue", "compartment"],
-        "validation": ["verification", "scrutiny", "inspection", "examination", "audit"],
-        "deployment": ["release", "dispatch", "installation", "distribution", "fielding"],
-        "pipeline": ["conduit", "channel", "passage", "artery", "duct"],
-        "container": ["capsule", "vessel", "enclosure", "pod", "chamber"],
-        "load-balancer": ["distributor", "equalizer", "traffic-warden", "disperser", "allocator"],
-        "logging": ["recording", "chronicling", "journaling", "transcription", "inscription"],
-        "monitoring": ["surveillance", "observation", "watching", "vigilance", "oversight"],
-    }
+    # Source terms we recognize as the prompt's "domain terminology". The
+    # replacement is drawn from ALIEN_VOCABULARIES (cross-domain), never from a
+    # same-domain synonym list — this was the audit's B2 finding (the name and
+    # docstring promised cross-domain injection but the code substituted
+    # ordinary English synonyms).
+    tech_terms: tuple[str, ...] = (
+        "api", "endpoint", "database", "server", "cache", "request", "response",
+        "authentication", "authorization", "encryption", "middleware", "router",
+        "microservice", "validation", "deployment", "pipeline", "container",
+        "load-balancer", "logging", "monitoring",
+    )
 
     domain = rng.choice(list(ALIEN_VOCABULARIES.keys()))
     words = ALIEN_VOCABULARIES[domain]
-    n_tokens = max(2, int(2 + 4 * strength))
+    # Calibrated count: 0.2 → 3, 0.5 → 5, 0.8 → 6, 1.0 → 8 (monotonic, no floor
+    # other than 1 for the smallest positive strengths).
+    n_tokens = max(1, int(2 + 6 * strength))
 
-    # Find tech terms in the prompt that we can replace
-    found_terms: list[tuple[str, str]] = []
-    for tech, alts in tech_terms.items():
+    found_terms: list[tuple[str, int, int]] = []
+    for tech in tech_terms:
         for m in re.finditer(r'\b' + re.escape(tech) + r'\b', prompt, re.IGNORECASE):
-            found_terms.append((m.group(0), m.start(), m.end(), tech, alts))
+            found_terms.append((m.group(0), m.start(), m.end()))
 
     result = prompt
-    replaced_terms: list[str] = []
+    injected_tokens: list[str] = []
     n_replace = min(n_tokens, len(found_terms))
 
     if n_replace > 0:
         selected = rng.sample(found_terms, n_replace)
-        # Replace from end to start to preserve positions
-        for _orig, start, end, tech, alts in sorted(selected, key=lambda x: x[1], reverse=True):
-            replacement = rng.choice(alts)
+        # Replace from end to start so earlier offsets stay valid.
+        for _orig, start, end in sorted(selected, key=lambda x: x[1], reverse=True):
+            replacement = rng.choice(words)
             result = result[:start] + replacement + result[end:]
-            replaced_terms.append(tech)
+            injected_tokens.append(replacement)
     else:
-        # Fallback: if no tech terms found, inject wrapped alien terms
+        # Fallback: no recognizable tech terms — append a directive naming alien
+        # concepts for the model to fold into its reasoning.
         injected = rng.sample(words, min(n_tokens, len(words)))
+        injected_tokens = list(injected)
         noise_block = (
             "Replace standard terminology with the following concepts "
             f"in your reasoning: {', '.join(injected)}"
         )
         result = prompt + "\n\n" + noise_block
 
-    return result, replaced_terms, domain
+    return result, injected_tokens, domain
 
 
 def _inject_false_premise(prompt: str, strength: float, rng: random.Random) -> str:
@@ -239,8 +237,9 @@ def _invert_constraint(prompt: str, strength: float, rng: random.Random) -> str:
     At low strength: invert a soft suggestion.
     At high strength: invert a hard requirement.
 
-    Actually transforms the text: finds constraint-like statements and
-    flips them (must → must not, secure → insecure, etc.).
+    Actually transforms the text: finds constraint-like sentences and flips
+    every applicable term in each selected sentence (must → must not,
+    secure → insecure, etc.), so no invertible term is left untouched.
     """
     import re
 
@@ -287,10 +286,10 @@ def _invert_constraint(prompt: str, strength: float, rng: random.Random) -> str:
     result = prompt
     for sent in selected:
         inverted = sent
+        # Apply every matching inversion pattern, not just the first (audit B4).
         for pattern, replacement in inversions_map:
             if re.search(pattern, inverted, re.IGNORECASE):
                 inverted = re.sub(pattern, replacement, inverted, count=1, flags=re.IGNORECASE)
-                break
         result = result.replace(sent, inverted, 1)
 
     return result
@@ -303,6 +302,7 @@ def _insert_contradiction(prompt: str, strength: float, rng: random.Random) -> s
     or rationalize both — each response reveals something about its
     reasoning policy.
     """
+    import re
 
     domain_contradictions = {
         "api": [
@@ -335,8 +335,8 @@ def _insert_contradiction(prompt: str, strength: float, rng: random.Random) -> s
                   'of', 'with', 'from', 'by', 'as', 'is', 'was', 'are', 'be', 'been',
                   'it', 'its', 'use', 'all', 'this', 'that', 'has', 'have', 'not', 'no'}
     all_domains = []
-    for _domain, pairs in domain_contradictions.items():
-        for a, _b in pairs:
+    for domain, pairs in domain_contradictions.items():
+        for a, b in pairs:
             keywords = [w for w in a.lower().split()[:5] if w not in _stopwords]
             if keywords and any(kw.lower() in prompt.lower() for kw in keywords):
                 all_domains = pairs
@@ -397,9 +397,9 @@ def _remove_critical_constraint(prompt: str, strength: float, rng: random.Random
     if not candidates:
         # Fallback: try to find and remove any checklist-like item
         lines = prompt.split('\n')
-        removals = [line for line in lines if line.strip() and len(line.strip()) > 15 and (
-            line.strip().startswith('-') or line.strip().startswith('*') or
-            any(kw in line.lower() for kw in ('must', 'should', 'required', 'ensure'))
+        removals = [l for l in lines if l.strip() and len(l.strip()) > 15 and (
+            l.strip().startswith('-') or l.strip().startswith('*') or
+            any(kw in l.lower() for kw in ('must', 'should', 'required', 'ensure'))
         )]
         if removals:
             to_remove = rng.choice(removals)
@@ -424,7 +424,10 @@ def _remove_critical_constraint(prompt: str, strength: float, rng: random.Random
             score = sum(1 for kw in critical_keywords if kw.lower() in c.lower())
             scored.append((score, c))
         scored.sort(key=lambda x: x[0], reverse=True)
-        to_remove = scored[0][1] if scored and scored[0][0] > 0 else rng.choice(actual_constraints)
+        if scored and scored[0][0] > 0:
+            to_remove = scored[0][1]
+        else:
+            to_remove = rng.choice(actual_constraints)
         n_remove = max(1, int(len(actual_constraints) * 0.4))
         removals = [to_remove] + rng.sample([c for c in actual_constraints if c != to_remove], min(n_remove - 1, len(actual_constraints) - 1))
     elif strength >= 0.5:
@@ -468,70 +471,67 @@ def _inject_phantom_success(prompt: str, strength: float, rng: random.Random) ->
 def _reverse_causality(prompt: str, strength: float, rng: random.Random) -> str:
     """Present solution before problem — reorder the prompt structure.
 
-    Forces non-linear reasoning. SFT models tend to reorder into familiar
-    narrative structure before reasoning; RL models may handle inverted order
-    directly without restructuring.
+    Forces non-linear reasoning: constraints and expected output are surfaced
+    before the task/problem description, so the model must hold the answer's
+    shape in mind while it works out what problem it solves.
 
-    At low strength: move requirements before task description.
-    At high strength: full structural inversion (constraints → output format → task).
+    At low strength: swap the prompt's two halves.
+    At moderate strength: move requirements before the task description.
+    At high strength: full structural inversion (constraints → output → task).
+
+    Each input line is emitted exactly once at every strength — no section is
+    duplicated (the audit's B3 finding) or dropped.
     """
-
     lines = prompt.split('\n')
     if len(lines) < 3:
         return "Consider the expected output first, then determine what problem it solves.\n\n" + prompt
 
-    # Try to identify sections: task/problem description, requirements/constraints, output/format
-    req_start = -1
-    output_start = -1
-
     req_keywords = ['requirement', 'constraint', 'must', 'should', 'need to', 'specification', 'rule']
     output_keywords = ['output', 'format', 'return', 'respond', 'deliverable', 'result', 'expected']
 
-    for i, line in enumerate(lines):
-        stripped = line.strip().lower()
-        if req_start < 0 and any(kw in stripped for kw in req_keywords):
-            req_start = i
-        if output_start < 0 and any(kw in stripped for kw in output_keywords):
-            output_start = i
+    # First line (if any) that reads as a requirement / output-section boundary.
+    req_start = next(
+        (i for i, ln in enumerate(lines)
+         if any(kw in ln.strip().lower() for kw in req_keywords)),
+        -1,
+    )
+    output_start = next(
+        (i for i, ln in enumerate(lines)
+         if any(kw in ln.strip().lower() for kw in output_keywords)),
+        -1,
+    )
 
     if req_start < 0 and output_start < 0:
-        # No clear sections — do a simple reversal
+        # No recognizable sections — simple half-reversal.
         mid = len(lines) // 2
-        reversed_lines = lines[mid:] + [''] + lines[:mid]
-        prefix = "Read the constraints and expected output BELOW before the task description above.\n\n"
-        return prefix + '\n'.join(reversed_lines)
+        return '\n'.join(["[REORDERED: second half first]"] + lines[mid:] + [''] + lines[:mid])
 
-    # Build reordered prompt
-    preamble = []
-    if req_start > 0:
-        preamble = lines[:req_start]
-        lines[req_start:]
-    elif output_start > 0:
-        preamble = lines[:output_start]
-        lines[output_start:]
-    else:
-        preamble = lines[:1]
-        lines[1:]
-
-    if strength >= 0.8 and output_start > req_start >= 0:
-        # Full inversion: constraints → output format → task description → preamble
-        output_section = lines[output_start:]
-        req_section = lines[req_start:output_start]
+    # Partition the prompt into disjoint sections so no line repeats or is lost.
+    if req_start >= 0 and output_start > req_start:
         task_section = lines[:req_start]
-        reordered = (
-            ["[INVERTED: constraints first, then expected output, then task]"]
-            + req_section + [''] + output_section + [''] + task_section + preamble
-        )
-    elif strength >= 0.4 and req_start >= 0:
-        # Moderate: constraints before task
+        req_section = lines[req_start:output_start]
+        output_section = lines[output_start:]
+    elif req_start >= 0:
         task_section = lines[:req_start]
         req_section = lines[req_start:]
+        output_section = []
+    else:
+        # Only an output/format section was found.
+        task_section = lines[:output_start]
+        req_section = []
+        output_section = lines[output_start:]
+
+    if strength >= 0.8 and req_section and output_section:
+        reordered = (
+            ["[INVERTED: constraints first, then expected output, then task]"]
+            + req_section + [''] + output_section + [''] + task_section
+        )
+    elif strength >= 0.4 and (req_section or output_section):
         reordered = (
             ["[INVERTED: constraints before task description]"]
-            + req_section + [''] + task_section
+            + req_section + output_section + [''] + task_section
         )
     else:
-        # Mild: swap halves
         mid = len(lines) // 2
         reordered = (
             ["[REORDERED: second half first]"]
@@ -680,6 +680,34 @@ def perturbation_class_for(operator: str) -> str:
     return ""
 
 
+def derive_seed(*parts: object) -> int:
+    """Derive a stable, order-independent integer seed from a cell's identity.
+
+    The seed is a pure function of the cell's identity fields: the canonical
+    string form ``"|".join(str(p) for p in parts)`` is SHA-256-hashed and the
+    first 8 hex digits are read as an integer — i.e.
+    ``int(sha256(f"{task}|{operator}|{strength}|{seed_variant}")[:8], 16)``.
+
+    The last part is a *seed variant* — a deliberate "starting point" index.
+    Different variants produce different perturbed prompts (a deviated starting
+    point, measured against the same baseline); re-running the same variant
+    reproduces the identical prompt. Repetition is deliberately NOT a seed input:
+    it re-measures the same starting point to isolate model variance. Because the
+    seed ignores loop order, model, and slot position, the same cell always
+    perturbs identically — and different models receive the identical perturbed
+    prompt, so cross-model drift is attributable to the model, not to the
+    perturbation. (This replaces the order-dependent ``42 + run_idx`` that the
+    audit's determinism section flagged.)
+
+    Example:
+        derive_seed(task, "invert_constraint", 0.5, 0)   # starting point 0
+        derive_seed(task, "invert_constraint", 0.5, 1)   # a deviated starting point
+    """
+    canonical = "|".join(str(p) for p in parts)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
+
+
 def perturb_prompt(
     base_prompt: str,
     operator_name: str,
@@ -701,7 +729,6 @@ def perturb_prompt(
         (perturbed_prompt, Perturbation metadata) tuple.
     """
     ops = operators if operators is not None else build_operators()
-    rng = random.Random(rng_seed)
 
     if operator_name == "baseline":
         return base_prompt, Perturbation(
@@ -717,6 +744,20 @@ def perturb_prompt(
         )
 
     op = ops[operator_name]
+
+    # Strength <= 0.0 means "no perturbation" per the module contract. Guarding
+    # here (single point) lets every operator assume strength > 0, so none can
+    # apply a minimum perturbation at zero (audit B1).
+    if strength <= 0.0:
+        return base_prompt, Perturbation(
+            operator=operator_name,
+            strength=strength,
+            perturbation_class=op.perturbation_class,
+            description=op.description,
+            noop_reason="strength 0.0 (no-op)",
+        )
+
+    rng = random.Random(rng_seed)
     perturbed = op.apply_fn(base_prompt, strength, rng)
 
     # Unpack alien_vocab's extended return (prompt, injected_tokens, vocab_domain)

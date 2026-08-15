@@ -1,0 +1,48 @@
+# Flash-authored perturbation — the session path of the starting point.
+#
+# `perturbation_mode: flash` means each cell's perturbed prompt is authored by a cheap
+# model (DeepSeek Flash V4, see FLASH_MODEL) in a one-shot opencode session, then pinned
+# as a reusable artifact (prompt text + sha256) under `perturbation_cache_dir`. Distinct
+# `seed_variants` produce distinct deviated starting points, each measured against the
+# same baseline. Authored artifacts are NOT regenerable — they are stored and reused.
+#
+# Contrast with the default `perturbation_mode: deterministic`, whose seeded pure-function
+# operators are fully regenerable from derive_seed(task, operator, strength, variant).
+#
+# NOTE: `model`/`model_id` below is the SOLVER (the model that attempts the task), not the
+# perturbation author — flash is chosen automatically by compile_prompt_perturbation().
+
+name: flash_perturbation
+task: >
+  Build a Python/Flask URL shortener with REST API, collision-resistant short codes,
+  persistent storage, rate limiting, and click analytics. Write the code and pytest tests.
+  Be thorough but concise.
+
+constraints:
+  - REST API endpoints for create and redirect
+  - Short code generation with collision handling
+  - Persistent storage (SQLite or PostgreSQL)
+  - Rate limiting per IP
+  - Click analytics tracking
+  - Test suite with pytest
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - remove_critical_constraint
+  - invert_constraint
+
+strengths: [0.5]
+
+# Starting-point variants: each is a DIFFERENT perturbed prompt measured against the same
+# baseline. With mode=flash each variant is authored once and cached; with mode=deterministic
+# each variant is a seeded draw (regenerable).
+seed_variants: [0, 1, 2]
+
+perturbation_mode: flash
+
+# Where flash-authored artifacts are pinned (one JSON per variant, keyed by sha256).
+perturbation_cache_dir: experiments/results/perturbations
+
+model: deepseek
+model_id: deepseek/deepseek-v4-pro

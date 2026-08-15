@@ -11,6 +11,7 @@ Usage:
   python3 scripts/sweep_silent_mode.py --limit 1    # run 1 model
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -21,18 +22,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 
-import contextlib
-
 from instrument import (
-    build_operators,
-    compute_efficiency,
-    compute_recovery_cost,
-    detect_constraints,
-    evaluate_solution,
-    perturb_prompt,
+    build_operators, perturb_prompt, derive_seed,
+    evaluate_solution, compute_efficiency,
+    detect_constraints, compute_recovery_cost,
 )
-from instrument.opencode import run_opencode_agentic
 from instrument.semantic_validation import analyze_markers
+from instrument.opencode import run_opencode_agentic
 
 # Core models for the sweep
 DEFAULT_MODELS = [
@@ -62,16 +58,15 @@ CONSTRAINTS = [
 
 def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
     models = models or DEFAULT_MODELS
-    if limit:
-        models = models[:limit]
+    if limit: models = models[:limit]
 
     total = len(models) * 2 * 2  # models × silent_modes × operators
     print(f"\n{'='*80}")
     print(f"SILENT MODE SWEEP — {len(models)} models × 2 silent modes × 2 operators = {total} runs")
     if dry_run:
         print("DRY RUN — showing plan only")
-        for _model_id, label in models:
-            for _silent_mode, mode_label in [(None, "natural"), (True, "forced-silent")]:
+        for model_id, label in models:
+            for silent_mode, mode_label in [(None, "natural"), (True, "forced-silent")]:
                 print(f"  {label:>20} | {mode_label:>14} | baseline + remove_critical_constraint")
         return []
 
@@ -79,7 +74,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
     results = []
 
     for model_id, label in models:
-        for silent_mode, _mode_label in [(None, "natural"), (True, "forced-silent")]:
+        for silent_mode, mode_label in [(None, "natural"), (True, "forced-silent")]:
             sm_str = "natural" if silent_mode is None else "forced-silent"
 
             # --- Baseline ---
@@ -92,7 +87,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             _cur = _c.cursor()
             _cur.execute("SELECT cost FROM session WHERE title = ? AND cost > 0 LIMIT 1", (session_name,))
             if _cur.fetchone():
-                print("  [SKIP — existing session found]")
+                print(f"  [SKIP — existing session found]")
                 _c.close()
                 continue
             _c.close()
@@ -138,7 +133,14 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             ops = build_operators()
             op_name = "remove_critical_constraint"
             pert_class = ops[op_name].perturbation_class
-            perturbed_task, _ = perturb_prompt(TASK, op_name, strength=0.5, rng_seed=42)
+            # Seed is a pure function of the cell (task|operator|strength|seed_variant),
+            # identical across models/silent-modes so the perturbed prompt is held
+            # constant for cross-model comparison (seed_variant = 0, single starting point).
+            perturbed_task, _ = perturb_prompt(
+                TASK, op_name, strength=0.5,
+                rng_seed=derive_seed(TASK, op_name, 0.5, 0),
+            )
+            perturbed_prompt_sha256 = hashlib.sha256(perturbed_task.encode("utf-8")).hexdigest()
             session_name_p = f"[silent_sweep:perturbed:{sm_str}] {label.lower().replace(' ','_')}"
 
             # Skip if already completed
@@ -147,7 +149,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             _cur2 = _c2.cursor()
             _cur2.execute("SELECT cost FROM session WHERE title = ? AND cost > 0 LIMIT 1", (session_name_p,))
             if _cur2.fetchone():
-                print("  [SKIP — existing perturbed session]")
+                print(f"  [SKIP — existing perturbed session]")
                 _c2.close()
                 continue
             _c2.close()
@@ -181,6 +183,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             pert_row = {
                 "model": model_id, "label": label, "silent_mode": sm_str,
                 "operator": op_name, "type": "perturbed",
+                "perturbed_prompt_sha256": perturbed_prompt_sha256,
                 "cost": r_pert.estimated_cost_usd, "total_tokens": r_pert.total_tokens,
                 "reasoning_tokens": r_pert.reasoning_tokens,
                 "thinking_ratio": eff_pert.thinking_ratio,
@@ -206,11 +209,11 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
 
 
 def _print_matrix(results):
-    KEY = ["label", "silent_mode", "type",  # noqa: N806
+    KEY = ["label", "silent_mode", "type",
            "cost", "total_tokens", "thinking_ratio", "correctness",
            "tests_passed", "tests_total", "tools", "retries",
            "marker_const", "recovery_cost", "recovery_factor"]
-    {k: k.replace("_"," ").title() for k in KEY}
+    KEYS_LABEL = {k: k.replace("_"," ").title() for k in KEY}
 
     print(f"\n{'='*120}")
     print("SILENT MODE SWEEP — Results Matrix")
@@ -266,15 +269,14 @@ def _save_results(results):
 
 def _collect(result):
     wd = getattr(result, 'workdir', '')
-    if not wd or not os.path.isdir(wd):
-        return None
+    if not wd or not os.path.isdir(wd): return None
     code = {}
     for root, dirs, files in os.walk(wd):
         dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__pycache__']
         for f in files:
             if f.endswith('.py') and not f.startswith('.'):
-                with contextlib.suppress(BaseException), open(os.path.join(root, f)) as fh:
-                    code[f] = fh.read()
+                try: code[f] = open(os.path.join(root, f)).read()
+                except: pass
     return code if code else None
 
 
