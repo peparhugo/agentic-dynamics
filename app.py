@@ -14,8 +14,16 @@ import sys
 import jwt
 from celery_tasks import send_notification_email
 from repositories import UserRepository, TaskRepository
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
+limiter = Limiter(
+    app=app,
+    key_func=lambda: _get_current_user_id() or get_remote_address(),
+    default_limits=["100/minute"],
+    storage_uri="memory://"
+)
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -24,6 +32,19 @@ VALID_STATUSES = {"pending", "done"}
 _app_module = sys.modules[__name__]
 user_repo = UserRepository(_app_module)
 task_repo = TaskRepository(_app_module)
+
+
+def _get_current_user_id():
+    """Extract user ID from JWT token in current request for rate limiting."""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header[7:]
+    try:
+        data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return str(data.get("user_id"))
+    except:
+        return None
 
 
 def _get_db():
@@ -109,6 +130,7 @@ def token_required(f):
 
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("100/minute")
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -125,6 +147,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("100/minute")
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -151,12 +174,24 @@ def login():
 
 @app.route("/tasks", methods=["GET"])
 @token_required
+@limiter.limit("100/minute")
 def list_tasks(user_id):
-    return jsonify(task_repo.get_all(user_id))
+    cursor = request.args.get("cursor", type=int, default=None)
+    limit = request.args.get("limit", type=int, default=20)
+
+    # Validate limit
+    if limit < 1:
+        limit = 20
+    if limit > 100:
+        limit = 100
+
+    result = task_repo.get_paginated(user_id, cursor=cursor, limit=limit)
+    return jsonify(result)
 
 
 @app.route("/tasks", methods=["POST"])
 @token_required
+@limiter.limit("100/minute")
 def add_task(user_id):
     data = request.get_json(silent=True) or {}
     title = data.get("title", "").strip()
@@ -168,6 +203,7 @@ def add_task(user_id):
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @token_required
+@limiter.limit("100/minute")
 def show_task(user_id, task_id: int):
     task = task_repo.get_by_id(task_id, user_id)
     if task is None:
@@ -177,6 +213,7 @@ def show_task(user_id, task_id: int):
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @token_required
+@limiter.limit("100/minute")
 def edit_task(user_id, task_id: int):
     task = task_repo.get_by_id(task_id, user_id)
     if task is None:

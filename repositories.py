@@ -123,3 +123,40 @@ class TaskRepository(BaseRepository):
             )
 
         return self.get_by_id(task_id, owner_id)
+
+    def get_paginated(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> dict:
+        """Get paginated tasks for a user with cursor-based pagination."""
+        # Get total count of tasks
+        total_result = self.fetch_one(
+            "SELECT COUNT(*) as count FROM tasks WHERE owner_id = ?",
+            (owner_id,)
+        )
+        total = total_result["count"] if total_result else 0
+
+        # Build query based on cursor
+        if cursor is None:
+            # First page: get tasks ordered by id descending (most recent first)
+            query = "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?"
+            params = (owner_id, limit + 1)
+        else:
+            # Subsequent pages: get tasks with id < cursor
+            query = "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?"
+            params = (owner_id, cursor, limit + 1)
+
+        rows = self.fetch_all(query, params)
+
+        # Determine if there's a next page
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]
+
+        # Get next cursor if there are more items
+        next_cursor = None
+        if has_more and len(rows) > 0:
+            next_cursor = rows[-1]["id"]
+
+        return {
+            "data": rows,
+            "next_cursor": next_cursor,
+            "total": total
+        }
