@@ -116,8 +116,8 @@ def test_users_only_see_own_tasks(client, auth_headers):
     bob_headers = other_auth_headers(client)
     client.post("/tasks", json={"title": "bob task"}, headers=bob_headers)
 
-    alice_tasks = client.get("/tasks", headers=auth_headers).get_json()
-    bob_tasks = client.get("/tasks", headers=bob_headers).get_json()
+    alice_tasks = client.get("/tasks", headers=auth_headers).get_json()["data"]
+    bob_tasks = client.get("/tasks", headers=bob_headers).get_json()["data"]
 
     assert [t["title"] for t in alice_tasks] == ["alice task"]
     assert [t["title"] for t in bob_tasks] == ["bob task"]
@@ -170,7 +170,7 @@ def test_create_task_no_body(client, auth_headers):
 def test_list_tasks_empty(client, auth_headers):
     resp = client.get("/tasks", headers=auth_headers)
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    assert resp.get_json() == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_ordered_desc(client, auth_headers):
@@ -178,10 +178,91 @@ def test_list_tasks_ordered_desc(client, auth_headers):
     client.post("/tasks", json={"title": "second"}, headers=auth_headers)
     resp = client.get("/tasks", headers=auth_headers)
     assert resp.status_code == 200
-    data = resp.get_json()
+    body = resp.get_json()
+    data = body["data"]
     assert len(data) == 2
     assert data[0]["title"] == "second"
     assert data[1]["title"] == "first"
+    assert body["next_cursor"] is None
+    assert body["total"] == 2
+
+
+# ── Pagination ────────────────────────────────────────────────
+
+
+def test_list_tasks_default_limit_and_no_cursor(client, auth_headers):
+    for i in range(3):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=auth_headers)
+    resp = client.get("/tasks", headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body["data"]) == 3
+    assert body["total"] == 3
+    assert body["next_cursor"] is None
+
+
+def test_list_tasks_respects_limit_param(client, auth_headers):
+    created = [
+        client.post("/tasks", json={"title": f"task {i}"}, headers=auth_headers).get_json()
+        for i in range(5)
+    ]
+    resp = client.get("/tasks?limit=2", headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body["data"]) == 2
+    assert body["total"] == 5
+    newest_first_ids = [t["id"] for t in reversed(created)]
+    assert [t["id"] for t in body["data"]] == newest_first_ids[:2]
+    assert body["next_cursor"] == newest_first_ids[1]
+
+
+def test_list_tasks_cursor_walks_all_pages(client, auth_headers):
+    created = [
+        client.post("/tasks", json={"title": f"task {i}"}, headers=auth_headers).get_json()
+        for i in range(5)
+    ]
+    expected_order = [t["id"] for t in reversed(created)]
+
+    seen_ids = []
+    cursor = None
+    for _ in range(10):  # safety bound against infinite loop on a bug
+        url = "/tasks?limit=2" + (f"&cursor={cursor}" if cursor is not None else "")
+        body = client.get(url, headers=auth_headers).get_json()
+        seen_ids.extend(t["id"] for t in body["data"])
+        cursor = body["next_cursor"]
+        if cursor is None:
+            break
+
+    assert seen_ids == expected_order
+
+
+def test_list_tasks_limit_clamped_to_max(client, auth_headers):
+    client.post("/tasks", json={"title": "only task"}, headers=auth_headers)
+    resp = client.get("/tasks?limit=1000", headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body["data"]) == 1
+
+
+def test_list_tasks_non_positive_limit_falls_back_to_default(client, auth_headers):
+    resp = client.get("/tasks?limit=0", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.get_json()["total"] == 0
+
+
+def test_list_tasks_pagination_is_scoped_per_user(client, auth_headers):
+    client.post("/tasks", json={"title": "alice task"}, headers=auth_headers)
+    bob_headers = other_auth_headers(client)
+    client.post("/tasks", json={"title": "bob task 1"}, headers=bob_headers)
+    client.post("/tasks", json={"title": "bob task 2"}, headers=bob_headers)
+
+    alice_body = client.get("/tasks", headers=auth_headers).get_json()
+    bob_body = client.get("/tasks?limit=1", headers=bob_headers).get_json()
+
+    assert alice_body["total"] == 1
+    assert bob_body["total"] == 2
+    assert len(bob_body["data"]) == 1
+    assert bob_body["next_cursor"] is not None
 
 
 def test_get_task(client, auth_headers):
@@ -353,3 +434,48 @@ def test_send_notification_email_task_returns_sent_payload():
         "task_title": "Ship report",
         "sent": True,
     }
+
+
+# ── Rate limiting ─────────────────────────────────────────────
+
+RATE_LIMIT_PER_MINUTE = 100
+
+
+def test_rate_limit_config_is_100_per_minute():
+    assert app_module.RATE_LIMIT == "100 per minute"
+
+
+def test_requests_within_limit_all_succeed(client, auth_headers):
+    for _ in range(10):
+        resp = client.get("/tasks", headers=auth_headers)
+        assert resp.status_code == 200
+
+
+def test_authenticated_user_blocked_after_limit_exceeded(client, auth_headers):
+    last_resp = None
+    for _ in range(RATE_LIMIT_PER_MINUTE + 1):
+        last_resp = client.get("/tasks", headers=auth_headers)
+    assert last_resp.status_code == 429
+    assert "error" in last_resp.get_json()
+    assert "Retry-After" in last_resp.headers
+    assert int(last_resp.headers["Retry-After"]) >= 0
+
+
+def test_unauthenticated_auth_endpoint_blocked_after_limit_exceeded(client):
+    last_resp = None
+    for _ in range(RATE_LIMIT_PER_MINUTE + 1):
+        last_resp = client.post(
+            "/auth/login", json={"username": "nobody", "password": "wrong"}
+        )
+    assert last_resp.status_code == 429
+    assert "Retry-After" in last_resp.headers
+
+
+def test_rate_limit_is_scoped_per_user(client, auth_headers):
+    for _ in range(RATE_LIMIT_PER_MINUTE):
+        resp = client.get("/tasks", headers=auth_headers)
+        assert resp.status_code == 200
+
+    bob_headers = other_auth_headers(client)
+    resp = client.get("/tasks", headers=bob_headers)
+    assert resp.status_code == 200

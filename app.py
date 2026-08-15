@@ -4,6 +4,8 @@ from functools import wraps
 from flask import Flask, request, jsonify, g
 from datetime import datetime, timedelta, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import sqlite3
 import os
 import jwt
@@ -17,6 +19,40 @@ DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me-please-32-bytes-min")
 JWT_ALGORITHM = "HS256"
 JWT_EXP_MINUTES = 60
+
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
+
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/2")
+
+
+def rate_limit_key() -> str:
+    """Rate-limit per authenticated user (by JWT subject); unauthenticated
+    requests (e.g. login/register) fall back to the client's IP address."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[len("Bearer ") :].strip()
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            return f"user:{payload['sub']}"
+        except jwt.PyJWTError:
+            pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    app=app,
+    key_func=rate_limit_key,
+    default_limits=[RATE_LIMIT],
+    storage_uri=RATELIMIT_STORAGE_URI,
+    headers_enabled=True,
+)
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(e):
+    return jsonify({"error": "rate limit exceeded"}), 429
 
 
 def get_db():
@@ -157,7 +193,11 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
-    return jsonify(task_repository.list_for_owner(g.current_user["id"]))
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", type=int) or DEFAULT_PAGE_LIMIT
+    limit = max(1, min(limit, MAX_PAGE_LIMIT))
+    page = task_repository.list_page_for_owner(g.current_user["id"], cursor=cursor, limit=limit)
+    return jsonify(page)
 
 
 @app.route("/tasks", methods=["POST"])

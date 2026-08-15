@@ -101,13 +101,35 @@ class TaskRepository(BaseRepository):
                 "owner_id": owner_id,
             }
 
-    def list_for_owner(self, owner_id: int) -> list[dict]:
+    def list_page_for_owner(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> dict:
+        """Return a cursor-paginated page of tasks, newest (highest id) first.
+
+        `cursor` is the id of the last item seen on the previous page; rows with
+        id >= cursor are excluded. IDs increase monotonically with created_at in
+        this app, so ordering by id DESC matches the prior created_at DESC order.
+        """
         with self._get_db() as conn:
-            rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-                (owner_id,),
-            ).fetchall()
-            return [dict(r) for r in rows]
+            total = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            if cursor is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+            has_more = len(rows) > limit
+            rows = rows[:limit]
+            next_cursor = rows[-1]["id"] if has_more else None
+            return {
+                "data": [dict(r) for r in rows],
+                "next_cursor": next_cursor,
+                "total": total,
+            }
 
     def get_for_owner(self, task_id: int, owner_id: int) -> dict | None:
         with self._get_db() as conn:
