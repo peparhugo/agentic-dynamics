@@ -4,6 +4,7 @@ import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { watch, FSWatcher } from 'chokidar';
 import { build } from './generate';
+import { Plugin } from './plugin';
 
 export interface DevServerOptions {
   contentDir: string;
@@ -12,6 +13,7 @@ export interface DevServerOptions {
   port: number;
   host?: string;
   debounceMs?: number;
+  plugins?: Plugin[];
 }
 
 export const RELOAD_MESSAGE = 'reload';
@@ -56,11 +58,14 @@ export class DevServer {
   }
 
   build(): number {
-    const pages = build({
-      contentDir: this.options.contentDir,
-      outputDir: this.options.outputDir,
-      templatesDir: this.options.templatesDir,
-    });
+    const pages = build(
+      {
+        contentDir: this.options.contentDir,
+        outputDir: this.options.outputDir,
+        templatesDir: this.options.templatesDir,
+      },
+      this.options.plugins ?? []
+    );
     return pages.length;
   }
 

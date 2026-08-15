@@ -1,5 +1,6 @@
 import { build } from './generate';
 import { DevServer } from './server';
+import { loadConfig, loadPlugins } from './config';
 
 export interface CliOptions {
   command: string;
@@ -48,11 +49,13 @@ export function parseArgs(argv: string[]): CliOptions {
 }
 
 function serve(options: CliOptions): number {
+  const plugins = loadPlugins(loadConfig());
   const server = new DevServer({
     contentDir: options.contentDir,
     outputDir: options.outputDir,
     templatesDir: options.templatesDir,
     port: options.port,
+    plugins,
   });
 
   server
@@ -72,11 +75,15 @@ export function run(argv: string[]): number {
   const options = parseArgs(argv);
   if (options.command === 'build') {
     try {
-      const pages = build({
-        contentDir: options.contentDir,
-        outputDir: options.outputDir,
-        templatesDir: options.templatesDir,
-      });
+      const plugins = loadPlugins(loadConfig());
+      const pages = build(
+        {
+          contentDir: options.contentDir,
+          outputDir: options.outputDir,
+          templatesDir: options.templatesDir,
+        },
+        plugins
+      );
       console.log(`Generated ${pages.length} page(s) in ${options.outputDir}`);
       return 0;
     } catch (err) {
