@@ -1,0 +1,4 @@
+Flask>=2.3
+Flask-Limiter>=3.0
+redis>=5.0
+celery>=5.0
