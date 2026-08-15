@@ -8,21 +8,29 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 import websockets
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.http11 import Headers, Request, Response
 
 
-SUPPORTED_TYPES = {"broadcast", "direct", "system"}
+SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _message(message_type: str, payload: dict[str, Any]) -> str:
-    return json.dumps({"type": message_type, "payload": payload, "timestamp": _timestamp()})
+def _message(message_type: str, payload: dict[str, Any], channel: str | None = None) -> str:
+    message: dict[str, Any] = {
+        "type": message_type,
+        "payload": payload,
+        "timestamp": _timestamp(),
+    }
+    if channel is not None:
+        message["channel"] = channel
+    return json.dumps(message)
 
 
 class NotificationServer:
@@ -32,6 +40,8 @@ class NotificationServer:
         self.host = host
         self.port = port
         self.clients: dict[str, ServerConnection] = {}
+        self.channels: dict[str, set[str]] = {}
+        self._client_channels: dict[str, set[str]] = {}
         self._server: Server | None = None
 
     @property
@@ -41,9 +51,20 @@ class NotificationServer:
     async def _process_request(
         self, _connection: ServerConnection, request: Request
     ) -> Response | None:
-        if request.path != "/health":
+        path = urlsplit(request.path).path
+        if path == "/health":
+            body = json.dumps({"connected_clients": self.client_count}).encode()
+        elif path == "/channels":
+            body = json.dumps(
+                {"channels": {name: len(client_ids) for name, client_ids in self.channels.items()}}
+            ).encode()
+        elif path.startswith("/channels/") and path.endswith("/subscribers"):
+            name = unquote(path[len("/channels/") : -len("/subscribers")]).rstrip("/")
+            body = json.dumps(
+                {"channel": name, "subscribers": sorted(self.channels.get(name, set()))}
+            ).encode()
+        else:
             return None
-        body = json.dumps({"connected_clients": self.client_count}).encode()
         return Response(
             200,
             "OK",
@@ -59,15 +80,44 @@ class NotificationServer:
     async def _send_error(self, websocket: ServerConnection, detail: str) -> None:
         await websocket.send(_message("system", {"error": detail}))
 
-    async def _broadcast(self, message: str) -> None:
+    async def _broadcast(self, message: str, channel: str | None = None) -> None:
         disconnected: list[str] = []
-        for client_id, websocket in list(self.clients.items()):
+        recipient_ids = (
+            self.channels.get(channel, set()) if channel is not None else set(self.clients)
+        )
+        for client_id in list(recipient_ids):
+            websocket = self.clients.get(client_id)
+            if websocket is None:
+                continue
             try:
                 await websocket.send(message)
             except websockets.exceptions.ConnectionClosed:
                 disconnected.append(client_id)
         for client_id in disconnected:
-            self.clients.pop(client_id, None)
+            self._remove_client(client_id)
+
+    def _remove_client(self, client_id: str) -> None:
+        self.clients.pop(client_id, None)
+        for channel in self._client_channels.pop(client_id, set()):
+            subscribers = self.channels.get(channel)
+            if subscribers is not None:
+                subscribers.discard(client_id)
+                if not subscribers:
+                    self.channels.pop(channel, None)
+
+    def _set_subscription(self, client_id: str, channel: str, subscribed: bool) -> None:
+        if subscribed:
+            self.channels.setdefault(channel, set()).add(client_id)
+            self._client_channels.setdefault(client_id, set()).add(channel)
+            return
+        self.channels.get(channel, set()).discard(client_id)
+        if channel in self.channels and not self.channels[channel]:
+            self.channels.pop(channel)
+        client_channels = self._client_channels.get(client_id)
+        if client_channels is not None:
+            client_channels.discard(channel)
+            if not client_channels:
+                self._client_channels.pop(client_id)
 
     async def _handle_message(self, client_id: str, websocket: ServerConnection, raw: str) -> None:
         try:
@@ -81,13 +131,29 @@ class NotificationServer:
         if message_type not in SUPPORTED_TYPES:
             await self._send_error(websocket, "unsupported message type")
             return
+        if message_type in {"subscribe", "unsubscribe"} and payload is None:
+            payload = {}
         if not isinstance(payload, dict):
             await self._send_error(websocket, "payload must be an object")
             return
 
-        outgoing = _message(message_type, payload)
+        channel = incoming.get("channel")
+        if channel is None:
+            channel = payload.get("channel")
+        if message_type in {"subscribe", "unsubscribe"}:
+            if not isinstance(channel, str) or not channel:
+                await self._send_error(websocket, "channel must be a non-empty string")
+                return
+            self._set_subscription(client_id, channel, message_type == "subscribe")
+            return
+
+        if channel is not None and not isinstance(channel, str):
+            await self._send_error(websocket, "channel must be a string")
+            return
+
+        outgoing = _message(message_type, payload, channel)
         if message_type in {"broadcast", "system"}:
-            await self._broadcast(outgoing)
+            await self._broadcast(outgoing, channel)
             return
 
         target_id = payload.get("client_id", payload.get("target_client_id"))
@@ -108,7 +174,7 @@ class NotificationServer:
             async for raw in websocket:
                 await self._handle_message(client_id, websocket, raw)
         finally:
-            self.clients.pop(client_id, None)
+            self._remove_client(client_id)
 
     async def start(self) -> None:
         """Start serving. The returned server runs until :meth:`stop` is called."""
@@ -128,6 +194,8 @@ class NotificationServer:
             await self._server.wait_closed()
             self._server = None
         self.clients.clear()
+        self.channels.clear()
+        self._client_channels.clear()
 
     async def __aenter__(self) -> "NotificationServer":
         await self.start()
