@@ -67,3 +67,22 @@ export function parseFrontmatter(raw: string): FrontmatterResult {
     content: parsed.content,
   };
 }
+
+const frontmatterCache = new Map<string, FrontmatterResult>();
+
+/**
+ * Same as `parseFrontmatter`, but memoized by a caller-supplied content hash
+ * (typically the source file's hash, already computed for the incremental-build
+ * cache) so re-parsing is skipped whenever the underlying content is unchanged.
+ */
+export function parseFrontmatterCached(contentHash: string, raw: string): FrontmatterResult {
+  const cached = frontmatterCache.get(contentHash);
+  if (cached) return cached;
+  const result = parseFrontmatter(raw);
+  frontmatterCache.set(contentHash, result);
+  return result;
+}
+
+export function clearFrontmatterCache(): void {
+  frontmatterCache.clear();
+}

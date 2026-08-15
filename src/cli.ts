@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from 'path';
 import { Command } from 'commander';
-import { build } from './build';
+import { build, buildIncremental } from './build';
 import { startServer } from './serve';
 
 const program = new Command();
@@ -14,10 +14,24 @@ program
   .option('--content <dir>', 'content directory', './content')
   .option('--output <dir>', 'output directory', './dist')
   .option('--templates <dir>', 'templates directory', './templates')
-  .action((opts: { content: string; output: string; templates: string }) => {
+  .option('--incremental', 'skip pages whose source and template are unchanged since the last build', false)
+  .option('--clean', 'ignore the incremental cache (used with --incremental) and rebuild every page', false)
+  .action((opts: { content: string; output: string; templates: string; incremental: boolean; clean: boolean }) => {
     const contentDir = path.resolve(process.cwd(), opts.content);
     const outputDir = path.resolve(process.cwd(), opts.output);
     const templatesDir = path.resolve(process.cwd(), opts.templates);
+
+    if (opts.incremental) {
+      const result = buildIncremental({ contentDir, outputDir, templatesDir, clean: opts.clean });
+      const { stats } = result;
+      const savedNote = stats.skipped > 0 ? `, saved ~${stats.timeSavedMs}ms` : '';
+      console.log(
+        `Built ${stats.built} page(s), skipped ${stats.skipped} page(s) (of ${stats.total}) into ${outputDir} ` +
+          `in ${stats.timeMs}ms${savedNote}`
+      );
+      return;
+    }
+
     const result = build({ contentDir, outputDir, templatesDir });
     console.log(`Built ${result.pages.length} page(s) into ${outputDir}`);
   });

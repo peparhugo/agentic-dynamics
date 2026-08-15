@@ -1,11 +1,17 @@
 import fs from 'fs';
 import path from 'path';
-import { parseFrontmatter } from './frontmatter';
+import { parseFrontmatterCached } from './frontmatter';
+import { hashString } from './hash';
 import { Page } from './types';
 import { Plugin, PluginContext, PageDraft } from './plugin';
 
 function slugify(filename: string): string {
   return filename.replace(/\.md$/i, '');
+}
+
+/** Resolves the layout a page renders with, falling back to "default" when frontmatter omits it. */
+export function resolveTemplateName(data: Record<string, unknown>): string {
+  return typeof data.template === 'string' && data.template.trim().length > 0 ? data.template.trim() : 'default';
 }
 
 function normalizeTags(tags: unknown): string[] {
@@ -27,14 +33,13 @@ export function findMarkdownFiles(contentDir: string): string[] {
 function makeDraft(contentDir: string, filename: string): PageDraft {
   const filePath = path.join(contentDir, filename);
   const raw = fs.readFileSync(filePath, 'utf-8');
-  const { data, content } = parseFrontmatter(raw);
+  const { data, content } = parseFrontmatterCached(hashString(raw), raw);
   const slug = slugify(filename);
   const title = typeof data.title === 'string' && data.title.length > 0 ? data.title : slug;
   const date = typeof data.date === 'string' ? data.date : undefined;
   const tags = normalizeTags(data.tags);
   const outputPath = `${slug}.html`;
-  const template =
-    typeof data.template === 'string' && data.template.trim().length > 0 ? data.template.trim() : 'default';
+  const template = resolveTemplateName(data);
   return { slug, filename, data, content, title, date, tags, template, outputPath, body: '', html: '' };
 }
 
@@ -79,15 +84,23 @@ export class SSGEngine {
     return toPage(draft);
   }
 
-  runBuild(ctx: PluginContext): Page[] {
+  runBeforeBuild(ctx: PluginContext): void {
     for (const plugin of this.plugins) {
       plugin.beforeBuild?.(ctx);
     }
-    const files = findMarkdownFiles(ctx.contentDir);
-    const pages = files.map((file) => this.buildFile(ctx.contentDir, file, ctx));
+  }
+
+  runAfterBuild(pages: Page[], ctx: PluginContext): void {
     for (const plugin of this.plugins) {
       plugin.afterBuild?.(pages, ctx);
     }
+  }
+
+  runBuild(ctx: PluginContext): Page[] {
+    this.runBeforeBuild(ctx);
+    const files = findMarkdownFiles(ctx.contentDir);
+    const pages = files.map((file) => this.buildFile(ctx.contentDir, file, ctx));
+    this.runAfterBuild(pages, ctx);
     return pages;
   }
 }

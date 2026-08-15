@@ -109,6 +109,41 @@ Body content.`
 
     fs.rmSync(templatesDir, { recursive: true, force: true });
   }, 20000);
+
+  it('supports --incremental, skipping unchanged pages and reporting stats on a second run', () => {
+    const workDir = makeTmpDir('ssg-cli-incremental-');
+    fs.mkdirSync(path.join(workDir, 'content'));
+    fs.writeFileSync(path.join(workDir, 'content', 'only.md'), '# Only Page');
+
+    const first = runCli(['build', '--content', 'content', '--output', 'dist', '--incremental'], workDir);
+    expect(first.status).toBe(0);
+    expect(first.stdout).toContain('Built 1 page(s), skipped 0 page(s)');
+    expect(fs.existsSync(path.join(workDir, '.ssg-cache.json'))).toBe(true);
+    expect(fs.existsSync(path.join(workDir, 'dist', 'only.html'))).toBe(true);
+
+    const second = runCli(['build', '--content', 'content', '--output', 'dist', '--incremental'], workDir);
+    expect(second.status).toBe(0);
+    expect(second.stdout).toContain('Built 0 page(s), skipped 1 page(s)');
+
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }, 20000);
+
+  it('supports --incremental --clean to force a full rebuild despite a warm cache', () => {
+    const workDir = makeTmpDir('ssg-cli-incremental-clean-');
+    fs.mkdirSync(path.join(workDir, 'content'));
+    fs.writeFileSync(path.join(workDir, 'content', 'only.md'), '# Only Page');
+
+    runCli(['build', '--content', 'content', '--output', 'dist', '--incremental'], workDir);
+    const result = runCli(
+      ['build', '--content', 'content', '--output', 'dist', '--incremental', '--clean'],
+      workDir
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('Built 1 page(s), skipped 0 page(s)');
+
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }, 20000);
 });
 
 describe('ssg serve command registration', () => {
