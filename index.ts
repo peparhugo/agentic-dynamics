@@ -7,6 +7,8 @@ export interface Frontmatter {
   title?: string;
   date?: string;
   tags?: string[];
+  template?: string;
+  layout?: string;
   [key: string]: unknown;
 }
 
@@ -17,11 +19,13 @@ export interface Page {
   date?: string;
   tags: string[];
   html: string;
+  frontmatter?: Frontmatter;
 }
 
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 export interface ParsedMarkdown {
@@ -101,9 +105,86 @@ function indexTemplate(pages: Page[]): string {
   return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>Index</title>\n</head>\n<body>\n<main>\n<h1>Index</h1>\n<ul>\n${items}\n</ul>\n</main>\n</body>\n</html>\n`;
 }
 
+type TemplateContext = Record<string, unknown>;
+
+function valueFor(context: TemplateContext, name: string): unknown {
+  return name.split('.').reduce<unknown>((value, key) => {
+    if (value && typeof value === 'object') return (value as Record<string, unknown>)[key];
+    return undefined;
+  }, context);
+}
+
+function renderTemplate(source: string, context: TemplateContext, partials: Map<string, string>): string {
+  let rendered = source;
+  rendered = rendered.replace(/{{#each\s+([\w.]+)}}([\s\S]*?){{\/each}}/g, (_match, name: string, body: string) => {
+    const values = valueFor(context, name);
+    if (!Array.isArray(values)) return '';
+    return values.map((item) => renderTemplate(body, {
+      ...context,
+      ...(item && typeof item === 'object' ? item as Record<string, unknown> : {}),
+      this: item,
+      '.': item,
+    }, partials)).join('');
+  });
+  rendered = rendered.replace(/{{#if\s+([\w.]+)}}([\s\S]*?){{\/if}}/g, (_match, name: string, body: string) => {
+    return valueFor(context, name) ? renderTemplate(body, context, partials) : '';
+  });
+  rendered = rendered.replace(/{{>\s*([\w./-]+)\s*}}/g, (_match, name: string) => {
+    const partial = partials.get(name) ?? partials.get(name.replace(/\.hbs$|\.ejs$/i, ''));
+    return partial ? renderTemplate(partial, context, partials) : '';
+  });
+  rendered = rendered.replace(/{{{\s*([\w.$]+)\s*}}}/g, (_match, name: string) => String(valueFor(context, name) ?? ''));
+  rendered = rendered.replace(/{{\s*([\w.$]+)\s*}}/g, (_match, name: string) => escapeHtml(String(valueFor(context, name) ?? '')));
+  return rendered;
+}
+
+async function loadTemplates(directory: string): Promise<{ templates: Map<string, string>; partials: Map<string, string>; layouts: Map<string, string> }> {
+  const templates = new Map<string, string>();
+  const partials = new Map<string, string>();
+  const layouts = new Map<string, string>();
+  async function readDirectory(current: string, target: Map<string, string>, prefix = ''): Promise<void> {
+    let entries;
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) await readDirectory(fullPath, target, prefix ? `${prefix}/${entry.name}` : entry.name);
+      else if (/\.(hbs|ejs)$/i.test(entry.name)) {
+        const name = `${prefix ? `${prefix}/` : ''}${entry.name}`;
+        const content = await fs.readFile(fullPath, 'utf8');
+        target.set(name, content);
+        target.set(name.replace(/\.(hbs|ejs)$/i, ''), content);
+      }
+    }
+  }
+  await readDirectory(directory, templates);
+  await readDirectory(path.join(directory, 'partials'), partials);
+  await readDirectory(path.join(directory, 'layouts'), layouts);
+  return { templates, partials, layouts };
+}
+
+function templateName(value: unknown, fallback: string): string {
+  if (typeof value !== 'string' || !value.trim()) return fallback;
+  return value.trim();
+}
+
+function templateContext(page: Page, data: Frontmatter, body: string): TemplateContext {
+  return { ...data, ...page, content: body, body, page };
+}
+
+function renderWithLayout(content: string, context: TemplateContext, layout: string | undefined, partials: Map<string, string>): string {
+  return layout ? renderTemplate(layout, { ...context, body: content }, partials) : content;
+}
+
 export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './dist');
+  const templatesDir = path.resolve(options.templatesDir ?? './templates');
+  const loaded = await loadTemplates(templatesDir);
   const files = await markdownFiles(contentDir);
   const pages: Page[] = [];
   for (const relativeSource of files) {
@@ -118,6 +199,7 @@ export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
       tags: tagsFor(parsed.data),
       html: await marked.parse(parsed.content),
     };
+    page.frontmatter = parsed.data;
     pages.push(page);
   }
   pages.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.outputPath.localeCompare(b.outputPath));
@@ -126,20 +208,30 @@ export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
   for (const page of pages) {
     const destination = path.join(outputDir, page.outputPath);
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, pageTemplate(page), 'utf8');
+    const data = page.frontmatter ?? {};
+    const selected = templateName(data.template, 'default');
+    const template = loaded.templates.get(selected) ?? loaded.templates.get(`${selected}.hbs`) ?? loaded.templates.get(`${selected}.ejs`);
+    const context = templateContext(page, data, page.html);
+    const rendered = template ? renderTemplate(template, context, loaded.partials) : pageTemplate(page);
+    const layoutName = template ? templateName(data.layout, 'default') : '';
+    const layout = layoutName ? loaded.layouts.get(layoutName) ?? loaded.layouts.get(`${layoutName}.hbs`) ?? loaded.layouts.get(`${layoutName}.ejs`) : undefined;
+    await fs.writeFile(destination, renderWithLayout(rendered, context, layout, loaded.partials), 'utf8');
   }
-  await fs.writeFile(path.join(outputDir, 'index.html'), indexTemplate(pages), 'utf8');
+  const indexSource = loaded.templates.get('index') ?? loaded.templates.get('index.hbs') ?? loaded.templates.get('index.ejs');
+  const index = indexSource ? renderTemplate(indexSource, { pages, title: 'Index' }, loaded.partials) : indexTemplate(pages);
+  await fs.writeFile(path.join(outputDir, 'index.html'), index, 'utf8');
   return pages;
 }
 
 export function parseArgs(args: string[]): BuildOptions {
   const options: BuildOptions = {};
   for (let index = 0; index < args.length; index += 1) {
-    if (args[index] === '--content' || args[index] === '--output') {
+    if (args[index] === '--content' || args[index] === '--output' || args[index] === '--templates') {
       const value = args[++index];
       if (!value) throw new Error(`${args[index - 1]} requires a directory`);
       if (args[index - 1] === '--content') options.contentDir = value;
-      else options.outputDir = value;
+      else if (args[index - 1] === '--output') options.outputDir = value;
+      else options.templatesDir = value;
     }
   }
   return options;

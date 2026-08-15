@@ -35,10 +35,36 @@ describe('buildSite', () => {
     expect(index).toContain('href="first.html"');
     expect(index).toContain('href="notes/second.html"');
   });
+
+  it('renders a selected template, layout, and partials', async () => {
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'), { recursive: true });
+    await fs.writeFile(path.join(templates, 'article.hbs'), '{{> header}}<article><h1>{{title}}</h1>{{{body}}}</article>');
+    await fs.writeFile(path.join(templates, 'layouts', 'default.hbs'), '<html><body>{{{body}}}<footer>Footer</footer></body></html>');
+    await fs.writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>{{siteName}}</header>');
+    await fs.writeFile(path.join(root, 'content', 'first.md'), '---\ntitle: Custom\ntemplate: article\nsiteName: Example\n---\n\n**Content**');
+
+    const output = path.join(root, 'public');
+    await buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates });
+    const page = await fs.readFile(path.join(output, 'first.html'), 'utf8');
+    expect(page).toContain('<html><body><header>Example</header><article><h1>Custom</h1>');
+    expect(page).toContain('<p><strong>Content</strong></p>');
+    expect(page).toContain('<footer>Footer</footer></body></html>');
+  });
+
+  it('uses the default template when a page does not select one', async () => {
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(templates, { recursive: true });
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<main>{{title}} {{{body}}}</main>');
+    const output = path.join(root, 'public');
+    await buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates });
+    expect(await fs.readFile(path.join(output, 'notes', 'second.html'), 'utf8')).toContain('<main>Second <h1>Second</h1>');
+  });
 });
 
 describe('CLI arguments', () => {
   it('parses build directory options', () => {
-    expect(parseArgs(['--content', 'articles', '--output', 'site'])).toEqual({ contentDir: 'articles', outputDir: 'site' });
+    expect(parseArgs(['--content', 'articles', '--output', 'site', '--templates', 'theme'])).toEqual({ contentDir: 'articles', outputDir: 'site', templatesDir: 'theme' });
   });
 });
