@@ -28,4 +28,18 @@ describe('parseArgs', () => {
       output: 'o',
     });
   });
+
+  it('parses --templates option', () => {
+    expect(parseArgs(['node', 'cli.js', 'build', '--templates', 'tpl'])).toEqual({
+      command: 'build',
+      templates: 'tpl',
+    });
+  });
+
+  it('parses --templates= option', () => {
+    expect(parseArgs(['node', 'cli.js', 'build', '--templates=tpl'])).toEqual({
+      command: 'build',
+      templates: 'tpl',
+    });
+  });
 });

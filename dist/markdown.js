@@ -53,6 +53,9 @@ function parseMarkdown(source) {
     if (date) {
         meta.date = date;
     }
+    if (typeof data.template === 'string' && data.template.trim().length > 0) {
+        meta.template = data.template.trim();
+    }
     const html = renderMarkdown(content);
     return { meta, content, html };
 }

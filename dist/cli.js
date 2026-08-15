@@ -16,11 +16,17 @@ function parseArgs(argv) {
         else if (arg === '--output' || arg === '-o') {
             options.output = args[++i];
         }
+        else if (arg === '--templates' || arg === '-t') {
+            options.templates = args[++i];
+        }
         else if (arg.startsWith('--content=')) {
             options.content = arg.slice('--content='.length);
         }
         else if (arg.startsWith('--output=')) {
             options.output = arg.slice('--output='.length);
+        }
+        else if (arg.startsWith('--templates=')) {
+            options.templates = arg.slice('--templates='.length);
         }
         else if (!arg.startsWith('-')) {
             options.command = arg;
@@ -36,6 +42,7 @@ function run(argv) {
     return (0, site_1.buildSite)({
         contentDir: options.content || './content',
         outputDir: options.output || './dist',
+        templatesDir: options.templates,
     });
 }
 function main(argv = process.argv) {
@@ -48,6 +55,7 @@ function main(argv = process.argv) {
     const result = (0, site_1.buildSite)({
         contentDir: options.content || './content',
         outputDir: options.output || './dist',
+        templatesDir: options.templates,
     });
     console.log(`Built ${result.posts.length} page(s) into ${options.output || './dist'}`);
 }

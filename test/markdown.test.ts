@@ -54,6 +54,27 @@ Body
     const result = parseMarkdown(source);
     expect(result.meta.tags).toEqual(['one', 'two', 'three']);
   });
+
+  it('extracts the template field from frontmatter', () => {
+    const source = `---
+title: Templated
+template: blog/post
+---
+Body
+`;
+    const result = parseMarkdown(source);
+    expect(result.meta.template).toBe('blog/post');
+  });
+
+  it('leaves template undefined when it is not present', () => {
+    const source = `---
+title: No Template
+---
+Body
+`;
+    const result = parseMarkdown(source);
+    expect(result.meta.template).toBeUndefined();
+  });
 });
 
 describe('renderMarkdown', () => {

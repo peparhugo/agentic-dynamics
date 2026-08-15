@@ -5,6 +5,7 @@ export interface CliOptions {
   command?: string;
   content?: string;
   output?: string;
+  templates?: string;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -17,10 +18,14 @@ export function parseArgs(argv: string[]): CliOptions {
       options.content = args[++i];
     } else if (arg === '--output' || arg === '-o') {
       options.output = args[++i];
+    } else if (arg === '--templates' || arg === '-t') {
+      options.templates = args[++i];
     } else if (arg.startsWith('--content=')) {
       options.content = arg.slice('--content='.length);
     } else if (arg.startsWith('--output=')) {
       options.output = arg.slice('--output='.length);
+    } else if (arg.startsWith('--templates=')) {
+      options.templates = arg.slice('--templates='.length);
     } else if (!arg.startsWith('-')) {
       options.command = arg;
     }
@@ -37,6 +42,7 @@ export function run(argv: string[]): BuildResult {
   return buildSite({
     contentDir: options.content || './content',
     outputDir: options.output || './dist',
+    templatesDir: options.templates,
   });
 }
 
@@ -50,6 +56,7 @@ export function main(argv: string[] = process.argv): void {
   const result = buildSite({
     contentDir: options.content || './content',
     outputDir: options.output || './dist',
+    templatesDir: options.templates,
   });
   console.log(`Built ${result.posts.length} page(s) into ${options.output || './dist'}`);
 }

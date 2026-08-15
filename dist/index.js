@@ -1,9 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.normalizeTags = exports.renderMarkdown = exports.parseMarkdown = exports.buildSite = void 0;
+exports.TemplateEngine = exports.normalizeTags = exports.renderMarkdown = exports.parseMarkdown = exports.buildSite = void 0;
 var site_1 = require("./site");
 Object.defineProperty(exports, "buildSite", { enumerable: true, get: function () { return site_1.buildSite; } });
 var markdown_1 = require("./markdown");
 Object.defineProperty(exports, "parseMarkdown", { enumerable: true, get: function () { return markdown_1.parseMarkdown; } });
 Object.defineProperty(exports, "renderMarkdown", { enumerable: true, get: function () { return markdown_1.renderMarkdown; } });
 Object.defineProperty(exports, "normalizeTags", { enumerable: true, get: function () { return markdown_1.normalizeTags; } });
+var templates_1 = require("./templates");
+Object.defineProperty(exports, "TemplateEngine", { enumerable: true, get: function () { return templates_1.TemplateEngine; } });

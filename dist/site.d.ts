@@ -2,6 +2,7 @@ import { Post } from './types';
 export interface BuildOptions {
     contentDir: string;
     outputDir: string;
+    templatesDir?: string;
 }
 export interface BuildResult {
     posts: Post[];

@@ -7,6 +7,7 @@ exports.buildSite = buildSite;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const markdown_1 = require("./markdown");
+const templates_1 = require("./templates");
 function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, (ch) => {
         switch (ch) {
@@ -109,8 +110,20 @@ ${post.html}
 </html>
 `;
 }
+function postToContext(post) {
+    return {
+        title: post.title,
+        date: post.date,
+        tags: post.tags,
+        slug: post.slug,
+        content: post.content,
+        body: post.html,
+    };
+}
 function buildSite(options) {
     const { contentDir, outputDir } = options;
+    const templatesDir = options.templatesDir ?? path_1.default.join(process.cwd(), 'templates');
+    const engine = new templates_1.TemplateEngine(templatesDir);
     const markdownFiles = listMarkdownFiles(contentDir);
     const posts = markdownFiles.map((filePath) => {
         const source = fs_1.default.readFileSync(filePath, 'utf-8');
@@ -120,6 +133,7 @@ function buildSite(options) {
             title: meta.title || slugForFile(filePath, contentDir),
             date: meta.date,
             tags: meta.tags,
+            template: meta.template,
             content,
             html,
         };
@@ -146,7 +160,8 @@ function buildSite(options) {
     for (const post of posts) {
         const pagePath = path_1.default.join(outputDir, `${post.slug}.html`);
         fs_1.default.mkdirSync(path_1.default.dirname(pagePath), { recursive: true });
-        fs_1.default.writeFileSync(pagePath, renderPage(post));
+        const rendered = engine.render(post.template, postToContext(post));
+        fs_1.default.writeFileSync(pagePath, rendered ?? renderPage(post));
         filesWritten.push(pagePath);
     }
     return { posts, filesWritten, outputDir };

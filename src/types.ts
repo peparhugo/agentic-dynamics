@@ -2,6 +2,7 @@ export interface PageMeta {
   title: string;
   date?: string;
   tags: string[];
+  template?: string;
 }
 
 export interface ParsedMarkdown {

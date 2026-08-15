@@ -2,11 +2,13 @@ import fs from 'fs';
 import path from 'path';
 
 import { parseMarkdown } from './markdown';
+import { TemplateEngine, PageContext } from './templates';
 import { Post } from './types';
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  templatesDir?: string;
 }
 
 export interface BuildResult {
@@ -123,8 +125,21 @@ ${post.html}
 `;
 }
 
+function postToContext(post: Post): PageContext {
+  return {
+    title: post.title,
+    date: post.date,
+    tags: post.tags,
+    slug: post.slug,
+    content: post.content,
+    body: post.html,
+  };
+}
+
 export function buildSite(options: BuildOptions): BuildResult {
   const { contentDir, outputDir } = options;
+  const templatesDir = options.templatesDir ?? path.join(process.cwd(), 'templates');
+  const engine = new TemplateEngine(templatesDir);
   const markdownFiles = listMarkdownFiles(contentDir);
 
   const posts: Post[] = markdownFiles.map((filePath) => {
@@ -135,6 +150,7 @@ export function buildSite(options: BuildOptions): BuildResult {
       title: meta.title || slugForFile(filePath, contentDir),
       date: meta.date,
       tags: meta.tags,
+      template: meta.template,
       content,
       html,
     };
@@ -166,7 +182,8 @@ export function buildSite(options: BuildOptions): BuildResult {
   for (const post of posts) {
     const pagePath = path.join(outputDir, `${post.slug}.html`);
     fs.mkdirSync(path.dirname(pagePath), { recursive: true });
-    fs.writeFileSync(pagePath, renderPage(post));
+    const rendered = engine.render(post.template, postToContext(post));
+    fs.writeFileSync(pagePath, rendered ?? renderPage(post));
     filesWritten.push(pagePath);
   }
 
