@@ -7,6 +7,7 @@ export interface PluginContext {
   pages: Page[];
   sources: Map<string, string>;
   renderedPages: Map<string, string>;
+  parsedPages: Map<string, Page>;
 }
 
 export interface Plugin {

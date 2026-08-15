@@ -20,6 +20,11 @@ export function parsePage(source: string, sourcePath: string, contentDir: string
 
 export const MarkdownPlugin: Plugin = {
   onFile(page, context) {
+    const cached = context.parsedPages.get(page.sourcePath);
+    if (cached) {
+      Object.assign(page, cached);
+      return;
+    }
     Object.assign(page, parsePage(context.sources.get(page.sourcePath) ?? '', page.sourcePath, context.contentDir, context.outputDir));
   },
 };

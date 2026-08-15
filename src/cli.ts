@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { buildSite } from './generator';
+import { buildSiteWithStats } from './generator';
 import { serveSite } from './server';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--port <port>]';
 }
 
 interface CliOptions {
@@ -11,6 +11,8 @@ interface CliOptions {
   outputDir?: string;
   templateDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 function options(args: string[], allowPort: boolean): CliOptions {
@@ -18,6 +20,8 @@ function options(args: string[], allowPort: boolean): CliOptions {
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index + 1];
     const option = args[index];
+    if (option === '--incremental') { result.incremental = true; continue; }
+    if (option === '--clean') { result.clean = true; continue; }
     if ((option === '--content' || option === '--output' || option === '--templates' || option === '--port') && (!value || value.startsWith('--'))) throw new Error(`Missing value for ${option}`);
     if (args[index] === '--content') result.contentDir = value;
     if (args[index] === '--output') result.outputDir = value;
@@ -36,8 +40,8 @@ function options(args: string[], allowPort: boolean): CliOptions {
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   if (command === 'build') {
-    const pages = await buildSite(options(args, false));
-    console.log(`Generated ${pages.length} page(s).`);
+    const result = await buildSiteWithStats(options(args, false));
+    console.log(`Generated ${result.pages.length} page(s): ${result.stats.pagesBuilt} built, ${result.stats.pagesSkipped} skipped, ${result.stats.timeSavedMs}ms saved.`);
     return;
   }
   if (command === 'serve') {

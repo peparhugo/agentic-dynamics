@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildSite, parseYamlFrontmatter } from '../src/generator';
+import { buildSite, buildSiteWithStats, parseYamlFrontmatter } from '../src/generator';
 import { Plugin } from '../src/plugin';
 
 describe('static site generator', () => {
@@ -97,5 +97,55 @@ describe('static site generator', () => {
     await buildSite({ contentDir: content, outputDir: output, configFile: config });
 
     expect(await readFile(join(output, 'page.html'), 'utf8')).toContain('<h1>Configured</h1>');
+  });
+
+  it('incrementally reuses unchanged rendered pages and invalidates source or template changes', async () => {
+    const content = join(directory, 'content');
+    const output = join(directory, 'public');
+    const templates = join(directory, 'templates');
+    const rendered: string[] = [];
+    const plugin: Plugin = { onFile: (page) => { rendered.push(page.sourcePath); page.title = `${page.title}!`; } };
+    await mkdir(content, { recursive: true });
+    await mkdir(templates, { recursive: true });
+    await writeFile(join(content, 'one.md'), '---\ntitle: One\n---\nFirst');
+    await writeFile(join(content, 'two.md'), '---\ntitle: Two\n---\nSecond');
+    await writeFile(join(templates, 'default.hbs'), '<main>{{title}}</main>');
+
+    const first = await buildSiteWithStats({ contentDir: content, outputDir: output, templateDir: templates, plugins: [plugin], incremental: true });
+    expect(first.stats).toEqual({ pagesBuilt: 2, pagesSkipped: 0, timeSavedMs: expect.any(Number) });
+    expect(rendered).toHaveLength(2);
+    expect(await readFile(join(output, '.ssg-cache.json'), 'utf8')).toContain('renderedHtml');
+
+    rendered.length = 0;
+    const unchanged = await buildSiteWithStats({ contentDir: content, outputDir: output, templateDir: templates, plugins: [plugin], incremental: true });
+    expect(unchanged.stats.pagesBuilt).toBe(0);
+    expect(unchanged.stats.pagesSkipped).toBe(2);
+    expect(rendered).toEqual([]);
+
+    await writeFile(join(content, 'one.md'), '---\ntitle: One Updated\n---\nFirst');
+    const sourceChanged = await buildSiteWithStats({ contentDir: content, outputDir: output, templateDir: templates, plugins: [plugin], incremental: true });
+    expect(sourceChanged.stats.pagesBuilt).toBe(1);
+    expect(sourceChanged.stats.pagesSkipped).toBe(1);
+    expect(await readFile(join(output, 'one.html'), 'utf8')).toContain('One Updated!');
+
+    await writeFile(join(templates, 'default.hbs'), '<article>{{title}}</article>');
+    const templateChanged = await buildSiteWithStats({ contentDir: content, outputDir: output, templateDir: templates, plugins: [plugin], incremental: true });
+    expect(templateChanged.stats.pagesBuilt).toBe(2);
+    expect(templateChanged.stats.pagesSkipped).toBe(0);
+    expect(await readFile(join(output, 'two.html'), 'utf8')).toContain('<article>Two!</article>');
+  });
+
+  it('performs a clean incremental build when requested', async () => {
+    const content = join(directory, 'content');
+    const output = join(directory, 'public');
+    await mkdir(content, { recursive: true });
+    await mkdir(output, { recursive: true });
+    await writeFile(join(content, 'page.md'), '# Page');
+    await writeFile(join(output, 'obsolete.txt'), 'remove me');
+
+    const result = await buildSiteWithStats({ contentDir: content, outputDir: output, incremental: true, clean: true });
+
+    expect(result.stats.pagesBuilt).toBe(1);
+    await expect(readFile(join(output, 'obsolete.txt'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
