@@ -14,6 +14,8 @@ app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
 
+VALID_STATUSES = {"pending", "done"}
+
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
@@ -113,14 +115,29 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    if status is not None and status not in VALID_STATUSES:
+        return jsonify({"error": f"invalid status: {status!r}"}), 422
     task = update_task(
         task_id,
         title=data.get("title"),
-        status=data.get("status"),
+        status=status,
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
+
+
+# ── Error handlers ───────────────────────────────────────────────
+
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({"error": "not found"}), 404
+
+
+@app.errorhandler(405)
+def handle_405(e):
+    return jsonify({"error": "method not allowed"}), 405
 
 
 if __name__ == "__main__":
