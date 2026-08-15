@@ -30,6 +30,7 @@ Client state keys
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
@@ -143,3 +144,30 @@ class MessageBroker:
     async def close(self) -> None:
         if self._owns_redis:
             await self._redis.aclose()
+
+
+RATE_LIMIT_KEY_PREFIX = "notify:rate:"
+
+
+class RateLimiter:
+    """Fixed-window rate limiter backed by Redis counters.
+
+    Each client gets a per-minute window key.  The counter is incremented
+    atomically with :meth:`~redis.Redis.incr` and expires shortly after the
+    window ends so stale keys do not accumulate.
+    """
+
+    def __init__(self, redis: Any, limit: int = 100) -> None:
+        self._redis = redis
+        self.limit = max(0, int(limit))
+
+    async def allow(self, client_id: int) -> bool:
+        """Return ``True`` if the client may send another message this minute."""
+        if self.limit == 0:
+            return False
+        window = int(time.time() // 60)
+        key = f"{RATE_LIMIT_KEY_PREFIX}{client_id}:{window}"
+        count = await self._redis.incr(key)
+        if count == 1:
+            await self._redis.expire(key, 120)
+        return count <= self.limit

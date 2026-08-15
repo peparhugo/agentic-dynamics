@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 DEFAULT_DATABASE_URL = "messages.db"
@@ -62,6 +63,15 @@ class MessageStore:
             conn.commit()
             return cursor.lastrowid
 
+    def _row_to_message(self, row: sqlite3.Row) -> Dict[str, Any]:
+        return {
+            "id": row["id"],
+            "channel": row["channel"],
+            "type": row["type"],
+            "payload": json.loads(row["payload"]),
+            "timestamp": row["timestamp"],
+        }
+
     def query(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         try:
             limit = int(limit)
@@ -80,18 +90,62 @@ class MessageStore:
                 (limit, offset),
             ).fetchall()
 
-        messages: List[Dict[str, Any]] = []
-        for row in rows:
-            messages.append(
-                {
-                    "id": row["id"],
-                    "channel": row["channel"],
-                    "type": row["type"],
-                    "payload": json.loads(row["payload"]),
-                    "timestamp": row["timestamp"],
-                }
+        return [self._row_to_message(row) for row in rows]
+
+    def query_history(
+        self,
+        channel: Optional[str] = None,
+        since: Optional[str] = None,
+        limit: int = 50,
+    ) -> Dict[str, Any]:
+        """Return messages for a channel/time range in chronological order.
+
+        Results are ordered oldest-first (ascending ``id``).  ``since`` filters
+        messages whose ``timestamp`` is greater than or equal to the given
+        ISO-8601 value.  ``has_more`` is ``True`` when additional messages
+        exist beyond the returned page.
+        """
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = 50
+        limit = max(1, min(limit, 1000))
+
+        conditions: List[str] = []
+        params: List[Any] = []
+        if channel:
+            conditions.append("channel = ?")
+            params.append(channel)
+        if since:
+            conditions.append("timestamp >= ?")
+            params.append(since)
+
+        where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM messages{where} ORDER BY id ASC LIMIT ?",
+                (*params, limit + 1),
+            ).fetchall()
+
+        has_more = len(rows) > limit
+        messages = [self._row_to_message(row) for row in rows[:limit]]
+        return {"messages": messages, "has_more": has_more}
+
+    def delete_older_than_days(self, days: int) -> int:
+        """Delete messages older than ``days`` and return the number removed."""
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            days = 7
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM messages WHERE timestamp < ?",
+                (cutoff,),
             )
-        return messages
+            conn.commit()
+            return cursor.rowcount
 
     def count(self) -> int:
         with self._connect() as conn:

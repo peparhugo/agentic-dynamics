@@ -60,6 +60,7 @@ from broker import (
     DIRECT_PREFIX,
     SUBSCRIBE_PATTERN,
     MessageBroker,
+    RateLimiter,
 )
 from store import MessageStore
 from transport import (
@@ -80,6 +81,16 @@ __all__ = [
     "encode_message",
     "utcnow",
 ]
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
 
 
 class ClientRegistry:
@@ -157,13 +168,22 @@ class NotificationServer:
         redis_url: str | None = None,
         database_url: str | None = None,
         transport: BaseTransport | str | type | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: int | None = None,
     ) -> None:
         self.clients = ClientRegistry()
         self.instance_id = uuid.uuid4().hex
         self.broker = broker if broker is not None else MessageBroker(redis_url=redis_url)
         self.store = store if store is not None else MessageStore(database_url)
         self.transport = self._select_transport(transport)
+        self.rate_limit = _env_int("RATE_LIMIT", 100) if rate_limit is None else rate_limit
+        self.rate_limiter = RateLimiter(self.broker.redis, self.rate_limit)
+        self.message_ttl_days = (
+            _env_int("MESSAGE_TTL_DAYS", 7) if message_ttl_days is None else message_ttl_days
+        )
+        self._cleanup_interval = 3600
         self._subscriber_task = None
+        self._cleanup_task = None
 
     def _select_transport(self, transport: BaseTransport | str | type | None) -> BaseTransport:
         if transport is None:
@@ -179,8 +199,17 @@ class NotificationServer:
     async def start(self, host: str = "127.0.0.1", port: int = 8765) -> None:
         await self.transport.start(host, port)
         self._subscriber_task = asyncio.create_task(self._subscriber_loop())
+        self.store.delete_older_than_days(self.message_ttl_days)
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def stop(self) -> None:
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._cleanup_task = None
         if self._subscriber_task is not None:
             self._subscriber_task.cancel()
             try:
@@ -214,6 +243,14 @@ class NotificationServer:
                 await ps.aclose()
             except Exception:
                 pass
+
+    async def _cleanup_loop(self) -> None:
+        while True:
+            try:
+                self.store.delete_older_than_days(self.message_ttl_days)
+            except Exception:
+                pass
+            await asyncio.sleep(self._cleanup_interval)
 
     async def _route(self, channel: str, message: Dict[str, Any]) -> None:
         if channel == BROADCAST_CHANNEL:
@@ -254,6 +291,18 @@ class NotificationServer:
             messages = self.store.query(limit=limit, offset=offset)
             return json.dumps({"messages": messages})
 
+        if route == "/history":
+            query = parse_qs(parts.query)
+            channel = query.get("channel", [None])[0]
+            since = query.get("since", [None])[0]
+            limit = query.get("limit", ["50"])[0]
+            result = self.store.query_history(
+                channel=channel or None,
+                since=since or None,
+                limit=limit,
+            )
+            return json.dumps(result)
+
         return None
 
     # ── Message handling ──────────────────────────────────────
@@ -275,6 +324,22 @@ class NotificationServer:
             if channel:
                 self.clients.unsubscribe(sender_id, channel)
                 await self.broker.unsubscribe_client(sender_id, channel)
+            return
+
+        if not await self.rate_limiter.allow(sender_id):
+            connection = self.clients.get(sender_id)
+            if connection is not None:
+                try:
+                    await self.transport.send_message(
+                        connection,
+                        {
+                            "type": "error",
+                            "payload": {"message": "rate limit exceeded"},
+                            "timestamp": utcnow(),
+                        },
+                    )
+                except Exception:
+                    pass
             return
 
         if mtype == "broadcast":
