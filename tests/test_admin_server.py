@@ -81,6 +81,59 @@ class FakePipeline:
         return [self._redis.logs.get(key, []) for key in self._keys]
 
 
+class QueuePipeline:
+    """Model the atomic delete+rpush transaction used by queue reinterleave."""
+
+    def __init__(self, redis):
+        self._redis = redis
+        self._deleted = []
+        self._rpushes = []
+
+    def delete(self, key):
+        self._deleted.append(key)
+        return self
+
+    def rpush(self, key, value):
+        self._rpushes.append((key, value))
+        return self
+
+    def execute(self):
+        for key in self._deleted:
+            self._redis.queue = []
+        for key, value in self._rpushes:
+            self._redis.queue.append(value)
+
+
+class QueueRedis(FakeRedis):
+    """Extend FakeRedis with a story_jobs list plus idempotency ops."""
+
+    def __init__(self, *, queue=None, **kwargs):
+        super().__init__(**kwargs)
+        self.queue = list(queue or [])
+        self.values = {}
+
+    def lrange(self, key, start, end):
+        if key == "story_jobs":
+            assert (start, end) == (0, -1)
+            return self.queue
+        return super().lrange(key, start, end)
+
+    def pipeline(self, transaction=False):
+        if transaction:
+            return QueuePipeline(self)
+        return super().pipeline(transaction=transaction)
+
+    def set(self, key, value, *, nx=False, ex=None):
+        assert ex is not None
+        if nx and key in self.values:
+            return False
+        self.values[key] = value
+        return True
+
+    def get(self, key):
+        return self.values.get(key)
+
+
 def _step(cost=None, input_tokens=None, output_tokens=None, **extra):
     """Return a realistic serialized ``step_finish`` event for fixtures."""
     part = {"tokens": {"input": input_tokens, "output": output_tokens}, "cost": cost}
@@ -248,3 +301,90 @@ def test_matrix_history_capped_false_when_window_open(monkeypatch):
     telemetry = server.app.test_client().get("/api/matrix").get_json()["telemetry"]
 
     assert telemetry["history_capped"] is False
+
+
+def _queue_cell(model: str, cell_id: str) -> str:
+    """Serialize one queued job the way enqueue.py does (head->tail LPUSH)."""
+    return json.dumps({"model": model, "cell_id": cell_id, "story": "task_manager_api"})
+
+
+def test_queue_reinterleave_spreads_providers_and_preserves_jobs(monkeypatch):
+    """The endpoint round-robins providers and never loses or duplicates a job.
+
+    The fake queue holds cells in Redis head->tail order (as LPUSH stores them).
+    ``_read_queue`` reads that and reverses for consumption order, exactly like
+    the worker's BRPOP. The fixture has a same-provider run at the consumption
+    tail (two openai cells back-to-back) so the reorder is observable.
+    """
+    queue = [
+        _queue_cell("openai/gpt-5.6-luna", "openai_a"),
+        _queue_cell("openai/gpt-5.6-luna", "openai_b"),
+        _queue_cell("deepseek/deepseek-v4-flash", "deepseek_a"),
+        _queue_cell("anthropic/claude-haiku-4-5", "anthropic_a"),
+        _queue_cell("anthropic/claude-sonnet-5", "anthropic_b"),
+        _queue_cell("openai/gpt-5.6-sol", "openai_c"),
+    ]
+    redis = QueueRedis(queue=queue)
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    response = server.app.test_client().post(
+        "/api/queue/reinterleave",
+        json={},
+        headers={"Idempotency-Key": "reinterleave-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["ok"] is True
+    assert body["count"] == 6
+
+    # Consumption order (tail-first, i.e. reversed head->tail) after reorder
+    # must have no two adjacent cells sharing a provider.
+    after_order = body["after"]["order"]
+    for left, right in zip(after_order, after_order[1:]):
+        assert left != right, f"adjacent same-provider cells: {left}, {right}"
+
+    # The queue still holds exactly the same cell ids (no loss, no duplication).
+    before_ids = sorted(json.loads(cell)["cell_id"] for cell in queue)
+    after_ids = sorted(json.loads(cell)["cell_id"] for cell in redis.queue)
+    assert len(after_ids) == len(before_ids) == 6
+    assert after_ids == before_ids
+
+
+def test_queue_reinterleave_idempotent_replay_does_not_rewrite(monkeypatch):
+    """Replaying the same Idempotency-Key returns the cached result unchanged.
+
+    A second identical POST must not re-read/reorder the (already reordered)
+    queue; it replays the reserved response, preserving the idempotency
+    contract that other Control Room mutations honor.
+    """
+    queue = [
+        _queue_cell("openai/gpt-5.6-luna", "openai_a"),
+        _queue_cell("deepseek/deepseek-v4-flash", "deepseek_a"),
+        _queue_cell("anthropic/claude-haiku-4-5", "anthropic_a"),
+    ]
+    redis = QueueRedis(queue=queue)
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+    client = server.app.test_client()
+    headers = {"Idempotency-Key": "reinterleave-replay"}
+
+    first = client.post("/api/queue/reinterleave", json={}, headers=headers)
+    snapshot_after_first = list(redis.queue)
+    replay = client.post("/api/queue/reinterleave", json={}, headers=headers)
+
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    assert replay.get_json() == first.get_json()
+    assert list(redis.queue) == snapshot_after_first
+
+
+def test_queue_reinterleave_requires_idempotency_header(monkeypatch):
+    """The route exists and enforces the server's mutation conventions."""
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    # Registered (not 404) but rejected because the body-validation convention
+    # requires an Idempotency-Key header on mutating POSTs.
+    response = server.app.test_client().post("/api/queue/reinterleave", json={})
+
+    assert response.status_code == 400
