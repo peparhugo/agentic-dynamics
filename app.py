@@ -20,6 +20,8 @@ import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from email_tasks import send_notification_email
+
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get(
     "SECRET_KEY", "dev-secret-key-for-local-development-only"
@@ -72,6 +74,7 @@ def _migrate(store: dict) -> bool:
             legacy = {
                 "id": store["next_user_id"],
                 "username": "legacy",
+                "email": "legacy@example.com",
                 "password_hash": generate_password_hash("legacy"),
             }
             store["next_user_id"] += 1
@@ -84,7 +87,7 @@ def _migrate(store: dict) -> bool:
 
 # ── Models: Users ──────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict:
+def create_user(username: str, password: str, email: str | None = None) -> dict:
     with _lock:
         store = _read()
         if any(u["username"] == username for u in store["users"]):
@@ -92,6 +95,7 @@ def create_user(username: str, password: str) -> dict:
         user = {
             "id": store["next_user_id"],
             "username": username,
+            "email": email or f"{username}@example.com",
             "password_hash": generate_password_hash(password),
         }
         store["next_user_id"] += 1
@@ -214,11 +218,12 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username")
     password = data.get("password")
+    email = data.get("email")
     if not isinstance(username, str) or not username.strip():
         return jsonify({"error": "username is required"}), 400
     if not isinstance(password, str) or not password:
         return jsonify({"error": "password is required"}), 400
-    user = create_user(username.strip(), password)
+    user = create_user(username.strip(), password, email=email)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify({"id": user["id"], "username": user["username"], "token": token_for(user)}), 201
@@ -269,6 +274,9 @@ def show_task(task_id: int):
 @auth_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    current = get_task(task_id, g.current_user["id"])
+    if current is None:
+        return jsonify({"error": "task not found"}), 404
     task = update_task(
         task_id,
         g.current_user["id"],
@@ -277,6 +285,10 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if task["status"] == "completed" and current["status"] != "completed":
+        user = g.current_user
+        user_email = user.get("email") or f"{user['username']}@example.com"
+        send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 
