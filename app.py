@@ -17,7 +17,6 @@ header (``Bearer <token>``). Tokens are issued by the REST endpoints
 Error handling returns SOAP Faults with the appropriate HTTP status codes.
 """
 
-from datetime import datetime
 import os
 import sqlite3
 import xml.etree.ElementTree as ET
@@ -25,8 +24,8 @@ from xml.sax.saxutils import escape
 
 import jwt
 from flask import Flask, Response, jsonify, request
-from werkzeug.security import check_password_hash, generate_password_hash
 
+from repositories import TaskRepository, UserRepository, create_schema
 from tasks import send_notification_email
 
 SOAP_11 = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -45,67 +44,15 @@ def get_db():
     return conn
 
 
+task_repo = TaskRepository(get_db)
+user_repo = UserRepository(get_db)
+
+
 def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS users ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL,"
-            "  email TEXT"
-            ")"
-        )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL,"
-            "  owner_id INTEGER REFERENCES users(id)"
-            ")"
-        )
-        # Migration: add owner_id to pre-existing task tables without
-        # disturbing any existing rows (they keep a NULL owner).
-        cols = [r["name"] for r in conn.execute("PRAGMA table_info(tasks)").fetchall()]
-        if "owner_id" not in cols:
-            conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
-        # Migration: add email to pre-existing user tables.
-        user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-        if "email" not in user_cols:
-            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
-        conn.commit()
+    create_schema(get_db)
 
 
 # ── Auth helpers ────────────────────────────────────────────────
-
-def create_user(username: str, password: str, email: str = None):
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        if existing is not None:
-            return None, "username already exists"
-        if email is None:
-            email = f"{username}@example.com"
-        cursor = conn.execute(
-            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-            (username, generate_password_hash(password), email),
-        )
-        conn.commit()
-        return {"id": cursor.lastrowid, "username": username, "email": email}, None
-
-
-def authenticate(username: str, password: str):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
-    if row is None:
-        return None
-    if not check_password_hash(row["password_hash"], password):
-        return None
-    return dict(row)
-
 
 def generate_token(user: dict) -> str:
     payload = {"sub": str(user["id"]), "username": user["username"]}
@@ -125,71 +72,7 @@ def current_user():
         user_id = int(payload["sub"])
     except (KeyError, TypeError, ValueError):
         return None
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    return dict(row) if row else None
-
-
-def get_user(user_id: int):
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    return dict(row) if row else None
-
-
-# ── Models ────────────────────────────────────────────────────
-
-def create_task(title: str, owner_id: int) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id)"
-            " VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-        }
-
-
-def get_tasks(owner_id: int):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_task(task_id: int, owner_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, owner_id),
-        ).fetchone()
-        return dict(row) if row else None
-
-
-def update_task(task_id: int, owner_id: int, title=None, status=None):
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates, params = [], []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params)
-            conn.commit()
-    return get_task(task_id, owner_id)
+    return user_repo.get(user_id)
 
 
 # ── SOAP helpers ───────────────────────────────────────────────
@@ -263,11 +146,11 @@ def _handle_create(soap_ns, op_elem, owner_id):
     title = _child_text(op_elem, "title")
     if not title:
         return _fault_response(soap_ns, "title is required", 400)
-    return _soap_response(soap_ns, _task_xml("CreateTaskResponse", create_task(title, owner_id)))
+    return _soap_response(soap_ns, _task_xml("CreateTaskResponse", task_repo.create(title, owner_id)))
 
 
 def _handle_list(soap_ns, op_elem, owner_id):
-    items = "".join(_task_xml("task", t) for t in get_tasks(owner_id))
+    items = "".join(_task_xml("task", t) for t in task_repo.all(owner_id))
     return _soap_response(
         soap_ns, f'<ListTasksResponse xmlns="{SERVICE_NS}">{items}</ListTasksResponse>'
     )
@@ -277,7 +160,7 @@ def _handle_get(soap_ns, op_elem, owner_id):
     task_id = _parse_id(_child_text(op_elem, "id"))
     if task_id is None:
         return _fault_response(soap_ns, "invalid or missing id", 400)
-    task = get_task(task_id, owner_id)
+    task = task_repo.get(task_id, owner_id)
     if task is None:
         return _fault_response(soap_ns, "task not found", 404)
     return _soap_response(soap_ns, _task_xml("GetTaskResponse", task))
@@ -293,8 +176,8 @@ def _handle_update(soap_ns, op_elem, owner_id):
         title = None
     if status == "":
         status = None
-    previous = get_task(task_id, owner_id)
-    task = update_task(task_id, owner_id, title=title, status=status)
+    previous = task_repo.get(task_id, owner_id)
+    task = task_repo.update(task_id, owner_id, title=title, status=status)
     if task is None:
         return _fault_response(soap_ns, "task not found", 404)
     if (
@@ -302,7 +185,7 @@ def _handle_update(soap_ns, op_elem, owner_id):
         and previous is not None
         and previous.get("status") != "completed"
     ):
-        owner = get_user(owner_id)
+        owner = user_repo.get(owner_id)
         if owner is not None:
             user_email = owner.get("email") or f"{owner['username']}@example.com"
             send_notification_email.delay(user_email, task["title"])
@@ -319,9 +202,9 @@ def register():
     email = (data.get("email") or "").strip() or None
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user, err = create_user(username, password, email)
-    if err:
-        return jsonify({"error": err}), 409
+    user = user_repo.create(username, password, email)
+    if user is None:
+        return jsonify({"error": "username already exists"}), 409
     return jsonify(user), 201
 
 
@@ -330,7 +213,7 @@ def login():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
-    user = authenticate(username, password)
+    user = user_repo.authenticate(username, password)
     if user is None:
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": generate_token(user)}), 200
