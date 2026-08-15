@@ -230,7 +230,9 @@ def run_experiment(
 
                 perturbed_prompt, record = perturb_prompt(
                     config.task, op_name, strength=strength,
-                    rng_seed=derive_seed(config.task, op_name, strength, rep),
+                    # seed_variant=0: repetition re-measures the SAME starting point
+                    # (consistent with scripts/run.py); variant would deviate it.
+                    rng_seed=derive_seed(config.task, op_name, strength, 0),
                 )
 
                 t0 = time.monotonic()

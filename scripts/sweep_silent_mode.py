@@ -133,9 +133,9 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             ops = build_operators()
             op_name = "remove_critical_constraint"
             pert_class = ops[op_name].perturbation_class
-            # Seed is a pure function of the cell (task|operator|strength|repetition),
+            # Seed is a pure function of the cell (task|operator|strength|seed_variant),
             # identical across models/silent-modes so the perturbed prompt is held
-            # constant for cross-model comparison (repetition = 0, single run).
+            # constant for cross-model comparison (seed_variant = 0, single starting point).
             perturbed_task, _ = perturb_prompt(
                 TASK, op_name, strength=0.5,
                 rng_seed=derive_seed(TASK, op_name, 0.5, 0),
