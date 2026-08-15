@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 from abc import ABC, abstractmethod
@@ -115,9 +117,23 @@ class TaskRepository(BaseRepository):
         with self._lock:
             return sorted(
                 (task for task in self._read() if task.get("owner_id") == owner_id),
-                key=lambda task: task["created_at"],
+                key=lambda task: (task["created_at"], task["id"]),
                 reverse=True,
             )
+
+    def paginate(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> tuple[list[dict[str, Any]], str | None, int]:
+        tasks = self.list(owner_id)
+        total = len(tasks)
+        if cursor is not None:
+            tasks = [task for task in tasks if task["id"] < cursor]
+
+        page = tasks[:limit]
+        next_cursor = (
+            str(page[-1]["id"]) if page and len(tasks) > len(page) else None
+        )
+        return page, next_cursor, total
 
     def get(self, task_id: int, owner_id: int) -> dict[str, Any] | None:
         with self._lock:

@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 
 from notification_tasks import send_notification_email
@@ -93,6 +96,12 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         ),
         JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", "development-secret"),
         JWT_LIFETIME_SECONDS=3600,
+        RATELIMIT_DEFAULT="100 per minute",
+        RATELIMIT_STORAGE_URI=os.environ.get(
+            "RATELIMIT_STORAGE_URI", "redis://localhost:6379"
+        ),
+        RATELIMIT_HEADERS_ENABLED=True,
+        RATELIMIT_HEADER_RETRY_AFTER_VALUE="delta-seconds",
     )
     if config:
         app.config.update(config)
@@ -100,11 +109,28 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
             app.config["USERS_FILE"] = str(
                 Path(config["TASKS_FILE"]).with_name("users.json")
             )
+    if app.config["TESTING"] and not (config or {}).get("RATELIMIT_STORAGE_URI"):
+        app.config["RATELIMIT_STORAGE_URI"] = "memory://"
 
     task_repository = TaskRepository(app.config["TASKS_FILE"])
     user_repository = UserRepository(app.config["USERS_FILE"])
     app.extensions["task_repository"] = task_repository
     app.extensions["user_repository"] = user_repository
+
+    def rate_limit_key() -> str:
+        authorization = request.headers.get("Authorization", "")
+        scheme, separator, token = authorization.partition(" ")
+        if separator == " " and scheme.lower() == "bearer" and token:
+            user_id = decode_token(token, app.config["JWT_SECRET_KEY"])
+            if user_id is not None:
+                return f"user:{user_id}"
+        return f"address:{get_remote_address()}"
+
+    limiter = Limiter(key_func=rate_limit_key, app=app)
+
+    @app.errorhandler(RateLimitExceeded)
+    def handle_rate_limit(error: RateLimitExceeded):
+        return jsonify(error="rate limit exceeded"), 429
 
     def require_auth(view: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(view)
@@ -176,7 +202,22 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     @app.get("/tasks")
     @require_auth
     def list_tasks():
-        return jsonify(task_repository.list(g.user_id))
+        cursor_value = request.args.get("cursor")
+        limit_value = request.args.get("limit", "20")
+        try:
+            cursor = int(cursor_value) if cursor_value is not None else None
+            limit = int(limit_value)
+        except ValueError:
+            return jsonify(error="cursor and limit must be integers"), 400
+        if cursor is not None and cursor < 1:
+            return jsonify(error="cursor must be a positive integer"), 400
+        if limit < 1 or limit > 100:
+            return jsonify(error="limit must be between 1 and 100"), 400
+
+        tasks, next_cursor, total = task_repository.paginate(
+            g.user_id, cursor, limit
+        )
+        return jsonify(data=tasks, next_cursor=next_cursor, total=total)
 
     @app.get("/tasks/<int:task_id>")
     @require_auth
