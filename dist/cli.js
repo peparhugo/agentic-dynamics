@@ -9,6 +9,8 @@ function parseArgs(argv) {
         content: './content',
         output: './dist',
         port: 3000,
+        incremental: false,
+        clean: false,
     };
     for (let i = 1; i < argv.length; i++) {
         const arg = argv[i];
@@ -24,14 +26,30 @@ function parseArgs(argv) {
                 result.port = value;
             }
         }
+        else if (arg === '--incremental') {
+            result.incremental = true;
+        }
+        else if (arg === '--clean') {
+            result.clean = true;
+        }
     }
     return result;
 }
 async function main() {
     const args = parseArgs(process.argv.slice(2));
     if (args.command === 'build') {
-        const pages = await (0, build_1.build)({ content: args.content, output: args.output });
-        console.log(`Built ${pages.length} page(s) into ${args.output}.`);
+        const result = await (0, build_1.buildWithStats)({
+            content: args.content,
+            output: args.output,
+            incremental: args.incremental,
+            clean: args.clean,
+        });
+        if (args.incremental) {
+            console.log(`Built ${result.stats.pagesBuilt} page(s), skipped ${result.stats.pagesSkipped} unchanged, saved ${result.stats.timeSavedMs}ms into ${args.output}.`);
+        }
+        else {
+            console.log(`Built ${result.pages.length} page(s) into ${args.output}.`);
+        }
         return;
     }
     if (args.command === 'serve') {
@@ -43,7 +61,7 @@ async function main() {
         console.log(`Serving ${args.output} at http://localhost:${devServer.port}`);
         return;
     }
-    console.error('Usage: ssg build [--content <dir>] [--output <dir>]');
+    console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--incremental] [--clean]');
     console.error('       ssg serve [--content <dir>] [--output <dir>] [--port <port>]');
     process.exit(1);
 }

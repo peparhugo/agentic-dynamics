@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.buildWithStats = buildWithStats;
 exports.build = build;
 const path_1 = __importDefault(require("path"));
 const config_1 = require("./config");
@@ -18,11 +19,16 @@ async function resolveBuildConfig(options) {
     const cwd = process.cwd();
     return { config: await (0, config_1.loadConfig)(cwd), baseDir: cwd };
 }
-async function build(options) {
+async function buildWithStats(options) {
     const { config, baseDir } = await resolveBuildConfig(options);
     const configPlugins = await (0, config_1.resolvePlugins)(config.plugins, baseDir);
     const plugins = [...configPlugins, ...(options.plugins ?? [])];
     const engine = new engine_1.SsgEngine(options, config, plugins);
-    return engine.run();
+    const pages = await engine.run();
+    return { pages, stats: engine.buildStats };
+}
+async function build(options) {
+    const { pages } = await buildWithStats(options);
+    return pages;
 }
 //# sourceMappingURL=build.js.map

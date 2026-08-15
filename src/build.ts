@@ -1,5 +1,5 @@
 import path from 'path';
-import type { BuildOptions, Page } from './types';
+import type { BuildOptions, BuildStats, Page } from './types';
 import type { Plugin } from './plugin';
 import type { SsgConfig } from './config';
 import { loadConfig, loadConfigFile, resolvePlugins } from './config';
@@ -7,6 +7,11 @@ import { SsgEngine } from './engine';
 
 export interface BuildInput extends BuildOptions {
   plugins?: Plugin[];
+}
+
+export interface BuildResult {
+  pages: Page[];
+  stats: BuildStats;
 }
 
 async function resolveBuildConfig(
@@ -23,11 +28,17 @@ async function resolveBuildConfig(
   return { config: await loadConfig(cwd), baseDir: cwd };
 }
 
-export async function build(options: BuildInput): Promise<Page[]> {
+export async function buildWithStats(options: BuildInput): Promise<BuildResult> {
   const { config, baseDir } = await resolveBuildConfig(options);
   const configPlugins = await resolvePlugins(config.plugins, baseDir);
   const plugins = [...configPlugins, ...(options.plugins ?? [])];
 
   const engine = new SsgEngine(options, config, plugins);
-  return engine.run();
+  const pages = await engine.run();
+  return { pages, stats: engine.buildStats };
+}
+
+export async function build(options: BuildInput): Promise<Page[]> {
+  const { pages } = await buildWithStats(options);
+  return pages;
 }

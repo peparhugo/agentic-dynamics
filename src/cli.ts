@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { build } from './build';
+import { buildWithStats } from './build';
 import { serve } from './serve';
 
 interface ParsedArgs {
@@ -7,6 +7,8 @@ interface ParsedArgs {
   content: string;
   output: string;
   port: number;
+  incremental: boolean;
+  clean: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -15,6 +17,8 @@ function parseArgs(argv: string[]): ParsedArgs {
     content: './content',
     output: './dist',
     port: 3000,
+    incremental: false,
+    clean: false,
   };
   for (let i = 1; i < argv.length; i++) {
     const arg = argv[i];
@@ -27,6 +31,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       if (Number.isFinite(value) && value >= 0) {
         result.port = value;
       }
+    } else if (arg === '--incremental') {
+      result.incremental = true;
+    } else if (arg === '--clean') {
+      result.clean = true;
     }
   }
   return result;
@@ -36,8 +44,19 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
   if (args.command === 'build') {
-    const pages = await build({ content: args.content, output: args.output });
-    console.log(`Built ${pages.length} page(s) into ${args.output}.`);
+    const result = await buildWithStats({
+      content: args.content,
+      output: args.output,
+      incremental: args.incremental,
+      clean: args.clean,
+    });
+    if (args.incremental) {
+      console.log(
+        `Built ${result.stats.pagesBuilt} page(s), skipped ${result.stats.pagesSkipped} unchanged, saved ${result.stats.timeSavedMs}ms into ${args.output}.`
+      );
+    } else {
+      console.log(`Built ${result.pages.length} page(s) into ${args.output}.`);
+    }
     return;
   }
 
@@ -51,7 +70,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('Usage: ssg build [--content <dir>] [--output <dir>]');
+  console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--incremental] [--clean]');
   console.error('       ssg serve [--content <dir>] [--output <dir>] [--port <port>]');
   process.exit(1);
 }

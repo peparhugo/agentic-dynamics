@@ -20,4 +20,12 @@ export interface BuildOptions {
   output: string;
   templates?: string;
   config?: string | false;
+  incremental?: boolean;
+  clean?: boolean;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
 }

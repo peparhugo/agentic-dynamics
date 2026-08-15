@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DevServerPlugin = exports.TemplatePlugin = exports.MarkdownPlugin = exports.SsgEngine = exports.loadConfig = exports.defineConfig = exports.isPlugin = exports.TemplateEngine = exports.renderPage = exports.renderIndex = exports.markdownToHtml = exports.normalizeTags = exports.parseFrontmatter = exports.liveReloadScript = exports.injectLiveReload = exports.serve = exports.build = void 0;
+exports.computeTemplatesHash = exports.hashFile = exports.hashString = exports.CacheManager = exports.DevServerPlugin = exports.TemplatePlugin = exports.MarkdownPlugin = exports.SsgEngine = exports.loadConfig = exports.defineConfig = exports.isPlugin = exports.TemplateEngine = exports.renderPage = exports.renderIndex = exports.markdownToHtml = exports.normalizeTags = exports.parseFrontmatter = exports.liveReloadScript = exports.injectLiveReload = exports.serve = exports.buildWithStats = exports.build = void 0;
 var build_1 = require("./build");
 Object.defineProperty(exports, "build", { enumerable: true, get: function () { return build_1.build; } });
+Object.defineProperty(exports, "buildWithStats", { enumerable: true, get: function () { return build_1.buildWithStats; } });
 var serve_1 = require("./serve");
 Object.defineProperty(exports, "serve", { enumerable: true, get: function () { return serve_1.serve; } });
 Object.defineProperty(exports, "injectLiveReload", { enumerable: true, get: function () { return serve_1.injectLiveReload; } });
@@ -30,4 +31,9 @@ var template_1 = require("./plugins/template");
 Object.defineProperty(exports, "TemplatePlugin", { enumerable: true, get: function () { return template_1.TemplatePlugin; } });
 var devServer_1 = require("./plugins/devServer");
 Object.defineProperty(exports, "DevServerPlugin", { enumerable: true, get: function () { return devServer_1.DevServerPlugin; } });
+var cache_1 = require("./cache");
+Object.defineProperty(exports, "CacheManager", { enumerable: true, get: function () { return cache_1.CacheManager; } });
+Object.defineProperty(exports, "hashString", { enumerable: true, get: function () { return cache_1.hashString; } });
+Object.defineProperty(exports, "hashFile", { enumerable: true, get: function () { return cache_1.hashFile; } });
+Object.defineProperty(exports, "computeTemplatesHash", { enumerable: true, get: function () { return cache_1.computeTemplatesHash; } });
 //# sourceMappingURL=index.js.map

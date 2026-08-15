@@ -1,4 +1,4 @@
-import type { BuildOptions, Page } from './types';
+import type { BuildOptions, BuildStats, Page } from './types';
 import type { Plugin } from './plugin';
 import type { SsgConfig } from './config';
 import { MarkdownPlugin } from './plugins/markdown';
@@ -14,7 +14,10 @@ export declare class SsgEngine {
     readonly template: TemplatePlugin;
     private readonly context;
     private pages;
+    private stats;
     constructor(options: EngineOptions, config: SsgConfig, plugins: Plugin[]);
     get builtPages(): Page[];
+    get buildStats(): BuildStats;
     run(): Promise<Page[]>;
+    private renderPageHtml;
 }
