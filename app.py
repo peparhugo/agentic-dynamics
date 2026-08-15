@@ -8,9 +8,10 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any, Protocol
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -77,6 +78,30 @@ class MessageStore:
                 "ORDER BY id ASC LIMIT ? OFFSET ?",
                 (limit, offset),
             ).fetchall()
+        return self._rows_to_messages(rows)
+
+    def history(
+        self, channel: str, since: str, limit: int
+    ) -> tuple[list[dict[str, Any]], bool]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages "
+                "WHERE channel = ? AND julianday(timestamp) >= julianday(?) "
+                "ORDER BY julianday(timestamp) ASC, id ASC LIMIT ?",
+                (channel, since, limit + 1),
+            ).fetchall()
+        return self._rows_to_messages(rows[:limit]), len(rows) > limit
+
+    def delete_before(self, timestamp: str) -> int:
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM messages WHERE julianday(timestamp) < julianday(?)",
+                (timestamp,),
+            )
+            return cursor.rowcount
+
+    @staticmethod
+    def _rows_to_messages(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
         return [
             {
                 "id": row["id"],
@@ -226,6 +251,46 @@ class RedisConnectionState:
         return value.decode("utf-8") if isinstance(value, bytes) else value
 
 
+class RateLimiter(Protocol):
+    async def allow(self, client_id: str) -> bool: ...
+
+
+class MemoryRateLimiter:
+    """Fixed-window limiter used when Redis isn't configured."""
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        self._counts: dict[tuple[str, int], int] = {}
+        self._window = -1
+
+    async def allow(self, client_id: str) -> bool:
+        window = int(time.time() // 60)
+        if window != self._window:
+            self._counts.clear()
+            self._window = window
+        key = (client_id, window)
+        self._counts[key] = self._counts.get(key, 0) + 1
+        return self._counts[key] <= self.limit
+
+
+class RedisRateLimiter:
+    """Enforce a shared fixed-window limit with Redis counters."""
+
+    def __init__(self, redis: Any, limit: int, namespace: str = "notifications") -> None:
+        self.redis = redis
+        self.limit = limit
+        self.namespace = namespace
+
+    async def allow(self, client_id: str) -> bool:
+        window = int(time.time() // 60)
+        key = f"{self.namespace}:rate_limit:{client_id}:{window}"
+        async with self.redis.pipeline(transaction=True) as pipe:
+            pipe.incr(key)
+            pipe.expire(key, 120)
+            count, _ = await pipe.execute()
+        return int(count) <= self.limit
+
+
 BrokerHandler = Callable[[dict[str, Any]], Awaitable[None]]
 
 
@@ -364,12 +429,18 @@ class NotificationServer:
         redis_client: Any | None = None,
         database_url: str | None = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: int | None = None,
     ) -> None:
         self.host = host
         self.port = port
         self.server_id = str(uuid.uuid4())
         self.clients = ClientRegistry()
         self.messages = MessageStore(database_url or os.getenv("DATABASE_URL", ":memory:"))
+        self.rate_limit = self._positive_config("RATE_LIMIT", rate_limit, 100)
+        self.message_ttl_days = self._positive_config(
+            "MESSAGE_TTL_DAYS", message_ttl_days, 7
+        )
         redis_url = os.getenv("REDIS_URL")
         if redis_client is None and redis_url:
             from redis.asyncio import from_url
@@ -381,13 +452,27 @@ class NotificationServer:
         if redis_client is None:
             self.state: ConnectionState = MemoryConnectionState()
             self.broker: MessageBroker = MemoryBroker()
+            self.limiter: RateLimiter = MemoryRateLimiter(self.rate_limit)
         else:
             self.state = RedisConnectionState(redis_client)
             self.broker = RedisBroker(redis_client)
+            self.limiter = RedisRateLimiter(redis_client, self.rate_limit)
         self._redis = redis_client
         self.transport = transport or self._transport_from_config(host, port)
         self.transport.bind(self)
         self._running = False
+        self._cleanup_task: asyncio.Task[int] | None = None
+
+    @staticmethod
+    def _positive_config(name: str, value: int | None, default: int) -> int:
+        raw_value: int | str = os.getenv(name, str(default)) if value is None else value
+        try:
+            parsed = int(raw_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be a positive integer") from exc
+        if parsed <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+        return parsed
 
     @staticmethod
     def _transport_from_config(host: str, port: int) -> BaseTransport:
@@ -417,6 +502,11 @@ class NotificationServer:
             await self.broker.close()
             raise
         self._running = True
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)
+        cutoff_text = cutoff.isoformat().replace("+00:00", "Z")
+        self._cleanup_task = asyncio.create_task(
+            asyncio.to_thread(self.messages.delete_before, cutoff_text)
+        )
 
     async def stop(self) -> None:
         if not self._running:
@@ -424,6 +514,9 @@ class NotificationServer:
         await self.transport.stop()
         self._running = False
         await self.broker.close()
+        if self._cleanup_task is not None:
+            await self._cleanup_task
+            self._cleanup_task = None
         self.messages.close()
         if self._owns_redis and self._redis is not None:
             await self._redis.aclose()
@@ -451,6 +544,20 @@ class NotificationServer:
             except ValueError as exc:
                 return {"error": str(exc)}, HTTPStatus.BAD_REQUEST
             return {"messages": self.messages.list(limit, offset)}, HTTPStatus.OK
+        if path == "/history":
+            try:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                channel = self._query_string(query, "channel")
+                since = self._query_string(query, "since")
+                limit = self._query_integer(query, "limit", 50)
+                datetime.fromisoformat(since.replace("Z", "+00:00"))
+            except ValueError as exc:
+                detail = str(exc) or "since must be an ISO timestamp"
+                if "Invalid isoformat" in detail:
+                    detail = "since must be an ISO timestamp"
+                return {"error": detail}, HTTPStatus.BAD_REQUEST
+            messages, has_more = self.messages.history(channel, since, limit)
+            return {"messages": messages, "has_more": has_more}, HTTPStatus.OK
         if path == "/channels":
             return {"channels": await self.state.channels()}, HTTPStatus.OK
 
@@ -493,6 +600,13 @@ class NotificationServer:
             raise ValueError(f"{name} must be a non-negative integer")
         return value
 
+    @staticmethod
+    def _query_string(query: dict[str, list[str]], name: str) -> str:
+        values = query.get(name)
+        if values is None or len(values) != 1 or not values[0]:
+            raise ValueError(f"{name} is required")
+        return values[0]
+
     async def transport_connected(self, client_id: str) -> dict[str, Any]:
         channels = await self.state.connect(client_id, self.server_id)
         self.clients.add(client_id, channels)
@@ -504,6 +618,11 @@ class NotificationServer:
 
     async def handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
         if not self.clients.contains(sender_id):
+            return
+        if not await self.limiter.allow(sender_id):
+            await self.transport.send_message(
+                sender_id, message("system", {"error": "rate limit exceeded"})
+            )
             return
         try:
             incoming = self._parse_message(raw_message)
@@ -551,7 +670,10 @@ class NotificationServer:
         self, notification: dict[str, Any], channel: str | None = None
     ) -> None:
         """Publish a server-originated notification through the shared backbone."""
-        self.messages.add(notification)
+        stored_notification = notification
+        if channel is not None and "channel" not in notification:
+            stored_notification = {**notification, "channel": channel}
+        self.messages.add(stored_notification)
         await self.broker.publish(
             {"notification": notification, "channel": channel, "target_id": None}
         )
