@@ -2,12 +2,13 @@ import pytest
 from unittest.mock import Mock
 
 import app as app_module
-from app import app, init_db
+from app import app, init_db, limiter
 
 
 @pytest.fixture()
 def client(tmp_path):
     app.config.update(TESTING=True, TASKS_FILE=str(tmp_path / "tasks.json"))
+    limiter.reset()
     init_db()
     with app.test_client() as test_client:
         yield test_client
@@ -29,7 +30,9 @@ def test_create_and_list_tasks(auth_client):
     assert task["id"] == 1
     assert task["title"] == "Write tests"
     assert task["status"] == "pending"
-    assert auth_client.get("/tasks").get_json() == [task]
+    assert auth_client.get("/tasks").get_json() == {
+        "data": [task], "next_cursor": None, "total": 1
+    }
 
 
 def test_create_requires_title(auth_client):
@@ -109,5 +112,36 @@ def test_users_only_see_their_own_tasks(client):
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {alice_token}"
     client.post("/tasks", json={"title": "Alice task"})
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {bob_token}"
-    assert client.get("/tasks").get_json() == []
+    assert client.get("/tasks").get_json() == {
+        "data": [], "next_cursor": None, "total": 0
+    }
     assert client.get("/tasks/1").status_code == 404
+
+
+def test_tasks_are_cursor_paginated(auth_client):
+    for index in range(3):
+        auth_client.post("/tasks", json={"title": f"Task {index}"})
+
+    first = auth_client.get("/tasks?limit=2")
+    assert first.status_code == 200
+    first_page = first.get_json()
+    assert len(first_page["data"]) == 2
+    assert first_page["total"] == 3
+    assert first_page["next_cursor"] == str(first_page["data"][-1]["id"])
+
+    second = auth_client.get(f"/tasks?cursor={first_page['next_cursor']}&limit=2")
+    second_page = second.get_json()
+    assert len(second_page["data"]) == 1
+    assert second_page["data"][0]["id"] not in {
+        task["id"] for task in first_page["data"]
+    }
+    assert second_page["next_cursor"] is None
+
+
+def test_rate_limit_returns_retry_after(client):
+    for _ in range(100):
+        assert client.post("/auth/login", json={}).status_code == 401
+
+    limited = client.post("/auth/login", json={})
+    assert limited.status_code == 429
+    assert limited.headers.get("Retry-After")

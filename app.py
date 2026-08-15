@@ -11,6 +11,8 @@ from threading import Lock
 from functools import wraps
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
@@ -21,8 +23,25 @@ app = Flask(__name__)
 app.config["TASKS_FILE"] = os.environ.get("TASKS_FILE", "tasks.json")
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
 app.config["JWT_EXPIRATION_MINUTES"] = 60
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"
+)
+app.config["RATELIMIT_HEADERS_ENABLED"] = True
 
 _storage_lock = Lock()
+
+
+def _rate_limit_key():
+    user = _current_user_from_token()
+    return f"user:{user['id']}" if user else get_remote_address()
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+)
 
 
 def init_db():
@@ -149,8 +168,29 @@ def create_task():
 @app.get("/tasks")
 @jwt_required
 def list_tasks():
-    tasks = _task_repository().list_for_owner(g.current_user["id"])
-    return jsonify(tasks)
+    cursor_value = request.args.get("cursor")
+    limit_value = request.args.get("limit", "20")
+    try:
+        limit = int(limit_value)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer"}), 400
+    if limit < 1 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    cursor = None
+    if cursor_value is not None:
+        try:
+            cursor = int(cursor_value)
+        except ValueError:
+            return jsonify({"error": "cursor must be an integer"}), 400
+
+    tasks, total, has_more = _task_repository().list_page_for_owner(
+        g.current_user["id"], cursor, limit
+    )
+    if tasks is None:
+        return jsonify({"error": "invalid cursor"}), 400
+    next_cursor = str(tasks[-1]["id"]) if has_more else None
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.get("/tasks/<int:task_id>")
