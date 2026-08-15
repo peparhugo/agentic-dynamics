@@ -1,7 +1,8 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { relative, basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { parseMarkdown } from './markdown';
-import { renderIndex, renderPage } from './render';
+import { renderIndex } from './render';
+import { renderTemplatePage } from './template';
 import { Page } from './types';
 
 async function markdownFiles(directory: string): Promise<string[]> {
@@ -13,7 +14,7 @@ async function markdownFiles(directory: string): Promise<string[]> {
   return files.flat();
 }
 
-export async function buildSite(contentDirectory = './content', outputDirectory = './dist'): Promise<Page[]> {
+export async function buildSite(contentDirectory = './content', outputDirectory = './dist', templatesDirectory = './templates'): Promise<Page[]> {
   const contentRoot = resolve(contentDirectory);
   const outputRoot = resolve(outputDirectory);
   const sourceFiles = await markdownFiles(contentRoot);
@@ -31,7 +32,7 @@ export async function buildSite(contentDirectory = './content', outputDirectory 
   await Promise.all(pages.map(async (page) => {
     const destination = join(outputRoot, page.outputPath);
     await mkdir(dirname(destination), { recursive: true });
-    await writeFile(destination, renderPage(page.metadata, page.html), 'utf8');
+    await writeFile(destination, await renderTemplatePage(page.metadata, page.html, templatesDirectory), 'utf8');
   }));
   await writeFile(join(outputRoot, 'index.html'), renderIndex(pages), 'utf8');
   return pages;

@@ -25,4 +25,27 @@ describe('buildSite', () => {
     expect(index).toContain('href="first.html"');
     expect(index).toContain('href="guides/second.html"');
   });
+
+  it('renders a selected Handlebars template inside a layout with partials', async () => {
+    const content = join(root, 'content');
+    const output = join(root, 'dist');
+    const templates = join(root, 'templates');
+    await mkdir(content, { recursive: true });
+    await mkdir(join(templates, 'layouts'), { recursive: true });
+    await mkdir(join(templates, 'partials'), { recursive: true });
+    await writeFile(join(content, 'welcome.md'), '---\ntitle: Welcome & friends\ntemplate: article\nlayout: site\n---\nHello **world**');
+    await writeFile(join(templates, 'article.hbs'), '{{> header}}<section>{{{body}}}</section>{{> footer}}');
+    await writeFile(join(templates, 'layouts', 'site.hbs'), '<!doctype html><html><head><title>{{title}}</title></head><body><nav>Navigation</nav>{{{body}}}</body></html>');
+    await writeFile(join(templates, 'partials', 'header.hbs'), '<header>{{title}}</header>');
+    await writeFile(join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+
+    await buildSite(content, output, templates);
+
+    const page = await readFile(join(output, 'welcome.html'), 'utf8');
+    expect(page).toContain('<title>Welcome &amp; friends</title>');
+    expect(page).toContain('<nav>Navigation</nav>');
+    expect(page).toContain('<header>Welcome &amp; friends</header>');
+    expect(page).toContain('<section><p>Hello <strong>world</strong></p>');
+    expect(page).toContain('<footer>Footer</footer>');
+  });
 });
