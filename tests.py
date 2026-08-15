@@ -1,6 +1,7 @@
 import pytest
 import json
 import os
+from unittest.mock import patch, MagicMock
 from app import app, STORAGE_FILE, USERS_FILE
 
 @pytest.fixture
@@ -24,9 +25,9 @@ def cleanup():
 @pytest.fixture
 def auth_headers(client, cleanup):
     """Helper to register and get auth token"""
-    def _get_token(username='testuser', password='testpass'):
+    def _get_token(username='testuser', password='testpass', email='testuser@example.com'):
         client.post('/auth/register',
-            json={'username': username, 'password': password},
+            json={'username': username, 'password': password, 'email': email},
             content_type='application/json'
         )
         response = client.post('/auth/login',
@@ -39,18 +40,19 @@ def auth_headers(client, cleanup):
 
 def test_register_success(client, cleanup):
     response = client.post('/auth/register',
-        json={'username': 'newuser', 'password': 'password123'},
+        json={'username': 'newuser', 'password': 'password123', 'email': 'newuser@example.com'},
         content_type='application/json'
     )
     assert response.status_code == 201
     data = response.get_json()
     assert data['username'] == 'newuser'
+    assert data['email'] == 'newuser@example.com'
     assert data['id'] == 1
     assert 'created_at' in data
 
 def test_register_missing_username(client, cleanup):
     response = client.post('/auth/register',
-        json={'password': 'password123'},
+        json={'password': 'password123', 'email': 'test@example.com'},
         content_type='application/json'
     )
     assert response.status_code == 400
@@ -59,7 +61,7 @@ def test_register_missing_username(client, cleanup):
 
 def test_register_missing_password(client, cleanup):
     response = client.post('/auth/register',
-        json={'username': 'newuser'},
+        json={'username': 'newuser', 'email': 'test@example.com'},
         content_type='application/json'
     )
     assert response.status_code == 400
@@ -68,11 +70,11 @@ def test_register_missing_password(client, cleanup):
 
 def test_register_duplicate_username(client, cleanup):
     client.post('/auth/register',
-        json={'username': 'testuser', 'password': 'pass1'},
+        json={'username': 'testuser', 'password': 'pass1', 'email': 'user1@example.com'},
         content_type='application/json'
     )
     response = client.post('/auth/register',
-        json={'username': 'testuser', 'password': 'pass2'},
+        json={'username': 'testuser', 'password': 'pass2', 'email': 'user2@example.com'},
         content_type='application/json'
     )
     assert response.status_code == 400
@@ -81,7 +83,7 @@ def test_register_duplicate_username(client, cleanup):
 
 def test_login_success(client, cleanup):
     client.post('/auth/register',
-        json={'username': 'testuser', 'password': 'testpass'},
+        json={'username': 'testuser', 'password': 'testpass', 'email': 'test@example.com'},
         content_type='application/json'
     )
     response = client.post('/auth/login',
@@ -94,7 +96,7 @@ def test_login_success(client, cleanup):
 
 def test_login_invalid_credentials(client, cleanup):
     client.post('/auth/register',
-        json={'username': 'testuser', 'password': 'testpass'},
+        json={'username': 'testuser', 'password': 'testpass', 'email': 'test@example.com'},
         content_type='application/json'
     )
     response = client.post('/auth/login',
@@ -414,3 +416,106 @@ def test_multiple_tasks_auto_increment(client, cleanup, auth_headers):
     assert id1 == 1
     assert id2 == 2
     assert id3 == 3
+
+@patch('app.send_notification_email.delay')
+def test_notification_sent_on_task_completion(mock_send_email, client, cleanup, auth_headers):
+    """Test that notification is triggered when task status changes to completed"""
+    headers = auth_headers('user1', 'pass1', 'user1@example.com')
+    create_response = client.post('/tasks',
+        json={'title': 'Important Task'},
+        content_type='application/json',
+        headers=headers
+    )
+    task_id = create_response.get_json()['id']
+
+    response = client.put(f'/tasks/{task_id}',
+        json={'status': 'completed'},
+        content_type='application/json',
+        headers=headers
+    )
+    assert response.status_code == 200
+
+    mock_send_email.assert_called_once_with('user1@example.com', 'Important Task')
+
+@patch('app.send_notification_email.delay')
+def test_notification_not_sent_on_other_status_changes(mock_send_email, client, cleanup, auth_headers):
+    """Test that notification is NOT triggered for non-completed status changes"""
+    headers = auth_headers('user1', 'pass1', 'user1@example.com')
+    create_response = client.post('/tasks',
+        json={'title': 'Test Task'},
+        content_type='application/json',
+        headers=headers
+    )
+    task_id = create_response.get_json()['id']
+
+    response = client.put(f'/tasks/{task_id}',
+        json={'status': 'in_progress'},
+        content_type='application/json',
+        headers=headers
+    )
+    assert response.status_code == 200
+
+    mock_send_email.assert_not_called()
+
+@patch('app.send_notification_email.delay')
+def test_notification_not_sent_when_already_completed(mock_send_email, client, cleanup, auth_headers):
+    """Test that notification is NOT triggered if status is already completed"""
+    headers = auth_headers('user1', 'pass1', 'user1@example.com')
+    create_response = client.post('/tasks',
+        json={'title': 'Test Task', 'status': 'completed'},
+        content_type='application/json',
+        headers=headers
+    )
+    task_id = create_response.get_json()['id']
+
+    response = client.put(f'/tasks/{task_id}',
+        json={'status': 'completed'},
+        content_type='application/json',
+        headers=headers
+    )
+    assert response.status_code == 200
+
+    mock_send_email.assert_not_called()
+
+@patch('app.send_notification_email.delay')
+def test_notification_sent_with_correct_task_title(mock_send_email, client, cleanup, auth_headers):
+    """Test that notification is sent with the correct task title"""
+    headers = auth_headers('user1', 'pass1', 'user1@example.com')
+    create_response = client.post('/tasks',
+        json={'title': 'Complete this ASAP'},
+        content_type='application/json',
+        headers=headers
+    )
+    task_id = create_response.get_json()['id']
+
+    response = client.put(f'/tasks/{task_id}',
+        json={'status': 'completed'},
+        content_type='application/json',
+        headers=headers
+    )
+    assert response.status_code == 200
+
+    mock_send_email.assert_called_once_with('user1@example.com', 'Complete this ASAP')
+
+@patch('app.send_notification_email.delay')
+def test_notification_with_status_and_title_update(mock_send_email, client, cleanup, auth_headers):
+    """Test that notification is sent when both title and status are updated to completed"""
+    headers = auth_headers('user1', 'pass1', 'user1@example.com')
+    create_response = client.post('/tasks',
+        json={'title': 'Original Title'},
+        content_type='application/json',
+        headers=headers
+    )
+    task_id = create_response.get_json()['id']
+
+    response = client.put(f'/tasks/{task_id}',
+        json={'title': 'Updated Title', 'status': 'completed'},
+        content_type='application/json',
+        headers=headers
+    )
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['title'] == 'Updated Title'
+    assert data['status'] == 'completed'
+
+    mock_send_email.assert_called_once_with('user1@example.com', 'Updated Title')

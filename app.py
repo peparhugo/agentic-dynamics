@@ -5,9 +5,13 @@ import os
 import jwt
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from celery_config import make_celery
+from celery_tasks import send_notification_email
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'test-secret-key-change-in-production'
+
+celery = make_celery(app)
 
 STORAGE_FILE = 'tasks.json'
 USERS_FILE = 'users.json'
@@ -72,14 +76,15 @@ def token_required(f):
 def register():
     data = request.get_json()
 
-    if not data or 'username' not in data or 'password' not in data:
-        return jsonify({'error': 'Missing username or password'}), 400
+    if not data or 'username' not in data or 'password' not in data or 'email' not in data:
+        return jsonify({'error': 'Missing username, password, or email'}), 400
 
     username = data['username']
     password = data['password']
+    email = data['email']
 
-    if not username or not password:
-        return jsonify({'error': 'Username and password cannot be empty'}), 400
+    if not username or not password or not email:
+        return jsonify({'error': 'Username, password, and email cannot be empty'}), 400
 
     users_data = load_users()
     if any(user['username'] == username for user in users_data['users']):
@@ -88,6 +93,7 @@ def register():
     new_user = {
         'id': get_next_user_id(users_data),
         'username': username,
+        'email': email,
         'password_hash': generate_password_hash(password),
         'created_at': datetime.utcnow().isoformat()
     }
@@ -97,6 +103,7 @@ def register():
     return jsonify({
         'id': new_user['id'],
         'username': new_user['username'],
+        'email': new_user['email'],
         'created_at': new_user['created_at']
     }), 201
 
@@ -180,12 +187,21 @@ def update_task(current_user_id, task_id):
         return jsonify({'error': 'Unauthorized'}), 403
 
     data = request.get_json()
+    old_status = task.get('status')
+
     if 'title' in data:
         task['title'] = data['title']
     if 'status' in data:
         task['status'] = data['status']
 
     save_tasks(tasks_data)
+
+    if data.get('status') == 'completed' and old_status != 'completed':
+        users_data = load_users()
+        user = next((u for u in users_data['users'] if u['id'] == current_user_id), None)
+        if user and 'email' in user:
+            send_notification_email.delay(user['email'], task['title'])
+
     return jsonify(task), 200
 
 if __name__ == '__main__':
