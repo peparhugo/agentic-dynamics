@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} - Blog</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Georgia, serif;
+      line-height: 1.8;
+      color: #2c3e50;
+      background: #ecf0f1;
+    }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 3rem 2rem; text-align: center; }
+    header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    nav { padding: 1rem 2rem; background: rgba(0,0,0,0.1); }
+    nav a { color: white; margin-right: 1.5rem; text-decoration: none; transition: opacity 0.2s; }
+    nav a:hover { opacity: 0.8; }
+    main { max-width: 900px; margin: 2rem auto; padding: 3rem; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    article { margin-bottom: 2rem; }
+    .post-header { border-bottom: 2px solid #667eea; padding-bottom: 1rem; margin-bottom: 2rem; }
+    .post-author { font-style: italic; color: #7f8c8d; }
+    .post-date { font-weight: bold; color: #667eea; }
+    .post-tags { margin: 1rem 0; }
+    .tag { background: #667eea; color: white; padding: 0.25rem 0.75rem; margin-right: 0.5rem; border-radius: 20px; font-size: 0.85rem; }
+    .post-body { line-height: 1.9; }
+    .post-body p { margin-bottom: 1rem; }
+    .post-body h2 { margin: 2rem 0 1rem 0; color: #764ba2; }
+    .post-body code { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 3px; }
+    .post-body pre { background: #2c3e50; color: #ecf0f1; padding: 1rem; border-radius: 5px; overflow-x: auto; }
+    footer { text-align: center; padding: 2rem; color: #7f8c8d; border-top: 1px solid #ecf0f1; }
+  </style>
+</head>
+<body>
+  {{>header}}
+  <main>
+    {{{body}}}
+  </main>
+  {{>footer}}
+</body>
+</html>

@@ -1,0 +1,8 @@
+<footer>
+  <p>&copy; {{year}} {{siteAuthor}}. All rights reserved.</p>
+  {{#if socialLinks}}
+  <div class="social-links">
+    {{#each socialLinks}}<a href="{{this.url}}">{{this.name}}</a> {{/each}}
+  </div>
+  {{/if}}
+</footer>

@@ -1,0 +1,15 @@
+<article class="blog-post">
+  <header class="post-header">
+    <h1>{{title}}</h1>
+    {{#if author}}<div class="post-author">By {{author}}</div>{{/if}}
+    {{#if date}}<time class="post-date" datetime="{{date}}">{{date}}</time>{{/if}}
+  </header>
+  {{#if tags}}
+  <div class="post-tags">
+    {{#each tags}}<span class="tag">{{this}}</span>{{/each}}
+  </div>
+  {{/if}}
+  <div class="post-body">
+    {{{content}}}
+  </div>
+</article>
