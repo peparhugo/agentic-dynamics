@@ -155,3 +155,172 @@ def test_run_workflow_resume_skips_committed_phases(tmp_path):
                           resume=True, run_agentic_fn=agent2)
     assert [p.phase for p in result.phases] == ["implement", "verify"]
     assert len(calls) == 1  # only implement re-runs; scope/ux skipped
+
+
+# ── RAG augmentation seam ───────────────────────────────────────
+
+class _FakeEvidence:
+    def __init__(self, cid, text, authority="source"):
+        self.id = cid
+        self.text = text
+        self.authority = authority
+        self.content_hash = f"ch:{cid}"
+        self.token_count = len(text.split())
+
+    def citation(self):
+        return f"[K:{self.id}@abc:loc]"
+
+
+class _FakeAttempt:
+    def __init__(self, evidence, fallback_mode="full"):
+        self.selected_evidence = evidence
+        self.fallback_mode = fallback_mode
+        self.retrieval_attempt_id = "ra:test"
+
+
+class _FakeAugmented:
+    def __init__(self, prompt):
+        self.prompt = prompt
+        self.fallback = False
+        self.evidence_ids = ["k1"]
+        self.versions = {"schema": "prompt-plan/v1"}
+        self.token_counts = {"in": 10}
+        self.cost_usd = 0.0
+        self.constructor_attempt_id = "ca:test"
+
+
+def test_no_rag_default_is_byte_identical(tmp_path):
+    spec = load_spec(SPEC)
+    prompts = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        prompts.append(prompt)
+        return _fake_agent()
+
+    run_workflow(spec, goal="the goal", model="m", workdir=tmp_path,
+                 commit=False, run_agentic_fn=agent)
+
+    prior = []
+    expected = []
+    for p in spec.workflow.params["phases"]:
+        if p.get("kind", "agent") == "agent":
+            expected.append(_build_phase_prompt(p, "the goal", prior))
+        prior.append(f"{p['name']} (ok)")
+    assert prompts == expected
+
+
+def test_rag_hook_ordering_between_route_and_agent(tmp_path):
+    spec = load_spec(SPEC)
+    order = []
+
+    def retrieve_fn(**kwargs):
+        order.append("retrieve")
+        return _FakeAttempt([_FakeEvidence("k1", "cached evidence")])
+
+    def construct_fn(request):
+        order.append("construct")
+        return _FakeAugmented("AUGMENTED: " + request.raw_work_item)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        order.append("agent")
+        return _fake_agent()
+
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                 rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
+                 run_agentic_fn=agent)
+
+    # scope, ux_design, implement are agent phases (retrieve -> construct -> agent);
+    # verify is a test phase and is bypassed entirely.
+    assert order == ["retrieve", "construct", "agent"] * 3
+
+
+def test_rag_bypasses_test_phases(tmp_path):
+    spec = load_spec(SPEC)
+    retrieve_calls = []
+
+    def retrieve_fn(**kwargs):
+        retrieve_calls.append(kwargs["raw_work_item"])
+        return _FakeAttempt([_FakeEvidence("k1", "x")])
+
+    def construct_fn(request):
+        return _FakeAugmented("AUG")
+
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                 rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
+                 run_agentic_fn=lambda *a, **k: _fake_agent())
+
+    assert len(retrieve_calls) == 3  # verify (kind == test) is never augmented
+
+
+def test_rag_prompt_is_augmented_and_provenance_serialized(tmp_path):
+    spec = load_spec(SPEC)
+    captured = []
+
+    def retrieve_fn(**kwargs):
+        return _FakeAttempt([_FakeEvidence("k1", "cached evidence")])
+
+    def construct_fn(request):
+        return _FakeAugmented("AUGMENTED: " + request.raw_work_item)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        captured.append(prompt)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
+                          run_agentic_fn=agent)
+
+    assert captured[0].startswith("AUGMENTED: ")
+    d = result.phases[0].to_dict()
+    assert d["raw_prompt_hash"]
+    assert d["retrieval_attempt_id"] == "ra:test"
+    assert d["constructor_attempt_id"] == "ca:test"
+    assert d["selected_evidence_ids"] == ["k1"]
+    assert d["fallback_mode"] == "full"
+    assert "pre_phase_commit" in d
+    assert "augmentation_versions" in d
+    assert "augmentation_tokens" in d
+    assert "augmentation_cost_usd" in d
+    assert "augmentation_latency_ms" in d
+
+
+def test_rag_fallback_on_retrieve_failure(tmp_path):
+    spec = load_spec(SPEC)
+    captured = []
+
+    def retrieve_fn(**kwargs):
+        raise RuntimeError("chroma down")
+
+    def construct_fn(request):
+        raise AssertionError("must not be called")
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        captured.append(prompt)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
+                          run_agentic_fn=agent)
+
+    assert result.phases[0].fallback_mode == "no_rag"
+    assert result.phases[0].status == "ok"  # never blocked the phase
+    expected = _build_phase_prompt(spec.workflow.params["phases"][0], "g", [])
+    assert captured[0] == expected
+
+
+def test_rag_fallback_on_construct_failure(tmp_path):
+    spec = load_spec(SPEC)
+
+    def retrieve_fn(**kwargs):
+        return _FakeAttempt([_FakeEvidence("k1", "x")])
+
+    def construct_fn(request):
+        raise RuntimeError("constructor model down")
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
+                          run_agentic_fn=lambda *a, **k: _fake_agent())
+
+    assert result.phases[0].fallback_mode == "no_rag"
+    assert result.phases[0].status == "ok"
+

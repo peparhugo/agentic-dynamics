@@ -17,6 +17,7 @@ later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import subprocess
@@ -46,6 +47,45 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+#: Default executor tool surface offered to the prompt constructor's ``allowed_tools``
+#: subset check. Overridable via ``rag_params.inherited_tools``; the constructor may only
+#: *reduce* this set, never add to it.
+DEFAULT_INHERITED_TOOLS = ("read", "write", "edit", "bash", "grep", "glob", "list")
+
+
+def _attempt_id(kind: str, *parts: str) -> str:
+    """Deterministic attempt id for retrieval/construction tracing.
+
+    Keyed on the semantic inputs (never a session/fork id) so an attempt can be
+    replayed and attributed without depending on a per-process random id.
+    """
+    digest = hashlib.sha256("|".join((kind, *parts)).encode("utf-8")).hexdigest()
+    return f"{kind}:{digest[:16]}"
+
+
+@dataclass
+class AugmentationOutcome:
+    """Result of ``retrieve -> construct -> render`` for one agent phase.
+
+    ``fallback`` is True only when the phase reverted to the base prompt; otherwise
+    the augmented (or degraded) prompt was produced and ``fallback_mode`` names the
+    degradation level (``full`` / ``lexical_graph_only`` / ``dense_local_exact`` /
+    ``no_rag``).
+    """
+
+    prompt: str
+    fallback: bool = True
+    fallback_mode: str = "no_rag"
+    raw_prompt_hash: str = ""
+    retrieval_attempt_id: str = ""
+    constructor_attempt_id: str = ""
+    selected_evidence_ids: list[str] = field(default_factory=list)
+    versions: dict[str, str] = field(default_factory=dict)
+    token_counts: dict[str, int] = field(default_factory=dict)
+    cost_usd: float = 0.0
+    latency_ms: float = 0.0
+
+
 @dataclass
 class PhaseResult:
     """Ledger record for one phase of a workflow run."""
@@ -67,6 +107,17 @@ class PhaseResult:
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
     final_response: str = ""
+    # augmentation provenance (populated only when rag_augment is enabled)
+    raw_prompt_hash: str = ""
+    pre_phase_commit: str = ""
+    retrieval_attempt_id: str = ""
+    constructor_attempt_id: str = ""
+    selected_evidence_ids: list[str] = field(default_factory=list)
+    augmentation_versions: dict[str, str] = field(default_factory=dict)
+    augmentation_tokens: dict[str, int] = field(default_factory=dict)
+    augmentation_cost_usd: float = 0.0
+    augmentation_latency_ms: float = 0.0
+    fallback_mode: str = ""
     # test phases
     test_executed_success: bool | None = None
     tests_passed: int = 0
@@ -89,6 +140,17 @@ class PhaseResult:
             "session_id": self.session_id,
             "files_created": self.files_created,
             "files_modified": self.files_modified,
+            # augmentation provenance — persisted structured, never in-memory-only
+            "raw_prompt_hash": self.raw_prompt_hash,
+            "pre_phase_commit": self.pre_phase_commit,
+            "retrieval_attempt_id": self.retrieval_attempt_id,
+            "constructor_attempt_id": self.constructor_attempt_id,
+            "selected_evidence_ids": self.selected_evidence_ids,
+            "augmentation_versions": self.augmentation_versions,
+            "augmentation_tokens": self.augmentation_tokens,
+            "augmentation_cost_usd": self.augmentation_cost_usd,
+            "augmentation_latency_ms": self.augmentation_latency_ms,
+            "fallback_mode": self.fallback_mode,
             "test_executed_success": self.test_executed_success,
             "tests_passed": self.tests_passed,
             "tests_total": self.tests_total,
@@ -135,6 +197,170 @@ def _build_phase_prompt(phase: dict[str, Any], goal: str, prior: list[str]) -> s
     prompt = str(phase.get("prompt", ""))
     prior_summary = "\n".join(f"- {p}" for p in prior) if prior else "(none)"
     return prompt.replace("{goal}", goal).replace("{prior_phases}", prior_summary)
+
+
+def _evidence_from_attempt(attempt: Any) -> list[Any]:
+    """Extract :class:`EvidenceUnit`-shaped items from a retrieval attempt.
+
+    ``retrieve()`` returns a ``RetrievalAttempt`` whose ``selected_evidence`` is a
+    list of candidates carrying ``id``/``text``/``authority``/``locator``; the
+    constructor consumes the equivalent shape. This adapter keeps the seam tolerant
+    of either (real candidates or test doubles).
+    """
+    selected = getattr(attempt, "selected_evidence", []) or []
+    from .prompt_constructor import EvidenceUnit  # lazy — avoids import-time coupling
+
+    units: list[Any] = []
+    for c in selected:
+        cid = getattr(c, "id", "") or ""
+        text = getattr(c, "text", "") or ""
+        authority = getattr(c, "authority", "") or ""
+        if hasattr(authority, "name"):
+            authority = authority.name.lower()
+        citation = ""
+        if hasattr(c, "citation"):
+            citation = c.citation()
+        units.append(
+            EvidenceUnit(
+                knowledge_id=cid,
+                text=text,
+                authority=str(authority),
+                citation=citation,
+                content_hash=getattr(c, "content_hash", "") or "",
+                token_count=int(getattr(c, "token_count", 0) or len(text.split())),
+            )
+        )
+    return units
+
+
+def _augment_prompt(
+    *,
+    base_prompt: str,
+    goal: str,
+    phase_def: dict[str, Any],
+    model: str,
+    commit_sha: str,
+    inherited_tools: list[str],
+    pinned_policy: str,
+    rag_params: dict[str, Any],
+    retrieve_fn: Callable[..., Any],
+    construct_fn: Callable[..., Any],
+) -> AugmentationOutcome:
+    """Run ``retrieve -> construct -> render`` between ``route_step`` and ``run_agent``.
+
+    Pure w.r.t. the worktree (no writes). Any retrieval/constructor failure reverts to
+    ``base_prompt`` and records a named fallback mode — augmentation never blocks the
+    phase. ``retrieve_fn`` returns a ``RetrievalAttempt``-shaped object;
+    ``construct_fn`` maps a ``ConstructionRequest`` to an ``AugmentedPrompt``.
+    """
+    from .prompt_constructor import (
+        ConstructionRequest,
+        DEFAULT_CONSTRUCTOR_MODEL,
+        hash_work_item,
+    )
+
+    outcome = AugmentationOutcome(
+        prompt=base_prompt,
+        fallback=True,
+        fallback_mode="no_rag",
+        raw_prompt_hash=hash_work_item(base_prompt),
+    )
+    t0 = time.time()
+    try:
+        # 1. retrieve (deterministic; may degrade but not raise on missing legs)
+        attempt = retrieve_fn(
+            raw_work_item=base_prompt,
+            phase_objective=goal,
+            commit_sha=commit_sha,
+            repository_id=str(rag_params.get("repository_id", "")),
+            acl_scope=str(rag_params.get("acl_scope", "")),
+            executor_context_tokens=int(rag_params.get("executor_context_tokens", 200_000)),
+            remaining_input_tokens=int(rag_params.get("remaining_input_tokens", 200_000)),
+            rag_token_limit=int(rag_params.get("rag_token_limit", 8000)),
+        )
+        if attempt is None:
+            raise RuntimeError("retrieve returned no attempt")
+        retrieval_mode = str(getattr(attempt, "fallback_mode", "") or "no_rag")
+        outcome.retrieval_attempt_id = getattr(attempt, "retrieval_attempt_id", "") or _attempt_id(
+            "retrieval", base_prompt, commit_sha
+        )
+
+        # 2. construct (one bounded model call + deterministic renderer)
+        evidence = _evidence_from_attempt(attempt)
+        constructor_model = str(rag_params.get("constructor_model", DEFAULT_CONSTRUCTOR_MODEL))
+        request = ConstructionRequest(
+            raw_work_item=base_prompt,
+            phase_objective=goal,
+            pinned_policy=pinned_policy,
+            evidence=evidence,
+            inherited_tools=list(inherited_tools),
+            user_constraints=list(rag_params.get("user_constraints", []) or []),
+            executor_model=model,
+            commit_sha=commit_sha,
+            constructor_model=constructor_model,
+        )
+        augmented = construct_fn(request)
+        if augmented is None or not getattr(augmented, "prompt", ""):
+            raise RuntimeError("constructor produced no prompt")
+
+        outcome.prompt = str(augmented.prompt)
+        # A constructor that internally fell back to its deterministic renderer still
+        # produced a valid prompt; record whether it did, but only mark the *phase*
+        # as reverted when retrieval degraded.
+        constructor_fell_back = bool(getattr(augmented, "fallback", False))
+        outcome.fallback = False
+        outcome.fallback_mode = "full" if retrieval_mode == "full" else retrieval_mode
+        outcome.constructor_attempt_id = getattr(augmented, "constructor_attempt_id", "") or _attempt_id(
+            "constructor", base_prompt, commit_sha, constructor_model
+        )
+        outcome.selected_evidence_ids = list(getattr(augmented, "evidence_ids", []) or [])
+        outcome.versions = dict(getattr(augmented, "versions", {}) or {})
+        outcome.token_counts = dict(getattr(augmented, "token_counts", {}) or {})
+        outcome.cost_usd = float(getattr(augmented, "cost_usd", 0.0) or 0.0)
+        if constructor_fell_back:
+            outcome.versions = {**outcome.versions, "constructor": "deterministic-fallback"}
+    except Exception:
+        outcome.prompt = base_prompt
+        outcome.fallback = True
+        outcome.fallback_mode = "no_rag"
+    finally:
+        outcome.latency_ms = round((time.time() - t0) * 1000.0, 2)
+    return outcome
+
+
+def _default_retrieve_fn() -> Callable[..., Any]:
+    """Lazily resolve the real ``retrieve`` (graceful no-RAG when no stores are wired)."""
+    from .retrieval import retrieve as _retrieve
+
+    return _retrieve
+
+
+def _default_construct_fn(rag_params: dict[str, Any], run_agent: Callable[..., Any]) -> Callable[..., Any]:
+    """Build a default constructor whose model call reuses the injected executor ``run_agent``.
+
+    The constructor runs on ``DEFAULT_CONSTRUCTOR_MODEL`` (cheapest), so the wiring has
+    a real end-to-end path when ``rag_augment`` is enabled without explicit injection.
+    """
+    from .prompt_constructor import DEFAULT_CONSTRUCTOR_MODEL, ModelPromptConstructor
+
+    constructor_model = str(rag_params.get("constructor_model", DEFAULT_CONSTRUCTOR_MODEL))
+
+    def run_constructor(prompt: str) -> str:
+        ar = run_agent(
+            prompt,
+            model=constructor_model,
+            backend=None,
+            workdir="",
+            thinking_effort="low",
+            thinking_budget_tokens=0,
+            output_token_limit=int(rag_params.get("output_budget_tokens", 1500)),
+            timeout=int(rag_params.get("constructor_timeout", 30)),
+            silent_mode=True,
+            enforce_pytest=False,
+        )
+        return str(getattr(ar, "final_response", "") or "")
+
+    return ModelPromptConstructor(model=constructor_model, run_constructor=run_constructor).construct
 
 
 def _git_commit(workdir: Path, phase: str, goal: str) -> str:
@@ -221,6 +447,10 @@ def run_workflow(
     preferences: RoutingPreferences | None = None,
     signals: dict[str, ModelSignals] | None = None,
     run_agentic_fn: Callable[..., Any] | None = None,
+    rag_augment: bool | None = None,
+    retrieve_fn: Callable[..., Any] | None = None,
+    construct_fn: Callable[..., Any] | None = None,
+    rag_params: dict[str, Any] | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
@@ -237,6 +467,14 @@ def run_workflow(
     "Run pytest. Fix failures." standardized constraint into agent phases — each phase
     must specify its own tests, and a phase can opt in via ``enforce_pytest: true`` on
     the phase. ``run_agentic_fn`` is injectable so tests can substitute a fake agent.
+
+    RAG augmentation (``retrieve -> construct -> render``) runs between ``route_step``
+    and ``run_agent`` only when ``spec.workflow.params.rag_augment`` (or ``rag_augment=``)
+    is true — default OFF, so the executor prompt stays byte-for-byte identical to
+    ``_build_phase_prompt``. ``retrieve_fn`` / ``construct_fn`` are injectable; ``rag_params``
+    carries budgets, ``constructor_model``, ``pinned_policy``, ``inherited_tools``, and
+    ``user_constraints``. Test phases are never augmented; any retrieval/constructor
+    failure falls back to the base prompt and records a named fallback mode.
 
     Per-step routing (``docs/routing_design.md``): when the spec declares
     ``workflow.params.model_pool``, each agent phase's model is chosen by
@@ -265,6 +503,18 @@ def run_workflow(
         language = profile.name if profile else "python"
 
     run_agent = run_agentic_fn or run_agentic
+
+    # RAG augmentation seam. Default OFF — the prompt passed to the executor is then
+    # byte-for-byte identical to ``_build_phase_prompt``. ``retrieve_fn``/``construct_fn``
+    # are injectable for tests; when unset, production resolves the real retrieve +
+    # a constructor whose model call reuses ``run_agent`` (default flash model).
+    rag_augment = rag_augment if rag_augment is not None else bool(
+        spec.workflow.params.get("rag_augment", False)
+    )
+    rag_params = dict(rag_params or spec.workflow.params.get("rag", {}) or {})
+    pinned_policy = str(rag_params.get("pinned_policy", ""))
+    inherited_tools = list(rag_params.get("inherited_tools") or DEFAULT_INHERITED_TOOLS)
+
     result = WorkflowRunResult(
         spec_name=spec.name, model=model, workdir=str(wd), goal=goal, started_at=_now()
     )
@@ -342,6 +592,36 @@ def run_workflow(
                         prev_cache_read_tokens=prev_cache_read_tokens,
                     )
                     model_i = route_step(phase_def, state, preferences, signals=signals)
+
+                    # RAG augmentation seam — retrieve -> construct -> render, placed
+                    # between route_step and run_agent (never before routing, so the
+                    # augmentation sees the selected executor model). Test phases bypass
+                    # this entirely (they live in the ``kind == "test"`` branch).
+                    if rag_augment:
+                        pre_commit = _git_head(wd)
+                        pr.pre_phase_commit = pre_commit
+                        outcome = _augment_prompt(
+                            base_prompt=prompt,
+                            goal=goal,
+                            phase_def=phase_def,
+                            model=model_i,
+                            commit_sha=pre_commit or result.git_sha,
+                            inherited_tools=inherited_tools,
+                            pinned_policy=pinned_policy,
+                            rag_params=rag_params,
+                            retrieve_fn=retrieve_fn or _default_retrieve_fn(),
+                            construct_fn=construct_fn or _default_construct_fn(rag_params, run_agent),
+                        )
+                        prompt = outcome.prompt
+                        pr.raw_prompt_hash = outcome.raw_prompt_hash
+                        pr.retrieval_attempt_id = outcome.retrieval_attempt_id
+                        pr.constructor_attempt_id = outcome.constructor_attempt_id
+                        pr.selected_evidence_ids = outcome.selected_evidence_ids
+                        pr.augmentation_versions = outcome.versions
+                        pr.augmentation_tokens = outcome.token_counts
+                        pr.augmentation_cost_usd = outcome.cost_usd
+                        pr.augmentation_latency_ms = outcome.latency_ms
+                        pr.fallback_mode = outcome.fallback_mode
 
                     agent_kwargs: dict[str, Any] = {
                         "model": model_i,

@@ -248,6 +248,7 @@ from .test_runner import run_suite, suite_succeeded
 
 # v1.0: the execute phase — run an agent_task workflow in a worktree
 from .workflow_runner import (
+    AugmentationOutcome,
     PhaseResult,
     WorkflowRunResult,
     run_workflow,
@@ -308,7 +309,7 @@ __all__ = [
     "DAG", "Phase", "SpecError", "RuleResult", "MEASUREMENT_RULES",
     "compile_spec", "experiment_matrix", "compare_arms", "evaluate_rules",
     "first_pass_quality",
-    "PhaseResult", "WorkflowRunResult", "run_workflow",
+    "PhaseResult", "WorkflowRunResult", "run_workflow", "AugmentationOutcome",
     # v1.0 knowledge identity + authority contract
     "Authority", "KnowledgeRecord", "KnowledgeEvent",
     "compute_entity_id", "compute_knowledge_id", "compute_content_hash",

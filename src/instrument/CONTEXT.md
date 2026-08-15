@@ -84,8 +84,8 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 
 | Module | Lines | Purpose | Key Exports |
 |--------|-------|---------|-------------|
-| `embeddings.py` | 288 | Text embedding + vector search via Ollama (bge-m3) + ChromaDB; replaces the trigram heuristic in `trajectory.py` with real cosine distance | `EmbeddingClient`, `ChromaStore`, `extract_session_text()`, `extract_session_steps()` |
-| `graph.py` | 524 | Neo4j knowledge graph population — models experiments as an interconnected graph of models, configs, runs, operators, strategies, basin topologies | `Neo4jClient` |
+| `embeddings.py` | 288 | Text embedding + vector search via Ollama (bge-m3) + ChromaDB; `ChromaStore` gains `collection_name` isolation, env-driven `CHROMA_HOST`/`CHROMA_PORT`, canonical upsert/delete/inventory, and `step_doc_id()` (the dense↔graph join key) | `EmbeddingClient`, `ChromaStore`, `ChromaStoreError`, `step_doc_id()`, `extract_session_text()`, `extract_session_steps()` |
+| `graph.py` | 524 | Neo4j knowledge graph — experiment ontology loaders + knowledge-base capabilities: `create_knowledge_schema()`, full-text/exact search, bounded `expand_candidates()`, `load_codebase_graph()`, and the `Step.doc_id`/`Step.text` join repair | `Neo4jClient`, `ALLOWED_EXPANSION_RELS` |
 | `ollama_analyzer.py` | 173 | Qualitative experiment analysis via DeepSeek R1 on Ollama — narrative commentary over game report metrics + session data | `OllamaAnalyzer`, `load_summary_data()` |
 | `opencode_analyzer.py` | 245 | Qualitative experiment analysis via real opencode sessions with DeepSeek — a meta-experiment, measured by the same instrument | `OpencodeAnalyzer` |
 | `sonar.py` | 401 | SonarQube static analysis for LLM-generated code — bugs, vulnerabilities, code smells, cognitive complexity, duplications, maintainability, plus differential quality analysis | `SonarMetrics`, `compute_sonar_diff()`, `run_sonar_analysis()`, `sonar_quality_score()` |
@@ -95,7 +95,7 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 | Module | Lines | Purpose | Key Exports |
 |--------|-------|---------|-------------|
 | `supervisor.py` | 171 | Shared Redis contracts for human-reviewed supervisor flags — observation metadata only; deliberately no OpenCode client dependency, so observation can't become control | `canonical_json()`, `normalize_flag()`, `parse_mapping()`, `register_session_mapping()`, `register_event_mapping()` |
-| `workflow_runner.py` | 336 | Executes an `agent_task` workflow's phases inside a git worktree, committing + ledgering (tokens, cost, `test_executed_success`) after each phase; the `execute` phase of the spec/compiler DAG | `PhaseResult`, `WorkflowRunResult`, `run_workflow()` |
+| `workflow_runner.py` | 706 | Executes an `agent_task` workflow's phases inside a git worktree, committing + ledgering (tokens, cost, `test_executed_success`) after each phase; the `execute` phase of the spec/compiler DAG; hosts the off-by-default RAG augmentation seam | `PhaseResult`, `WorkflowRunResult`, `AugmentationOutcome`, `run_workflow()` |
 | `test_runner.py` | 140 | Independent pytest/jest/go-test/cargo-test runner, keyed off `language.py`; sole source of truth for `test_executed_success` — never taken from the model's self-reported pass/fail | `resolve_node()`, `run_suite()`, `suite_succeeded()` |
 
 ### Backend, Telemetry & Routing
@@ -116,6 +116,33 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 |--------|-------|---------|
 | `game_report.py` | 319 | Combines all metrics into a single Markdown report per experiment |
 | `lab_book.py` | 82 | [deprecated] YAML-frontmatter persistence for experiment results |
+
+### Runtime RAG / Knowledge Base (v1.0)
+
+The runtime-RAG stack (design: `code_reviews/2026-08-15_rag-knowledge-base-proposal-review.md`) adds a
+knowledge identity + authority contract, a deterministic retrieval pipeline, and a typed
+prompt-constructor, wired into `run_workflow()` as an **off-by-default** augmentation seam
+(`spec.workflow.params.rag_augment`). Data flow for one agent phase:
+
+```
+raw work item ── route_step ──▶ retrieve ──▶ construct ──▶ render ──▶ run_agent
+   (base prompt)                 (deterministic,   (one flash-      (typed
+                                  dense+lexical      model call +     plan →
+                                  RRF fusion)        validator)      prompt)
+```
+
+| Module | Lines | Purpose | Key Exports |
+|--------|-------|---------|-------------|
+| `knowledge.py` | 288 | Canonical identity + authority contract — two sha256 ids (`entity_id`, `knowledge_id`), ordered `Authority` (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY), frozen `KnowledgeRecord`/`KnowledgeEvent` (pointer-only) | `Authority`, `KnowledgeRecord`, `KnowledgeEvent`, `compute_entity_id()`, `compute_knowledge_id()`, `compute_content_hash()` |
+| `retrieval.py` | 907 | Deterministic retrieval — regex query planner, parallel dense (Chroma) + lexical (Neo4j full-text) legs, RRF fusion × authority/freshness/exact-id/conflict, bounded decayed graph expansion, token-budgeted whole-chunk selection, `RetrievalAttempt`, offline `build_evidence_cards()` | `QueryPlan`, `Candidate`, `RetrievalAttempt`, `build_query_plan()`, `retrieve()`, `rrf_base()`, `compute_fused_score()`, `graph_boost()`, `select_evidence()`, `build_evidence_cards()`, `FallbackMode` |
+| `prompt_constructor.py` | 456 | Typed prompt-constructor — `PromptConstructor` protocol, `prompt-plan/v1` schema, deterministic validator, one-repair + deterministic fallback renderer, no-fork cache keying, default `deepseek/deepseek-v4-flash` | `PromptConstructor`, `ModelPromptConstructor`, `ConstructionRequest`, `AugmentedPrompt`, `PromptPlan`, `validate_plan()`, `render_prompt()`, `construction_cache_key()`, `hash_work_item()` |
+
+`workflow_runner.py` is the seam: between `route_step()` and `run_agent()` it calls
+`retrieve → construct → render` (gated by `spec.workflow.params.rag_augment`, default OFF) and
+persists augmentation provenance on `PhaseResult` (`raw_prompt_hash`, `pre_phase_commit`,
+`retrieval_attempt_id`, `constructor_attempt_id`, `selected_evidence_ids`, `augmentation_versions`,
+`augmentation_tokens`, `augmentation_cost_usd`, `augmentation_latency_ms`, `fallback_mode`). Any
+retrieval/constructor failure falls back to the base prompt and records a named fallback mode.
 
 ### The spec/compiler layer
 
