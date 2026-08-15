@@ -24,6 +24,8 @@ from xml.sax.saxutils import escape
 
 import jwt
 from flask import Flask, Response, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from repositories import TaskRepository, UserRepository, create_schema
 from tasks import send_notification_email
@@ -36,6 +38,10 @@ app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "insecure-dev-secret")
+RATE_LIMIT_STORAGE_URI = os.environ.get(
+    "RATE_LIMIT_STORAGE_URI", "redis://localhost:6379/2"
+)
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
 
 
 def get_db():
@@ -73,6 +79,24 @@ def current_user():
     except (KeyError, TypeError, ValueError):
         return None
     return user_repo.get(user_id)
+
+
+# ── Rate limiting ──────────────────────────────────────────────
+
+def rate_limit_key():
+    user = current_user()
+    if user is not None:
+        return f"user:{user['id']}"
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+    default_limits=[RATE_LIMIT],
+    headers_enabled=True,
+    app=app,
+)
 
 
 # ── SOAP helpers ───────────────────────────────────────────────
@@ -220,6 +244,28 @@ def login():
 
 
 # ── Routes ─────────────────────────────────────────────────────
+
+@app.route("/tasks", methods=["GET"])
+def list_tasks():
+    user = current_user()
+    if user is None:
+        return jsonify({"error": "missing or invalid token"}), 401
+
+    cursor = request.args.get("cursor")
+    if cursor is not None:
+        try:
+            cursor = int(cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid cursor"}), 400
+
+    raw_limit = request.args.get("limit", "20")
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        limit = 20
+
+    return jsonify(task_repo.paginate(user["id"], cursor=cursor, limit=limit))
+
 
 @app.route("/tasks", methods=["POST"])
 def soap_handler():

@@ -72,6 +72,33 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def paginate(self, owner_id, cursor=None, limit=20):
+        """Return a cursor-based page of tasks for ``owner_id``.
+
+        Tasks are ordered by id ascending. ``cursor`` is the id of the last
+        item from the previous page (exclusive lower bound for this page).
+        Returns ``{"data": [...], "next_cursor": str | None, "total": int}``.
+        """
+        limit = max(1, min(int(limit), 100))
+        with self.get_db() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            if cursor is not None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id > ?"
+                    " ORDER BY id ASC LIMIT ?",
+                    (owner_id, int(cursor), limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id ASC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+        page = [dict(r) for r in rows[:limit]]
+        next_cursor = str(page[-1]["id"]) if len(rows) > limit else None
+        return {"data": page, "next_cursor": next_cursor, "total": total}
+
     def update(self, task_id, owner_id, title=None, status=None):
         task = self.get(task_id, owner_id)
         if task is None:

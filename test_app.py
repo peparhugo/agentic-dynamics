@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 from unittest import mock
 
 import pytest
+import redis
 
 import app as app_module
 from app import app
@@ -17,6 +18,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "SECRET_KEY", "test-secret-key-that-is-long-enough-123")
     app_module.init_db()
     app.config["TESTING"] = True
+    rate_storage = redis.Redis.from_url(app_module.RATE_LIMIT_STORAGE_URI)
+    rate_storage.flushdb()
     with app.test_client() as c:
         yield c
 
@@ -318,3 +321,115 @@ def test_notification_task_emails_owner(capsys):
     result = app_module.send_notification_email("alice@example.com", "Buy milk")
     assert result == {"to": "alice@example.com", "title": "Buy milk"}
     assert "alice@example.com" in capsys.readouterr().out
+
+
+# ── Pagination ─────────────────────────────────────────────────
+
+def seed_tasks(n, owner_id=1):
+    for i in range(1, n + 1):
+        app_module.task_repo.create(f"task {i}", owner_id)
+
+
+def test_pagination_requires_token(client):
+    assert client.get("/tasks").status_code == 401
+
+
+def test_pagination_first_page_default_limit(client, auth):
+    seed_tasks(25)
+    resp = client.get("/tasks", headers=auth)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["total"] == 25
+    assert len(body["data"]) == 20
+    assert body["next_cursor"] == "20"
+    assert [t["id"] for t in body["data"]] == list(range(1, 21))
+
+
+def test_pagination_follow_cursor_last_page(client, auth):
+    seed_tasks(25)
+    resp = client.get("/tasks", headers=auth, query_string={"cursor": "20"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["total"] == 25
+    assert len(body["data"]) == 5
+    assert body["next_cursor"] is None
+    assert [t["id"] for t in body["data"]] == list(range(21, 26))
+
+
+def test_pagination_custom_limit_walks_pages(client, auth):
+    seed_tasks(7)
+    body = client.get("/tasks", headers=auth, query_string={"limit": "3"}).get_json()
+    assert body["total"] == 7
+    assert [t["id"] for t in body["data"]] == [1, 2, 3]
+    assert body["next_cursor"] == "3"
+
+    body = client.get(
+        "/tasks", headers=auth, query_string={"limit": "3", "cursor": "3"}
+    ).get_json()
+    assert [t["id"] for t in body["data"]] == [4, 5, 6]
+    assert body["next_cursor"] == "6"
+
+    body = client.get(
+        "/tasks", headers=auth, query_string={"limit": "3", "cursor": "6"}
+    ).get_json()
+    assert [t["id"] for t in body["data"]] == [7]
+    assert body["next_cursor"] is None
+
+
+def test_pagination_limit_is_capped_at_100(client, auth):
+    seed_tasks(120)
+    body = client.get("/tasks", headers=auth, query_string={"limit": "1000"}).get_json()
+    assert body["total"] == 120
+    assert len(body["data"]) == 100
+    assert body["next_cursor"] == "100"
+
+
+def test_pagination_invalid_cursor_returns_400(client, auth):
+    resp = client.get("/tasks", headers=auth, query_string={"cursor": "abc"})
+    assert resp.status_code == 400
+
+
+def test_pagination_isolated_per_user(client):
+    register(client)
+    seed_tasks(3, owner_id=1)
+    register(client, "bob", "bobpass")
+    bob = {
+        "Authorization": f"Bearer {login(client, 'bob', 'bobpass').get_json()['token']}"
+    }
+    body = client.get("/tasks", headers=bob).get_json()
+    assert body["total"] == 0
+    assert body["data"] == []
+    assert body["next_cursor"] is None
+
+
+# ── Rate limiting ──────────────────────────────────────────────
+
+def test_rate_limit_authenticated_user(client, auth):
+    for _ in range(100):
+        assert client.get("/tasks", headers=auth).status_code == 200
+    resp = client.get("/tasks", headers=auth)
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_is_per_user(client):
+    register(client)
+    alice = {"Authorization": f"Bearer {login(client).get_json()['token']}"}
+    register(client, "bob", "bobpass")
+    bob = {
+        "Authorization": f"Bearer {login(client, 'bob', 'bobpass').get_json()['token']}"
+    }
+    for _ in range(100):
+        assert client.get("/tasks", headers=alice).status_code == 200
+    assert client.get("/tasks", headers=alice).status_code == 429
+    assert client.get("/tasks", headers=bob).status_code == 200
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for _ in range(100):
+        assert client.post(
+            "/auth/login", json={"username": "x", "password": "y"}
+        ).status_code == 401
+    resp = client.post("/auth/login", json={"username": "x", "password": "y"})
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
