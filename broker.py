@@ -22,12 +22,17 @@ Configuration is read from environment variables:
                         (default: ``redis://localhost:6379/0``).
 - ``DATABASE_URL``   - SQLite path for message history
                         (default: ``notifications.db``).
+- ``MESSAGE_TTL_DAYS`` - messages older than this many days are cleaned up
+                        by the background task at server startup
+                        (default: 7).
 """
 
 from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import aiosqlite
 
@@ -39,6 +44,22 @@ KEY_PREFIX = "notifications:"
 
 CLIENTS_KEY = KEY_PREFIX + "clients"
 COUNTER_KEY = KEY_PREFIX + "counter"
+
+
+def _normalize_since(value: str) -> str:
+    """Normalise a since timestamp into the server's canonical UTC format.
+
+    Naive timestamps are assumed to be UTC. A value without microseconds
+    (``...+00:00``) sorts before any ``....xxxxxx+00:00`` in the same second,
+    so string comparison with stored timestamps stays correct.
+    """
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat()
 
 
 def _sqlite_path(url: str) -> str:
@@ -95,16 +116,64 @@ class MessageStore:
                 " FROM messages ORDER BY id DESC LIMIT ? OFFSET ?",
                 (limit, offset),
             )
-        return [
-            {
-                "id": row["id"],
-                "channel": row["channel"],
-                "type": row["type"],
-                "payload": json.loads(row["payload"]),
-                "timestamp": row["timestamp"],
-            }
-            for row in rows
-        ]
+        return [self._row_to_dict(row) for row in rows]
+
+    @staticmethod
+    def _row_to_dict(row) -> dict:
+        return {
+            "id": row["id"],
+            "channel": row["channel"],
+            "type": row["type"],
+            "payload": json.loads(row["payload"]),
+            "timestamp": row["timestamp"],
+        }
+
+    async def history(
+        self,
+        channel: str | None = None,
+        since: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """Return messages for a channel/time range in chronological order.
+
+        ``channel`` filters by channel (None matches every channel). ``since``
+        is an ISO-8601 timestamp; messages at or after it are returned.
+        Paginated by ``limit``/``offset`` with a ``has_more`` flag.
+        """
+        clauses: list[str] = []
+        params: list[Any] = []
+        if channel is not None:
+            clauses.append("channel = ?")
+            params.append(channel)
+        if since:
+            clauses.append("timestamp >= ?")
+            params.append(_normalize_since(since))
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            rows = await db.execute_fetchall(
+                f"SELECT id, channel, type, payload, timestamp"
+                f" FROM messages {where} ORDER BY id ASC LIMIT ? OFFSET ?",
+                (*params, limit + 1, offset),
+            )
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        return {
+            "messages": [self._row_to_dict(row) for row in rows],
+            "has_more": has_more,
+        }
+
+    async def cleanup(self, ttl_days: int = 7) -> int:
+        """Delete messages older than ``ttl_days`` days; return rows removed."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
+        async with aiosqlite.connect(self.path) as db:
+            cursor = await db.execute(
+                "DELETE FROM messages WHERE timestamp < ?", (cutoff,)
+            )
+            await db.commit()
+            return cursor.rowcount
 
     async def close(self) -> None:
         return None

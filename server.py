@@ -30,7 +30,15 @@ Message distribution runs over a configurable message backbone (see
   behaviour.
 
 All distributed messages are persisted to SQLite (``DATABASE_URL``) and can be
-queried via ``GET /messages?limit=50&offset=0``.
+queried via ``GET /messages?limit=50&offset=0`` (newest first) or
+``GET /history?channel=X&since=ISO_TIMESTAMP&limit=50`` (chronological,
+pagination with ``has_more``). Messages older than ``MESSAGE_TTL_DAYS`` days
+(default 7) are cleaned up by a background task at server startup.
+
+Incoming client messages are rate limited per client-ID (``RATE_LIMIT``,
+default 100 per minute). Counters live in Redis when ``REDIS_URL`` is set and
+are shared across instances; a client that exceeds the limit receives a system
+error message instead of being dropped.
 
 Message format (JSON):
     {type: str, payload: dict, timestamp: str}
@@ -65,9 +73,22 @@ from broker import (
     MessageStore,
     default_backbone,
 )
+from ratelimit import RateLimiter, default_rate_limiter
 
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 WELCOME_TIMEOUT = 5.0
+DEFAULT_TTL_DAYS = 7
+
+
+def _env_ttl_days() -> int:
+    """Read the message retention window from ``MESSAGE_TTL_DAYS`` (default 7)."""
+    raw = (os.environ.get("MESSAGE_TTL_DAYS") or "").strip()
+    if not raw:
+        return DEFAULT_TTL_DAYS
+    try:
+        return max(int(raw), 1)
+    except ValueError:
+        return DEFAULT_TTL_DAYS
 
 
 def make_message(msg_type: str, payload: dict) -> dict:
@@ -241,6 +262,8 @@ class NotificationServer:
         backbone: Broker | None = None,
         store: MessageStore | None = None,
         transport: BaseTransport | None = None,
+        rate_limiter: RateLimiter | None = None,
+        ttl_days: int | None = None,
     ) -> None:
         self._transport = transport or default_transport()
         self._transport.server = self
@@ -254,7 +277,10 @@ class NotificationServer:
         if isinstance(self._backbone, LocalBroker) and self._backbone.server is None:
             self._backbone.server = self
         self._store = store or MessageStore()
+        self._rate_limiter = rate_limiter or default_rate_limiter()
+        self._ttl_days = ttl_days if ttl_days is not None else _env_ttl_days()
         self._consumer_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._server = None
 
@@ -444,6 +470,9 @@ class NotificationServer:
 
     async def handle_incoming(self, client_id: str, raw) -> None:
         """Route a raw client message through the core notification logic."""
+        if not await self._rate_limiter.allow(client_id):
+            await self._system(client_id, "error", error="rate limit exceeded")
+            return
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
@@ -503,6 +532,22 @@ class NotificationServer:
                 "limit": limit,
                 "offset": offset,
             }
+        if path == "/history":
+            channel = self._query_value(query, "channel")
+            since = self._query_value(query, "since")
+            limit = self._int_query(query, "limit", 50)
+            offset = self._int_query(query, "offset", 0)
+            result = await self._store.history(
+                channel, since=since, limit=limit, offset=offset
+            )
+            return 200, {
+                "messages": result["messages"],
+                "channel": channel,
+                "since": since,
+                "limit": limit,
+                "offset": offset,
+                "has_more": result["has_more"],
+            }
         return None
 
     @staticmethod
@@ -511,6 +556,13 @@ class NotificationServer:
             return max(int(query.get(key, [str(default)])[0]), 0)
         except (ValueError, TypeError):
             return default
+
+    @staticmethod
+    def _query_value(query: dict, key: str) -> str | None:
+        values = query.get(key)
+        if not values:
+            return None
+        return values[0]
 
     # ── Lifecycle ───────────────────────────────────────────────
 
@@ -524,10 +576,19 @@ class NotificationServer:
             for client_id in subs:
                 self._client_channels.setdefault(client_id, set()).add(name)
 
+    async def _run_startup_cleanup(self) -> None:
+        """Delete expired messages in the background on server startup."""
+        try:
+            await self._store.cleanup(self._ttl_days)
+        except Exception:
+            pass
+
     async def start(self, host: str = "localhost", port: int = 8765) -> None:
         self._loop = asyncio.get_running_loop()
         await self._store.init()
         await self._hydrate()
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._run_startup_cleanup())
         if self._backbone.consumable:
             self._consumer_task = asyncio.create_task(
                 self._backbone.consume(self._deliver_event)
@@ -543,8 +604,16 @@ class NotificationServer:
             except (asyncio.CancelledError, Exception):
                 pass
             self._consumer_task = None
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._cleanup_task = None
         await self._transport.stop()
         await self._backbone.close()
+        await self._rate_limiter.close()
         await self._store.close()
 
 
