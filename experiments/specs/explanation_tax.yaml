@@ -1,25 +1,38 @@
 name: explanation_tax
 question: >-
-  What fraction of a session's output-token cost is explanation (reasoning prose) rather than
-  answer (code and committed decisions), and does the answer/explanation split predict
-  correctness or flail — the Explanation Tax — under natural vs forced-silent modes?
-version: "0.1"
+  What is each output-token bucket FOR? Decompose a session's output stream into `answer`
+  (tokens in steps that wrote files) and `explanation` (tokens in prose-only steps) — the
+  provider-agnostic split derivable from the output stream alone — and measure whether each
+  predicts correctness or flail, under natural vs forced-silent modes. NOTE: "tax" is a
+  misnomer retained for continuity — non-code output is NOT assumed to be waste. Explanation
+  is working memory for the next step and a candidate future asset (docs/design/policy).
+  `reasoning` is a DeepSeek-only side-channel (Claude folds thinking into output_tokens and
+  reports reasoning=0) and is excluded from every cross-provider claim.
+version: "0.2"
 workflow:
   kind: task
   params:
     tasks: [task_manager, static_site_gen]
     silent_modes: [natural, forced_silent]
+    context: >-
+      silent_mode suppresses the model's visible narration/reasoning (opencode --silent):
+      for DeepSeek it suppresses the reasoning stream; for Claude it suppresses the thinking
+      text the adapter folds into output_tokens. The measurement is therefore "does visible
+      narration pay for itself?" (value), not "how much is wasted?" (tax). answer/explanation
+      are cross-provider comparable; reasoning is DeepSeek-only and must not appear on a
+      cross-provider axis.
 factors:
-  - {name: model,        levels: [deepseek/deepseek-v4-pro, deepseek/deepseek-v4-flash, anthropic/claude-haiku-4-5, openai/gpt-5.6-luna]}
-  - {name: silent_mode,  levels: [natural, forced_silent]}
+  - {name: model, levels: [deepseek/deepseek-v4-pro, deepseek/deepseek-v4-flash, anthropic/claude-haiku-4-5, openai/gpt-5.6-luna]}
+  - {name: silent_mode, levels: [natural, forced_silent]}
 design: factorial
 rules:
   - {name: instrument_token_split, plane: measurement, evidence_class: "[M]", requires: [], produces: [answer, explanation]}
-  - {name: explanation_tax,        plane: measurement, evidence_class: "[C]", requires: [answer, explanation, tokens_reasoning, cost_inference], produces: [explanation_tax]}
-  - {name: narration_coupling,     plane: measurement, evidence_class: "[C]", requires: [explanation, completed], produces: [think_do_coupling]}
+  - {name: output_decomposition,   plane: measurement, evidence_class: "[C]", requires: [answer, explanation], produces: [answer_ratio, explanation_ratio]}
+  - {name: narration_value,        plane: measurement, evidence_class: "[C]", requires: [explanation, first_pass], produces: [narration_predicts_outcome]}
+  - {name: reasoning_side_channel, plane: measurement, evidence_class: "[H]", requires: [tokens_reasoning], produces: [reasoning_ratio]}
 metrics:
-  - {name: explanation_tax,   agg: mean, over: cell}
-  - {name: think_do_coupling, agg: mean, over: cell}
+  - {name: answer_ratio,      agg: mean, over: cell}
+  - {name: explanation_ratio, agg: mean, over: cell}
   - {name: correctness,       agg: mean, over: cell}
 comparison: {kind: effect_size, arm_factor: silent_mode, loss: {cost: 1.0, quality: -5.0}}
 writeup: {format: lab_book, sections: [hypothesis, method, results, interpretation]}
