@@ -1,7 +1,9 @@
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import WebSocket from 'ws';
 import { buildSite, parsePage } from './site';
+import { startDevServer } from './server';
 
 describe('parsePage', () => {
   it('parses simple YAML frontmatter and renders Markdown', () => {
@@ -64,5 +66,41 @@ describe('buildSite', () => {
     await buildSite({ contentDir: content, outputDir: output, templateDir: templates });
 
     await expect(readFile(join(output, 'plain.html'), 'utf8')).resolves.toBe('<html><body><article>Plain: <p>Text</p>\n</article></body></html>');
+  });
+});
+
+describe('development server', () => {
+  it('serves generated pages with live reload and reloads after a content change', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-server-'));
+    const content = join(root, 'content');
+    const output = join(root, 'dist');
+    await mkdir(content);
+    const page = join(content, 'page.md');
+    await writeFile(page, '---\ntitle: First\n---\n\nBody');
+
+    const server = await startDevServer({ contentDir: content, outputDir: output, port: 0 });
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}`);
+    try {
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.once('open', resolveOpen);
+        socket.once('error', reject);
+      });
+      const reload = new Promise<void>((resolveReload, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timed out waiting for reload')), 5000);
+        socket.once('message', () => {
+          clearTimeout(timeout);
+          resolveReload();
+        });
+      });
+
+      const response = await fetch(`http://127.0.0.1:${server.port}/page.html`);
+      expect(await response.text()).toContain('new WebSocket');
+      await writeFile(page, '---\ntitle: Updated\n---\n\nBody');
+      await reload;
+      await expect(readFile(join(output, 'page.html'), 'utf8')).resolves.toContain('<h1>Updated</h1>');
+    } finally {
+      socket.terminate();
+      await server.close();
+    }
   });
 });
