@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -358,6 +359,91 @@ def test_data_persisted_to_flat_file(auth_client, tmp_path):
     assert storage_file.exists()
     contents = storage_file.read_text()
     assert "persisted task" in contents
+
+
+# ---------------------------------------------------------------------------
+# Completion notification trigger
+# ---------------------------------------------------------------------------
+
+
+def test_status_change_to_completed_triggers_notification(auth_client):
+    c, headers = auth_client
+    created = create(c, headers, "task").get_json()
+    with patch("app.send_notification_email") as mock_task:
+        resp = c.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+    assert resp.status_code == 200
+    mock_task.delay.assert_called_once()
+    email_arg, title_arg = mock_task.delay.call_args[0]
+    assert "alice" in email_arg
+    assert title_arg == "task"
+
+
+def test_status_change_to_non_completed_does_not_trigger_notification(auth_client):
+    c, headers = auth_client
+    created = create(c, headers, "task").get_json()
+    with patch("app.send_notification_email") as mock_task:
+        resp = c.put(
+            f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=headers
+        )
+    assert resp.status_code == 200
+    mock_task.delay.assert_not_called()
+
+
+def test_title_only_update_does_not_trigger_notification(auth_client):
+    c, headers = auth_client
+    created = create(c, headers, "task").get_json()
+    with patch("app.send_notification_email") as mock_task:
+        resp = c.put(
+            f"/tasks/{created['id']}", json={"title": "new title"}, headers=headers
+        )
+    assert resp.status_code == 200
+    mock_task.delay.assert_not_called()
+
+
+def test_already_completed_task_does_not_retrigger_notification(auth_client):
+    c, headers = auth_client
+    created = create(c, headers, "task").get_json()
+    c.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+
+    with patch("app.send_notification_email") as mock_task:
+        resp = c.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+    assert resp.status_code == 200
+    mock_task.delay.assert_not_called()
+
+
+def test_notification_not_triggered_for_other_users_task(client):
+    register(client, "alice", "password1")
+    register(client, "bob", "password2")
+    alice_headers = auth_headers(login(client, "alice", "password1").get_json()["token"])
+    bob_headers = auth_headers(login(client, "bob", "password2").get_json()["token"])
+
+    alice_task = create(client, alice_headers, "alice task").get_json()
+
+    with patch("app.send_notification_email") as mock_task:
+        resp = client.put(
+            f"/tasks/{alice_task['id']}",
+            json={"status": "completed"},
+            headers=bob_headers,
+        )
+    assert resp.status_code == 404
+    mock_task.delay.assert_not_called()
+
+
+def test_notification_failure_does_not_break_response(auth_client):
+    c, headers = auth_client
+    created = create(c, headers, "task").get_json()
+    with patch("app.send_notification_email") as mock_task:
+        mock_task.delay.side_effect = Exception("broker unavailable")
+        resp = c.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "completed"
 
 
 # ---------------------------------------------------------------------------

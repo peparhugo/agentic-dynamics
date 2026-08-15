@@ -15,6 +15,7 @@ from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import storage
+from tasks import send_notification_email
 
 JWT_ALGORITHM = "HS256"
 JWT_EXP_HOURS = 24
@@ -155,6 +156,21 @@ def create_app():
             title=title.strip() if has_title else None,
             status=status.strip() if has_status else None,
         )
+
+        newly_completed = (
+            has_status
+            and status.strip() == "completed"
+            and existing.get("status") != "completed"
+        )
+        if newly_completed:
+            owner = storage.get_user_by_id(task["owner_id"])
+            if owner is not None:
+                owner_email = owner.get("email") or f"{owner['username']}@example.com"
+                try:
+                    send_notification_email.delay(owner_email, task["title"])
+                except Exception:
+                    app.logger.exception("Failed to enqueue completion notification email")
+
         return jsonify(task), 200
 
     return app
