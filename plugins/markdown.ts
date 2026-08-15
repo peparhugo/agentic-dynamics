@@ -2,7 +2,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
-import type { Frontmatter, ParsedMarkdown, Page } from '../index';
+import type { CacheManifest, Frontmatter, ParsedMarkdown, Page } from '../index';
+import { createHash } from 'node:crypto';
 import type { BuildContext, Plugin } from './types';
 
 const markdownExtensions = new Set(['.md', '.markdown']);
@@ -61,17 +62,25 @@ export class MarkdownPlugin implements Plugin {
     context.files = await markdownFiles(context.contentDir);
     for (const relativeSource of context.files) {
       const source = await fs.readFile(path.join(context.contentDir, relativeSource), 'utf8');
-      const parsed = parseMarkdown(source);
+      const sourceHash = createHash('sha256').update(source).digest('hex');
+      const hashes = (context.metadata.sourceHashes ??= {}) as Record<string, string>;
+      hashes[relativeSource.split(path.sep).join('/')] = sourceHash;
+      const cached = (context.metadata.cache as CacheManifest | undefined)?.pages[relativeSource.split(path.sep).join('/')];
+      const parsed = cached?.sourceHash === sourceHash && cached.frontmatter && cached.markdownContent !== undefined
+        ? { data: cached.frontmatter, content: cached.markdownContent }
+        : parseMarkdown(source);
       const page: Page = {
         sourcePath: relativeSource.split(path.sep).join('/'),
         outputPath: relativeSource.replace(/\.(md|markdown)$/i, '.html').split(path.sep).join('/'),
         title: titleFor(relativeSource, parsed.data),
         date: typeof parsed.data.date === 'string' ? parsed.data.date : undefined,
         tags: tagsFor(parsed.data),
-        html: await marked.parse(parsed.content),
+        html: cached?.sourceHash === sourceHash && cached.markdownHtml !== undefined ? cached.markdownHtml : await marked.parse(parsed.content),
         frontmatter: parsed.data,
       };
       context.pages.push(page);
+      (context.metadata.markdownContent ??= {}) as Record<string, string>;
+      (context.metadata.markdownContent as Record<string, string>)[page.sourcePath] = parsed.content;
     }
     context.pages.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.outputPath.localeCompare(b.outputPath));
   }

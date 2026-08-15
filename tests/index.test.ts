@@ -75,6 +75,39 @@ describe('buildSite', () => {
     expect(events).toEqual(['start', 'before', 'file:first.md', 'file:notes/second.markdown', 'after', 'end']);
     expect(await fs.readFile(path.join(root, 'public', 'first.html'), 'utf8')).toContain('<h1>Changed</h1>');
   });
+
+  it('skips unchanged pages and rebuilds only changed pages', async () => {
+    const output = path.join(root, 'public');
+    await buildSite({ contentDir: path.join(root, 'content'), outputDir: output });
+    const rebuilt: string[] = [];
+    await fs.writeFile(path.join(root, 'content', 'first.md'), '---\ntitle: Updated\n---\n\nChanged');
+    await buildSite({
+      contentDir: path.join(root, 'content'),
+      outputDir: output,
+      incremental: true,
+      plugins: [{ onFile: (page) => { rebuilt.push(page.sourcePath); } }],
+    });
+    expect(rebuilt).toEqual(['first.md']);
+    expect(await fs.readFile(path.join(output, 'first.html'), 'utf8')).toContain('Updated');
+    expect(await fs.readFile(path.join(output, 'notes', 'second.html'), 'utf8')).toContain('<h1>Second</h1>');
+    expect(await fs.readFile(path.join(output, '.ssg-cache.json'), 'utf8')).toContain('renderedHtml');
+  });
+
+  it('rebuilds every page when a template changes and reports stats', async () => {
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(templates, { recursive: true });
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<main>{{title}} {{{body}}}</main>');
+    const output = path.join(root, 'public');
+    await buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates });
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<article>{{title}} {{{body}}}</article>');
+    const rebuilt: string[] = [];
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      await buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates, incremental: true, plugins: [{ onFile: (page) => { rebuilt.push(page.sourcePath); } }] });
+    } finally { log.mockRestore(); }
+    expect(rebuilt).toEqual(['first.md', 'notes/second.markdown']);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('2 built, 0 skipped'));
+  });
 });
 
 describe('CLI arguments', () => {
@@ -84,6 +117,10 @@ describe('CLI arguments', () => {
 
   it('validates the serve port', () => {
     expect(() => parseArgs(['--port', '0'])).toThrow('--port requires a valid port');
+  });
+
+  it('parses incremental build flags', () => {
+    expect(parseArgs(['--incremental', '--clean'])).toEqual({ incremental: true, clean: true });
   });
 
   it('injects the reload client before the closing body tag', () => {
