@@ -12,8 +12,14 @@ export function parseArgs(argv) {
         else if (arg === '--output' && i + 1 < argv.length) {
             args.outputDir = argv[++i];
         }
+        else if (arg === '--port' && i + 1 < argv.length) {
+            args.port = parseInt(argv[++i], 10);
+        }
         else if (arg === 'build') {
             args.command = 'build';
+        }
+        else if (arg === 'serve') {
+            args.command = 'serve';
         }
     }
     return args;

@@ -1,10 +1,4 @@
-import { type PageMetadata } from './parser.js';
-export interface PageData {
-    slug: string;
-    filename: string;
-    content: string;
-    metadata: PageMetadata;
-}
+import { PageData } from './plugin.js';
 export interface GeneratorOptions {
     contentDir: string;
     outputDir: string;
@@ -12,5 +6,6 @@ export interface GeneratorOptions {
     layoutsDir?: string;
     partialsDir?: string;
 }
+export { PageData };
 export declare function generate(options: GeneratorOptions): Promise<void>;
 //# sourceMappingURL=generator.d.ts.map
