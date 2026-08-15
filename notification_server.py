@@ -33,6 +33,20 @@ Channels
   subscribe/unsubscribe dynamically.
 * A ``channel`` field (top-level or inside ``payload``) on a message restricts
   delivery to the subscribers of that channel.
+
+Redis backbone
+--------------
+When a Redis broker is configured (``REDIS_URL`` env var or ``redis_client``),
+the server publishes messages to Redis pub/sub channels and a background worker
+subscribes to Redis and delivers messages to locally connected clients. This
+lets multiple server instances share one Redis backbone. Client connection
+state (connected clients and their channel subscriptions) is mirrored into
+Redis so it survives a server restart.
+
+Persistence
+-----------
+All relayed messages are stored in a SQLite database (``DATABASE_URL`` env var,
+defaulting to ``messages.db``) and are exposed via ``GET /messages``.
 """
 
 from __future__ import annotations
@@ -40,11 +54,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import os
+import sqlite3
 import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Optional
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit, parse_qsl
 
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
@@ -53,6 +69,16 @@ DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8765
 
 SUPPORTED_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
+
+# ── Configuration ─────────────────────────────────────────────
+REDIS_URL = os.environ.get("REDIS_URL")
+DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
+
+# Prefix for all Redis keys/channels used by the backbone.
+REDIS_PREFIX = "notifications:"
+REDIS_SUBSCRIBE_PATTERN = REDIS_PREFIX + "*"
+
+DEFAULT_LIMIT = 50
 
 
 def utc_now() -> str:
@@ -81,6 +107,74 @@ def get_channel(message: dict) -> Optional[str]:
     if channel is None and isinstance(message.get("payload"), dict):
         channel = message.get("payload").get("channel")
     return channel
+
+
+class MessageStore:
+    """SQLite-backed message history.
+
+    Every message relayed by the server is persisted to a ``messages`` table
+    with columns ``id``, ``channel``, ``type``, ``payload`` and ``timestamp``.
+    The ``payload`` column stores a JSON-serialized object.
+    """
+
+    def __init__(self, database_path: str) -> None:
+        self.database_path = database_path
+        self._lock = threading.Lock()
+        self._init_db()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.database_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_db(self) -> None:
+        conn = self._connect()
+        try:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS messages ("
+                "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "  channel TEXT,"
+                "  type TEXT,"
+                "  payload TEXT,"
+                "  timestamp TEXT"
+                ")"
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def save(self, channel: str, type_: str, payload: dict, timestamp: str) -> None:
+        conn = self._connect()
+        try:
+            with self._lock:
+                conn.execute(
+                    "INSERT INTO messages (channel, type, payload, timestamp)"
+                    " VALUES (?, ?, ?, ?)",
+                    (channel, type_, json.dumps(payload), timestamp),
+                )
+                conn.commit()
+        finally:
+            conn.close()
+
+    def list(self, limit: int = DEFAULT_LIMIT, offset: int = 0) -> list[dict]:
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages"
+                " ORDER BY id DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+        finally:
+            conn.close()
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["payload"] = json.loads(item["payload"])
+            except (TypeError, ValueError):
+                item["payload"] = {}
+            result.append(item)
+        return result
 
 
 class ClientRegistry:
@@ -153,11 +247,148 @@ class ChannelRegistry:
 
 
 class NotificationServer:
-    """Async notification server managing thread-safe registries."""
+    """Async notification server managing thread-safe registries.
 
-    def __init__(self) -> None:
+    The server can optionally use Redis pub/sub as its message backbone. When a
+    Redis backend is configured (``start()`` is called), inbound messages are
+    published to Redis channels and a background worker subscribes to Redis and
+    delivers messages to locally connected clients. This lets multiple server
+    instances share a single Redis backbone and cross-deliver messages.
+
+    Client connection state (which clients are connected, and which channels
+    they subscribe to) is mirrored into Redis so that it survives a server
+    restart.
+    """
+
+    def __init__(
+        self,
+        redis_url: Optional[str] = None,
+        database_url: Optional[str] = None,
+        redis_client: Any = None,
+    ) -> None:
         self.registry = ClientRegistry()
         self.channels = ChannelRegistry()
+        self.store = MessageStore(database_url or DATABASE_URL)
+        self.redis_url = redis_url if redis_url is not None else REDIS_URL
+        self.instance_id = str(uuid.uuid4())
+        self._redis_client = redis_client
+        self._redis: Any = None
+        self._pubsub: Any = None
+        self._worker_task: Optional[asyncio.Task] = None
+        self._redis_connected = False
+
+    # ── Lifecycle ──────────────────────────────────────────────
+
+    @property
+    def redis_connected(self) -> bool:
+        return self._redis_connected
+
+    async def start(self) -> None:
+        """Connect to Redis (if configured) and start the delivery worker."""
+        if self._redis_connected:
+            return
+        if self._redis_client is not None:
+            self._redis = self._redis_client
+            self._redis_connected = True
+        elif self.redis_url:
+            from redis import asyncio as aioredis
+
+            self._redis = aioredis.from_url(self.redis_url, decode_responses=True)
+            self._redis_connected = True
+        if self._redis_connected:
+            self._pubsub = self._redis.pubsub()
+            await self._pubsub.psubscribe(REDIS_SUBSCRIBE_PATTERN)
+            self._worker_task = asyncio.create_task(self._run_worker())
+
+    async def stop(self) -> None:
+        """Stop the worker and close the Redis connection."""
+        if self._worker_task is not None:
+            self._worker_task.cancel()
+            try:
+                await self._worker_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._worker_task = None
+        if self._pubsub is not None:
+            try:
+                await self._pubsub.aclose()
+            except Exception:
+                pass
+            self._pubsub = None
+        if self._redis is not None and self._redis_client is None:
+            try:
+                await self._redis.aclose()
+            except Exception:
+                pass
+        self._redis = None
+        self._redis_connected = False
+
+    # ── Redis backbone ─────────────────────────────────────────
+
+    async def _run_worker(self) -> None:
+        """Subscribe to the Redis backbone and deliver messages locally."""
+        async for message in self._pubsub.listen():
+            if message.get("type") != "pmessage":
+                continue
+            try:
+                payload = json.loads(message.get("data"))
+            except (TypeError, ValueError):
+                continue
+            if isinstance(payload, dict):
+                await self._deliver_from_redis(message.get("channel"), payload)
+
+    async def _deliver_from_redis(self, redis_channel: str, message: dict) -> None:
+        msg_type = message.get("type")
+        if msg_type == "broadcast":
+            channel = message.get("channel")
+            if channel:
+                await self.publish(channel, message)
+            else:
+                await self.broadcast(message)
+        elif msg_type == "direct":
+            prefix = REDIS_PREFIX + "direct:"
+            if redis_channel.startswith(prefix):
+                await self.send_to(redis_channel[len(prefix):], message)
+
+    async def _publish_to_redis(self, message: dict, target: Optional[str] = None) -> None:
+        msg_type = message.get("type")
+        if msg_type == "broadcast":
+            channel = message.get("channel")
+            redis_channel = (
+                REDIS_PREFIX + "channel:" + channel if channel else REDIS_PREFIX + "broadcast"
+            )
+        elif msg_type == "direct":
+            redis_channel = REDIS_PREFIX + "direct:" + str(target)
+        else:
+            return
+        await self._redis.publish(redis_channel, json.dumps(message))
+
+    async def _client_exists(self, client_id: str) -> bool:
+        if self._redis_connected:
+            return bool(
+                await self._redis.exists(REDIS_PREFIX + "client:" + client_id)
+            )
+        return client_id in self.registry
+
+    async def _register_client(self, client_id: str) -> None:
+        await self._redis.set(REDIS_PREFIX + "client:" + client_id, self.instance_id)
+
+    async def _unregister_client(self, client_id: str) -> None:
+        await self._redis.delete(REDIS_PREFIX + "client:" + client_id)
+
+    async def _redis_subscribe(self, client_id: str, channel: str) -> None:
+        await self._redis.sadd(REDIS_PREFIX + "subscribers:" + channel, client_id)
+
+    async def _redis_unsubscribe(self, client_id: str, channel: str) -> None:
+        await self._redis.srem(REDIS_PREFIX + "subscribers:" + channel, client_id)
+
+    def _persist(self, outgoing: dict) -> None:
+        msg_type = outgoing.get("type") or ""
+        channel = outgoing.get("channel") or ""
+        payload = outgoing.get("payload")
+        if not isinstance(payload, dict):
+            payload = {}
+        self.store.save(channel, msg_type, payload, outgoing.get("timestamp") or utc_now())
 
     # ── Outbound helpers ───────────────────────────────────────
 
@@ -213,6 +444,10 @@ class NotificationServer:
             channel = get_channel(message)
             if isinstance(channel, str) and channel:
                 outgoing["channel"] = channel
+            self._persist(outgoing)
+            if self._redis_connected:
+                await self._publish_to_redis(outgoing)
+            elif isinstance(channel, str) and channel:
                 await self.publish(channel, outgoing)
             else:
                 await self.broadcast(outgoing)
@@ -230,6 +465,8 @@ class NotificationServer:
                 )
                 return
             self.channels.subscribe(sender_id, channel)
+            if self._redis_connected:
+                await self._redis_subscribe(sender_id, channel)
 
         elif msg_type == "unsubscribe":
             channel = get_channel(message)
@@ -244,6 +481,8 @@ class NotificationServer:
                 )
                 return
             self.channels.unsubscribe(sender_id, channel)
+            if self._redis_connected:
+                await self._redis_unsubscribe(sender_id, channel)
 
         elif msg_type == "direct":
             target = payload.get("to")
@@ -262,16 +501,30 @@ class NotificationServer:
                 "payload": {"from": sender_id, "message": payload.get("message")},
                 "timestamp": utc_now(),
             }
-            delivered = await self.send_to(target, outgoing)
-            if not delivered:
-                await self.send_to(
-                    sender_id,
-                    {
-                        "type": "system",
-                        "payload": {"error": f"target client {target!r} not connected"},
-                        "timestamp": utc_now(),
-                    },
-                )
+            self._persist(outgoing)
+            if self._redis_connected:
+                if not await self._client_exists(target):
+                    await self.send_to(
+                        sender_id,
+                        {
+                            "type": "system",
+                            "payload": {"error": f"target client {target!r} not connected"},
+                            "timestamp": utc_now(),
+                        },
+                    )
+                    return
+                await self._publish_to_redis(outgoing, target=target)
+            else:
+                delivered = await self.send_to(target, outgoing)
+                if not delivered:
+                    await self.send_to(
+                        sender_id,
+                        {
+                            "type": "system",
+                            "payload": {"error": f"target client {target!r} not connected"},
+                            "timestamp": utc_now(),
+                        },
+                    )
 
         else:
             await self.send_to(
@@ -290,6 +543,8 @@ class NotificationServer:
         """Handle a single WebSocket connection lifecycle."""
         client_id = str(uuid.uuid4())
         self.registry.add(client_id, websocket)
+        if self._redis_connected:
+            await self._register_client(client_id)
         try:
             await websocket.send(
                 encode_frame(
@@ -334,6 +589,8 @@ class NotificationServer:
         finally:
             self.registry.remove(client_id)
             self.channels.remove_client(client_id)
+            if self._redis_connected:
+                await self._unregister_client(client_id)
 
     # ── REST endpoints ─────────────────────────────────────────
 
@@ -349,19 +606,34 @@ class NotificationServer:
     ) -> Any:
         """Serve REST endpoints over plain HTTP, otherwise allow the WS handshake."""
         path = request.path
+        route_path = urlsplit(path).path
 
-        if path == "/health":
+        if route_path == "/health":
             return self._json_response(
                 connection, 200, {"connected_clients": self.registry.count()}
             )
 
-        if path == "/channels":
+        if route_path == "/channels":
             return self._json_response(connection, 200, self.channels.counts())
 
-        if path.startswith("/channels/") and path.endswith("/subscribers"):
-            name = unquote(path[len("/channels/"):-len("/subscribers")])
+        if route_path.startswith("/channels/") and route_path.endswith("/subscribers"):
+            name = unquote(route_path[len("/channels/"):-len("/subscribers")])
             return self._json_response(
                 connection, 200, self.channels.subscribers(name)
+            )
+
+        if route_path == "/messages":
+            params = dict(parse_qsl(urlsplit(path).query))
+            try:
+                limit = int(params.get("limit", DEFAULT_LIMIT))
+            except (TypeError, ValueError):
+                limit = DEFAULT_LIMIT
+            try:
+                offset = int(params.get("offset", 0))
+            except (TypeError, ValueError):
+                offset = 0
+            return self._json_response(
+                connection, 200, self.store.list(limit=limit, offset=offset)
             )
 
         return None
@@ -383,8 +655,12 @@ def create_server(
 
 async def main(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
     app = NotificationServer()
-    async with serve(app.handler, host, port, process_request=app.process_request):
-        await asyncio.Future()  # run forever
+    await app.start()
+    try:
+        async with serve(app.handler, host, port, process_request=app.process_request):
+            await asyncio.Future()  # run forever
+    finally:
+        await app.stop()
 
 
 if __name__ == "__main__":

@@ -14,9 +14,9 @@ except ImportError:  # pragma: no cover
 
 
 @pytest_asyncio.fixture
-async def server():
+async def server(tmp_path):
     """Start a NotificationServer on an ephemeral port and yield (app, port)."""
-    app = NotificationServer()
+    app = NotificationServer(database_url=str(tmp_path / "messages.db"))
     async with serve(
         app.handler,
         "127.0.0.1",
@@ -43,6 +43,54 @@ async def client_factory(server):
     for ws in connections:
         try:
             await ws.close()
+        except Exception:
+            pass
+
+
+@pytest_asyncio.fixture
+async def redis_backbone():
+    """Provide a shared in-process Redis server (fakeredis) as the backbone."""
+    import fakeredis.aioredis as fakeredis_aioredis
+
+    yield fakeredis_aioredis.FakeServer()
+
+
+@pytest_asyncio.fixture
+async def redis_server_factory(redis_backbone):
+    """Return a factory that starts Redis-backed NotificationServer instances.
+
+    Every instance created by the factory shares the same in-process Redis
+    backbone, mirroring how multiple real server processes share a single
+    Redis server.
+    """
+    import fakeredis.aioredis as fakeredis_aioredis
+
+    servers = []
+
+    async def _factory(database_path=None):
+        client = fakeredis_aioredis.FakeRedis(
+            server=redis_backbone, decode_responses=True
+        )
+        app = NotificationServer(redis_client=client, database_url=database_path)
+        await app.start()
+        ws_server = await serve(
+            app.handler,
+            "127.0.0.1",
+            0,
+            process_request=app.process_request,
+        )
+        port = ws_server.sockets[0].getsockname()[1]
+        servers.append((ws_server, app, client))
+        return app, port
+
+    yield _factory
+
+    for ws_server, app, client in servers:
+        ws_server.close()
+        await ws_server.wait_closed()
+        await app.stop()
+        try:
+            await client.aclose()
         except Exception:
             pass
 
