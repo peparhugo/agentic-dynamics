@@ -11,6 +11,8 @@ import jwt
 from flask import Flask, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 _storage_lock = threading.RLock()
 _default_jwt_secret = secrets.token_bytes(32)
@@ -161,10 +163,16 @@ def create_app(config: dict | None = None) -> Flask:
 
     @app.post("/auth/register")
     def register():
-        credentials = _valid_credentials(_json_body())
+        data = _json_body()
+        credentials = _valid_credentials(data)
         if credentials is None:
             return jsonify(error="username and password are required"), 400
         username, password = credentials
+        email = data.get("email")
+        if email is not None and (
+            not isinstance(email, str) or not email.strip()
+        ):
+            return jsonify(error="email must be a non-empty string"), 400
 
         with _storage_lock:
             users = _read_users()
@@ -173,6 +181,7 @@ def create_app(config: dict | None = None) -> Flask:
             user = {
                 "id": max((user["id"] for user in users), default=0) + 1,
                 "username": username,
+                "email": email.strip() if email is not None else username,
                 "password_hash": generate_password_hash(password, method="scrypt"),
             }
             users.append(user)
@@ -287,12 +296,20 @@ def create_app(config: dict | None = None) -> Flask:
             )
             if task is None:
                 return jsonify(error="task not found"), 404
+            status_changed_to_completed = (
+                data.get("status", "").strip() == "completed"
+                and task.get("status") != "completed"
+            )
             if "title" in data:
                 task["title"] = data["title"].strip()
             if "status" in data:
                 task["status"] = data["status"].strip()
             _write_tasks(tasks)
-        return jsonify(task)
+            task_result = task.copy()
+        if status_changed_to_completed:
+            owner_email = g.current_user.get("email", g.current_user["username"])
+            send_notification_email.delay(owner_email, task_result["title"])
+        return jsonify(task_result)
 
     return app
 

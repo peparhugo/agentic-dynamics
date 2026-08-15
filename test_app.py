@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from unittest.mock import patch
 
 import jwt
 import pytest
@@ -242,6 +243,42 @@ def test_update_one_field(client, auth):
 
     assert response.json["title"] == "Task"
     assert response.json["status"] == "active"
+
+
+def test_completed_status_transition_enqueues_notification(client):
+    auth, _ = register_and_login(client, "owner@example.com")
+    task = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=auth
+    ).json
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=auth,
+        )
+
+    assert response.status_code == 200
+    delay.assert_called_once_with("owner@example.com", "Ship release")
+
+
+def test_completed_status_without_transition_does_not_enqueue_notification(
+    client, auth
+):
+    task = client.post("/tasks", json={"title": "Task"}, headers=auth).json
+
+    with patch("app.send_notification_email.delay") as delay:
+        first = client.put(
+            f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth
+        )
+        delay.reset_mock()
+        second = client.put(
+            f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    delay.assert_not_called()
 
 
 def test_update_validates_body_and_missing_task(client, auth):
