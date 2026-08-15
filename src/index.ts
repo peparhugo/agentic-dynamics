@@ -30,15 +30,27 @@ yargs(hideBin(process.argv))
           alias: 't',
           describe: 'Templates directory',
           type: 'string'
+        })
+        .option('incremental', {
+          describe: 'Only rebuild changed pages',
+          type: 'boolean',
+          default: false
+        })
+        .option('clean', {
+          describe: 'Clear cache before building',
+          type: 'boolean',
+          default: false
         });
     },
     async (argv) => {
       const contentDir = path.resolve(argv.content as string);
       const outputDir = path.resolve(argv.output as string);
       const templateDir = argv.templates ? path.resolve(argv.templates as string) : undefined;
+      const incremental = argv.incremental as boolean;
+      const clean = argv.clean as boolean;
 
       try {
-        await build(contentDir, outputDir, templateDir);
+        await build(contentDir, outputDir, templateDir, false, { incremental, clean });
       } catch (error) {
         console.error('Error:', (error as Error).message);
         process.exit(1);
