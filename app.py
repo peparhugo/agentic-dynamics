@@ -14,12 +14,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
 
+from celery_app import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
-VALID_STATUSES = {"pending", "done"}
+# 'completed' is an alias status alongside the original 'pending'/'done' pair.
+# It exists so a status update can trigger the completion notification email
+# without altering the meaning or behavior of the pre-existing 'done' status.
+VALID_STATUSES = {"pending", "done", "completed"}
 TOKEN_TTL = timedelta(hours=24)
 
 
@@ -81,6 +86,12 @@ def create_user(username: str, password: str) -> dict | None:
 def get_user_by_username(username: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
 
 
@@ -239,6 +250,10 @@ def edit_task(task_id: int):
         title=data.get("title"),
         status=status,
     )
+    if status == "completed" and existing["status"] != "completed":
+        owner = get_user_by_id(task["owner_id"])
+        if owner is not None:
+            send_notification_email.delay(owner["username"], task["title"])
     return jsonify(task)
 
 
