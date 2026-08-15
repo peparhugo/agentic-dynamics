@@ -8,6 +8,7 @@ Endpoints:
     GET  /api/events/<cell_id> — SSE stream of a cell's events (replay + live)
     GET  /api/routing          — routing board (Phase 7; stub for now)
     POST /api/experiments      — enqueue/clear the experiment queue
+    POST /api/queue/reinterleave — re-interleave story_jobs round-robin by provider
     GET  /api/claude-agents           — Claude background-session roster (Redis read only)
     GET  /api/claude-agents/<id>/logs — one-shot log tail for an external session
     GET  /api/claude-agents/daemon    — read-only `claude daemon status`
@@ -65,6 +66,12 @@ from instrument.supervisor import (
     SUPERVISOR_SESSION_CELLS_KEY,
     normalize_flag,
     parse_mapping,
+)
+from instrument.queue_reinterleave import (
+    provider_summary,
+    read_queue,
+    reinterleave_cells,
+    write_queue,
 )
 
 try:  # Package imports under pytest and WSGI.
@@ -898,6 +905,35 @@ def api_experiments() -> Response:
         return jsonify({"error": str(e)}), 500
 
     return jsonify({"ok": proc.returncode == 0, "output": (proc.stdout or proc.stderr).strip()})
+
+
+@app.post("/api/queue/reinterleave")
+def api_queue_reinterleave() -> Response:
+    """Re-interleave ``story_jobs`` round-robin across providers.
+
+    Queue-level control (unlike the flagged session interrupts): it needs no
+    supervisor flag because it reorders *future* picks without touching any
+    running session. The reorder logic is shared with the CLI via
+    ``instrument.queue_reinterleave`` so the two surfaces can never drift.
+    """
+    body, failure = _design_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+
+    def reinterleave() -> tuple[Response, int]:
+        r = _redis()
+        before = read_queue(r)
+        after = reinterleave_cells(before)
+        write_queue(r, after)
+        return jsonify({
+            "ok": True,
+            "count": len(before),
+            "before": provider_summary(before),
+            "after": provider_summary(after),
+        }), 200
+
+    return _idempotent_design_response("queue-reinterleave", body, reinterleave)
 
 
 @app.get("/api/design-sessions")
