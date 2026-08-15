@@ -10,13 +10,13 @@ import math
 from pathlib import Path
 from typing import Any
 
-import ollama
-
 
 class EmbeddingClient:
     """Generate text embeddings via local Ollama model."""
 
     def __init__(self, model: str = "bge-m3:latest", host: str | None = None):
+        import ollama
+
         self.model = model
         self._client = ollama.Client(host=host) if host else ollama
 
