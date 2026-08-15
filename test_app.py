@@ -70,3 +70,32 @@ def test_existing_task_schema_is_migrated(tmp_path, monkeypatch):
         columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
         assert "owner_id" in columns
         assert conn.execute("SELECT title FROM tasks WHERE id = 0").fetchone()[0] == "legacy"
+
+
+def test_completion_enqueues_notification(client, monkeypatch):
+    register(client, "alice@example.com")
+    alice = login(client, "alice@example.com")
+    task = client.post("/tasks", json={"title": "Ship feature"}, headers=alice).json
+    queued = []
+    monkeypatch.setattr("app.send_notification_email.delay", lambda *args: queued.append(args))
+
+    response = client.put(
+        f"/tasks/{task['id']}", json={"status": "completed"}, headers=alice
+    )
+
+    assert response.status_code == 200
+    assert queued == [("alice@example.com", "Ship feature")]
+
+
+def test_notification_only_enqueues_on_status_transition(client, monkeypatch):
+    register(client, "alice")
+    alice = login(client, "alice")
+    task = client.post("/tasks", json={"title": "Write docs"}, headers=alice).json
+    queued = []
+    monkeypatch.setattr("app.send_notification_email.delay", lambda *args: queued.append(args))
+
+    client.put(f"/tasks/{task['id']}", json={"title": "Updated docs"}, headers=alice)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=alice)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=alice)
+
+    assert queued == [("alice", "Updated docs")]

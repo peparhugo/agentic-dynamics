@@ -11,6 +11,7 @@ import sqlite3
 
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
+from notifications import send_notification_email
 
 
 app = Flask(__name__)
@@ -226,9 +227,12 @@ def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
         return jsonify({"error": "request body must be a JSON object"}), 400
+    previous_task = get_task(task_id, g.current_user["id"])
     task = update_task(task_id, data.get("title"), data.get("status"), g.current_user["id"])
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if previous_task["status"] != "completed" and task["status"] == "completed":
+        send_notification_email.delay(g.current_user["username"], task["title"])
     return jsonify(task)
 
 
