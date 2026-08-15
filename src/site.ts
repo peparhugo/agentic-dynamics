@@ -2,11 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parseMarkdownFile } from './frontmatter';
 import { renderMarkdown } from './markdown';
-import { Page, renderIndexHtml, renderPageHtml } from './page';
+import { Page } from './page';
+import { DEFAULT_LAYOUT_NAME, DEFAULT_TEMPLATE_NAME, INDEX_TEMPLATE_NAME, TemplateEngine } from './templates';
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  templatesDir?: string;
 }
 
 export interface BuildResult {
@@ -56,6 +58,8 @@ export function buildPage(contentDir: string, filePath: string): Page {
   const title = typeof data.title === 'string' && data.title.trim() ? data.title : titleFromSlug(slug);
   const date = typeof data.date === 'string' && data.date.trim() ? data.date : null;
   const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
+  const template = typeof data.template === 'string' && data.template.trim() ? data.template : DEFAULT_TEMPLATE_NAME;
+  const layout = typeof data.layout === 'string' && data.layout.trim() ? data.layout : DEFAULT_LAYOUT_NAME;
 
   return {
     slug,
@@ -65,26 +69,33 @@ export function buildPage(contentDir: string, filePath: string): Page {
     html,
     sourcePath: filePath,
     outputPath: `${slug}.html`,
+    template,
+    layout,
   };
 }
 
 export function buildSite(options: BuildOptions): BuildResult {
   const contentDir = path.resolve(options.contentDir);
   const outputDir = path.resolve(options.outputDir);
+  const templatesDir = path.resolve(options.templatesDir ?? './templates');
 
   const files = findMarkdownFiles(contentDir);
   const pages = files.map((file) => buildPage(contentDir, file));
+
+  const templateEngine = new TemplateEngine(templatesDir);
 
   fs.mkdirSync(outputDir, { recursive: true });
 
   for (const page of pages) {
     const destPath = path.join(outputDir, page.outputPath);
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
-    fs.writeFileSync(destPath, renderPageHtml(page), 'utf-8');
+    const html = templateEngine.render(page.template, page.layout, { ...page });
+    fs.writeFileSync(destPath, html, 'utf-8');
   }
 
   const indexPath = path.join(outputDir, 'index.html');
-  fs.writeFileSync(indexPath, renderIndexHtml(pages), 'utf-8');
+  const indexHtml = templateEngine.render(INDEX_TEMPLATE_NAME, DEFAULT_LAYOUT_NAME, { title: 'Index', pages });
+  fs.writeFileSync(indexPath, indexHtml, 'utf-8');
 
   return { pages, outputDir };
 }

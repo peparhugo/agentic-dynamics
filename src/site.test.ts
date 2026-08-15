@@ -86,3 +86,110 @@ describe('buildSite', () => {
     expect(() => buildSite({ contentDir: missingDir, outputDir })).toThrow(/not found/i);
   });
 });
+
+describe('buildSite with a custom templates directory', () => {
+  let contentDir: string;
+  let outputDir: string;
+  let templatesDir: string;
+
+  beforeEach(() => {
+    contentDir = makeTmpDir('ssg-tpl-content-');
+    outputDir = makeTmpDir('ssg-tpl-output-');
+    templatesDir = makeTmpDir('ssg-tpl-templates-');
+    fs.mkdirSync(path.join(templatesDir, 'layouts'));
+    fs.mkdirSync(path.join(templatesDir, 'partials'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(contentDir, { recursive: true, force: true });
+    fs.rmSync(outputDir, { recursive: true, force: true });
+    fs.rmSync(templatesDir, { recursive: true, force: true });
+  });
+
+  it('uses the default template and layout when a page specifies neither', () => {
+    fs.writeFileSync(path.join(templatesDir, 'page.hbs'), '<h1>{{title}}</h1><div>{{{html}}}</div>');
+    fs.writeFileSync(
+      path.join(templatesDir, 'layouts', 'default.hbs'),
+      '<html><title>{{title}}</title><body>{{{body}}}</body></html>'
+    );
+    fs.writeFileSync(path.join(contentDir, 'plain.md'), '---\ntitle: Plain\n---\n\nBody text.');
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'plain.html'), 'utf-8');
+    expect(html).toContain('<html><title>Plain</title><body><h1>Plain</h1><div>');
+    expect(html).toContain('<p>Body text.</p>');
+    expect(html).toContain('</div></body></html>');
+  });
+
+  it('lets a page pick a non-default template via frontmatter', () => {
+    fs.writeFileSync(path.join(templatesDir, 'page.hbs'), 'DEFAULT:{{title}}');
+    fs.writeFileSync(path.join(templatesDir, 'post.hbs'), 'POST:{{title}}');
+    fs.writeFileSync(path.join(templatesDir, 'layouts', 'default.hbs'), '{{{body}}}');
+    fs.writeFileSync(
+      path.join(contentDir, 'article.md'),
+      '---\ntitle: Article\ntemplate: post\n---\n\nSome text.'
+    );
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'article.html'), 'utf-8');
+    expect(html).toBe('POST:Article');
+  });
+
+  it('lets a page pick a non-default layout via frontmatter', () => {
+    fs.writeFileSync(path.join(templatesDir, 'page.hbs'), 'CONTENT');
+    fs.writeFileSync(path.join(templatesDir, 'layouts', 'default.hbs'), 'DEFAULT[{{{body}}}]');
+    fs.writeFileSync(path.join(templatesDir, 'layouts', 'bare.hbs'), 'BARE[{{{body}}}]');
+    fs.writeFileSync(
+      path.join(contentDir, 'note.md'),
+      '---\ntitle: Note\nlayout: bare\n---\n\nText.'
+    );
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'note.html'), 'utf-8');
+    expect(html).toBe('BARE[CONTENT]');
+  });
+
+  it('renders header/footer/nav partials referenced from the layout', () => {
+    fs.writeFileSync(path.join(templatesDir, 'partials', 'nav.hbs'), '<nav>NAV</nav>');
+    fs.writeFileSync(path.join(templatesDir, 'partials', 'header.hbs'), '<header>{{> nav}}</header>');
+    fs.writeFileSync(path.join(templatesDir, 'partials', 'footer.hbs'), '<footer>FOOTER</footer>');
+    fs.writeFileSync(
+      path.join(templatesDir, 'layouts', 'default.hbs'),
+      '{{> header}}{{{body}}}{{> footer}}'
+    );
+    fs.writeFileSync(path.join(templatesDir, 'page.hbs'), 'PAGE');
+    fs.writeFileSync(path.join(contentDir, 'p.md'), '---\ntitle: P\n---\n\nText.');
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'p.html'), 'utf-8');
+    expect(html).toBe('<header><nav>NAV</nav></header>PAGE<footer>FOOTER</footer>');
+  });
+
+  it('renders the generated index through the index template and default layout', () => {
+    fs.writeFileSync(path.join(templatesDir, 'page.hbs'), '{{title}}');
+    fs.writeFileSync(path.join(templatesDir, 'index.hbs'), 'INDEX:{{#each pages}}{{title}};{{/each}}');
+    fs.writeFileSync(path.join(templatesDir, 'layouts', 'default.hbs'), '[{{title}}]{{{body}}}');
+    fs.writeFileSync(path.join(contentDir, 'a.md'), '---\ntitle: A\n---\n\nText.');
+    fs.writeFileSync(path.join(contentDir, 'b.md'), '---\ntitle: B\n---\n\nText.');
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf-8');
+    expect(html).toBe('[Index]INDEX:A;B;');
+  });
+
+  it('falls back to a built-in default template/layout when no matching files exist on disk', () => {
+    fs.writeFileSync(path.join(contentDir, 'fallback.md'), '---\ntitle: Fallback Page\n---\n\nHello.');
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'fallback.html'), 'utf-8');
+    expect(html).toContain('<title>Fallback Page</title>');
+    expect(html).toContain('<h1>Fallback Page</h1>');
+    expect(html).toContain('Hello.');
+  });
+});
