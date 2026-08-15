@@ -9,6 +9,14 @@ import path from 'path';
 import { parseFrontmatter } from './frontmatter';
 import { markdownToHtml } from './markdown';
 import { pageTitle, renderIndex, renderPage } from './render';
+import {
+  DEFAULT_TEMPLATES_DIR,
+  TEMPLATE_EXTENSION,
+  hasTemplates,
+  loadTemplates,
+  renderIndexWithTemplates,
+  renderPageWithTemplates,
+} from './templates';
 import type { BuildOptions, Frontmatter, Page } from './types';
 
 /** Strip the file extension to produce a page slug. */
@@ -65,19 +73,32 @@ export function loadPages(contentDir: string): Page[] {
 /**
  * Build the site: render every page into its own HTML file inside the
  * output directory, then generate index.html. Returns the built pages.
+ *
+ * When a templates directory is available, pages are rendered through their
+ * Handlebars templates and layouts; otherwise the built-in renderers are used.
  */
 export function buildSite(options: BuildOptions): Page[] {
   const { contentDir, outputDir } = options;
   ensureDirectoryExists(outputDir);
 
+  const templatesDir = options.templatesDir ?? DEFAULT_TEMPLATES_DIR;
+  const templates = hasTemplates(templatesDir) ? loadTemplates(templatesDir) : null;
+
   const pages = loadPages(contentDir);
 
   for (const page of pages) {
     const outputPath = path.join(outputDir, page.outputName);
-    fs.writeFileSync(outputPath, renderPage(page));
+    const html = templates ? renderPageWithTemplates(page, templates) : renderPage(page);
+    fs.writeFileSync(outputPath, html);
   }
 
-  fs.writeFileSync(path.join(outputDir, 'index.html'), renderIndex(pages));
+  let indexHtml: string;
+  if (templates && templates.templates.has(`index.${TEMPLATE_EXTENSION}`)) {
+    indexHtml = renderIndexWithTemplates(pages, templates);
+  } else {
+    indexHtml = renderIndex(pages);
+  }
+  fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml);
 
   return pages;
 }

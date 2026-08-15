@@ -3,12 +3,13 @@
 /**
  * Static site generator CLI.
  *
- *   npx ssg build [--content <dir>] [--output <dir>]
+ *   npx ssg build [--content <dir>] [--output <dir>] [--templates <dir>]
  */
 
 import path from 'path';
 
 import { buildSite } from './site';
+import { DEFAULT_TEMPLATES_DIR } from './templates';
 
 const DEFAULT_CONTENT_DIR = 'content';
 const DEFAULT_OUTPUT_DIR = 'dist';
@@ -16,14 +17,16 @@ const DEFAULT_OUTPUT_DIR = 'dist';
 export const USAGE = `Usage: ssg build [options]
 
 Options:
-  --content <dir>   Directory containing Markdown files (default: ${DEFAULT_CONTENT_DIR})
-  --output <dir>    Directory where the site is written (default: ${DEFAULT_OUTPUT_DIR})
-  -h, --help        Show this help message`;
+  --content <dir>    Directory containing Markdown files (default: ${DEFAULT_CONTENT_DIR})
+  --output <dir>     Directory where the site is written (default: ${DEFAULT_OUTPUT_DIR})
+  --templates <dir>  Directory containing templates, layouts and partials (default: ${DEFAULT_TEMPLATES_DIR})
+  -h, --help         Show this help message`;
 
 export interface CliOptions {
   command: string;
   contentDir: string;
   outputDir: string;
+  templatesDir: string;
   help: boolean;
 }
 
@@ -32,6 +35,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let command = '';
   let contentDir = path.resolve(DEFAULT_CONTENT_DIR);
   let outputDir = path.resolve(DEFAULT_OUTPUT_DIR);
+  let templatesDir = path.resolve(DEFAULT_TEMPLATES_DIR);
   let help = false;
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -51,12 +55,18 @@ export function parseArgs(argv: string[]): CliOptions {
         outputDir = path.resolve(value);
         i += 1;
       }
+    } else if (arg === '--templates' || arg === '-t') {
+      const value = argv[i + 1];
+      if (value && !value.startsWith('--')) {
+        templatesDir = path.resolve(value);
+        i += 1;
+      }
     } else if (arg === '--help' || arg === '-h') {
       help = true;
     }
   }
 
-  return { command, contentDir, outputDir, help };
+  return { command, contentDir, outputDir, templatesDir, help };
 }
 
 /**
@@ -80,6 +90,7 @@ export function main(argv: string[]): number {
   const pages = buildSite({
     contentDir: options.contentDir,
     outputDir: options.outputDir,
+    templatesDir: options.templatesDir,
   });
 
   console.log(

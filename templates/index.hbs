@@ -1,0 +1,9 @@
+<section class="page-index">
+  <ul>
+    {{#each pages}}
+    <li><a href="{{outputName}}">{{title}}</a>{{#if date}} <span class="date">{{date}}</span>{{/if}}{{#if tags}} <span class="tags">{{#each tags}}<span class="tag">{{this}}</span> {{/each}}</span>{{/if}}</li>
+    {{else}}
+    <li>No pages yet.</li>
+    {{/each}}
+  </ul>
+</section>

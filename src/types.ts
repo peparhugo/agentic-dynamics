@@ -7,6 +7,10 @@ export interface Frontmatter {
   title?: string;
   date?: string;
   tags?: string[];
+  /** Page template name (without or with the `.hbs` extension). */
+  template?: string;
+  /** Layout template name (without or with the `.hbs` extension). */
+  layout?: string;
   [key: string]: unknown;
 }
 
@@ -40,4 +44,10 @@ export interface BuildOptions {
   contentDir: string;
   /** Directory where generated HTML files are written. */
   outputDir: string;
+  /**
+   * Directory containing templates, layouts and partials
+   * (default: `./templates`). When it does not exist, the built-in
+   * renderers are used instead.
+   */
+  templatesDir?: string;
 }

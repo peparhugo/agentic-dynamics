@@ -81,10 +81,14 @@ describe('buildSite', () => {
     fs.rmSync(outputDir, { recursive: true, force: true });
   });
 
+  // Point at a non-existent templates directory so these tests exercise the
+  // built-in renderers regardless of whether ./templates exists in the repo.
+  const missingTemplatesDir = () => path.join(outputDir, 'missing-templates');
+
   it('writes a page html file and an index.html', () => {
     fs.writeFileSync(path.join(contentDir, 'first.md'), SAMPLE_MD);
 
-    const pages = buildSite({ contentDir, outputDir });
+    const pages = buildSite({ contentDir, outputDir, templatesDir: missingTemplatesDir() });
 
     expect(pages).toHaveLength(1);
     expect(fs.existsSync(path.join(outputDir, 'first.html'))).toBe(true);
@@ -107,7 +111,7 @@ describe('buildSite', () => {
       '---\ntitle: <script>alert(1)</script>\n---\nBody'
     );
 
-    buildSite({ contentDir, outputDir });
+    buildSite({ contentDir, outputDir, templatesDir: missingTemplatesDir() });
 
     const pageHtml = fs.readFileSync(path.join(outputDir, 'x.html'), 'utf8');
     expect(pageHtml).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
@@ -118,7 +122,7 @@ describe('buildSite', () => {
     fs.writeFileSync(path.join(contentDir, 'one.md'), SAMPLE_MD);
     fs.writeFileSync(path.join(contentDir, 'two.md'), '---\ntitle: Two\n---\nBody');
 
-    buildSite({ contentDir, outputDir });
+    buildSite({ contentDir, outputDir, templatesDir: missingTemplatesDir() });
 
     const files = fs.readdirSync(outputDir).sort();
     expect(files).toEqual(['index.html', 'one.html', 'two.html']);
@@ -128,12 +132,12 @@ describe('buildSite', () => {
     const nested = path.join(outputDir, 'missing', 'site');
     fs.writeFileSync(path.join(contentDir, 'one.md'), SAMPLE_MD);
 
-    buildSite({ contentDir, outputDir: nested });
+    buildSite({ contentDir, outputDir: nested, templatesDir: missingTemplatesDir() });
     expect(fs.existsSync(path.join(nested, 'index.html'))).toBe(true);
   });
 
   it('handles an empty content directory', () => {
-    const pages = buildSite({ contentDir, outputDir });
+    const pages = buildSite({ contentDir, outputDir, templatesDir: missingTemplatesDir() });
     expect(pages).toHaveLength(0);
     const indexHtml = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
     expect(indexHtml).toContain('No pages yet.');
