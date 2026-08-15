@@ -2,6 +2,8 @@ export interface Frontmatter {
   title?: string;
   date?: string;
   tags?: string[];
+  template?: string;
+  layout?: string;
   [key: string]: unknown;
 }
 
@@ -17,9 +19,12 @@ export interface PageMetadata {
   date?: string;
   tags: string[];
   url: string;
+  template?: string;
+  layout?: string;
 }
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  templatesDir?: string;
 }

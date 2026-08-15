@@ -1,10 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseMarkdown } from './parser.js';
+import { TemplateEngine } from './template-engine.js';
 export class SiteGenerator {
     constructor(options) {
+        this.templateEngine = null;
         this.contentDir = options.contentDir;
         this.outputDir = options.outputDir;
+        this.templatesDir = options.templatesDir || './templates';
+        if (fs.existsSync(this.templatesDir)) {
+            this.templateEngine = new TemplateEngine(this.templatesDir);
+        }
     }
     ensureDir(dirPath) {
         if (!fs.existsSync(dirPath)) {
@@ -19,6 +25,27 @@ export class SiteGenerator {
             .readdirSync(this.contentDir)
             .filter((file) => file.endsWith('.md'))
             .sort();
+    }
+    renderPageWithTemplate(title, content, templateName, layoutName, data) {
+        if (!this.templateEngine) {
+            return this.generatePageHtml(title, content);
+        }
+        const pageData = {
+            title: this.escapeHtml(title),
+            content,
+            ...data,
+        };
+        const template = templateName || 'page';
+        const layout = layoutName || 'default';
+        try {
+            if (this.templateEngine.hasLayout(layout)) {
+                return this.templateEngine.renderPageTemplate(template, pageData, layout);
+            }
+        }
+        catch {
+            // Fall back to default HTML if template rendering fails
+        }
+        return this.generatePageHtml(title, content);
     }
     generatePageHtml(title, content) {
         return `<!DOCTYPE html>
@@ -126,7 +153,16 @@ export class SiteGenerator {
             const title = parsed.frontmatter.title || file.replace('.md', '');
             const slug = file.replace('.md', '.html');
             const outputPath = path.join(this.outputDir, slug);
-            fs.writeFileSync(outputPath, this.generatePageHtml(title, parsed.html));
+            const templateName = parsed.frontmatter.template ? String(parsed.frontmatter.template) : undefined;
+            const layoutName = parsed.frontmatter.layout ? String(parsed.frontmatter.layout) : undefined;
+            const pageHtml = this.renderPageWithTemplate(
+                title,
+                parsed.html,
+                templateName,
+                layoutName,
+                parsed.frontmatter
+            );
+            fs.writeFileSync(outputPath, pageHtml);
             pages.push({
                 filename: file,
                 title,
@@ -135,6 +171,8 @@ export class SiteGenerator {
                     ? parsed.frontmatter.tags.map((tag) => String(tag))
                     : [],
                 url: slug,
+                template: templateName,
+                layout: layoutName,
             });
         }
         const indexPath = path.join(this.outputDir, 'index.html');

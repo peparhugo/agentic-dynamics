@@ -217,4 +217,178 @@ Normal content.`;
     expect(indexContent).toContain('testing');
     expect(indexContent).toContain('cli');
   });
+
+  it('should use custom templates when template directory exists', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    fs.mkdirSync(templatesDir);
+    fs.mkdirSync(path.join(templatesDir, 'layouts'));
+
+    const pageTemplate = '<div class="page">{{content}}</div>';
+    const layoutTemplate = '<html><body>{{{body}}}</body></html>';
+
+    fs.writeFileSync(path.join(templatesDir, 'page.hbs'), pageTemplate);
+    fs.writeFileSync(path.join(templatesDir, 'layouts', 'default.hbs'), layoutTemplate);
+
+    fs.writeFileSync(
+      path.join(contentDir, 'test.md'),
+      '---\ntitle: Test Page\ntemplate: page\nlayout: default\n---\n\n# Content'
+    );
+
+    const generator = new SiteGenerator({
+      contentDir,
+      outputDir,
+      templatesDir,
+    });
+    await generator.build();
+
+    const content = fs.readFileSync(path.join(outputDir, 'test.html'), 'utf-8');
+    expect(content).toContain('<html>');
+    expect(content).toContain('<body>');
+    expect(content).toContain('class="page"');
+  });
+
+  it('should fall back to default HTML if template is missing', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    fs.mkdirSync(templatesDir);
+    fs.mkdirSync(path.join(templatesDir, 'layouts'));
+
+    fs.writeFileSync(path.join(contentDir, 'test.md'), '---\ntitle: Test\ntemplate: page\n---\nContent');
+
+    const generator = new SiteGenerator({
+      contentDir,
+      outputDir,
+      templatesDir,
+    });
+    await generator.build();
+
+    const content = fs.readFileSync(path.join(outputDir, 'test.html'), 'utf-8');
+    expect(content).toContain('<!DOCTYPE html>');
+    expect(content).toContain('<title>Test</title>');
+  });
+
+  it('should support template frontmatter variable', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    fs.mkdirSync(templatesDir);
+    fs.mkdirSync(path.join(templatesDir, 'layouts'));
+
+    const postTemplate = '<article class="post">{{content}}</article>';
+    fs.writeFileSync(path.join(templatesDir, 'post.hbs'), postTemplate);
+    fs.writeFileSync(
+      path.join(templatesDir, 'layouts', 'blog.hbs'),
+      '<div class="blog">{{{body}}}</div>'
+    );
+
+    fs.writeFileSync(
+      path.join(contentDir, 'article.md'),
+      '---\ntitle: My Post\ntemplate: post\nlayout: blog\n---\n\n# Article Content'
+    );
+
+    const generator = new SiteGenerator({
+      contentDir,
+      outputDir,
+      templatesDir,
+    });
+    await generator.build();
+
+    const content = fs.readFileSync(path.join(outputDir, 'article.html'), 'utf-8');
+    expect(content).toContain('class="blog"');
+    expect(content).toContain('class="post"');
+  });
+
+  it('should support partials in templates', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    fs.mkdirSync(templatesDir);
+    fs.mkdirSync(path.join(templatesDir, 'layouts'));
+    fs.mkdirSync(path.join(templatesDir, 'partials'));
+
+    const headerPartial = '<header>My Site</header>';
+    const footerPartial = '<footer>© 2024</footer>';
+    fs.writeFileSync(path.join(templatesDir, 'partials', 'header.hbs'), headerPartial);
+    fs.writeFileSync(path.join(templatesDir, 'partials', 'footer.hbs'), footerPartial);
+
+    const layoutTemplate = '{{>header}}<main>{{{body}}}</main>{{>footer}}';
+    fs.writeFileSync(path.join(templatesDir, 'layouts', 'default.hbs'), layoutTemplate);
+
+    const pageTemplate = '<h1>{{title}}</h1>{{content}}';
+    fs.writeFileSync(path.join(templatesDir, 'page.hbs'), pageTemplate);
+
+    fs.writeFileSync(
+      path.join(contentDir, 'test.md'),
+      '---\ntitle: Test\ntemplate: page\nlayout: default\n---\n\nPage content'
+    );
+
+    const generator = new SiteGenerator({
+      contentDir,
+      outputDir,
+      templatesDir,
+    });
+    await generator.build();
+
+    const content = fs.readFileSync(path.join(outputDir, 'test.html'), 'utf-8');
+    expect(content).toContain('<header>My Site</header>');
+    expect(content).toContain('<footer>© 2024</footer>');
+    expect(content).toContain('<h1>Test</h1>');
+  });
+
+  it('should work without templates directory', async () => {
+    fs.writeFileSync(
+      path.join(contentDir, 'simple.md'),
+      '---\ntitle: Simple Page\n---\n\nSimple content'
+    );
+
+    const generator = new SiteGenerator({
+      contentDir,
+      outputDir,
+    });
+    await generator.build();
+
+    const content = fs.readFileSync(path.join(outputDir, 'simple.html'), 'utf-8');
+    expect(content).toContain('<!DOCTYPE html>');
+    expect(content).toContain('<title>Simple Page</title>');
+  });
+
+  it('should preserve backward compatibility without template config', async () => {
+    fs.writeFileSync(
+      path.join(contentDir, 'page.md'),
+      '---\ntitle: Backward Compat\ndate: 2024-01-01\ntags: old, style\n---\n\nOld style page'
+    );
+
+    const generator = new SiteGenerator({ contentDir, outputDir });
+    await generator.build();
+
+    const content = fs.readFileSync(path.join(outputDir, 'page.html'), 'utf-8');
+    expect(content).toContain('<!DOCTYPE html>');
+    expect(content).toContain('<title>Backward Compat</title>');
+    expect(content).toContain('← Home');
+    expect(content).toContain('Old style page');
+  });
+
+  it('should pass custom frontmatter fields to templates', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    fs.mkdirSync(templatesDir);
+    fs.mkdirSync(path.join(templatesDir, 'layouts'));
+
+    const pageTemplate = '<h1>{{title}}</h1><p>Author: {{author}}</p>{{content}}';
+    fs.writeFileSync(path.join(templatesDir, 'page.hbs'), pageTemplate);
+    fs.writeFileSync(
+      path.join(templatesDir, 'layouts', 'default.hbs'),
+      '<article>{{{body}}}</article>'
+    );
+
+    fs.writeFileSync(
+      path.join(contentDir, 'post.md'),
+      '---\ntitle: Custom Post\nauthor: Jane Doe\ntemplate: page\nlayout: default\n---\n\nContent here'
+    );
+
+    const generator = new SiteGenerator({
+      contentDir,
+      outputDir,
+      templatesDir,
+    });
+    await generator.build();
+
+    const content = fs.readFileSync(path.join(outputDir, 'post.html'), 'utf-8');
+    expect(content).toContain('<h1>Custom Post</h1>');
+    expect(content).toContain('<p>Author: Jane Doe</p>');
+  });
 });
