@@ -74,4 +74,38 @@ Hello from the CLI test.`
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('Content directory not found');
   }, 20000);
+
+  it('builds using a custom --templates directory and honors the per-page frontmatter template', () => {
+    const templatesDir = makeTmpDir('ssg-cli-templates-');
+    fs.mkdirSync(path.join(templatesDir, 'layouts'));
+    fs.writeFileSync(
+      path.join(templatesDir, 'layouts', 'default.hbs'),
+      '<html><body class="default-layout">{{{body}}}</body></html>'
+    );
+    fs.writeFileSync(
+      path.join(templatesDir, 'layouts', 'post.hbs'),
+      '<html><body class="post-layout">{{{body}}}</body></html>'
+    );
+    fs.writeFileSync(
+      path.join(contentDir, 'templated-page.md'),
+      `---
+title: Templated Page
+template: post
+---
+Body content.`
+    );
+
+    const result = runCli(
+      ['build', '--content', contentDir, '--output', outputDir, '--templates', templatesDir],
+      process.cwd()
+    );
+
+    expect(result.status).toBe(0);
+    const templatedHtml = fs.readFileSync(path.join(outputDir, 'templated-page.html'), 'utf-8');
+    expect(templatedHtml).toContain('class="post-layout"');
+    const pageHtml = fs.readFileSync(path.join(outputDir, 'page.html'), 'utf-8');
+    expect(pageHtml).toContain('class="default-layout"');
+
+    fs.rmSync(templatesDir, { recursive: true, force: true });
+  }, 20000);
 });

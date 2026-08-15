@@ -35,6 +35,15 @@ tags: update
 Some more content here.`
     );
     fs.writeFileSync(path.join(contentDir, 'no-frontmatter.md'), '# No Frontmatter\n\nJust text.');
+    fs.writeFileSync(
+      path.join(contentDir, 'blog-post.md'),
+      `---
+title: Blog Post
+date: 2024-03-01
+template: post
+---
+Posted with the post layout.`
+    );
   });
 
   afterEach(() => {
@@ -44,7 +53,7 @@ Some more content here.`
 
   it('finds all markdown files in the content directory, sorted', () => {
     const files = findMarkdownFiles(contentDir);
-    expect(files).toEqual(['first-post.md', 'no-frontmatter.md', 'second-post.md']);
+    expect(files).toEqual(['blog-post.md', 'first-post.md', 'no-frontmatter.md', 'second-post.md']);
   });
 
   it('throws when the content directory does not exist', () => {
@@ -74,11 +83,11 @@ Some more content here.`
 
   it('writes an HTML file per page plus an index.html to the output directory', () => {
     const result = build({ contentDir, outputDir });
-    expect(result.pages).toHaveLength(3);
+    expect(result.pages).toHaveLength(4);
 
     const distFiles = fs.readdirSync(outputDir).sort();
     expect(distFiles).toEqual(
-      ['first-post.html', 'index.html', 'no-frontmatter.html', 'second-post.html'].sort()
+      ['blog-post.html', 'first-post.html', 'index.html', 'no-frontmatter.html', 'second-post.html'].sort()
     );
 
     const indexHtml = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf-8');
@@ -91,5 +100,55 @@ Some more content here.`
     const nestedOutput = path.join(outputDir, 'nested', 'dist');
     build({ contentDir, outputDir: nestedOutput });
     expect(fs.existsSync(path.join(nestedOutput, 'index.html'))).toBe(true);
+  });
+
+  it('defaults to the "default" template when none is specified in frontmatter', () => {
+    const page = buildPage(contentDir, 'first-post.md');
+    expect(page.template).toBe('default');
+  });
+
+  it('uses the layout named in frontmatter "template" and renders page-specific markup', () => {
+    const page = buildPage(contentDir, 'blog-post.md');
+    expect(page.template).toBe('post');
+    expect(page.html).toContain('class="post"');
+    expect(page.html).toContain('Posted on 2024-03-01');
+  });
+
+  it('renders header/nav/footer partials into every page via the shared layouts', () => {
+    const page = buildPage(contentDir, 'first-post.md');
+    expect(page.html).toContain('<header>');
+    expect(page.html).toContain('<a href="index.html">Home</a>');
+    expect(page.html).toContain('<footer>');
+  });
+
+  it('renders the index page through templates/index.hbs, including shared partials', () => {
+    const result = build({ contentDir, outputDir });
+    const indexHtml = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf-8');
+    expect(indexHtml).toContain('<a href="index.html">Home</a>');
+    expect(indexHtml).toContain('All Pages');
+  });
+
+  it('throws a clear error when frontmatter references a template with no matching layout file', () => {
+    fs.writeFileSync(
+      path.join(contentDir, 'broken.md'),
+      `---
+title: Broken
+template: does-not-exist
+---
+Body`
+    );
+    expect(() => buildPage(contentDir, 'broken.md')).toThrow(/Unknown template "does-not-exist"/);
+  });
+
+  it('supports a custom templatesDir so different sites can use different template sets', () => {
+    const customTemplatesDir = makeTmpDir('ssg-custom-templates-');
+    fs.mkdirSync(path.join(customTemplatesDir, 'layouts'));
+    fs.writeFileSync(
+      path.join(customTemplatesDir, 'layouts', 'default.hbs'),
+      '<custom-layout>{{{body}}}</custom-layout>'
+    );
+    const page = buildPage(contentDir, 'first-post.md', customTemplatesDir);
+    expect(page.html).toContain('<custom-layout>');
+    fs.rmSync(customTemplatesDir, { recursive: true, force: true });
   });
 });

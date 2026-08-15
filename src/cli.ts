@@ -12,10 +12,12 @@ program
   .description('Generate the static site')
   .option('--content <dir>', 'content directory', './content')
   .option('--output <dir>', 'output directory', './dist')
-  .action((opts: { content: string; output: string }) => {
+  .option('--templates <dir>', 'templates directory', './templates')
+  .action((opts: { content: string; output: string; templates: string }) => {
     const contentDir = path.resolve(process.cwd(), opts.content);
     const outputDir = path.resolve(process.cwd(), opts.output);
-    const result = build({ contentDir, outputDir });
+    const templatesDir = path.resolve(process.cwd(), opts.templates);
+    const result = build({ contentDir, outputDir, templatesDir });
     console.log(`Built ${result.pages.length} page(s) into ${outputDir}`);
   });
 

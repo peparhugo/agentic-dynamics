@@ -2,17 +2,22 @@ import fs from 'fs';
 import path from 'path';
 import { parseFrontmatter } from './frontmatter';
 import { renderMarkdown } from './markdown';
-import { renderIndexTemplate, renderPageTemplate } from './templates';
+import { getTemplateEngine } from './templates';
 import { Page } from './types';
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  templatesDir?: string;
 }
 
 export interface BuildResult {
   pages: Page[];
   outputDir: string;
+}
+
+function defaultTemplatesDir(): string {
+  return path.resolve(process.cwd(), 'templates');
 }
 
 function slugify(filename: string): string {
@@ -35,7 +40,7 @@ export function findMarkdownFiles(contentDir: string): string[] {
     .sort();
 }
 
-export function buildPage(contentDir: string, filename: string): Page {
+export function buildPage(contentDir: string, filename: string, templatesDir: string = defaultTemplatesDir()): Page {
   const filePath = path.join(contentDir, filename);
   const raw = fs.readFileSync(filePath, 'utf-8');
   const { data, content } = parseFrontmatter(raw);
@@ -45,20 +50,23 @@ export function buildPage(contentDir: string, filename: string): Page {
   const date = typeof data.date === 'string' ? data.date : undefined;
   const tags = normalizeTags(data.tags);
   const outputPath = `${slug}.html`;
-  const html = renderPageTemplate({ title, date, tags, body });
-  return { slug, title, date, tags, html, outputPath };
+  const templateName = typeof data.template === 'string' && data.template.trim().length > 0 ? data.template.trim() : 'default';
+  const engine = getTemplateEngine(templatesDir);
+  const html = engine.renderPage({ title, date, tags, body }, templateName);
+  return { slug, title, date, tags, html, outputPath, template: templateName };
 }
 
 export function build(options: BuildOptions): BuildResult {
-  const { contentDir, outputDir } = options;
+  const { contentDir, outputDir, templatesDir = defaultTemplatesDir() } = options;
   const files = findMarkdownFiles(contentDir);
-  const pages = files.map((file) => buildPage(contentDir, file));
+  const pages = files.map((file) => buildPage(contentDir, file, templatesDir));
 
   fs.mkdirSync(outputDir, { recursive: true });
   for (const page of pages) {
     fs.writeFileSync(path.join(outputDir, page.outputPath), page.html, 'utf-8');
   }
-  fs.writeFileSync(path.join(outputDir, 'index.html'), renderIndexTemplate(pages), 'utf-8');
+  const engine = getTemplateEngine(templatesDir);
+  fs.writeFileSync(path.join(outputDir, 'index.html'), engine.renderIndex(pages), 'utf-8');
 
   return { pages, outputDir };
 }

@@ -12,4 +12,5 @@ export interface Page {
   tags: string[];
   html: string;
   outputPath: string;
+  template: string;
 }

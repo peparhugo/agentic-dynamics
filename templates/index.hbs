@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Index</title>
+</head>
+<body>
+{{> header}}
+<main>
+<h1>All Pages</h1>
+<ul class="page-list">
+{{#each pages}}
+<li><a href="{{outputPath}}">{{title}}</a>{{#if date}} <span class="date">{{date}}</span>{{/if}}</li>
+{{/each}}
+</ul>
+</main>
+{{> footer}}
+</body>
+</html>
