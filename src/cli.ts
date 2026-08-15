@@ -3,11 +3,13 @@ import { buildSite } from './generator';
 
 const DEFAULT_CONTENT_DIR = './content';
 const DEFAULT_OUTPUT_DIR = './dist';
+const DEFAULT_TEMPLATE_DIR = './templates';
 
 export interface CliOptions {
   command: string;
   contentDir: string;
   outputDir: string;
+  templateDir?: string;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -33,6 +35,9 @@ export function parseArgs(argv: string[]): CliOptions {
     } else if (arg === '--output') {
       opts.outputDir = args[i + 1] ?? DEFAULT_OUTPUT_DIR;
       i += 1;
+    } else if (arg === '--templates') {
+      opts.templateDir = args[i + 1] ?? DEFAULT_TEMPLATE_DIR;
+      i += 1;
     }
   }
   return opts;
@@ -47,9 +52,10 @@ export function printHelp(): void {
       '  npx ssg build [options]',
       '',
       'Options:',
-      '  --content <dir>   Markdown content directory (default: ./content)',
-      '  --output <dir>    Output directory (default: ./dist)',
-      '  -h, --help        Show this help',
+      '  --content <dir>    Markdown content directory (default: ./content)',
+      '  --output <dir>     Output directory (default: ./dist)',
+      '  --templates <dir>  Template directory (default: ./templates)',
+      '  -h, --help         Show this help',
       '',
     ].join('\n')
   );
@@ -68,7 +74,11 @@ export function main(argv: string[]): number {
   }
 
   try {
-    const pages = buildSite({ contentDir: opts.contentDir, outputDir: opts.outputDir });
+    const pages = buildSite({
+      contentDir: opts.contentDir,
+      outputDir: opts.outputDir,
+      templateDir: opts.templateDir,
+    });
     console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${opts.outputDir}`);
     return 0;
   } catch (error) {

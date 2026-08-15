@@ -5,9 +5,16 @@ export interface Page {
   tags?: string[];
   contentHtml: string;
   content: string;
+  template?: string;
+  layout?: string;
+  data?: Record<string, unknown>;
 }
 
 export interface ParsedMarkdown {
   data: Record<string, unknown>;
   content: string;
+}
+
+export interface PageContext {
+  [key: string]: unknown;
 }

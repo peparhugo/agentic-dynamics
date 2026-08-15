@@ -1,23 +1,21 @@
 import fs from 'fs';
 import path from 'path';
 import { renderMarkdownToHtml } from './markdown';
+import { TemplateEngine } from './templates';
+import { escapeHtml } from './escape';
 import type { Page } from './types';
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  templateDir?: string;
+  defaultTemplate?: string;
+  defaultLayout?: string;
 }
 
 const MARKDOWN_EXTENSIONS = /\.(md|markdown)$/;
 
-export function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+export { escapeHtml };
 
 function pageTitle(data: Record<string, unknown>, slug: string): string {
   const title = data.title;
@@ -37,6 +35,11 @@ function pageTags(data: Record<string, unknown>): string[] | undefined {
   return tags.length > 0 ? tags : undefined;
 }
 
+function pageStringField(data: Record<string, unknown>, key: string): string | undefined {
+  const value = data[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
 function readPages(contentDir: string): Page[] {
   const entries = fs.readdirSync(contentDir);
   const files = entries.filter((entry) => MARKDOWN_EXTENSIONS.test(entry)).sort();
@@ -50,6 +53,9 @@ function readPages(contentDir: string): Page[] {
       title: pageTitle(data, slug),
       date: pageDate(data),
       tags: pageTags(data),
+      template: pageStringField(data, 'template'),
+      layout: pageStringField(data, 'layout'),
+      data,
       contentHtml: html,
       content,
     });
@@ -127,8 +133,27 @@ export function renderIndex(pages: Page[]): string {
 }
 
 /**
+ * Resolve the template directory. An explicitly requested directory that does
+ * not exist is an error; the default `./templates` directory is only used when
+ * present so sites without templates keep the built-in rendering.
+ */
+function resolveTemplateDir(options: BuildOptions): string | null {
+  if (options.templateDir !== undefined) {
+    const dir = path.resolve(options.templateDir);
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+      throw new Error(`Template directory does not exist: ${dir}`);
+    }
+    return dir;
+  }
+  const dir = path.resolve('templates');
+  return fs.existsSync(dir) && fs.statSync(dir).isDirectory() ? dir : null;
+}
+
+/**
  * Build the site: every markdown file in `contentDir` becomes a page in
  * `outputDir` and an `index.html` listing all pages is generated.
+ * When a template directory exists (default `./templates`), pages are rendered
+ * through its Handlebars templates, layouts and partials.
  * Returns the list of generated pages.
  */
 export function buildSite(options: BuildOptions): Page[] {
@@ -144,10 +169,22 @@ export function buildSite(options: BuildOptions): Page[] {
 
   fs.mkdirSync(outputDir, { recursive: true });
 
+  const templateDir = resolveTemplateDir(options);
+  const engine =
+    templateDir === null
+      ? null
+      : new TemplateEngine({
+          templateDir,
+          defaultTemplate: options.defaultTemplate,
+          defaultLayout: options.defaultLayout,
+        });
+
   const pages = readPages(contentDir);
   for (const page of pages) {
-    fs.writeFileSync(path.join(outputDir, `${page.slug}.html`), renderPage(page));
+    const html = engine && engine.hasContent() ? engine.renderPage(page) : renderPage(page);
+    fs.writeFileSync(path.join(outputDir, `${page.slug}.html`), html);
   }
-  fs.writeFileSync(path.join(outputDir, 'index.html'), renderIndex(pages));
+  const indexHtml = engine && engine.hasContent() ? engine.renderIndex(pages) : renderIndex(pages);
+  fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml);
   return pages;
 }
