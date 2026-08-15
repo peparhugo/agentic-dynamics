@@ -460,6 +460,65 @@ def test_build_evidence_cards_is_deterministic():
     assert build_evidence_cards(runs) == build_evidence_cards(runs)
 
 
+def test_build_evidence_cards_absent_new_signals_render_dash_and_omit():
+    # The legacy run shape (no confidence/strength/test fields) must not crash and
+    # must not fabricate numbers: confidence renders an em-dash placeholder, and the
+    # test/strength segments are omitted entirely.
+    card = build_evidence_cards([_run()])[0]
+    assert card.confidence is None
+    assert card.perturbation_strength is None
+    assert card.test_executed_success is None
+    assert "confidence —" in card.text
+    assert "perturb_strength" not in card.text
+    assert "tests " not in card.text
+
+
+def test_build_evidence_cards_renders_present_signals():
+    card = build_evidence_cards(
+        [_run(confidence=0.72, perturbation_strength=0.5, test_executed_success=True)]
+    )[0]
+    assert card.confidence == pytest.approx(0.72)
+    assert card.perturbation_strength == pytest.approx(0.5)
+    assert card.test_executed_success is True
+    assert "confidence 0.72" in card.text
+    assert "perturb_strength 0.50" in card.text
+    assert "tests pass" in card.text
+
+
+def test_build_evidence_cards_nan_treated_as_unmeasured():
+    # NaN must behave exactly like an absent value: not crash, not render a number.
+    card = build_evidence_cards(
+        [_run(confidence=float("nan"), perturbation_strength=float("nan"),
+              test_executed_success=float("nan"))]
+    )[0]
+    assert card.confidence is None
+    assert card.perturbation_strength is None
+    assert card.test_executed_success is None
+    assert "confidence —" in card.text
+    assert "perturb_strength" not in card.text
+
+
+def test_build_evidence_cards_flags_failed_suite_unverified():
+    # A run whose independent suite failed must be flagged so it never reads as a
+    # verified finding — the card is kept (the data point is still measured) but the
+    # text carries an explicit UNVERIFIED marker.
+    card = build_evidence_cards(
+        [_run(confidence=0.91, test_executed_success=False)]
+    )[0]
+    assert card.test_executed_success is False
+    assert "tests FAIL (unverified)" in card.text
+    assert "tests pass" not in card.text
+
+
+def test_build_evidence_cards_skips_unmeasured_correctness():
+    # A run with absent or NaN correctness is unmeasured, not a "0.00" finding.
+    absent = _run()
+    del absent["correctness"]
+    nan = _run(correctness=float("nan"))
+    cards = build_evidence_cards([absent, nan])
+    assert cards == []
+
+
 # ── RetrievalAttempt sanity (recorded before any LLM call) ──────
 
 def test_candidate_citation_format():

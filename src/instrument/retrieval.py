@@ -29,6 +29,7 @@ companion ``docs/rag_design.md`` §2.
 
 from __future__ import annotations
 
+import math
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -642,7 +643,13 @@ class RetrievalAttempt:
 
 @dataclass
 class EvidenceCard:
-    """A derived one-line finding, precomputed offline — never synthesized at query time."""
+    """A derived one-line finding, precomputed offline — never synthesized at query time.
+
+    The measured vector is (correctness, cost, flail); the three ledger signals
+    (``confidence`` [H], ``test_executed_success`` [M], ``perturbation_strength`` [M])
+    are ``None`` when unmeasured, so a card can distinguish "measured" from "absent"
+    without ever fabricating a number.
+    """
 
     run_id: str
     model: str
@@ -652,7 +659,10 @@ class EvidenceCard:
     correctness: float
     cost: float
     flail: float
-    text: str
+    confidence: float | None = None            # [H] execution-confidence; None = unmeasured
+    test_executed_success: bool | None = None  # [M] independent suite; False = unverified
+    perturbation_strength: float | None = None # [M] strength axis (0.0 = baseline)
+    text: str = ""                             # the rendered one-line finding
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -664,50 +674,113 @@ class EvidenceCard:
             "correctness": self.correctness,
             "cost": self.cost,
             "flail": self.flail,
+            "confidence": self.confidence,
+            "test_executed_success": self.test_executed_success,
+            "perturbation_strength": self.perturbation_strength,
             "text": self.text,
         }
+
+
+def _finite_float(value: Any) -> float | None:
+    """Coerce ``value`` to a finite float, or ``None`` when missing/NaN/infinite.
+
+    A ``_results_summary.json`` run dict marks an unmeasured dimension with ``None``
+    or ``NaN`` (see ``analyze_worktrees.py``); neither may leak into a card as a
+    fabricated number. Mirrors ``signal_store._as_float`` so the card layer and the
+    routing signal store agree on what "measured" means.
+    """
+    if value is None:
+        return None
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(f):  # NaN and +/-inf are "unmeasured", never a number
+        return None
+    return f
 
 
 def _derive_flail(run: dict[str, Any]) -> float:
     """Return the run's flail signal.
 
-    Prefer an explicit ``flail`` column; when absent (the current ``load_runs``
+    Prefer an explicit ``flail`` column; when absent (the current ``load_results``
     vector has none), fall back to the basin escape rate — the per-run
-    search-dynamics signal the lab books already treat as flail.
+    search-dynamics signal the lab books already treat as flail. NaN-safe: an
+    unmeasured value falls through to ``0.0`` rather than rendering ``"flail nan"``.
     """
-    flail = run.get("flail")
+    flail = _finite_float(run.get("flail"))
     if flail is not None:
-        return float(flail)
-    return float(run.get("escape", 0.0))
+        return flail
+    return _finite_float(run.get("escape")) or 0.0
 
 
 def build_evidence_cards(runs: list[dict[str, Any]]) -> list[EvidenceCard]:
-    """Derive one-line finding cards offline from the ``load_runs`` property set.
+    """Derive one-line finding cards offline from ``load_results`` run dicts.
 
     One card per completed run, keyed off the measured vector (model, operator,
     strategy, correctness, cost, flail). Rows are skipped when ``narration_failure``
-    is truthy or ``correctness < 0`` — a flailed or unmeasured run must not become a
-    trusted finding. The card text is a pure function of the vector, never an LLM.
+    is truthy or ``correctness`` is unmeasured (``None``/NaN) or negative — a flailed
+    or unmeasured run must not become a trusted finding. The card text is a pure
+    function of the vector, never an LLM.
+
+    Input shape note (field-name confirmation): the run dicts are the
+    ``_results_summary.json`` entries returned by :func:`signal_store.load_results`,
+    *not* the Neo4j ``load_runs`` node properties. The two disagree on one name that
+    matters here — ``cost`` in the summary vs the ``cost_usd`` property ``load_runs``
+    copies it to (it likewise renames ``tokens``→``tokens_total``). This function
+    reads the summary names, so it must be fed ``load_results()`` output, and it
+    reuses that alias layer rather than hitting Neo4j.
+
+    New ledger signals are consumed only when present (absent/NaN → ``None``, never a
+    fabricated number):
+      - ``confidence`` [H] — always shown, rendered ``"confidence —"`` when unmeasured.
+      - ``perturbation_strength`` [M] — the numeric strength axis (0.0 = baseline);
+        omitted from the card when unmeasured.
+      - ``test_executed_success`` [M] (bool|None) — independent-suite pass/fail. A run
+        with ``False`` is flagged ``UNVERIFIED`` in the text so a failed suite can
+        never read as a verified finding (and the card's field lets a consumer
+        down-weight or filter it).
     """
     cards: list[EvidenceCard] = []
     for run in runs:
         if run.get("narration_failure"):
             continue
-        correctness = float(run.get("correctness", 0.0))
-        if correctness < 0:
+        correctness = _finite_float(run.get("correctness"))
+        if correctness is None or correctness < 0:
             continue
         model = run.get("model", "unknown")
         operator = run.get("operator", "unknown")
         pclass = run.get("perturbation_class", "")
         strategy = run.get("strategy", "?")
-        cost = float(run.get("cost", 0.0))
+        cost = _finite_float(run.get("cost")) or 0.0
         flail = _derive_flail(run)
         run_id = str(run.get("worktree_name") or run.get("run_id") or "")
+
+        # Ledger signals — measured-or-None, so an absent value never renders as 0.00.
+        confidence = _finite_float(run.get("confidence"))
+        perturbation_strength = _finite_float(run.get("perturbation_strength"))
+        test_executed_success = run.get("test_executed_success")
+        if not isinstance(test_executed_success, bool):
+            test_executed_success = None  # a non-bool value is unmeasured, not a verdict
+
         operator_label = operator + (f" (class {pclass})" if pclass else "")
         text = (
             f"{model} under {operator_label} -> correctness {correctness:.2f}, "
             f"cost ${cost:.4f}, flail {flail:.2f}"
         )
+        # confidence [H] is always present in the card so an absent signal can't be
+        # mistaken for a low one — it renders an explicit em-dash placeholder instead.
+        text += f", confidence {confidence:.2f}" if confidence is not None else ", confidence —"
+        # perturbation_strength [M] only when measured.
+        if perturbation_strength is not None:
+            text += f", perturb_strength {perturbation_strength:.2f}"
+        # test_executed_success [M] gates the verification claim: a failed suite must
+        # be flagged so an unverified finding can never look verified.
+        if test_executed_success is True:
+            text += ", tests pass"
+        elif test_executed_success is False:
+            text += ", tests FAIL (unverified)"
+
         cards.append(
             EvidenceCard(
                 run_id=run_id,
@@ -718,6 +791,9 @@ def build_evidence_cards(runs: list[dict[str, Any]]) -> list[EvidenceCard]:
                 correctness=correctness,
                 cost=cost,
                 flail=flail,
+                confidence=confidence,
+                test_executed_success=test_executed_success,
+                perturbation_strength=perturbation_strength,
                 text=text,
             )
         )
