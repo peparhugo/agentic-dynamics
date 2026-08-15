@@ -55,3 +55,29 @@ tags: [news, release]
 
 # Welcome
 ```
+
+## Plugins
+
+Add TypeScript plugins in `plugins/` and list them in `ssg.config.ts`. Hooks run
+in declaration order and may be synchronous or asynchronous:
+
+```ts
+import type { Plugin, SsgConfig } from './src';
+
+const labels: Plugin = {
+  name: 'labels',
+  onFile(page) {
+    page.data.label = `Page: ${page.title}`;
+  },
+};
+
+export default {
+  plugins: [labels],
+} satisfies SsgConfig;
+```
+
+The lifecycle is `onStart`, `beforeBuild`, `onFile` for every page,
+`afterBuild`, and `onEnd`. `MarkdownPlugin`, `TemplatePlugin`, and
+`DevServerPlugin` are exported for custom integrations. The normal build API
+installs Markdown and template handling automatically; configured plugins run
+after those built-ins, with generated files written during `afterBuild`.

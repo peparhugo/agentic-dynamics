@@ -3,7 +3,8 @@ import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import WebSocket, { WebSocketServer } from 'ws';
-import { buildSite, type BuildOptions } from './index';
+import { buildSite } from './engine';
+import type { BuildContext, BuildOptions, Plugin } from './types';
 
 const LIVE_RELOAD_PATH = '/__ssg_live_reload';
 const LIVE_RELOAD_SCRIPT = `<script>
@@ -97,14 +98,20 @@ function createStaticServer(outputDir: string): Server {
   });
 }
 
-export async function startDevServer(options: DevServerOptions = {}): Promise<DevServer> {
+async function createDevServer(options: DevServerOptions = {}): Promise<DevServer> {
   const port = options.port ?? 3000;
   const host = options.host ?? 'localhost';
   const outputDir = path.resolve(options.outputDir ?? './dist');
   const contentDir = path.resolve(options.contentDir ?? './content');
   const templatesDir = path.resolve(options.templatesDir ?? './templates');
   const log = options.log ?? ((message: string) => process.stdout.write(`${message}\n`));
-  const buildOptions = { contentDir, outputDir, templatesDir };
+  const buildOptions: BuildOptions = {
+    contentDir,
+    outputDir,
+    templatesDir,
+    configFile: options.configFile,
+    plugins: options.plugins,
+  };
 
   await buildSite(buildOptions);
 
@@ -142,7 +149,13 @@ export async function startDevServer(options: DevServerOptions = {}): Promise<De
     rebuilding = false;
   };
 
-  const watcher: FSWatcher = chokidar.watch([contentDir, templatesDir], {
+  const configFile = path.resolve(options.configFile ?? './ssg.config.ts');
+  const watcher: FSWatcher = chokidar.watch([
+    contentDir,
+    templatesDir,
+    configFile,
+    path.join(path.dirname(configFile), 'plugins'),
+  ], {
     ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 20 },
   });
@@ -179,4 +192,36 @@ export async function startDevServer(options: DevServerOptions = {}): Promise<De
       ]);
     },
   };
+}
+
+export class DevServerPlugin implements Plugin, DevServer {
+  readonly name = 'dev-server';
+  port: number;
+  private server?: DevServer;
+
+  constructor(private readonly options: DevServerOptions = {}) {
+    this.port = options.port ?? 3000;
+  }
+
+  async onStart(_context?: BuildContext): Promise<void> {
+    if (this.server) return;
+    this.server = await createDevServer(this.options);
+    this.port = this.server.port;
+  }
+
+  async onEnd(_context?: BuildContext): Promise<void> {
+    await this.close();
+  }
+
+  async close(): Promise<void> {
+    const server = this.server;
+    this.server = undefined;
+    await server?.close();
+  }
+}
+
+export async function startDevServer(options: DevServerOptions = {}): Promise<DevServer> {
+  const plugin = new DevServerPlugin(options);
+  await plugin.onStart();
+  return plugin;
 }

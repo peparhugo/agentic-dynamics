@@ -16,6 +16,7 @@
     "chokidar": "^4.0.3",
     "gray-matter": "^4.0.3",
     "marked": "^15.0.12",
+    "typescript": "^5.8.3",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -23,8 +24,7 @@
     "@types/node": "^22.15.3",
     "@types/ws": "^8.5.13",
     "jest": "^29.7.0",
-    "ts-jest": "^29.3.2",
-    "typescript": "^5.8.3"
+    "ts-jest": "^29.3.2"
   },
   "engines": {
     "node": ">=18"

@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import { get } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite, parseMarkdown, renderPage } from '../src';
+import { buildSite, parseMarkdown, renderPage, type Plugin } from '../src';
 import { parseArguments } from '../src/cli';
 import { startDevServer, type DevServer } from '../src/server';
 import WebSocket from 'ws';
@@ -139,6 +139,67 @@ describe('buildSite', () => {
     await fs.writeFile(path.join(contentDir, 'post.md'), '---\ntemplate: missing\n---\nBody');
 
     await expect(buildSite({ contentDir, outputDir, templatesDir })).rejects.toThrow('Template not found: missing');
+  });
+
+  it('runs configured TypeScript plugins through the lifecycle in order', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'site');
+    const pluginsDir = path.join(temporaryDirectory, 'plugins');
+    const eventsPath = path.join(temporaryDirectory, 'events.json');
+    const configFile = path.join(temporaryDirectory, 'ssg.config.ts');
+    await fs.mkdir(contentDir);
+    await fs.mkdir(pluginsDir);
+    await fs.writeFile(path.join(contentDir, 'hello.md'), '---\ntitle: Hello\n---\nBody');
+    await fs.writeFile(configFile, "export default { plugins: ['./plugins/custom'] };\n");
+    await fs.writeFile(path.join(pluginsDir, 'custom.ts'), `
+      import { writeFileSync } from 'node:fs';
+      const events: string[] = [];
+      export default {
+        onStart() { events.push('start'); },
+        beforeBuild() { events.push('before'); },
+        onFile(page: { title: string; html: string }) {
+          events.push('file:' + page.title);
+          page.title = 'Plugin ' + page.title;
+          page.html += '<aside>plugin</aside>';
+        },
+        afterBuild() { events.push('after'); },
+        onEnd() {
+          events.push('end');
+          writeFileSync(${JSON.stringify(eventsPath)}, JSON.stringify(events));
+        },
+      };
+    `);
+
+    const pages = await buildSite({ contentDir, outputDir, configFile });
+
+    expect(pages[0].title).toBe('Plugin Hello');
+    await expect(fs.readFile(path.join(outputDir, 'hello.html'), 'utf8')).resolves.toContain('<aside>plugin</aside>');
+    await expect(fs.readFile(eventsPath, 'utf8')).resolves.toBe(
+      '["start","before","file:Hello","after","end"]',
+    );
+  });
+
+  it('runs passed plugins in order and calls onEnd after a failed build', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'site');
+    const events: string[] = [];
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), 'Post');
+    const first: Plugin = {
+      onStart: () => { events.push('first:start'); },
+      onFile: () => { events.push('first:file'); },
+      onEnd: () => { events.push('first:end'); },
+    };
+    const failing: Plugin = {
+      onStart: () => { events.push('second:start'); },
+      onFile: () => { events.push('second:file'); throw new Error('plugin failure'); },
+      onEnd: () => { events.push('second:end'); },
+    };
+
+    await expect(buildSite({ contentDir, outputDir, plugins: [first, failing] })).rejects.toThrow('plugin failure');
+    expect(events).toEqual([
+      'first:start', 'second:start', 'first:file', 'second:file', 'first:end', 'second:end',
+    ]);
   });
 });
 
