@@ -164,7 +164,7 @@ rules:
   - {name: measure_provider_spread, plane: measurement, evidence_class: "[M]", requires: [], produces: [provider_imbalance]}
   - {name: reinterleave_queue,      plane: control,     evidence_class: "[P]", requires: [provider_imbalance], produces: [reinterleaved]}
 metrics:
-  - {name: max_same_provider_run, agg: max, over: cell}
+  - {name: max_same_provider_run, agg: mean, over: cell}
   - {name: worker_count,          agg: mean, over: cell}
   - {name: provider_spread,       agg: distribution, over: cell}
 comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
