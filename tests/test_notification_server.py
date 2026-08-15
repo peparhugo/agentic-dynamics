@@ -30,6 +30,18 @@ async def health_response(port):
     return response
 
 
+async def http_response(port, path):
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(
+        f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode()
+    )
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    return json.loads(response.split(b"\r\n\r\n", 1)[1])
+
+
 @pytest.mark.asyncio
 async def test_assigns_unique_ids_and_health_count(server):
     uri = f"ws://127.0.0.1:{server.port}"
@@ -100,3 +112,58 @@ async def test_disconnect_removes_client_and_health_endpoint(server):
     assert server.connected_client_count == 0
     response = await health_response(server.port)
     assert json.loads(response.split(b"\r\n\r\n", 1)[1]) == {"connected_clients": 0}
+
+
+@pytest.mark.asyncio
+async def test_channel_messages_only_reach_subscribers_and_can_unsubscribe(server):
+    uri = f"ws://127.0.0.1:{server.port}"
+    clients = [await connect(uri) for _ in range(3)]
+    try:
+        connected = [await receive_json(client) for client in clients]
+        first_id = connected[0]["payload"]["client_id"]
+        await clients[0].send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await clients[1].send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await clients[2].send(json.dumps({"type": "subscribe", "channel": "system"}))
+
+        await clients[2].send(json.dumps({
+            "type": "broadcast", "channel": "alerts", "payload": {"text": "warning"},
+        }))
+        assert (await receive_json(clients[0]))["payload"]["text"] == "warning"
+        assert (await receive_json(clients[1]))["payload"]["text"] == "warning"
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(clients[2].recv(), timeout=0.1)
+
+        await clients[1].send(json.dumps({"type": "unsubscribe", "channel": "alerts"}))
+        await clients[0].send(json.dumps({
+            "type": "broadcast", "channel": "alerts", "payload": {"text": "again"},
+        }))
+        assert (await receive_json(clients[0]))["payload"]["text"] == "again"
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(clients[1].recv(), timeout=0.1)
+
+        channel_info = await http_response(server.port, "/channels")
+        assert channel_info == {
+            "channels": [
+                {"name": "alerts", "subscriber_count": 1},
+                {"name": "system", "subscriber_count": 1},
+            ]
+        }
+        subscribers = await http_response(server.port, "/channels/alerts/subscribers")
+        assert subscribers == {"channel": "alerts", "subscribers": [first_id]}
+    finally:
+        await asyncio.gather(*(client.close() for client in clients))
+
+
+@pytest.mark.asyncio
+async def test_messages_without_channel_still_broadcast_to_all(server):
+    uri = f"ws://127.0.0.1:{server.port}"
+    clients = [await connect(uri), await connect(uri)]
+    try:
+        for client in clients:
+            await receive_json(client)
+        await clients[0].send(json.dumps({"type": "broadcast", "payload": {"text": "all"}}))
+        assert [
+            (await receive_json(client))["payload"]["text"] for client in clients
+        ] == ["all", "all"]
+    finally:
+        await asyncio.gather(*(client.close() for client in clients))
