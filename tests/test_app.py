@@ -186,8 +186,11 @@ def test_list_tasks_ordered_by_created_at_desc(client):
     _create(client, token, "Second")
     resp = client.get("/tasks", headers=_auth(token))
     assert resp.status_code == 200
-    tasks = resp.get_json()
+    data = resp.get_json()
+    tasks = data["data"]
     assert [t["title"] for t in tasks] == ["Second", "First"]
+    assert data["total"] == 2
+    assert data["next_cursor"] is None
     assert [t["created_at"] for t in tasks] == sorted(
         [t["created_at"] for t in tasks], reverse=True
     )
@@ -281,10 +284,12 @@ def test_each_user_sees_only_their_own_tasks(client):
     _create(client, bob, "Bob task")
 
     alice_tasks = client.get("/tasks", headers=_auth(alice)).get_json()
-    assert [t["title"] for t in alice_tasks] == ["Alice task"]
+    assert [t["title"] for t in alice_tasks["data"]] == ["Alice task"]
+    assert alice_tasks["total"] == 1
 
     bob_tasks = client.get("/tasks", headers=_auth(bob)).get_json()
-    assert [t["title"] for t in bob_tasks] == ["Bob task"]
+    assert [t["title"] for t in bob_tasks["data"]] == ["Bob task"]
+    assert bob_tasks["total"] == 1
 
 
 def test_user_cannot_get_others_task(client):
@@ -330,7 +335,7 @@ def test_data_persists_across_requests(client):
     _create(client, token, "One")
     _create(client, token, "Two")
     tasks = client.get("/tasks", headers=_auth(token)).get_json()
-    assert [t["title"] for t in tasks] == ["Two", "One"]
+    assert [t["title"] for t in tasks["data"]] == ["Two", "One"]
 
 
 def test_no_sqlite_database_file_created(client, tmp_path):
@@ -465,3 +470,210 @@ def test_send_notification_email_task_runs_locally():
         "to": "alice@example.com",
         "task_title": "Build the thing",
     }
+
+
+# ── Rate limiting ────────────────────────────────────────────────
+
+
+def test_rate_limit_exceeded_returns_429_with_retry_after(client):
+    app_module.app.config["RATELIMIT_DEFAULT_LIMIT"] = "5 per minute"
+    token = _token(client, "alice")
+    for _ in range(5):
+        resp = client.get("/tasks", headers=_auth(token))
+        assert resp.status_code == 200
+    resp = client.get("/tasks", headers=_auth(token))
+    assert resp.status_code == 429
+    assert resp.get_json() == {"error": "rate limit exceeded"}
+    assert resp.headers.get("Retry-After") is not None
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    app_module.app.config["RATELIMIT_DEFAULT_LIMIT"] = "3 per minute"
+    for username in ("u1", "u2", "u3"):
+        assert _register(client, username).status_code == 201
+    resp = _register(client, "u4")
+    assert resp.status_code == 429
+    assert resp.get_json() == {"error": "rate limit exceeded"}
+    assert resp.headers.get("Retry-After") is not None
+
+
+def test_rate_limit_is_per_user(client):
+    app_module.app.config["RATELIMIT_DEFAULT_LIMIT"] = "5 per minute"
+    alice = _token(client, "alice")
+    bob = _token(client, "bob")
+    for _ in range(5):
+        assert client.get("/tasks", headers=_auth(alice)).status_code == 200
+    assert client.get("/tasks", headers=_auth(alice)).status_code == 429
+    for _ in range(5):
+        assert client.get("/tasks", headers=_auth(bob)).status_code == 200
+    assert client.get("/tasks", headers=_auth(bob)).status_code == 429
+
+
+def test_rate_limit_applies_to_task_endpoints(client):
+    app_module.app.config["RATELIMIT_DEFAULT_LIMIT"] = "2 per minute"
+    token = _token(client, "alice")
+    assert _create(client, token, "One").status_code == 201
+    assert _create(client, token, "Two").status_code == 201
+    resp = _create(client, token, "Three")
+    assert resp.status_code == 429
+    assert resp.headers.get("Retry-After") is not None
+
+
+def test_default_rate_limit_is_100_per_minute(client):
+    token = _token(client, "alice")
+    for _ in range(100):
+        resp = client.get("/tasks", headers=_auth(token))
+        assert resp.status_code == 200
+    resp = client.get("/tasks", headers=_auth(token))
+    assert resp.status_code == 429
+    assert resp.headers.get("Retry-After") is not None
+
+
+# ── Pagination ───────────────────────────────────────────────────
+
+
+def _create_many(client, token, count):
+    return [_create(client, token, f"Task {i}") for i in range(count)]
+
+
+def test_list_tasks_returns_pagination_response_shape(client):
+    token = _token(client, "alice")
+    _create_many(client, token, 3)
+    resp = client.get("/tasks", headers=_auth(token))
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert set(body.keys()) == {"data", "next_cursor", "total"}
+    assert len(body["data"]) == 3
+    assert body["total"] == 3
+    assert body["next_cursor"] is None
+
+
+def test_list_tasks_default_limit_is_20(client):
+    token = _token(client, "alice")
+    _create_many(client, token, 25)
+    resp = client.get("/tasks", headers=_auth(token))
+    body = resp.get_json()
+    assert len(body["data"]) == 20
+    assert body["total"] == 25
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_respects_limit_param(client):
+    token = _token(client, "alice")
+    _create_many(client, token, 25)
+    resp = client.get("/tasks?limit=10", headers=_auth(token))
+    body = resp.get_json()
+    assert len(body["data"]) == 10
+    assert body["total"] == 25
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_next_cursor_is_last_item_id(client):
+    token = _token(client, "alice")
+    _create_many(client, token, 5)
+    resp = client.get("/tasks?limit=2", headers=_auth(token))
+    body = resp.get_json()
+    assert body["next_cursor"] == str(body["data"][-1]["id"])
+
+
+def test_list_tasks_cursor_pagination_walks_all_pages(client):
+    token = _token(client, "alice")
+    _create_many(client, token, 25)
+    seen = []
+    cursor = None
+    page_count = 0
+    while True:
+        url = "/tasks?limit=10"
+        if cursor is not None:
+            url += f"&cursor={cursor}"
+        resp = client.get(url, headers=_auth(token))
+        assert resp.status_code == 200
+        body = resp.get_json()
+        seen.extend(t["id"] for t in body["data"])
+        page_count += 1
+        next_cursor = body["next_cursor"]
+        if next_cursor is None:
+            break
+        assert body["data"]
+        cursor = int(next_cursor)
+    assert page_count == 3
+    assert len(seen) == 25
+    assert set(seen) == set(range(1, 26))
+
+
+def test_list_tasks_cursor_returns_following_page(client):
+    token = _token(client, "alice")
+    _create_many(client, token, 5)
+    resp = client.get("/tasks?limit=2", headers=_auth(token))
+    first = resp.get_json()
+    assert [t["id"] for t in first["data"]] == [5, 4]
+    assert first["next_cursor"] == "4"
+
+    resp = client.get(
+        f"/tasks?limit=2&cursor={first['next_cursor']}", headers=_auth(token)
+    )
+    second = resp.get_json()
+    assert [t["id"] for t in second["data"]] == [3, 2]
+    assert second["next_cursor"] == "2"
+
+    resp = client.get(
+        f"/tasks?limit=2&cursor={second['next_cursor']}", headers=_auth(token)
+    )
+    third = resp.get_json()
+    assert [t["id"] for t in third["data"]] == [1]
+    assert third["next_cursor"] is None
+
+
+def test_list_tasks_last_page_has_no_next_cursor(client):
+    token = _token(client, "alice")
+    _create_many(client, token, 5)
+    resp = client.get("/tasks?limit=5", headers=_auth(token))
+    body = resp.get_json()
+    assert len(body["data"]) == 5
+    assert body["next_cursor"] is None
+
+
+def test_list_tasks_limit_capped_at_100(client):
+    app_module.app.config["RATELIMIT_DEFAULT_LIMIT"] = "1000 per minute"
+    token = _token(client, "alice")
+    _create_many(client, token, 120)
+    resp = client.get("/tasks?limit=500", headers=_auth(token))
+    body = resp.get_json()
+    assert len(body["data"]) == 100
+    assert body["total"] == 120
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_invalid_limit_falls_back_to_default(client):
+    token = _token(client, "alice")
+    _create_many(client, token, 25)
+    resp = client.get("/tasks?limit=abc", headers=_auth(token))
+    body = resp.get_json()
+    assert len(body["data"]) == 20
+    assert body["total"] == 25
+
+
+def test_list_tasks_zero_limit_falls_back_to_default(client):
+    token = _token(client, "alice")
+    _create_many(client, token, 25)
+    resp = client.get("/tasks?limit=0", headers=_auth(token))
+    body = resp.get_json()
+    assert len(body["data"]) == 20
+    assert body["total"] == 25
+
+
+def test_list_tasks_invalid_cursor_returns_400(client):
+    token = _token(client, "alice")
+    resp = client.get("/tasks?cursor=abc", headers=_auth(token))
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+    resp = client.get("/tasks?cursor=999", headers=_auth(token))
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
+def test_list_tasks_empty_returns_empty_page(client):
+    token = _token(client, "alice")
+    resp = client.get("/tasks", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.get_json() == {"data": [], "next_cursor": None, "total": 0}

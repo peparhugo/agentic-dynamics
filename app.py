@@ -6,6 +6,9 @@ from functools import wraps
 import bcrypt
 import jwt
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
+from flask_limiter.util import get_remote_address
 
 from repositories import TaskRepository, UserRepository, storage_lock
 from tasks import send_notification_email
@@ -15,6 +18,9 @@ app.config["STORAGE_FILE"] = os.environ.get("TASKS_DB", "tasks.json")
 app.config["USERS_FILE"] = os.environ.get("USERS_DB", "users.json")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 app.config["JWT_ALGORITHM"] = "HS256"
+RATE_LIMIT_STORAGE_URI = os.environ.get("RATE_LIMIT_STORAGE_URI", "redis://localhost:6379")
+app.config["RATELIMIT_STORAGE_URI"] = RATE_LIMIT_STORAGE_URI
+app.config["RATELIMIT_HEADERS_ENABLED"] = True
 
 TOKEN_TTL_SECONDS = int(os.environ.get("TOKEN_TTL", "3600"))
 
@@ -106,6 +112,33 @@ def require_auth(f):
     return decorated
 
 
+def rate_limit_key():
+    user = get_current_user()
+    if user is not None:
+        return f"user:{user['id']}"
+    return get_remote_address()
+
+
+def default_rate_limit():
+    return app.config.get("RATELIMIT_DEFAULT_LIMIT", "100 per minute")
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    default_limits=[default_rate_limit],
+    headers_enabled=True,
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+)
+
+
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit_exceeded(_exc):
+    return jsonify({"error": "rate limit exceeded"}), 429
+
+
+limiter.init_app(app)
+
+
 @app.route("/auth/register", methods=["POST"])
 def register():
     init_storage()
@@ -170,9 +203,40 @@ def create_task(user):
 @require_auth
 def list_tasks(user):
     init_storage()
+    try:
+        limit = int(request.args.get("limit", 20))
+    except (TypeError, ValueError):
+        limit = 20
+    if limit < 1:
+        limit = 20
+    limit = min(limit, 100)
+
+    cursor_raw = request.args.get("cursor")
+    cursor = None
+    if cursor_raw is not None:
+        try:
+            cursor = int(cursor_raw)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid cursor"}), 400
+
     tasks = task_repository.find_by_owner(user["id"])
     tasks.sort(key=lambda t: t.get("created_at", ""), reverse=True)
-    return jsonify(tasks)
+    total = len(tasks)
+
+    start = 0
+    if cursor is not None:
+        cursor_index = next(
+            (i for i, task in enumerate(tasks) if task.get("id") == cursor), None
+        )
+        if cursor_index is None:
+            return jsonify({"error": "invalid cursor"}), 400
+        start = cursor_index + 1
+
+    page = tasks[start : start + limit]
+    next_cursor = None
+    if start + limit < total:
+        next_cursor = str(page[-1]["id"])
+    return jsonify({"data": page, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
