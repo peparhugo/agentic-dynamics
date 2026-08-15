@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
+import { hashContent } from '../hash';
 import type { Frontmatter, Page } from '../generator';
 import type { BuildContext, Plugin } from '../plugin';
 
@@ -65,7 +66,16 @@ export class MarkdownPlugin implements Plugin {
 
   async beforeBuild(context: BuildContext): Promise<void> {
     context.files = await markdownFiles(context.contentDir);
-    context.pages = await Promise.all(context.files.map(async (file) => parseMarkdown(await fs.readFile(file, 'utf8'), path.relative(context.contentDir, file))));
+    context.pages = await Promise.all(context.files.map(async (file) => {
+      const source = await fs.readFile(file, 'utf8');
+      const relative = path.relative(context.contentDir, file).split(path.sep).join('/');
+      const sourceHash = hashContent(source);
+      context.build?.sourceHashes.set(relative, sourceHash);
+      const cached = context.build?.cache.pages[relative];
+      const page = cached?.sourceHash === sourceHash && cached.parsedPage ? cached.parsedPage : parseMarkdown(source, relative);
+      context.build?.parsedPages.set(relative, page);
+      return page;
+    }));
     context.pages.sort((a, b) => (b.date || '').localeCompare(a.date || '') || a.title.localeCompare(b.title));
   }
 }

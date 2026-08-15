@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite, parseMarkdown } from '../src/generator';
+import { buildSite, buildSiteWithStats, parseMarkdown } from '../src/generator';
 
 describe('static site generator', () => {
   it('parses YAML frontmatter and markdown', () => {
@@ -58,5 +58,53 @@ describe('static site generator', () => {
 
     await buildSite(content, output, templates);
     expect(await fs.readFile(path.join(output, 'page.html'), 'utf8')).toBe('<html><body><h1>EJS Page</h1><p>Content</p>\n</body></html>');
+  });
+
+  it('skips unchanged pages and rebuilds only changed sources', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'first.md'), '# First');
+    await fs.writeFile(path.join(content, 'second.md'), '# Second');
+
+    const initial = await buildSiteWithStats(content, output, undefined, { incremental: true });
+    expect(initial.stats.pagesBuilt).toBe(2);
+    expect(initial.stats.pagesSkipped).toBe(0);
+    expect(JSON.parse(await fs.readFile(path.join(output, '.ssg-cache.json'), 'utf8')).pages['first.md'].sourceHash).toBeTruthy();
+
+    const unchanged = await buildSiteWithStats(content, output, undefined, { incremental: true });
+    expect(unchanged.stats.pagesBuilt).toBe(0);
+    expect(unchanged.stats.pagesSkipped).toBe(2);
+
+    await fs.writeFile(path.join(content, 'second.md'), '# Second changed');
+    const changed = await buildSiteWithStats(content, output, undefined, { incremental: true });
+    expect(changed.stats.pagesBuilt).toBe(1);
+    expect(changed.stats.pagesSkipped).toBe(1);
+    expect(await fs.readFile(path.join(output, 'second.html'), 'utf8')).toContain('Second changed');
+    expect(await fs.readFile(path.join(output, 'first.html'), 'utf8')).toContain('<h1>First</h1>');
+  });
+
+  it('rebuilds all pages when a template changes or a clean build is requested', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content);
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'one.md'), '# One');
+    await fs.writeFile(path.join(content, 'two.md'), '# Two');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<article>{{{html}}}</article>');
+
+    await buildSiteWithStats(content, output, templates, { incremental: true });
+    expect((await buildSiteWithStats(content, output, templates, { incremental: true })).stats.pagesSkipped).toBe(2);
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<section>{{{html}}}</section>');
+    const templateChanged = await buildSiteWithStats(content, output, templates, { incremental: true });
+    expect(templateChanged.stats.pagesBuilt).toBe(2);
+    expect(await fs.readFile(path.join(output, 'one.html'), 'utf8')).toContain('<section>');
+
+    const clean = await buildSiteWithStats(content, output, templates, { incremental: true, clean: true });
+    expect(clean.stats.pagesBuilt).toBe(2);
+    expect(clean.stats.pagesSkipped).toBe(0);
   });
 });

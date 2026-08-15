@@ -1,5 +1,5 @@
-export { buildSite, parseMarkdown } from './generator';
-export type { Frontmatter, Page } from './generator';
+export { buildSite, buildSiteWithStats, parseMarkdown } from './generator';
+export type { BuildOptions, BuildResult, BuildStats, Frontmatter, Page } from './generator';
 export type { BuildContext, Plugin, PluginFactory } from './plugin';
 export { MarkdownPlugin } from './plugins/markdown';
 export { TemplatePlugin } from './plugins/template';
