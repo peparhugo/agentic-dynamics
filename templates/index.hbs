@@ -1,0 +1,12 @@
+{{> header}}
+<main>
+  <h1>Index</h1>
+  <ul class="posts">
+    {{#each pages}}
+    <li><a href="{{slug}}.html">{{title}}</a>{{#if dateDisplay}} &mdash; <time datetime="{{dateIso}}">{{dateDisplay}}</time>{{/if}}{{#if tags}} [{{join tags ", "}}]{{/if}}</li>
+    {{else}}
+    <li>No posts</li>
+    {{/each}}
+  </ul>
+</main>
+{{> footer}}

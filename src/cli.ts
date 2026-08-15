@@ -4,6 +4,7 @@ export interface CliOptions {
   command: string;
   contentDir: string;
   outputDir: string;
+  templatesDir: string;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -12,6 +13,7 @@ export function parseArgs(argv: string[]): CliOptions {
     command: '',
     contentDir: './content',
     outputDir: './dist',
+    templatesDir: './templates',
   };
 
   let i = 0;
@@ -21,10 +23,14 @@ export function parseArgs(argv: string[]): CliOptions {
       options.contentDir = args[++i];
     } else if (arg === '--output') {
       options.outputDir = args[++i];
+    } else if (arg === '--templates') {
+      options.templatesDir = args[++i];
     } else if (arg.startsWith('--content=')) {
       options.contentDir = arg.slice('--content='.length);
     } else if (arg.startsWith('--output=')) {
       options.outputDir = arg.slice('--output='.length);
+    } else if (arg.startsWith('--templates=')) {
+      options.templatesDir = arg.slice('--templates='.length);
     } else if (!arg.startsWith('-')) {
       if (!options.command) options.command = arg;
     }
@@ -37,7 +43,7 @@ export function parseArgs(argv: string[]): CliOptions {
 export function run(argv: string[]): number {
   const options = parseArgs(argv);
   if (options.command !== 'build') {
-    console.error('Usage: ssg build [--content <dir>] [--output <dir>]');
+    console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
     return 1;
   }
 
@@ -45,6 +51,7 @@ export function run(argv: string[]): number {
     const pages = build({
       contentDir: options.contentDir,
       outputDir: options.outputDir,
+      templatesDir: options.templatesDir,
     });
     console.log(`Generated ${pages.length} page(s) in ${options.outputDir}`);
     return 0;

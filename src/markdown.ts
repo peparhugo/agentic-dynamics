@@ -41,6 +41,8 @@ export function buildPage(slug: string, raw: string): Page {
     date: toDate(data.date),
     tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
     html,
+    template: typeof data.template === 'string' ? data.template : undefined,
+    layout: typeof data.layout === 'string' ? data.layout : undefined,
   };
 }
 

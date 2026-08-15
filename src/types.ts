@@ -2,6 +2,8 @@ export interface Frontmatter {
   title?: string;
   date?: Date | string;
   tags?: string[];
+  template?: string;
+  layout?: string;
 }
 
 export interface Page {
@@ -10,9 +12,12 @@ export interface Page {
   date: Date;
   tags: string[];
   html: string;
+  template?: string;
+  layout?: string;
 }
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  templatesDir?: string;
 }

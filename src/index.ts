@@ -1,6 +1,6 @@
 import { Frontmatter, Page, BuildOptions } from './types';
 import { parseMarkdown, markdownToHtml, toDate, buildPage, sortByDate, loadPages, readMarkdownFiles } from './markdown';
-import { escapeHtml, formatDate, renderIndex, renderPage } from './templates';
+import { escapeHtml, formatDate, renderIndex, renderPage, TemplateEngine } from './templates';
 import { build } from './generate';
 
 export {
@@ -18,5 +18,6 @@ export {
   formatDate,
   renderIndex,
   renderPage,
+  TemplateEngine,
   build,
 };

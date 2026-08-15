@@ -1,0 +1,12 @@
+{{> header}}
+<main>
+  <article>
+    <h1>{{title}}</h1>
+    {{#if dateDisplay}}<time datetime="{{dateIso}}">{{dateDisplay}}</time>{{/if}}
+    {{#if tags}}<ul class="tags">{{#each tags}}<li>{{this}}</li>{{/each}}</ul>{{/if}}
+    <div class="content">
+      {{{html}}}
+    </div>
+  </article>
+</main>
+{{> footer}}
