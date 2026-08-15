@@ -14,6 +14,18 @@ By default, Markdown is read recursively from `./content` and HTML is written to
 npx ssg build --content ./posts --output ./public
 ```
 
+Start a development server at `http://localhost:3000` with live reload:
+
+```sh
+npx ssg serve
+npx ssg serve --port 4000
+```
+
+The development server builds and serves `./dist`, watches `./content` and
+`./templates`, then reloads connected browsers after each successful rebuild.
+The `--content`, `--output`, and `--templates` options are also supported by
+`serve`.
+
 Templates are loaded from `./templates` by default. Use `--templates <dir>` to
 choose another directory. Pages use `templates/default.hbs`, or can select a
 template and layout in frontmatter:

@@ -1,8 +1,25 @@
 import { promises as fs } from 'node:fs';
+import { get } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { buildSite, parseMarkdown, renderPage } from '../src';
 import { parseArguments } from '../src/cli';
+import { startDevServer, type DevServer } from '../src/server';
+import WebSocket from 'ws';
+
+function fetchText(url: string): Promise<{ status: number; body: string; contentType?: string }> {
+  return new Promise((resolve, reject) => {
+    get(url, (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.on('end', () => resolve({
+        status: response.statusCode ?? 0,
+        body: Buffer.concat(chunks).toString('utf8'),
+        contentType: response.headers['content-type'],
+      }));
+    }).on('error', reject);
+  });
+}
 
 describe('parseMarkdown', () => {
   it('parses YAML frontmatter and Markdown', () => {
@@ -134,8 +151,76 @@ describe('parseArguments', () => {
     });
   });
 
+  it('accepts serve options and validates the port', () => {
+    expect(parseArguments(['serve', '--port', '4000', '--content', 'articles'])).toEqual({
+      port: 4000,
+      contentDir: 'articles',
+    });
+    expect(() => parseArguments(['serve', '--port', 'not-a-port'])).toThrow('Invalid port');
+    expect(() => parseArguments(['build', '--port', '4000'])).toThrow('Unknown');
+  });
+
   it('rejects invalid commands and incomplete options', () => {
-    expect(() => parseArguments(['serve'])).toThrow('Usage:');
+    expect(parseArguments(['serve'])).toEqual({});
+    expect(() => parseArguments(['preview'])).toThrow('Usage:');
     expect(() => parseArguments(['build', '--content'])).toThrow('incomplete');
+  });
+});
+
+describe('development server', () => {
+  let temporaryDirectory: string;
+  let server: DevServer | undefined;
+
+  beforeEach(async () => {
+    temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-server-test-'));
+  });
+
+  afterEach(async () => {
+    await server?.close();
+    await fs.rm(temporaryDirectory, { recursive: true, force: true });
+  });
+
+  it('serves dist HTML with the live reload client injected', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'hello.md'), '---\ntitle: Hello\n---\nFirst version');
+
+    server = await startDevServer({ contentDir, outputDir, host: '127.0.0.1', port: 0, log: () => undefined });
+    const response = await fetchText(`http://127.0.0.1:${server.port}/hello.html`);
+
+    expect(response.status).toBe(200);
+    expect(response.contentType).toBe('text/html; charset=utf-8');
+    expect(response.body).toContain('First version');
+    expect(response.body).toContain("new WebSocket(protocol + '//' + location.host + '/__ssg_live_reload')");
+    await expect(fs.readFile(path.join(outputDir, 'hello.html'), 'utf8')).resolves.not.toContain('__ssg_live_reload');
+    await expect(fetchText(`http://127.0.0.1:${server.port}/missing.html`)).resolves.toMatchObject({ status: 404 });
+  });
+
+  it('rebuilds changed content and notifies WebSocket clients', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    await fs.mkdir(contentDir);
+    const sourcePath = path.join(contentDir, 'hello.md');
+    await fs.writeFile(sourcePath, 'Old content');
+    server = await startDevServer({ contentDir, outputDir, host: '127.0.0.1', port: 0, log: () => undefined });
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/__ssg_live_reload`);
+    await new Promise<void>((resolve, reject) => {
+      socket.once('open', resolve);
+      socket.once('error', reject);
+    });
+
+    const reload = new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timed out waiting for live reload')), 5000);
+      socket.once('message', (data) => {
+        clearTimeout(timeout);
+        resolve(data.toString());
+      });
+    });
+    await fs.writeFile(sourcePath, 'New content');
+
+    await expect(reload).resolves.toBe('reload');
+    await expect(fs.readFile(path.join(outputDir, 'hello.html'), 'utf8')).resolves.toContain('New content');
+    socket.close();
   });
 });
