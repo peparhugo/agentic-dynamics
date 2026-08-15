@@ -63,10 +63,16 @@ def get_task(task_id: int) -> dict | None:
         return dict(row) if row else None
 
 
-def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
+def is_valid_status(status: str) -> bool:
+    return status in ("pending", "done")
+
+
+def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None | tuple:
     task = get_task(task_id)
     if task is None:
         return None
+    if status is not None and not is_valid_status(status):
+        return ("invalid_status", status)
     with get_db() as conn:
         updates = []
         params = []
@@ -120,6 +126,8 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if isinstance(task, tuple) and task[0] == "invalid_status":
+        return jsonify({"error": f"invalid status: {task[1]}"}), 422
     return jsonify(task)
 
 
