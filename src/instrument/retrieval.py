@@ -498,6 +498,35 @@ def collapse_redundant(
     return [c for c in candidates if c.id not in dropped]
 
 
+def _pairwise_similarities(
+    candidates: list[Candidate], embedder: Any = None
+) -> tuple[dict[tuple[str, str], float], str]:
+    """Compute pairwise cosine similarities among candidates (or degrade to a no-op).
+
+    Returns ``(similarities, path)``. ``similarities`` maps ``(id_a, id_b)`` to a
+    similarity in ``[0, 1]`` (``1.0`` = identical) computed as ``1 - cosine_distance``
+    over the embedder's vectors. When no embedder is supplied, fewer than two
+    candidates survive, or embedding fails, returns ``({}, "none")`` so
+    :func:`collapse_redundant` degrades to a no-op. ``path`` is ``"embedding"`` or
+    ``"none"`` and is recorded on the attempt for audit (which dedupe leg actually
+    ran).
+    """
+    if len(candidates) < 2 or embedder is None:
+        return {}, "none"
+    try:
+        embeddings = [embedder.embed(c.text) for c in candidates]
+        sims: dict[tuple[str, str], float] = {}
+        for i in range(len(candidates)):
+            for j in range(i + 1, len(candidates)):
+                dist = embedder.cosine_distance(embeddings[i], embeddings[j])
+                sims[(candidates[i].id, candidates[j].id)] = 1.0 - dist
+        return sims, "embedding"
+    except Exception:
+        # Embedding infra unavailable (Ollama down, embedder missing, etc.) — the
+        # collapse must degrade to a no-op, never crash the phase.
+        return {}, "none"
+
+
 def compute_token_budget(
     *,
     executor_context_tokens: int = 200_000,
@@ -576,6 +605,7 @@ class RetrievalAttempt:
     latency_ms: float
     cache_status: str
     fallback_mode: str
+    dedup_path: str = ""          # "embedding" | "none" — which redundancy-collapse leg ran
     weights_version: str = WEIGHTS_VERSION
     timestamp: str = ""
 
@@ -601,6 +631,7 @@ class RetrievalAttempt:
             "token_count": self.token_count,
             "latency_ms": self.latency_ms,
             "cache_status": self.cache_status,
+            "dedup_path": self.dedup_path,
             "fallback_mode": self.fallback_mode,
             "weights_version": self.weights_version,
             "timestamp": self.timestamp,
@@ -739,7 +770,9 @@ def retrieve(
 
     Both legs run in parallel (a small thread pool); a leg failure marks that leg
     down rather than failing the pass, and the surviving set selects the named
-    fallback mode. The ``RetrievalAttempt`` is returned *before* any LLM call so the
+    fallback mode. Survivors are fused, content-hash deduped, then cosine-collapsed
+    (``collapse_redundant``, embeddings optional), graph-expanded, token-budgeted,
+    and selected. The ``RetrievalAttempt`` is returned *before* any LLM call so the
     trace survives construction/execution failures.
     """
     t0 = time.monotonic()
@@ -839,12 +872,26 @@ def retrieve(
         ranks.setdefault(cid, {})["lexical"] = rank
         raw_scores.setdefault(cid, {})["lexical"] = hit.get("score")
 
-    # Fuse, dedupe, then expand the strongest seeds through the graph (decayed boost).
+    # Fuse, content-hash dedupe, then cosine-redundancy collapse (conflicts survive).
     fused = fuse_candidates(
         candidates, exact_terms=plan.exact_terms, current_commit=commit_sha, now=now
     )
     fused = deduplicate(fused)
 
+    # Redundancy collapse: cosine > threshold dedupe over the surviving candidates.
+    # Embeddings are optional (local Ollama) — when unavailable the similarities dict
+    # is empty and collapse_redundant is a no-op; the path is recorded on the attempt.
+    embedder: Any = None
+    try:
+        from .embeddings import EmbeddingClient
+
+        embedder = EmbeddingClient()
+    except Exception:
+        embedder = None  # optional dep missing → collapse degrades to a no-op
+    similarities, dedup_path = _pairwise_similarities(fused, embedder)
+    fused = collapse_redundant(fused, similarities)
+
+    # Then expand the strongest seeds through the graph (decayed boost).
     if graph_client is not None and fused:
         try:
             seeds = [c.id for c in fused[:seed_count]]
@@ -915,6 +962,7 @@ def retrieve(
         token_count=sum(c.token_count for c in selected),
         latency_ms=round((time.monotonic() - t0) * 1000.0, 2),
         cache_status="unknown",
+        dedup_path=dedup_path,
         fallback_mode=fallback.value,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )

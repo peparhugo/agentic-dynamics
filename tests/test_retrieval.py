@@ -470,27 +470,37 @@ def test_candidate_citation_format():
 # ── Graph-expansion leg wiring (real seed score × weight × decay) ──
 
 class _FakeDenseStore:
-    """Minimal dense store returning a single seed hit."""
+    """Minimal dense store: returns scripted hits, or raises (simulates a down leg)."""
 
-    def __init__(self, hits):
+    def __init__(self, hits, error=None):
         self._hits = hits
+        self._error = error
 
     def search(self, query, *, top_k=40, where=None):
+        if self._error is not None:
+            raise self._error
         return list(self._hits)
 
 
 class _FakeGraph:
-    """Minimal graph client recording expansion and returning scripted nodes."""
+    """Minimal graph client: scripted lexical hits, expansion nodes, or down legs."""
 
-    def __init__(self, expanded):
-        self._expanded = expanded
+    def __init__(self, expanded=None, lexical_hits=None, lexical_error=None, expand_error=None):
+        self._expanded = expanded or []
+        self._lexical_hits = lexical_hits or []
+        self._lexical_error = lexical_error
+        self._expand_error = expand_error
         self.expand_seeds = None
 
     def search_fulltext(self, index, query, *, limit=10, commit=None):
-        return []  # lexical leg contributes nothing in these tests
+        if self._lexical_error is not None:
+            raise self._lexical_error
+        return list(self._lexical_hits)
 
     def expand_candidates(self, seeds, **kwargs):
         self.expand_seeds = list(seeds)
+        if self._expand_error is not None:
+            raise self._expand_error
         return list(self._expanded)
 
 
@@ -500,6 +510,23 @@ def _seed_hit():
         "document": "seed document about websocket reload protocol",
         "metadata": {"authority": "source", "content_hash": "hash_seed"},
         "distance": 0.1,
+    }
+
+
+def _dense_hit(cid, text, *, authority="source", content_hash="", distance=0.1):
+    return {
+        "id": cid,
+        "document": text,
+        "metadata": {"authority": authority, "content_hash": content_hash or f"hash:{cid}"},
+        "distance": distance,
+    }
+
+
+def _lexical_hit(cid="doc_lex", text="lexical websocket reload hit"):
+    return {
+        "id": "elem:lex",
+        "properties": {"text": text, "authority": "source", "content_hash": "hash_lex", "doc_id": cid},
+        "score": 0.9,
     }
 
 
@@ -560,3 +587,107 @@ def test_retrieve_expansion_skips_orphan_origin():
         graph_client=_FakeGraph([_expanded_node("unknown_seed")]),
     )
     assert all(c.id != "k_expanded" for c in attempt.candidates)
+
+
+# ── End-to-end pipeline wiring (fuse → dedupe → collapse → expand → select) ──
+
+def test_retrieve_end_to_end_pipeline():
+    # Two dense hits sharing a content_hash (deduplicate collapses the advisory one)
+    # plus a distinct third hit; the graph leg contributes one expanded neighbor.
+    dense = _FakeDenseStore([
+        _dense_hit("k1", "websocket live reload protocol", authority="source", content_hash="dup"),
+        _dense_hit("k2", "websocket live reload protocol", authority="advisory", content_hash="dup"),
+        _dense_hit("k3", "quantum entanglement of distant particles", authority="source", content_hash="distinct"),
+    ])
+    graph = _FakeGraph([_expanded_node("k1", cid="k_expanded")])
+
+    attempt = retrieve("websocket reload", dense_store=dense, graph_client=graph)
+
+    ids = {c.id for c in attempt.candidates}
+    # fused: every candidate carries a real fused score.
+    assert all(c.fused_score > 0 for c in attempt.candidates)
+    # deduped: content-hash duplicate collapsed (k2 dropped, k1 survives as SOURCE).
+    assert "k1" in ids and "k2" not in ids
+    # expanded: graph neighbor appended (k1 survives collapse → is a seed).
+    assert "k_expanded" in ids
+    assert next(c for c in attempt.candidates if c.id == "k_expanded").graph_depth == 1
+    # budgeted + selected: evidence is a non-empty, budget-respecting subset.
+    assert attempt.selected_evidence
+    assert set(c.id for c in attempt.selected_evidence) <= ids
+    assert attempt.token_count == sum(c.token_count for c in attempt.selected_evidence)
+    assert attempt.token_count <= compute_token_budget()
+    # both legs + graph survived → full.
+    assert attempt.fallback_mode == "full"
+
+
+def test_retrieve_collapse_redundant_wired(monkeypatch):
+    import instrument.embeddings as embeddings
+
+    class _FakeEmbedder:
+        """Deterministic embedder double: text → fixed vector, real cosine distance."""
+
+        VECTORS = {
+            "near duplicate text one": [1.0, 0.0],
+            "near duplicate text two": [1.0, 0.0],
+            "completely different topic": [0.0, 1.0],
+        }
+
+        def embed(self, text):
+            if text not in self.VECTORS:
+                raise KeyError(text)
+            return self.VECTORS[text]
+
+        def cosine_distance(self, a, b):
+            import math
+            dot = sum(x * y for x, y in zip(a, b))
+            ma = math.sqrt(sum(x * x for x in a))
+            mb = math.sqrt(sum(y * y for y in b))
+            if ma == 0 or mb == 0:
+                return 1.0
+            return (1.0 - dot / (ma * mb)) / 2.0
+
+    monkeypatch.setattr(embeddings, "EmbeddingClient", _FakeEmbedder)
+
+    # Distinct content hashes → deduplicate keeps all three; only the embedding-based
+    # collapse (similarity 1.0 > 0.92) drops the lower-authority near-duplicate.
+    dense = _FakeDenseStore([
+        _dense_hit("k1", "near duplicate text one", authority="source"),
+        _dense_hit("k2", "near duplicate text two", authority="advisory"),
+        _dense_hit("k3", "completely different topic", authority="source"),
+    ])
+
+    attempt = retrieve("near duplicate text one", dense_store=dense)
+
+    assert attempt.dedup_path == "embedding"
+    ids = {c.id for c in attempt.candidates}
+    assert "k1" in ids and "k3" in ids
+    assert "k2" not in ids  # near-duplicate collapsed by cosine similarity
+
+
+@pytest.mark.parametrize(
+    "dense_store, graph_client, expected_mode",
+    [
+        (_FakeDenseStore([_seed_hit()]), None, "dense_local_exact"),
+        (None, _FakeGraph(lexical_hits=[_lexical_hit()]), "lexical_graph_only"),
+        (_FakeDenseStore([_seed_hit()]), _FakeGraph(), "full"),
+        (None, None, "no_rag"),
+    ],
+)
+def test_retrieve_fallback_reflects_surviving_legs(dense_store, graph_client, expected_mode):
+    attempt = retrieve("websocket reload", dense_store=dense_store, graph_client=graph_client)
+    assert attempt.fallback_mode == expected_mode
+
+
+def test_retrieve_fully_down_yields_no_rag_empty_evidence():
+    # Both stores raise (infra down): each leg is marked down, evidence is empty,
+    # and the attempt degrades to no_rag without raising.
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([], error=RuntimeError("chroma down")),
+        graph_client=_FakeGraph(lexical_error=RuntimeError("neo4j down")),
+    )
+    assert attempt.fallback_mode == "no_rag"
+    assert attempt.candidates == []
+    assert attempt.selected_evidence == []
+    assert attempt.token_count == 0
+    assert attempt.dedup_path == "none"  # no survivors → embeddings never attempted

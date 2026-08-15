@@ -131,10 +131,18 @@ raw work item ── route_step ──▶ retrieve ──▶ construct ──▶
                                   RRF fusion)        validator)      prompt)
 ```
 
+The `retrieve()` sub-pipeline, in order: parallel dense (Chroma) + lexical (Neo4j
+full-text) legs → RRF fusion × authority/freshness/exact-id/conflict (with the commit
+scope applied as a HARD pre-filter on every leg) → `deduplicate` (content-hash) →
+`collapse_redundant` (cosine > 0.92 via optional `EmbeddingClient`; the attempt records
+which path ran in `dedup_path`) → allowlisted graph expansion (real seed score × weight ×
+`0.7**depth`) → `compute_token_budget` + `select_evidence` (whole-chunk, source-capped) →
+`RetrievalAttempt`.
+
 | Module | Lines | Purpose | Key Exports |
 |--------|-------|---------|-------------|
 | `knowledge.py` | 288 | Canonical identity + authority contract — two sha256 ids (`entity_id`, `knowledge_id`), ordered `Authority` (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY), frozen `KnowledgeRecord`/`KnowledgeEvent` (pointer-only) | `Authority`, `KnowledgeRecord`, `KnowledgeEvent`, `compute_entity_id()`, `compute_knowledge_id()`, `compute_content_hash()` |
-| `retrieval.py` | 907 | Deterministic retrieval — regex query planner, parallel dense (Chroma) + lexical (Neo4j full-text) legs, RRF fusion × authority/freshness/exact-id/conflict, bounded decayed graph expansion, token-budgeted whole-chunk selection, `RetrievalAttempt`, offline `build_evidence_cards()` | `QueryPlan`, `Candidate`, `RetrievalAttempt`, `build_query_plan()`, `retrieve()`, `rrf_base()`, `compute_fused_score()`, `graph_boost()`, `select_evidence()`, `build_evidence_cards()`, `FallbackMode` |
+| `retrieval.py` | 963 | Deterministic retrieval — regex query planner, parallel dense (Chroma) + lexical (Neo4j full-text) legs, RRF fusion × authority/freshness/exact-id/conflict (hard commit pre-filter), content-hash `deduplicate`, cosine `collapse_redundant` (embeddings-optional), allowlisted decayed graph expansion, token-budgeted whole-chunk selection, `RetrievalAttempt` (`dedup_path` records the collapse leg), offline `build_evidence_cards()` | `QueryPlan`, `Candidate`, `RetrievalAttempt`, `build_query_plan()`, `retrieve()`, `rrf_base()`, `compute_fused_score()`, `graph_boost()`, `deduplicate()`, `collapse_redundant()`, `select_evidence()`, `build_evidence_cards()`, `FallbackMode` |
 | `prompt_constructor.py` | 456 | Typed prompt-constructor — `PromptConstructor` protocol, `prompt-plan/v1` schema, deterministic validator, one-repair + deterministic fallback renderer, no-fork cache keying, default `deepseek/deepseek-v4-flash` | `PromptConstructor`, `ModelPromptConstructor`, `ConstructionRequest`, `AugmentedPrompt`, `PromptPlan`, `validate_plan()`, `render_prompt()`, `construction_cache_key()`, `hash_work_item()` |
 
 `workflow_runner.py` is the seam: between `route_step()` and `run_agent()` it calls
@@ -143,6 +151,16 @@ persists augmentation provenance on `PhaseResult` (`raw_prompt_hash`, `pre_phase
 `retrieval_attempt_id`, `constructor_attempt_id`, `selected_evidence_ids`, `augmentation_versions`,
 `augmentation_tokens`, `augmentation_cost_usd`, `augmentation_latency_ms`, `fallback_mode`). Any
 retrieval/constructor failure falls back to the base prompt and records a named fallback mode.
+
+Two wiring gaps fixed (both live in `retrieval.py`, covered end-to-end in
+`tests/test_retrieval.py` with store doubles — no live Chroma/Neo4j required):
+1. `collapse_redundant` (cosine > 0.92) was defined/exported but never called — `retrieve()`
+   now runs it after `deduplicate`, feeding it pairwise similarities from an optional
+   `EmbeddingClient` (an empty dict → no-op when embeddings are unavailable), and records
+   the path on the attempt (`dedup_path`: `"embedding"` | `"none"`).
+2. `retrieve()` was never exercised against the other modules — the integration tests now
+   drive the full fused → deduped → collapsed → expanded → budgeted → selected pipeline
+   and assert `fallback_mode` tracks the surviving legs (fully-down → `no_rag`, empty evidence).
 
 ### The spec/compiler layer
 
