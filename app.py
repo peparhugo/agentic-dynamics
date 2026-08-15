@@ -16,6 +16,8 @@ from typing import Any
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 app = Flask(__name__)
 app.config["TASKS_FILE"] = os.environ.get("TASKS_FILE", "tasks.json")
@@ -151,8 +153,11 @@ def register():
     data = _json_body()
     username = data.get("username") if data else None
     password = data.get("password") if data else None
+    email = data.get("email") if data else None
     if not isinstance(username, str) or not username.strip() or not isinstance(password, str) or not password:
         return jsonify(error="username and password are required"), 400
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return jsonify(error="email must be a non-empty string"), 400
 
     with _storage_lock:
         data = _read_data()
@@ -163,6 +168,8 @@ def register():
             "username": username.strip(),
             "password_hash": generate_password_hash(password),
         }
+        if email is not None:
+            user["email"] = email.strip()
         data["users"].append(user)
         _write_data(data)
     return jsonify({"id": user["id"], "username": user["username"]}), 201
@@ -239,11 +246,17 @@ def update_task(task_id: int):
         task, error = _task_or_404(task_id, stored_data["tasks"], user_id)
         if error:
             return error
+        was_completed = task.get("status") == "completed"
         if "title" in data:
             task["title"] = data["title"].strip()
         if "status" in data:
             task["status"] = data["status"]
         _write_data(stored_data)
+        should_notify = not was_completed and task.get("status") == "completed"
+        user = next((item for item in stored_data["users"] if item.get("id") == user_id), None)
+        user_email = user.get("email", user.get("username")) if user else None
+    if should_notify and user_email:
+        send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 

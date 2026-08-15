@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -89,6 +90,23 @@ def test_get_and_update_owned_task(client):
     response = client.put(f"/tasks/{task['id']}", json={"title": "Published", "status": "done"}, headers=headers)
     assert response.status_code == 200
     assert response.get_json() == {**task, "title": "Published", "status": "done"}
+
+
+def test_completing_task_enqueues_notification_once(client):
+    assert client.post(
+        "/auth/register", json={"username": "alice", "password": "secret", "email": "alice@example.com"}
+    ).status_code == 201
+    login = client.post("/auth/login", json={"username": "alice", "password": "secret"})
+    headers = {"Authorization": f"Bearer {login.get_json()['token']}"}
+    task = client.post("/tasks", json={"title": "Ship release"}, headers=headers).get_json()
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+        assert response.status_code == 200
+        delay.assert_called_once_with("alice@example.com", "Ship release")
+
+        client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+        delay.assert_called_once()
 
 
 def test_update_task_validates_input_and_missing_task(client):
