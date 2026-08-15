@@ -4,7 +4,7 @@ import json
 import pytest
 from websockets.asyncio.client import connect
 
-from app import NotificationServer
+from app import BaseTransport, NotificationServer, WebSocketTransport
 
 
 class FakeRedis:
@@ -288,3 +288,47 @@ async def test_redis_pubsub_delivers_between_server_instances_and_tracks_clients
     finally:
         await first.stop()
         await second.stop()
+
+
+def test_websocket_is_the_default_transport(monkeypatch):
+    monkeypatch.delenv("TRANSPORT", raising=False)
+    assert isinstance(NotificationServer().transport, WebSocketTransport)
+
+
+def test_transport_is_selected_from_configuration(monkeypatch):
+    monkeypatch.setenv("TRANSPORT", "polling")
+    with pytest.raises(ValueError, match="unsupported transport: polling"):
+        NotificationServer()
+
+
+class RecordingTransport(BaseTransport):
+    def __init__(self):
+        super().__init__()
+        self.sent = []
+
+    async def on_connect(self, client):
+        pass
+
+    async def on_disconnect(self, client):
+        pass
+
+    async def send_message(self, client, message):
+        self.sent.append((client, message))
+
+    async def broadcast(self, clients, message):
+        for client in clients:
+            await self.send_message(client, message)
+        return []
+
+
+@pytest.mark.asyncio
+async def test_core_routes_messages_through_an_injected_transport():
+    transport = RecordingTransport()
+    server = NotificationServer(transport=transport)
+    client = object()
+    await server._on_connect(client)
+    await server.broadcast({"text": "hello"})
+
+    assert transport.server is server
+    assert [message["type"] for _, message in transport.sent] == ["system", "broadcast"]
+    await server.stop()
