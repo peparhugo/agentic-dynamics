@@ -8,6 +8,7 @@ import os
 import tempfile
 import shutil
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 from app import (
     app, TASKS_FILE, STORAGE_DIR, USERS_FILE,
     _load_tasks, _save_tasks, _load_users, _save_users,
@@ -49,7 +50,7 @@ def authenticated_client(client):
     """Create an authenticated test client with a registered user."""
     # Register a test user
     register_response = client.post('/auth/register',
-        json={"username": "testuser", "password": "testpass123"},
+        json={"username": "testuser", "password": "testpass123", "email": "testuser@example.com"},
         content_type='application/json'
     )
     assert register_response.status_code == 201
@@ -651,3 +652,209 @@ class TestIntegration:
         data2 = json.loads(resp2.data)
         assert len(data2) == 3
         assert data1 == data2
+
+
+class TestEmailNotification:
+    @patch('app.send_notification_email.delay')
+    def test_notification_sent_on_task_completion(self, mock_celery_task, authenticated_client):
+        """Test that email notification is triggered when task status changes to completed."""
+        # Create task
+        create_resp = authenticated_client.post('/tasks',
+            json={"title": "Important Task"},
+            content_type='application/json'
+        )
+        assert create_resp.status_code == 201
+        task_id = json.loads(create_resp.data)['id']
+
+        # Update task to completed
+        update_resp = authenticated_client.put(f'/tasks/{task_id}',
+            json={"status": "completed"},
+            content_type='application/json'
+        )
+        assert update_resp.status_code == 200
+
+        # Verify Celery task was called
+        assert mock_celery_task.called
+        # Get the call arguments
+        call_args = mock_celery_task.call_args
+        assert call_args is not None
+        email, title = call_args[0]
+        assert title == "Important Task"
+        assert "@" in email
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_not_sent_for_non_completion_update(self, mock_celery_task, authenticated_client):
+        """Test that notification is NOT triggered for non-completion status changes."""
+        # Create task
+        create_resp = authenticated_client.post('/tasks',
+            json={"title": "Task"},
+            content_type='application/json'
+        )
+        assert create_resp.status_code == 201
+        task_id = json.loads(create_resp.data)['id']
+
+        # Update task to in_progress (not completed)
+        update_resp = authenticated_client.put(f'/tasks/{task_id}',
+            json={"status": "in_progress"},
+            content_type='application/json'
+        )
+        assert update_resp.status_code == 200
+
+        # Verify Celery task was NOT called
+        assert not mock_celery_task.called
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_not_sent_for_title_only_update(self, mock_celery_task, authenticated_client):
+        """Test that notification is NOT triggered when only title is updated."""
+        # Create task
+        create_resp = authenticated_client.post('/tasks',
+            json={"title": "Old Title"},
+            content_type='application/json'
+        )
+        assert create_resp.status_code == 201
+        task_id = json.loads(create_resp.data)['id']
+
+        # Update only title
+        update_resp = authenticated_client.put(f'/tasks/{task_id}',
+            json={"title": "New Title"},
+            content_type='application/json'
+        )
+        assert update_resp.status_code == 200
+
+        # Verify Celery task was NOT called
+        assert not mock_celery_task.called
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_not_sent_if_already_completed(self, mock_celery_task, authenticated_client):
+        """Test that notification is NOT sent if task is already completed."""
+        # Create task
+        create_resp = authenticated_client.post('/tasks',
+            json={"title": "Task"},
+            content_type='application/json'
+        )
+        assert create_resp.status_code == 201
+        task_id = json.loads(create_resp.data)['id']
+
+        # First update to completed
+        update_resp1 = authenticated_client.put(f'/tasks/{task_id}',
+            json={"status": "completed"},
+            content_type='application/json'
+        )
+        assert update_resp1.status_code == 200
+        assert mock_celery_task.call_count == 1
+
+        # Second update (still completed but updating title)
+        update_resp2 = authenticated_client.put(f'/tasks/{task_id}',
+            json={"title": "Updated Title", "status": "completed"},
+            content_type='application/json'
+        )
+        assert update_resp2.status_code == 200
+
+        # Verify Celery task was called only once
+        assert mock_celery_task.call_count == 1
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_uses_correct_task_title(self, mock_celery_task, authenticated_client):
+        """Test that notification includes the correct task title."""
+        task_title = "Buy groceries and prepare dinner"
+        create_resp = authenticated_client.post('/tasks',
+            json={"title": task_title},
+            content_type='application/json'
+        )
+        assert create_resp.status_code == 201
+        task_id = json.loads(create_resp.data)['id']
+
+        # Update task to completed
+        update_resp = authenticated_client.put(f'/tasks/{task_id}',
+            json={"status": "completed"},
+            content_type='application/json'
+        )
+        assert update_resp.status_code == 200
+
+        # Verify the task title passed to Celery
+        assert mock_celery_task.called
+        call_args = mock_celery_task.call_args
+        email, title = call_args[0]
+        assert title == task_title
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_not_sent_without_user_email(self, mock_celery_task, client):
+        """Test that notification is not sent if user has no email."""
+        # Register user without email
+        register_resp = client.post('/auth/register',
+            json={"username": "nomail", "password": "password123"},
+            content_type='application/json'
+        )
+        assert register_resp.status_code == 201
+
+        # Login
+        login_resp = client.post('/auth/login',
+            json={"username": "nomail", "password": "password123"},
+            content_type='application/json'
+        )
+        assert login_resp.status_code == 200
+        token = json.loads(login_resp.data)['token']
+
+        # Create task
+        create_resp = client.post('/tasks',
+            json={"title": "Task"},
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert create_resp.status_code == 201
+        task_id = json.loads(create_resp.data)['id']
+
+        # Update task to completed
+        update_resp = client.put(f'/tasks/{task_id}',
+            json={"status": "completed"},
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert update_resp.status_code == 200
+
+        # Verify Celery task was NOT called (no email)
+        assert not mock_celery_task.called
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_uses_correct_user_email(self, mock_celery_task, client):
+        """Test that notification is sent to the correct user email."""
+        user_email = "alice@example.com"
+
+        # Register user with email
+        register_resp = client.post('/auth/register',
+            json={"username": "alice", "password": "password123", "email": user_email},
+            content_type='application/json'
+        )
+        assert register_resp.status_code == 201
+
+        # Login
+        login_resp = client.post('/auth/login',
+            json={"username": "alice", "password": "password123"},
+            content_type='application/json'
+        )
+        assert login_resp.status_code == 200
+        token = json.loads(login_resp.data)['token']
+
+        # Create task
+        create_resp = client.post('/tasks',
+            json={"title": "Alice's Task"},
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert create_resp.status_code == 201
+        task_id = json.loads(create_resp.data)['id']
+
+        # Update task to completed
+        update_resp = client.put(f'/tasks/{task_id}',
+            json={"status": "completed"},
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert update_resp.status_code == 200
+
+        # Verify Celery task was called with correct email
+        assert mock_celery_task.called
+        call_args = mock_celery_task.call_args
+        email, title = call_args[0]
+        assert email == user_email
+        assert title == "Alice's Task"

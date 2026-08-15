@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from celery_tasks import send_notification_email
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -97,8 +98,8 @@ def _get_next_user_id():
     return max(u['id'] for u in users) + 1
 
 
-def _create_user(username, password):
-    """Create a new user with hashed password."""
+def _create_user(username, password, email=None):
+    """Create a new user with hashed password and optional email."""
     if _get_user_by_username(username):
         return None, "Username already exists"
 
@@ -106,7 +107,8 @@ def _create_user(username, password):
     new_user = {
         'id': _get_next_user_id(),
         'username': username,
-        'password_hash': generate_password_hash(password)
+        'password_hash': generate_password_hash(password),
+        'email': email
     }
     users.append(new_user)
     _save_users(users)
@@ -159,46 +161,58 @@ def _require_auth(f):
 
 
 def _migrate_tasks_to_add_owner():
-    """Migrate existing tasks to have owner_id."""
+    """Migrate existing tasks to have owner_id and add email field to users."""
     tasks = _load_tasks()
     users = _load_users()
 
-    if not tasks or all('owner_id' in t for t in tasks):
-        return
+    tasks_migrated = False
+    if tasks and not all('owner_id' in t for t in tasks):
+        default_user_id = None
+        if users:
+            default_user_id = users[0]['id']
+        else:
+            user, _ = _create_user('admin', 'admin', 'admin@example.com')
+            default_user_id = user['id']
 
-    default_user_id = None
-    if users:
-        default_user_id = users[0]['id']
-    else:
-        user, _ = _create_user('admin', 'admin')
-        default_user_id = user['id']
+        for task in tasks:
+            if 'owner_id' not in task:
+                task['owner_id'] = default_user_id
 
-    for task in tasks:
-        if 'owner_id' not in task:
-            task['owner_id'] = default_user_id
+        _save_tasks(tasks)
+        tasks_migrated = True
 
-    _save_tasks(tasks)
+    users_migrated = False
+    if users and not all('email' in u for u in users):
+        for user in users:
+            if 'email' not in user:
+                user['email'] = f"{user['username']}@example.com"
+        _save_users(users)
+        users_migrated = True
+
+    return tasks_migrated or users_migrated
 
 
 # ── Endpoints ────────────────────────────────────────────────────
 
 @app.route('/auth/register', methods=['POST'])
 def register():
-    """Register a new user. Expects JSON: {username: str, password: str}"""
+    """Register a new user. Expects JSON: {username: str, password: str, email?: str}"""
     data = request.get_json(silent=True) or {}
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
+    email = data.get('email', '').strip() or None
 
     if not username or not password:
         return jsonify({"error": "missing username or password"}), 400
 
-    user, error = _create_user(username, password)
+    user, error = _create_user(username, password, email)
     if error:
         return jsonify({"error": error}), 409
 
     return jsonify({
         "id": user['id'],
-        "username": user['username']
+        "username": user['username'],
+        "email": user.get('email')
     }), 201
 
 
@@ -290,9 +304,17 @@ def update_task(user, task_id):
         if title:
             task['title'] = title
 
-    # Update status if provided
+    # Update status if provided and trigger notification if completed
     if 'status' in data:
-        task['status'] = data['status']
+        old_status = task.get('status')
+        new_status = data['status']
+        task['status'] = new_status
+
+        # Trigger email notification asynchronously when task is completed
+        if new_status == 'completed' and old_status != 'completed':
+            user_email = user.get('email')
+            if user_email:
+                send_notification_email.delay(user_email, task['title'])
 
     _save_tasks(tasks)
     return jsonify(task)
