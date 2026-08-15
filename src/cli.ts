@@ -2,6 +2,7 @@
 import path from 'path';
 import { Command } from 'commander';
 import { build } from './build';
+import { startServer } from './serve';
 
 const program = new Command();
 
@@ -19,6 +20,22 @@ program
     const templatesDir = path.resolve(process.cwd(), opts.templates);
     const result = build({ contentDir, outputDir, templatesDir });
     console.log(`Built ${result.pages.length} page(s) into ${outputDir}`);
+  });
+
+program
+  .command('serve')
+  .description('Start a live-reload development server')
+  .option('--content <dir>', 'content directory', './content')
+  .option('--output <dir>', 'output directory', './dist')
+  .option('--templates <dir>', 'templates directory', './templates')
+  .option('--port <port>', 'port to serve on', '3000')
+  .action(async (opts: { content: string; output: string; templates: string; port: string }) => {
+    const contentDir = path.resolve(process.cwd(), opts.content);
+    const outputDir = path.resolve(process.cwd(), opts.output);
+    const templatesDir = path.resolve(process.cwd(), opts.templates);
+    const port = parseInt(opts.port, 10);
+    const server = await startServer({ contentDir, outputDir, templatesDir, port });
+    console.log(`Dev server running at http://localhost:${server.port}`);
   });
 
 if (require.main === module) {

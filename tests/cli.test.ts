@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
+import { program } from '../src/cli';
 
 const CLI_ENTRY = path.join(__dirname, '..', 'src', 'cli.ts');
 const TS_NODE_REGISTER = require.resolve('ts-node/register/transpile-only');
@@ -108,4 +109,17 @@ Body content.`
 
     fs.rmSync(templatesDir, { recursive: true, force: true });
   }, 20000);
+});
+
+describe('ssg serve command registration', () => {
+  it('registers a serve command with content/output/templates/port options', () => {
+    const serveCommand = program.commands.find((cmd) => cmd.name() === 'serve');
+    expect(serveCommand).toBeDefined();
+
+    const optionFlags = serveCommand!.options.map((opt) => opt.long);
+    expect(optionFlags).toEqual(expect.arrayContaining(['--content', '--output', '--templates', '--port']));
+
+    const portOption = serveCommand!.options.find((opt) => opt.long === '--port');
+    expect(portOption?.defaultValue).toBe('3000');
+  });
 });

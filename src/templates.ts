@@ -133,3 +133,17 @@ export function getTemplateEngine(templatesDir: string): TemplateEngine {
   }
   return engine;
 }
+
+/**
+ * Drops cached TemplateEngine instances so the next getTemplateEngine() call
+ * recompiles layouts/partials from disk. Needed by long-lived processes (like
+ * the dev server) that rebuild after a template file changes; a one-shot
+ * `ssg build` never needs this since it exits after a single build.
+ */
+export function clearTemplateEngineCache(templatesDir?: string): void {
+  if (templatesDir) {
+    engineCache.delete(templatesDir);
+  } else {
+    engineCache.clear();
+  }
+}
