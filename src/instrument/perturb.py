@@ -686,16 +686,22 @@ def derive_seed(*parts: object) -> int:
     The seed is a pure function of the cell's identity fields: the canonical
     string form ``"|".join(str(p) for p in parts)`` is SHA-256-hashed and the
     first 8 hex digits are read as an integer — i.e.
-    ``int(sha256(f"{task}|{operator}|{strength}|{repetition}")[:8], 16)``.
+    ``int(sha256(f"{task}|{operator}|{strength}|{seed_variant}")[:8], 16)``.
 
-    Because the seed ignores loop order, model, and slot position, the same
-    cell always perturbs identically — and different models receive the
-    identical perturbed prompt, so cross-model drift is attributable to the
-    model, not to the perturbation. (This replaces the order-dependent
-    ``42 + run_idx`` that the audit's determinism section flagged.)
+    The last part is a *seed variant* — a deliberate "starting point" index.
+    Different variants produce different perturbed prompts (a deviated starting
+    point, measured against the same baseline); re-running the same variant
+    reproduces the identical prompt. Repetition is deliberately NOT a seed input:
+    it re-measures the same starting point to isolate model variance. Because the
+    seed ignores loop order, model, and slot position, the same cell always
+    perturbs identically — and different models receive the identical perturbed
+    prompt, so cross-model drift is attributable to the model, not to the
+    perturbation. (This replaces the order-dependent ``42 + run_idx`` that the
+    audit's determinism section flagged.)
 
     Example:
-        derive_seed(task, "invert_constraint", 0.5, 0)
+        derive_seed(task, "invert_constraint", 0.5, 0)   # starting point 0
+        derive_seed(task, "invert_constraint", 0.5, 1)   # a deviated starting point
     """
     canonical = "|".join(str(p) for p in parts)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()

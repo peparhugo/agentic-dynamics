@@ -30,7 +30,8 @@ from instrument.backends import run_agentic
 
 def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
                    timeout: int = 200, repetitions: int = 1,
-                   thinking_effort: str = "", backend: str = "auto"):
+                   thinking_effort: str = "", backend: str = "auto",
+                   seed_variant: int | None = None):
     """Run a complete experiment from a YAML config file."""
     import yaml
 
@@ -44,6 +45,12 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     if limit:
         operators = operators[:limit]
     strengths = cfg["strengths"]
+    # Starting-point variants: each variant is a DIFFERENT perturbation ("deviated
+    # starting point") measured against the same baseline; repetition re-measures the
+    # SAME variant (model variance only). seed_variant (singular) overrides the list.
+    seed_variants = cfg.get("seed_variants", [0])
+    if seed_variant is not None:
+        seed_variants = [seed_variant]
     model_id = model_override or cfg.get("model_id", "deepseek/deepseek-v4-pro")
     if model_override:
         model_label = model_override.split("/")[-1].replace(" ", "_").lower()
@@ -63,12 +70,12 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     results_dir = Path("experiments/results")
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    total = 1 + (len(operators) * len(strengths) * repetitions)
+    total = 1 + (len(operators) * len(strengths) * len(seed_variants) * repetitions)
     te_str = f" think={thinking_effort}" if thinking_effort else ""
     print(f"\n{'='*80}")
     print(f"Experiment: {name}  |  Model: {model_id}{te_str}")
     print(f"Task: {task[:100]}...")
-    print(f"Constraints: {len(constraints)}  |  Operators: {len(operators)} × {len(strengths)} strengths × {repetitions} reps")
+    print(f"Constraints: {len(constraints)}  |  Operators: {len(operators)} × {len(strengths)} strengths × {len(seed_variants)} variants × {repetitions} reps")
     if thinking_budget_tokens:
         print(f"Thinking budget: {thinking_budget_tokens}tok  |  Output limit: {output_token_limit or 'none'}  |  Standardized: {standardize}")
     print(f"Estimated runs: {total}  |  Timeout per run: {timeout}s")
@@ -85,21 +92,22 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     all_runs.append(base)
 
     run_idx = 0
-    total_perturbed = len(operators) * len(strengths) * repetitions
+    total_perturbed = len(operators) * len(strengths) * len(seed_variants) * repetitions
     for op_name in operators:
         for s in strengths:
-            for rep in range(repetitions):
-                run_idx += 1
-                r = _run_perturbed(task, constraints, op_name, s, base,
-                                   ops, model_id, run_idx, total_perturbed, timeout, name,
-                                   thinking_effort=thinking_effort,
-                                   thinking_budget_tokens=thinking_budget_tokens,
-                                   output_token_limit=output_token_limit,
-                                   silent_mode=silent_mode,
-                                   standardize=standardize, enforce_pytest=enforce_pytest,
-                                   backend=backend, rep=rep)
-                all_runs.append(r)
-                time.sleep(2)
+            for variant in seed_variants:
+                for rep in range(repetitions):
+                    run_idx += 1
+                    r = _run_perturbed(task, constraints, op_name, s, base,
+                                       ops, model_id, run_idx, total_perturbed, timeout, name,
+                                       thinking_effort=thinking_effort,
+                                       thinking_budget_tokens=thinking_budget_tokens,
+                                       output_token_limit=output_token_limit,
+                                       silent_mode=silent_mode,
+                                       standardize=standardize, enforce_pytest=enforce_pytest,
+                                       backend=backend, rep=rep, seed_variant=variant)
+                    all_runs.append(r)
+                    time.sleep(2)
 
     # Aggregation
     perturbed = [r for r in all_runs if r["type"] == "perturbed"]
@@ -180,11 +188,12 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
                    thinking_effort="", thinking_budget_tokens=0,
                    output_token_limit=0, silent_mode=None,
                    standardize=True, enforce_pytest=True, backend="auto",
-                   rep=0):
+                   rep=0, seed_variant=0):
     pert_class = ops[op_name].perturbation_class if op_name in ops else "?"
-    # Seed is a pure function of the cell (task|operator|strength|repetition),
+    # Seed is a pure function of the cell (task|operator|strength|seed_variant),
     # independent of loop order/model/run_idx — see derive_seed in perturb.py.
-    seed = derive_seed(task, op_name, strength, rep)
+    # repetition re-measures the SAME starting point; seed_variant deviates it.
+    seed = derive_seed(task, op_name, strength, seed_variant)
     perturbed, _ = perturb_prompt(task, op_name, strength=strength, rng_seed=seed)
     perturbed_prompt_sha256 = hashlib.sha256(perturbed.encode("utf-8")).hexdigest()
 
@@ -250,6 +259,8 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
         "type": "perturbed", "model": model_id,
         "operator": op_name, "perturbation_class": pert_class, "strength": strength,
         "rng_seed": seed,
+        "seed_variant": seed_variant,
+        "repetition": rep,
         "perturbed_prompt": perturbed,
         "perturbed_prompt_sha256": perturbed_prompt_sha256,
         "correctness": sol.correctness_score,
@@ -500,6 +511,8 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--timeout", type=int, default=200)
     parser.add_argument("--repetitions", type=int, default=1)
+    parser.add_argument("--seed-variant", type=int, default=None,
+                        help="override the starting-point variant (repetitions re-measure it)")
     parser.add_argument("--backend", choices=["auto", "opencode", "claude_cli"], default="auto",
                         help="Backend to execute runs (auto routes anthropic/* to claude_cli)")
     args = parser.parse_args()
@@ -508,4 +521,4 @@ if __name__ == "__main__":
         multi_model_compare(args.config, args.compare, args.timeout)
     else:
         run_experiment(args.config, args.model or "", args.limit, args.timeout, args.repetitions,
-                       backend=args.backend)
+                       backend=args.backend, seed_variant=args.seed_variant)

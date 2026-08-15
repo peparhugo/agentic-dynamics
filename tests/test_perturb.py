@@ -121,7 +121,7 @@ def test_determinism_same_seed_same_output(op_name):
 
 
 def test_cross_model_same_cell_same_seed():
-    """A cell's seed is a pure function of (task, operator, strength, repetition).
+    """A cell's seed is a pure function of (task, operator, strength, seed_variant).
 
     derive_seed takes no model argument, so two models running the same cell get
     the same seed. We also lock the exact formula so any accidental change to
@@ -130,17 +130,34 @@ def test_cross_model_same_cell_same_seed():
     task = "Build a REST API"
     operator = "invert_constraint"
     strength = 0.5
-    repetition = 0
+    variant = 0
 
-    seed = derive_seed(task, operator, strength, repetition)
+    seed = derive_seed(task, operator, strength, variant)
     expected = int(
         hashlib.sha256(
-            f"{task}|{operator}|{strength}|{repetition}".encode("utf-8")
+            f"{task}|{operator}|{strength}|{variant}".encode("utf-8")
         ).hexdigest()[:8],
         16,
     )
     assert seed == expected
-    assert seed == derive_seed(task, operator, strength, repetition)
+    assert seed == derive_seed(task, operator, strength, variant)
+
+
+def test_seed_variant_deviates_starting_point():
+    """A deviated starting point (new seed_variant) yields a distinct seed.
+
+    repetition is deliberately NOT a seed input, so re-measuring a cell
+    reproduces the same starting point (see test_cross_model_same_cell_same_seed
+    and test_determinism_same_seed_same_output), while each seed_variant level
+    yields a distinct seed — and therefore a distinct perturbed prompt for any
+    seed-sensitive operator — measured against the same baseline.
+    """
+    task = "Build a REST API with JWT authentication."
+    op = "invert_constraint"
+    strength = 0.5
+
+    variants = [derive_seed(task, op, strength, v) for v in range(4)]
+    assert len(set(variants)) == 4  # every variant yields a distinct starting point
 
 
 @pytest.mark.parametrize("op_name", _OPERATOR_NAMES)
