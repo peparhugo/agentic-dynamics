@@ -6,6 +6,7 @@ describe('parseArgs', () => {
     expect(command).toBe('build');
     expect(options.contentDir).toBe('content');
     expect(options.outputDir).toBe('dist');
+    expect(options.templatesDir).toBe('templates');
   });
 
   it('parses --content and --output', () => {
@@ -21,10 +22,16 @@ describe('parseArgs', () => {
     expect(options.outputDir).toBe('public');
   });
 
+  it('parses --templates', () => {
+    const { options } = parseArgs(['build', '--templates', 'theme']);
+    expect(options.templatesDir).toBe('theme');
+  });
+
   it('supports = syntax', () => {
-    const { options } = parseArgs(['build', '--content=posts', '--output=site']);
+    const { options } = parseArgs(['build', '--content=posts', '--output=site', '--templates=theme']);
     expect(options.contentDir).toBe('posts');
     expect(options.outputDir).toBe('site');
+    expect(options.templatesDir).toBe('theme');
   });
 
   it('throws for unknown arguments', () => {

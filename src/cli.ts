@@ -3,6 +3,7 @@ import { BuildOptions } from './types';
 
 const DEFAULT_CONTENT_DIR = 'content';
 const DEFAULT_OUTPUT_DIR = 'dist';
+const DEFAULT_TEMPLATES_DIR = 'templates';
 
 export interface CliArgs {
   command: string;
@@ -10,20 +11,22 @@ export interface CliArgs {
 }
 
 function usage(): string {
-  return `Usage: ssg build [--content <dir>] [--output <dir>]
+  return `Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]
 
 Build a static site from Markdown files.
 
 Options:
-  --content <dir>  Content directory containing Markdown files (default: ./content)
-  --output <dir>   Output directory for generated HTML (default: ./dist)
-  --help           Show this help message`;
+  --content <dir>   Content directory containing Markdown files (default: ./content)
+  --output <dir>    Output directory for generated HTML (default: ./dist)
+  --templates <dir> Templates directory with .hbs templates, layouts/, and partials/ (default: ./templates)
+  --help            Show this help message`;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
   const options: BuildOptions = {
     contentDir: DEFAULT_CONTENT_DIR,
     outputDir: DEFAULT_OUTPUT_DIR,
+    templatesDir: DEFAULT_TEMPLATES_DIR,
   };
   let command = 'build';
   let seenPositional = false;
@@ -48,6 +51,11 @@ export function parseArgs(argv: string[]): CliArgs {
       options.outputDir = inlineValue ?? argv[++i];
       if (!options.outputDir) {
         throw new Error('--output requires a directory argument');
+      }
+    } else if (flag === '--templates') {
+      options.templatesDir = inlineValue ?? argv[++i];
+      if (!options.templatesDir) {
+        throw new Error('--templates requires a directory argument');
       }
     } else if (arg.startsWith('-')) {
       throw new Error(`unknown argument: ${arg}`);

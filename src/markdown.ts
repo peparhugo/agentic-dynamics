@@ -29,6 +29,9 @@ export function parseMarkdown(source: string, sourcePath: string, slug: string):
     content: gm.content,
     html,
     sourcePath,
+    data: merged,
+    template: readString(merged.template),
+    layout: readString(merged.layout),
   };
 }
 

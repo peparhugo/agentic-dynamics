@@ -2,7 +2,10 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { parseMarkdown } from './markdown';
 import { renderIndexHtml, renderPageHtml } from './render';
+import { loadTemplates, renderIndexTemplate, renderPageTemplate, TemplateBundle } from './templates';
 import { BuildOptions, Page } from './types';
+
+const DEFAULT_TEMPLATES_DIR = 'templates';
 
 const CONTENT_EXTENSIONS = ['.md', '.markdown', '.mdown'];
 
@@ -61,17 +64,33 @@ async function dirExists(dir: string): Promise<boolean> {
   }
 }
 
+function renderPageForBuild(page: Page, bundle: TemplateBundle): string {
+  if (!bundle.exists) {
+    if (page.template) {
+      throw new Error(`template not found: "${page.template}" (no templates directory configured)`);
+    }
+    return renderPageHtml(page);
+  }
+  return renderPageTemplate(page, bundle);
+}
+
+function renderIndexForBuild(pages: Page[], bundle: TemplateBundle): string {
+  return renderIndexTemplate(pages, bundle) ?? renderIndexHtml(pages);
+}
+
 export async function build(options: BuildOptions): Promise<Page[]> {
-  const { contentDir, outputDir } = options;
+  const { contentDir, outputDir, templatesDir = DEFAULT_TEMPLATES_DIR } = options;
   const pages = await readPages(contentDir);
   await fs.mkdir(outputDir, { recursive: true });
 
+  const bundle = await loadTemplates(templatesDir);
+
   for (const page of pages) {
-    const html = renderPageHtml(page);
+    const html = renderPageForBuild(page, bundle);
     await fs.writeFile(path.join(outputDir, `${page.slug}.html`), html, 'utf8');
   }
 
-  const indexHtml = renderIndexHtml(pages);
+  const indexHtml = renderIndexForBuild(pages, bundle);
   await fs.writeFile(path.join(outputDir, 'index.html'), indexHtml, 'utf8');
 
   return pages;
