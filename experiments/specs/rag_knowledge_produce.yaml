@@ -1,0 +1,163 @@
+name: rag_knowledge_produce
+question: >-
+  Implement the missing producer edge of the async knowledge spine: the code that turns a measured
+  run result into a KnowledgeRecord + a pointer-only KnowledgeEvent and emits it into the change
+  stream (kb:v1:changes), so the consumers (kb-chroma-v1 / kb-neo4j-v1 / kb-ledger-v1) have
+  something to drain. Then run it once against the current measured corpus to give the spine its
+  first heartbeat. The retrieval/constructor/identity core and the consumer side already exist on
+  main; only the producer is missing.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      brief: >-
+        This completes the async spine end-to-end. The consumer side (knowledge_stream.py +
+        scripts/kb_worker.py) is built and on main; retrieval/constructor/identity are built. The
+        producer is the missing edge: measured result -> KnowledgeRecord -> KnowledgeEvent -> stream.
+        Do NOT modify the consumer side or the retrieval/constructor core. This is a batch producer
+        (reads the measured corpus, emits idempotently) — a run-path hook (emit on run completion) is
+        a later step, not this spec. Async is the target architecture: do not collapse it to
+        synchronous writes.
+      isolation: >-
+        Redis 127.0.0.1:FINOPS_REDIS_PORT (6380) DB 2 ONLY, keys kb:v1:*. Never 6379, never DB 1
+        (the story queue). Neo4j (7687) is SHARED — MERGE-only, never clear_all. Chroma uses the
+        knowledge_chunks_v1 collection only, never session_embeddings. Verify no other kb_worker.py
+        is running before starting consumers.
+      prior_art:
+        - src/instrument/knowledge.py          # Authority, KnowledgeRecord, KnowledgeEvent, compute_*_id
+        - src/instrument/retrieval.py          # build_evidence_cards (the finding unit)
+        - src/instrument/signal_store.py       # load_results (the measured-corpus reader)
+        - src/instrument/knowledge_stream.py   # connect, publish_event, CHECKPOINT_KEY, CONSUMER_GROUPS
+        - scripts/kb_worker.py                 # the consumer side (structurally parallel)
+    phases:
+      - name: derive
+        kind: agent
+        prompt: |
+          Implement src/instrument/knowledge_ingestion.py — the producer-side derivation (the richer
+          measured-result extractor that supersedes knowledge_stream.default_extract). Deliver it plus
+          tests/test_knowledge_ingestion.py.
+
+          READ FIRST:
+          - src/instrument/knowledge.py      (Authority, KnowledgeRecord, KnowledgeEvent,
+            compute_entity_id(), compute_knowledge_id(), compute_content_hash(), SCHEMA_VERSION="kb/v1",
+            OPERATIONS={upsert,supersede,delete})
+          - src/instrument/retrieval.py      (build_evidence_cards — the one-line finding unit)
+          - src/instrument/signal_store.py   (load_results — the _results_summary.json entries)
+          - src/instrument/knowledge_stream.py (default_extract — the placeholder you are replacing)
+
+          REQUIREMENTS:
+          - EXTRACTOR_VERSION = "measured-finding/v1". Bumping it yields a new knowledge_id for the
+            same finding (a new extractor generation), so it must be stable and explicit.
+          - build_record(entry: dict) -> KnowledgeRecord: derive ONE measured-finding record from a
+            _results_summary.json entry:
+              text      = the evidence-card one-liner (reuse build_evidence_cards' rendering over
+                          model/operator/correctness/cost/flail, plus confidence / perturbation_strength /
+                          test_executed_success when measured — "confidence —" when absent, "tests FAIL
+                          (unverified)" when False).
+              entity_id = compute_entity_id(repository_id, source_uri, logical_locator)
+              content_hash = compute_content_hash(text)
+              knowledge_id = compute_knowledge_id(entity_id, source_revision, content_hash, EXTRACTOR_VERSION)
+              authority = Authority.MEASURED; evidence_class = "[M]"
+              source_uri = durable locator (e.g. file://experiments/results/_results_summary.json);
+              logical_locator = run_id / worktree_name; source_revision = the entry's commit/git_sha
+              or a result-version string when absent (document which).
+              Carry test_executed_success, confidence, perturbation_strength, outcome_id through from
+              the entry; set valid_from/observed_at/indexed_at, acl_scope, and token_count consistently.
+          - record_to_event(record) -> KnowledgeEvent: a POINTER-only event (knowledge_id, entity_id,
+            operation="upsert", source_uri, source_revision, content_hash, occurred_at=now-iso,
+            schema_version=SCHEMA_VERSION). Deliberately no text/body — mirror KnowledgeEvent's docstring.
+          - derive_records(entries) -> list[KnowledgeRecord]: build_evidence_cards(entries) then
+            build_record each (narration_failure / correctness<0 are already skipped upstream).
+          - Leave knowledge_stream.default_extract in place as the fallback; document that
+            knowledge_ingestion is the measured-result path.
+
+          TESTS: tests/test_knowledge_ingestion.py — ids stable across call sites; authority=MEASURED;
+          event carries no body; confidence/perturbation_strength/test_executed_success carried through;
+          content_hash recomputes from text; extractor-version bump changes knowledge_id. Run green.
+          Update src/instrument/__init__.py exports.
+      - name: produce
+        kind: agent
+        prompt: |
+          Implement scripts/kb_produce.py — the batch producer CLI.
+
+          READ FIRST:
+          - src/instrument/knowledge_ingestion.py (derive_records, record_to_event)
+          - src/instrument/knowledge_stream.py    (connect, publish_event, CHECKPOINT_KEY, REDIS_DB)
+          - scripts/kb_worker.py                  (consumer side; structurally parallel)
+
+          REQUIREMENTS:
+          - Flags: --dry-run (report would-emit count, touch nothing), --limit N (cap emits),
+            --results PATH (default _results_summary.json), --repository-id (default "agentic-dynamics").
+          - Flow: load_results(PATH) -> derive_records -> for each record: skip if its knowledge_id is
+            already emitted (Redis DB 2 CHECKPOINT_KEY HGET; also dedupe in-process); else
+            publish_event(connect(), record_to_event(record)) then HSET the checkpoint. Idempotent:
+            re-running emits nothing new (knowledge_id is the idempotence key).
+          - Isolation: 127.0.0.1:FINOPS_REDIS_PORT (6380) DB 2 only. Never 6379, never DB 1. Fail fast
+            (raise) on connection error, matching knowledge_stream.connect.
+          - --dry-run prints the count + a few sample records WITHOUT touching Redis.
+          - Match scripts/worker.py conventions: sys.path.insert(src), argparse, a log() helper.
+
+          TESTS: add a dry-run smoke to tests/test_knowledge_ingestion.py (no live Redis required)
+          and any pure-logic tests. Run green.
+      - name: run
+        kind: agent
+        prompt: |
+          Give the spine its first heartbeat: produce events, drain the consumers, verify the stores.
+          Stop at the first failure and report it — do not paper over a dead consumer.
+
+          ORDER (strict):
+          1. python scripts/kb_produce.py --dry-run   → record the would-emit count.
+          2. python scripts/kb_produce.py --limit 5   → emit 5 events for real; confirm they land in
+             kb:v1:changes (XLEN).
+          3. Drain each consumer ONCE:
+               python scripts/kb_worker.py --group kb-chroma-v1 --once
+               python scripts/kb_worker.py --group kb-neo4j-v1 --once
+               python scripts/kb_worker.py --group kb-ledger-v1 --once
+          4. Verify: stream pending == 0; Chroma knowledge_chunks_v1 has ~5 docs; Neo4j Knowledge node
+             count grew; CHECKPOINT_KEY has the 5 knowledge_ids; nothing dead-lettered.
+          5. ONLY if 1-4 pass: python scripts/kb_produce.py  (full emit) and drain all three groups
+             again; record final counts.
+          6. Report the pipeline record: emitted count, per-consumer upserts, end-to-end lag, and any
+             dead-lettered events.
+
+          ISOLATION (load-bearing): Redis DB 2 only; Neo4j SHARED (MERGE-only, never clear_all);
+          Chroma knowledge_chunks_v1 only. Confirm no other kb_worker.py is running before step 3.
+      - name: verify
+        kind: agent
+        prompt: >
+          Scoped verification — do NOT run the full `pytest .` suite. Run only
+          tests/test_knowledge_ingestion.py tests/test_knowledge.py tests/test_retrieval.py
+          tests/test_knowledge_stream.py -q, plus an import smoke of instrument.knowledge_ingestion
+          and scripts/kb_produce.py. Re-assert the produce->consume record is consistent (no
+          dead-lettered events, idempotence holds on a second --dry-run). Leave green.
+      - name: docs
+        kind: agent
+        prompt: >
+          Sync the agent-facing surfaces (standard closing step — do not skip). Update BOTH surfaces
+          in lockstep:
+          - .opencode/instructions/mental-model.md AND .claude/rules/mental-model.md: add
+            knowledge_ingestion.py to the Runtime RAG module map (with derive_records/build_record/
+            record_to_event signatures) and the producer data flow line (measured result -> derive ->
+            KnowledgeEvent -> stream -> consumers).
+          - .opencode/agents/instrument-dev.md AND .claude/agents/instrument-dev.md: bump the module
+            count (knowledge_ingestion.py) and add it to the RAG module list.
+          - src/instrument/CONTEXT.md (Runtime RAG section): add knowledge_ingestion.py row.
+          - scripts/CONTEXT.md: add the kb_produce.py row (structurally parallel to kb_worker.py).
+          - experiments/CONTEXT.md (specs/ section): note the RAG spec set (rag_knowledge_base,
+            rag_knowledge_base_build, rag_knowledge_base_wire, rag_knowledge_base_reconcile,
+            rag_knowledge_produce) as the runtime-RAG workflow family.
+          Keep the two surfaces in lockstep.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
