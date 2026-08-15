@@ -19,6 +19,7 @@ import time
 import jwt
 
 from notifications import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -105,6 +106,10 @@ def _migrate_add_columns():
         conn.commit()
 
 
+user_repo = UserRepository(get_db)
+task_repo = TaskRepository(get_db)
+
+
 # ── Auth Utilities ──────────────────────────────────────────────
 
 def hash_password(password: str) -> str:
@@ -140,11 +145,7 @@ def get_user_from_token(token: str) -> dict | None:
         user_id = int(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError, TypeError):
         return None
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-    return dict(row) if row else None
+    return user_repo.find_by_id(user_id)
 
 
 def require_auth(f):
@@ -176,19 +177,16 @@ def register():
         return jsonify({"error": "username and password required"}), 400
     if len(password) < 8:
         return jsonify({"error": "password must be at least 8 characters"}), 400
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        if existing:
-            return jsonify({"error": "username already taken"}), 409
-        now = datetime.now(timezone.utc).isoformat()
-        conn.execute(
-            "INSERT INTO users (username, password_hash, role, email, created_at) "
-            "VALUES (?, ?, 'user', ?, ?)",
-            (username, hash_password(password), email, now),
-        )
-        conn.commit()
+    if user_repo.find_by_username(username):
+        return jsonify({"error": "username already taken"}), 409
+    now = datetime.now(timezone.utc).isoformat()
+    user_repo.create(
+        username=username,
+        password_hash=hash_password(password),
+        role="user",
+        email=email,
+        created_at=now,
+    )
     return jsonify({"message": "user registered", "username": username}), 201
 
 
@@ -199,20 +197,13 @@ def login():
     password = data.get("password", "")
     if not username or not password:
         return jsonify({"error": "username and password required"}), 400
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        user = None
-        if row is not None and verify_password(password, row["password_hash"]):
-            user = dict(row)
-            if _is_legacy_hash(row["password_hash"]):
-                # Lazily upgrade legacy sha256 hashes to werkzeug's scheme on successful login.
-                conn.execute(
-                    "UPDATE users SET password_hash = ? WHERE id = ?",
-                    (hash_password(password), user["id"]),
-                )
-                conn.commit()
+    row = user_repo.find_by_username(username)
+    user = None
+    if row is not None and verify_password(password, row["password_hash"]):
+        user = row
+        if _is_legacy_hash(row["password_hash"]):
+            # Lazily upgrade legacy sha256 hashes to werkzeug's scheme on successful login.
+            user_repo.update(user["id"], password_hash=hash_password(password))
     if user is None:
         return jsonify({"error": "invalid credentials"}), 401
     token = create_token(user["id"], user["username"])
@@ -227,12 +218,7 @@ tasks_bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 @tasks_bp.route("", methods=["GET"])
 @require_auth
 def list_tasks(user: dict):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (user["id"],),
-        ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(task_repo.find_by_owner(user["id"]))
 
 
 @tasks_bp.route("", methods=["POST"])
@@ -242,77 +228,57 @@ def create_task(user: dict):
     name = data.get("name", "").strip()
     if not name:
         return jsonify({"error": "name is required"}), 400
-    with get_db() as conn:
-        now = datetime.now(timezone.utc).isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (owner_id, name, description, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (user["id"], name, data.get("description", ""), now),
-        )
-        conn.commit()
-        return jsonify({
-            "id": cursor.lastrowid,
-            "name": name,
-            "description": data.get("description", ""),
-            "status": "pending",
-            "created_at": now,
-        }), 201
+    now = datetime.now(timezone.utc).isoformat()
+    description = data.get("description", "")
+    task_id = task_repo.create(
+        owner_id=user["id"], name=name, description=description, created_at=now
+    )
+    return jsonify({
+        "id": task_id,
+        "name": name,
+        "description": description,
+        "status": "pending",
+        "created_at": now,
+    }), 201
 
 
 @tasks_bp.route("/<int:task_id>", methods=["GET"])
 @require_auth
 def get_task(user: dict, task_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user["id"]),
-        ).fetchone()
+    row = task_repo.find_by_id_and_owner(task_id, user["id"])
     if row is None:
         return jsonify({"error": "task not found"}), 404
-    return jsonify(dict(row))
+    return jsonify(row)
 
 
 @tasks_bp.route("/<int:task_id>", methods=["PUT"])
 @require_auth
 def update_task(user: dict, task_id: int):
     data = request.get_json(silent=True) or {}
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user["id"]),
-        ).fetchone()
-        if row is None:
-            return jsonify({"error": "task not found"}), 404
+    row = task_repo.find_by_id_and_owner(task_id, user["id"])
+    if row is None:
+        return jsonify({"error": "task not found"}), 404
 
-        name = data.get("name", row["name"])
-        description = data.get("description", row["description"])
-        status = data.get("status", row["status"])
+    name = data.get("name", row["name"])
+    description = data.get("description", row["description"])
+    status = data.get("status", row["status"])
 
-        conn.execute(
-            "UPDATE tasks SET name = ?, description = ?, status = ? WHERE id = ?",
-            (name, description, status, task_id),
-        )
-        conn.commit()
-        updated = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    task_repo.update(task_id, name=name, description=description, status=status)
+    updated = task_repo.find_by_id(task_id)
 
     if status == "completed" and row["status"] != "completed":
         send_notification_email.delay(user["email"], updated["name"])
 
-    return jsonify(dict(updated))
+    return jsonify(updated)
 
 
 @tasks_bp.route("/<int:task_id>", methods=["DELETE"])
 @require_auth
 def delete_task(user: dict, task_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT id FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user["id"]),
-        ).fetchone()
-        if row is None:
-            return jsonify({"error": "task not found"}), 404
-        conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-        conn.commit()
+    row = task_repo.find_by_id_and_owner(task_id, user["id"])
+    if row is None:
+        return jsonify({"error": "task not found"}), 404
+    task_repo.delete(task_id)
     return jsonify({"message": "task deleted"})
 
 
@@ -326,11 +292,7 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 def list_users(user: dict):
     if user.get("role") != "admin":
         return jsonify({"error": "admin access required"}), 403
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT id, username, role, created_at FROM users ORDER BY created_at"
-        ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(user_repo.find_summary_all())
 
 
 # ── Register Blueprints ─────────────────────────────────────────
