@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { buildSite } from './build';
+import { buildSiteWithStats } from './build';
 import { startDevServer } from './server';
 
 function option(args: string[], name: string): string | undefined {
@@ -21,8 +21,11 @@ function portOption(args: string[]): number | undefined {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args[0] === 'build') {
-    const pages = await buildSite(option(args, '--content'), option(args, '--output'));
-    process.stdout.write(`Generated ${pages.length} page(s).\n`);
+    const result = await buildSiteWithStats(option(args, '--content'), option(args, '--output'), undefined, undefined, {
+      incremental: args.includes('--incremental'),
+      clean: args.includes('--clean'),
+    });
+    process.stdout.write(`Generated ${result.pages.length} page(s). Built ${result.stats.pagesBuilt}, skipped ${result.stats.pagesSkipped}, time saved ${result.stats.timeSavedMs}ms.\n`);
     return;
   }
   if (args[0] === 'serve') {
@@ -30,7 +33,7 @@ async function main(): Promise<void> {
     process.stdout.write(`Serving on http://localhost:${server.port}\n`);
     return;
   }
-  throw new Error('Usage: ssg build [--content <dir>] [--output <dir>] | ssg serve [--port <port>] [--content <dir>] [--output <dir>]');
+  throw new Error('Usage: ssg build [--incremental] [--clean] [--content <dir>] [--output <dir>] | ssg serve [--port <port>] [--content <dir>] [--output <dir>]');
 }
 
 main().catch((error: unknown) => {

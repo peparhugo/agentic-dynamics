@@ -22,6 +22,21 @@ export interface BuildOptions {
   contentDirectory?: string;
   outputDirectory?: string;
   templatesDirectory?: string;
+  /** Reuse unchanged pages recorded in the output cache manifest. */
+  incremental?: boolean;
+  /** Remove all generated output and ignore any existing cache manifest. */
+  clean?: boolean;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
+}
+
+export interface BuildResult {
+  pages: Page[];
+  stats: BuildStats;
 }
 
 export interface BuildContext {

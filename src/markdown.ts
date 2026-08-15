@@ -2,6 +2,8 @@ import matter from 'gray-matter';
 import { marked } from 'marked';
 import { PageMetadata } from './types';
 
+const parsedMarkdownCache = new Map<string, { metadata: PageMetadata; html: string }>();
+
 function parseYamlValue(value: string): string | string[] {
   const trimmed = value.trim();
   if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
@@ -28,6 +30,9 @@ function extractYamlFrontmatter(source: string): { data: Record<string, string |
 }
 
 export function parseMarkdown(source: string, fallbackTitle: string): { metadata: PageMetadata; html: string } {
+  const cacheKey = `${fallbackTitle}\0${source}`;
+  const cached = parsedMarkdownCache.get(cacheKey);
+  if (cached) return { metadata: { ...cached.metadata, tags: [...cached.metadata.tags] }, html: cached.html };
   const yaml = extractYamlFrontmatter(source);
   // gray-matter remains responsible for its native JSON frontmatter format.
   const parsed = matter(yaml.content);
@@ -39,8 +44,10 @@ export function parseMarkdown(source: string, fallbackTitle: string): { metadata
       ? rawTags.split(',').map((tag) => tag.trim()).filter(Boolean)
       : [];
 
-  return {
+  const result = {
     metadata: { ...data, title: typeof data.title === 'string' ? data.title : fallbackTitle, date: typeof data.date === 'string' ? data.date : undefined, tags },
     html: marked.parse(parsed.content)
   };
+  parsedMarkdownCache.set(cacheKey, result);
+  return { metadata: { ...result.metadata, tags: [...result.metadata.tags] }, html: result.html };
 }
