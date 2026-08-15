@@ -190,3 +190,140 @@ async def test_invalid_base64_frame_reports_error(server, client_factory):
     msg = await recv_message(ws)
     assert msg["type"] == "system"
     assert "error" in msg["payload"]
+
+
+# ── Channels ─────────────────────────────────────────────────
+
+
+async def _wait_for_channel(app, name, count):
+    for _ in range(100):
+        if app.channels.counts().get(name, 0) == count:
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError(f"channel {name!r} never reached count {count}")
+
+
+async def test_subscribe_receives_only_channel_broadcast(server, client_factory):
+    app, _ = server
+    ws1 = await client_factory()
+    ws2 = await client_factory()
+    await recv_message(ws1)
+    await recv_message(ws2)
+
+    await send_message(ws1, {"type": "subscribe", "payload": {"channel": "alerts"}})
+    await _wait_for_channel(app, "alerts", 1)
+
+    await send_message(
+        ws2, {"type": "broadcast", "channel": "alerts", "payload": {"text": "hello"}}
+    )
+
+    msg = await recv_message(ws1)
+    assert msg["type"] == "broadcast"
+    assert msg["channel"] == "alerts"
+    assert msg["payload"]["text"] == "hello"
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(recv_message(ws2), timeout=0.3)
+
+
+async def test_unsubscribe_stops_delivery(server, client_factory):
+    app, _ = server
+    ws1 = await client_factory()
+    ws2 = await client_factory()
+    await recv_message(ws1)
+    await recv_message(ws2)
+
+    await send_message(ws1, {"type": "subscribe", "payload": {"channel": "alerts"}})
+    await _wait_for_channel(app, "alerts", 1)
+
+    await send_message(ws1, {"type": "unsubscribe", "payload": {"channel": "alerts"}})
+    await _wait_for_channel(app, "alerts", 0)
+
+    await send_message(
+        ws2, {"type": "broadcast", "channel": "alerts", "payload": {"text": "gone"}}
+    )
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(recv_message(ws1), timeout=0.3)
+
+
+async def test_client_can_subscribe_to_multiple_channels(server, client_factory):
+    app, _ = server
+    ws1 = await client_factory()
+    ws2 = await client_factory()
+    await recv_message(ws1)
+    await recv_message(ws2)
+
+    await send_message(ws1, {"type": "subscribe", "channel": "alerts"})
+    await send_message(ws1, {"type": "subscribe", "channel": "chat"})
+    await _wait_for_channel(app, "alerts", 1)
+    await _wait_for_channel(app, "chat", 1)
+
+    await send_message(
+        ws2, {"type": "broadcast", "channel": "alerts", "payload": {"text": "a"}}
+    )
+    await send_message(
+        ws2, {"type": "broadcast", "channel": "chat", "payload": {"text": "c"}}
+    )
+
+    msg_a = await recv_message(ws1)
+    msg_c = await recv_message(ws1)
+    assert msg_a["payload"]["text"] == "a"
+    assert msg_c["payload"]["text"] == "c"
+
+
+async def test_broadcast_without_channel_still_reaches_all(server, client_factory):
+    app, _ = server
+    ws1 = await client_factory()
+    ws2 = await client_factory()
+    await recv_message(ws1)
+    await recv_message(ws2)
+
+    await send_message(ws1, {"type": "subscribe", "payload": {"channel": "alerts"}})
+    await _wait_for_channel(app, "alerts", 1)
+
+    await send_message(ws1, {"type": "broadcast", "payload": {"text": "all"}})
+
+    for ws in (ws1, ws2):
+        msg = await recv_message(ws)
+        assert msg["type"] == "broadcast"
+        assert msg["payload"]["text"] == "all"
+
+
+async def test_channels_endpoint_lists_counts(server, client_factory):
+    app, _ = server
+    ws1 = await client_factory()
+    ws2 = await client_factory()
+    ws3 = await client_factory()
+    await recv_message(ws1)
+    await recv_message(ws2)
+    await recv_message(ws3)
+
+    await send_message(ws1, {"type": "subscribe", "payload": {"channel": "alerts"}})
+    await send_message(ws2, {"type": "subscribe", "payload": {"channel": "alerts"}})
+    await send_message(ws3, {"type": "subscribe", "payload": {"channel": "chat"}})
+    await _wait_for_channel(app, "alerts", 2)
+    await _wait_for_channel(app, "chat", 1)
+
+    _, port = server
+    status, body = parse_http(await http_get(port, "/channels"))
+    assert status == 200
+    data = json.loads(body)
+    assert data == {"alerts": 2, "chat": 1}
+
+
+async def test_channel_subscribers_endpoint_lists_ids(server, client_factory):
+    app, _ = server
+    ws1 = await client_factory()
+    ws2 = await client_factory()
+    id1 = (await recv_message(ws1))["payload"]["client_id"]
+    await recv_message(ws2)
+
+    await send_message(ws1, {"type": "subscribe", "payload": {"channel": "alerts"}})
+    await _wait_for_channel(app, "alerts", 1)
+
+    _, port = server
+    status, body = parse_http(await http_get(port, "/channels/alerts/subscribers"))
+    assert status == 200
+    data = json.loads(body)
+    assert data == [id1]
