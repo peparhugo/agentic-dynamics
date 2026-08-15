@@ -7,7 +7,7 @@
     "total_lines_added": 7284,
     "total_lines_removed": 441,
     "net_lines": 6843,
-    "average_convention_score": 0.53
+    "average_convention_score": 0.562
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
-        "bugs_delta": 2,
-        "smells_delta": 3,
-        "complexity_delta": 45,
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.562,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -145,14 +145,14 @@
         "lines_removed": 27
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 28,
-        "duplications_delta": 2.9
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.562,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -262,14 +262,14 @@
         "lines_removed": 8
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 62,
-        "duplications_delta": -1.0
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.562,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -379,14 +379,14 @@
         "lines_removed": 403
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 30,
-        "duplications_delta": -0.3999999999999999
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.562,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -496,14 +496,14 @@
         "lines_removed": 3
       },
       "sonar": {
-        "available": true,
-        "bugs_delta": 1,
+        "available": false,
+        "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 68,
-        "duplications_delta": -0.3999999999999999
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.562,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -598,9 +598,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "tsc",
-      "errors": 1,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -671,7 +671,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8344,
+      "strategy_score": 0.9844,
       "exploration_premium": 9.9962,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.73) and found a novel correct solution (novelty=0.90, correctness=100%). Cost: $0.0897, ~0J.",

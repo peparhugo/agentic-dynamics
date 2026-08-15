@@ -1,0 +1,141 @@
+name: queue_steer
+question: >-
+  When the story queue is provider-blocked (a run of same-provider cells that makes N
+  concurrent workers hammer one provider's rate limit), can a reusable operation detect the
+  imbalance, interrupt the workers, re-interleave the queue round-robin, and respawn a
+  provider-bounded worker set — the "interrupt + re-interleave + continue" queue-level steer?
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool:
+      - deepseek/deepseek-v4-flash
+    context:
+      motivation: >-
+        On 2026-08-15 the remediation workflow's rerun phase enqueued ~33 cells in a
+        single-provider block (no --interleave), and 6-8 workers hammered one provider. The
+        manual fix (code: kill workers -> round-robin reorder -> respawn) is the operation this
+        spec generalizes. See code_reviews/2026-08-15_self-healing-remediation-finding.md.
+      queue_semantics: >-
+        Redis `story_jobs` (127.0.0.1:6380 db 1). enqueue.py rpush; worker.py brpop — the queue
+        is consumed from the TAIL, so the re-interleave must ensure CONSECUTIVE list elements are
+        different providers (round-robin), which guarantees concurrent workers spread whether
+        consumed FIFO or LIFO.
+      provider_rotation: >-
+        HARD CONSTRAINT — respawn at most (distinct provider count) workers, and re-enqueue with
+        `enqueue.py --interleave` for future fills. Never a single-provider block.
+    phases:
+      - name: detect
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Detect queue imbalance and plan the re-interleave.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - scripts/monitor.py (queue status; REDIS on 127.0.0.1:6380 db 1, key story_jobs)
+          - scripts/enqueue.py / worker.py (rpush / brpop — tail-consumed)
+
+          REQUIREMENTS:
+          - Read the queue and compute the provider distribution and the longest run of
+            consecutive same-provider cells. Flag "blocked" if that run exceeds 1 (workers would
+            hammer a provider).
+          - Do NOT mutate anything.
+
+          DELIVER a short detection note (providers, counts, longest same-provider run, verdict).
+      - name: interrupt
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Interrupt the workers (the queue-level "interrupt" — stop re-picking jobs).
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Identify the `scripts/worker.py` PIDs and kill them (SIGKILL). Do NOT kill the
+            parent workflow or any single-task opencode session that is not a queue worker.
+          - Confirm zero worker.py processes remain.
+
+          DELIVER the list of killed worker PIDs.
+      - name: reinterleave
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Re-interleave the queue round-robin and extract the logic into a reusable script.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Extract the round-robin reorder into `scripts/reinterleave_queue.py` (read story_jobs,
+            group by provider preserving first-appearance order, round-robin, atomic delete+rpush).
+            It must guarantee consecutive list elements are different providers.
+          - Run it and report the before/after provider order and counts.
+          - Add a test (tests/test_reinterleave_queue.py) asserting consecutive-element provider
+            uniqueness and job preservation (no job lost or duplicated).
+
+          DELIVER the script, the test, and the run output.
+      - name: respawn
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Respawn a provider-bounded worker set.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Respawn at most (distinct provider count) `scripts/worker.py` workers, detached
+            (start_new_session), from the repository/worktree root.
+          - Note that future enqueues must use `enqueue.py --interleave` so this operation is not
+            needed again.
+
+          DELIVER the respawned worker count.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Verify the drain is spread across providers.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Poll `python scripts/monitor.py --json` for a few minutes and confirm that no single
+            provider dominates the `running` set — concurrent cells should span >= 2 providers.
+          - Record the observation.
+
+          DELIVER a short verification note.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - {name: measure_provider_spread, plane: measurement, evidence_class: "[M]", requires: [], produces: [provider_imbalance]}
+  - {name: reinterleave_queue,      plane: control,     evidence_class: "[P]", requires: [provider_imbalance], produces: [reinterleaved]}
+metrics:
+  - {name: max_same_provider_run, agg: max, over: cell}
+  - {name: worker_count,          agg: mean, over: cell}
+  - {name: provider_spread,       agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, detection, interrupt, reinterleave, respawn, verification]
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

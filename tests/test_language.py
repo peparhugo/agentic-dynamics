@@ -3,17 +3,11 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from instrument.language import (
-    LanguageProfile,
-    detect_language,
-    parse_codebase,
-    CodebaseAST,
-    collect_functions,
-    collect_imports,
-    get_parser,
     _PROFILES,
+    detect_language,
+    get_parser,
+    parse_codebase,
 )
 
 

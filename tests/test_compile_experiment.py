@@ -57,12 +57,12 @@ def test_compile_spec_refuses_unmet_requires(tmp_path):
         "factors: [{name: model, levels: [a]}]\n"
         "design: factorial\n"
         "rules:\n"
-        "  - {name: model_cascade, plane: control, evidence_class: '[H]', requires: [confidence]}\n"
+        "  - {name: model_cascade, plane: control, evidence_class: '[H]', requires: [next_gen_signal]}\n"
     )
     spec = ExperimentSpec.from_yaml(p)
     with pytest.raises(SpecError) as exc:
         compile_spec(spec)
-    assert "confidence" in str(exc.value)
+    assert "next_gen_signal" in str(exc.value)
 
 
 def test_experiment_matrix_cross_product():
@@ -129,10 +129,10 @@ def test_first_pass_quality():
     assert rr.evidence_class == "[M]"
 
 
-def test_grit_is_registered_but_gated_on_unmeasured_inputs():
-    # Grit(s) = P(test_executed_success | perturbation_strength=s). It is registered
-    # (the implementation is correct), but returns unmeasured until the ledger
-    # instruments perturbation_strength + test_executed_success. It must not be a
+def test_grit_returns_unmeasured_when_attempts_lack_inputs():
+    # Grit(s) = P(test_executed_success | perturbation_strength=s). The inputs are now
+    # ledger-measured (re-admitted by the validator), but a specific attempts list that
+    # lacks those fields still yields an explicit unmeasured result — never a
     # "completed/n" proxy.
     assert "grit" in MEASUREMENT_RULES
     rr = MEASUREMENT_RULES["grit"]([{"attempt_number": 1, "completed": True}])

@@ -11,12 +11,11 @@ Uses deepseek/deepseek-v4-flash by default for speed and cost efficiency.
 from __future__ import annotations
 
 import json
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .opencode import run_opencode_agentic, AgenticResult
+from .opencode import AgenticResult, run_opencode_agentic
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"

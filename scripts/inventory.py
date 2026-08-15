@@ -9,8 +9,6 @@ Sources: opencode.db SQLite, /tmp/exp_* worktrees, experiments/results/*.json, e
 
 import argparse
 import json
-import os
-import re
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -84,7 +82,7 @@ def refresh():
 
     # Classify sessions as experiment or non-experiment
     exp_sessions = [s for s in db_sessions if _is_experiment_title(s.get("title") or "")]
-    other_sessions = [s for s in db_sessions if s not in exp_sessions]
+    [s for s in db_sessions if s not in exp_sessions]
 
     # Classify worktrees
     exp_worktrees = []
@@ -351,7 +349,7 @@ def cmd_report(args):
     exp_sessions = c['db_sessions_experiments']
     other_wt = c['worktrees_other']
     print(f"  The {total_wt} worktrees include {other_wt} non-experiment worktrees")
-    print(f"  (personal sessions, site builds, tooling experiments).")
+    print("  (personal sessions, site builds, tooling experiments).")
     print(f"  The {exp_sessions} instrumented experiment sessions are the validated corpus.")
     print()
 
@@ -360,7 +358,7 @@ def main():
     parser = argparse.ArgumentParser(description="Experiment/Worktree Inventory Registry")
     sub = parser.add_subparsers(dest="command")
 
-    p_refresh = sub.add_parser("refresh", help="Rebuild inventory from all data sources")
+    sub.add_parser("refresh", help="Rebuild inventory from all data sources")
 
     p_list = sub.add_parser("list", help="List all experiments and model breakdown")
     p_list.add_argument("-v", "--verbose", action="store_true", help="Show session titles")

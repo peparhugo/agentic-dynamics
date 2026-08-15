@@ -7,7 +7,7 @@
     "total_lines_added": 2578,
     "total_lines_removed": 107,
     "net_lines": 2471,
-    "average_convention_score": 0.752
+    "average_convention_score": 0.773
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 6,
-        "complexity_delta": 31,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.752,
+        "score": 0.773,
         "violations": [
           "app.py: Classes should use PascalCase",
           "__init__.py: Functions should use snake_case",
@@ -93,14 +93,14 @@
         "lines_removed": 15
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 6,
-        "complexity_delta": 16,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.752,
+        "score": 0.773,
         "violations": [
           "app.py: Classes should use PascalCase",
           "__init__.py: Functions should use snake_case",
@@ -158,14 +158,14 @@
         "lines_removed": 18
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 4,
-        "complexity_delta": 38,
-        "duplications_delta": 2.8
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.752,
+        "score": 0.773,
         "violations": [
           "app.py: Classes should use PascalCase",
           "__init__.py: Functions should use snake_case",
@@ -223,14 +223,14 @@
         "lines_removed": 67
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 7,
-        "duplications_delta": -0.19999999999999973
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.752,
+        "score": 0.773,
         "violations": [
           "app.py: Classes should use PascalCase",
           "__init__.py: Functions should use snake_case",
@@ -288,14 +288,14 @@
         "lines_removed": 7
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 13,
-        "complexity_delta": 34,
-        "duplications_delta": -2.6
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.752,
+        "score": 0.773,
         "violations": [
           "app.py: Classes should use PascalCase",
           "__init__.py: Functions should use snake_case",
@@ -338,9 +338,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
-      "errors": 19,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -410,12 +410,12 @@
       "run_id": ""
     },
     "strategy": {
-      "strategy": "wasteful",
-      "strategy_score": 0.3354,
+      "strategy": "conservative",
+      "strategy_score": 0.4354,
       "exploration_premium": 0.0,
       "thermal_efficiency": 0.0,
-      "verdict": "WASTEFUL \u2014 model burned 0 tokens ($6.1056, ~0J, 0% thinking) achieving only 0% correctness. High reasoning overhead without convergence.",
-      "recommendation": "Reduce perturbation strength or avoid this operator class.",
+      "verdict": "CONSERVATIVE \u2014 model maintained sound reasoning (correctness=0%, quality=0.44) with moderate resource use ($6.1056, ~0J). Model absorbed the perturbation without divergence.",
+      "recommendation": "Reliable but not novel. Good for production, not for exploration.",
       "operator": "",
       "perturbation_class": "",
       "model": "anthropic/claude-sonnet-5",

@@ -14,16 +14,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from _constants import SESSION_TIMEOUT, model_slug
+
 from instrument.story import (
     BUILTIN_STORIES,
+    PerturbationCondition,
     StoryConfig,
     run_story,
     save_story_result,
-    PerturbationCondition,
 )
-from instrument.mutation import compile_mutation
-
-from _constants import model_slug, SESSION_TIMEOUT
 
 # Default codebase mappings for --codebase-quality shortcut
 _CODEBASE_MAP = {
@@ -135,11 +134,11 @@ def main():
         codebase_path = _CODEBASE_MAP.get(key)
         if codebase_path is None:
             print(f"No codebase mapping for {key}")
-            print(f"Use --codebase to specify path manually")
+            print("Use --codebase to specify path manually")
             sys.exit(1)
         if not Path(codebase_path).exists():
             print(f"Codebase not found: {codebase_path}")
-            print(f"Use --codebase to specify path or generate the missing codebase")
+            print("Use --codebase to specify path or generate the missing codebase")
             sys.exit(1)
 
     condition = PerturbationCondition(args.condition)

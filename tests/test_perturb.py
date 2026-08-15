@@ -1,8 +1,13 @@
+import hashlib
+
 import pytest
 import random
 from instrument.perturb import (
-    build_operators,
+    ALIEN_VOCABULARIES,
     PERTURBATION_CLASSES,
+    build_operators,
+    derive_seed,
+    perturb_prompt,
     perturbation_class_for,
 )
 from instrument.basin import BasinMetrics
@@ -86,3 +91,118 @@ def test_basin_verdict_handles_every_class(cls):
 def test_basin_verdict_unknown_class_does_not_crash():
     m = BasinMetrics(perturbation_class="", escape_score=0.9)
     assert m.get_verdict()
+
+
+# ── Regression tests: operator invariants (post-fix) ──
+
+# Parametrize over the live registry so a newly added operator is covered
+# automatically by the determinism / no-op / smoke tests below.
+_OPERATOR_NAMES = sorted(build_operators())
+
+# A representative prompt that exercises every operator: tech terms
+# (alien_vocab), constraint sentences (invert/remove_critical_constraint),
+# and section headers (reverse_causality).
+_SAMPLE_PROMPT = (
+    "Build a REST API with JWT authentication.\n"
+    "Requirements:\n"
+    "- Must support rate limiting on all endpoints.\n"
+    "- Should include input validation.\n"
+    "- Must handle pagination.\n"
+    "Output format: JSON responses."
+)
+
+
+@pytest.mark.parametrize("op_name", _OPERATOR_NAMES)
+def test_determinism_same_seed_same_output(op_name):
+    """The same (prompt, operator, strength, seed) must yield the same prompt."""
+    out1, _ = perturb_prompt(_SAMPLE_PROMPT, op_name, strength=0.5, rng_seed=7)
+    out2, _ = perturb_prompt(_SAMPLE_PROMPT, op_name, strength=0.5, rng_seed=7)
+    assert out1 == out2
+
+
+def test_cross_model_same_cell_same_seed():
+    """A cell's seed is a pure function of (task, operator, strength, seed_variant).
+
+    derive_seed takes no model argument, so two models running the same cell get
+    the same seed. We also lock the exact formula so any accidental change to
+    the seed contract fails the test.
+    """
+    task = "Build a REST API"
+    operator = "invert_constraint"
+    strength = 0.5
+    variant = 0
+
+    seed = derive_seed(task, operator, strength, variant)
+    expected = int(
+        hashlib.sha256(
+            f"{task}|{operator}|{strength}|{variant}".encode("utf-8")
+        ).hexdigest()[:8],
+        16,
+    )
+    assert seed == expected
+    assert seed == derive_seed(task, operator, strength, variant)
+
+
+def test_seed_variant_deviates_starting_point():
+    """A deviated starting point (new seed_variant) yields a distinct seed.
+
+    repetition is deliberately NOT a seed input, so re-measuring a cell
+    reproduces the same starting point (see test_cross_model_same_cell_same_seed
+    and test_determinism_same_seed_same_output), while each seed_variant level
+    yields a distinct seed — and therefore a distinct perturbed prompt for any
+    seed-sensitive operator — measured against the same baseline.
+    """
+    task = "Build a REST API with JWT authentication."
+    op = "invert_constraint"
+    strength = 0.5
+
+    variants = [derive_seed(task, op, strength, v) for v in range(4)]
+    assert len(set(variants)) == 4  # every variant yields a distinct starting point
+
+
+@pytest.mark.parametrize("op_name", _OPERATOR_NAMES)
+def test_strength_zero_is_noop(op_name):
+    """strength <= 0.0 must return the base prompt unchanged (no minimum perturb)."""
+    out, rec = perturb_prompt(_SAMPLE_PROMPT, op_name, strength=0.0, rng_seed=42)
+    assert out == _SAMPLE_PROMPT
+    assert rec.noop_reason == "strength 0.0 (no-op)"
+
+
+def test_alien_vocab_injects_cross_domain_terms():
+    """The main path must substitute ALIEN_VOCABULARIES terms, not same-domain synonyms."""
+    base = "Build a REST API. The api endpoint uses a database server with a cache."
+    out, rec = perturb_prompt(base, "inject_alien_vocab", strength=0.5, rng_seed=42)
+
+    assert rec.vocab_domain in ALIEN_VOCABULARIES
+    alien_words = ALIEN_VOCABULARIES[rec.vocab_domain]
+    assert any(word in out for word in alien_words)
+    assert rec.injected_tokens
+    assert all(tok in alien_words for tok in rec.injected_tokens)
+
+
+def test_reverse_causality_no_duplication():
+    """The task description must appear exactly once at every strength."""
+    task_sentence = "Build a REST API with JWT authentication."
+    base = (
+        task_sentence + "\n"
+        "Requirements:\n"
+        "- Must support rate limiting.\n"
+        "- Should include input validation.\n"
+        "Output format: JSON responses."
+    )
+    for strength in (0.1, 0.5, 0.8, 1.0):
+        out, _ = perturb_prompt(base, "reverse_causality", strength=strength, rng_seed=42)
+        assert out.count(task_sentence) == 1, f"task duplicated at strength {strength}"
+
+
+@pytest.mark.parametrize("op_name", _OPERATOR_NAMES)
+def test_operator_smoke(op_name):
+    """At strength 0.5 every operator yields non-empty output that differs from base,
+    with a canonical perturbation class."""
+    ops = build_operators()
+    out, rec = perturb_prompt(_SAMPLE_PROMPT, op_name, strength=0.5, rng_seed=42)
+
+    assert out, "perturbed prompt must be non-empty"
+    assert out != _SAMPLE_PROMPT, "strength 0.5 must perturb the prompt"
+    assert rec.perturbation_class in PERTURBATION_CLASSES
+    assert rec.perturbation_class == ops[op_name].perturbation_class

@@ -9,8 +9,8 @@ Output: experiments/results/lab_survival_horizon.json
 """
 
 import json
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
@@ -160,8 +160,8 @@ def main():
     data = compute()
     m = data["_meta"]
 
-    print(f"=== LAB BOOK 8: INFINITE GAME SURVIVAL HORIZON ===\n")
-    print(f"Effective cost formula: baseline × (1-P) × (1-F) + perturbed × P × (1-F) × R + flail terms")
+    print("=== LAB BOOK 8: INFINITE GAME SURVIVAL HORIZON ===\n")
+    print("Effective cost formula: baseline × (1-P) × (1-F) + perturbed × P × (1-F) × R + flail terms")
     print(f"Retry rate: {m['retry_rate']} | Escalation: {m['escalation_multiplier']}×\n")
 
     print("MODEL COST PROFILES:")
@@ -170,7 +170,7 @@ def main():
     for label, mc in sorted(data["model_costs"].items()):
         print(f"{label:<22} ${mc['baseline_cost']:>8.4f} ${mc['perturbed_cost']:>8.4f} {mc['recovery_multiplier']:>6.2f}x {mc['overall_correctness']:>7.0%} {mc['flail_rate']*100:>5.1f}%")
 
-    print(f"\nSURVIVAL HORIZON — sessions before bankruptcy:")
+    print("\nSURVIVAL HORIZON — sessions before bankruptcy:")
     for sr in data["scenarios"]:
         print(f"\n  {sr['scenario']}:")
         models_sorted = sorted(sr["models"].items(), key=lambda x: x[1].get("sessions", 0) or 0, reverse=True)
@@ -184,7 +184,7 @@ def main():
                 days = mh.get("days_at_100_per_day", 0)
                 print(f"    {label:<22} {s:>10,} sessions ({days:.0f} days at 100/day) [{mh.get('status','')}]")
 
-    print(f"\nSURVIVAL RANKING (total sessions across all scenarios):")
+    print("\nSURVIVAL RANKING (total sessions across all scenarios):")
     for i, r in enumerate(data["survival_ranking"]):
         print(f"  {i+1}. {r['model']}: {r['total_sessions']:,}")
 

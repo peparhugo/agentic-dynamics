@@ -21,8 +21,7 @@ from typing import Any
 
 import yaml
 
-from .language import detect_language, parse_codebase, LanguageProfile, CodebaseAST
-
+from .language import LanguageProfile, detect_language
 
 # ── Data Structures ────────────────────────────────────────────
 
@@ -393,7 +392,7 @@ def score_conventions(
     forbidden_total = 0
 
     tracked = _run_git(worktree, "ls-files", "--cached", "--others", "--exclude-standard")
-    _EXCLUDED_DIRS = ("node_modules/", "build/", "dist/", ".instrument/", "__pycache__/", ".pytest_cache/", "venv/", ".venv/")
+    _EXCLUDED_DIRS = ("node_modules/", "build/", "dist/", ".instrument/", "__pycache__/", ".pytest_cache/", "venv/", ".venv/")  # noqa: N806
     for rel_path in tracked.splitlines():
         rel_path = rel_path.strip()
         if not rel_path:
@@ -452,7 +451,7 @@ def compute_sonar_delta(
     Returns dict with delta values. All zero if SonarQube unavailable.
     """
     try:
-        from .sonar import run_sonar_analysis, SonarMetrics
+        from .sonar import run_sonar_analysis
     except ImportError:
         return _empty_sonar_delta()
 
@@ -534,6 +533,7 @@ def _prescan_sonar_parallel(
     (~30s each) sequentially.
     """
     from concurrent.futures import ThreadPoolExecutor
+
     from .sonar import run_sonar_analysis
 
     unique = list(dict.fromkeys(commit_hashes))
@@ -728,10 +728,10 @@ def compute_deep_metrics(
     baseline; basin escape measures seed-vs-final structural divergence; and
     the strategy classifier combines those with efficiency into an archetype.
     """
+    from .basin import measure_basin_escape
     from .language import detect_language
     from .lsp_diagnostics import run_diagnostics
     from .solution import evaluate_solution
-    from .basin import measure_basin_escape
     from .strategy import classify_strategy
 
     deep: dict[str, Any] = {}

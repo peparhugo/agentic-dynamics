@@ -7,7 +7,7 @@
     "total_lines_added": 4020,
     "total_lines_removed": 81,
     "net_lines": 3939,
-    "average_convention_score": 0.766
+    "average_convention_score": 0.786
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 3,
-        "complexity_delta": 45,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.766,
+        "score": 0.786,
         "violations": [
           "__init__.py: Functions should use snake_case",
           "__init__.py: Classes should use PascalCase",
@@ -81,14 +81,14 @@
         "lines_removed": 4
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 3,
-        "complexity_delta": 21,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.766,
+        "score": 0.786,
         "violations": [
           "__init__.py: Functions should use snake_case",
           "__init__.py: Classes should use PascalCase",
@@ -134,14 +134,14 @@
         "lines_removed": 3
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 3,
-        "complexity_delta": 76,
-        "duplications_delta": 1.7
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.766,
+        "score": 0.786,
         "violations": [
           "__init__.py: Functions should use snake_case",
           "__init__.py: Classes should use PascalCase",
@@ -194,7 +194,7 @@
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.766,
+        "score": 0.786,
         "violations": [
           "__init__.py: Functions should use snake_case",
           "__init__.py: Classes should use PascalCase",
@@ -247,7 +247,7 @@
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.766,
+        "score": 0.786,
         "violations": [
           "__init__.py: Functions should use snake_case",
           "__init__.py: Classes should use PascalCase",
@@ -278,9 +278,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
-      "errors": 25,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -351,7 +351,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8326,
+      "strategy_score": 0.9826,
       "exploration_premium": 0.5614,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.80) and found a novel correct solution (novelty=0.88, correctness=100%). Cost: $1.5751, ~0J.",

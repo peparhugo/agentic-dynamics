@@ -9,8 +9,8 @@ Output: experiments/results/lab_correctness_premium.json
 """
 
 import json
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
@@ -169,7 +169,7 @@ def main():
     m = data["_meta"]
     agg = data["aggregate"]
 
-    print(f"=== LAB BOOK 3: DOES CLAUDE'S PREMIUM BUY ANYTHING? ===\n")
+    print("=== LAB BOOK 3: DOES CLAUDE'S PREMIUM BUY ANYTHING? ===\n")
     print(f"Overlapping tasks: {m['overlapping_tasks']}")
     print(f"Decision rule: {m['decision_rule']}")
     print(f"Tie rule: {m['tie_threshold']}\n")
@@ -181,7 +181,7 @@ def main():
         worth = "YES" if t["is_claude_worth_it"] else "No"
         print(f"{t['task']:<30} {t['ds_correctness']:>6.0%} {t['cl_correctness']:>6.0%} {t['correctness_delta']:>+6.0%} ${t['cl_cost']:>8.4f} {t['cost_ratio']:>6.1f}x {worth:>9}")
 
-    print(f"\nAGGREGATE:")
+    print("\nAGGREGATE:")
     print(f"  DeepSeek: {agg['deepseek_avg_correctness']:.0%} at ${agg['deepseek_avg_cost']:.4f}/session ({agg['deepseek_n']} entries)")
     print(f"  Claude:   {agg['claude_avg_correctness']:.0%} at ${agg['claude_avg_cost']:.4f}/session ({agg['claude_n']} entries)")
     print(f"  Cost ratio: {agg['cost_ratio']:.0f}×")
@@ -190,7 +190,7 @@ def main():
     print(f"  Tied:              {agg['ties_n']}/{m['overlapping_tasks']} tasks")
     print(f"  Worth paying for:  {agg['claude_worth_it_n']}/{m['overlapping_tasks']} tasks")
 
-    print(f"\nBY PERTURBATION CLASS:")
+    print("\nBY PERTURBATION CLASS:")
     for pc, d in data["by_perturbation_class"].items():
         print(f"  {pc}: DS {d['ds_avg_correctness']:.0%} (${d['ds_avg_cost']:.4f}) vs CL {d['cl_avg_correctness']:.0%} (${d['cl_avg_cost']:.4f})")
 

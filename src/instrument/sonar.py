@@ -10,12 +10,13 @@ degrade code quality beyond structural divergence?
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -130,7 +131,8 @@ def compute_sonar_diff(baseline: SonarMetrics, perturbed: SonarMetrics) -> dict[
 
     Returns a dict suitable for merging into BasinMetrics or results JSON.
     """
-    _delta = lambda b, p: max(0, p - b) if isinstance(b, int) else round(p - b, 4)
+    def _delta(b, p):
+        return max(0, p - b) if isinstance(b, int) else round(p - b, 4)
 
     b_r = _rating_value(baseline.maintainability_rating)
     p_r = _rating_value(perturbed.maintainability_rating)
@@ -395,7 +397,5 @@ def _float_val(measures: dict, key: str) -> float:
 
 
 def _cleanup(props_path: Path) -> None:
-    try:
+    with contextlib.suppress(OSError):
         props_path.unlink(missing_ok=True)
-    except OSError:
-        pass

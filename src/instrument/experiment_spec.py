@@ -33,14 +33,14 @@ ADAPT_SELECTIONS = frozenset(
 # Base information fields the ledger emits. Measurement rules consume these directly;
 # control rules consume them transitively via a measurement rule's ``produces``.
 #
-# Deliberately ABSENT (the current gap — instrumented in step 3 of the build order):
-#   - ``confidence``            — the ``model_cascade``/``dynamics`` arms need it
-#   - ``perturbation_strength`` — the ``grit`` rule needs it (Grit(s) needs an s axis)
-#   - ``test_executed_success`` — the ``grit`` rule needs it (verified success, not
-#                                  "did the session complete")
-#   - ``answer``/``explanation`` token split — unlocks the Explanation Tax decomposition
-# The validator refuses any rule whose ``requires`` touch these until they are
-# instrumented — the executable form of "measure (and instrument) before policy."
+# The four formerly-absent fields are now MEASURED (instrumentation step 3 is done):
+#   - ``confidence``            — [H] per-attempt execution-confidence (opencode.py)
+#   - ``perturbation_strength`` — the strength axis (s=0.0 baseline) on every result
+#   - ``test_executed_success`` — independently verified by test_runner, not self-report
+#   - ``tokens_answer`` / ``tokens_explanation`` — the answer/explanation output split
+# Because they are ledger-produced, the validator now admits the ``grit`` rule (needs
+# perturbation_strength + test_executed_success) and the ``model_cascade``/``dynamics``
+# control arms (need confidence).
 LEDGER_FIELDS: frozenset[str] = frozenset(
     {
         # job-level
@@ -88,11 +88,17 @@ LEDGER_FIELDS: frozenset[str] = frozenset(
         "tokens_in",
         "tokens_out",
         "tokens_reasoning",
+        "tokens_answer",
+        "tokens_explanation",
         "cost_inference",
         "cost_orchestration",
         "value",
         "rework_cost",
         "reuse_value",
+        # measured attempt-level signals (previously the instrumentation gap)
+        "confidence",
+        "perturbation_strength",
+        "test_executed_success",
     }
 )
 

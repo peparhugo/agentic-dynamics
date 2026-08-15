@@ -10,11 +10,16 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from analyze_worktrees import (
-    analyze_worktree, load_db_sessions, build_baseline_index, 
-    find_baseline_code, parse_session_title_info, REPORTS_DIR
-)
 import shutil
+
+from analyze_worktrees import (
+    REPORTS_DIR,
+    analyze_worktree,
+    build_baseline_index,
+    find_baseline_code,
+    load_db_sessions,
+    parse_session_title_info,
+)
 
 DB_PATH = os.path.expanduser("~/.local/share/opencode/opencode.db")
 
@@ -50,8 +55,8 @@ def main():
 
     for i, (s, wt_path) in enumerate(existing):
         title = s["title"] or ""
-        model_raw = json.loads(s["model"]) if s["model"] else {}
-        info = parse_session_title_info(title)
+        json.loads(s["model"]) if s["model"] else {}
+        parse_session_title_info(title)
 
         baseline_code = find_baseline_code(title, dict(s), baseline_index,
                                            worktree_path=str(wt_path))
@@ -101,19 +106,19 @@ def main():
                     md += f"| {label} | {val_str} |\n"
 
             if metrics.get("narration_penalty", 0) > 0:
-                md += f"\n## Narration Assessment\n\n"
+                md += "\n## Narration Assessment\n\n"
                 md += f"**Narration penalty:** {metrics['narration_penalty']:.0%}\n\n"
-                md += f"| Metric | Value |\n|--------|-------|\n"
+                md += "| Metric | Value |\n|--------|-------|\n"
                 md += f"| Output tokens | {s.get('tokens_output', 0):,} |\n"
                 md += f"| Python files | {ast.get('py_files', 0)} |\n"
                 md += f"| Non-Python files | {metrics.get('non_python_files', 0)} |\n"
                 md += f"| Code density | {metrics.get('code_density', 0):.4f} LOC/tok |\n"
                 if metrics.get("narration_failure"):
-                    md += f"| **Verdict** | **NARRATION FAILURE** |\n"
+                    md += "| **Verdict** | **NARRATION FAILURE** |\n"
                 elif metrics.get("is_frontend"):
-                    md += f"| **Verdict** | **FRONTEND WORKTREE** |\n"
+                    md += "| **Verdict** | **FRONTEND WORKTREE** |\n"
                 else:
-                    md += f"| **Assessment** | Low code density |\n"
+                    md += "| **Assessment** | Low code density |\n"
                 md += "\n"
 
             md_path.write_text(md)
@@ -147,7 +152,7 @@ def main():
             print(f"    FAILED: {err}")
 
     print(f"\n{'='*60}")
-    print(f"COMPLETE")
+    print("COMPLETE")
     print(f"  Generated:  {len(results)} game reports")
     print(f"  Failed:     {len(failed)}")
     print(f"  Reports dir: {REPORTS_DIR}")

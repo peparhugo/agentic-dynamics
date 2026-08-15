@@ -3,25 +3,22 @@
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
+
+from .experiment import ExperimentConfig, ExperimentResult
+
 warnings.warn(
     "instrument.lab_book is deprecated. Lab scripts bypass this module; "
     "use instrument.opencode_analyzer for current pipeline.",
-    DeprecationWarning, stacklevel=2
+    DeprecationWarning, stacklevel=2,
 )
-
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
-
-from .experiment import ExperimentResult, ExperimentConfig
-
 
 _MANIFOLD_OPS = {"inject_alien_vocab", "shift_framing", "reverse_causality", "force_abandonment"}
 
 
 def build_hypothesis(config: ExperimentConfig) -> tuple[dict, dict]:
     h0 = {"text": f"Under perturbation at strengths {config.strengths}, no systematic difference in trajectory deviation between manifold and semantic perturbation classes.", "status": "untested"}
-    h1 = {"text": f"Manifold perturbations produce higher trajectory deviation and slower recovery than semantic perturbations because semantic perturbations operate within the model's existing concept manifold."}
+    h1 = {"text": "Manifold perturbations produce higher trajectory deviation and slower recovery than semantic perturbations because semantic perturbations operate within the model's existing concept manifold."}
     return h0, h1
 
 
@@ -42,7 +39,7 @@ def persist_to_lab_book(result: ExperimentResult, output_dir: Path | None = None
 
     eid = result.config.name
     h0, h1 = build_hypothesis(result.config)
-    methodology = build_methodology(result.config)
+    build_methodology(result.config)
 
     by_cls = {"manifold": [], "semantic": []}
     for r in result.runs:
@@ -78,5 +75,6 @@ def persist_to_lab_book(result: ExperimentResult, output_dir: Path | None = None
              "", "## Conclusion", f"**Null hypothesis:** {conclusion['null_status']}", f"**Reasoning:** {conclusion['reasoning']}"]
 
     content = f"---\n{yaml.dump(fm, default_flow_style=False, sort_keys=False, allow_unicode=True)}---\n\n" + "\n".join(body)
-    fp = dest / f"{eid}.md"; fp.write_text(content)
+    fp = dest / f"{eid}.md"
+    fp.write_text(content)
     return fp

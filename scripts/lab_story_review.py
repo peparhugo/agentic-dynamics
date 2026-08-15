@@ -8,7 +8,7 @@ Usage:
 
 import json
 import sys
-from collections import defaultdict, Counter
+from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -85,7 +85,7 @@ def main():
         print(f"  {cond:15s}: {len(items):2d} cells | "
               f"success={success}/{len(items)} ({100*success//max(len(items),1)}%) | "
               f"timeouts={timeout}/{total_sessions} sessions | "
-              f"avg_cost=\${avg_cost:.4f}")
+              rf"avg_cost=\${avg_cost:.4f}")
 
     # ── Table 2: Story Type Comparison ──
     print()
@@ -108,7 +108,7 @@ def main():
               f"success={success}/{len(items)} ({100*success//max(len(items),1)}%) | "
               f"avg_correctness={avg_corr:.2f} | "
               f"timeouts={timeout}/{total_sessions} | "
-              f"avg_cost=\${avg_cost:.4f}")
+              rf"avg_cost=\${avg_cost:.4f}")
 
     # ── Table 3: Session Type Timeout Analysis ──
     print()
@@ -142,7 +142,6 @@ def main():
         s5 = c["correctness_values"][-1] if len(c["correctness_values"]) >= 5 else s1
         recovered = s5 > s1
         degraded = s5 < s1
-        same = s5 == s1
         status = "recovered" if recovered else ("degraded" if degraded else "same")
         print(f"  {c['story'][:25]:25s} S1={s1:.2f} S5={s5:.2f} ({status})")
 
@@ -161,7 +160,7 @@ def main():
         ("API contract changes", "breaking response format without versioning", 8),
         ("O(n) inefficiency", "full table scans, redundant loops per request", 6),
     ]
-    for name, desc, count in problems:
+    for name, _desc, count in problems:
         pct = count * 100 // 26
         bar = "█" * pct
         print(f"  {name:25s}: {count:2d}/26 ({pct:2d}%) {bar}")
@@ -176,10 +175,10 @@ def main():
     total_sessions = sum(c["sessions"] for c in cells)
     print(f"  Cells: {len(cells)}")
     print(f"  Sessions: {total_sessions}")
-    print(f"  Total cost: \${total_cost:.4f}")
+    print(rf"  Total cost: \${total_cost:.4f}")
     print(f"  Total tokens: {total_tokens:,}")
-    print(f"  Avg cost/cell: \${total_cost/len(cells):.4f}")
-    print(f"  Avg cost/session: \${total_cost/total_sessions:.4f}")
+    print(rf"  Avg cost/cell: \${total_cost/len(cells):.4f}")
+    print(rf"  Avg cost/session: \${total_cost/total_sessions:.4f}")
 
     # ── JSON Output ──
     output = {

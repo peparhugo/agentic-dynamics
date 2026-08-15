@@ -7,7 +7,7 @@
     "total_lines_added": 1931,
     "total_lines_removed": 382,
     "net_lines": 1549,
-    "average_convention_score": 0.909
+    "average_convention_score": 0.917
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 252
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.909,
+        "score": 0.917,
         "violations": [
           "test_app.py: Module-level constants should be UPPER_CASE"
         ]
@@ -64,14 +64,14 @@
         "lines_removed": 8
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 17,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.909,
+        "score": 0.917,
         "violations": [
           "test_app.py: Module-level constants should be UPPER_CASE"
         ]
@@ -100,14 +100,14 @@
         "lines_removed": 14
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 22,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.909,
+        "score": 0.917,
         "violations": [
           "test_app.py: Module-level constants should be UPPER_CASE"
         ]
@@ -136,14 +136,14 @@
         "lines_removed": 105
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 5,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.909,
+        "score": 0.917,
         "violations": [
           "test_app.py: Module-level constants should be UPPER_CASE"
         ]
@@ -172,14 +172,14 @@
         "lines_removed": 3
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 4,
-        "complexity_delta": 28,
-        "duplications_delta": 3.5
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.909,
+        "score": 0.917,
         "violations": [
           "test_app.py: Module-level constants should be UPPER_CASE"
         ]
@@ -193,9 +193,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
-      "errors": 6,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -266,7 +266,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8377,
+      "strategy_score": 0.9877,
       "exploration_premium": 7.1108,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.76) and found a novel correct solution (novelty=0.92, correctness=100%). Cost: $0.1291, ~0J.",

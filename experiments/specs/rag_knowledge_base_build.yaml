@@ -1,0 +1,210 @@
+name: rag_knowledge_base_build
+question: >-
+  Implement the v1 runtime-RAG knowledge base + prompt-constructor, per the synthesis in
+  code_reviews/2026-08-15_rag-knowledge-base-proposal-review.md: Sol's skeleton (canonical dual-ID
+  identity, ordered authority, deterministic query planner, typed + validated constructor, no
+  cross-item fork), Fable-5's storage (Neo4j native full-text, graph-as-boost, CodeModule bridge,
+  Step.doc_id/text fix, Redis Streams trigger), and DeepSeek's evidence-card unit (precomputed
+  findings, not raw steps). Everything ships default-off behind workflow.params.rag_augment, gated
+  by the load-bearing rule; no control rule is authored until the measurement rules it consumes are
+  implemented and run. confidence is never consumed.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true   # builder cache economics: phases chain sessions so shared context becomes cache reads
+    context:
+      brief: >-
+        Build order is the load-bearing dependency chain, not the visible seam: identity contract
+        first, then store capabilities, then retrieval, then the constructor, then the hook, then
+        ingestion, then verification. Every phase commits tests alongside the code. Read the review
+        doc and the modules you touch before editing. Never rebuild Neo4jClient/ChromaStore — extend
+        them. Never consume the unmeasured `confidence` field (a reference to it is a hard error).
+        Never add Elasticsearch. Never call Neo4jClient.clear_all() or Redis flushall() on 6380.
+      prior_art:
+        - code_reviews/2026-08-15_rag-knowledge-base-proposal-review.md   # the synthesis this builds
+        - src/instrument/graph.py      # Neo4jClient — extend, don't rebuild
+        - src/instrument/embeddings.py # ChromaStore + EmbeddingClient — extend
+        - src/instrument/workflow_runner.py # the seam (route_step -> run_agent)
+        - src/instrument/live.py       # Redis connection conventions to reuse
+        - src/instrument/experiment_spec.py # LEDGER_FIELDS + validate_rules (the gate)
+    phases:
+      - name: identity
+        kind: agent
+        prompt: |
+          Implement the canonical identity + authority contract. Deliver src/instrument/knowledge.py
+          and tests/test_knowledge.py.
+
+          REQUIREMENTS (from Sol's design; see code_reviews/2026-08-15_rag-knowledge-base-proposal-review.md):
+          - Two immutable IDs, both sha256:
+              entity_id    = sha256(repository_id | source_uri | logical_locator)
+              knowledge_id = sha256(entity_id | source_revision | content_hash | extractor_version)
+          - Authority as an ordered Enum: POLICY > SOURCE > MEASURED > DERIVED > ADVISORY
+            (pinned policy reads directly from checkout, never probabilistically retrieved).
+          - Frozen dataclasses KnowledgeRecord and KnowledgeEvent. KnowledgeEvent carries a source
+            POINTER (source_uri, source_revision, content_hash, operation, occurred_at,
+            schema_version) — never the body. KnowledgeRecord carries knowledge_id, entity_id,
+            source_uri, source_type, logical_locator, repository_id, branch, worktree_id, commit_sha,
+            content_hash, extractor_version, embedding_version, authority, valid_from, valid_to,
+            observed_at, indexed_at, acl_scope, contains_sensitive_data, text, token_count, language,
+            symbols, outcome_id, test_executed_success, evidence_class.
+          - snake_case functions, type hints on public signatures, dataclasses over dicts (AGENTS.md).
+          - Update src/instrument/__init__.py exports for the new public symbols.
+
+          TESTS: tests/test_knowledge.py — stable IDs across call sites, version change produces a new
+          knowledge_id, authority ordering, event has no body field, serialization round-trip.
+          Run `pytest tests/test_knowledge.py -q` and leave it green before finishing.
+      - name: stores
+        kind: agent
+        prompt: |
+          Extend the two store clients. Do NOT rewrite them; add capabilities.
+
+          1) src/instrument/embeddings.py — extend ChromaStore:
+             - __init__ gains an optional collection_name (default "session_embeddings" — the existing
+               contract must not change).
+             - Read CHROMA_HOST/CHROMA_PORT env vars (mirror live.py's FINOPS_REDIS_* pattern) instead
+               of the hardcoded host="localhost", port=8000 that collides with admin/server.py.
+             - Add generic canonical upsert/delete/search with metadata filters and an inventory/
+               checkpoint method. Propagate store failures explicitly (don't swallow).
+          2) src/instrument/graph.py — extend Neo4jClient:
+             - create_knowledge_schema(): knowledge constraints/indexes + a native full-text index
+               (CREATE FULLTEXT INDEX ... FOR (s:Step) ON EACH [s.text]).
+             - FIX the dangling join in build_step_graph(): populate Step.text and set Step.doc_id to
+               the SAME scheme embeddings.py uses (f"{session_id}_step_{step_idx:04d}") instead of the
+               hardcoded "". Add a regression test asserting both ID call sites agree.
+             - add load_codebase_graph(graph, worktree_name) writing CodeModule nodes + IMPORTS/
+               IMPORTED_BY edges + (ExperimentRun)-[:TOUCHED]->(CodeModule).
+             - add bounded expand_candidates(): depth <= 2, <=8 neighbors/seed/hop, <=40 nodes, <=300ms,
+               allowlisted relationships only (DEFINES, IMPORTS, CALLS, TESTED_BY, PRODUCED_BY,
+               PRECEDES, SUPERSEDES, CONTRADICTS).
+             - add exact-property + full-text search helpers (typed, no hand-written Cypher at call sites).
+
+          TESTS: extend tests/test_embeddings.py (collection isolation, canonical IDs, env endpoint)
+          and tests/test_graph.py (knowledge schema, doc_id/text regression, CodeModule, bounded
+          expansion). Leave both green. Update __init__.py exports.
+      - name: retrieval
+        kind: agent
+        prompt: |
+          Implement retrieval + evidence cards. Deliver src/instrument/retrieval.py and
+          tests/test_retrieval.py.
+
+          REQUIREMENTS:
+          - Deterministic query planner: extract quoted strings, file paths, stack frames, test names,
+            CLI flags, dotted identifiers, and language symbols from the raw work item. NO LLM
+            query-rewriting in v1 (do not entangle recall with constructor quality).
+          - Parallel legs: dense (ChromaStore.search) and lexical (Neo4j full-text) top-40 each.
+          - Rank fusion (RRF base) times authority/freshness/exact-identifier/conflict factors, per the
+            review; graph expansion is a DECAYED BOOST (0.7**depth * relationship_weight * seed), NOT a
+            third ranked peer. Version the weights and mark them [H].
+          - Token-budgeted whole-chunk selection (default min(8000, 20% executor context, remaining
+            input)); never split a symbol or citation.
+          - Record a RetrievalAttempt (query, filters, candidates, ranks, raw scores, graph paths,
+            selected evidence, token count, latency, cache status, fallback mode) BEFORE any LLM call.
+          - build_evidence_cards(runs) — DeepSeek's unit: derive one-line finding cards offline from the
+            load_runs property set (model/operator/strategy/correctness/cost/flail), never synthesized
+            at query time; skip narration_failure and correctness < 0 rows.
+          - Named fallback modes: lexical_graph_only, dense_local_exact, no_rag (monotonic degradation).
+
+          TESTS: tests/test_retrieval.py — planner extraction, fusion math, graph decay, budget cap,
+          dedupe, conflict retention, fallback modes, card derivation filters.
+          Run `pytest tests/test_retrieval.py -q` green. Update __init__.py exports.
+      - name: constructor
+        kind: agent
+        prompt: |
+          Implement the prompt-constructor. Deliver src/instrument/prompt_constructor.py and
+          tests/test_prompt_constructor.py.
+
+          REQUIREMENTS:
+          - A typed PromptConstructor protocol: construct(request) -> AugmentedPrompt. Side-effect free:
+            no shell, no worktree writes, no permission changes, no routing.
+          - Typed output schema (v1): schema_version, task_intent, raw_work_item_hash, hard_constraints
+            (each cites user/policy source), relevant_targets (cite knowledge_ids), evidence_claims
+            (cite knowledge_ids + authority), conflicts_and_unknowns, acceptance_checks,
+            allowed_tools (must be an unchanged SUBSET of inherited tools), executor_instructions.
+          - Deterministic validator: schema valid, raw-work-item hash matches, constraints originate in
+            user/policy, citations exist and are in scope, tools are a subset, budget respected,
+            retrieved text stays evidence (not control).
+          - ONE repair call allowed, only on a deterministic validation failure; then a deterministic
+            renderer (raw item + pinned policy + validated evidence, no model-generated claims).
+          - NO cross-item session forking (Sol's stance): keep stable instructions/schema as a
+            provider-cacheable prefix; treat new evidence as new input. Document this explicitly.
+          - Default model deepseek/deepseek-v4-flash (cheapest in PROVIDER_PRICING); constructor model
+            is a tunable param, not a hardcoded constant.
+
+          TESTS: tests/test_prompt_constructor.py — schema validation, invented-constraint rejection,
+          citation validity, tool-subset enforcement, one-repair, deterministic fallback, no-fork keying.
+          Run green. Update __init__.py exports.
+      - name: hook
+        kind: agent
+        prompt: |
+          Wire augmentation into the workflow seam. Modify src/instrument/workflow_runner.py.
+
+          REQUIREMENTS:
+          - Insert retrieve() -> construct() -> render BETWEEN route_step() and
+            run_agent(prompt, **agent_kwargs), gated by spec.workflow.params.rag_augment (default
+            False). Default-off must be byte-for-byte identical to today's _build_phase_prompt output.
+          - Bypass test phases (kind == "test") — no augmentation there.
+          - Extend PhaseResult.to_dict() with: raw prompt hash, pre-phase commit, retrieval_attempt_id,
+            constructor_attempt_id, selected evidence ids, versions, token/cost/timing, and fallback
+            mode. Persist structured, not in-memory-only (do not repeat the final_response omission
+            class of gap).
+          - On any constructor/retrieval failure: fall back to the base prompt and record a named
+            fallback mode; never block the phase.
+          - Update src/instrument/__init__.py exports and src/instrument/CONTEXT.md (new module table
+            rows + data flow).
+
+          TESTS: extend tests/test_workflow_runner.py — hook ordering, test-phase bypass, no-RAG
+          default identity, provenance serialization, fallback path. Run green.
+      - name: ingest
+        kind: agent
+        prompt: |
+          Implement durable ingestion. Deliver src/instrument/knowledge_stream.py,
+          scripts/kb_worker.py, and tests/test_knowledge_stream.py.
+
+          REQUIREMENTS:
+          - Redis Streams (XADD/XREADGROUP) on the framework instance: host 127.0.0.1, port
+            FINOPS_REDIS_PORT (6380), DB 2, keys kb:v1:*, stream kb:v1:changes, dead-letter
+            kb:v1:dead_letter. NEVER port 6379 (story Redis is a test sandbox that flushall()s).
+          - Events are pointers only (reuse knowledge.KnowledgeEvent); consumers read the source
+            artifact, verify content_hash, upsert idempotently keyed by knowledge_id, and XACK only
+            after the destination confirms.
+          - Consumer groups: kb-chroma-v1, kb-neo4j-v1, kb-ledger-v1. Claims after lease timeout,
+            capped retries, dead-letter on persistent failure, hourly manifest reconciliation.
+          - scripts/kb_worker.py: run a named consumer group, structurally parallel to scripts/worker.py.
+          - Do NOT extend live.py (keep dashboard telemetry separate); reuse its connection conventions.
+          - Document the AOF + DB 2 reservation note in infrastructure/docker-compose.experiment.yml
+            comments (no behavior change).
+
+          TESTS: tests/test_knowledge_stream.py — group creation, idempotence, XACK, claiming, retries,
+          dead-letter, DB 2 key isolation. Run green. Update __init__.py and scripts/CONTEXT.md.
+      - name: test
+        kind: test
+        prompt: >
+          Independent verification: run the full test suite in the worktree. The workflow must be
+          green, and default-off (rag_augment=False) behavior must be unchanged.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+# Measurement rules this build CREATES (instrumentation contract). All plane=measurement — no
+# control rule is authored yet, because the retrieval policy that would consume these signals is
+# gated behind them (load-bearing rule). The `verify` phase (test kind) confirms each has a real
+# evaluator before it is registered with compile_experiment.py.
+rules:
+  - {name: exact_identifier_match, plane: measurement, evidence_class: "[C]", requires: [], produces: [exact_identifier_match]}
+  - {name: classify_authority,      plane: measurement, evidence_class: "[P]", requires: [], produces: [authority_class]}
+  - {name: knowledge_freshness,     plane: measurement, evidence_class: "[C]", requires: [], produces: [freshness_lag]}
+  - {name: fuse_candidate_ranks,    plane: measurement, evidence_class: "[C]", requires: [], produces: [fused_score]}
+  - {name: score_graph_expansion,   plane: measurement, evidence_class: "[C]", requires: [], produces: [graph_contribution]}
+  - {name: validate_prompt_plan,    plane: measurement, evidence_class: "[C]", requires: [], produces: [plan_validity]}
+  - {name: constraint_coverage,     plane: measurement, evidence_class: "[C]", requires: [], produces: [constraint_recall]}
+  - {name: citation_validity,       plane: measurement, evidence_class: "[C]", requires: [], produces: [citation_validity]}
+  - {name: evaluate_retrieval,      plane: measurement, evidence_class: "[C]", requires: [], produces: [recall_at_k]}
+  - {name: rag_economics,           plane: measurement, evidence_class: "[C]", requires: [], produces: [rag_cost]}
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

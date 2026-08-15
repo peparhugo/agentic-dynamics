@@ -86,7 +86,6 @@ def main():
     rows.sort(key=lambda x: (x["model"], x["tests"]))
 
     # Correlation: tests vs worse_rate across all story-cells with >=3 reviews.
-    import statistics
     pts = [(r["tests"], r["worse_rate"]) for r in rows if r["reviews"] >= 3]
     corr = None
     if len(pts) >= 3:

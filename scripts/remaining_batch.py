@@ -1,6 +1,11 @@
 """Run remaining experiment cells — one at a time, no parallelism, no fuss."""
-import subprocess, time, sqlite3, os, yaml, sys
+import os
+import sqlite3
+import subprocess
+import time
 from pathlib import Path
+
+import yaml
 from _constants import WORKTREE_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -9,7 +14,8 @@ OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 
 def load_task(config_filename):
-    cfg = yaml.safe_load(open(CONFIG_DIR / config_filename))
+    with open(CONFIG_DIR / config_filename) as f:
+        cfg = yaml.safe_load(f)
     return cfg["task"].strip()
 
 def cell_done(title):
@@ -28,12 +34,12 @@ def run_cell(model_id, title, config_file, timeout=400):
     if cell_done(title):
         print(f"SKIP: {title}")
         return
-    
+
     task = load_task(config_file)
     prompt = f"[STANDARDIZED CONSTRAINTS]\n- Write ALL code files. Run pytest. Fix failures until all tests pass.\n- End with EXACTLY: \"TESTS: N passed, M failed\"\n\n{task}"
     workdir = f"{WORKTREE_ROOT}/exp_batch_{title.replace('[','').replace(']','').replace(':','_')[:40]}"
     os.makedirs(workdir, exist_ok=True)
-    
+
     print(f"RUN: {title}", flush=True)
     t0 = time.monotonic()
     try:
@@ -46,7 +52,7 @@ def run_cell(model_id, title, config_file, timeout=400):
     except subprocess.TimeoutExpired:
         print(f"  TIMEOUT after {timeout}s")
         return
-    
+
     elapsed = time.monotonic() - t0
     s = get_session(title)
     if s:

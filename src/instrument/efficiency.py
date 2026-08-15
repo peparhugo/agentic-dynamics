@@ -12,7 +12,6 @@ from typing import Any
 
 from .solution import SolutionMetrics
 
-
 # Architecture constants — publicly disclosed where available.
 # DeepSeek: 49B active parameters (MoE V4 Pro, publicly disclosed).
 # Claude: undisclosed — placeholder for energy model estimation only.
@@ -176,7 +175,7 @@ def _resolve_pricing_key(provider_id: str, model_id: str = "") -> str:
 
 def get_pricing(provider_id: str, model_id: str = "") -> dict[str, float]:
     """Get approximate pricing for a provider/model.
-    
+
     Returns per-million-token rates. Falls back to generic provider rates
     if model-specific pricing is unavailable. Returns historical billing
     rates for pre-v0.9 models, current rates for v0.9+ models.
@@ -402,7 +401,7 @@ def estimate_bounded_energy(
     # All-provider baseline: token-count-based energy
     # Assume ~0.1 J/token as a conservative per-token energy floor
     # (TokenPowerBench finds 0.1-2 J/tok depending on hardware)
-    J_PER_TOKEN_FLOOR = 0.1
+    J_PER_TOKEN_FLOOR = 0.1  # noqa: N806
 
     total_observable = prompt_tokens + completion_tokens + reasoning_tokens
     total_with_cache = total_observable + cache_read_tokens + cache_write_tokens

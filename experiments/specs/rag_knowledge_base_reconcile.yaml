@@ -1,0 +1,158 @@
+name: rag_knowledge_base_reconcile
+question: >-
+  Reconcile the runtime-RAG knowledge base (branch feature/rag-kb-wire: knowledge.py,
+  retrieval.py, prompt_constructor.py, knowledge_stream.py + kb_worker.py + the wire fixes)
+  with the current main, which has since moved 376 files and instrumented the ledger
+  (confidence, perturbation_strength, test_executed_success, answer/explanation token split).
+  Then extend the offline evidence-card derivation to the richer ledger, wire the merged KB into
+  the self-recommending-experiment adapt loop (observe -> recommend -> enqueue --interleave ->
+  measure -> writeup), verify, and sync the agent-facing docs. This is a merge, not a rewrite:
+  the RAG stack stays (async is the target architecture), and both sides' functionality must
+  survive.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      brief: >-
+        You are merging, not re-deriving. The RAG stack on feature/rag-kb-wire is correct and
+        tested (187 scoped tests green); main has since instrumented the ledger and drifted. Your
+        job is to bring main's changes and the RAG changes together WITHOUT losing either. Read
+        both sides of every conflict before editing. Keep the async ingestion spine (knowledge_stream
+        + kb_worker) — async is the intended architecture, do not cut it. Never consume the
+        unmeasured-vs-measured distinction sloppily: confidence is now measured [H]; treat it as a
+        signal, not an oracle. This merge satisfies "Next step 3" of
+        code_reviews/2026-08-15_self-healing-remediation-finding.md (KB branch + ledger merged): the
+        self-recommending loop's observe phase should now read the whole measured corpus + KB, and its
+        recommend phase can propose routing-policy and system-optimization experiments — the evidence
+        cards you extend are the finding unit that feeds it. Do NOT weaken the self-recommending loop's
+        --interleave hard constraint.
+      conflict_map: >-
+        The merge conflicts are confined to seven files, all additive on both sides:
+        workflow_runner.py (main added PhaseResult.confidence + answer/explanation tokens in the
+        token dict; RAG added the rag_augment hook + AugmentationOutcome + augmentation_* fields —
+        keep BOTH); graph.py (main moved `import neo4j` into __init__ and switched schema creation
+        to contextlib.suppress; RAG added ALLOWED_EXPANSION_RELS, the _KNOWLEDGE_* constraints/indexes
+        incl. the full-text index, the Step.doc_id/text repair, load_codebase_graph, expand_candidates,
+        find_exact, search_fulltext — keep BOTH); embeddings.py (main moved `import ollama` into
+        __init__ and added strict=False to zip; RAG added step_doc_id, CHROMA_HOST/PORT, ChromaStoreError,
+        collection_name isolation, upsert/delete/inventory — keep BOTH); __init__.py, src/instrument/CONTEXT.md,
+        tests/test_graph.py, tests/test_embeddings.py (purely additive on both sides — union the exports,
+        rows, and tests).
+    phases:
+      - name: reconcile
+        kind: agent
+        prompt: >
+          Merge current main into this branch and resolve all conflicts, preserving BOTH sides'
+          functionality. Run `git merge main` in the worktree, then work through every conflicted file.
+
+          CONFLICT MAP (authoritative — read both sides before editing):
+          - workflow_runner.py: main added PhaseResult.confidence (float|None, [H]) + answer/explanation
+            keys in the per-phase tokens dict + `pr.confidence = getattr(ar, "confidence", None)`; the RAG
+            side added AugmentationOutcome, the rag_augment hook between route_step and run_agent, and the
+            augmentation_* PhaseResult fields. The merged file must contain BOTH the confidence/token-split
+            instrumentation AND the rag_augment seam.
+          - graph.py: main moved `from neo4j import GraphDatabase` into Neo4jClient.__init__ and replaced
+            the try/except schema loop with contextlib.suppress; the RAG side added ALLOWED_EXPANSION_RELS,
+            _KNOWLEDGE_CONSTRAINTS/_INDEXES/_FULLTEXT (native full-text over Step.text), the Step.doc_id/text
+            repair in build_step_graph, load_codebase_graph, expand_candidates/_neighbors/_get_node,
+            find_exact, search_fulltext, and the _validate_identifier Cypher guard. Keep main's lazy import +
+            contextlib style AND all RAG capabilities.
+          - embeddings.py: main moved `import ollama` into EmbeddingClient.__init__ and used zip(..., strict=False);
+            the RAG side added step_doc_id(), CHROMA_HOST/CHROMA_PORT, ChromaStoreError, collection_name
+            isolation, upsert/delete/inventory, and the search(where=) filter. Keep both.
+          - __init__.py / src/instrument/CONTEXT.md / tests/test_graph.py / tests/test_embeddings.py: additive —
+            union both sides (main's new exports/rows + the RAG exports/rows; both test additions).
+
+          After resolving, ensure the tree is committed (a completed merge commit is fine; the workflow will
+          record this phase with an empty commit hash). Do NOT squash main's history, do NOT drop any RAG
+          module, and do NOT revert main's ledger instrumentation.
+      - name: evidence_cards
+        kind: agent
+        prompt: >
+          Extend the offline evidence-card derivation to the now-instrumented ledger. Read
+          src/instrument/retrieval.py build_evidence_cards() and src/instrument/signal_store.py.
+
+          REQUIREMENTS:
+          - Consume, when present in each run dict, the newly-measured signals: confidence [H],
+            test_executed_success [M] (bool|None), and perturbation_strength (float|None), in addition
+            to the existing correctness/cost/flail.
+          - Use graceful fallbacks: absent or NaN values must not crash the derivation and must not be
+            rendered as a false number (e.g. render "confidence —" when None).
+          - Gate on test_executed_success: a run with test_executed_success == False must be excluded or
+            explicitly down-weighted/flagged in its card text (unverified findings must never look verified).
+          - Keep the card one line and precomputed (no LLM); update the card text template to include the
+            new signals only when present.
+          - Confirm the run-dict field names by checking what signal_store.load_results() actually returns
+            from _results_summary.json entries (reuse its alias normalization rather than hitting Neo4j);
+            add a note if the load_runs property set and the _results_summary entries disagree on any name.
+
+          TESTS: extend tests/test_retrieval.py for the new fields (present, absent, NaN, and
+          test_executed_success False gating). Run tests/test_retrieval.py green.
+      - name: recommend_wiring
+        kind: agent
+        prompt: >
+          Wire the merged knowledge base into the self-recommending-experiment adapt loop.
+
+          READ FIRST:
+          - code_reviews/2026-08-15_self-healing-remediation-finding.md
+          - experiments/specs/self_recommending_experiment.yaml  (observe -> recommend -> enqueue
+            --interleave -> measure -> writeup)
+          - src/instrument/retrieval.py (build_evidence_cards) and src/instrument/signal_store.py
+
+          REQUIREMENTS:
+          - Update experiments/specs/self_recommending_experiment.yaml `observe` phase READ FIRST:
+            replace "the knowledge base, if present (rag_knowledge_base branch)" with a concrete pointer
+            to the merged KB — `src/instrument/retrieval.build_evidence_cards(load_results())` (the
+            offline finding cards) plus the KB stores (Neo4j full-text / Chroma) when populated — and
+            note that evidence cards are the finding unit its `recommend` phase should consume.
+          - Smoke-check consumability: run build_evidence_cards over signal_store.load_results() and
+            confirm the cards carry the newly-measured signals (confidence, test_executed_success,
+            perturbation_strength) and that failed/unverified runs are gated.
+          - Do NOT change the loop's phases, factor grid, comparison, or the --interleave hard
+            constraint; only tighten the observe inputs to read the now-merged KB.
+
+          DELIVER the tightened observe section (committed with the rest of this phase).
+      - name: verify
+        kind: agent
+        prompt: >
+          Scoped verification — do NOT run the full `pytest .` suite. Run only the RAG-relevant files
+          on the merged tree:
+
+            pytest tests/test_knowledge.py tests/test_retrieval.py tests/test_prompt_constructor.py \
+                   tests/test_knowledge_stream.py tests/test_graph.py tests/test_embeddings.py \
+                   tests/test_workflow_runner.py -q
+
+          ISOLATION (load-bearing): Neo4j (7687) is SHARED — prefer a throwaway NEO4J_URI if available,
+          else accept MERGE-only writes (never DETACH DELETE). Redis tests flush ONLY DB 2; DB 1 is the
+          queue and read-only — verify no kb_worker.py is running first. Chroma uses throwaway test_*
+          collections. Then an import smoke test of the merged modules (including the rag_augment path),
+          and re-assert default-off (rag_augment=False) remains byte-identical. Leave all seven files green.
+      - name: docs
+        kind: agent
+        prompt: >
+          Sync the agent-facing surfaces to the merged code (standard closing step — do not skip).
+          Update BOTH convention surfaces in lockstep:
+          - .opencode/instructions/mental-model.md AND .claude/rules/mental-model.md: add knowledge.py,
+            retrieval.py, prompt_constructor.py, knowledge_stream.py to the module map; add the
+            rag_augment hook signature (run_workflow(..., rag_augment, retrieve_fn, construct_fn,
+            rag_params)) and the data-flow line route_step -> retrieve -> construct -> render -> run_agent.
+          - AGENTS.md and CLAUDE.md: one "Key files" pointer to the RAG layer, marked default-off.
+          - .opencode/agents/instrument-dev.md AND .claude/agents/instrument-dev.md: bump the module count
+            (the RAG layer adds knowledge/retrieval/prompt_constructor/knowledge_stream) and add them to
+            the module map.
+          - scripts/CONTEXT.md: ensure the kb_worker.py row is accurate and consistent with scripts/worker.py.
+          Keep the two surfaces (opencode vs .claude) in lockstep — they must not drift further.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -12,10 +12,8 @@ No embeddings. No model internals. No API-specific features.
 from __future__ import annotations
 
 import ast
-import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
-
 
 # ── Method 1: Pragmatic Marker Analysis ──
 
@@ -210,11 +208,11 @@ def analyze_ast(
     bt_names = {n.name if isinstance(n, ast.FunctionDef) else n.id
                 for n in ast.walk(bt)
                 if isinstance(n, (ast.FunctionDef, ast.Name))
-                and (isinstance(n, ast.FunctionDef) or isinstance(n, ast.Name))}
+                and (isinstance(n, (ast.FunctionDef, ast.Name)))}
     pt_names = {n.name if isinstance(n, ast.FunctionDef) else n.id
                 for n in ast.walk(pt)
                 if isinstance(n, (ast.FunctionDef, ast.Name))
-                and (isinstance(n, ast.FunctionDef) or isinstance(n, ast.Name))}
+                and (isinstance(n, (ast.FunctionDef, ast.Name)))}
     all_names = bt_names | pt_names
     if all_names:
         renamed = len(pt_names - bt_names)

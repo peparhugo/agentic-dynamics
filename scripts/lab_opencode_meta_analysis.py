@@ -11,7 +11,6 @@ Output: experiments/results/lab_opencode_meta_analysis.json
 import json
 import sys
 import time
-from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent

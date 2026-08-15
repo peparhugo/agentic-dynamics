@@ -56,7 +56,8 @@ Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 `plane` is `"measurement"` (produces) or `"control"` (consumes). The validator refuses a control
 rule whose `requires` are unmet. **Consequence: instrument `confidence` (and attempt/timestamp
 fields, `answer`/`explanation` token split) BEFORE authoring `model_cascade`/`dynamics` arms.**
-`confidence` is currently UNMEASURED (see the proposed `AttemptRecord` ledger).
+`confidence` (and `perturbation_strength`, `test_executed_success`, the `answer`/`explanation`
+split) are now MEASURED in the ledger (see `LEDGER_FIELDS`).
 
 ### Dependencies
 `language.py` is the foundation (no internal deps, used by mutation, story, commit_analysis, entropy, codebase_graph, lsp_diagnostics).

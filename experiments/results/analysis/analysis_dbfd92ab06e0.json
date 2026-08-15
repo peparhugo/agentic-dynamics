@@ -7,7 +7,7 @@
     "total_lines_added": 1161,
     "total_lines_removed": 21,
     "net_lines": 1140,
-    "average_convention_score": 0.818
+    "average_convention_score": 0.833
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 2,
-        "complexity_delta": 28,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase",
           "conftest.py: Classes should use PascalCase",
@@ -69,14 +69,14 @@
         "lines_removed": 6
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 2,
-        "complexity_delta": 20,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase",
           "conftest.py: Classes should use PascalCase",
@@ -110,14 +110,14 @@
         "lines_removed": 15
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 36,
-        "duplications_delta": 5.7
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase",
           "conftest.py: Classes should use PascalCase",
@@ -151,14 +151,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
-        "duplications_delta": -0.10000000000000053
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase",
           "conftest.py: Classes should use PascalCase",
@@ -192,14 +192,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase",
           "conftest.py: Classes should use PascalCase",
@@ -218,9 +218,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
-      "errors": 17,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -290,12 +290,12 @@
       "run_id": ""
     },
     "strategy": {
-      "strategy": "wasteful",
-      "strategy_score": 0.314,
+      "strategy": "conservative",
+      "strategy_score": 0.414,
       "exploration_premium": 0.0,
       "thermal_efficiency": 0.0,
-      "verdict": "WASTEFUL \u2014 model burned 0 tokens ($3.4760, ~0J, 0% thinking) achieving only 0% correctness. High reasoning overhead without convergence.",
-      "recommendation": "Reduce perturbation strength or avoid this operator class.",
+      "verdict": "CONSERVATIVE \u2014 model maintained sound reasoning (correctness=0%, quality=0.42) with moderate resource use ($3.4760, ~0J). Model absorbed the perturbation without divergence.",
+      "recommendation": "Reliable but not novel. Good for production, not for exploration.",
       "operator": "",
       "perturbation_class": "",
       "model": "anthropic/claude-sonnet-5",

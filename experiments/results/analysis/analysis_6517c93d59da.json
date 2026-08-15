@@ -7,7 +7,7 @@
     "total_lines_added": 9859,
     "total_lines_removed": 528,
     "net_lines": 9331,
-    "average_convention_score": 0.528
+    "average_convention_score": 0.562
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 106
       },
       "sonar": {
-        "available": true,
-        "bugs_delta": 1,
-        "smells_delta": 6,
-        "complexity_delta": 64,
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.528,
+        "score": 0.562,
         "violations": [
           "dev-server.ts: Functions should use camelCase",
           "dev-server.ts: Classes should use PascalCase",
@@ -149,14 +149,14 @@
         "lines_removed": 8
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 3,
-        "complexity_delta": 42,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.528,
+        "score": 0.562,
         "violations": [
           "dev-server.ts: Functions should use camelCase",
           "dev-server.ts: Classes should use PascalCase",
@@ -270,14 +270,14 @@
         "lines_removed": 29
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 88,
-        "duplications_delta": 1.4
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.528,
+        "score": 0.562,
         "violations": [
           "dev-server.ts: Functions should use camelCase",
           "dev-server.ts: Classes should use PascalCase",
@@ -391,14 +391,14 @@
         "lines_removed": 377
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 2,
-        "complexity_delta": 41,
-        "duplications_delta": -0.3999999999999999
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.528,
+        "score": 0.562,
         "violations": [
           "dev-server.ts: Functions should use camelCase",
           "dev-server.ts: Classes should use PascalCase",
@@ -512,14 +512,14 @@
         "lines_removed": 8
       },
       "sonar": {
-        "available": true,
-        "bugs_delta": 2,
+        "available": false,
+        "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 27,
-        "duplications_delta": 1.2999999999999998
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.528,
+        "score": 0.562,
         "violations": [
           "dev-server.ts: Functions should use camelCase",
           "dev-server.ts: Classes should use PascalCase",
@@ -618,9 +618,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "tsc",
-      "errors": 1,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -691,7 +691,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8447,
+      "strategy_score": 0.9947,
       "exploration_premium": 11.2305,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.88) and found a novel correct solution (novelty=0.96, correctness=100%). Cost: $0.0859, ~0J.",

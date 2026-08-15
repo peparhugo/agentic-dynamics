@@ -65,12 +65,13 @@ def main() -> None:
     print(f"Spawning {REVIEW_WORKERS} review workers...", flush=True)
     for i in range(REVIEW_WORKERS):
         log_path = LOG_DIR / f"review_worker_{i}.log"
-        subprocess.Popen(
-            ["nohup", sys.executable, "-u", "scripts/review_worker.py"],
-            stdout=open(log_path, "w"),
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+        with open(log_path, "w") as f:
+            subprocess.Popen(
+                ["nohup", sys.executable, "-u", "scripts/review_worker.py"],
+                stdout=f,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
 
     print("Done — review workers running against 'review_jobs'.", flush=True)
 

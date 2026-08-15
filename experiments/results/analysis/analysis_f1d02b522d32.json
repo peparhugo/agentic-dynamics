@@ -7,7 +7,7 @@
     "total_lines_added": 2251,
     "total_lines_removed": 202,
     "net_lines": 2049,
-    "average_convention_score": 0.836
+    "average_convention_score": 0.85
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 6,
-        "complexity_delta": 31,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.836,
+        "score": 0.85,
         "violations": [
           "app.py: Classes should use PascalCase",
           "messages.py: Classes should use PascalCase",
@@ -72,14 +72,14 @@
         "lines_removed": 12
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 6,
-        "complexity_delta": 26,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.836,
+        "score": 0.85,
         "violations": [
           "app.py: Classes should use PascalCase",
           "messages.py: Classes should use PascalCase",
@@ -116,14 +116,14 @@
         "lines_removed": 16
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 10,
-        "complexity_delta": 43,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.836,
+        "score": 0.85,
         "violations": [
           "app.py: Classes should use PascalCase",
           "messages.py: Classes should use PascalCase",
@@ -160,14 +160,14 @@
         "lines_removed": 169
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.836,
+        "score": 0.85,
         "violations": [
           "app.py: Classes should use PascalCase",
           "messages.py: Classes should use PascalCase",
@@ -204,14 +204,14 @@
         "lines_removed": 5
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 2,
-        "complexity_delta": 28,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.836,
+        "score": 0.85,
         "violations": [
           "app.py: Classes should use PascalCase",
           "messages.py: Classes should use PascalCase",
@@ -233,9 +233,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
-      "errors": 22,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -306,7 +306,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8307,
+      "strategy_score": 0.9807,
       "exploration_premium": 0.1437,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.69) and found a novel correct solution (novelty=0.87, correctness=100%). Cost: $6.0620, ~0J.",

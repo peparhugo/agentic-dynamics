@@ -1,0 +1,43 @@
+name: routing_regret_under_degradation
+question: >-
+  Does a dynamics controller that escalates on measured confidence beat static
+  cheapest / premium / quality-cascade policies in accepted-cost-per-outcome, once the
+  four missing ledger fields (confidence, perturbation_strength, test_executed_success,
+  answer/explanation split) are instrumented?
+version: "0.2"
+workflow:
+  kind: story
+  params: {stories: [task_manager_api, static_site_gen, notification_service]}
+factors:
+  - {name: model,     levels: [deepseek/deepseek-v4-flash, openai/gpt-5.6-luna, deepseek/deepseek-v4-pro, anthropic/claude-haiku-4-5, openai/gpt-5.6-terra, anthropic/claude-sonnet-5, openai/gpt-5.6-sol]}
+  - {name: condition, levels: [clean, bad_seed, early_degrade, late_degrade]}
+  - {name: policy,    levels: [cheapest, premium_static, quality_cascade, dynamics]}
+design: factorial
+rules:
+  # instrumentation measurement rules — produce the information the policy arms consume.
+  # NOTE: these return an explicit "unmeasured" (NaN, uncertainty 1.0) result until the
+  # remediation_data_integrity spec's `instrument` phase lands the code that emits them.
+  - {name: instrument_confidence,    plane: measurement, evidence_class: "[H]", requires: [], produces: [confidence]}
+  - {name: instrument_grit_inputs,   plane: measurement, evidence_class: "[M]", requires: [], produces: [perturbation_strength, test_executed_success]}
+  - {name: instrument_token_split,   plane: measurement, evidence_class: "[M]", requires: [], produces: [answer, explanation]}
+  # measurement rules
+  - {name: first_pass_quality,       plane: measurement, evidence_class: "[M]", requires: [attempt_number, accepted, evaluator_independent], produces: [first_pass_rate, accepted_outcome]}
+  - {name: grit,                     plane: measurement, evidence_class: "[M]", requires: [perturbation_strength, test_executed_success], produces: [grit, retention, grit_auc, recovery_premium]}
+  - {name: outcome_multiplier,       plane: measurement, evidence_class: "[P]", requires: [value, rework_cost, reuse_value], produces: [net_value]}
+  - {name: explanation_tax,          plane: measurement, evidence_class: "[C]", requires: [answer, explanation, cost_inference], produces: [explanation_tax]}
+  # control rules — the policy arms
+  - {name: model_cascade,            plane: control, evidence_class: "[H]", requires: [confidence], produces: [escalation_decision]}
+  - {name: dynamics,                 plane: control, evidence_class: "[P]", requires: [confidence, first_pass, deadline_slack], produces: [admit_or_halt]}
+  - {name: budget_ceiling,           plane: control, evidence_class: "[P]", requires: [budget, forecast_cost, actual_cost], produces: [budget_admit]}
+metrics:
+  - {name: cost_per_accepted_outcome, agg: mean, over: outcome}
+  - {name: first_pass_rate,           agg: ratio, over: job}
+  - {name: escalation_rate,           agg: ratio, over: job}
+  - {name: grit_auc,                  agg: mean, over: cell}
+comparison:
+  kind: routing_regret
+  arm_factor: policy
+  loss: {cost: 1.0, quality: -5.0, sla: 2.0, value: -3.0}
+writeup: {format: lab_book, sections: [hypothesis, method, results, interpretation]}
+stop: {budget_usd: 40.0, max_attempts: 1, uncertainty_threshold: 0.05}
+adapt: {strategy: coordinate_descent, selection: highest_regret}

@@ -1,0 +1,168 @@
+name: self_recommending_experiment
+question: >-
+  Can an async worker observe the measured corpus + knowledge base, author the next
+  highest-value experiment (a new spec or a targeted re-run), enqueue it with providers
+  interleaved, measure the regret, and write the finding — i.e. is the emergent self-healing
+  loop observed on 2026-08-15 a reusable, repeatable experiment shape?
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool:
+      - deepseek/deepseek-v4-pro
+      - deepseek/deepseek-v4-flash
+    context:
+      prior_art: >-
+        This generalizes the emergent behavior documented in
+        code_reviews/2026-08-15_self-healing-remediation-finding.md: the remediation worker
+        diagnosed contamination, authored a re-run experiment, enqueued it, and spawned workers.
+      enabling_merge: >-
+        A knowledge-base branch is pending; once merged with the instrumented ledger, `observe`
+        reads the whole measured corpus + KB and `recommend` can propose system-optimization and
+        routing-policy experiments, not just data re-runs.
+      provider_rotation: >-
+        HARD CONSTRAINT — enqueue with `scripts/enqueue.py --interleave` so cells round-robin
+        across providers. Never enqueue a single-provider block. Bound the worker count to the
+        number of distinct providers (or fewer) so concurrent workers spread instead of hammering
+        one provider's rate limit.
+    phases:
+      - name: observe
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Observe the measured corpus and knowledge base; rank candidate experiments.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - experiments/results/_results_summary.json  (the measured corpus)
+          - experiments/results/lab_*.json             (prior lab findings)
+          - src/instrument/experiment_spec.py          (LEDGER_FIELDS — what is measured)
+          - code_reviews/2026-08-15_self-healing-remediation-finding.md  (the prior art)
+          - the knowledge base, if present (rag_knowledge_base branch)
+
+          REQUIREMENTS:
+          - Enumerate the highest-value gaps: contamination (stale labels / silent-fallback
+            cells), unmeasured signals (anything a control rule requires but the ledger lacks),
+            high-regret cells, routing-policy opportunities, and system-optimization
+            opportunities.
+          - Rank them by expected information-per-dollar: value of the signal × reachability
+            ÷ cost to acquire. Prefer gaps that unlock a policy arm (the requires/produces gate).
+          - Do NOT enqueue or mutate anything in this phase.
+
+          DELIVER exactly one file: docs/observation_rankings.md (ranked candidates + rationale).
+      - name: recommend
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Author the next highest-value experiment as a concrete spec or re-run plan.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/observation_rankings.md  (produced by the observe phase)
+          - experiments/specs/*.yaml      (existing spec shapes to reuse/parameterize)
+          - code_reviews/2026-08-14_experiment-spec-and-compiler-design.md  (the spec schema)
+
+          REQUIREMENTS:
+          - For the top-ranked candidate, write either (a) a new ExperimentSpec YAML under
+            experiments/specs/ (validating it with the requires/produces gate), or (b) a precise
+            re-run inventory (which cells, which condition, which models) appended to
+            docs/observation_rankings.md.
+          - State the question, the factor grid, the comparison loss, the stop budget, and the
+            adapt selection. A control arm is only admissible if its requires are already
+            measured — if not, recommend the instrumentation first (measure before policy).
+
+          DELIVER the new spec or re-run inventory, with its rationale.
+      - name: enqueue
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Enqueue the recommended experiment and drain it — providers interleaved.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/enqueue.py / worker.py / monitor.py  (queue lifecycle)
+
+          HARD REQUIREMENTS:
+          - Enqueue with `python scripts/enqueue.py --interleave` so cells ROUND-ROBIN across
+            providers. Never enqueue a single-provider block. (Framework Redis on port 6380,
+            never 6379.)
+          - Start NO MORE workers than there are distinct providers, so concurrent workers spread
+            across providers instead of hammering one rate limit. For single-provider re-runs,
+            run at most 1-2 workers.
+          - Poll `python scripts/monitor.py --json` until queued and running both hit 0.
+
+          DELIVER the enqueue/worker record: cells enqueued, providers, worker count, and the
+          final drained state.
+      - name: measure
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Measure the result and decide keep / drop.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/analyze_worktrees.py / analyze_stories.py  (post-hoc measurement)
+          - src/instrument/routing.py (simulate_strategies / recommend_route) for policy grids
+
+          REQUIREMENTS:
+          - Compute the effect size or arm regret from the drained results (the comparison the
+            spec declared). Report the uncertainty.
+          - Decide: does this finding move the routing/policy recommendation? If regret is high
+            or the signal is uninformative, say so explicitly — a null result is still
+            information.
+
+          DELIVER a short measurement note appended to docs/observation_rankings.md.
+      - name: writeup
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Write the finding as a dated, provenance-tagged review.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Write the finding to code_reviews/YYYY-MM-DD_<slug>.md with [M]/[C]/[H]/[P] tags,
+            following the shape of code_reviews/2026-08-15_self-healing-remediation-finding.md.
+          - State the observation, the mechanism, why it matters, and the next recommended
+            experiment (the input to the NEXT adapt iteration).
+
+          DELIVER exactly one finding doc.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: measure_regret,       plane: measurement, evidence_class: "[C]", requires: [cost_inference, value, test_executed_success], produces: [regret]}
+  - {name: recommend_experiment, plane: control,     evidence_class: "[P]", requires: [regret], produces: [recommendation]}
+metrics:
+  - {name: regret,          agg: distribution, over: cell}
+  - {name: cost_per_phase,  agg: distribution, over: cell}
+  - {name: info_per_dollar, agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, observation_rankings, recommendation, enqueue_record, measurement, finding]
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: coordinate_descent, selection: highest_regret}

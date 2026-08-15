@@ -12,8 +12,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-import ollama
-
 # ── Endpoint configuration (mirrors live.py's FINOPS_REDIS_* pattern) ──
 # The store is no longer hardcoded to localhost:8000 — which collides with
 # ``admin/server.py`` — because CHROMA_HOST / CHROMA_PORT override it. The
@@ -39,6 +37,8 @@ class EmbeddingClient:
     """Generate text embeddings via local Ollama model."""
 
     def __init__(self, model: str = "bge-m3:latest", host: str | None = None):
+        import ollama
+
         self.model = model
         self._client = ollama.Client(host=host) if host else ollama
 
@@ -57,7 +57,7 @@ class EmbeddingClient:
     def cosine_distance(self, a: list[float], b: list[float]) -> float:
         if not a or not b:
             return 1.0
-        dot = sum(x * y for x, y in zip(a, b))
+        dot = sum(x * y for x, y in zip(a, b, strict=False))
         mag_a = math.sqrt(sum(x * x for x in a))
         mag_b = math.sqrt(sum(y * y for y in b))
         if mag_a == 0 or mag_b == 0:

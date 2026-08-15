@@ -1,10 +1,12 @@
 """Tests for embeddings module — EmbeddingClient, ChromaStore, extract_session_text."""
 
-import os
-import pytest
+import contextlib
 import socket
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from instrument.embeddings import (
     ChromaStore,
     ChromaStoreError,
@@ -15,12 +17,12 @@ from instrument.embeddings import (
 
 # Skip entire module if Ollama or ChromaDB is unreachable
 try:
-    s = socket.create_connection(("localhost", 11434), timeout=2); s.close()
+    socket.create_connection(("localhost", 11434), timeout=2).close()
     _OLLAMA_OK = True
 except Exception:
     _OLLAMA_OK = False
 try:
-    s = socket.create_connection(("localhost", 8000), timeout=2); s.close()
+    socket.create_connection(("localhost", 8000), timeout=2).close()
     _CHROMA_OK = True
 except Exception:
     _CHROMA_OK = False
@@ -29,7 +31,7 @@ NEEDS_OLLAMA = pytest.mark.skipif(not _OLLAMA_OK, reason="Ollama not available o
 NEEDS_CHROMA = pytest.mark.skipif(not _CHROMA_OK, reason="ChromaDB not available on localhost:8000")
 
 
-pytestmark = NEEDS_OLLAMA
+pytestmark = [pytest.mark.external, NEEDS_OLLAMA]
 
 
 TEST_DIR = Path(__file__).resolve().parent
@@ -104,10 +106,8 @@ class TestChromaStore:
             metadata={"hnsw:space": "cosine"},
         )
         yield
-        try:
+        with contextlib.suppress(Exception):
             self.store._client.delete_collection(self.TEST_COLLECTION)
-        except Exception:
-            pass
 
     def test_connectivity(self):
         store = ChromaStore()

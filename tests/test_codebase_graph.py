@@ -7,15 +7,14 @@ import pytest
 
 from instrument.codebase_graph import (
     CodebaseGraph,
-    ModuleNode,
     GraphMetrics,
-    GraphDelta,
-    build_graph,
-    compute_metrics,
-    compute_graph_delta,
+    ModuleNode,
+    _approx_modularity,
     _extract_imports,
     _resolve_import,
-    _approx_modularity,
+    build_graph,
+    compute_graph_delta,
+    compute_metrics,
 )
 from instrument.language import _PROFILES
 

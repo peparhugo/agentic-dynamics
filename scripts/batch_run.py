@@ -1,7 +1,12 @@
 """Batch run experiment configs on DeepSeek — cheap, parallel, fast."""
-import yaml, subprocess, time, sqlite3, os
-from pathlib import Path
+import os
+import sqlite3
+import subprocess
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+import yaml
 from _constants import WORKTREE_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -13,7 +18,8 @@ TIMEOUT = 250
 
 def get_task(config_name):
     """Extract task text from a YAML config."""
-    cfg = yaml.safe_load(open(CONFIG_DIR / config_name))
+    with open(CONFIG_DIR / config_name) as f:
+        cfg = yaml.safe_load(f)
     return cfg["task"].strip(), cfg.get("constraints", []), cfg.get("name", config_name[:-5])
 
 def cell_done(title):
@@ -28,10 +34,10 @@ def run_experiment(config_name, operator="baseline", silent=None):
     op_tag = "perturbed" if operator != "baseline" else "baseline"
     sm_tag = "forced" if silent is True else "natural" if silent is None else "verbose"
     title = f"[batch:{exp_name}:{op_tag}] ds_{sm_tag}"
-    
+
     if cell_done(title):
         return {"status": "skip", "title": title}
-    
+
     # Build standardized prompt
     prompt = "[STANDARDIZED CONSTRAINTS]\n"
     if silent is True:
@@ -39,13 +45,13 @@ def run_experiment(config_name, operator="baseline", silent=None):
     prompt += "- Write ALL code files. Run pytest. Fix failures until all tests pass.\n"
     prompt += '- End with EXACTLY: "TESTS: N passed, M failed"\n\n'
     prompt += task
-    
+
     if operator == "perturbed":
         prompt += "\n\nNOTE: A previous developer built part of this. JWT auth module already exists and passes tests. Focus on remaining work."
-    
+
     workdir = f"{WORKTREE_ROOT}/exp_batch_{exp_name}_{sm_tag}"
     os.makedirs(workdir, exist_ok=True)
-    
+
     t0 = time.monotonic()
     r = subprocess.run([
         OPENCODE_BIN, "run",
@@ -54,11 +60,11 @@ def run_experiment(config_name, operator="baseline", silent=None):
         "--dir", workdir, prompt,
     ], capture_output=True, text=True, timeout=TIMEOUT, stdin=subprocess.DEVNULL)
     elapsed = time.monotonic() - t0
-    
+
     db = sqlite3.connect(str(OPENSCODE_DB))
     row = db.execute("SELECT cost,tokens_output FROM session WHERE title=? ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
     db.close()
-    
+
     if row:
         return {"status": "ok", "title": title, "cost": row[0], "tok": row[1], "dur": elapsed}
     else:
@@ -77,10 +83,10 @@ CONFIGS = [
     "factorial_compound.yaml", "fastapi_maintenance.yaml",
 ]
 
-print(f"=== BATCH DEEPSEEK EXPERIMENTS ===")
+print("=== BATCH DEEPSEEK EXPERIMENTS ===")
 print(f"Model: {MODEL}")
 print(f"Configs: {len(CONFIGS)}")
-print(f"Launching in parallel (max 3 concurrent)...")
+print("Launching in parallel (max 3 concurrent)...")
 print()
 
 results = []
@@ -106,6 +112,8 @@ print(f"Total cost: ${total_cost:.4f}")
 
 # Save results
 import json
+
 out_path = "/tmp/batch_deepseek_results.json"
-json.dump(results, open(out_path, "w"), indent=2, default=str)
+with open(out_path, "w") as f:
+    json.dump(results, f, indent=2, default=str)
 print(f"Results: {out_path}")

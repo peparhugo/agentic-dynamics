@@ -1,18 +1,23 @@
 """Tests for Neo4j graph module — Neo4jClient, _BufferedResult."""
 
-import pytest
 import socket
 from pathlib import Path
+
+import pytest
+
 from instrument.graph import ALLOWED_EXPANSION_RELS, Neo4jClient, _BufferedResult
 from instrument.embeddings import step_doc_id
 
 try:
-    s = socket.create_connection(("localhost", 7687), timeout=2); s.close()
+    socket.create_connection(("localhost", 7687), timeout=2).close()
     _NEO4J_OK = True
 except Exception:
     _NEO4J_OK = False
 
-pytestmark = pytest.mark.skipif(not _NEO4J_OK, reason="Neo4j not available on localhost:7687")
+pytestmark = [
+    pytest.mark.external,
+    pytest.mark.skipif(not _NEO4J_OK, reason="Neo4j not available on localhost:7687"),
+]
 
 
 class _Neo4jTestBase:

@@ -11,6 +11,7 @@ Usage:
   python3 scripts/sweep_silent_mode.py --limit 1    # run 1 model
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -22,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 
 from instrument import (
-    build_operators, perturb_prompt,
+    build_operators, perturb_prompt, derive_seed,
     evaluate_solution, compute_efficiency,
     detect_constraints, compute_recovery_cost,
 )
@@ -132,7 +133,14 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             ops = build_operators()
             op_name = "remove_critical_constraint"
             pert_class = ops[op_name].perturbation_class
-            perturbed_task, _ = perturb_prompt(TASK, op_name, strength=0.5, rng_seed=42)
+            # Seed is a pure function of the cell (task|operator|strength|seed_variant),
+            # identical across models/silent-modes so the perturbed prompt is held
+            # constant for cross-model comparison (seed_variant = 0, single starting point).
+            perturbed_task, _ = perturb_prompt(
+                TASK, op_name, strength=0.5,
+                rng_seed=derive_seed(TASK, op_name, 0.5, 0),
+            )
+            perturbed_prompt_sha256 = hashlib.sha256(perturbed_task.encode("utf-8")).hexdigest()
             session_name_p = f"[silent_sweep:perturbed:{sm_str}] {label.lower().replace(' ','_')}"
 
             # Skip if already completed
@@ -175,6 +183,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             pert_row = {
                 "model": model_id, "label": label, "silent_mode": sm_str,
                 "operator": op_name, "type": "perturbed",
+                "perturbed_prompt_sha256": perturbed_prompt_sha256,
                 "cost": r_pert.estimated_cost_usd, "total_tokens": r_pert.total_tokens,
                 "reasoning_tokens": r_pert.reasoning_tokens,
                 "thinking_ratio": eff_pert.thinking_ratio,

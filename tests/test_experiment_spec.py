@@ -73,15 +73,13 @@ def test_load_spec_round_trip(tmp_path):
     assert spec.adapt.strategy == "coordinate_descent"
 
 
-def test_validate_rules_reports_unmet_requires(tmp_path):
+def test_validate_rules_admits_instrumented_arms(tmp_path):
     spec = load_spec(_write_yaml(tmp_path))
     errors = validate_rules(spec)
-    # Three unmet fields: grit needs perturbation_strength + test_executed_success,
-    # model_cascade needs confidence. One error per unmet field.
-    assert len(errors) == 3
-    assert any("model_cascade" in e and "confidence" in e for e in errors)
-    assert any("grit" in e and "perturbation_strength" in e for e in errors)
-    assert any("grit" in e and "test_executed_success" in e for e in errors)
+    # All four formerly-missing fields are now ledger-produced: grit needs
+    # perturbation_strength + test_executed_success, model_cascade needs
+    # confidence. The flagship spec therefore validates with no unmet requires.
+    assert errors == []
 
 
 def test_round_trip_to_dict_from_dict(tmp_path):
@@ -90,22 +88,23 @@ def test_round_trip_to_dict_from_dict(tmp_path):
     assert restored == spec
 
 
-def test_confidence_is_not_a_ledger_field():
-    # The load-bearing gap: model_cascade needs confidence, grit needs
-    # perturbation_strength + test_executed_success — none are measured yet.
-    assert "confidence" not in LEDGER_FIELDS
-    assert "perturbation_strength" not in LEDGER_FIELDS
-    assert "test_executed_success" not in LEDGER_FIELDS
+def test_ledger_fields_are_measured():
+    # The instrumentation gap is closed: the four fields the control arms consume
+    # are now ledger-produced, so the validator admits them.
+    assert "confidence" in LEDGER_FIELDS
+    assert "perturbation_strength" in LEDGER_FIELDS
+    assert "test_executed_success" in LEDGER_FIELDS
+    assert "tokens_answer" in LEDGER_FIELDS
+    assert "tokens_explanation" in LEDGER_FIELDS
     assert "attempt_number" in LEDGER_FIELDS
     assert "budget" in LEDGER_FIELDS
 
 
-def test_validator_refuses_unmeasured_rules(tmp_path):
+def test_validator_admits_flagship_spec(tmp_path):
     spec = load_spec(_write_yaml(tmp_path))
-    errors = validate_spec(spec)
-    assert len(errors) == 3
-    assert any("model_cascade" in e and "confidence" in e for e in errors)
-    assert any("grit" in e and "perturbation_strength" in e for e in errors)
+    # The flagship spec (grit + model_cascade + dynamics arms) now compiles clean:
+    # every requires field is produced by the ledger.
+    assert validate_spec(spec) == []
 
 
 def test_validator_admits_after_missing_information_instrumented(tmp_path):

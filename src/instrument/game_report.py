@@ -15,13 +15,12 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from .basin import BasinMetrics
-from .solution import SolutionMetrics
 from .efficiency import EfficiencyMetrics
-from .strategy import StrategyReport, classify_strategy
+from .solution import SolutionMetrics
+from .strategy import StrategyReport
 
 
 @dataclass
@@ -132,8 +131,8 @@ class GameReport:
         ]
         if r:
             lines += [
-                f"| Metric | Value |",
-                f"|--------|-------|",
+                "| Metric | Value |",
+                "|--------|-------|",
                 f"| Escape score [H] | {r.escape_score:.3f} |",
                 f"| Architecture div [H] | {r.architecture_divergence:.3f} |",
                 f"| Structure div [H] | {r.structure_divergence:.3f} |",
@@ -155,8 +154,8 @@ class GameReport:
         ]
         if sol:
             lines += [
-                f"| Metric | Value |",
-                f"|--------|-------|",
+                "| Metric | Value |",
+                "|--------|-------|",
                 f"| Correctness | {sol.correctness_score:.0%} ({sol.tests_passed}/{sol.tests_total} tests) {'[M]' if sol.evaluator_independent else '[H]'} |",
                 f"| Constraint satisfaction [H] | {sol.constraint_score:.0%} ({sol.constraints_met}/{sol.constraints_total} constraints) |",
                 f"| Lines of code [M] | {sol.lines_of_code} |",
@@ -177,8 +176,8 @@ class GameReport:
                 "",
                 "## SonarQube Quality [X]",
                 "",
-                f"| Metric | Value |",
-                f"|--------|-------|",
+                "| Metric | Value |",
+                "|--------|-------|",
                 f"| Bugs | {sol.sonar_bugs} |",
                 f"| Vulnerabilities | {sol.sonar_vulnerabilities} |",
                 f"| Code smells | {sol.sonar_code_smells} |",
@@ -199,10 +198,10 @@ class GameReport:
                 "",
                 "## SonarQube Diff Quality [X]",
                 "",
-                f"**Perturbation quality degradation — how much code quality was lost.**",
+                "**Perturbation quality degradation — how much code quality was lost.**",
                 "",
-                f"| Metric | Baseline | Perturbed | Delta |",
-                f"|--------|----------|-----------|-------|",
+                "| Metric | Baseline | Perturbed | Delta |",
+                "|--------|----------|-----------|-------|",
                 f"| Bugs | {r.sonar_baseline_bugs} | {r.sonar_perturbed_bugs} | +{r.sonar_bugs_delta} |",
                 f"| Code smells | {r.sonar_baseline_smells} | {r.sonar_perturbed_smells} | +{r.sonar_code_smells_delta} |",
                 f"| Vulnerabilities | — | — | +{r.sonar_vulnerabilities_delta} |",
@@ -221,8 +220,8 @@ class GameReport:
         ]
         if e:
             lines += [
-                f"| Metric | Value |",
-                f"|--------|-------|",
+                "| Metric | Value |",
+                "|--------|-------|",
                 f"| Prompt tokens [M] | {e.prompt_tokens:,} |",
                 f"| Completion tokens [M] | {e.completion_tokens:,} |",
                 f"| Reasoning tokens [M] | {e.reasoning_tokens:,} |",

@@ -43,6 +43,7 @@
 <div class="pulse"><span class="dot"></span> How — Research Methodology</div>
 <h1>The N x M Measurement Instrument</h1>
 <p class="lead" style="font-size:1.05rem;color:var(--t)">How the measurement instrument was built. A calibrated measurement apparatus that measures how specification degradation changes agent decisions, behavior, and the economics of the results — cost, correctness, and what those outcomes are worth.</p>
+<p style="max-width:800px;margin:0.5rem auto 0;font-size:0.8rem;color:var(--t2)">This page describes the 249-session perturbation corpus; the <a href="evidence.html" style="color:var(--ac)">Evidence page</a> leads with the newer 1,097-session linked-story corpus.</p>
 <div class="stats">
 <div class="stat"><div class="v">10</div><div class="l">Perturbation Operators</div></div>
 <div class="stat"><div class="v">7</div><div class="l">Recovery Signals</div></div>
@@ -63,7 +64,7 @@
 
 <div class="highlight-box" style="border-left-color:var(--cy);margin-bottom:2rem">
 <strong>&#9881; Just want to run the instrument?</strong><br>
-<code style="display:block;margin:0.5rem 0;font-size:0.75rem;word-break:break-all">git clone https://github.com/peparhugo/agentic-dynamics && cd agentic-dynamics && pip install -e . && python scripts/run.py --config experiments/configs/task_manager.yaml</code>
+<code style="display:block;margin:0.5rem 0;font-size:0.75rem;word-break:break-all">git clone https://github.com/peparhugo/agentic-dynamics && cd agentic-dynamics && pip install -e . && python scripts/run.py experiments/configs/task_manager.yaml</code>
 For the full methodology — perturbation operators, recovery signals, strategy archetypes — read on.
 </div>
 
@@ -85,7 +86,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <h2>The CLI Tools</h2>
 <p class="lead">The instrument runs in two regimes over the same backend, orchestrated by a YAML pipeline and observed through a live control plane.</p>
 <div class="cards">
-<div class="card"><div class="ctag">Single-session</div><div class="ctitle">Perturbation experiments</div><div class="cdesc"><code style="color:var(--ac)">scripts/run.py --config &lt;task&gt;.yaml</code>. One task, one (perturbed) prompt, one isolated worktree. Produces a Game Report and feeds <code>_results_summary.json</code> — the original 227-worktree corpus.</div></div>
+<div class="card"><div class="ctag">Single-session</div><div class="ctitle">Perturbation experiments</div><div class="cdesc"><code style="color:var(--ac)">scripts/run.py &lt;task&gt;.yaml</code>. One task, one (perturbed) prompt, one isolated worktree. Produces a Game Report and feeds <code>_results_summary.json</code> — the original 227-worktree corpus.</div></div>
 <div class="card"><div class="ctag amber">Multi-session</div><div class="ctitle">Story pipeline</div><div class="cdesc"><code style="color:var(--ac)">scripts/enqueue.py</code> fills a Redis queue (story &times; tier &times; quality &times; condition); <code style="color:var(--ac)">scripts/worker.py</code> drains it, running each cell as a five-session story with git commits between sessions &mdash; greenfield &rarr; feature &rarr; integration &rarr; refactor &rarr; cross-cutting.</div></div>
 <div class="card"><div class="ctag">Orchestration</div><div class="ctitle">YAML pipeline</div><div class="cdesc"><code style="color:var(--ac)">scripts/pipeline.py --plan &lt;ci|deploy|full_matrix|feature|ship_features&gt;</code>. Phase DAGs (lint &rarr; test &rarr; build; matrix &rarr; analyze &rarr; review &rarr; deploy) with Redis state and parallel workers.</div></div>
 <div class="card"><div class="ctag">Control plane</div><div class="ctitle">Live telemetry</div><div class="cdesc"><code style="color:var(--ac)">admin/server.py</code> serves a dashboard: a live experiment matrix, per-cell event streams (SSE), and a routing board &mdash; reading the same Redis state the workers write.</div></div>
@@ -202,7 +203,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 
 <div class="cards">
 <div class="card"><div class="ctitle">1. Clone &amp; Install</div><div class="cdesc"><code style="color:var(--ac)">git clone https://github.com/peparhugo/agentic-dynamics<br>cd agentic-dynamics<br>pip install -e .</code></div></div>
-<div class="card"><div class="ctitle">2. Run a Config</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run.py --config experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro</code><br><br>Choose from 34 configs in <code>experiments/configs/</code>. Each defines the task, model, perturbation operators, and strengths.</div></div>
+<div class="card"><div class="ctitle">2. Run a Config</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run.py experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro</code><br><br>Choose from 34 configs in <code>experiments/configs/</code>. Each defines the task, model, perturbation operators, and strengths.</div></div>
 <div class="card"><div class="ctitle">3. Run a Story</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run_story.py task_manager_api --model anthropic/claude-sonnet-5 --backend claude_cli</code><br><br>Five-session stories with git commits between sessions. <code>--backend claude_cli</code> runs Claude on your subscription; <code>--model anthropic/*</code> auto-routes the same way. Scale with <code>scripts/enqueue.py</code> + <code>scripts/worker.py</code>.</div></div>
 <div class="card"><div class="ctitle">4. Watch It Live</div><div class="cdesc"><code style="color:var(--ac)">python admin/server.py</code><br><br>Live control plane: experiment matrix, per-cell event streams, routing board. Or <code>scripts/monitor.py</code> for a terminal dashboard.</div></div>
 <div class="card"><div class="ctitle">5. Read &amp; Extend</div><div class="cdesc">Results output to <code>experiments/results/</code> as JSON and Markdown. Add perturbation operators in <code>src/instrument/perturb.py</code>, configs in <code>experiments/configs/</code>. The instrument is modular &ndash; new operators, models, and providers plug in without modifying the core runner.</div></div>

@@ -22,8 +22,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from instrument.opencode_analyzer import OpencodeAnalyzer, REPORTS_DIR
 from instrument.opencode import AgenticResult
+from instrument.opencode_analyzer import REPORTS_DIR, OpencodeAnalyzer
 
 
 def _persist_result(result: AgenticResult, tag: str) -> Path:

@@ -12,13 +12,10 @@ import os
 import subprocess
 import sys
 import time
-import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
 
 import redis
-
 from _constants import SESSION_TIMEOUT, STORY_SESSIONS
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")

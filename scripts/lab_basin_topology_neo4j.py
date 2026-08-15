@@ -80,9 +80,8 @@ def compute():
                 }
 
     # Compare with original
-    original = {}
     if ORIGINAL_PATH.exists():
-        original = json.loads(ORIGINAL_PATH.read_text())
+        json.loads(ORIGINAL_PATH.read_text())
 
     validation = {"match": True, "differences": []}
     result["validation"] = validation

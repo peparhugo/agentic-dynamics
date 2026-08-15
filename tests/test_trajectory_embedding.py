@@ -5,23 +5,28 @@ EmbeddingClient for semantic distance computation instead of
 the old dreamlab/recall fallback.
 """
 
-import pytest
 import socket
+
+import pytest
+
 from instrument.trajectory import (
-    TrajectoryStep,
     ReasoningTrajectory,
-    compute_trajectory_distance,
+    TrajectoryStep,
     _content_distance,
     _embedding_distance,
+    compute_trajectory_distance,
 )
 
 try:
-    s = socket.create_connection(("localhost", 11434), timeout=2); s.close()
+    socket.create_connection(("localhost", 11434), timeout=2).close()
     _OLLAMA_OK = True
 except Exception:
     _OLLAMA_OK = False
 
-pytestmark = pytest.mark.skipif(not _OLLAMA_OK, reason="Ollama not available on localhost:11434")
+pytestmark = [
+    pytest.mark.external,
+    pytest.mark.skipif(not _OLLAMA_OK, reason="Ollama not available on localhost:11434"),
+]
 
 
 def make_trajectory(run_id, actions):

@@ -1,0 +1,204 @@
+name: perturbation_operators_fix
+question: >-
+  Are the ten reasoning-space perturbation operators semantically correct, strength-calibrated
+  (0.0 = no-op), deterministic (same seed -> same prompt), and cross-model reproducible (same
+  cell -> same perturbed prompt), and are they covered by tests? Fix the operators and lock the
+  invariants in before any downstream spec consumes their output.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool:
+      - deepseek/deepseek-v4-pro
+    context:
+      known_bugs: >-
+        (1) strength 0.0 is not a no-op for ANY operator — inject_alien_vocab does max(2, int(2+4s))
+        replacements, force_abandonment does 1+int(s*3) rounds, and the premise/contradiction/
+        phantom/competing-goal/invert/remove/reverse operators fall into their mild branch at s=0;
+        only the special "baseline" operator is a true control. (2) inject_alien_vocab's main path
+        substitutes tech terms with mild synonyms (database->vault) and only uses ALIEN_VOCABULARIES
+        in the fallback — it does not inject cross-domain vocabulary as claimed. (3) reverse_causality
+        duplicates the task section at strength>=0.8 (task_section == preamble == lines[:req_start])
+        and has dead code (lines[req_start:] / lines[output_start:] expressions discarded).
+        (4) invert_constraint inverts only one term per sentence (count=1 then break).
+      seed_fragility: >-
+        run.py:189 uses rng_seed=42+run_idx (a sequential cell counter within one --model
+        invocation). multi_model_compare re-runs run_experiment per model so run_idx restarts at 0
+        and cross-model consistency holds today, but the seed is order-dependent and does not encode
+        the cell identity; reordering operators/strengths shifts every downstream seed. sweep_silent_mode.py:141
+        also hardcodes rng_seed=42.
+      prerequisite_for: >-
+        This spec is upstream of remediation_data_integrity (which re-runs contaminated cells),
+        routing_regret_under_degradation, process_perturbation_resample, and explanation_tax — all of
+        which assume valid perturbation and reproducible cross-model prompts.
+    phases:
+      - name: assess
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Audit the perturbation operators and write docs/operator_audit.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - src/instrument/perturb.py   (all 10 operator implementations + perturb_prompt)
+          - tests/test_perturb.py       (current coverage — only remove_critical_constraint)
+          - src/instrument/__init__.py  (exports)
+
+          REQUIREMENTS:
+          - For each of the 10 operators produce a table row: name, claimed behavior (docstring),
+            ACTUAL behavior (from the code), perturbation_class, whether strength=0.0 is a no-op,
+            and whether any test covers it.
+          - Enumerate the concrete bugs: strength-0-not-noop (all 9), alien_vocab synonym substitution
+            vs cross-domain injection, reverse_causality task-section duplication + dead code,
+            invert_constraint single-term inversion.
+          - Note the determinism contract: perturb_prompt is seeded via random.Random(rng_seed), and
+            the callers (scripts/run.py:189, scripts/sweep_silent_mode.py:141, scripts/experiment.py)
+            and what seed each passes.
+
+          DELIVER exactly one file: docs/operator_audit.md. Do not modify code.
+      - name: fix_operators
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Fix the operator bugs and calibrate strength semantics.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/operator_audit.md (produced by the assess phase)
+          - src/instrument/perturb.py
+
+          REQUIRED OUTCOME:
+          - strength no-op: every operator returns the base prompt UNCHANGED at strength <= 0.0.
+            Add a guard at the top of perturb_prompt (or each apply_fn): if strength <= 0.0, return
+            the prompt as-is with perturbation_class set and noop_reason="strength 0.0 (no-op)".
+          - inject_alien_vocab: make the MAIN path replace domain terms with cross-domain
+            ALIEN_VOCABULARIES terms (not synonyms), or, if synonym substitution is the intended
+            design, rename the operator and rewrite the docstring to match reality. Choose one;
+            do not leave the name/docstring contradicting the code.
+          - reverse_causality: remove the dead code and fix the task-section duplication so the
+            task description appears exactly once at every strength.
+          - invert_constraint: invert every applicable pattern in each selected sentence (or document
+            explicitly that only the first is inverted), consistent with the docstring.
+          - Preserve the noop_reason detection (perturbed == base_prompt) for the strength>0 cases.
+
+          EDITING CONSTRAINTS:
+          - Operators remain pure functions (prompt, strength, rng) -> str. Do not change signatures.
+          - Keep the 3-way PERTURBATION_CLASSES taxonomy and the registry single source of truth.
+          - snake_case, type hints, no comments unless asked.
+
+          DELIVER the fixed perturb.py.
+      - name: seed_cell_identity
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Make the perturbation seed a pure function of the cell and persist the prompt.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/run.py            (run_idx loop, _run_perturbed, multi_model_compare)
+          - scripts/sweep_silent_mode.py
+          - src/instrument/perturb.py (perturb_prompt signature)
+
+          REQUIRED OUTCOME:
+          - Replace rng_seed=42+run_idx with a cell-derived seed that is order-independent and encodes
+            the cell identity: seed = int(sha256(f"{task}|{operator}|{strength}|{repetition}")[:8], 16).
+            Same (task, operator, strength, repetition) -> same seed, regardless of loop order, model,
+            or which run_idx slot it occupies.
+          - Persist reproducibility evidence into every result record: add perturbed_prompt_sha256
+            (and the perturbed prompt text) to the result dict written by _run_perturbed, so cross-model
+            prompt drift is verifiable after the fact, not assumed.
+          - Update sweep_silent_mode.py (and any other perturb_prompt caller found via grep) to the
+            same seed derivation for consistency.
+
+          EDITING CONSTRAINTS:
+          - Do not change the baseline operator path. Do not alter pricing or taxonomy. Keep run_idx
+            available for display only.
+
+          DELIVER the seed change plus a short note in docs/operator_audit.md on the new contract.
+      - name: add_tests
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Add regression tests that lock in the operator invariants.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - tests/test_perturb.py (existing — extend, do not delete)
+          - src/instrument/perturb.py (post-fix)
+
+          REQUIRED OUTCOME (new tests, run them explicitly with pytest tests/test_perturb.py -v):
+          - test_determinism_same_seed_same_output: perturb_prompt(base, op, strength=0.5, rng_seed=7)
+            twice -> identical prompt, for every operator.
+          - test_cross_model_same_cell_same_seed: the seed derivation function returns the same seed
+            for the same (task, operator, strength, repetition) regardless of model.
+          - test_strength_zero_is_noop: for all 9 non-baseline operators, perturb_prompt(base, op,
+            strength=0.0) returns base unchanged (parametrized).
+          - test_alien_vocab_injects_cross_domain_terms: the main path output contains a term from
+            ALIEN_VOCABULARIES (or, if renamed/redocumented, assert the documented behavior instead).
+          - test_reverse_causality_no_duplication: the task description sentence appears exactly once
+            at strength 0.8.
+          - test_operator_smoke: for each operator at strength 0.5, output is non-empty, differs from
+            base, and perturbation_class is canonical.
+
+          EDITING CONSTRAINTS:
+          - Parametrize over build_operators() so a new operator is automatically covered.
+          - Never run a bare suite — enumerate test files explicitly.
+
+          DELIVER the extended tests/test_perturb.py.
+      - name: verify
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Run the targeted tests and write docs/operator_fix_verify.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - Run pytest tests/test_perturb.py -v (and re-run tests/test_strategy.py,
+            tests/test_basin.py, tests/test_data_integrity.py to confirm no downstream regression).
+            Report the exact command and result; fix any failure introduced by this work first.
+          - Confirm all 10 operators pass the smoke test, all 9 are no-ops at strength 0, alien_vocab
+            matches its (possibly renamed) documentation, and reverse_causality no longer duplicates.
+          - Confirm the seed derivation is a pure function of the cell and the sha256 is persisted.
+
+          DELIVER exactly one file: docs/operator_fix_verify.md with PASS/FAIL per check, commands run,
+          and a one-line summary of what each fixed operator now does.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: operator_determinism,          plane: measurement, evidence_class: "[M]", requires: [], produces: [deterministic]}
+  - {name: strength_zero_noop,            plane: measurement, evidence_class: "[M]", requires: [], produces: [noop_at_zero]}
+  - {name: cross_model_prompt_consistency, plane: measurement, evidence_class: "[M]", requires: [], produces: [same_prompt]}
+metrics:
+  - {name: operators_passing_smoke, agg: ratio, over: cell}
+  - {name: operators_noop_at_zero,  agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, operator_audit, fixes, seed_contract, tests, verification]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

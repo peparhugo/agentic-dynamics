@@ -16,15 +16,14 @@ import json
 import shutil
 import sqlite3
 import sys
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from instrument.efficiency import compute_cost_estimate
 from instrument.opencode import AgenticResult, _parse_session_output
 from instrument.story import _count_tests
-from instrument.efficiency import compute_cost_estimate
 
 RESULTS_DIR = ROOT / "experiments" / "results" / "stories"
 BACKUP_DIR = RESULTS_DIR / ".backfill_backup"
@@ -110,7 +109,7 @@ def backfill(dry_run: bool = False) -> dict:
         story_sessions = [
             s for s in d.get("sessions", [])
         ]
-        main_db_sessions = [
+        [
             s for s in db_sessions
             if "Session" in s["title"] and "@explore" not in s["title"].lower()
         ]
@@ -126,7 +125,7 @@ def backfill(dry_run: bool = False) -> dict:
         for ses in story_sessions:
             sn = ses.get("session_number", 0)
             db_match = _match_db_to_session(db_sessions, sn)
-            
+
             if db_match:
                 db_cost = float(db_match["cost"] or 0)
                 if db_cost > 0:

@@ -45,7 +45,8 @@ ERROR: policy arm "dynamics" requires [confidence, first_pass, deadline_slack]
 
 **Consequence for implementation order — instrument `confidence` FIRST** (plus attempt/timestamp
 fields and the `answer`/`explanation` token split), then author the `model_cascade`/`dynamics`
-control arms. `confidence` is currently UNMEASURED in the ledger.
+control arms. `confidence` (and `perturbation_strength`, `test_executed_success`, the
+`answer`/`explanation` split) are now MEASURED in the ledger (instrumentation step 3 done).
 
 **Reuse map (no new transport):** `experiment_matrix` generalizes `_gen_matrix_cells`
 (`pipeline.py:394`); `experiment_run` = existing enqueue+worker+run_story; `evaluate_rules` =
@@ -59,7 +60,7 @@ the lab books driven by `spec.rules`; `compare_arms` = `routing.simulate_strateg
 ## Perturbation Operators (perturb.py)
 
 ```python
-from ai_finops_dynamics import build_operators, perturb_prompt
+from instrument import build_operators, perturb_prompt
 
 operators = build_operators()  # dict[str, PerturbationOperator]
 # Apply operator at given strength:
@@ -99,7 +100,7 @@ Typescript variants: typescript_ssg, typescript_ssg_claude, typescript_ssg_gpt5,
 ## The AgenticResult (opencode.py)
 
 ```python
-from ai_finops_dynamics import run_opencode_agentic
+from instrument import run_opencode_agentic
 
 result = run_opencode_agentic(
     prompt=perturbed_prompt,
@@ -130,7 +131,7 @@ python scripts/run_story.py task_manager_api --condition early_degrade \
 ```
 
 ```python
-from ai_finops_dynamics import (
+from instrument import (
     run_story, BUILTIN_STORIES, PerturbationCondition,
     condition_to_mutations, save_story_result, load_story_result
 )
@@ -142,7 +143,7 @@ from ai_finops_dynamics import (
 # LATE_DEGRADE: spec corrupted in session 4
 
 # Mutation compilation (mutation.py):
-from ai_finops_dynamics import compile_mutation, apply_mutation, ALL_OPERATORS
+from instrument import compile_mutation, apply_mutation, ALL_OPERATORS
 # compile_mutation() calls Flash V4 to generate coherent mutations
 # 20 total operators: 10 spec + 10 codebase
 # apply_mutation() writes mutated code to target_path
@@ -156,7 +157,7 @@ from ai_finops_dynamics import compile_mutation, apply_mutation, ALL_OPERATORS
 ## Measurement Stack (post-hoc, consumed by analyze_worktrees.py)
 
 ```python
-from ai_finops_dynamics import evaluate_solution, measure_basin_escape
+from instrument import evaluate_solution, measure_basin_escape
 
 # Solution evaluation:
 metrics = evaluate_solution(code, constraints=["..."], baseline_code="...",
@@ -171,17 +172,17 @@ basin = measure_basin_escape(baseline_solution, perturbed_solution,
 #                       escape_score, quality_per_dollar, quality_per_joule
 
 # Efficiency (tokens, dollars, joules):
-from ai_finops_dynamics import compute_efficiency
+from instrument import compute_efficiency
 eff = compute_efficiency(result, model="deepseek", baseline_metrics=None)
 # Returns EfficiencyMetrics with PROVIDER_PRICING internals
 
 # Strategy classification:
-from ai_finops_dynamics import classify_strategy
+from instrument import classify_strategy
 report = classify_strategy(basin, solution, efficiency)
 # Returns StrategyReport with one of: CONSERVATIVE/EXPLORATORY/EFFICIENT/WASTEFUL
 
 # Game report:
-from ai_finops_dynamics import GameReport
+from instrument import GameReport
 gr = GameReport(experiment_id="exp_xyz", model="deepseek", ...)
 markdown = gr.to_markdown()  # with [M]/[C]/[H]/[X] tags
 ```
@@ -189,7 +190,7 @@ markdown = gr.to_markdown()  # with [M]/[C]/[H]/[X] tags
 ## Models & Pricing
 
 ```python
-from ai_finops_dynamics.efficiency import PROVIDER_PRICING
+from instrument.efficiency import PROVIDER_PRICING
 # Keys: "deepseek", "deepseek-flash", "anthropic", "anthropic-sonnet5", "anthropic-haiku", "openai", "openai-luna", "openai-sol", "openai-terra"
 # Each has: prompt_per_1k, completion_per_1k, reasoning_per_1k (if applicable)
 

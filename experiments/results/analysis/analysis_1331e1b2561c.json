@@ -7,7 +7,7 @@
     "total_lines_added": 0,
     "total_lines_removed": 0,
     "net_lines": 0,
-    "average_convention_score": 0.818
+    "average_convention_score": 0.833
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase"
         ]
@@ -64,14 +64,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase"
         ]
@@ -100,14 +100,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase"
         ]
@@ -136,14 +136,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase"
         ]
@@ -172,14 +172,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "app.py: Classes should use PascalCase"
         ]
@@ -193,7 +193,7 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
       "errors": 0,
       "warnings": 0
@@ -266,7 +266,7 @@
     },
     "strategy": {
       "strategy": "conservative",
-      "strategy_score": 0.3502,
+      "strategy_score": 0.3002,
       "exploration_premium": 0.0,
       "thermal_efficiency": 0.0,
       "verdict": "CONSERVATIVE \u2014 model maintained sound reasoning (correctness=0%, quality=0.15) with moderate resource use ($0.0000, ~0J). Model absorbed the perturbation without divergence.",

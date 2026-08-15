@@ -3,11 +3,11 @@
   "story_id": "75fe715d17cb",
   "language": "python",
   "summary": {
-    "commits": 5,
-    "total_lines_added": 1463,
-    "total_lines_removed": 357,
-    "net_lines": 1106,
-    "average_convention_score": 0.758
+    "commits": 4,
+    "total_lines_added": 1258,
+    "total_lines_removed": 356,
+    "net_lines": 902,
+    "average_convention_score": 0.778
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 243
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": -4,
-        "complexity_delta": 11,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.758,
+        "score": 0.778,
         "violations": [
           "test_integrations.py: Classes should use PascalCase",
           "test_integrations.py: Module-level constants should be UPPER_CASE",
@@ -67,14 +67,14 @@
         "lines_removed": 16
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 30,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.758,
+        "score": 0.778,
         "violations": [
           "test_integrations.py: Classes should use PascalCase",
           "test_integrations.py: Module-level constants should be UPPER_CASE",
@@ -106,14 +106,14 @@
         "lines_removed": 16
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 4,
-        "complexity_delta": 47,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.758,
+        "score": 0.778,
         "violations": [
           "test_integrations.py: Classes should use PascalCase",
           "test_integrations.py: Module-level constants should be UPPER_CASE",
@@ -145,53 +145,14 @@
         "lines_removed": 81
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 6,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.758,
-        "violations": [
-          "test_integrations.py: Classes should use PascalCase",
-          "test_integrations.py: Module-level constants should be UPPER_CASE",
-          "test_server.py: Classes should use PascalCase",
-          "test_server.py: Module-level constants should be UPPER_CASE"
-        ]
-      },
-      "review": {
-        "score": null,
-        "problems": [],
-        "better_or_worse": ""
-      }
-    },
-    {
-      "commit_hash": "1cdc5c6d4c5f0a119c351bbcd7dea30459be406b",
-      "commit_message": "[story] Session 5: cross_cutting",
-      "session_number": 5,
-      "ast": {
-        "files_added": 0,
-        "files_modified": 4,
-        "files_deleted": 0,
-        "functions_added": 4,
-        "functions_removed": 0,
-        "classes_added": 0,
-        "classes_removed": 0,
-        "imports_added": 3,
-        "imports_removed": 1,
-        "lines_added": 205,
-        "lines_removed": 1
-      },
-      "sonar": {
-        "available": true,
-        "bugs_delta": 0,
-        "smells_delta": 3,
-        "complexity_delta": 23,
-        "duplications_delta": 0.0
-      },
-      "convention": {
-        "score": 0.758,
+        "score": 0.778,
         "violations": [
           "test_integrations.py: Classes should use PascalCase",
           "test_integrations.py: Module-level constants should be UPPER_CASE",
@@ -208,9 +169,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
-      "errors": 18,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -281,7 +242,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8374,
+      "strategy_score": 0.9874,
       "exploration_premium": 0.4392,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.78) and found a novel correct solution (novelty=0.92, correctness=100%). Cost: $2.0852, ~0J.",

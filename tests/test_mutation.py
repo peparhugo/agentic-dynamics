@@ -6,12 +6,12 @@ from pathlib import Path
 import pytest
 
 from instrument.mutation import (
-    MutationArtifact,
-    compile_mutation,
-    apply_mutation,
     ALL_OPERATORS,
-    SPECIFICATION_OPERATORS,
     CODEBASE_OPERATORS,
+    SPECIFICATION_OPERATORS,
+    MutationArtifact,
+    apply_mutation,
+    compile_mutation,
 )
 
 

@@ -7,7 +7,7 @@
     "total_lines_added": 5717,
     "total_lines_removed": 81,
     "net_lines": 5636,
-    "average_convention_score": 0.53
+    "average_convention_score": 0.558
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
-        "bugs_delta": 1,
-        "smells_delta": 2,
-        "complexity_delta": 45,
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.558,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -114,14 +114,14 @@
         "lines_removed": 66
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 6,
-        "complexity_delta": 20,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.558,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -200,14 +200,14 @@
         "lines_removed": 15
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 3,
-        "complexity_delta": 50,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.558,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -286,14 +286,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.558,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -372,14 +372,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.53,
+        "score": 0.558,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase",
@@ -443,9 +443,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "tsc",
-      "errors": 1,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -515,12 +515,12 @@
       "run_id": ""
     },
     "strategy": {
-      "strategy": "wasteful",
-      "strategy_score": 0.331,
+      "strategy": "conservative",
+      "strategy_score": 0.431,
       "exploration_premium": 0.0,
       "thermal_efficiency": 0.0,
-      "verdict": "WASTEFUL \u2014 model burned 0 tokens ($6.4531, ~0J, 0% thinking) achieving only 0% correctness. High reasoning overhead without convergence.",
-      "recommendation": "Reduce perturbation strength or avoid this operator class.",
+      "verdict": "CONSERVATIVE \u2014 model maintained sound reasoning (correctness=0%, quality=0.44) with moderate resource use ($6.4531, ~0J). Model absorbed the perturbation without divergence.",
+      "recommendation": "Reliable but not novel. Good for production, not for exploration.",
       "operator": "",
       "perturbation_class": "",
       "model": "anthropic/claude-sonnet-5",

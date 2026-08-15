@@ -9,7 +9,6 @@ Output: experiments/results/lab_drift.json
 """
 
 import json
-import math
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -19,8 +18,9 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from instrument.embeddings import ChromaStore
 from _constants import MODEL_LABELS
+
+from instrument.embeddings import ChromaStore
 
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_drift.json"
 

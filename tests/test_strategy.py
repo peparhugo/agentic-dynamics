@@ -6,9 +6,9 @@ no model is "expensive" or "efficient" purely by its price tier.
 """
 
 from instrument.basin import BasinMetrics
-from instrument.solution import SolutionMetrics
 from instrument.efficiency import EfficiencyMetrics
-from instrument.strategy import classify_strategy, StrategyType
+from instrument.solution import SolutionMetrics
+from instrument.strategy import StrategyType, classify_strategy
 
 
 def _classify(correctness, novelty, escape, thinking_ratio, cost) -> StrategyType:

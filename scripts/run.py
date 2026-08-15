@@ -18,18 +18,21 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from instrument import (
-    build_operators, perturb_prompt,
+    build_operators, resolve_perturbed_prompt,
     evaluate_solution, compute_efficiency,
     classify_strategy, measure_basin_escape,
     BasinMetrics, GameReport,
     detect_constraints,
+    run_suite, suite_succeeded,
 )
 from instrument.backends import run_agentic
+from instrument.language import detect_language
 
 
 def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
                    timeout: int = 200, repetitions: int = 1,
-                   thinking_effort: str = "", backend: str = "auto"):
+                   thinking_effort: str = "", backend: str = "auto",
+                   seed_variant: int | None = None):
     """Run a complete experiment from a YAML config file."""
     import yaml
 
@@ -43,6 +46,16 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     if limit:
         operators = operators[:limit]
     strengths = cfg["strengths"]
+    # Starting-point variants: each variant is a DIFFERENT perturbation ("deviated
+    # starting point") measured against the same baseline; repetition re-measures the
+    # SAME variant (model variance only). seed_variant (singular) overrides the list.
+    seed_variants = cfg.get("seed_variants", [0])
+    if seed_variant is not None:
+        seed_variants = [seed_variant]
+    # Perturbation source: "deterministic" (seeded operators) or "flash" (a cheap model
+    # authors the perturbation and it is pinned as a reusable, variant-indexed artifact).
+    perturbation_mode = cfg.get("perturbation_mode", "deterministic")
+    perturbation_cache_dir = Path(cfg.get("perturbation_cache_dir", "experiments/results/perturbations"))
     model_id = model_override or cfg.get("model_id", "deepseek/deepseek-v4-pro")
     if model_override:
         model_label = model_override.split("/")[-1].replace(" ", "_").lower()
@@ -62,12 +75,12 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     results_dir = Path("experiments/results")
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    total = 1 + (len(operators) * len(strengths) * repetitions)
+    total = 1 + (len(operators) * len(strengths) * len(seed_variants) * repetitions)
     te_str = f" think={thinking_effort}" if thinking_effort else ""
     print(f"\n{'='*80}")
     print(f"Experiment: {name}  |  Model: {model_id}{te_str}")
     print(f"Task: {task[:100]}...")
-    print(f"Constraints: {len(constraints)}  |  Operators: {len(operators)} × {len(strengths)} strengths × {repetitions} reps")
+    print(f"Constraints: {len(constraints)}  |  Operators: {len(operators)} × {len(strengths)} strengths × {len(seed_variants)} variants × {repetitions} reps")
     if thinking_budget_tokens:
         print(f"Thinking budget: {thinking_budget_tokens}tok  |  Output limit: {output_token_limit or 'none'}  |  Standardized: {standardize}")
     print(f"Estimated runs: {total}  |  Timeout per run: {timeout}s")
@@ -84,21 +97,24 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     all_runs.append(base)
 
     run_idx = 0
-    total_perturbed = len(operators) * len(strengths) * repetitions
+    total_perturbed = len(operators) * len(strengths) * len(seed_variants) * repetitions
     for op_name in operators:
         for s in strengths:
-            for rep in range(repetitions):
-                run_idx += 1
-                r = _run_perturbed(task, constraints, op_name, s, base,
-                                   ops, model_id, run_idx, total_perturbed, timeout, name,
-                                   thinking_effort=thinking_effort,
-                                   thinking_budget_tokens=thinking_budget_tokens,
-                                   output_token_limit=output_token_limit,
-                                   silent_mode=silent_mode,
-                                   standardize=standardize, enforce_pytest=enforce_pytest,
-                                   backend=backend)
-                all_runs.append(r)
-                time.sleep(2)
+            for variant in seed_variants:
+                for rep in range(repetitions):
+                    run_idx += 1
+                    r = _run_perturbed(task, constraints, op_name, s, base,
+                                       ops, model_id, run_idx, total_perturbed, timeout, name,
+                                       thinking_effort=thinking_effort,
+                                       thinking_budget_tokens=thinking_budget_tokens,
+                                       output_token_limit=output_token_limit,
+                                       silent_mode=silent_mode,
+                                       standardize=standardize, enforce_pytest=enforce_pytest,
+                                       backend=backend, rep=rep, seed_variant=variant,
+                                       perturbation_mode=perturbation_mode,
+                                       perturbation_cache_dir=perturbation_cache_dir)
+                    all_runs.append(r)
+                    time.sleep(2)
 
     # Aggregation
     perturbed = [r for r in all_runs if r["type"] == "perturbed"]
@@ -147,6 +163,9 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
     return {
         "type": "baseline", "model": model_id,
         "operator": "baseline", "perturbation_class": "baseline",
+        "strength": 0.0,
+        "perturbation_strength": 0.0,
+        "test_executed_success": _verify_tests(r.workdir),
         "correctness": sol.correctness_score,
         "constraints_met": sol.constraints_met,
         "constraints_total": sol.constraints_total,
@@ -157,6 +176,9 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
         "prompt_tokens": r.prompt_tokens,
         "completion_tokens": r.completion_tokens,
         "reasoning_tokens": r.reasoning_tokens,
+        "answer_tokens": r.answer_tokens,
+        "explanation_tokens": r.explanation_tokens,
+        "confidence": r.confidence,
         "thinking_ratio": eff.thinking_ratio,
         "cost_usd": r.estimated_cost_usd,
         "energy_j": eff.total_energy_j,
@@ -178,9 +200,16 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
                    ops, model_id, run_idx, total, timeout, exp_name="exp",
                    thinking_effort="", thinking_budget_tokens=0,
                    output_token_limit=0, silent_mode=None,
-                   standardize=True, enforce_pytest=True, backend="auto"):
+                   standardize=True, enforce_pytest=True, backend="auto",
+                   rep=0, seed_variant=0, perturbation_mode="deterministic",
+                   perturbation_cache_dir=None):
     pert_class = ops[op_name].perturbation_class if op_name in ops else "?"
-    perturbed, _ = perturb_prompt(task, op_name, strength=strength, rng_seed=42 + run_idx)
+    # The starting point is either a deterministic seeded draw (derive_seed + operator)
+    # or a flash-authored, pinned artifact — same (prompt, sha256, provenance) contract.
+    perturbed, perturbed_prompt_sha256, provenance = resolve_perturbed_prompt(
+        task, op_name, strength, seed_variant=seed_variant, mode=perturbation_mode,
+        cache_dir=perturbation_cache_dir,
+    )
 
     print(f"[{run_idx}/{total}] {op_name} s={strength} ({pert_class})...",
           end=" ", flush=True)
@@ -243,10 +272,18 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
     return {
         "type": "perturbed", "model": model_id,
         "operator": op_name, "perturbation_class": pert_class, "strength": strength,
+        "perturbation_strength": strength,
+        "seed_variant": seed_variant,
+        "repetition": rep,
+        "perturbation_mode": perturbation_mode,
+        "provenance": provenance,
+        "perturbed_prompt": perturbed,
+        "perturbed_prompt_sha256": perturbed_prompt_sha256,
         "correctness": sol.correctness_score,
         "actual_correctness": actual_correctness,
         "tests_passed": r.tests_passed,
         "tests_total": r.tests_total,
+        "test_executed_success": _verify_tests(r.workdir),
         "constraints_met": sol.constraints_met,
         "constraints_total": sol.constraints_total,
         "lines_of_code": sol.lines_of_code,
@@ -258,6 +295,9 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
         "prompt_tokens": r.prompt_tokens,
         "completion_tokens": r.completion_tokens,
         "reasoning_tokens": r.reasoning_tokens,
+        "answer_tokens": r.answer_tokens,
+        "explanation_tokens": r.explanation_tokens,
+        "confidence": r.confidence,
         "thinking_ratio": eff.thinking_ratio,
         "cost_usd": r.estimated_cost_usd,
         "energy_j": eff.total_energy_j,
@@ -461,6 +501,24 @@ _SOURCE_EXTS = {'.py', '.js', '.ts', '.tsx', '.jsx', '.go', '.rs', '.java', '.rb
                 '.json', '.yaml', '.yml', '.toml', '.proto', '.prisma', '.sql',
                 '.css', '.scss', '.html', '.hbs', '.md', '.mjs', '.cjs'}
 
+
+def _verify_tests(workdir: str) -> bool | None:
+    """Run the independent test suite against a completed run's workdir.
+
+    ``test_executed_success`` is measured by the harness (``test_runner.run_suite``),
+    never the model's self-reported ``tests_passed``/``tests_total``. Returns the
+    verified bool, or ``None`` when the workdir is missing/unrunnable (no signal).
+    """
+    try:
+        if not workdir or not os.path.isdir(workdir):
+            return None
+        profile = detect_language(Path(workdir))
+        language = profile.name if profile else "python"
+        suite = run_suite(Path(workdir), language)
+        return suite_succeeded(suite)
+    except Exception:
+        return None
+
 def _collect_code(result) -> dict[str, str] | None:
     """Collect code file contents from an AgenticResult's workdir."""
     import os, glob
@@ -491,6 +549,8 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--timeout", type=int, default=200)
     parser.add_argument("--repetitions", type=int, default=1)
+    parser.add_argument("--seed-variant", type=int, default=None,
+                        help="override the starting-point variant (repetitions re-measure it)")
     parser.add_argument("--backend", choices=["auto", "opencode", "claude_cli"], default="auto",
                         help="Backend to execute runs (auto routes anthropic/* to claude_cli)")
     args = parser.parse_args()
@@ -499,4 +559,4 @@ if __name__ == "__main__":
         multi_model_compare(args.config, args.compare, args.timeout)
     else:
         run_experiment(args.config, args.model or "", args.limit, args.timeout, args.repetitions,
-                       backend=args.backend)
+                       backend=args.backend, seed_variant=args.seed_variant)

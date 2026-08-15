@@ -7,7 +7,7 @@
     "total_lines_added": 0,
     "total_lines_removed": 0,
     "net_lines": 0,
-    "average_convention_score": 0.727
+    "average_convention_score": 0.75
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.727,
+        "score": 0.75,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase"
@@ -65,14 +65,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.727,
+        "score": 0.75,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase"
@@ -102,14 +102,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.727,
+        "score": 0.75,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase"
@@ -139,14 +139,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.727,
+        "score": 0.75,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase"
@@ -176,14 +176,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.727,
+        "score": 0.75,
         "violations": [
           "index.ts: Classes should use PascalCase",
           "index.ts: Interfaces should use PascalCase"
@@ -198,9 +198,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "tsc",
-      "errors": 1,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -271,7 +271,7 @@
     },
     "strategy": {
       "strategy": "conservative",
-      "strategy_score": 0.3504,
+      "strategy_score": 0.3004,
       "exploration_premium": 0.0,
       "thermal_efficiency": 0.0,
       "verdict": "CONSERVATIVE \u2014 model maintained sound reasoning (correctness=0%, quality=0.32) with moderate resource use ($0.0000, ~0J). Model absorbed the perturbation without divergence.",

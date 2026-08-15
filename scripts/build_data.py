@@ -11,10 +11,11 @@ Usage:
 """
 
 import json
+import os
 import sqlite3
 import sys
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -26,7 +27,7 @@ OUTPUT_PATH = ROOT / "firebase" / "public" / "data.js"
 
 DATA_DIR = ROOT / "experiments" / "data"
 
-from _constants import WORKTREE_ROOT, MODEL_LABELS, bootstrap_ci, probe_session_schema
+from _constants import MODEL_LABELS, WORKTREE_ROOT, bootstrap_ci, probe_session_schema
 
 from instrument.routing import compute_routing  # noqa: E402
 from instrument.solution import COMPOSITE_WEIGHTS  # noqa: E402
@@ -90,9 +91,8 @@ def _load_grit_matrix():
 def _compute_sonar(entries):
     """Per-model SonarQube quality aggregates, excluding known library-copy outliers."""
     from collections import defaultdict
-    import math
 
-    SONAR_OUTLIERS = {"exp_batch_fastapi_maintenance_natural"}
+    SONAR_OUTLIERS = {"exp_batch_fastapi_maintenance_natural"}  # noqa: N806
     models = defaultdict(lambda: {"bugs": [], "smells": [], "ncloc": [],
                                    "scores": [], "ratings": [], "gates_ok": 0, "total": 0})
 
@@ -187,7 +187,7 @@ def compute_model_data(inventory, summary, db_breakdown):
         label = MODEL_LABELS.get(mid, mid)
         provider = get_provider(mid)
 
-        db_data = db_breakdown.get(mid, {})
+        db_breakdown.get(mid, {})
         entries = summary.get("entries", summary) if isinstance(summary, dict) else []
         reports = [r for r in entries if _parse_model_id(r.get("model", "")) == mid]
 
@@ -384,8 +384,8 @@ def compute_calculator(models):
 
 
 def compute_derived(models, inventory, report_count):
-    counts = inventory.get("counts", {})
-    costs = inventory.get("costs", {})
+    inventory.get("counts", {})
+    inventory.get("costs", {})
 
     valid_tests = 0
     total_tests_sum = 0
@@ -1069,7 +1069,7 @@ def build():
     )
 
     counts = inventory.get("counts", {})
-    costs = inventory.get("costs", {})
+    inventory.get("costs", {})
 
     data = {
         "_meta": {
@@ -1167,6 +1167,14 @@ def main():
     parser = argparse.ArgumentParser(description="Build data.js for the Agentic Dynamics website")
     parser.add_argument("--dry-run", action="store_true", help="Print instead of writing")
     args = parser.parse_args()
+
+    if not INVENTORY_PATH.exists() and os.environ.get("ALLOW_MISSING_EXPERIMENT_DATA"):
+        print(
+            "SKIP: experiment inventory not present "
+            "(ALLOW_MISSING_EXPERIMENT_DATA set) — exiting without building data.js.",
+            file=sys.stderr,
+        )
+        return
 
     js, data = build()
 

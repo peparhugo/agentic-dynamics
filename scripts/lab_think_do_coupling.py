@@ -9,16 +9,15 @@ Low coupling = narration and action are disconnected.
 Output: experiments/results/lab_coupling.json
 """
 
-import json
 import glob
-import numpy as np
-from pathlib import Path
+import json
 from collections import defaultdict
+from pathlib import Path
 
+import numpy as np
+from _constants import MODEL_LABELS
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
-from _constants import MODEL_LABELS
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
@@ -187,7 +186,7 @@ def compute():
     for model, sessions in sorted(by_model.items()):
         tdciv = [s["tdci"] for s in sessions]
         corrv = [s["correctness"] for s in sessions]
-        narrv = [s["narration_penalty"] for s in sessions]
+        [s["narration_penalty"] for s in sessions]
         label = MODEL_LABELS.get(model, model)
         by_model_agg[label] = {
             "model_id": model,
@@ -241,8 +240,8 @@ def compute():
     def pearson_r(x, y):
         if len(x) < 3:
             return 0.0
-        mx = np.mean(x)
-        my = np.mean(y)
+        np.mean(x)
+        np.mean(y)
         sx = np.std(x, ddof=0)
         sy = np.std(y, ddof=0)
         if sx == 0 or sy == 0:
@@ -282,7 +281,7 @@ def compute():
 def main():
     data = compute()
 
-    print(f"\n=== LAB BOOK: THINK-DO COUPLING INDEX ===\n")
+    print("\n=== LAB BOOK: THINK-DO COUPLING INDEX ===\n")
 
     print("BY MODEL (mean TDCI):")
     print(f"{'Model':<25} {'Mean':>8} {'Median':>8} {'Std':>8} {'N':>5} {'Correct':>8}")
@@ -291,21 +290,21 @@ def main():
         print(f"{label:<25} {d['mean_tdci']:>8.4f} {d['median_tdci']:>8.4f} "
               f"{d['std_tdci']:>8.4f} {d['n_sessions']:>5} {d['mean_correctness']:>7.0%}")
 
-    print(f"\nBY PERTURBATION CLASS:")
+    print("\nBY PERTURBATION CLASS:")
     for pc, d in sorted(data["by_perturbation_class"].items()):
         print(f"  {pc}: mean_tdci={d['mean_tdci']:.4f}, n={d['n_sessions']}")
 
-    print(f"\nCORRELATIONS:")
+    print("\nCORRELATIONS:")
     print(f"  TDCI vs Correctness: {data['tdci_vs_correctness_correlation']:+.4f}")
     print(f"  TDCI vs Narration Penalty: {data['tdci_vs_narration_penalty_correlation']:+.4f}")
 
-    print(f"\nBottom 5 sessions (lowest coupling):")
+    print("\nBottom 5 sessions (lowest coupling):")
     bottom = sorted(data["sessions"], key=lambda s: s["tdci"])[:5]
     for s in bottom:
         print(f"  {s['session']}: tdci={s['tdci']:.4f}, model={MODEL_LABELS.get(s['model'], s['model'])}, "
               f"correctness={s['correctness']:.0%}, penalty={s['narration_penalty']}")
 
-    print(f"\nTop 5 sessions (highest coupling):")
+    print("\nTop 5 sessions (highest coupling):")
     top = sorted(data["sessions"], key=lambda s: -s["tdci"])[:5]
     for s in top:
         print(f"  {s['session']}: tdci={s['tdci']:.4f}, model={MODEL_LABELS.get(s['model'], s['model'])}, "

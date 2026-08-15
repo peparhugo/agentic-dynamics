@@ -43,7 +43,7 @@ def _iter_source_files(worktree: Path):
             continue
         if rel.name.startswith("."):
             continue
-        if rel.suffix.lower() not in INCLUDED_SUFFIXES and not rel.name == "Dockerfile":
+        if rel.suffix.lower() not in INCLUDED_SUFFIXES and rel.name != "Dockerfile":
             continue
         # Skip .instrument session.jsonl (that's already committed as transcripts)
         if ".instrument" in parts:

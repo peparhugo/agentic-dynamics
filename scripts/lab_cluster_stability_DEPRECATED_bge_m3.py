@@ -19,8 +19,8 @@ from sklearn.cluster import KMeans
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+
 from instrument.embeddings import ChromaStore
-from _constants import MODEL_LABELS
 
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_stability.json"

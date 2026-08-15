@@ -17,7 +17,6 @@ from typing import Any
 
 from .language import LanguageProfile, detect_language
 
-
 # ── Data Structures ────────────────────────────────────────────
 
 @dataclass

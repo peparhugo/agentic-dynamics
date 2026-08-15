@@ -112,10 +112,8 @@ def _terminate_process_group(proc: subprocess.Popen) -> None:
     A bare ``proc.kill()`` leaves spawned build/test tools orphaned; killing the
     whole session group ensures the pipes close so reader threads can finish.
     """
-    try:
+    with contextlib.suppress(ProcessLookupError, PermissionError):
         os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-    except (ProcessLookupError, PermissionError):
-        pass
     try:
         proc.wait(timeout=5)
     except subprocess.TimeoutExpired:

@@ -12,11 +12,9 @@ Usage:
 
 import argparse
 import json
-import os
 import re
 import shutil
 import sqlite3
-import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -108,9 +106,8 @@ def backfill_worktree(
                     pass
     elif not sessions_only:
         for item in wt.rglob("*"):
-            if item.is_file() and not (SKIP_DIRS & set(item.parts)):
-                if not item.name.startswith("."):
-                    code_files += 1
+            if item.is_file() and not (SKIP_DIRS & set(item.parts)) and not item.name.startswith("."):
+                code_files += 1
 
     result["code_files"] = code_files
 
@@ -210,7 +207,7 @@ def main():
         session_icon = " [+]session" if r["has_session"] else ""
         print(f"  {icon} {r['name']:<30} {r['code_files']:>4d} files{'' if r.get('skipped') else ' → artifacts/'}{session_icon}")
         if r.get("patched_report"):
-            print(f"    Patched report with Artifacts section")
+            print("    Patched report with Artifacts section")
         return
 
     # Discover worktrees
@@ -240,7 +237,7 @@ def main():
         skip_reason = f" ({r.get('reason','')})" if r.get("skipped") else ""
         print(f"  {icon} {r['name']:<30} {r['code_files']:>4d} files{'' if r.get('skipped') else ' → artifacts/'}{session_icon}{has_report}{skip_reason}")
         if r.get("patched_report"):
-            print(f"    Patched report with Artifacts section")
+            print("    Patched report with Artifacts section")
 
     # Summary
     skipped = sum(1 for r in results if r.get("skipped"))
@@ -256,7 +253,7 @@ def main():
     print(f"  Session transcripts:    {with_session}")
     print(f"  Reports patched:        {patched}")
     if args.dry_run:
-        print(f"  (DRY RUN — no changes made)")
+        print("  (DRY RUN — no changes made)")
     print(f"  Artifacts dir:          {REPORTS_DIR}/")
 
 

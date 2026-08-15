@@ -78,9 +78,10 @@ python scripts/analyze_worktrees.py --worktree /tmp/exp_xyz --no-tests
 python scripts/lab_<name>.py  # output: experiments/results/lab_<name>.json
 ```
 
-**Website deploy:**
+**Website deploy (BOTH hosts):**
 ```bash
-firebase deploy --only hosting
+firebase deploy --only hosting                          # canonical (ai-finops-rulebook)
+firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy BOTH
 ```
 
 ### Gotchas

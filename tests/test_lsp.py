@@ -1,25 +1,22 @@
 """Tests for LSP diagnostics module."""
 
 import json
-from pathlib import Path
 import tempfile
-
-import pytest
+from pathlib import Path
 
 from instrument.lsp_diagnostics import (
+    _TOOLS,
     LSPDiagnostic,
     LSPReport,
     LSPToolConfig,
-    run_diagnostics,
-    diagnostics_delta,
-    available_tools,
-    _parse_pyright,
-    _parse_mypy,
-    _parse_tsc,
     _parse_cargo,
     _parse_generic,
-    _tool_available,
-    _TOOLS,
+    _parse_mypy,
+    _parse_pyright,
+    _parse_tsc,
+    available_tools,
+    diagnostics_delta,
+    run_diagnostics,
 )
 
 

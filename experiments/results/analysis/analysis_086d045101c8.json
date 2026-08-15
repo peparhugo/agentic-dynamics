@@ -7,7 +7,7 @@
     "total_lines_added": 2960,
     "total_lines_removed": 161,
     "net_lines": 2799,
-    "average_convention_score": 0.768
+    "average_convention_score": 0.778
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 122
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 9,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.768,
+        "score": 0.778,
         "violations": [
           "app.py: Module-level constants should be UPPER_CASE",
           "database.py: Module-level constants should be UPPER_CASE",
@@ -74,14 +74,14 @@
         "lines_removed": 7
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 17,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.768,
+        "score": 0.778,
         "violations": [
           "app.py: Module-level constants should be UPPER_CASE",
           "database.py: Module-level constants should be UPPER_CASE",
@@ -127,7 +127,7 @@
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.768,
+        "score": 0.778,
         "violations": [
           "app.py: Module-level constants should be UPPER_CASE",
           "database.py: Module-level constants should be UPPER_CASE",
@@ -166,14 +166,14 @@
         "lines_removed": 29
       },
       "sonar": {
-        "available": true,
-        "bugs_delta": 1,
+        "available": false,
+        "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 5,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.768,
+        "score": 0.778,
         "violations": [
           "app.py: Module-level constants should be UPPER_CASE",
           "database.py: Module-level constants should be UPPER_CASE",
@@ -212,14 +212,14 @@
         "lines_removed": 1
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 8,
-        "complexity_delta": 51,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.768,
+        "score": 0.778,
         "violations": [
           "app.py: Module-level constants should be UPPER_CASE",
           "database.py: Module-level constants should be UPPER_CASE",
@@ -243,9 +243,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
-      "errors": 15,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -316,7 +316,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.841,
+      "strategy_score": 0.991,
       "exploration_premium": 0.6658,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.79) and found a novel correct solution (novelty=0.94, correctness=100%). Cost: $1.4113, ~0J.",

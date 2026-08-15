@@ -10,13 +10,13 @@ controlled game. The model's strategy reveals its learned policy.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
 from .basin import BasinMetrics
-from .solution import SolutionMetrics
 from .efficiency import EfficiencyMetrics
+from .solution import SolutionMetrics
 
 
 class StrategyType(str, Enum):

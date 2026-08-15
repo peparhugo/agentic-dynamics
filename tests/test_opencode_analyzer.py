@@ -16,6 +16,8 @@ from instrument.opencode_analyzer import (
     _resolve_worktree,
 )
 
+pytestmark = pytest.mark.external
+
 
 class TestLoadSummary:
     def test_returns_list_with_entries(self):

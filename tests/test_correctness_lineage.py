@@ -1,15 +1,7 @@
-from dataclasses import replace
-import json
-import tempfile
-import shutil
-from pathlib import Path
-from unittest.mock import patch
 
-import pytest
 
-from instrument.solution import SolutionMetrics, evaluate_solution
 from instrument.basin import BasinMetrics
-from instrument.efficiency import EfficiencyMetrics
+from instrument.solution import SolutionMetrics
 
 
 def _scrub_nan(d: dict) -> dict:
@@ -68,7 +60,7 @@ def test_python_test_ok_semantics():
 # ── Basin receives canonical correctness ─────────────────────────────────────
 
 def test_basin_receives_post_test_correctness():
-    baseline = SolutionMetrics(correctness_score=0.9)
+    SolutionMetrics(correctness_score=0.9)
     perturbed = SolutionMetrics(correctness_score=0.8, evaluator_source="heuristic")
     test_results = {"ok": False, "passed": 0, "failed": 1, "total": 1, "pass_rate": 0.0}
     if test_results and test_results.get("total", 0) > 0:

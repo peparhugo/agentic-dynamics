@@ -21,7 +21,13 @@ import redis
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from instrument.commit_analysis import analyze_story_worktree, compute_deep_metrics, agentic_token_dicts
+import contextlib
+
+from instrument.commit_analysis import (
+    agentic_token_dicts,
+    analyze_story_worktree,
+    compute_deep_metrics,
+)
 from instrument.story import load_story_result
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
@@ -65,10 +71,8 @@ def _connect_redis() -> redis.Redis:
 
 
 def _safe_hset(r: redis.Redis, key: str, field: str, value: str) -> None:
-    try:
+    with contextlib.suppress(Exception):
         r.hset(key, field, value)
-    except Exception:
-        pass
 
 
 def main() -> None:
@@ -140,10 +144,8 @@ def main() -> None:
             failed += 1
             log(f"[{story_id}] FAILED ({time.monotonic() - t0:.0f}s): {e}")
             err_log = ANALYSIS_DIR / f"analysis_{story_id}.error.txt"
-            try:
+            with contextlib.suppress(Exception):
                 err_log.write_text(str(e))
-            except Exception:
-                pass
 
         # Reconnect after a long SonarQube run — the connection is likely stale.
         try:

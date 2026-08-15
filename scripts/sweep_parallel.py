@@ -1,9 +1,12 @@
 """Parallel silent-mode sweep — each cell is an independent subprocess run.
 No fragile imports. No serial blocking. Just spawn and wait.
 """
-import subprocess, time, json, os
+import os
+import subprocess
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
 from _constants import WORKTREE_ROOT
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
@@ -37,12 +40,12 @@ def cell_done(title):
         r = c.execute("SELECT cost FROM session WHERE title = ? AND cost > 0 ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
         c.close()
         return r is not None
-    except:
+    except Exception:
         return False
 
 def run_cell(model_id, silent_mode, operator, label_slug, timeout=200):
     title = f"[silent_sweep:{operator}:{silent_mode}] {label_slug}"
-    
+
     if cell_done(title):
         return {"title": title, "status": "skipped", "duration": 0}
 
@@ -59,7 +62,7 @@ def run_cell(model_id, silent_mode, operator, label_slug, timeout=200):
         "--dir", workdir,
         prompt,
     ]
-    
+
     t0 = time.monotonic()
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
@@ -78,7 +81,7 @@ def main():
                 cells.append((model_id, silent_mode, operator, label_slug))
 
     print(f"Launching {len(cells)} cells in parallel...")
-    
+
     with ThreadPoolExecutor(max_workers=4) as ex:
         futures = {ex.submit(run_cell, *c): c for c in cells}
         for f in as_completed(futures):

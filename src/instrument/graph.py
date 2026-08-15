@@ -6,14 +6,13 @@ perturbation operators, strategies, and basin topologies.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import sys
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-from neo4j import GraphDatabase
 
 if TYPE_CHECKING:
     from .codebase_graph import CodebaseGraph
@@ -107,6 +106,8 @@ class Neo4jClient:
 
     def __init__(self, uri: str = "bolt://localhost:7687", user: str = "neo4j",
                  password: str = "password123"):  # local dev only — override via ENV for prod
+        from neo4j import GraphDatabase
+
         self._driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):
@@ -135,10 +136,8 @@ class Neo4jClient:
             "CREATE CONSTRAINT strategy_name_unique IF NOT EXISTS FOR (s:StrategyArchetype) REQUIRE s.name IS UNIQUE",
         ]
         for c in constraints:
-            try:
+            with contextlib.suppress(Exception):
                 self._run(c)
-            except Exception:
-                pass
 
     def clear_all(self) -> None:
         self._run("MATCH (n) DETACH DELETE n")
@@ -364,10 +363,8 @@ class Neo4jClient:
             "MERGE (r)-[:CLASSIFIED_AS]->(s)",
         ]
         for query in queries:
-            try:
+            with contextlib.suppress(Exception):
                 self._run(query)
-            except Exception:
-                pass
 
     def load_basin_topology(self, basin_path: Path | None = None) -> None:
         if basin_path is None:

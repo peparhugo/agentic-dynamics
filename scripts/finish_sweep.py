@@ -1,6 +1,11 @@
 """Run remaining silent sweep cells — one at a time, properly."""
-import subprocess, time, sqlite3, os, sys
+import os
+import sqlite3
+import subprocess
+import sys
+import time
 from pathlib import Path
+
 from _constants import WORKTREE_ROOT
 
 OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
@@ -38,15 +43,15 @@ cells = [
 for model_id, silent_mode, operator in cells:
     slug = model_id.split("/")[1].replace(".","_").replace("-","_")
     title = f"[silent_sweep:{operator}:{silent_mode}] {slug}"
-    
+
     if cell_done(title):
         print(f"SKIP: {title}")
         continue
-    
+
     workdir = f"{WORKTREE_ROOT}/exp_sweep_{slug}_{silent_mode[0]}{operator[0]}"
     os.makedirs(workdir, exist_ok=True)
     prompt = build_prompt(silent_mode, operator)
-    
+
     print(f"RUN: {title}")
     sys.stdout.flush()
     t0 = time.monotonic()
@@ -60,7 +65,7 @@ for model_id, silent_mode, operator in cells:
         prompt,
     ], capture_output=True, text=True, timeout=400, stdin=subprocess.DEVNULL)
     elapsed = time.monotonic() - t0
-    
+
     db = sqlite3.connect(str(OPENCODE_DB))
     row = db.execute("SELECT cost,tokens_output FROM session WHERE title=? ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
     db.close()
@@ -68,7 +73,7 @@ for model_id, silent_mode, operator in cells:
         print(f"  OK ${row[0]:.4f} {row[1]}tok ({elapsed:.0f}s)")
     else:
         print(f"  ERR exit={r.returncode} ({elapsed:.0f}s)")
-    
+
     time.sleep(2)
 
 print("\nALL DONE")
