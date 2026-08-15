@@ -1,0 +1,12 @@
+import { MarkdownPlugin, TemplatePlugin } from './src/plugins/index.js';
+import type { PluginConfig } from './src/plugin.js';
+
+const config: PluginConfig = {
+  plugins: [
+    new MarkdownPlugin(),
+    new TemplatePlugin(),
+    // Add custom plugins here
+  ],
+};
+
+export default config;

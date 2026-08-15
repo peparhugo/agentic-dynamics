@@ -3,6 +3,7 @@
 import * as path from 'path';
 import { SiteGenerator } from './generator.js';
 import { DevServer } from './dev-server.js';
+import { loadConfig } from './config-loader.js';
 
 function parseArgs(args: string[]): { command: string; contentDir: string; outputDir: string; templatesDir: string; port: number } {
   let command = 'build';
@@ -42,12 +43,17 @@ async function main(): Promise<void> {
   const resolvedTemplatesDir = path.resolve(templatesDir);
 
   try {
+    const plugins = await loadConfig(path.resolve('ssg.config.ts'));
+
     if (command === 'build') {
-      const generator = new SiteGenerator({
-        contentDir: resolvedContentDir,
-        outputDir: resolvedOutputDir,
-        templatesDir: resolvedTemplatesDir,
-      });
+      const generator = new SiteGenerator(
+        {
+          contentDir: resolvedContentDir,
+          outputDir: resolvedOutputDir,
+          templatesDir: resolvedTemplatesDir,
+        },
+        plugins
+      );
 
       await generator.build();
     } else if (command === 'serve') {

@@ -1,0 +1,1 @@
+{"version":3,"file":"markdown-plugin.d.ts","sourceRoot":"","sources":["../../src/plugins/markdown-plugin.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,MAAM,EAAE,aAAa,EAAE,WAAW,EAAE,MAAM,cAAc,CAAC;AAGlE,qBAAa,cAAe,YAAW,MAAM;IAC3C,IAAI,SAAc;IAClB,OAAO,SAAW;IAEZ,MAAM,CAAC,OAAO,EAAE,aAAa,EAAE,IAAI,EAAE,WAAW,GAAG,OAAO,CAAC,IAAI,CAAC;CAQvE"}

@@ -9,16 +9,11 @@ export declare class DevServer {
     private outputDir;
     private templatesDir;
     private port;
-    private httpServer;
-    private wsServer;
     private generator;
-    private isBuilding;
+    private devServerPlugin;
     constructor(options: DevServerOptions);
-    private rebuild;
-    private notifyClients;
-    private injectLiveReloadScript;
-    private createHttpServer;
     start(): Promise<void>;
     stop(): Promise<void>;
+    private injectLiveReloadScript;
 }
 //# sourceMappingURL=dev-server.d.ts.map
