@@ -197,13 +197,17 @@ from .prompt_constructor import (
 # v1.0: producer-side measured-finding derivation (richer extractor over the summary)
 from .knowledge_ingestion import (
     ACL_SCOPE,
+    ARTIFACT_DIR,
     EXTRACTOR_VERSION,
     REPOSITORY_ID,
     RESULT_VERSION,
     SOURCE_TYPE,
     SOURCE_URI,
+    artifact_uri,
     build_record,
     derive_records,
+    extract_record,
+    record_to_artifact,
     record_to_event,
 )
 
@@ -380,8 +384,9 @@ __all__ = [
     "CONSUMER_GROUPS", "STREAM_KEY", "DEAD_LETTER_KEY",
     # v1.0 producer-side measured-finding derivation
     "build_record", "record_to_event", "derive_records",
+    "record_to_artifact", "extract_record", "artifact_uri",
     "EXTRACTOR_VERSION", "RESULT_VERSION", "SOURCE_URI", "SOURCE_TYPE",
-    "REPOSITORY_ID", "ACL_SCOPE",
+    "REPOSITORY_ID", "ACL_SCOPE", "ARTIFACT_DIR",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",

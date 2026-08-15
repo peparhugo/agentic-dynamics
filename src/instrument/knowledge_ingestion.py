@@ -27,7 +27,10 @@ Relationship to the other KB modules (one line each):
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any
 
@@ -36,7 +39,6 @@ from .knowledge import (
     Authority,
     KnowledgeEvent,
     KnowledgeRecord,
-    compute_content_hash,
     compute_entity_id,
     compute_knowledge_id,
 )
@@ -54,6 +56,23 @@ EXTRACTOR_VERSION = "measured-finding/v1"
 #: consumer can ``knowledge_stream.read_artifact`` it directly (that helper strips the
 #: ``file://`` prefix and resolves relative to the checkout root).
 SOURCE_URI = "file://experiments/results/_results_summary.json"
+
+#: Directory holding the per-record durable artifacts. ``record_to_event`` points at
+#: ``file://<ARTIFACT_DIR>/<knowledge_id>.json`` — one JSON artifact per derived record — so a
+#: consumer's ``read_artifact`` + ``verify_content_hash`` can verify the *exact* bytes the
+#: event hashes (unlike the aggregate ``_results_summary.json``, whose bytes can never match a
+#: per-finding hash).
+ARTIFACT_DIR = "experiments/results/kb"
+
+
+def artifact_uri(knowledge_id: str) -> str:
+    """Return the durable per-record ``file://`` URI for a record id.
+
+    The producer (``scripts/kb_produce.py``) writes the artifact to this path before
+    publishing the pointer event; the consumer (``knowledge_stream.process_entry``) reads it
+    back via ``read_artifact`` and verifies ``content_hash`` against its bytes.
+    """
+    return f"file://{ARTIFACT_DIR}/{knowledge_id}.json"
 
 #: Canonical repository identity (the rebranded ``agentic-dynamics`` id, per
 #: ``docs/agentic_dynamics_rebrand_plan.md``). It is a stable component of ``entity_id`` so the
@@ -145,6 +164,32 @@ def _yields_finding(entry: dict[str, Any]) -> bool:
 
 # ── Record / event construction ─────────────────────────────────
 
+def _sha256_bytes(data: bytes) -> str:
+    """Return the sha256 hex digest of raw bytes (the artifact-hash primitive).
+
+    ``compute_content_hash`` in :mod:`instrument.knowledge` hashes *str*; the durable
+    artifact is bytes, so this is the byte-level counterpart used for ``content_hash``.
+    """
+    return hashlib.sha256(data).hexdigest()
+
+
+def record_to_artifact(record: KnowledgeRecord) -> bytes:
+    """Serialize ``record`` to its durable per-record artifact bytes.
+
+    This is the JSON serialization of ``record.to_dict()`` with stable (sorted) key ordering.
+    The two *derived* identities — ``knowledge_id`` and ``content_hash`` — are written as
+    empty strings so the artifact bytes are **hash-independent**: ``content_hash`` is
+    ``sha256(artifact)`` (must not be self-referential) and ``knowledge_id`` folds
+    ``content_hash`` (so it too cannot be hashed back in). The real values travel in the
+    pointer event and are reattached by :func:`extract_record`; every other field survives
+    the round trip byte-for-byte.
+    """
+    data = record.to_dict()
+    data["knowledge_id"] = ""
+    data["content_hash"] = ""
+    return json.dumps(data, sort_keys=True).encode("utf-8")
+
+
 def build_record(
     entry: dict[str, Any],
     *,
@@ -163,9 +208,12 @@ def build_record(
     * ``entity_id`` — ``sha256(repository_id | source_uri | logical_locator)``; stable across
       extractor generations and call sites. ``repository_id`` defaults to
       :data:`REPOSITORY_ID` but is overridable (the producer's ``--repository-id`` flag).
-    * ``content_hash`` — ``sha256(text)``, recomputable from the record's own ``text``.
+    * ``content_hash`` — ``sha256(record_to_artifact(record))``, the sha256 of the durable
+      per-record JSON artifact (not the finding text alone). This is what the consumer's
+      ``verify_content_hash`` compares against the bytes it reads back from ``source_uri``.
     * ``knowledge_id`` — ``sha256(entity_id | source_revision | content_hash | extractor_version)``;
-      a new extractor version, revision, or text yields a new id while ``entity_id`` holds.
+      a new extractor version, revision, or artifact content yields a new id while
+      ``entity_id`` holds.
 
     ``authority`` is ``MEASURED`` (a raw attempt measurement supports an outcome claim) and
     ``evidence_class`` is ``"[M]"``. ``confidence`` and ``perturbation_strength`` are carried
@@ -192,16 +240,15 @@ def build_record(
     run_id = _run_id(entry)
     source_revision = _source_revision(entry)
 
-    # Identity: the record's text is the authoritative payload, so the content hash is
-    # computed from it — a consumer can re-derive text from the entry and compare hashes.
+    # Identity: entity_id is the stable logical identity (aggregate origin + locator). The
+    # record is built with placeholder derived ids, then the durable artifact is serialized
+    # and hashed, and only then are content_hash (sha256 of the artifact) and knowledge_id
+    # (which folds content_hash) back-filled. Ordering matters: both derived ids must not be
+    # part of the bytes that content_hash covers, or the hash would be self-referential.
     entity_id = compute_entity_id(repository_id, SOURCE_URI, run_id)
-    content_hash = compute_content_hash(card.text)
-    knowledge_id = compute_knowledge_id(
-        entity_id, source_revision, content_hash, EXTRACTOR_VERSION
-    )
 
-    return KnowledgeRecord(
-        knowledge_id=knowledge_id,
+    record = KnowledgeRecord(
+        knowledge_id="",  # back-filled below (folds content_hash)
         entity_id=entity_id,
         source_uri=SOURCE_URI,
         source_type=SOURCE_TYPE,
@@ -212,7 +259,7 @@ def build_record(
         # commit_sha *is* the source_revision for repository-backed units (knowledge.py's
         # docstring); here that is the commit id when stamped, else RESULT_VERSION.
         commit_sha=source_revision,
-        content_hash=content_hash,
+        content_hash="",  # back-filled below (sha256 of the artifact)
         extractor_version=EXTRACTOR_VERSION,
         embedding_version="",  # no embedding is computed at extraction time
         authority=Authority.MEASURED,
@@ -230,6 +277,11 @@ def build_record(
         test_executed_success=card.test_executed_success,
         evidence_class="[M]",
     )
+    content_hash = _sha256_bytes(record_to_artifact(record))
+    knowledge_id = compute_knowledge_id(
+        entity_id, source_revision, content_hash, EXTRACTOR_VERSION
+    )
+    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 def record_to_event(
@@ -239,20 +291,45 @@ def record_to_event(
 
     Deliberately carries **no** ``text``/``body`` — mirroring ``KnowledgeEvent``'s docstring,
     a consumer must read the source artifact, verify ``content_hash``, and re-run the
-    versioned extractor. The ``source_revision`` is recovered from ``record.commit_sha``
-    (which stores the revision folded into ``knowledge_id``), so a replay reproduces the
-    exact id. ``occurred_at`` is the producer timestamp used to measure end-to-end lag.
+    versioned extractor. The pointer's ``source_uri`` is the **per-record durable artifact**
+    (``file://experiments/results/kb/<knowledge_id>.json``), not the aggregate summary, so the
+    consumer reads the *exact* bytes that ``content_hash`` covers. ``content_hash`` is
+    ``sha256(record_to_artifact(record))``. The ``source_revision`` is recovered from
+    ``record.commit_sha`` (which stores the revision folded into ``knowledge_id``), so a replay
+    reproduces the exact id. ``occurred_at`` is the producer timestamp used to measure
+    end-to-end lag.
     """
     return KnowledgeEvent(
         knowledge_id=record.knowledge_id,
         entity_id=record.entity_id,
         operation="upsert",
-        source_uri=record.source_uri,
+        source_uri=artifact_uri(record.knowledge_id),
         source_revision=record.commit_sha,
-        content_hash=record.content_hash,
+        content_hash=_sha256_bytes(record_to_artifact(record)),
         occurred_at=_now_iso(now),
         schema_version=SCHEMA_VERSION,
         event_id="",
+    )
+
+
+def extract_record(event: KnowledgeEvent, artifact_bytes: bytes) -> KnowledgeRecord:
+    """Reconstruct the FULL measured-finding record from a verified pointer + artifact.
+
+    This is the domain-specific extractor for the measured-result path — it supersedes
+    ``knowledge_stream.default_extract`` for producer-emitted events and is wired in as the
+    ``extractor`` arg of ``process_entry`` (see ``scripts/kb_worker.py``). The artifact is the
+    JSON from :func:`record_to_artifact`, which serializes the two derived identities
+    (``knowledge_id`` and ``content_hash``) as empty strings so the artifact bytes are
+    hash-independent. Their real values travel in the pointer event and are reattached here;
+    every other field — including ``authority=MEASURED`` — is restored via
+    ``KnowledgeRecord.from_dict``.
+    """
+    data = json.loads(artifact_bytes.decode("utf-8"))
+    record = KnowledgeRecord.from_dict(data)
+    return replace(
+        record,
+        knowledge_id=event.knowledge_id,
+        content_hash=event.content_hash,
     )
 
 

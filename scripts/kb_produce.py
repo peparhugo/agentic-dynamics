@@ -49,6 +49,12 @@ DEFAULT_RESULTS_PATH = (
 #: How many sample records ``--dry-run`` prints (a preview, not the whole batch).
 SAMPLE_COUNT = 5
 
+#: Durable per-record artifact directory, anchored to the repo root so the producer writes to
+#: the same path the consumer's ``read_artifact`` resolves (``file://experiments/results/kb/…``).
+KB_ARTIFACT_DIR = (
+    Path(__file__).resolve().parent.parent / "experiments" / "results" / "kb"
+)
+
 
 def log(msg: str) -> None:
     ts = datetime.now().strftime("%H:%M:%S")
@@ -84,9 +90,12 @@ def emit_records(r, records: list[ki.KnowledgeRecord]) -> tuple[int, int]:
     """Publish one pointer event per record, skipping ids already checkpointed.
 
     Returns ``(emitted, skipped)``. For each record: skip when the checkpoint hash already
-    carries the ``knowledge_id`` (``HGET``), else ``publish_event`` the pointer event then
-    ``HSET`` the checkpoint — the destination-confirm-then-ack ordering mirrors the consumer's,
-    so a crash between publish and checkpoint leaves the stream the single source of truth.
+    carries the ``knowledge_id`` (``HGET``), else write the durable per-record artifact to
+    ``experiments/results/kb/<knowledge_id>.json`` **before** publishing the pointer event,
+    then ``HSET`` the checkpoint — the destination-confirm-then-ack ordering mirrors the
+    consumer's, so a crash between publish and checkpoint leaves the stream the single source
+    of truth. Writing the artifact first guarantees the consumer can read + verify the bytes
+    the event's ``content_hash`` covers as soon as the pointer lands.
     """
     emitted = 0
     skipped = 0
@@ -94,6 +103,9 @@ def emit_records(r, records: list[ki.KnowledgeRecord]) -> tuple[int, int]:
         if r.hget(ks.CHECKPOINT_KEY, record.knowledge_id) is not None:
             skipped += 1
             continue
+        artifact = ki.record_to_artifact(record)
+        KB_ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+        (KB_ARTIFACT_DIR / f"{record.knowledge_id}.json").write_bytes(artifact)
         ks.publish_event(r, ki.record_to_event(record))
         r.hset(ks.CHECKPOINT_KEY, record.knowledge_id, record.indexed_at)
         emitted += 1

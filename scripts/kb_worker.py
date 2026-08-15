@@ -28,6 +28,7 @@ import redis
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from instrument import knowledge_ingestion as ki  # noqa: E402
 from instrument import knowledge_stream as ks  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
@@ -130,13 +131,19 @@ def process_batch(r, group, consumer, handler, *, once: bool) -> int:
 
     # Reclaim messages left behind by a crashed/lagging consumer after the lease.
     for entry in ks.claim_pending(r, group, consumer):
-        outcome = ks.process_entry(r, group, entry.entry_id, entry.event, handler)
+        outcome = ks.process_entry(
+            r, group, entry.entry_id, entry.event, handler,
+            extractor=ki.extract_record,
+        )
         processed += 1
         log(f"claimed {entry.entry_id} {entry.event.knowledge_id[:12]} -> {outcome}")
 
     # Read new messages (block briefly so the loop is not a busy spin).
     for entry in ks.read_events(r, group, consumer, count=ks.CLAIM_BATCH, block_ms=BLOCK_TIMEOUT_MS):
-        outcome = ks.process_entry(r, group, entry.entry_id, entry.event, handler)
+        outcome = ks.process_entry(
+            r, group, entry.entry_id, entry.event, handler,
+            extractor=ki.extract_record,
+        )
         processed += 1
         log(f"new {entry.entry_id} {entry.event.knowledge_id[:12]} -> {outcome}")
 

@@ -232,13 +232,16 @@ def read_artifact(source_uri: str) -> bytes:
     return Path(path).read_bytes()
 
 
-def default_extract(event: KnowledgeEvent, text: str) -> KnowledgeRecord:
-    """Build a :class:`KnowledgeRecord` from a verified pointer + artifact text.
+def default_extract(event: KnowledgeEvent, artifact: bytes) -> KnowledgeRecord:
+    """Build a :class:`KnowledgeRecord` from a verified pointer + artifact bytes.
 
-    This is the minimal v1 extractor: it carries the identity, provenance, and text
-    through. A richer extractor (symbols, chunking, redaction, evidence class) belongs
-    to ``knowledge_ingestion`` and may replace it via the injectable ``extractor`` arg.
+    This is the minimal v1 extractor: it decodes the artifact as UTF-8 text and carries the
+    identity, provenance, and text through. A richer extractor (symbols, chunking, redaction,
+    evidence class) belongs to ``knowledge_ingestion`` and may replace it via the injectable
+    ``extractor`` arg — e.g. ``knowledge_ingestion.extract_record``, which parses the durable
+    JSON artifact and reconstructs the full ``MEASURED`` record.
     """
+    text = artifact.decode("utf-8", errors="replace")
     return KnowledgeRecord(
         knowledge_id=event.knowledge_id,
         entity_id=event.entity_id,
@@ -281,7 +284,7 @@ def process_entry(
     max_retries: int = MAX_RETRIES,
     stream: str = STREAM_KEY,
     artifact_reader: Callable[[str], bytes] = read_artifact,
-    extractor: Callable[[KnowledgeEvent, str], KnowledgeRecord] = default_extract,
+    extractor: Callable[[KnowledgeEvent, bytes], KnowledgeRecord] = default_extract,
 ) -> str:
     """Read → verify → extract → upsert → ack, one entry. Returns ``ok | retry | dead_letter``.
 
@@ -294,8 +297,7 @@ def process_entry(
         artifact = artifact_reader(event.source_uri)
         if not verify_content_hash(artifact, event.content_hash):
             raise ValueError(f"content_hash mismatch for {event.source_uri!r}")
-        text = artifact.decode("utf-8", errors="replace")
-        record = extractor(event, text)
+        record = extractor(event, artifact)
         handler(record)
     except Exception as exc:
         if delivery_count(r, group, entry_id, stream=stream) >= max_retries:

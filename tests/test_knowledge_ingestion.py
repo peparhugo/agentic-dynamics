@@ -7,6 +7,7 @@ test_executed_success are carried through, that the event is pointer-only, the b
 ``derive_records`` filtering, and the batch producer's pure emission planning + dry-run smoke.
 """
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -22,7 +23,6 @@ from instrument.knowledge import (
     Authority,
     KnowledgeEvent,
     KnowledgeRecord,
-    compute_content_hash,
     compute_entity_id,
     compute_knowledge_id,
 )
@@ -33,8 +33,11 @@ from instrument.knowledge_ingestion import (
     RESULT_VERSION,
     SOURCE_TYPE,
     SOURCE_URI,
+    artifact_uri,
     build_record,
     derive_records,
+    extract_record,
+    record_to_artifact,
     record_to_event,
 )
 
@@ -98,8 +101,13 @@ def test_record_authority_measured_and_evidence_class_m():
 
 def test_ids_stable_across_call_sites():
     # Two independent derivations of the same entry converge on one identity pair.
-    a = build_record(_entry())
-    b = build_record(_entry())
+    # content_hash now covers the durable artifact (which includes the observation
+    # timestamp), so pin `now` to make the derivation deterministic.
+    from datetime import datetime, timezone
+
+    pinned = datetime(2026, 8, 15, 12, 0, 0, tzinfo=timezone.utc)
+    a = build_record(_entry(), now=pinned)
+    b = build_record(_entry(), now=pinned)
     assert a.entity_id == b.entity_id
     assert a.knowledge_id == b.knowledge_id
     # And they are real sha256 digests.
@@ -113,9 +121,16 @@ def test_entity_id_uses_repository_source_and_locator():
     assert record.entity_id == expected
 
 
-def test_content_hash_recomputes_from_text():
+def test_content_hash_is_artifact_hash():
     record = build_record(_entry())
-    assert record.content_hash == compute_content_hash(record.text)
+    # content_hash is the sha256 of the durable per-record artifact — not of the finding text.
+    assert record.content_hash == hashlib.sha256(record_to_artifact(record)).hexdigest()
+    # The artifact serialization excludes the two derived ids so the hash is not
+    # self-referential: re-serializing the *final* record (with its real ids) still hashes
+    # to the same bytes.
+    assert record_to_artifact(record) == record_to_artifact(
+        KnowledgeRecord.from_dict(record.to_dict())
+    )
 
 
 def test_knowledge_id_folds_revision_hash_and_extractor():
@@ -230,7 +245,7 @@ def test_event_carries_identity_and_pointers():
     assert event.knowledge_id == record.knowledge_id
     assert event.entity_id == record.entity_id
     assert event.operation == "upsert"
-    assert event.source_uri == record.source_uri
+    assert event.source_uri == artifact_uri(record.knowledge_id)
     assert event.source_revision == record.commit_sha
     assert event.content_hash == record.content_hash
     assert event.schema_version == SCHEMA_VERSION
@@ -373,4 +388,61 @@ def test_kb_produce_dry_run_smoke(tmp_path):
     assert "exp_good_a" in out
     assert "exp_good_b" in out
     assert "exp_narr" not in out
+
+
+# ── Producer → consumer boundary (the bug the original run missed) ──
+
+
+def test_producer_emitted_event_verifies_and_lands_measured(tmp_path, monkeypatch):
+    """Drive the full boundary: producer emits, consumer reads/verifies/extracts/upserts.
+
+    This is the end-to-end contract the original run broke — the producer hashed the
+    one-line finding text but pointed ``source_uri`` at the whole ``_results_summary.json``,
+    so ``verify_content_hash`` could never match and every event retried forever. Here the
+    producer writes the per-record JSON artifact and hashes *its* bytes; the consumer reads
+    those same bytes, verifies, and reconstructs a ``MEASURED`` record via ``extract_record``.
+    """
+    from instrument import knowledge_stream as ks
+
+    # 1. Producer path — derive, serialize, and durably write the per-record artifact.
+    record = build_record(_entry(worktree_name="exp_int", run_id="exp_int"))
+    artifact = record_to_artifact(record)
+    rel_path = artifact_uri(record.knowledge_id)[len("file://"):]
+    artifact_path = tmp_path / rel_path
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_bytes(artifact)
+    event = record_to_event(record)
+
+    # The event points at the per-record artifact and hashes those exact bytes.
+    assert event.source_uri == artifact_uri(record.knowledge_id)
+    assert event.content_hash == hashlib.sha256(artifact).hexdigest()
+    assert ks.verify_content_hash(artifact, event.content_hash)
+
+    # 2. Consumer path — resolve the artifact from the event's source_uri (relative to the
+    #    checkout root, which we chdir to), verify, extract, and upsert into a store double.
+    monkeypatch.chdir(tmp_path)
+
+    class Store:
+        def __init__(self):
+            self.docs = {}
+
+        def upsert(self, rec):
+            self.docs[rec.knowledge_id] = rec
+
+    class _FakeRedis:
+        def xack(self, *args, **kwargs):
+            return 1
+
+    store = Store()
+    outcome = ks.process_entry(
+        _FakeRedis(), "kb-int", "0-1", event, store.upsert,
+        extractor=extract_record,
+    )
+    assert outcome == "ok"
+
+    upserted = store.docs[record.knowledge_id]
+    assert upserted.authority is Authority.MEASURED
+    assert upserted.text == record.text
+    assert upserted.knowledge_id == record.knowledge_id
+    assert upserted.content_hash == record.content_hash
 
