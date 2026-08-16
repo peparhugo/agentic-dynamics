@@ -219,6 +219,16 @@ from .knowledge_ingestion import (
     record_to_event,
 )
 
+# v1.0: producer-side code-structure derivation (source_type=code records + graph wiring)
+from .code_ingestion import (
+    ACL_SCOPE as CODE_ACL_SCOPE,
+    EXTRACTOR_VERSION as CODE_EXTRACTOR_VERSION,
+    SOURCE_TYPE as CODE_SOURCE_TYPE,
+    build_code_record,
+    derive_code_records,
+    ingest_codebase_graph,
+)
+
 # v1.0: durable ingestion over Redis Streams (DB 2, pointer-only events)
 from .knowledge_stream import (
     CONSUMER_GROUPS,
@@ -396,6 +406,9 @@ __all__ = [
     "record_to_artifact", "extract_record", "artifact_uri",
     "EXTRACTOR_VERSION", "RESULT_VERSION", "SOURCE_URI", "SOURCE_TYPE",
     "REPOSITORY_ID", "ACL_SCOPE", "ARTIFACT_DIR",
+    # v1.0 code ingestion
+    "derive_code_records", "build_code_record", "ingest_codebase_graph",
+    "CODE_EXTRACTOR_VERSION", "CODE_SOURCE_TYPE", "CODE_ACL_SCOPE",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",
