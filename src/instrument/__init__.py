@@ -133,6 +133,14 @@ from .prompt_perturbation import (
     compile_prompt_perturbation,
     resolve_perturbed_prompt,
 )
+from .queue_reinterleave import (
+    connect,
+    provider_of,
+    provider_summary,
+    read_queue,
+    reinterleave_cells,
+    write_queue,
+)
 
 # Deprecated: RecoveryCost, recovery_summary_table — not used by current scripts
 from .recovery_cost import compute_recovery_cost
@@ -303,6 +311,7 @@ from .workflow_runner import (
 __all__ = [
     "build_operators", "perturb_prompt", "PERTURBATION_CLASSES", "perturbation_class_for", "derive_seed",
     "compile_prompt_perturbation", "resolve_perturbed_prompt", "PromptPerturbation", "FLASH_MODEL",
+    "reinterleave_cells", "read_queue", "write_queue", "provider_summary", "provider_of", "connect",
     "BasinMetrics", "measure_basin_escape",
     "SolutionMetrics", "evaluate_solution",
     "EfficiencyMetrics", "compute_efficiency", "compute_cost_estimate",
