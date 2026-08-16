@@ -5,23 +5,29 @@ from datetime import datetime
 
 import pytest
 import pytest_asyncio
+from fakeredis import FakeAsyncRedis, FakeServer
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
 
 from app import NotificationServer
+from broker import RedisBroker
+from storage import MessageStore
 
 
 @pytest_asyncio.fixture
 async def running_server():
     notifications = NotificationServer()
-    async with serve(
-        notifications.handler,
-        "127.0.0.1",
-        0,
-        process_request=notifications.process_request,
-    ) as websocket_server:
-        port = websocket_server.sockets[0].getsockname()[1]
-        yield notifications, port
+    try:
+        async with serve(
+            notifications.handler,
+            "127.0.0.1",
+            0,
+            process_request=notifications.process_request,
+        ) as websocket_server:
+            port = websocket_server.sockets[0].getsockname()[1]
+            yield notifications, port
+    finally:
+        await notifications.close()
 
 
 async def receive_json(websocket):
@@ -208,3 +214,105 @@ async def test_channel_rest_endpoints(running_server):
                 ),
             },
         )
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_distributes_between_server_instances():
+    redis_server = FakeServer()
+    first_redis = FakeAsyncRedis(server=redis_server, decode_responses=True)
+    second_redis = FakeAsyncRedis(server=redis_server, decode_responses=True)
+    first_server = NotificationServer(broker=RedisBroker(client=first_redis))
+    second_server = NotificationServer(broker=RedisBroker(client=second_redis))
+    await asyncio.gather(first_server.start(), second_server.start())
+
+    try:
+        async with serve(
+            first_server.handler,
+            "127.0.0.1",
+            0,
+            process_request=first_server.process_request,
+        ) as first_listener, serve(
+            second_server.handler,
+            "127.0.0.1",
+            0,
+            process_request=second_server.process_request,
+        ) as second_listener:
+            first_port = first_listener.sockets[0].getsockname()[1]
+            second_port = second_listener.sockets[0].getsockname()[1]
+            async with connect(f"ws://127.0.0.1:{first_port}") as first, connect(
+                f"ws://127.0.0.1:{second_port}"
+            ) as second:
+                await asyncio.gather(receive_json(first), receive_json(second))
+                assert await first_server.broker.connected_count() == 2
+
+                outgoing = {
+                    "type": "broadcast",
+                    "payload": {"text": "through redis"},
+                    "timestamp": "2026-08-16T00:00:00Z",
+                }
+                await first.send(json.dumps(outgoing))
+
+                assert await receive_json(first) == outgoing
+                assert await receive_json(second) == outgoing
+    finally:
+        await asyncio.gather(first_server.close(), second_server.close())
+        await asyncio.gather(first_redis.aclose(), second_redis.aclose())
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path):
+    database_path = tmp_path / "messages.sqlite3"
+    notifications = NotificationServer(
+        store=MessageStore(f"sqlite:///{database_path}")
+    )
+    try:
+        async with serve(
+            notifications.handler,
+            "127.0.0.1",
+            0,
+            process_request=notifications.process_request,
+        ) as websocket_server:
+            port = websocket_server.sockets[0].getsockname()[1]
+            async with connect(f"ws://127.0.0.1:{port}") as websocket:
+                await receive_json(websocket)
+                await websocket.send(json.dumps(channel_message("subscribe", "history")))
+                await asyncio.sleep(0.01)
+                for number in (1, 2):
+                    message = {
+                        "type": "broadcast",
+                        "payload": {"number": number},
+                        "timestamp": f"2026-08-16T00:00:0{number}Z",
+                        "channel": "history",
+                    }
+                    await websocket.send(json.dumps(message))
+                    await receive_json(websocket)
+
+                def get_messages():
+                    url = f"http://127.0.0.1:{port}/messages?limit=1&offset=1"
+                    with urllib.request.urlopen(url) as response:
+                        return response.status, json.load(response)
+
+                status, body = await asyncio.to_thread(get_messages)
+                assert status == 200
+                assert body == {
+                    "messages": [
+                        {
+                            "id": 2,
+                            "channel": "history",
+                            "type": "broadcast",
+                            "payload": {"number": 1},
+                            "timestamp": "2026-08-16T00:00:01Z",
+                        }
+                    ]
+                }
+    finally:
+        await notifications.close()
+
+    reopened = MessageStore(f"sqlite:///{database_path}")
+    try:
+        broadcasts = [
+            message for message in reopened.list() if message["type"] == "broadcast"
+        ]
+        assert [message["payload"]["number"] for message in broadcasts] == [2, 1]
+    finally:
+        reopened.close()
