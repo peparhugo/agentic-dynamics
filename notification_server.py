@@ -1,7 +1,14 @@
-"""WebSocket-based notification server built on the `websockets` library.
+"""Pluggable-transport notification server.
+
+The server core (routing, channels, Redis backbone, persistence) talks only
+to a ``BaseTransport`` abstraction, so different transport mechanisms
+(WebSocket, SSE, polling, raw TCP, ...) can be swapped in without touching
+core logic. ``WebSocketTransport`` is the default and is selected via the
+``TRANSPORT`` environment variable.
 
 Core features:
-- Accepts WebSocket connections and assigns each client a unique ID.
+- Accepts connections through the configured transport and assigns each
+  client a unique ID.
 - Broadcasts messages to all connected clients.
 - Routes direct messages to a single target client.
 - Supports channel-based subscriptions: clients subscribe/unsubscribe to
@@ -41,6 +48,7 @@ directly.
 
 from __future__ import annotations
 
+import abc
 import asyncio
 import json
 import os
@@ -184,7 +192,10 @@ class MessageStore:
 
 
 class ClientRegistry:
-    """Thread-safe client registry mapping client IDs to WebSocket objects.
+    """Thread-safe client registry mapping client IDs to connection objects.
+
+    The registry is transport-agnostic: it stores whatever connection object
+    the active transport hands it (WebSocket, SSE stream, TCP socket, ...).
 
     asyncio runs everything on a single event loop, so plain dict operations
     are always safe here -- no locking is required even when background
@@ -192,7 +203,7 @@ class ClientRegistry:
     """
 
     def __init__(self) -> None:
-        self._clients: dict[str, websockets.ServerConnection] = {}
+        self._clients: dict[str, object] = {}
         self._next_id: int = 1
         self._channel_members: dict[str, set[str]] = {}
 
@@ -212,7 +223,7 @@ class ClientRegistry:
                 del self._channel_members[channel]
 
     def get(self, client_id: str):
-        """Return the WebSocket for a client ID, or None."""
+        """Return the connection object for a client ID, or None."""
         return self._clients.get(client_id)
 
     def count(self) -> int:
@@ -223,8 +234,8 @@ class ClientRegistry:
         """Snapshot of the connected client IDs."""
         return list(self._clients)
 
-    def items(self) -> list[tuple[str, websockets.ServerConnection]]:
-        """Snapshot of ``(client_id, websocket)`` pairs."""
+    def items(self) -> list[tuple[str, object]]:
+        """Snapshot of ``(client_id, connection)`` pairs."""
         return list(self._clients.items())
 
     def subscribe(self, client_id: str, channel: str) -> None:
