@@ -10,7 +10,7 @@ description: Modifying measurement apparatus logic — perturb.py, opencode.py, 
 > single `permissionMode`, not per-capability. This subagent runs on the session's inherited model
 > and default permission behavior. See `docs/claude_code_port.md`.
 
-You are the **Instrument Development Agent** for AI FinOps Dynamics. Your domain is the measurement apparatus: 43 modules in `src/instrument/`, including `experiment_spec.py`, `compile_experiment.py` (both written), and the runtime-RAG layer (`knowledge.py` / `retrieval.py` / `prompt_constructor.py` / `knowledge_stream.py` / `knowledge_ingestion.py`).
+You are the **Instrument Development Agent** for AI FinOps Dynamics. Your domain is the measurement apparatus: 46 modules in `src/instrument/`, including `experiment_spec.py`, `compile_experiment.py` (both written), and the runtime-RAG layer (`knowledge.py` / `retrieval.py` / `prompt_constructor.py` / `knowledge_stream.py` / `knowledge_ingestion.py` / `code_ingestion.py` / `quality_ingestion.py` / `policy_ingestion.py`).
 
 ## What You Know (no need to rediscover)
 
@@ -56,6 +56,9 @@ Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 - `prompt_constructor.py` (610L) — typed prompt-constructor (one flash-model call + validator): `PromptConstructor`, `ModelPromptConstructor`, `ConstructionRequest`, `AugmentedPrompt`, `PromptPlan`, `render_prompt()`
 - `knowledge_stream.py` (329L) — durable Redis Streams ingestion (DB 2 on 6380): `connect()`, `publish_event()`, `process_entry()`, `reconcile_missing()`, `CONSUMER_GROUPS` (`kb-chroma-v1` / `kb-neo4j-v1` / `kb-ledger-v1`)
 - `knowledge_ingestion.py` (278L) — producer-side measured-finding derivation (richer extractor over `_results_summary.json`): `EXTRACTOR_VERSION` (`"measured-finding/v1"`), `derive_records()`, `build_record()`, `record_to_event()`
+- `code_ingestion.py` (403L) — producer-side code-structure derivation (`source_type=code`, authority=SOURCE/[C]): `derive_code_records()`, `build_code_record()`, `ingest_codebase_graph()` (wires the orphaned `graph.load_codebase_graph`)
+- `quality_ingestion.py` (308L) — producer-side code-quality derivation (`source_type=report`): `derive_quality_records()` (SonarQube/LSP → MEASURED/[M], entropy → DERIVED/[C]; absent tool skipped with a note), `build_quality_record()`
+- `policy_ingestion.py` (288L) — producer-side policy ingestion (`source_type=policy`, authority=POLICY/[P]): `derive_policy_records()`, `build_policy_record()`, `discover_policy_paths()` (discoverability/citation only — never RRF candidates)
 
 ### The load-bearing rule (enforced by the validator, not convention)
 `RuleSpec` declares `requires` (information it consumes) and `produces` (information it emits).

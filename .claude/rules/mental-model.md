@@ -205,6 +205,26 @@ record_to_event(record, *, now=None) -> KnowledgeEvent
 extract_record(event, artifact_bytes) -> KnowledgeRecord
   # measured-result extractor — supersedes default_extract; wired in kb_worker.py
 
+# code_ingestion.py — producer-side code-structure derivation (source_type=code)
+EXTRACTOR_VERSION = "code/v1"
+derive_code_records(profile, *, repository_id, revision, repo_root, now=None) -> list[KnowledgeRecord]
+build_code_record(symbol, file_path, language, *, repository_id, revision, now=None) -> KnowledgeRecord
+ingest_codebase_graph(client, repo_root, *, worktree_name, profile=None) -> dict
+  # one record per function/class; authority=SOURCE, evidence_class="[C]"; wires graph.load_codebase_graph
+
+# quality_ingestion.py — producer-side code-quality derivation (source_type=report)
+EXTRACTOR_VERSION = "quality/v1"
+derive_quality_records(codebase_path, *, profile, repository_id, revision, now=None, notes=None) -> list[KnowledgeRecord]
+build_quality_record(*, signal, logical_locator, language, text, authority, evidence_class, ...) -> KnowledgeRecord
+  # SonarQube/LSP -> MEASURED "[M]"; entropy -> DERIVED "[C]"; absent tool -> skipped (noted, never fabricated)
+
+# policy_ingestion.py — producer-side policy ingestion (source_type=policy)
+EXTRACTOR_VERSION = "policy/v1"
+derive_policy_records(policy_paths, *, repository_id, revision, repo_root=None, now=None) -> list[KnowledgeRecord]
+build_policy_record(locator, text, *, repository_id, revision, now=None) -> KnowledgeRecord
+discover_policy_paths(repo_root) -> list[Path]
+  # authority=POLICY (top tier), evidence_class="[P]"; discoverability/citation only — never RRF candidates
+
 # workflow_runner.py — the rag_augment seam (default OFF)
 run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=None,
              construct_fn=None, rag_params=None) -> WorkflowRunResult
@@ -212,9 +232,11 @@ run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=N
 # one agent phase (only when rag_augment enabled):
 route_step ──▶ retrieve ──▶ construct ──▶ render ──▶ run_agent
 
-# producer data flow (batch ingestion): measured result ──▶ derive_records ──▶
+# producer data flow (batch ingestion): any of four sources ──▶ derive_*_records ──▶
 #   record_to_artifact (write kb/<id>.json) ──▶ record_to_event ──▶ publish_event ──▶
 #   stream ──▶ process_entry (read → verify sha256(artifact) → extract_record → upsert)
+# four record types, over the authority ordering (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY):
+#   finding → MEASURED [M] | code → SOURCE [C] | report → MEASURED [M] (Sonar/LSP) or DERIVED [C] (entropy) | policy → POLICY [P]
 ```
 
 ### Ledger (the data model rules consume) — schema WRITTEN; the four formerly-missing fields are now MEASURED
