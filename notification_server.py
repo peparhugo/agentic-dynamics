@@ -4,13 +4,17 @@ Core features:
 - Accepts WebSocket connections and assigns each client a unique ID.
 - Broadcasts messages to all connected clients.
 - Routes direct messages to a single target client.
+- Supports channel-based subscriptions: clients subscribe/unsubscribe to
+  named channels and messages carrying a ``channel`` field are delivered
+  only to that channel's subscribers.
 - Sends server-generated system messages (connect ack, errors, ...).
-- Cleans up clients on disconnect.
-- Exposes a REST ``GET /health`` endpoint reporting the connected client
-  count via a small background HTTP server.
+- Cleans up clients (and their channel memberships) on disconnect.
+- Exposes REST endpoints via a small background HTTP server:
+  ``GET /health``, ``GET /channels``, ``GET /channels/{name}/subscribers``.
 
 Message format (JSON): ``{type: str, payload: dict, timestamp: str}``.
-Supported types: ``broadcast``, ``direct``, ``system``.
+Supported types: ``broadcast``, ``direct``, ``system``, ``subscribe``,
+``unsubscribe``.
 
 Thread safety: everything runs on a single asyncio event loop, so the client
 registry needs no locking -- plain dict reads and writes are safe by
@@ -19,11 +23,11 @@ construction, even when the background HTTP server thread reads the registry.
 
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
+from urllib.parse import unquote, urlparse
 
 import websockets
 
@@ -48,6 +52,7 @@ class ClientRegistry:
     def __init__(self) -> None:
         self._clients: dict[str, websockets.ServerConnection] = {}
         self._next_id: int = 1
+        self._channel_members: dict[str, set[str]] = {}
 
     def add(self, websocket) -> str:
         """Register a connection and return its unique client ID."""
@@ -57,8 +62,12 @@ class ClientRegistry:
         return client_id
 
     def remove(self, client_id: str) -> None:
-        """Remove a client from the registry (no-op if already gone)."""
+        """Remove a client (and its channel memberships); no-op if already gone."""
         self._clients.pop(client_id, None)
+        for channel, members in list(self._channel_members.items()):
+            members.discard(client_id)
+            if not members:
+                del self._channel_members[channel]
 
     def get(self, client_id: str):
         """Return the WebSocket for a client ID, or None."""
@@ -76,20 +85,60 @@ class ClientRegistry:
         """Snapshot of ``(client_id, websocket)`` pairs."""
         return list(self._clients.items())
 
+    def subscribe(self, client_id: str, channel: str) -> None:
+        """Subscribe a client to a named channel (idempotent)."""
+        self._channel_members.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        """Unsubscribe a client from a named channel (idempotent)."""
+        members = self._channel_members.get(channel)
+        if members is None:
+            return
+        members.discard(client_id)
+        if not members:
+            del self._channel_members[channel]
+
+    def channel_subscribers(self, channel: str) -> set[str]:
+        """Snapshot of the client IDs subscribed to a channel."""
+        return set(self._channel_members.get(channel, set()))
+
+    def channels(self) -> dict[str, int]:
+        """Map of active channel name -> subscriber count."""
+        return {
+            name: len(members)
+            for name, members in self._channel_members.items()
+        }
+
 
 def build_health_handler(registry: ClientRegistry):
-    """Build a ``BaseHTTPRequestHandler`` reporting connected client counts.
+    """Build a ``BaseHTTPRequestHandler`` exposing the REST endpoints.
 
     ``GET /health`` -> 200 ``{"status": "ok", "connected_clients": N}``
+    ``GET /channels`` -> 200 ``{"channels": {name: subscriber_count}}``
+    ``GET /channels/{name}/subscribers`` -> 200
+        ``{"channel": name, "subscribers": [client_id, ...]}``
     """
 
     class HealthHandler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802 (BaseHTTPRequestHandler API)
-            if self.path in ("/health", "/health/"):
+            path = urlparse(self.path).path
+            if path in ("/health", "/health/"):
                 self._send_json(
                     200,
                     {"status": "ok", "connected_clients": registry.count()},
                 )
+            elif path in ("/channels", "/channels/"):
+                self._send_json(200, {"channels": registry.channels()})
+            elif path.startswith("/channels/"):
+                name = unquote(path[len("/channels/"):]).strip("/")
+                if name.endswith("/subscribers"):
+                    name = name[: -len("/subscribers")]
+                    subs = sorted(registry.channel_subscribers(name))
+                    self._send_json(
+                        200, {"channel": name, "subscribers": subs}
+                    )
+                else:
+                    self._send_json(404, {"error": "not found"})
             else:
                 self._send_json(404, {"error": "not found"})
 
@@ -195,8 +244,31 @@ class NotificationServer:
             payload = {}
 
         if msg_type == "broadcast":
+            channel = message.get("channel") or payload.get("channel")
             outbound = make_message("broadcast", {"from": sender_id, **payload})
-            await self.broadcast(outbound)
+            if channel:
+                outbound["channel"] = channel
+                if "channel" not in outbound["payload"]:
+                    outbound["payload"]["channel"] = channel
+                await self.send_to_channel(channel, outbound)
+            else:
+                await self.broadcast(outbound)
+        elif msg_type == "subscribe":
+            channel = message.get("channel") or payload.get("channel")
+            if not channel:
+                await self._send_error(
+                    websocket, "subscribe message missing 'channel'"
+                )
+            else:
+                self.registry.subscribe(sender_id, channel)
+        elif msg_type == "unsubscribe":
+            channel = message.get("channel") or payload.get("channel")
+            if not channel:
+                await self._send_error(
+                    websocket, "unsubscribe message missing 'channel'"
+                )
+            else:
+                self.registry.unsubscribe(sender_id, channel)
         elif msg_type == "direct":
             target = payload.get("to")
             if not target:
@@ -262,3 +334,15 @@ class NotificationServer:
             self.registry.remove(client_id)
             return False
         return True
+
+    async def send_to_channel(self, channel: str, message: dict) -> None:
+        """Send a message only to the subscribers of a named channel."""
+        data = json.dumps(message)
+        for client_id in self.registry.channel_subscribers(channel):
+            ws = self.registry.get(client_id)
+            if ws is None:
+                continue
+            try:
+                await ws.send(data)
+            except websockets.exceptions.ConnectionClosed:
+                self.registry.remove(client_id)

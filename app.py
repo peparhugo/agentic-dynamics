@@ -14,7 +14,7 @@ async def main() -> None:
     )
     await server.start()
     print(f"WebSocket server listening on {server.ws_url}")
-    print(f"REST health endpoint on {server.http_url}")
+    print(f"REST endpoints on {server.http_url} (health, channels)")
     try:
         await asyncio.Future()  # run until interrupted
     finally:
