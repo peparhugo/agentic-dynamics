@@ -1,5 +1,6 @@
 import asyncio
 import json
+from pathlib import Path
 from urllib.request import urlopen
 
 import pytest
@@ -123,3 +124,45 @@ async def test_channel_endpoints_list_subscribers(server):
         assert subscribers == {"channel": "alerts", "subscribers": [client_id]}
     finally:
         await websocket.close()
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path: Path):
+    instance = NotificationServer(port=0, database_url=str(tmp_path / "messages.db"), redis_url="redis://127.0.0.1:1")
+    await instance.start()
+    try:
+        await instance.broadcast({"text": "one", "channel": "history"})
+        await instance.broadcast({"text": "two"}, "system")
+
+        def request():
+            with urlopen(f"http://127.0.0.1:{instance.port}/messages?limit=1&offset=1") as response:
+                return response.status, json.loads(response.read())
+
+        status, body = await asyncio.to_thread(request)
+        assert status == 200
+        assert body["messages"][0]["payload"] == {"text": "two"}
+        assert body["messages"][0]["type"] == "system"
+    finally:
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_broker_distributes_messages_between_server_instances():
+    first = NotificationServer(port=0, redis_url="redis://127.0.0.1:1")
+    second = NotificationServer(port=0, redis_url="redis://127.0.0.1:1")
+    await first.start()
+    await second.start()
+    try:
+        import websockets
+        client = await websockets.connect(f"ws://127.0.0.1:{second.port}")
+        try:
+            await client.send(json.dumps({"type": "subscribe", "channel": "shared"}))
+            await asyncio.sleep(0)
+            await first.broadcast({"channel": "shared", "text": "from another server"})
+            message = json.loads(await asyncio.wait_for(client.recv(), 1))
+            assert message["payload"]["text"] == "from another server"
+        finally:
+            await client.close()
+    finally:
+        await first.stop()
+        await second.stop()
