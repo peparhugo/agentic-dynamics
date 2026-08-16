@@ -6,6 +6,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -20,6 +21,64 @@ from websockets.http11 import Request, Response
 
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 BROKER_PREFIX = "notifications:"
+
+
+class BaseTransport(ABC):
+    """Protocol adapter between notification delivery and client connections."""
+
+    @abstractmethod
+    async def on_connect(self, server: "NotificationServer", connection: Any) -> None:
+        """Serve a newly established client connection."""
+
+    @abstractmethod
+    async def on_disconnect(self, server: "NotificationServer", connection: Any) -> None:
+        """Release transport-specific resources for a client connection."""
+
+    @abstractmethod
+    async def send_message(self, client: Any, message: dict[str, Any]) -> None:
+        """Send one normalized notification to a client."""
+
+    @abstractmethod
+    async def broadcast(self, clients: list[Any], message: dict[str, Any]) -> None:
+        """Send one normalized notification to multiple clients."""
+
+    @asynccontextmanager
+    async def listen(self, server: "NotificationServer", host: str, port: int) -> AsyncIterator[Any]:
+        """Accept connections for this transport when it supports a listener."""
+        raise NotImplementedError(f"{type(self).__name__} does not provide a listener")
+        yield None
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport interface."""
+
+    async def on_connect(self, server: "NotificationServer", connection: ServerConnection) -> None:
+        client_id = await server._connect(connection)
+        try:
+            async for raw_message in connection:
+                await server._handle_message(client_id, raw_message)
+        except ConnectionClosed:
+            pass
+        finally:
+            await server._disconnect(client_id)
+            await self.on_disconnect(server, connection)
+
+    async def on_disconnect(self, server: "NotificationServer", connection: ServerConnection) -> None:
+        return None
+
+    async def send_message(self, client: ServerConnection, message: dict[str, Any]) -> None:
+        try:
+            await client.send(json.dumps(message))
+        except ConnectionClosed:
+            pass
+
+    async def broadcast(self, clients: list[ServerConnection], message: dict[str, Any]) -> None:
+        await asyncio.gather(*(self.send_message(client, message) for client in clients))
+
+    @asynccontextmanager
+    async def listen(self, server: "NotificationServer", host: str, port: int) -> AsyncIterator[Any]:
+        async with serve(server.handler, host, port, process_request=server.process_request) as listener:
+            yield listener
 
 
 class InMemoryBroker:
@@ -173,15 +232,29 @@ class MessageStore:
 class NotificationServer:
     """Manage clients while Redis distributes messages among server instances."""
 
-    def __init__(self, redis_url: str | None = None, database_url: str | None = None, broker: Any | None = None) -> None:
+    def __init__(
+        self,
+        redis_url: str | None = None,
+        database_url: str | None = None,
+        broker: Any | None = None,
+        transport: BaseTransport | None = None,
+    ) -> None:
         redis_url = redis_url if redis_url is not None else os.environ.get("REDIS_URL")
         database_url = database_url if database_url is not None else os.environ.get("DATABASE_URL", ":memory:")
-        self.clients: dict[str, ServerConnection] = {}
+        self.clients: dict[str, Any] = {}
         self.channels: dict[str, set[str]] = {}
         self._clients_lock = threading.RLock()
         self._broker = broker if broker is not None else RedisBroker(redis_url) if redis_url else InMemoryBroker()
+        self._transport = transport if transport is not None else self._transport_from_config()
         self._store = MessageStore(database_url)
         self._worker: asyncio.Task[None] | None = None
+
+    @staticmethod
+    def _transport_from_config() -> BaseTransport:
+        transport_name = os.environ.get("TRANSPORT", "websocket").lower()
+        if transport_name == "websocket":
+            return WebSocketTransport()
+        raise ValueError(f"Unsupported transport: {transport_name}")
 
     @property
     def client_count(self) -> int:
@@ -205,25 +278,25 @@ class NotificationServer:
         await self._broker.stop()
         self._store.close()
 
-    async def handler(self, websocket: ServerConnection) -> None:
+    async def handler(self, connection: Any) -> None:
+        await self._transport.on_connect(self, connection)
+
+    async def _connect(self, connection: Any) -> str:
         client_id = uuid.uuid4().hex
         with self._clients_lock:
-            self.clients[client_id] = websocket
+            self.clients[client_id] = connection
         await self._broker.connect(client_id)
-        await self._send(websocket, self._message("system", {"event": "connected", "client_id": client_id}))
-        try:
-            async for raw_message in websocket:
-                await self._handle_message(client_id, raw_message)
-        except ConnectionClosed:
-            pass
-        finally:
-            await self._broker.disconnect(client_id)
-            with self._clients_lock:
-                self.clients.pop(client_id, None)
-                for channel, subscribers in list(self.channels.items()):
-                    subscribers.discard(client_id)
-                    if not subscribers:
-                        del self.channels[channel]
+        await self._send(connection, self._message("system", {"event": "connected", "client_id": client_id}))
+        return client_id
+
+    async def _disconnect(self, client_id: str) -> None:
+        await self._broker.disconnect(client_id)
+        with self._clients_lock:
+            self.clients.pop(client_id, None)
+            for channel, subscribers in list(self.channels.items()):
+                subscribers.discard(client_id)
+                if not subscribers:
+                    del self.channels[channel]
 
     async def _handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
         if isinstance(raw_message, bytes):
@@ -275,7 +348,7 @@ class NotificationServer:
             else:
                 with self._clients_lock:
                     recipients = [self.clients[client_id] for client_id in self.channels.get(message["channel"], set()) if client_id in self.clients]
-            await asyncio.gather(*(self._send(client, message) for client in recipients))
+            await self._transport.broadcast(recipients, message)
 
     async def broadcast(self, message: dict[str, Any]) -> None:
         await self._broker.publish(message)
@@ -304,12 +377,8 @@ class NotificationServer:
         if client is not None:
             await self._send(client, self._message("system", {"event": "error", "detail": detail}))
 
-    @staticmethod
-    async def _send(client: ServerConnection, message: dict[str, Any]) -> None:
-        try:
-            await client.send(json.dumps(message))
-        except ConnectionClosed:
-            pass
+    async def _send(self, client: Any, message: dict[str, Any]) -> None:
+        await self._transport.send_message(client, message)
 
     @staticmethod
     def _valid_message(message: Any) -> bool:
@@ -358,7 +427,7 @@ class NotificationServer:
     async def listen(self, host: str = "127.0.0.1", port: int = 8765):
         await self.start()
         try:
-            async with serve(self.handler, host, port, process_request=self.process_request) as listener:
+            async with self._transport.listen(self, host, port) as listener:
                 yield listener
         finally:
             await self.stop()
