@@ -8,6 +8,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 import websockets
 from websockets.http11 import Headers, Response
@@ -15,7 +16,7 @@ from websockets.server import ServerConnection
 
 
 LOGGER = logging.getLogger(__name__)
-SUPPORTED_TYPES = {"broadcast", "direct", "system"}
+SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 def timestamp() -> str:
@@ -30,6 +31,8 @@ class NotificationServer:
         self.host = host
         self.port = port
         self.clients: dict[str, ServerConnection] = {}
+        self.channels: dict[str, set[str]] = {}
+        self._client_channels: dict[str, set[str]] = {}
         self._server: Any = None
 
     @property
@@ -57,10 +60,16 @@ class NotificationServer:
         self._server = None
 
     async def broadcast(self, payload: dict[str, Any], message_type: str = "broadcast") -> None:
-        """Send a notification to every currently connected client."""
+        """Send a notification to all clients or to a channel's subscribers."""
         if message_type not in SUPPORTED_TYPES:
             raise ValueError(f"unsupported message type: {message_type}")
-        await self._send_to(list(self.clients.values()), self._message(message_type, payload))
+        channel = payload.get("channel")
+        if isinstance(channel, str):
+            client_ids = self.channels.get(channel, set())
+            clients = [self.clients[client_id] for client_id in client_ids if client_id in self.clients]
+        else:
+            clients = list(self.clients.values())
+        await self._send_to(clients, self._message(message_type, payload))
 
     async def send_direct(self, client_id: str, payload: dict[str, Any]) -> None:
         """Send a notification to one client, if it is still connected."""
@@ -71,15 +80,22 @@ class NotificationServer:
     async def _handle_connection(self, websocket: ServerConnection) -> None:
         client_id = str(uuid.uuid4())
         self.clients[client_id] = websocket
+        self._client_channels[client_id] = set()
         try:
             async for raw_message in websocket:
-                await self._handle_message(raw_message)
+                await self._handle_message(raw_message, client_id)
         except websockets.ConnectionClosed:
             pass
         finally:
             self.clients.pop(client_id, None)
+            for channel in self._client_channels.pop(client_id, set()):
+                subscribers = self.channels.get(channel)
+                if subscribers is not None:
+                    subscribers.discard(client_id)
+                    if not subscribers:
+                        self.channels.pop(channel, None)
 
-    async def _handle_message(self, raw_message: str) -> None:
+    async def _handle_message(self, raw_message: str, client_id: str | None = None) -> None:
         try:
             message = json.loads(raw_message)
         except (TypeError, json.JSONDecodeError):
@@ -87,17 +103,42 @@ class NotificationServer:
         if not isinstance(message, dict):
             return
         message_type = message.get("type")
-        payload = message.get("payload")
+        payload = message.get("payload", {})
         if message_type not in SUPPORTED_TYPES or not isinstance(payload, dict):
+            return
+
+        channel = message.get("channel", payload.get("channel"))
+        if message_type in {"subscribe", "unsubscribe"}:
+            if client_id is None or not isinstance(channel, str) or not channel:
+                return
+            if message_type == "subscribe":
+                self.channels.setdefault(channel, set()).add(client_id)
+                self._client_channels.setdefault(client_id, set()).add(channel)
+            else:
+                self._unsubscribe(client_id, channel)
             return
 
         if message_type == "direct":
             target_id = payload.get("client_id", payload.get("target_id"))
             if isinstance(target_id, str):
                 direct_payload = {key: value for key, value in payload.items() if key not in {"client_id", "target_id"}}
+                if isinstance(channel, str):
+                    direct_payload["channel"] = channel
+                    if target_id not in self.channels.get(channel, set()):
+                        return
                 await self.send_direct(target_id, direct_payload)
         else:
+            if isinstance(channel, str) and "channel" not in payload:
+                payload = {**payload, "channel": channel}
             await self.broadcast(payload, message_type)
+
+    def _unsubscribe(self, client_id: str, channel: str) -> None:
+        self._client_channels.get(client_id, set()).discard(channel)
+        subscribers = self.channels.get(channel)
+        if subscribers is not None:
+            subscribers.discard(client_id)
+            if not subscribers:
+                self.channels.pop(channel, None)
 
     async def _send_to(self, clients: list[ServerConnection], message: dict[str, Any]) -> None:
         encoded = json.dumps(message)
@@ -107,15 +148,39 @@ class NotificationServer:
                 client_id = next((key for key, value in self.clients.items() if value is client), None)
                 if client_id is not None:
                     self.clients.pop(client_id, None)
+                    for channel in self._client_channels.pop(client_id, set()):
+                        subscribers = self.channels.get(channel)
+                        if subscribers is not None:
+                            subscribers.discard(client_id)
+                            if not subscribers:
+                                self.channels.pop(channel, None)
 
     @staticmethod
     def _message(message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
         return {"type": message_type, "payload": payload, "timestamp": timestamp()}
 
     def _process_request(self, _connection: ServerConnection, request: Any) -> Response | None:
-        if request.path != "/health":
+        path = urlsplit(request.path).path
+        if path == "/health":
+            body = json.dumps({"status": "ok", "connected_clients": self.client_count}).encode()
+        elif path == "/channels":
+            body = json.dumps({
+                "channels": [
+                    {"name": name, "subscriber_count": len(subscribers)}
+                    for name, subscribers in sorted(self.channels.items())
+                    if subscribers
+                ]
+            }).encode()
+        elif path.startswith("/channels/") and path.endswith("/subscribers"):
+            name = unquote(path[len("/channels/") : -len("/subscribers")]).rstrip("/")
+            if not name:
+                return None
+            body = json.dumps({
+                "channel": name,
+                "subscribers": sorted(self.channels.get(name, set())),
+            }).encode()
+        else:
             return None
-        body = json.dumps({"status": "ok", "connected_clients": self.client_count}).encode()
         return Response(
             200,
             "OK",

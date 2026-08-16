@@ -77,3 +77,49 @@ async def test_health_endpoint_and_disconnect_cleanup(server):
             break
         await asyncio.sleep(0)
     assert server.client_count == 0
+
+
+@pytest.mark.asyncio
+async def test_channel_subscription_routes_and_unsubscribes(server):
+    first = await websockets.connect(f"ws://127.0.0.1:{server.port}")
+    second = await websockets.connect(f"ws://127.0.0.1:{server.port}")
+    try:
+        await first.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await second.send(json.dumps({"type": "subscribe", "payload": {"channel": "system"}}))
+        await asyncio.sleep(0)
+
+        await first.send(json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "alert"}}))
+        assert (await receive_message(first))["payload"]["text"] == "alert"
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(second.recv(), 0.05)
+
+        await first.send(json.dumps({"type": "unsubscribe", "payload": {"channel": "alerts"}}))
+        await asyncio.sleep(0)
+        await first.send(json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "ignored"}}))
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(first.recv(), 0.05)
+    finally:
+        await first.close()
+        await second.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_endpoints_list_subscribers(server):
+    websocket = await websockets.connect(f"ws://127.0.0.1:{server.port}")
+    try:
+        await websocket.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0)
+
+        def request(path):
+            with urlopen(f"http://127.0.0.1:{server.port}{path}") as response:
+                return response.status, json.loads(response.read())
+
+        status, channels = await asyncio.to_thread(request, "/channels")
+        assert status == 200
+        assert channels == {"channels": [{"name": "alerts", "subscriber_count": 1}]}
+        client_id = next(iter(server.clients))
+        status, subscribers = await asyncio.to_thread(request, "/channels/alerts/subscribers")
+        assert status == 200
+        assert subscribers == {"channel": "alerts", "subscribers": [client_id]}
+    finally:
+        await websocket.close()
