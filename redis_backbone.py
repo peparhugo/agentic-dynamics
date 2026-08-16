@@ -23,11 +23,13 @@ connected to sibling instances too. RedisBackbone provides that hand-off:
 from __future__ import annotations
 
 import json
+import time
 from typing import AsyncIterator, Optional
 
 BUS_CHANNEL = "notif:bus"
 CLIENTS_KEY = "notif:clients"
 CHANNEL_INDEX_KEY = "notif:channels:index"
+RATE_LIMIT_WINDOW_SECONDS = 60
 
 
 def _channel_key(channel: str) -> str:
@@ -36,6 +38,10 @@ def _channel_key(channel: str) -> str:
 
 def _client_channels_key(client_id: str) -> str:
     return f"notif:client-channels:{client_id}"
+
+
+def _rate_limit_key(client_id: str, window: int) -> str:
+    return f"notif:ratelimit:{client_id}:{window}"
 
 
 class RedisBackbone:
@@ -134,6 +140,24 @@ class RedisBackbone:
         for name in names:
             result[name] = await self.client.scard(_channel_key(name))
         return result
+
+    # ── Rate limiting ───────────────────────────────────────────────
+
+    async def check_rate_limit(
+        self, client_id: str, limit: int, window_seconds: int = RATE_LIMIT_WINDOW_SECONDS
+    ) -> bool:
+        """Increment client_id's counter for the current fixed window and
+        report whether they're still within `limit` messages for that
+        window. The counter lives in Redis (not per-instance memory) so the
+        limit is enforced per client ID cluster-wide, no matter which server
+        instance the client's messages land on. Returns True if the message
+        is allowed, False if the client has exceeded the limit."""
+        window = int(time.time() // window_seconds)
+        key = _rate_limit_key(client_id, window)
+        count = await self.client.incr(key)
+        if count == 1:
+            await self.client.expire(key, window_seconds * 2)
+        return count <= limit
 
 
 def create_redis_client(redis_url: str):

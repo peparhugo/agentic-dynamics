@@ -1,5 +1,7 @@
 import asyncio
 import json
+import urllib.parse
+from datetime import datetime, timedelta, timezone
 
 import fakeredis
 import pytest
@@ -9,6 +11,8 @@ from websockets.asyncio.client import connect
 
 from notification_server import (
     DATABASE_URL,
+    MESSAGE_TTL_DAYS,
+    RATE_LIMIT,
     REDIS_URL,
     ChannelRegistry,
     Client,
@@ -865,3 +869,302 @@ async def test_message_store_roundtrip(tmp_path):
 def test_config_env_vars_have_sane_defaults():
     assert REDIS_URL
     assert DATABASE_URL
+
+
+def test_rate_limit_and_ttl_env_vars_have_sane_defaults():
+    assert RATE_LIMIT > 0
+    assert MESSAGE_TTL_DAYS > 0
+
+
+# ── Unit tests: RedisBackbone rate limiting ─────────────────────────
+
+@pytest.mark.asyncio
+async def test_redis_backbone_check_rate_limit_blocks_after_limit():
+    server = fakeredis.FakeServer()
+    backbone = RedisBackbone(fakeredis_aioredis.FakeRedis(server=server), instance_id="a")
+    assert await backbone.check_rate_limit("client-1", limit=2) is True
+    assert await backbone.check_rate_limit("client-1", limit=2) is True
+    assert await backbone.check_rate_limit("client-1", limit=2) is False
+
+
+@pytest.mark.asyncio
+async def test_redis_backbone_check_rate_limit_is_per_client():
+    server = fakeredis.FakeServer()
+    backbone = RedisBackbone(fakeredis_aioredis.FakeRedis(server=server), instance_id="a")
+    assert await backbone.check_rate_limit("client-1", limit=1) is True
+    assert await backbone.check_rate_limit("client-1", limit=1) is False
+    assert await backbone.check_rate_limit("client-2", limit=1) is True
+
+
+# ── Integration tests: rate limiting enforced over the wire ────────
+
+@pytest.mark.asyncio
+async def test_rate_limit_blocks_after_configured_threshold(tmp_path, redis_server):
+    redis_client = fakeredis_aioredis.FakeRedis(server=redis_server)
+    db_path = str(tmp_path / "ratelimit.db")
+    ws_server, state = create_server(
+        host="127.0.0.1", port=0, redis_client=redis_client, db_path=db_path, rate_limit=3,
+    )
+    server = await ws_server
+    uri = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(uri) as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            for i in range(3):
+                await ws.send(json.dumps({"type": "broadcast", "payload": {"text": f"m{i}"}}))
+                raw = await asyncio.wait_for(ws.recv(), timeout=5)
+                assert json.loads(raw)["type"] == "broadcast"
+
+            await ws.send(json.dumps({"type": "broadcast", "payload": {"text": "over limit"}}))
+            raw = await asyncio.wait_for(ws.recv(), timeout=5)
+            msg = json.loads(raw)
+            assert msg["type"] == "system"
+            assert msg["payload"]["error"] == "rate limit exceeded"
+    finally:
+        server.close()
+        await server.wait_closed()
+        await state.close()
+        await redis_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_is_tracked_per_client_id(tmp_path, redis_server):
+    redis_client = fakeredis_aioredis.FakeRedis(server=redis_server)
+    db_path = str(tmp_path / "ratelimit_multi.db")
+    ws_server, state = create_server(
+        host="127.0.0.1", port=0, redis_client=redis_client, db_path=db_path, rate_limit=1,
+    )
+    server = await ws_server
+    uri = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(uri) as ws1, connect(uri) as ws2:
+            raw1 = await asyncio.wait_for(ws1.recv(), timeout=5)
+            id1 = json.loads(raw1)["payload"]["client_id"]
+            raw2 = await asyncio.wait_for(ws2.recv(), timeout=5)
+            id2 = json.loads(raw2)["payload"]["client_id"]
+
+            # Direct-message-to-self keeps each client's traffic isolated
+            # from the other, so the assertions below aren't racing a
+            # broadcast fan-out to both connections.
+            await ws1.send(json.dumps({
+                "type": "direct", "payload": {"target_id": id1, "message": {"text": "a1"}},
+            }))
+            raw = await asyncio.wait_for(ws1.recv(), timeout=5)
+            assert json.loads(raw)["type"] == "direct"
+
+            await ws1.send(json.dumps({
+                "type": "direct", "payload": {"target_id": id1, "message": {"text": "a2"}},
+            }))
+            raw = await asyncio.wait_for(ws1.recv(), timeout=5)
+            assert json.loads(raw)["payload"]["error"] == "rate limit exceeded"
+
+            # ws2 has its own independent counter and is unaffected by ws1.
+            await ws2.send(json.dumps({
+                "type": "direct", "payload": {"target_id": id2, "message": {"text": "b1"}},
+            }))
+            raw = await asyncio.wait_for(ws2.recv(), timeout=5)
+            assert json.loads(raw)["type"] == "direct"
+    finally:
+        server.close()
+        await server.wait_closed()
+        await state.close()
+        await redis_client.aclose()
+
+
+# ── Integration tests: GET /history ─────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_history_endpoint_returns_chronological_order(running_server):
+    uri, state = running_server
+    host_port = uri.removeprefix("ws://")
+    await state.message_store.store_message(
+        "alerts", "broadcast", json.dumps({"text": "first"}), "2026-08-16T00:00:00+00:00")
+    await state.message_store.store_message(
+        "alerts", "broadcast", json.dumps({"text": "second"}), "2026-08-16T00:01:00+00:00")
+    await state.message_store.store_message(
+        "alerts", "broadcast", json.dumps({"text": "third"}), "2026-08-16T00:02:00+00:00")
+
+    status, body = await asyncio.to_thread(_get_json, host_port, "/history?channel=alerts")
+    assert status == 200
+    assert [m["payload"]["text"] for m in body["messages"]] == ["first", "second", "third"]
+    assert body["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_filters_by_channel(running_server):
+    uri, state = running_server
+    host_port = uri.removeprefix("ws://")
+    await state.message_store.store_message(
+        "alerts", "broadcast", json.dumps({"text": "alert-msg"}), "2026-08-16T00:00:00+00:00")
+    await state.message_store.store_message(
+        "chat", "broadcast", json.dumps({"text": "chat-msg"}), "2026-08-16T00:00:01+00:00")
+
+    status, body = await asyncio.to_thread(_get_json, host_port, "/history?channel=chat")
+    assert status == 200
+    assert [m["payload"]["text"] for m in body["messages"]] == ["chat-msg"]
+
+
+def _history_url(**params) -> str:
+    # urlencode percent-encodes '+' -- a raw '+' in a query string decodes
+    # as a space (form-encoding semantics), which would corrupt an ISO
+    # timestamp's "+00:00" UTC offset if left unescaped.
+    return "/history?" + urllib.parse.urlencode(params)
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_filters_by_since(running_server):
+    uri, state = running_server
+    host_port = uri.removeprefix("ws://")
+    await state.message_store.store_message(
+        "alerts", "broadcast", json.dumps({"text": "old"}), "2026-08-16T00:00:00+00:00")
+    await state.message_store.store_message(
+        "alerts", "broadcast", json.dumps({"text": "new"}), "2026-08-16T00:05:00+00:00")
+
+    status, body = await asyncio.to_thread(
+        _get_json, host_port, _history_url(channel="alerts", since="2026-08-16T00:01:00+00:00"))
+    assert status == 200
+    assert [m["payload"]["text"] for m in body["messages"]] == ["new"]
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_pagination_has_more_flag(running_server):
+    uri, state = running_server
+    host_port = uri.removeprefix("ws://")
+    for i in range(5):
+        await state.message_store.store_message(
+            "alerts", "broadcast", json.dumps({"text": f"m{i}"}), f"2026-08-16T00:0{i}:00+00:00")
+
+    status, body = await asyncio.to_thread(
+        _get_json, host_port, _history_url(channel="alerts", limit=2))
+    assert status == 200
+    assert [m["payload"]["text"] for m in body["messages"]] == ["m0", "m1"]
+    assert body["has_more"] is True
+
+    status, body = await asyncio.to_thread(
+        _get_json, host_port,
+        _history_url(channel="alerts", limit=2, since="2026-08-16T00:01:00+00:00"))
+    assert status == 200
+    assert [m["payload"]["text"] for m in body["messages"]] == ["m2", "m3"]
+    assert body["has_more"] is True
+
+    status, body = await asyncio.to_thread(
+        _get_json, host_port,
+        _history_url(channel="alerts", limit=2, since="2026-08-16T00:03:00+00:00"))
+    assert status == 200
+    assert [m["payload"]["text"] for m in body["messages"]] == ["m4"]
+    assert body["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_empty_when_no_messages(running_server):
+    uri, state = running_server
+    host_port = uri.removeprefix("ws://")
+    status, body = await asyncio.to_thread(_get_json, host_port, "/history?channel=alerts")
+    assert status == 200
+    assert body["messages"] == []
+    assert body["has_more"] is False
+
+
+# ── Unit tests: MessageStore history query + TTL deletion ──────────
+
+@pytest.mark.asyncio
+async def test_message_store_get_history_chronological_and_has_more(tmp_path):
+    store = MessageStore(str(tmp_path / "history.db"))
+    store.init_sync()
+    for i in range(3):
+        await store.store_message(
+            "alerts", "broadcast", json.dumps({"text": f"m{i}"}), f"2026-08-16T00:0{i}:00+00:00")
+
+    rows, has_more = await store.get_history(channel="alerts", limit=2)
+    assert [json.loads(r["payload"])["text"] for r in rows] == ["m0", "m1"]
+    assert has_more is True
+
+    rows, has_more = await store.get_history(channel="alerts", limit=10)
+    assert [json.loads(r["payload"])["text"] for r in rows] == ["m0", "m1", "m2"]
+    assert has_more is False
+
+
+@pytest.mark.asyncio
+async def test_message_store_delete_older_than(tmp_path):
+    store = MessageStore(str(tmp_path / "ttl.db"))
+    store.init_sync()
+    await store.store_message(None, "broadcast", json.dumps({"text": "old"}), "2026-08-01T00:00:00+00:00")
+    await store.store_message(None, "broadcast", json.dumps({"text": "new"}), "2026-08-16T00:00:00+00:00")
+
+    deleted = await store.delete_older_than("2026-08-10T00:00:00+00:00")
+    assert deleted == 1
+
+    rows = await store.get_messages()
+    assert len(rows) == 1
+    assert json.loads(rows[0]["payload"])["text"] == "new"
+
+
+# ── Integration tests: message expiry cleanup ───────────────────────
+
+@pytest.mark.asyncio
+async def test_cleanup_expired_messages_removes_old_keeps_recent(running_server):
+    uri, state = running_server
+    old_timestamp = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+    recent_timestamp = datetime.now(timezone.utc).isoformat()
+    await state.message_store.store_message(None, "broadcast", json.dumps({"text": "old"}), old_timestamp)
+    await state.message_store.store_message(None, "broadcast", json.dumps({"text": "recent"}), recent_timestamp)
+
+    deleted = await state.cleanup_expired_messages()
+    assert deleted == 1
+
+    rows = await state.message_store.get_messages()
+    assert len(rows) == 1
+    assert json.loads(rows[0]["payload"])["text"] == "recent"
+
+
+@pytest.mark.asyncio
+async def test_cleanup_respects_configurable_ttl(tmp_path, redis_server):
+    redis_client = fakeredis_aioredis.FakeRedis(server=redis_server)
+    db_path = str(tmp_path / "ttl_config.db")
+    ws_server, state = create_server(
+        host="127.0.0.1", port=0, redis_client=redis_client, db_path=db_path, message_ttl_days=1,
+    )
+    server = await ws_server
+    try:
+        two_days_ago = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        twelve_hours_ago = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
+        await state.message_store.store_message(None, "broadcast", json.dumps({"text": "too old"}), two_days_ago)
+        await state.message_store.store_message(None, "broadcast", json.dumps({"text": "within ttl"}), twelve_hours_ago)
+
+        deleted = await state.cleanup_expired_messages()
+        assert deleted == 1
+        rows = await state.message_store.get_messages()
+        assert len(rows) == 1
+        assert json.loads(rows[0]["payload"])["text"] == "within ttl"
+    finally:
+        server.close()
+        await server.wait_closed()
+        await state.close()
+        await redis_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_runs_automatically_on_server_startup(tmp_path, redis_server):
+    redis_client = fakeredis_aioredis.FakeRedis(server=redis_server)
+    db_path = str(tmp_path / "ttl_startup.db")
+
+    pre_store = MessageStore(db_path)
+    pre_store.init_sync()
+    old_timestamp = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+    await pre_store.store_message(None, "broadcast", json.dumps({"text": "stale"}), old_timestamp)
+
+    ws_server, state = create_server(
+        host="127.0.0.1", port=0, redis_client=redis_client, db_path=db_path,
+        message_ttl_days=7, cleanup_interval_seconds=3600,
+    )
+    server = await ws_server
+    try:
+        await asyncio.sleep(0.2)
+        rows = await state.message_store.get_messages()
+        assert rows == []
+    finally:
+        server.close()
+        await server.wait_closed()
+        await state.close()
+        await redis_client.aclose()

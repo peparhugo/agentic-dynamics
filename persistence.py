@@ -77,3 +77,43 @@ class MessageStore:
 
     async def get_messages(self, limit: int = 50, offset: int = 0) -> list[dict]:
         return await asyncio.to_thread(self._get_messages_sync, limit, offset)
+
+    def _get_history_sync(
+        self, channel: Optional[str], since: Optional[str], limit: int
+    ) -> tuple[list[dict], bool]:
+        conditions = []
+        args: list = []
+        if channel is not None:
+            conditions.append("channel = ?")
+            args.append(channel)
+        if since is not None:
+            conditions.append("timestamp > ?")
+            args.append(since)
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        # Fetch one extra row to learn whether more history exists beyond
+        # this page without a separate COUNT(*) query.
+        args.append(limit + 1)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT id, channel, type, payload, timestamp FROM messages "
+                f"{where_clause} ORDER BY timestamp ASC, id ASC LIMIT ?",
+                args,
+            ).fetchall()
+        has_more = len(rows) > limit
+        return [dict(row) for row in rows[:limit]], has_more
+
+    async def get_history(
+        self, channel: Optional[str] = None, since: Optional[str] = None, limit: int = 50
+    ) -> tuple[list[dict], bool]:
+        return await asyncio.to_thread(self._get_history_sync, channel, since, limit)
+
+    def _delete_older_than_sync(self, cutoff_timestamp: str) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM messages WHERE timestamp < ?", (cutoff_timestamp,)
+            )
+            conn.commit()
+            return cursor.rowcount
+
+    async def delete_older_than(self, cutoff_timestamp: str) -> int:
+        return await asyncio.to_thread(self._delete_older_than_sync, cutoff_timestamp)

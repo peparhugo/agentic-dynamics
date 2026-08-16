@@ -48,7 +48,7 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from persistence import MessageStore
@@ -61,6 +61,9 @@ MESSAGE_TYPES = {"broadcast", "direct", "system"}
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 DATABASE_URL = os.environ.get("DATABASE_URL", "notifications.db")
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+CLEANUP_INTERVAL_SECONDS = 3600
 
 
 def utc_now_iso() -> str:
@@ -149,6 +152,9 @@ class NotificationServer:
         message_store: MessageStore,
         instance_id: Optional[str] = None,
         transport: Optional[BaseTransport] = None,
+        rate_limit: Optional[int] = None,
+        message_ttl_days: Optional[int] = None,
+        cleanup_interval_seconds: Optional[float] = None,
     ) -> None:
         self.registry = ClientRegistry()
         self.channels = ChannelRegistry()
@@ -157,21 +163,32 @@ class NotificationServer:
         self.instance_id = instance_id or str(uuid.uuid4())
         self.transport = transport or create_transport()
         self.transport.bind(self)
+        self.rate_limit = rate_limit if rate_limit is not None else RATE_LIMIT
+        self.message_ttl_days = message_ttl_days if message_ttl_days is not None else MESSAGE_TTL_DAYS
+        self.cleanup_interval_seconds = (
+            cleanup_interval_seconds if cleanup_interval_seconds is not None else CLEANUP_INTERVAL_SECONDS
+        )
         self._bus_task: Optional[asyncio.Task] = None
+        self._cleanup_task: Optional[asyncio.Task] = None
 
     def start(self) -> None:
-        """Start the background task that relays envelopes from the Redis
-        bus to this instance's locally-connected clients. Must be called
-        from within a running event loop."""
+        """Start the background tasks that relay envelopes from the Redis
+        bus to this instance's locally-connected clients and that
+        periodically purge expired message history. Must be called from
+        within a running event loop."""
         if self._bus_task is None:
             self._bus_task = asyncio.create_task(self._bus_listener_loop())
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def close(self) -> None:
-        if self._bus_task is not None:
-            self._bus_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._bus_task
-            self._bus_task = None
+        for task_attr in ("_bus_task", "_cleanup_task"):
+            task = getattr(self, task_attr)
+            if task is not None:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+                setattr(self, task_attr, None)
 
     async def _bus_listener_loop(self) -> None:
         async for envelope in self.redis_backbone.listen():
@@ -191,6 +208,20 @@ class NotificationServer:
         elif kind == "direct":
             await self._deliver_local_direct(envelope["target_id"], envelope["message"])
 
+    async def _cleanup_loop(self) -> None:
+        while True:
+            try:
+                await self.cleanup_expired_messages()
+            except Exception:
+                logger.exception("message history cleanup failed")
+            await asyncio.sleep(self.cleanup_interval_seconds)
+
+    async def cleanup_expired_messages(self) -> int:
+        """Delete messages older than message_ttl_days. Returns the number
+        of rows removed."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+        return await self.message_store.delete_older_than(cutoff)
+
     async def handle_connect(self, client_id: str) -> None:
         """Called by the transport once client_id is registered and
         reachable. Registers the client cluster-wide and sends the
@@ -209,6 +240,13 @@ class NotificationServer:
         await self.redis_backbone.unsubscribe_all_channels(client_id)
 
     async def handle_incoming(self, client_id: str, raw_message: str) -> None:
+        allowed = await self.redis_backbone.check_rate_limit(client_id, self.rate_limit)
+        if not allowed:
+            await self.transport.send_message(client_id, json.dumps(make_message(
+                "system", {"error": "rate limit exceeded"},
+            )))
+            return
+
         try:
             data = json.loads(raw_message)
         except json.JSONDecodeError:
@@ -312,6 +350,9 @@ def create_server(
     db_path: Optional[str] = None,
     instance_id: Optional[str] = None,
     transport: Optional[BaseTransport] = None,
+    rate_limit: Optional[int] = None,
+    message_ttl_days: Optional[int] = None,
+    cleanup_interval_seconds: Optional[float] = None,
 ):
     instance_id = instance_id or str(uuid.uuid4())
     if redis_client is None:
@@ -321,7 +362,15 @@ def create_server(
     message_store = MessageStore(db_path or DATABASE_URL)
     message_store.init_sync()
 
-    server_state = NotificationServer(redis_backbone, message_store, instance_id, transport)
+    server_state = NotificationServer(
+        redis_backbone,
+        message_store,
+        instance_id,
+        transport,
+        rate_limit=rate_limit,
+        message_ttl_days=message_ttl_days,
+        cleanup_interval_seconds=cleanup_interval_seconds,
+    )
     server_state.start()
 
     ws_server = server_state.transport.serve(host, port)

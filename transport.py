@@ -173,6 +173,19 @@ class WebSocketTransport(BaseTransport):
             body = json.dumps({"messages": rows, "limit": limit, "offset": offset})
             return self._json_response(connection, body)
 
+        if path == "/history":
+            channel, since, limit = self._parse_history_params(request.path)
+            rows, has_more = await ns.message_store.get_history(channel=channel, since=since, limit=limit)
+            for row in rows:
+                row["payload"] = json.loads(row["payload"])
+            body = json.dumps({
+                "messages": rows,
+                "has_more": has_more,
+                "limit": limit,
+                "channel": channel,
+            })
+            return self._json_response(connection, body)
+
         return None
 
     @staticmethod
@@ -182,6 +195,15 @@ class WebSocketTransport(BaseTransport):
         limit = int(params.get("limit", ["50"])[0])
         offset = int(params.get("offset", ["0"])[0])
         return limit, offset
+
+    @staticmethod
+    def _parse_history_params(full_path: str) -> tuple[Optional[str], Optional[str], int]:
+        query = urllib.parse.urlsplit(full_path).query
+        params = urllib.parse.parse_qs(query)
+        channel = params.get("channel", [None])[0]
+        since = params.get("since", [None])[0]
+        limit = int(params.get("limit", ["50"])[0])
+        return channel, since, limit
 
     @staticmethod
     def _json_response(connection, body: str):
