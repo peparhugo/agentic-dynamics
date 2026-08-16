@@ -12,6 +12,7 @@ import abc
 import asyncio
 import json
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -27,6 +28,10 @@ SUPPORTED_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
 
 REDIS_CHANNEL_PREFIX = "notif:"
 BROADCAST_CHANNEL = "notif:broadcast"
+
+DEFAULT_RATE_LIMIT = 100
+DEFAULT_MESSAGE_TTL_DAYS = 7
+CLEANUP_INTERVAL_SECONDS = 3600
 
 Connection = Any
 
@@ -232,6 +237,42 @@ class ClientRegistry:
         ]
 
 
+class RateLimiter:
+    """Per-client message rate limiter.
+
+    When a Redis broker is available the counters live in Redis so the limit
+    holds across every server instance. When Redis is unavailable the limiter
+    falls back to an in-memory fixed window so existing deployments without a
+    Redis backbone keep working.
+    """
+
+    WINDOW_SECONDS = 60.0
+
+    def __init__(self, server: "NotificationServer", limit: int) -> None:
+        self.server = server
+        self.limit = max(0, int(limit))
+        self._local: dict[str, tuple[float, int]] = {}
+
+    async def allowed(self, client_id: str) -> bool:
+        broker = self.server.broker
+        if broker is not None:
+            try:
+                count = await broker.increment_rate(client_id)
+            except Exception:
+                return self._allowed_local(client_id)
+            return count <= self.limit
+        return self._allowed_local(client_id)
+
+    def _allowed_local(self, client_id: str) -> bool:
+        now = time.monotonic()
+        window_start, count = self._local.get(client_id, (0.0, 0))
+        if now - window_start >= self.WINDOW_SECONDS:
+            window_start, count = now, 0
+        count += 1
+        self._local[client_id] = (window_start, count)
+        return count <= self.limit
+
+
 class NotificationServer:
     def __init__(
         self,
@@ -241,6 +282,8 @@ class NotificationServer:
         redis_url: Optional[str] = None,
         database_url: Optional[str] = None,
         transport: Optional[str] = None,
+        rate_limit: Optional[int] = None,
+        message_ttl_days: Optional[int] = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -263,6 +306,26 @@ class NotificationServer:
         )
         self.transport = create_transport(transport_name, self, self.host, self.port)
         self._health_server: Optional[asyncio.Server] = None
+        self._cleanup_task: Optional[asyncio.Task] = None
+        self.rate_limit = self._resolve_int_env("RATE_LIMIT", rate_limit, DEFAULT_RATE_LIMIT)
+        self.message_ttl_days = self._resolve_int_env(
+            "MESSAGE_TTL_DAYS", message_ttl_days, DEFAULT_MESSAGE_TTL_DAYS
+        )
+        self.rate_limiter = RateLimiter(self, self.rate_limit)
+
+    @staticmethod
+    def _resolve_int_env(
+        name: str, explicit: Optional[int], default: int
+    ) -> int:
+        if explicit is not None:
+            return int(explicit)
+        raw = os.environ.get(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return default
 
     async def start(self) -> "NotificationServer":
         await self.transport.start()
@@ -277,9 +340,17 @@ class NotificationServer:
                 await self.broker.start_listener(self._deliver_from_redis)
             except Exception:
                 self.broker = None
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         return self
 
     async def stop(self) -> None:
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._cleanup_task = None
         if self.broker is not None:
             await self.broker.close()
             self.broker = None
@@ -289,6 +360,20 @@ class NotificationServer:
             await self._health_server.wait_closed()
             self._health_server = None
         self.store.close()
+
+    async def _cleanup_loop(self) -> None:
+        while True:
+            try:
+                await self.run_cleanup()
+            except Exception:
+                pass
+            await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+
+    async def run_cleanup(self) -> int:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, self.store.cleanup_older_than, self.message_ttl_days
+        )
 
     async def __aenter__(self) -> "NotificationServer":
         return await self.start()
@@ -309,6 +394,22 @@ class NotificationServer:
         await self._on_client_unregistered(client_id)
 
     async def _handle_incoming(self, client_id: str, raw: str) -> None:
+        if not await self.rate_limiter.allowed(client_id):
+            connection = self.registry.get(client_id)
+            if connection is not None:
+                await self.transport.send_message(
+                    connection,
+                    encode_message(
+                        make_message(
+                            "error",
+                            {
+                                "code": "rate_limited",
+                                "message": "rate limit exceeded",
+                            },
+                        )
+                    ),
+                )
+            return
         try:
             message = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
@@ -466,6 +567,20 @@ class NotificationServer:
                 body = json.dumps(self.store.query(limit=limit, offset=offset)).encode(
                     "utf-8"
                 )
+            elif method == "GET" and path == "/history":
+                channel = params.get("channel", [None])[0]
+                since = params.get("since", [None])[0]
+                try:
+                    limit = int(params.get("limit", ["50"])[0])
+                except (ValueError, IndexError):
+                    limit = 50
+                messages, has_more = self.store.history(
+                    channel=channel, since=since, limit=limit
+                )
+                status = "200 OK"
+                body = json.dumps(
+                    {"messages": messages, "has_more": has_more}
+                ).encode("utf-8")
             elif (
                 method == "GET"
                 and path.startswith("/channels/")

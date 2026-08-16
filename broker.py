@@ -15,6 +15,7 @@ except ImportError:  # pragma: no cover - redis is a declared dependency
 REDIS_CHANNEL_PREFIX = "notif:"
 BROADCAST_CHANNEL = "notif:broadcast"
 CLIENTS_SET = "notif:clients"
+RATE_LIMIT_PREFIX = "notif:rate:"
 
 
 def _redis_channel(channel: str, message_type: str) -> str:
@@ -123,6 +124,19 @@ class RedisBroker:
 
     async def unsubscribe_client(self, client_id: str, channel: str) -> None:
         await self._client.srem(f"{REDIS_CHANNEL_PREFIX}subs:{client_id}", channel)
+
+    async def increment_rate(self, client_id: str) -> int:
+        """Increment the per-minute message counter for a client.
+
+        The first increment arms a 60 second expiry so the window resets
+        automatically; Redis returns the post-increment count which callers
+        compare against their configured limit.
+        """
+        key = f"{RATE_LIMIT_PREFIX}{client_id}"
+        count = await self._client.incr(key)
+        if count == 1:
+            await self._client.expire(key, 60)
+        return count
 
     async def connected_clients(self) -> set[str]:
         return await self._client.smembers(CLIENTS_SET)
