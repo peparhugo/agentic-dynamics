@@ -54,8 +54,9 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from urllib.parse import parse_qs, unquote, urlparse
@@ -65,6 +66,9 @@ import websockets
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "chat.db")
 REDIS_BROADCAST_CHANNEL = "notifications:messages"
+
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
 
 _redis_client = None
 _redis_failed = False
@@ -181,6 +185,58 @@ class MessageStore:
             result.append(item)
         return result
 
+    def history(
+        self,
+        channel: str | None = None,
+        since: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Return messages filtered by channel/time, in chronological order.
+
+        ``since`` is inclusive and compared against the stored ISO timestamp.
+        ``limit`` rows are returned (the caller may ask for ``limit + 1`` to
+        detect whether more pages exist).
+        """
+        conn = self._connect()
+        try:
+            sql = "SELECT id, channel, type, payload, timestamp FROM messages"
+            conditions: list[str] = []
+            params: list[object] = []
+            if channel:
+                conditions.append("channel = ?")
+                params.append(channel)
+            if since:
+                conditions.append("timestamp >= ?")
+                params.append(since)
+            if conditions:
+                sql += " WHERE " + " AND ".join(conditions)
+            sql += " ORDER BY timestamp ASC, id ASC LIMIT ? OFFSET ?"
+            rows = conn.execute(sql, (*params, limit, offset)).fetchall()
+        finally:
+            conn.close()
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["payload"] = json.loads(item["payload"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+            result.append(item)
+        return result
+
+    def purge(self, before: str) -> int:
+        """Delete messages older than the ``before`` timestamp (exclusive)."""
+        conn = self._connect()
+        try:
+            cur = conn.execute(
+                "DELETE FROM messages WHERE timestamp < ?", (before,)
+            )
+            conn.commit()
+            return cur.rowcount
+        finally:
+            conn.close()
+
     def clear(self) -> None:
         """Delete every stored message (used by tests)."""
         conn = self._connect()
@@ -189,6 +245,50 @@ class MessageStore:
             conn.commit()
         finally:
             conn.close()
+
+
+class RateLimiter:
+    """Fixed-window per-client rate limiter backed by Redis counters.
+
+    Each client ID gets a Redis counter that is incremented on every inbound
+    message and expires once per minute, giving a rolling-ish fixed window of
+    ``limit`` messages per client per minute. When Redis is unreachable the
+    limiter falls back to an in-process counter so limits are still enforced.
+    """
+
+    def __init__(self, limit: int, window_seconds: float = 60.0) -> None:
+        self.limit = limit
+        self.window_seconds = window_seconds
+        self._local: dict[str, tuple[float, int]] = {}
+
+    def allow(self, client_id: str) -> bool:
+        """Count one inbound message and report whether it is allowed."""
+        r = _get_redis()
+        if r is not None:
+            try:
+                key = f"chat:ratelimit:{client_id}"
+                count = r.incr(key)
+                if count == 1:
+                    r.expire(key, int(self.window_seconds))
+                return count <= self.limit
+            except Exception:
+                pass
+        now = time.monotonic()
+        window_start, count = self._local.get(client_id, (now, 0))
+        if now - window_start >= self.window_seconds:
+            window_start, count = now, 0
+        self._local[client_id] = (window_start, count + 1)
+        return count + 1 <= self.limit
+
+    def reset(self, client_id: str) -> None:
+        """Clear a client's counters (used by tests)."""
+        self._local.pop(client_id, None)
+        r = _get_redis()
+        if r is not None:
+            try:
+                r.delete(f"chat:ratelimit:{client_id}")
+            except Exception:
+                pass
 
 
 class ClientRegistry:
@@ -279,6 +379,8 @@ def build_health_handler(registry: ClientRegistry, store: MessageStore):
     ``GET /channels/{name}/subscribers`` -> 200
         ``{"channel": name, "subscribers": [client_id, ...]}``
     ``GET /messages?limit=50&offset=0`` -> 200 list of stored messages.
+    ``GET /history?channel=X&since=ISO_TIMESTAMP&limit=50&offset=0`` -> 200
+        ``{"messages": [...], "has_more": bool}`` in chronological order.
     """
 
     class HealthHandler(BaseHTTPRequestHandler):
@@ -303,6 +405,26 @@ def build_health_handler(registry: ClientRegistry, store: MessageStore):
                 except ValueError:
                     offset = 0
                 self._send_json(200, store.list(limit=limit, offset=offset))
+            elif path in ("/history", "/history/"):
+                params = parse_qs(parsed.query)
+                channel = params.get("channel", [None])[0]
+                since = params.get("since", [None])[0]
+                try:
+                    limit = int(params.get("limit", ["50"])[0])
+                except ValueError:
+                    limit = 50
+                try:
+                    offset = int(params.get("offset", ["0"])[0])
+                except ValueError:
+                    offset = 0
+                rows = store.history(
+                    channel=channel, since=since, limit=limit + 1, offset=offset
+                )
+                has_more = len(rows) > limit
+                messages = rows[:limit]
+                self._send_json(
+                    200, {"messages": messages, "has_more": has_more}
+                )
             elif path.startswith("/channels/"):
                 name = unquote(path[len("/channels/"):]).strip("/")
                 if name.endswith("/subscribers"):
@@ -347,6 +469,8 @@ class NotificationServer:
         registry: ClientRegistry | None = None,
         store: MessageStore | None = None,
         server_id: str | None = None,
+        rate_limit: int | None = None,
+        ttl_days: int | None = None,
     ) -> None:
         self.host = host
         self.ws_port = ws_port
@@ -354,6 +478,10 @@ class NotificationServer:
         self.registry = registry or ClientRegistry()
         self.store = store or MessageStore()
         self.server_id = server_id or str(uuid.uuid4())
+        self.rate_limiter = RateLimiter(
+            rate_limit if rate_limit is not None else RATE_LIMIT
+        )
+        self.ttl_days = ttl_days if ttl_days is not None else MESSAGE_TTL_DAYS
         self.ws_url: str | None = None
         self.http_url: str | None = None
         self.redis_ready = threading.Event()
@@ -364,6 +492,7 @@ class NotificationServer:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._pubsub = None
         self._subscriber_thread: Thread | None = None
+        self._cleanup_task: asyncio.Task | None = None
         self._shutting_down = False
 
     async def start(self) -> "NotificationServer":
@@ -388,11 +517,19 @@ class NotificationServer:
         self._http_thread.start()
 
         self._start_redis_subscriber()
+        self._cleanup_task = asyncio.create_task(self.run_cleanup())
         return self
 
     async def stop(self) -> None:
         """Stop both servers and release their ports."""
         self._shutting_down = True
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._cleanup_task = None
         await self._stop_redis_subscriber()
         if self._http_server is not None:
             self._http_server.shutdown()
@@ -405,6 +542,20 @@ class NotificationServer:
             self._ws_server.close()
             await self._ws_server.wait_closed()
             self._ws_server = None
+
+    # ── Message expiry ──────────────────────────────────────────────
+
+    async def run_cleanup(self) -> None:
+        """Delete persisted messages older than the configured TTL.
+
+        Runs in the background on startup so it never blocks connection
+        handling. The threshold is ``now - ttl_days`` (``MESSAGE_TTL_DAYS``).
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self.ttl_days)
+        try:
+            await asyncio.to_thread(self.store.purge, cutoff.isoformat())
+        except Exception:
+            pass
 
     # ── Redis pub/sub backbone ──────────────────────────────────────
 
@@ -612,7 +763,16 @@ class NotificationServer:
             self._drop_connection(client_id, channels)
 
     async def _dispatch(self, websocket, sender_id: str, message: dict) -> None:
-        """Route an incoming client message."""
+        """Route an incoming client message.
+
+        Every inbound message consumes one slot in the client's per-minute
+        rate budget. When the budget is exhausted the message is rejected
+        (not processed or delivered) and the client is sent a system error so
+        nothing is silently dropped.
+        """
+        if not self.rate_limiter.allow(sender_id):
+            await self._send_error(websocket, "rate limit exceeded")
+            return
         msg_type = message.get("type")
         payload = message.get("payload") or {}
         if not isinstance(payload, dict):
