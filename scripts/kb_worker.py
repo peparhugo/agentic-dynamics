@@ -104,10 +104,17 @@ def build_handler(group: str, r: redis.Redis):
             client = Neo4jClient()
             try:
                 client.create_knowledge_schema()
+                # ``source_type`` is stored here (alongside the citation fields) so the KB
+                # can answer "what kinds of knowledge do we hold" without a cross-store join —
+                # the verify step of the sources run depends on it (findings alone are not
+                # enough). logical_locator / language / evidence_class carry the citation
+                # provenance the retrieval leg may want to surface.
                 client._run(
                     "MERGE (k:Knowledge {knowledge_id: $id}) "
                     "SET k.entity_id = $eid, k.text = $text, k.source_uri = $uri, "
-                    "k.authority = $authority, k.commit_sha = $commit",
+                    "k.authority = $authority, k.commit_sha = $commit, "
+                    "k.source_type = $stype, k.logical_locator = $loc, "
+                    "k.language = $lang, k.evidence_class = $ev",
                     {
                         "id": record.knowledge_id,
                         "eid": record.entity_id,
@@ -115,6 +122,10 @@ def build_handler(group: str, r: redis.Redis):
                         "uri": record.source_uri,
                         "authority": record.authority.name,
                         "commit": record.commit_sha,
+                        "stype": record.source_type,
+                        "loc": record.logical_locator,
+                        "lang": record.language,
+                        "ev": record.evidence_class,
                     },
                 )
             finally:

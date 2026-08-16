@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .language import LanguageProfile, _should_skip, detect_language, parse_codebase
+from .language import LanguageProfile, _should_skip, detect_language
 
 # ── Data Structures ────────────────────────────────────────────
 
@@ -144,17 +144,12 @@ def build_graph(
         except Exception:
             pass
 
-    # Populate aggregate counts
+    # Populate aggregate counts. ``import_count`` was already populated in the import pass;
+    # ``function_count`` / ``class_count`` are not tracked at module granularity in this
+    # pass (they stay 0), so totals sum the import count only. (This loop previously also
+    # re-ran ``parse_codebase`` — a full-AST build — once per module, an O(n²) no-op whose
+    # body did ``pass``; it has been removed so ``build_graph`` stays O(n) in files.)
     for module in file_modules.values():
-        for file_path in [codebase_path / module.path]:
-            if file_path.exists():
-                try:
-                    ast = parse_codebase(codebase_path, profile)
-                    if ast and module.path in ast.files:
-                        pass  # counts already captured
-                except Exception:
-                    pass
-
         graph.total_functions += module.function_count
         graph.total_classes += module.class_count
         graph.total_imports += module.import_count
