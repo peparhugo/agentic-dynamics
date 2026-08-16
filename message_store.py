@@ -5,10 +5,13 @@ queried later via ``GET /messages``. The database location is configured
 through the ``DATABASE_URL`` environment variable (``sqlite:///path``).
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
 import sqlite3
+from datetime import datetime, timedelta, timezone
 
 import aiosqlite
 
@@ -38,6 +41,16 @@ def sqlite_path(database_url: str) -> str:
     return database_url
 
 
+def _parse_iso(value: str) -> datetime | None:
+    """Parse an ISO-8601 timestamp to a tz-aware datetime (or None)."""
+    if isinstance(value, str):
+        value = value.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class MessageStore:
     """Async wrapper around a SQLite messages table."""
 
@@ -63,6 +76,17 @@ class MessageStore:
             self._conn = None
 
     # ── queries ───────────────────────────────────────────────
+
+    @staticmethod
+    def _row_to_dict(row) -> dict:
+        """Convert a database row to the public message dict shape."""
+        return {
+            "id": row["id"],
+            "channel": row["channel"],
+            "type": row["type"],
+            "payload": json.loads(row["payload"]),
+            "timestamp": row["timestamp"],
+        }
 
     async def store(
         self,
@@ -96,16 +120,74 @@ class MessageStore:
         rows = await cursor.fetchall()
         count_cursor = await self._conn.execute("SELECT COUNT(*) AS n FROM messages")
         total = (await count_cursor.fetchone())[0]
+        messages = [self._row_to_dict(row) for row in rows]
+        return messages, total
+
+    async def history(
+        self,
+        channel: str | None = None,
+        since: str | None = None,
+        limit: int = 50,
+    ) -> tuple[list[dict], bool]:
+        """Return (messages, has_more) for a channel/time range, oldest first.
+
+        ``channel`` filters on the channel column (omitted when None); ``since``
+        filters to messages with a timestamp at or after the given ISO-8601
+        timestamp. Messages are returned in chronological order and ``has_more``
+        reports whether more matching messages exist beyond the returned page.
+        """
+        if self._conn is None:
+            return [], False
+        limit = max(1, int(limit))
+        since_dt = _parse_iso(since) if since else None
+
+        conditions, params = [], []
+        if channel:
+            conditions.append("channel = ?")
+            params.append(channel)
+        where = ""
+        if conditions:
+            where = "WHERE " + " AND ".join(conditions)
+        cursor = await self._conn.execute(
+            f"SELECT {_SELECT_COLUMNS} FROM messages "
+            f"{where} ORDER BY timestamp ASC, id ASC",
+            params,
+        )
+        rows = await cursor.fetchall()
         messages = []
         for row in rows:
-            messages.append({
-                "id": row["id"],
-                "channel": row["channel"],
-                "type": row["type"],
-                "payload": json.loads(row["payload"]),
-                "timestamp": row["timestamp"],
-            })
-        return messages, total
+            message = self._row_to_dict(row)
+            if since_dt is not None:
+                message_dt = _parse_iso(message["timestamp"])
+                if message_dt is None or message_dt < since_dt:
+                    continue
+            messages.append(message)
+        has_more = len(messages) > limit
+        return messages[:limit], has_more
+
+    async def cleanup_expired(self, ttl_days: int) -> int:
+        """Delete messages older than ``ttl_days`` days; return rows deleted."""
+        if self._conn is None:
+            return 0
+        cutoff = datetime.now(timezone.utc) - timedelta(
+            days=max(0, int(ttl_days))
+        )
+        cursor = await self._conn.execute("SELECT id, timestamp FROM messages")
+        rows = await cursor.fetchall()
+        to_delete = [
+            row["id"]
+            for row in rows
+            if _parse_iso(row["timestamp"]) is not None
+            and _parse_iso(row["timestamp"]) < cutoff
+        ]
+        if not to_delete:
+            return 0
+        placeholders = ",".join("?" * len(to_delete))
+        cursor = await self._conn.execute(
+            f"DELETE FROM messages WHERE id IN ({placeholders})", to_delete
+        )
+        await self._conn.commit()
+        return cursor.rowcount
 
     async def count(self) -> int:
         """Return the total number of stored messages."""

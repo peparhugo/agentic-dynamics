@@ -26,7 +26,17 @@ channel subscriptions) is persisted in Redis so it survives a server restart.
 Persistence
 -----------
 Every distributed message is stored in SQLite (``DATABASE_URL``) and can be
-queried via ``GET /messages?limit=50&offset=0``.
+queried via ``GET /messages?limit=50&offset=0`` or, per channel / time range,
+via ``GET /history?channel=X&since=ISO_TIMESTAMP&limit=50``. Messages older
+than ``MESSAGE_TTL_DAYS`` days (default 7) are deleted by a background cleanup
+task that starts with the server.
+
+Rate limiting
+-------------
+Each client is limited to ``RATE_LIMIT`` messages per minute (default 100).
+Counters are kept per client ID in Redis when a Redis backbone is configured,
+and in memory otherwise. Clients that exceed the limit are told so with a
+system error message; they are never silently dropped.
 
 Everything runs inside a single asyncio event loop. Because asyncio guarantees
 thread safety by construction, the client registry uses a plain dict with no
@@ -48,6 +58,7 @@ from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
 from message_store import MessageStore
+from rate_limiter import DEFAULT_RATE_LIMIT, RateLimiter
 from redis_broker import (
     BROADCAST_CHANNEL,
     CHANNEL_PUBSUB_PREFIX,
@@ -356,7 +367,9 @@ class NotificationServer:
                  rest_port: int = 8080, redis_url: str | None = None,
                  database_url: str | None = None,
                  redis_client=None, message_store=None,
-                 transport: type[BaseTransport] | None = None) -> None:
+                 transport: type[BaseTransport] | None = None,
+                 rate_limit: int | None = None,
+                 message_ttl_days: int | None = None) -> None:
         self.host = host
         self.ws_port = ws_port
         self.rest_port = rest_port
@@ -367,6 +380,18 @@ class NotificationServer:
         self._rest_site: web.TCPSite | None = None
         self.ws_bound_port: int | None = None
         self.rest_bound_port: int | None = None
+
+        self._rate_limit = (
+            rate_limit if rate_limit is not None
+            else int(os.environ.get("RATE_LIMIT", str(DEFAULT_RATE_LIMIT)))
+        )
+        self._message_ttl_days = (
+            message_ttl_days if message_ttl_days is not None
+            else int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+        )
+        self.rate_limiter = RateLimiter(limit=self._rate_limit)
+        self._cleanup_interval_seconds = 3600
+        self._cleanup_task: asyncio.Task | None = None
 
         transport_cls = transport or get_transport_class()
         self.transport: BaseTransport = transport_cls(
@@ -413,9 +438,12 @@ class NotificationServer:
         if self.broker is not None:
             await self.broker.start(self._dispatch)
             await self._restore_state()
+            self.rate_limiter.set_redis(self.broker.redis)
 
         await self.transport.start()
         self.ws_bound_port = self.transport.bound_port
+
+        self._cleanup_task = asyncio.create_task(self._run_message_cleanup())
 
         rest_app = web.Application()
         rest_app.router.add_get("/health", self.health_handler)
@@ -424,6 +452,7 @@ class NotificationServer:
             "/channels/{name}/subscribers", self.channel_subscribers_handler
         )
         rest_app.router.add_get("/messages", self.messages_handler)
+        rest_app.router.add_get("/history", self.history_handler)
         self._rest_runner = web.AppRunner(rest_app)
         await self._rest_runner.setup()
         self._rest_site = web.TCPSite(self._rest_runner, self.host, self.rest_port)
@@ -440,6 +469,13 @@ class NotificationServer:
     async def stop(self) -> None:
         """Stop the backbone, transport, REST endpoint and store."""
         self._stopping = True
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
         if self.broker is not None:
             await self.broker.stop()
         await self.transport.stop()
@@ -497,6 +533,14 @@ class NotificationServer:
 
     async def _handle_client_message(self, sender_id: str, raw: Any) -> None:
         """Parse and dispatch a message received from a client."""
+        if not await self.rate_limiter.allow(sender_id):
+            await self._send(sender_id, make_message(
+                TYPE_SYSTEM,
+                {"error": "rate limit exceeded",
+                 "limit": self.rate_limiter.limit,
+                 "client_id": sender_id},
+            ))
+            return
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
@@ -635,6 +679,26 @@ class NotificationServer:
             channel, message["type"], message["payload"], message["timestamp"]
         )
 
+    # ── message expiry ─────────────────────────────────────────
+
+    async def _run_message_cleanup(self) -> None:
+        """Background task deleting messages older than ``MESSAGE_TTL_DAYS``."""
+        while not self._stopping:
+            try:
+                deleted = await self.store.cleanup_expired(
+                    self._message_ttl_days
+                )
+                if deleted:
+                    log.info("Cleaned up %d expired messages", deleted)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("Message cleanup failed")
+            try:
+                await asyncio.sleep(self._cleanup_interval_seconds)
+            except asyncio.CancelledError:
+                raise
+
     # ── Redis backbone dispatch ────────────────────────────────
 
     async def _dispatch(self, channel: str, message: dict) -> None:
@@ -696,4 +760,24 @@ class NotificationServer:
             "total": total,
             "limit": limit,
             "offset": offset,
+        })
+
+    async def history_handler(self, request: web.Request) -> web.Response:
+        """REST ``GET /history`` — messages for a channel/time range."""
+        channel = request.query.get("channel") or None
+        since = request.query.get("since")
+        try:
+            limit = int(request.query.get("limit", "50"))
+        except ValueError:
+            limit = 50
+        limit = max(1, min(limit, 500))
+        messages, has_more = await self.store.history(
+            channel=channel, since=since, limit=limit
+        )
+        return web.json_response({
+            "channel": channel,
+            "since": since,
+            "limit": limit,
+            "messages": messages,
+            "has_more": has_more,
         })

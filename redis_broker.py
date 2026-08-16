@@ -78,6 +78,11 @@ class RedisBackbone:
         self._dispatch = None
         self._channel_refs: dict[str, int] = {}
 
+    @property
+    def redis(self):
+        """The underlying Redis client used for pub/sub and shared state."""
+        return self._redis
+
     # ── lifecycle ─────────────────────────────────────────────
 
     async def start(self, dispatch) -> "RedisBackbone":
