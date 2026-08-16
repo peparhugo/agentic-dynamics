@@ -5,6 +5,7 @@
 export * from './types';
 export * from './plugin';
 export * from './config';
+export * from './cache';
 export { parseFrontmatter, parseYamlBlock, extractYamlBlock, coerceScalar, normalizeTags } from './frontmatter';
 export { markdownToHtml } from './markdown';
 export { escapeHtml, pageTitle, renderIndex, renderPage } from './render';

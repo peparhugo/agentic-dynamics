@@ -59,4 +59,15 @@ export interface BuildOptions {
   config?: string;
   /** Extra plugins registered after the config file plugins. */
   plugins?: Plugin[];
+  /**
+   * Perform an incremental build: skip any page whose source file and
+   * templates have not changed since the last build. The first incremental
+   * build seeds the cache (`.ssg-cache.json` in the output directory).
+   */
+  incremental?: boolean;
+  /**
+   * Force a clean build: discard the cached incremental state so every page
+   * is rebuilt. The cache manifest is regenerated afterwards.
+   */
+  clean?: boolean;
 }

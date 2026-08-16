@@ -61,6 +61,22 @@ describe('parseArgs', () => {
     expect(options.outputDir).toBe(path.resolve('y'));
     expect(options.templatesDir).toBe(path.resolve('z'));
   });
+
+  it('parses the --incremental flag', () => {
+    expect(parseArgs(['build']).incremental).toBe(false);
+    expect(parseArgs(['build', '--incremental']).incremental).toBe(true);
+  });
+
+  it('parses the --clean flag', () => {
+    expect(parseArgs(['build']).clean).toBe(false);
+    expect(parseArgs(['build', '--clean']).clean).toBe(true);
+  });
+
+  it('parses --incremental and --clean together', () => {
+    const options = parseArgs(['build', '--incremental', '--clean']);
+    expect(options.incremental).toBe(true);
+    expect(options.clean).toBe(true);
+  });
 });
 
 describe('main', () => {
@@ -133,6 +149,36 @@ describe('main', () => {
   it('returns 1 for an unknown command', () => {
     const code = main(['node', 'ssg', 'deploy']);
     expect(code).toBe(1);
+  });
+
+  it('builds incrementally with --incremental and creates the cache manifest', () => {
+    fs.writeFileSync(
+      path.join(contentDir, 'post.md'),
+      '---\ntitle: Post\n---\n# Post body'
+    );
+
+    const args = [
+      'node',
+      'ssg',
+      'build',
+      '--incremental',
+      '--content',
+      contentDir,
+      '--output',
+      outputDir,
+      '--templates',
+      path.join(outputDir, 'missing-templates'),
+    ];
+
+    expect(main(args)).toBe(0);
+    expect(fs.existsSync(path.join(outputDir, '.ssg-cache.json'))).toBe(true);
+
+    const spy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    expect(main(args)).toBe(0);
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('0 pages'),
+    );
+    spy.mockRestore();
   });
 
   it('returns 0 and prints usage for --help', () => {

@@ -4,11 +4,18 @@
  * Static site generator CLI.
  *
  *   npx ssg build [--content <dir>] [--output <dir>] [--templates <dir>]
+ *                 [--incremental] [--clean]
+ *   npx ssg serve [--content <dir>] [--output <dir>] [--templates <dir>]
+ *                 [--port <number>]
+ *
+ * `--incremental` skips pages whose source and templates have not changed by
+ * consulting the `.ssg-cache.json` manifest in the output directory, and
+ * reports build stats (pages built / skipped / time saved).
  */
 
 import path from 'path';
 
-import { buildSite } from './site';
+import { createEngine } from './engine';
 import { DEFAULT_PORT, startDevServer } from './serve';
 import { DEFAULT_TEMPLATES_DIR } from './templates';
 
@@ -26,6 +33,8 @@ Options:
   --output <dir>     Directory where the site is written (default: ${DEFAULT_OUTPUT_DIR})
   --templates <dir>  Directory containing templates, layouts and partials (default: ${DEFAULT_TEMPLATES_DIR})
   --port <number>    Port for the dev server (default: ${DEFAULT_PORT})
+  --incremental      Only rebuild pages whose source or templates changed
+  --clean            Force a full rebuild, discarding the build cache
   -h, --help         Show this help message`;
 
 export interface CliOptions {
@@ -34,6 +43,8 @@ export interface CliOptions {
   outputDir: string;
   templatesDir: string;
   port: number;
+  incremental: boolean;
+  clean: boolean;
   help: boolean;
 }
 
@@ -44,6 +55,8 @@ export function parseArgs(argv: string[]): CliOptions {
   let outputDir = path.resolve(DEFAULT_OUTPUT_DIR);
   let templatesDir = path.resolve(DEFAULT_TEMPLATES_DIR);
   let port = DEFAULT_PORT;
+  let incremental = false;
+  let clean = false;
   let help = false;
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -80,12 +93,16 @@ export function parseArgs(argv: string[]): CliOptions {
         }
         i += 1;
       }
+    } else if (arg === '--incremental') {
+      incremental = true;
+    } else if (arg === '--clean') {
+      clean = true;
     } else if (arg === '--help' || arg === '-h') {
       help = true;
     }
   }
 
-  return { command, contentDir, outputDir, templatesDir, port, help };
+  return { command, contentDir, outputDir, templatesDir, port, incremental, clean, help };
 }
 
 /**
@@ -102,15 +119,27 @@ export function main(argv: string[]): number {
   }
 
   if (options.command === 'build') {
-    const pages = buildSite({
+    const engine = createEngine({
       contentDir: options.contentDir,
       outputDir: options.outputDir,
       templatesDir: options.templatesDir,
+      incremental: options.incremental,
+      clean: options.clean,
     });
 
-    console.log(
-      `Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${options.outputDir}`
-    );
+    const pages = engine.run();
+    const stats = engine.stats;
+
+    if (options.incremental) {
+      console.log(
+        `Built ${stats.pagesBuilt} page${stats.pagesBuilt === 1 ? '' : 's'} into ${options.outputDir} ` +
+          `(${stats.pagesSkipped} skipped, ${Math.round(stats.timeSavedMs)}ms saved)`
+      );
+    } else {
+      console.log(
+        `Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${options.outputDir}`
+      );
+    }
     return 0;
   }
 
