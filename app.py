@@ -12,12 +12,15 @@ from collections.abc import Iterable
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any
+from urllib.parse import unquote
 
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Request, Response
 
-SUPPORTED_TYPES = frozenset({"broadcast", "direct", "system"})
+SUPPORTED_TYPES = frozenset(
+    {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
+)
 
 
 def utc_timestamp() -> str:
@@ -43,6 +46,7 @@ class ClientRegistry:
 
     def __init__(self) -> None:
         self._clients: dict[str, ServerConnection] = {}
+        self._channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
     def add(self, connection: ServerConnection) -> str:
@@ -54,6 +58,11 @@ class ClientRegistry:
     def remove(self, client_id: str) -> None:
         with self._lock:
             self._clients.pop(client_id, None)
+            for channel in list(self._channels):
+                subscribers = self._channels[channel]
+                subscribers.discard(client_id)
+                if not subscribers:
+                    del self._channels[channel]
 
     def get(self, client_id: str) -> ServerConnection | None:
         with self._lock:
@@ -62,6 +71,43 @@ class ClientRegistry:
     def snapshot(self) -> list[tuple[str, ServerConnection]]:
         with self._lock:
             return list(self._clients.items())
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            if client_id in self._clients:
+                self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._channels[channel]
+
+    def channel_snapshot(self, channel: str) -> list[tuple[str, ServerConnection]]:
+        with self._lock:
+            return [
+                (client_id, self._clients[client_id])
+                for client_id in self._channels.get(channel, set())
+                if client_id in self._clients
+            ]
+
+    def channels(self) -> dict[str, int]:
+        with self._lock:
+            return {
+                channel: len(subscribers)
+                for channel, subscribers in sorted(self._channels.items())
+            }
+
+    def subscribers(self, channel: str) -> list[str]:
+        with self._lock:
+            return sorted(self._channels.get(channel, set()))
+
+    def is_subscribed(self, client_id: str, channel: str) -> bool:
+        with self._lock:
+            return client_id in self._channels.get(channel, set())
 
     def __len__(self) -> int:
         with self._lock:
@@ -77,12 +123,23 @@ class NotificationServer:
     async def process_request(
         self, connection: ServerConnection, request: Request
     ) -> Response | None:
-        """Serve GET /health before the WebSocket upgrade."""
+        """Serve REST endpoints before the WebSocket upgrade."""
         path = request.path.partition("?")[0]
-        if path != "/health":
+        if path == "/health":
+            body = json.dumps({"connected_clients": len(self.registry)})
+        elif path == "/channels":
+            body = json.dumps({"channels": self.registry.channels()})
+        elif path.startswith("/channels/") and path.endswith("/subscribers"):
+            encoded_name = path[len("/channels/") : -len("/subscribers")]
+            if not encoded_name or "/" in encoded_name:
+                return None
+            channel = unquote(encoded_name)
+            body = json.dumps(
+                {"channel": channel, "subscribers": self.registry.subscribers(channel)}
+            )
+        else:
             return None
 
-        body = json.dumps({"connected_clients": len(self.registry)})
         response = connection.respond(HTTPStatus.OK, body)
         del response.headers["Content-Type"]
         response.headers["Content-Type"] = "application/json"
@@ -117,10 +174,14 @@ class NotificationServer:
             return
 
         message_type = message["type"]
-        if message_type == "direct":
+        if message_type == "subscribe":
+            self.registry.subscribe(sender_id, message["channel"])
+        elif message_type == "unsubscribe":
+            self.registry.unsubscribe(sender_id, message["channel"])
+        elif message_type == "direct":
             await self._send_direct(sender, message)
         else:
-            await self.broadcast(message)
+            await self.broadcast(message, message.get("channel"))
 
     @staticmethod
     def _parse_message(raw_message: str | bytes) -> dict[str, Any]:
@@ -137,14 +198,24 @@ class NotificationServer:
 
         if not isinstance(message, dict):
             raise ValueError("message must be a JSON object")
-        if set(message) != {"type", "payload", "timestamp"}:
-            raise ValueError("message must contain type, payload, and timestamp")
+        required_fields = {"type", "payload", "timestamp"}
+        if not required_fields.issubset(message) or not set(message).issubset(
+            required_fields | {"channel"}
+        ):
+            raise ValueError(
+                "message must contain type, payload, and timestamp, with optional channel"
+            )
         if not isinstance(message["type"], str) or message["type"] not in SUPPORTED_TYPES:
             raise ValueError("unsupported message type")
         if not isinstance(message["payload"], dict):
             raise ValueError("payload must be a JSON object")
         if not isinstance(message["timestamp"], str):
             raise ValueError("timestamp must be a string")
+        channel = message.get("channel")
+        if channel is not None and (not isinstance(channel, str) or not channel):
+            raise ValueError("channel must be a non-empty string")
+        if message["type"] in {"subscribe", "unsubscribe"} and channel is None:
+            raise ValueError(f'{message["type"]} requires channel')
         return message
 
     async def _send_direct(
@@ -160,15 +231,25 @@ class NotificationServer:
         if target is None:
             await self._send_error(sender, "target client is not connected")
             return
+        channel = message.get("channel")
+        if channel is not None and not self.registry.is_subscribed(target_id, channel):
+            await self._send_error(sender, "target client is not subscribed to channel")
+            return
         try:
             await self._send(target, message)
         except ConnectionClosed:
             self.registry.remove(target_id)
             await self._send_error(sender, "target client is not connected")
 
-    async def broadcast(self, message: dict[str, Any]) -> None:
-        """Send a message to every client connected at call time."""
-        clients = self.registry.snapshot()
+    async def broadcast(
+        self, message: dict[str, Any], channel: str | None = None
+    ) -> None:
+        """Send a message to all clients, or only a channel's subscribers."""
+        clients = (
+            self.registry.snapshot()
+            if channel is None
+            else self.registry.channel_snapshot(channel)
+        )
         results = await asyncio.gather(
             *(self._send(connection, message) for _, connection in clients),
             return_exceptions=True,

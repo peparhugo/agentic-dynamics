@@ -28,6 +28,15 @@ async def receive_json(websocket):
     return json.loads(await asyncio.wait_for(websocket.recv(), timeout=1))
 
 
+def channel_message(message_type, channel):
+    return {
+        "type": message_type,
+        "payload": {},
+        "timestamp": "2026-08-16T00:00:00Z",
+        "channel": channel,
+    }
+
+
 def assert_message_format(message):
     assert set(message) == {"type", "payload", "timestamp"}
     assert isinstance(message["type"], str)
@@ -118,3 +127,84 @@ async def test_health_reports_connected_clients(running_server):
         assert status == 200
         assert headers.get_content_type() == "application/json"
         assert body == {"connected_clients": 1}
+
+
+@pytest.mark.asyncio
+async def test_channel_messages_reach_only_subscribers(running_server):
+    _, port = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as first, connect(
+        f"ws://127.0.0.1:{port}"
+    ) as second, connect(f"ws://127.0.0.1:{port}") as third:
+        await asyncio.gather(
+            receive_json(first), receive_json(second), receive_json(third)
+        )
+        await first.send(json.dumps(channel_message("subscribe", "alerts")))
+        await second.send(json.dumps(channel_message("subscribe", "alerts")))
+        await asyncio.sleep(0.01)
+
+        outgoing = channel_message("broadcast", "alerts")
+        outgoing["payload"] = {"text": "channel only"}
+        await first.send(json.dumps(outgoing))
+
+        assert await receive_json(first) == outgoing
+        assert await receive_json(second) == outgoing
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(third.recv(), timeout=0.05)
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_and_disconnect_remove_channel_membership(running_server):
+    notifications, port = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as websocket:
+        welcome = await receive_json(websocket)
+        client_id = welcome["payload"]["client_id"]
+        await websocket.send(json.dumps(channel_message("subscribe", "chat")))
+        await asyncio.sleep(0.01)
+        assert notifications.registry.subscribers("chat") == [client_id]
+
+        await websocket.send(json.dumps(channel_message("unsubscribe", "chat")))
+        await asyncio.sleep(0.01)
+        assert notifications.registry.channels() == {}
+
+        await websocket.send(json.dumps(channel_message("subscribe", "chat")))
+        await asyncio.sleep(0.01)
+    await asyncio.sleep(0)
+    assert notifications.registry.channels() == {}
+
+
+@pytest.mark.asyncio
+async def test_channel_rest_endpoints(running_server):
+    _, port = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as first, connect(
+        f"ws://127.0.0.1:{port}"
+    ) as second:
+        first_welcome, second_welcome = await asyncio.gather(
+            receive_json(first), receive_json(second)
+        )
+        await first.send(json.dumps(channel_message("subscribe", "system alerts")))
+        await second.send(json.dumps(channel_message("subscribe", "system alerts")))
+        await asyncio.sleep(0.01)
+
+        def get_json(path):
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}") as response:
+                return response.status, response.headers.get_content_type(), json.load(response)
+
+        channels = await asyncio.to_thread(get_json, "/channels")
+        subscribers = await asyncio.to_thread(
+            get_json, "/channels/system%20alerts/subscribers"
+        )
+
+        assert channels == (200, "application/json", {"channels": {"system alerts": 2}})
+        assert subscribers == (
+            200,
+            "application/json",
+            {
+                "channel": "system alerts",
+                "subscribers": sorted(
+                    [
+                        first_welcome["payload"]["client_id"],
+                        second_welcome["payload"]["client_id"],
+                    ]
+                ),
+            },
+        )
