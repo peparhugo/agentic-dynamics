@@ -14,7 +14,14 @@ async def main() -> None:
     )
     await server.start()
     print(f"WebSocket server listening on {server.ws_url}")
-    print(f"REST endpoints on {server.http_url} (health, channels)")
+    print(
+        f"REST endpoints on {server.http_url}"
+        " (health, channels, channels/<name>/subscribers, messages)"
+    )
+    print(
+        "Redis backbone: "
+        + os.environ.get("REDIS_URL", "redis://localhost:6379")
+    )
     try:
         await asyncio.Future()  # run until interrupted
     finally:
