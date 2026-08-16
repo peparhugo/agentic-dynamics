@@ -1,0 +1,160 @@
+name: rag_knowledge_sources
+question: >-
+  Populate the knowledge base's second ingestion path — the code, code-quality, and policy
+  knowledge that the finding-producer does not cover. The schema already anticipates it
+  (KnowledgeRecord.source_type = code|report|policy, plus language/symbols fields), and the
+  retrieval query planner already extracts code symbols/paths from work items, but the corpus is
+  code-blind: graph.load_codebase_graph is orphaned (zero callers) and sonar.py / lsp_diagnostics.py /
+  entropy.py feed post-hoc analysis but never the KB. This spec ingests those sources through the
+  SAME pointer contract the finding-producer fix established, so the KB holds findings + code +
+  quality + policy, not just findings.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      brief: >-
+        Builds ON TOP of the fixed producer contract (per-record JSON artifacts, content_hash =
+        sha256(artifact), extract_record) from feature/rag-kb-produce-fix. Do NOT change that
+        contract; add new DERIVATION paths that emit through it. The finding path (measured
+        run outcomes) already exists; this adds code-structure, code-quality, and policy records.
+        Keep every record idempotent by knowledge_id and authority-ordered. Async stays the
+        architecture — nothing collapses to synchronous writes.
+      isolation: >-
+        Redis 127.0.0.1:FINOPS_REDIS_PORT (6380) DB 2 ONLY. Never 6379, never DB 1. Neo4j (7687)
+        SHARED — MERGE-only, never clear_all. Chroma knowledge_chunks_v1 only. SonarQube / LSP are
+        optional tools (graceful skip when the server/binaries are absent). Verify no other
+        kb_worker.py is running before draining.
+      prior_art:
+        - src/instrument/knowledge_ingestion.py  # the fixed contract: record_to_artifact, extract_record, derive_records
+        - src/instrument/language.py             # parse_codebase, collect_imports, collect_functions (tree-sitter)
+        - src/instrument/codebase_graph.py       # build_graph, compute_metrics (import-graph structure)
+        - src/instrument/graph.py                # load_codebase_graph (orphaned — wire it)
+        - src/instrument/sonar.py                # run_sonar_analysis, sonar_quality_score
+        - src/instrument/lsp_diagnostics.py      # run_diagnostics, LSPReport
+        - src/instrument/entropy.py              # compute_entropy, EntropyProfile
+        - src/instrument/knowledge.py            # KnowledgeRecord (source_type, language, symbols), Authority
+    phases:
+      - name: code
+        kind: agent
+        prompt: >
+          Implement src/instrument/code_ingestion.py — derive source_type=code records from the
+          codebase and wire graph.load_codebase_graph into the KB.
+
+          READ FIRST: language.py (parse_codebase/collect_imports/collect_functions), codebase_graph.py
+          (build_graph/compute_metrics), graph.py (load_codebase_graph — currently ORPHANED),
+          knowledge_ingestion.py (the fixed record_to_artifact/extract_record contract to reuse).
+
+          REQUIREMENTS:
+          - derive_code_records(profile: LanguageProfile|CodebaseAST, *, repository_id, revision) ->
+            list[KnowledgeRecord]: one record per module/function with source_type="code", language set
+            from the profile, symbols = the function/class names collected, text = a short signature
+            summary (name + params + docstring head, no full body), logical_locator = the file path,
+            source_revision = the git HEAD sha, authority=Authority.SOURCE, evidence_class="[C]".
+          - Reuse the fixed artifact/event contract: record_to_artifact + extract_record handle code
+            records identically to findings (source_uri = the per-record artifact, content_hash =
+            sha256(artifact)). Do not invent a second contract.
+          - Wire graph.load_codebase_graph into the KB: call it from the code-ingestion run path (or a
+            kb_worker handler) so CodeModule + IMPORTS/IMPORTED_BY + TOUCHED actually populate — it is
+            dead code today (no callers). Confirm the CodeModule nodes appear after ingest.
+          - Keep it deterministic and testable: inject the repo root + revision; no LLM.
+          TESTS: tests/test_code_ingestion.py — a record per function, symbols/language correct,
+          source_type=code, authority=SOURCE, artifact round-trip. Run green; update __init__.py.
+      - name: quality
+        kind: agent
+        prompt: >
+          Implement src/instrument/quality_ingestion.py — derive source_type=report records from
+          SonarQube, LSP, and entropy.
+
+          READ FIRST: sonar.py (run_sonar_analysis/sonar_quality_score), lsp_diagnostics.py
+          (run_diagnostics/LSPReport), entropy.py (compute_entropy/EntropyProfile),
+          knowledge_ingestion.py (the fixed contract).
+
+          REQUIREMENTS:
+          - derive_quality_records(codebase_path, *, profile, repository_id, revision) -> list[KnowledgeRecord]:
+            one record per quality signal, source_type="report", authority=Authority.MEASURED for
+            SonarQube/LSP (they are instrument measurements), Authority.DERIVED for entropy (a computed
+            index), evidence_class="[M]"/"[C]" respectively. text = a one-line quality finding
+            (e.g. "module X: 3 bugs, 12 smells, maintainability C"). logical_locator = the codebase/module
+            path; source_revision = git HEAD sha.
+          - Graceful degradation: when SonarQube (no server) or an LSP binary is absent, skip that signal
+            and note it — never fail the phase, never fabricate a metric (mirror lsp_diagnostics.py's
+            available_tools() fallback).
+          - Reuse the fixed artifact/event contract identically to the code path.
+          TESTS: tests/test_quality_ingestion.py — a record per available signal, absent tool -> skipped
+          not fabricated, artifact round-trip. Run green; update __init__.py.
+      - name: policy
+        kind: agent
+        prompt: >
+          Implement policy ingestion — emit the pinned policy surface as authority=POLICY records.
+
+          READ FIRST: knowledge.py (Authority.POLICY is the top tier, never overridden), knowledge_ingestion.py
+          (the fixed contract).
+
+          REQUIREMENTS:
+          - derive_policy_records(policy_paths, *, repository_id, revision) -> list[KnowledgeRecord]:
+            one record per policy artifact — experiments/specs/*.yaml, AGENTS.md, and the conventions/
+            mental-model files — with authority=Authority.POLICY, source_type="policy", text = the file's
+            first meaningful block (not the whole file), logical_locator = the file path,
+            source_revision = git HEAD sha, evidence_class="[P]".
+          - Respect the retrieval design: policy is read directly from the checkout, NEVER probabilistically
+            retrieved. These records exist for DISCOVERABILITY and citation, not as RRF candidates — note
+            that in the module docstring.
+          - Reuse the fixed artifact/event contract.
+          TESTS: tests/test_policy_ingestion.py — one record per policy file, authority=POLICY,
+          source_type=policy. Run green; update __init__.py.
+      - name: run
+        kind: agent
+        prompt: >
+          Ingest the code, quality, and policy sources, then verify the stores now hold more than findings.
+
+          ORDER (strict; stop and report at the first failure):
+          1. Code: derive + emit source_type=code records for src/ and scripts/ (start with --limit 20 to
+             smoke, then full). Confirm graph.load_codebase_graph populated CodeModule nodes in Neo4j.
+          2. Quality: derive + emit quality records (SonarQube/LSP/entropy), skipping gracefully any
+             absent tool. Report which signals were available vs skipped.
+          3. Policy: derive + emit the policy records.
+          4. Drain each consumer once (kb-chroma-v1, kb-neo4j-v1, kb-ledger-v1) and confirm NO retry /
+             dead-letter outcomes — if a consumer retries, STOP and report the exception.
+          5. VERIFY: stream pending == 0; Neo4j has Knowledge nodes with source_type=code, report, policy
+             (not only finding) AND CodeModule nodes; Chroma knowledge_chunks_v1 count grew; checkpoint
+             has one entry per emitted knowledge_id; dead-letter XLEN == 0.
+          6. Report the record: emitted per source_type, per-consumer upserts, available vs skipped quality
+             signals, end-to-end lag.
+
+          ISOLATION (load-bearing): Redis DB 2 only; Neo4j SHARED (MERGE-only); Chroma knowledge_chunks_v1
+          only. Confirm no other kb_worker.py is running before step 4.
+      - name: verify
+        kind: agent
+        prompt: >
+          Scoped verification — do NOT run the full pytest suite. Run
+          tests/test_code_ingestion.py tests/test_quality_ingestion.py tests/test_policy_ingestion.py
+          tests/test_knowledge.py tests/test_retrieval.py tests/test_knowledge_stream.py -q, plus an
+          import smoke of the three new modules. Re-assert idempotence (second dry-run -> 0 would-emit).
+          Leave green.
+      - name: docs
+        kind: agent
+        prompt: >
+          Sync the agent-facing surfaces (standard closing step — do not skip). Update BOTH surfaces in
+          lockstep:
+          - .opencode/instructions/mental-model.md AND .claude/rules/mental-model.md: add code_ingestion.py,
+            quality_ingestion.py, policy_ingestion.py to the Runtime RAG module map, and note the KB now
+            holds four record types (finding/code/report/policy) over the authority ordering.
+          - .opencode/agents/instrument-dev.md AND .claude/agents/instrument-dev.md: bump the module count
+            (+3) and add the three modules to the RAG list.
+          - src/instrument/CONTEXT.md (Runtime RAG section): add the three module rows + the source_type
+            taxonomy (finding | code | report | policy) and which authority each maps to.
+          Keep the two surfaces in lockstep.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
