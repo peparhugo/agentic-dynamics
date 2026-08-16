@@ -11,12 +11,13 @@ import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import unquote
 
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.http11 import Response
 
-SUPPORTED_TYPES = ("broadcast", "direct", "system")
+SUPPORTED_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
 
 
 def utc_now_iso() -> str:
@@ -35,6 +36,7 @@ class NotificationServer:
         self.host = host
         self.port = port
         self._clients: dict[str, ServerConnection] = {}
+        self._subscriptions: dict[str, set[str]] = {}
         self._server = None
 
     # ── Registry ──────────────────────────────────────────────────
@@ -48,6 +50,47 @@ class NotificationServer:
 
     def has_client(self, client_id: str) -> bool:
         return client_id in self._clients
+
+    def _drop_client(self, client_id: str) -> None:
+        self._clients.pop(client_id, None)
+        for name in list(self._subscriptions):
+            members = self._subscriptions[name]
+            members.discard(client_id)
+            if not members:
+                self._subscriptions.pop(name, None)
+
+    # ── Channels ──────────────────────────────────────────────────
+
+    def subscribe(self, client_id: str, channel: str) -> bool:
+        if not self.has_client(client_id):
+            return False
+        self._subscriptions.setdefault(channel, set()).add(client_id)
+        return True
+
+    def unsubscribe(self, client_id: str, channel: str) -> bool:
+        members = self._subscriptions.get(channel)
+        if members is None:
+            return False
+        members.discard(client_id)
+        if not members:
+            self._subscriptions.pop(channel, None)
+        return True
+
+    def channel_names(self) -> list[str]:
+        return sorted(self._subscriptions.keys())
+
+    def channel_subscribers(self, channel: str) -> list[str]:
+        return sorted(self._subscriptions.get(channel, set()))
+
+    def channel_count(self, channel: str) -> int:
+        return len(self._subscriptions.get(channel, set()))
+
+    def channels(self) -> list[dict[str, Any]]:
+        return [
+            {"name": name, "subscribers": len(self._subscriptions[name])}
+            for name in sorted(self._subscriptions)
+            if self._subscriptions[name]
+        ]
 
     # ── Message helpers ───────────────────────────────────────────
 
@@ -69,8 +112,24 @@ class NotificationServer:
             await ws.send(self.encode(message))
             return True
         except Exception:
-            self._clients.pop(client_id, None)
+            self._drop_client(client_id)
             return False
+
+    async def send_to_channel(self, channel: str, message: dict[str, Any]) -> int:
+        data = self.encode(message)
+        members = list(self._subscriptions.get(channel, set()))
+        delivered = 0
+        for client_id in members:
+            ws = self._clients.get(client_id)
+            if ws is None:
+                self._drop_client(client_id)
+                continue
+            try:
+                await ws.send(data)
+                delivered += 1
+            except Exception:
+                self._drop_client(client_id)
+        return delivered
 
     async def broadcast(self, message: dict[str, Any]) -> int:
         data = self.encode(message)
@@ -81,7 +140,7 @@ class NotificationServer:
             except Exception:
                 stale.append(client_id)
         for client_id in stale:
-            self._clients.pop(client_id, None)
+            self._drop_client(client_id)
         return len(self._clients)
 
     # ── Connection handling ───────────────────────────────────────
@@ -99,7 +158,7 @@ class NotificationServer:
             async for raw in websocket:
                 await self._route(websocket, client_id, raw)
         finally:
-            self._clients.pop(client_id, None)
+            self._drop_client(client_id)
             await self.broadcast(
                 self.make_message(
                     "system", {"event": "disconnected", "client_id": client_id}
@@ -134,8 +193,49 @@ class NotificationServer:
         if not isinstance(payload, dict):
             payload = {}
 
-        if mtype == "broadcast":
-            await self.broadcast(self.make_message("broadcast", dict(payload)))
+        channel = data.get("channel")
+        if not isinstance(channel, str) and "channel" in payload:
+            channel = payload.get("channel")
+
+        if mtype == "subscribe":
+            if not channel:
+                await self.send_to(
+                    client_id,
+                    self.make_message(
+                        "system",
+                        {"event": "error", "message": "subscribe requires a channel"},
+                    ),
+                )
+                return
+            self.subscribe(client_id, channel)
+            await self.send_to(
+                client_id,
+                self.make_message("system", {"event": "subscribed", "channel": channel}),
+            )
+        elif mtype == "unsubscribe":
+            if not channel:
+                await self.send_to(
+                    client_id,
+                    self.make_message(
+                        "system",
+                        {"event": "error", "message": "unsubscribe requires a channel"},
+                    ),
+                )
+                return
+            self.unsubscribe(client_id, channel)
+            await self.send_to(
+                client_id,
+                self.make_message(
+                    "system", {"event": "unsubscribed", "channel": channel}
+                ),
+            )
+        elif mtype == "broadcast":
+            message = self.make_message("broadcast", dict(payload))
+            if channel:
+                message["channel"] = channel
+                await self.send_to_channel(channel, message)
+            else:
+                await self.broadcast(message)
         elif mtype == "direct":
             target = payload.get("target")
             if not target:
@@ -184,6 +284,21 @@ class NotificationServer:
             ).encode("utf-8")
             headers = Headers({"Content-Type": "application/json"})
             return Response(200, "OK", headers, body)
+        if path == "/channels":
+            body = json.dumps({"channels": self.channels()}).encode("utf-8")
+            headers = Headers({"Content-Type": "application/json"})
+            return Response(200, "OK", headers, body)
+        if path.startswith("/channels/") and path.endswith("/subscribers"):
+            name = unquote(path[len("/channels/") : -len("/subscribers")])
+            if not name or name not in self._subscriptions:
+                body = json.dumps({"error": "channel not found"}).encode("utf-8")
+                headers = Headers({"Content-Type": "application/json"})
+                return Response(404, "Not Found", headers, body)
+            body = json.dumps(
+                {"channel": name, "subscribers": self.channel_subscribers(name)}
+            ).encode("utf-8")
+            headers = Headers({"Content-Type": "application/json"})
+            return Response(200, "OK", headers, body)
         return None
 
     # ── Lifecycle ─────────────────────────────────────────────────
@@ -218,6 +333,10 @@ class NotificationServer:
     @property
     def health_url(self) -> str:
         return f"http://{self.host}:{self.port}/health"
+
+    @property
+    def channels_url(self) -> str:
+        return f"http://{self.host}:{self.port}/channels"
 
 
 def main() -> None:
