@@ -21,7 +21,12 @@ from notifications import (
 
 @pytest.fixture
 async def server():
-    srv = NotificationServer(host="127.0.0.1", ws_port=0, rest_port=0)
+    srv = NotificationServer(
+        host="127.0.0.1",
+        ws_port=0,
+        rest_port=0,
+        database_url="sqlite:///:memory:",
+    )
     await srv.start()
     yield srv
     await srv.stop()

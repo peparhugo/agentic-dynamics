@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import logging
+import os
 
 from notifications import NotificationServer
 
@@ -10,7 +11,13 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def main(host: str, ws_port: int, rest_port: int) -> None:
-    server = NotificationServer(host=host, ws_port=ws_port, rest_port=rest_port)
+    server = NotificationServer(
+        host=host,
+        ws_port=ws_port,
+        rest_port=rest_port,
+        redis_url=os.environ.get("REDIS_URL"),
+        database_url=os.environ.get("DATABASE_URL"),
+    )
     await server.start()
     try:
         await asyncio.Future()  # run forever
