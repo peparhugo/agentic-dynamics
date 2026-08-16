@@ -1,10 +1,20 @@
 """
-WebSocket-based notification server.
+Notification server core: client/channel registries, the Redis-backed
+cross-instance bus, SQLite persistence, and message routing.
 
-Accepts WebSocket connections, assigns each client a unique ID, and
-supports broadcasting JSON messages to every connected client. A plain
-GET /health request (handled on the same port, before the WebSocket
-handshake) reports the number of currently connected clients.
+Accepts client connections, assigns each client a unique ID, and
+supports broadcasting JSON messages to every connected client (or every
+subscriber of a channel). A plain GET /health request reports the
+number of currently connected clients; see transport.py for that and
+the other HTTP endpoints.
+
+How clients actually connect and receive bytes is delegated entirely to
+a pluggable Transport (see transport.py): NotificationServer never
+touches a raw connection object itself, only client ids. It calls
+`self.transport.send_message()`/`.broadcast()` to deliver, and the
+transport calls back into `handle_connect`/`handle_disconnect`/
+`handle_incoming` as connection/message events happen. WebSocketTransport
+is the default; the TRANSPORT env var selects a different one.
 
 Every client registry mutation happens inside a coroutine running on the
 single asyncio event loop driving this server (connection handlers,
@@ -20,14 +30,14 @@ Redis pub/sub is the message backbone: every broadcast/direct message is
 published onto a shared Redis channel (see redis_backbone.py) in addition
 to being delivered directly to this instance's own locally-connected
 clients. Every server instance also subscribes to that same channel, so
-sibling instances (each holding a different subset of live WebSocket
-connections) receive the envelope and deliver it to whichever of their
-own local clients should get it. That is what lets multiple server
-processes share one logical set of clients. Connection and channel
-subscription state is additionally mirrored into plain Redis keys as it
-changes, so it is visible cluster-wide and isn't lost if one instance
-restarts. Every broadcast/direct message is also persisted to SQLite
-(persistence.py) for history, retrievable via GET /messages.
+sibling instances (each holding a different subset of live connections)
+receive the envelope and deliver it to whichever of their own local
+clients should get it. That is what lets multiple server processes share
+one logical set of clients. Connection and channel subscription state is
+additionally mirrored into plain Redis keys as it changes, so it is
+visible cluster-wide and isn't lost if one instance restarts. Every
+broadcast/direct message is also persisted to SQLite (persistence.py) for
+history, retrievable via GET /messages.
 """
 
 from __future__ import annotations
@@ -37,19 +47,13 @@ import contextlib
 import json
 import logging
 import os
-import re
-import urllib.parse
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from http import HTTPStatus
 from typing import Optional
-
-import websockets
-from websockets.asyncio.server import serve
 
 from persistence import MessageStore
 from redis_backbone import RedisBackbone, create_redis_client
+from transport import BaseTransport, Client, create_transport
 
 logger = logging.getLogger("notification_server")
 
@@ -63,22 +67,16 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-@dataclass
-class Client:
-    client_id: str
-    connection: "websockets.asyncio.server.ServerConnection"
-
-
 class ClientRegistry:
     """Tracks connected clients.
 
     All access happens from coroutines scheduled on the single asyncio
-    event loop that runs this server (connect/disconnect handlers,
-    broadcast, and the /health request handler). Because nothing outside
-    that event loop ever touches `_clients`, plain dict reads/writes are
-    safe without a lock. If a caller ever needed to mutate this registry
-    from a separate OS thread, that guarantee would no longer hold and
-    an asyncio.Lock (or a thread-safe handoff via
+    event loop that runs this server (transport connect/disconnect
+    hooks, broadcast, and the /health request handler). Because nothing
+    outside that event loop ever touches `_clients`, plain dict
+    reads/writes are safe without a lock. If a caller ever needed to
+    mutate this registry from a separate OS thread, that guarantee would
+    no longer hold and an asyncio.Lock (or a thread-safe handoff via
     call_soon_threadsafe) would be required.
     """
 
@@ -150,12 +148,15 @@ class NotificationServer:
         redis_backbone: RedisBackbone,
         message_store: MessageStore,
         instance_id: Optional[str] = None,
+        transport: Optional[BaseTransport] = None,
     ) -> None:
         self.registry = ClientRegistry()
         self.channels = ChannelRegistry()
         self.redis_backbone = redis_backbone
         self.message_store = message_store
         self.instance_id = instance_id or str(uuid.uuid4())
+        self.transport = transport or create_transport()
+        self.transport.bind(self)
         self._bus_task: Optional[asyncio.Task] = None
 
     def start(self) -> None:
@@ -190,33 +191,28 @@ class NotificationServer:
         elif kind == "direct":
             await self._deliver_local_direct(envelope["target_id"], envelope["message"])
 
-    async def handler(self, connection) -> None:
-        client_id = str(uuid.uuid4())
-        client = Client(client_id=client_id, connection=connection)
-        self.registry.add(client)
+    async def handle_connect(self, client_id: str) -> None:
+        """Called by the transport once client_id is registered and
+        reachable. Registers the client cluster-wide and sends the
+        "connected" welcome message."""
         await self.redis_backbone.register_client(client_id)
-        logger.info("client connected: %s", client_id)
-        try:
-            await connection.send(json.dumps(make_message(
-                "system",
-                {"event": "connected", "client_id": client_id},
-            )))
-            async for raw_message in connection:
-                await self._handle_incoming(client, raw_message)
-        except websockets.exceptions.ConnectionClosed:
-            pass
-        finally:
-            self.registry.remove(client_id)
-            self.channels.unsubscribe_all(client_id)
-            await self.redis_backbone.unregister_client(client_id)
-            await self.redis_backbone.unsubscribe_all_channels(client_id)
-            logger.info("client disconnected: %s", client_id)
+        await self.transport.send_message(client_id, json.dumps(make_message(
+            "system",
+            {"event": "connected", "client_id": client_id},
+        )))
 
-    async def _handle_incoming(self, client: Client, raw_message: str) -> None:
+    async def handle_disconnect(self, client_id: str) -> None:
+        """Called by the transport once client_id is no longer reachable.
+        Cleans up channel subscriptions and cluster-wide registration."""
+        self.channels.unsubscribe_all(client_id)
+        await self.redis_backbone.unregister_client(client_id)
+        await self.redis_backbone.unsubscribe_all_channels(client_id)
+
+    async def handle_incoming(self, client_id: str, raw_message: str) -> None:
         try:
             data = json.loads(raw_message)
         except json.JSONDecodeError:
-            await client.connection.send(json.dumps(make_message(
+            await self.transport.send_message(client_id, json.dumps(make_message(
                 "system", {"error": "invalid JSON"},
             )))
             return
@@ -225,42 +221,42 @@ class NotificationServer:
         payload = data.get("payload", {})
 
         if msg_type == "broadcast":
-            await self.broadcast(payload, sender_id=client.client_id)
+            await self.broadcast(payload, sender_id=client_id)
         elif msg_type == "direct":
             target_id = payload.get("target_id")
-            await self.send_direct(target_id, payload.get("message", {}), sender_id=client.client_id)
+            await self.send_direct(target_id, payload.get("message", {}), sender_id=client_id)
         elif msg_type == "subscribe":
-            await self._handle_subscribe(client, payload)
+            await self._handle_subscribe(client_id, payload)
         elif msg_type == "unsubscribe":
-            await self._handle_unsubscribe(client, payload)
+            await self._handle_unsubscribe(client_id, payload)
         else:
-            await client.connection.send(json.dumps(make_message(
+            await self.transport.send_message(client_id, json.dumps(make_message(
                 "system", {"error": f"unsupported message type: {msg_type}"},
             )))
 
-    async def _handle_subscribe(self, client: "Client", payload: dict) -> None:
+    async def _handle_subscribe(self, client_id: str, payload: dict) -> None:
         channel = payload.get("channel")
         if not channel:
-            await client.connection.send(json.dumps(make_message(
+            await self.transport.send_message(client_id, json.dumps(make_message(
                 "system", {"error": "channel is required"},
             )))
             return
-        self.channels.subscribe(channel, client.client_id)
-        await self.redis_backbone.subscribe_channel(channel, client.client_id)
-        await client.connection.send(json.dumps(make_message(
+        self.channels.subscribe(channel, client_id)
+        await self.redis_backbone.subscribe_channel(channel, client_id)
+        await self.transport.send_message(client_id, json.dumps(make_message(
             "system", {"event": "subscribed", "channel": channel},
         )))
 
-    async def _handle_unsubscribe(self, client: "Client", payload: dict) -> None:
+    async def _handle_unsubscribe(self, client_id: str, payload: dict) -> None:
         channel = payload.get("channel")
         if not channel:
-            await client.connection.send(json.dumps(make_message(
+            await self.transport.send_message(client_id, json.dumps(make_message(
                 "system", {"error": "channel is required"},
             )))
             return
-        self.channels.unsubscribe(channel, client.client_id)
-        await self.redis_backbone.unsubscribe_channel(channel, client.client_id)
-        await client.connection.send(json.dumps(make_message(
+        self.channels.unsubscribe(channel, client_id)
+        await self.redis_backbone.unsubscribe_channel(channel, client_id)
+        await self.transport.send_message(client_id, json.dumps(make_message(
             "system", {"event": "unsubscribed", "channel": channel},
         )))
 
@@ -279,20 +275,10 @@ class NotificationServer:
     async def _deliver_local_broadcast(self, message_dict: dict, channel: Optional[str]) -> int:
         message = json.dumps(message_dict)
         if channel:
-            clients = [
-                c for c in (self.registry.get(cid) for cid in self.channels.subscribers(channel))
-                if c is not None
-            ]
+            client_ids = self.channels.subscribers(channel)
         else:
-            clients = self.registry.all()
-        sent = 0
-        for client in clients:
-            try:
-                await client.connection.send(message)
-                sent += 1
-            except websockets.exceptions.ConnectionClosed:
-                continue
-        return sent
+            client_ids = [client.client_id for client in self.registry.all()]
+        return await self.transport.broadcast(client_ids, message)
 
     async def send_direct(self, target_id: Optional[str], payload: dict, sender_id: Optional[str] = None) -> bool:
         message_dict = make_message("direct", {**payload, **({"sender_id": sender_id} if sender_id else {})})
@@ -306,15 +292,9 @@ class NotificationServer:
         return delivered
 
     async def _deliver_local_direct(self, target_id: Optional[str], message_dict: dict) -> bool:
-        client = self.registry.get(target_id) if target_id else None
-        if client is None:
+        if not target_id:
             return False
-        message = json.dumps(message_dict)
-        try:
-            await client.connection.send(message)
-            return True
-        except websockets.exceptions.ConnectionClosed:
-            return False
+        return await self.transport.send_message(target_id, json.dumps(message_dict))
 
     async def _persist(self, channel: Optional[str], message_dict: dict) -> None:
         await self.message_store.store_message(
@@ -324,53 +304,6 @@ class NotificationServer:
             message_dict["timestamp"],
         )
 
-    async def process_request(self, connection, request):
-        """Serve GET /health, /channels, /channels/{name}/subscribers, and
-        /messages as plain HTTP responses before the WebSocket handshake;
-        let every other path continue as a normal upgrade attempt."""
-        path = request.path.split("?", 1)[0]
-
-        if path == "/health":
-            body = json.dumps({"connected_clients": self.registry.count()})
-            return self._json_response(connection, body)
-
-        if path == "/channels":
-            body = json.dumps({"channels": self.channels.channels()})
-            return self._json_response(connection, body)
-
-        match = re.fullmatch(r"/channels/([^/]+)/subscribers", path)
-        if match:
-            channel = urllib.parse.unquote(match.group(1))
-            body = json.dumps({
-                "channel": channel,
-                "subscribers": self.channels.subscribers(channel),
-            })
-            return self._json_response(connection, body)
-
-        if path == "/messages":
-            limit, offset = self._parse_pagination(request.path)
-            rows = await self.message_store.get_messages(limit=limit, offset=offset)
-            for row in rows:
-                row["payload"] = json.loads(row["payload"])
-            body = json.dumps({"messages": rows, "limit": limit, "offset": offset})
-            return self._json_response(connection, body)
-
-        return None
-
-    @staticmethod
-    def _parse_pagination(full_path: str) -> tuple[int, int]:
-        query = urllib.parse.urlsplit(full_path).query
-        params = urllib.parse.parse_qs(query)
-        limit = int(params.get("limit", ["50"])[0])
-        offset = int(params.get("offset", ["0"])[0])
-        return limit, offset
-
-    @staticmethod
-    def _json_response(connection, body: str):
-        response = connection.respond(HTTPStatus.OK, body)
-        response.headers["Content-Type"] = "application/json"
-        return response
-
 
 def create_server(
     host: str = "127.0.0.1",
@@ -378,6 +311,7 @@ def create_server(
     redis_client=None,
     db_path: Optional[str] = None,
     instance_id: Optional[str] = None,
+    transport: Optional[BaseTransport] = None,
 ):
     instance_id = instance_id or str(uuid.uuid4())
     if redis_client is None:
@@ -387,15 +321,10 @@ def create_server(
     message_store = MessageStore(db_path or DATABASE_URL)
     message_store.init_sync()
 
-    server_state = NotificationServer(redis_backbone, message_store, instance_id)
+    server_state = NotificationServer(redis_backbone, message_store, instance_id, transport)
     server_state.start()
 
-    ws_server = serve(
-        server_state.handler,
-        host,
-        port,
-        process_request=server_state.process_request,
-    )
+    ws_server = server_state.transport.serve(host, port)
     return ws_server, server_state
 
 
