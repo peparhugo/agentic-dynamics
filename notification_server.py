@@ -22,6 +22,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
+import urllib.parse
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -78,6 +80,39 @@ class ClientRegistry:
         return len(self._clients)
 
 
+class ChannelRegistry:
+    """Tracks channel subscriptions as channel name -> set of client IDs.
+
+    Like ClientRegistry, every mutation happens from a coroutine running on
+    the single event loop that drives this server, so a plain dict of sets
+    is safe without a lock.
+    """
+
+    def __init__(self) -> None:
+        self._channels: dict[str, set[str]] = {}
+
+    def subscribe(self, channel: str, client_id: str) -> None:
+        self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, channel: str, client_id: str) -> None:
+        subscribers = self._channels.get(channel)
+        if subscribers is None:
+            return
+        subscribers.discard(client_id)
+        if not subscribers:
+            del self._channels[channel]
+
+    def unsubscribe_all(self, client_id: str) -> None:
+        for channel in list(self._channels.keys()):
+            self.unsubscribe(channel, client_id)
+
+    def subscribers(self, channel: str) -> list[str]:
+        return sorted(self._channels.get(channel, set()))
+
+    def channels(self) -> dict[str, int]:
+        return {name: len(subscribers) for name, subscribers in self._channels.items()}
+
+
 def make_message(msg_type: str, payload: dict, timestamp: Optional[str] = None) -> dict:
     if msg_type not in MESSAGE_TYPES:
         raise ValueError(f"unsupported message type: {msg_type}")
@@ -91,6 +126,7 @@ def make_message(msg_type: str, payload: dict, timestamp: Optional[str] = None) 
 class NotificationServer:
     def __init__(self) -> None:
         self.registry = ClientRegistry()
+        self.channels = ChannelRegistry()
 
     async def handler(self, connection) -> None:
         client_id = str(uuid.uuid4())
@@ -108,6 +144,7 @@ class NotificationServer:
             pass
         finally:
             self.registry.remove(client_id)
+            self.channels.unsubscribe_all(client_id)
             logger.info("client disconnected: %s", client_id)
 
     async def _handle_incoming(self, client: Client, raw_message: str) -> None:
@@ -127,14 +164,49 @@ class NotificationServer:
         elif msg_type == "direct":
             target_id = payload.get("target_id")
             await self.send_direct(target_id, payload.get("message", {}), sender_id=client.client_id)
+        elif msg_type == "subscribe":
+            await self._handle_subscribe(client, payload)
+        elif msg_type == "unsubscribe":
+            await self._handle_unsubscribe(client, payload)
         else:
             await client.connection.send(json.dumps(make_message(
                 "system", {"error": f"unsupported message type: {msg_type}"},
             )))
 
+    async def _handle_subscribe(self, client: "Client", payload: dict) -> None:
+        channel = payload.get("channel")
+        if not channel:
+            await client.connection.send(json.dumps(make_message(
+                "system", {"error": "channel is required"},
+            )))
+            return
+        self.channels.subscribe(channel, client.client_id)
+        await client.connection.send(json.dumps(make_message(
+            "system", {"event": "subscribed", "channel": channel},
+        )))
+
+    async def _handle_unsubscribe(self, client: "Client", payload: dict) -> None:
+        channel = payload.get("channel")
+        if not channel:
+            await client.connection.send(json.dumps(make_message(
+                "system", {"error": "channel is required"},
+            )))
+            return
+        self.channels.unsubscribe(channel, client.client_id)
+        await client.connection.send(json.dumps(make_message(
+            "system", {"event": "unsubscribed", "channel": channel},
+        )))
+
     async def broadcast(self, payload: dict, sender_id: Optional[str] = None) -> int:
         message = json.dumps(make_message("broadcast", {**payload, **({"sender_id": sender_id} if sender_id else {})}))
-        clients = self.registry.all()
+        channel = payload.get("channel")
+        if channel:
+            clients = [
+                c for c in (self.registry.get(cid) for cid in self.channels.subscribers(channel))
+                if c is not None
+            ]
+        else:
+            clients = self.registry.all()
         sent = 0
         for client in clients:
             try:
@@ -156,15 +228,35 @@ class NotificationServer:
             return False
 
     def process_request(self, connection, request):
-        """Serve GET /health as a plain HTTP response before the
-        WebSocket handshake; let every other path continue as a normal
-        upgrade attempt."""
-        if request.path == "/health":
+        """Serve GET /health, /channels, and /channels/{name}/subscribers as
+        plain HTTP responses before the WebSocket handshake; let every other
+        path continue as a normal upgrade attempt."""
+        path = request.path.split("?", 1)[0]
+
+        if path == "/health":
             body = json.dumps({"connected_clients": self.registry.count()})
-            response = connection.respond(HTTPStatus.OK, body)
-            response.headers["Content-Type"] = "application/json"
-            return response
+            return self._json_response(connection, body)
+
+        if path == "/channels":
+            body = json.dumps({"channels": self.channels.channels()})
+            return self._json_response(connection, body)
+
+        match = re.fullmatch(r"/channels/([^/]+)/subscribers", path)
+        if match:
+            channel = urllib.parse.unquote(match.group(1))
+            body = json.dumps({
+                "channel": channel,
+                "subscribers": self.channels.subscribers(channel),
+            })
+            return self._json_response(connection, body)
+
         return None
+
+    @staticmethod
+    def _json_response(connection, body: str):
+        response = connection.respond(HTTPStatus.OK, body)
+        response.headers["Content-Type"] = "application/json"
+        return response
 
 
 def create_server(host: str = "127.0.0.1", port: int = 8765):
