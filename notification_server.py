@@ -1,16 +1,18 @@
-"""WebSocket-based notification server built on the ``websockets`` library.
+"""Transport-agnostic notification server.
 
-Clients connect over WebSocket, are assigned a unique ID, and can exchange
-JSON messages. The server also exposes a small REST API (``GET /health``,
-``GET /channels``, ``GET /messages``) served through the WebSocket handshake
-hook.
+Clients connect over a pluggable :term:`transport` (WebSocket by default),
+are assigned a unique ID, and can exchange JSON messages. The core
+notification logic knows nothing about the wire protocol — it interacts with
+clients exclusively through a :class:`BaseTransport` implementation. The
+server also exposes a small REST API (``GET /health``, ``GET /channels``,
+``GET /messages``).
 
 Message distribution is backed by Redis pub/sub when ``REDIS_URL`` (or an
 explicit ``redis`` client) is configured. In that mode:
 
 * The server publishes an envelope to a shared Redis pub/sub channel.
 * A worker coroutine subscribes to that channel and delivers messages to the
-  locally connected WebSocket clients.
+  locally connected clients.
 * Client connection state (which instance owns a client and which channels a
   client is subscribed to) is stored in Redis so it survives restarts and is
   visible across multiple server instances.
@@ -31,9 +33,10 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import parse_qs, unquote
 
-from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.http11 import Response
+
+from transport import BaseTransport, WebSocketTransport
 
 SUPPORTED_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
 
@@ -44,6 +47,19 @@ REDIS_CHANNEL = "notifications"
 KEY_CLIENT_INSTANCE = "notif:client:{client_id}"
 KEY_CHANNEL_SUBS = "notif:subs:{channel}"
 KEY_CLIENT_SUBS = "notif:client_subs:{client_id}"
+
+# Registry of available transports, keyed by the name used in the
+# ``TRANSPORT`` environment variable. New transports register themselves here
+# without any change to the core notification logic.
+_TRANSPORT_REGISTRY: dict[str, type[BaseTransport]] = {
+    "websocket": WebSocketTransport,
+    "ws": WebSocketTransport,
+}
+
+
+def register_transport(name: str, transport_cls: type[BaseTransport]) -> None:
+    """Register a transport implementation under ``name``."""
+    _TRANSPORT_REGISTRY[name] = transport_cls
 
 
 def utc_now_iso() -> str:
@@ -59,11 +75,12 @@ def _resolve_db_path(url: str) -> str:
 
 
 class NotificationServer:
-    """An asyncio WebSocket notification server.
+    """An asyncio notification server with a pluggable transport.
 
-    The client registry is a plain :class:`dict`. Because asyncio runs all
-    coroutines and callbacks on a single event loop, every read and write to
-    the registry happens on that loop, so no locking is required.
+    The client registry lives inside the transport; the server tracks
+    subscriptions and message state. Because asyncio runs all coroutines and
+    callbacks on a single event loop, every read and write happens on that
+    loop, so no locking is required.
     """
 
     def __init__(
@@ -72,12 +89,11 @@ class NotificationServer:
         port: int = 8765,
         redis: Any = None,
         database_url: str | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.host = host
         self.port = port
-        self._clients: dict[str, ServerConnection] = {}
         self._subscriptions: dict[str, set[str]] = {}
-        self._server = None
         self.instance_id = uuid.uuid4().hex
 
         self._redis = redis
@@ -99,6 +115,15 @@ class NotificationServer:
         )
         self._db_path = _resolve_db_path(self._database_url)
         self._init_db()
+
+        self.transport = transport if transport is not None else self._make_transport()
+
+    def _make_transport(self) -> BaseTransport:
+        name = os.environ.get("TRANSPORT", "websocket").strip().lower()
+        transport_cls = _TRANSPORT_REGISTRY.get(name)
+        if transport_cls is None:
+            raise ValueError(f"Unknown transport: {name!r}")
+        return transport_cls(self, self.host, self.port)
 
     # ── Persistence ───────────────────────────────────────────────
 
@@ -148,20 +173,20 @@ class NotificationServer:
             result.append(item)
         return result
 
-    # ── Registry ──────────────────────────────────────────────────
+    # ── Registry (delegated to the transport) ─────────────────────
 
     @property
     def client_count(self) -> int:
-        return len(self._clients)
+        return self.transport.client_count
 
     def client_ids(self) -> list[str]:
-        return list(self._clients.keys())
+        return self.transport.client_ids()
 
     def has_client(self, client_id: str) -> bool:
-        return client_id in self._clients
+        return self.transport.has_client(client_id)
 
     async def _drop_client(self, client_id: str) -> None:
-        self._clients.pop(client_id, None)
+        await self.transport.on_disconnect(client_id)
         for name in list(self._subscriptions):
             members = self._subscriptions[name]
             members.discard(client_id)
@@ -237,12 +262,10 @@ class NotificationServer:
     # ── Sending ───────────────────────────────────────────────────
 
     async def send_to(self, client_id: str, message: dict[str, Any]) -> bool:
-        ws = self._clients.get(client_id)
-        if ws is None:
+        if not self.transport.has_client(client_id):
             return False
         try:
-            await ws.send(self.encode(message))
-            return True
+            return await self.transport.send_message(client_id, self.encode(message))
         except Exception:
             await self._drop_client(client_id)
             return False
@@ -252,28 +275,18 @@ class NotificationServer:
         members = list(self._subscriptions.get(channel, set()))
         delivered = 0
         for client_id in members:
-            ws = self._clients.get(client_id)
-            if ws is None:
+            if not self.transport.has_client(client_id):
                 await self._drop_client(client_id)
                 continue
             try:
-                await ws.send(data)
-                delivered += 1
+                if await self.transport.send_message(client_id, data):
+                    delivered += 1
             except Exception:
                 await self._drop_client(client_id)
         return delivered
 
     async def _broadcast_local(self, message: dict[str, Any]) -> int:
-        data = self.encode(message)
-        stale: list[str] = []
-        for client_id, ws in list(self._clients.items()):
-            try:
-                await ws.send(data)
-            except Exception:
-                stale.append(client_id)
-        for client_id in stale:
-            await self._drop_client(client_id)
-        return len(self._clients)
+        return await self.transport.broadcast(self.encode(message))
 
     async def send_to_channel(self, channel: str, message: dict[str, Any]) -> int:
         self._persist_message(message)
@@ -322,11 +335,9 @@ class NotificationServer:
             except Exception:
                 pass
 
-    # ── Connection handling ───────────────────────────────────────
+    # ── Transport callbacks ───────────────────────────────────────
 
-    async def handler(self, websocket: ServerConnection) -> None:
-        client_id = str(uuid.uuid4())
-        self._clients[client_id] = websocket
+    async def on_client_connected(self, client_id: str) -> None:
         if self._redis is not None:
             try:
                 await self._redis.set(
@@ -334,26 +345,25 @@ class NotificationServer:
                 )
             except Exception:
                 pass
-        try:
-            await self.send_to(
-                client_id,
-                self.make_message(
-                    "system", {"event": "connected", "client_id": client_id}
-                ),
-            )
-            async for raw in websocket:
-                await self._route(websocket, client_id, raw)
-        finally:
-            await self._drop_client(client_id)
-            await self.broadcast(
-                self.make_message(
-                    "system", {"event": "disconnected", "client_id": client_id}
-                )
-            )
+        await self.send_to(
+            client_id,
+            self.make_message(
+                "system", {"event": "connected", "client_id": client_id}
+            ),
+        )
 
-    async def _route(
-        self, websocket: ServerConnection, client_id: str, raw: str | bytes
-    ) -> None:
+    async def on_client_message(self, client_id: str, raw: str | bytes) -> None:
+        await self._route(client_id, raw)
+
+    async def on_client_disconnected(self, client_id: str) -> None:
+        await self._drop_client(client_id)
+        await self.broadcast(
+            self.make_message(
+                "system", {"event": "disconnected", "client_id": client_id}
+            )
+        )
+
+    async def _route(self, client_id: str, raw: str | bytes) -> None:
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, TypeError, ValueError):
@@ -488,7 +498,7 @@ class NotificationServer:
     # ── REST endpoints (via the WebSocket handshake hook) ──────────
 
     async def process_request(
-        self, connection: ServerConnection, request: Any
+        self, connection: Any, request: Any
     ) -> Response | None:
         full_path = request.path
         path = full_path.split("?", 1)[0]
@@ -539,14 +549,9 @@ class NotificationServer:
         if self._redis is not None:
             self._worker_task = asyncio.create_task(self._redis_worker())
             await self._redis_ready.wait()
-        self._server = await serve(
-            self.handler,
-            self.host,
-            self.port,
-            process_request=self.process_request,
-        )
-        if self.port == 0:
-            self.port = self._server.sockets[0].getsockname()[1]
+        await self.transport.start()
+        self.host = self.transport.host
+        self.port = self.transport.port
 
     async def stop(self) -> None:
         if self._worker_task is not None:
@@ -556,10 +561,8 @@ class NotificationServer:
             except asyncio.CancelledError:
                 pass
             self._worker_task = None
-        if self._server is not None:
-            self._server.close()
-            await self._server.wait_closed()
-            self._server = None
+        if self.transport is not None:
+            await self.transport.stop()
         if self._owns_redis and self._redis is not None:
             try:
                 await self._redis.aclose()
@@ -570,7 +573,7 @@ class NotificationServer:
     async def run_forever(self) -> None:
         await self.start()
         try:
-            await self._server.serve_forever()
+            await self.transport.serve_forever()
         finally:
             await self.stop()
 
