@@ -15,13 +15,28 @@ access is always safe even from other threads" -- a dict mutated from a
 real OS thread while the event loop reads it would still need a lock or
 another handoff mechanism. It applies only because this design keeps all
 registry access on the loop.
+
+Redis pub/sub is the message backbone: every broadcast/direct message is
+published onto a shared Redis channel (see redis_backbone.py) in addition
+to being delivered directly to this instance's own locally-connected
+clients. Every server instance also subscribes to that same channel, so
+sibling instances (each holding a different subset of live WebSocket
+connections) receive the envelope and deliver it to whichever of their
+own local clients should get it. That is what lets multiple server
+processes share one logical set of clients. Connection and channel
+subscription state is additionally mirrored into plain Redis keys as it
+changes, so it is visible cluster-wide and isn't lost if one instance
+restarts. Every broadcast/direct message is also persisted to SQLite
+(persistence.py) for history, retrievable via GET /messages.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
+import os
 import re
 import urllib.parse
 import uuid
@@ -33,9 +48,15 @@ from typing import Optional
 import websockets
 from websockets.asyncio.server import serve
 
+from persistence import MessageStore
+from redis_backbone import RedisBackbone, create_redis_client
+
 logger = logging.getLogger("notification_server")
 
 MESSAGE_TYPES = {"broadcast", "direct", "system"}
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+DATABASE_URL = os.environ.get("DATABASE_URL", "notifications.db")
 
 
 def utc_now_iso() -> str:
@@ -124,14 +145,56 @@ def make_message(msg_type: str, payload: dict, timestamp: Optional[str] = None) 
 
 
 class NotificationServer:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        redis_backbone: RedisBackbone,
+        message_store: MessageStore,
+        instance_id: Optional[str] = None,
+    ) -> None:
         self.registry = ClientRegistry()
         self.channels = ChannelRegistry()
+        self.redis_backbone = redis_backbone
+        self.message_store = message_store
+        self.instance_id = instance_id or str(uuid.uuid4())
+        self._bus_task: Optional[asyncio.Task] = None
+
+    def start(self) -> None:
+        """Start the background task that relays envelopes from the Redis
+        bus to this instance's locally-connected clients. Must be called
+        from within a running event loop."""
+        if self._bus_task is None:
+            self._bus_task = asyncio.create_task(self._bus_listener_loop())
+
+    async def close(self) -> None:
+        if self._bus_task is not None:
+            self._bus_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._bus_task
+            self._bus_task = None
+
+    async def _bus_listener_loop(self) -> None:
+        async for envelope in self.redis_backbone.listen():
+            if envelope.get("origin_instance") == self.instance_id:
+                # Already delivered synchronously to local clients by the
+                # publish()-ing call in broadcast()/send_direct().
+                continue
+            try:
+                await self._deliver_envelope(envelope)
+            except Exception:
+                logger.exception("failed to deliver bus envelope: %r", envelope)
+
+    async def _deliver_envelope(self, envelope: dict) -> None:
+        kind = envelope.get("kind")
+        if kind == "broadcast":
+            await self._deliver_local_broadcast(envelope["message"], envelope.get("channel"))
+        elif kind == "direct":
+            await self._deliver_local_direct(envelope["target_id"], envelope["message"])
 
     async def handler(self, connection) -> None:
         client_id = str(uuid.uuid4())
         client = Client(client_id=client_id, connection=connection)
         self.registry.add(client)
+        await self.redis_backbone.register_client(client_id)
         logger.info("client connected: %s", client_id)
         try:
             await connection.send(json.dumps(make_message(
@@ -145,6 +208,8 @@ class NotificationServer:
         finally:
             self.registry.remove(client_id)
             self.channels.unsubscribe_all(client_id)
+            await self.redis_backbone.unregister_client(client_id)
+            await self.redis_backbone.unsubscribe_all_channels(client_id)
             logger.info("client disconnected: %s", client_id)
 
     async def _handle_incoming(self, client: Client, raw_message: str) -> None:
@@ -181,6 +246,7 @@ class NotificationServer:
             )))
             return
         self.channels.subscribe(channel, client.client_id)
+        await self.redis_backbone.subscribe_channel(channel, client.client_id)
         await client.connection.send(json.dumps(make_message(
             "system", {"event": "subscribed", "channel": channel},
         )))
@@ -193,13 +259,25 @@ class NotificationServer:
             )))
             return
         self.channels.unsubscribe(channel, client.client_id)
+        await self.redis_backbone.unsubscribe_channel(channel, client.client_id)
         await client.connection.send(json.dumps(make_message(
             "system", {"event": "unsubscribed", "channel": channel},
         )))
 
     async def broadcast(self, payload: dict, sender_id: Optional[str] = None) -> int:
-        message = json.dumps(make_message("broadcast", {**payload, **({"sender_id": sender_id} if sender_id else {})}))
+        message_dict = make_message("broadcast", {**payload, **({"sender_id": sender_id} if sender_id else {})})
         channel = payload.get("channel")
+        sent = await self._deliver_local_broadcast(message_dict, channel)
+        await self._persist(channel, message_dict)
+        await self.redis_backbone.publish({
+            "kind": "broadcast",
+            "channel": channel,
+            "message": message_dict,
+        })
+        return sent
+
+    async def _deliver_local_broadcast(self, message_dict: dict, channel: Optional[str]) -> int:
+        message = json.dumps(message_dict)
         if channel:
             clients = [
                 c for c in (self.registry.get(cid) for cid in self.channels.subscribers(channel))
@@ -217,20 +295,39 @@ class NotificationServer:
         return sent
 
     async def send_direct(self, target_id: Optional[str], payload: dict, sender_id: Optional[str] = None) -> bool:
+        message_dict = make_message("direct", {**payload, **({"sender_id": sender_id} if sender_id else {})})
+        delivered = await self._deliver_local_direct(target_id, message_dict)
+        await self._persist(None, message_dict)
+        await self.redis_backbone.publish({
+            "kind": "direct",
+            "target_id": target_id,
+            "message": message_dict,
+        })
+        return delivered
+
+    async def _deliver_local_direct(self, target_id: Optional[str], message_dict: dict) -> bool:
         client = self.registry.get(target_id) if target_id else None
         if client is None:
             return False
-        message = json.dumps(make_message("direct", {**payload, **({"sender_id": sender_id} if sender_id else {})}))
+        message = json.dumps(message_dict)
         try:
             await client.connection.send(message)
             return True
         except websockets.exceptions.ConnectionClosed:
             return False
 
-    def process_request(self, connection, request):
-        """Serve GET /health, /channels, and /channels/{name}/subscribers as
-        plain HTTP responses before the WebSocket handshake; let every other
-        path continue as a normal upgrade attempt."""
+    async def _persist(self, channel: Optional[str], message_dict: dict) -> None:
+        await self.message_store.store_message(
+            channel,
+            message_dict["type"],
+            json.dumps(message_dict["payload"]),
+            message_dict["timestamp"],
+        )
+
+    async def process_request(self, connection, request):
+        """Serve GET /health, /channels, /channels/{name}/subscribers, and
+        /messages as plain HTTP responses before the WebSocket handshake;
+        let every other path continue as a normal upgrade attempt."""
         path = request.path.split("?", 1)[0]
 
         if path == "/health":
@@ -250,7 +347,23 @@ class NotificationServer:
             })
             return self._json_response(connection, body)
 
+        if path == "/messages":
+            limit, offset = self._parse_pagination(request.path)
+            rows = await self.message_store.get_messages(limit=limit, offset=offset)
+            for row in rows:
+                row["payload"] = json.loads(row["payload"])
+            body = json.dumps({"messages": rows, "limit": limit, "offset": offset})
+            return self._json_response(connection, body)
+
         return None
+
+    @staticmethod
+    def _parse_pagination(full_path: str) -> tuple[int, int]:
+        query = urllib.parse.urlsplit(full_path).query
+        params = urllib.parse.parse_qs(query)
+        limit = int(params.get("limit", ["50"])[0])
+        offset = int(params.get("offset", ["0"])[0])
+        return limit, offset
 
     @staticmethod
     def _json_response(connection, body: str):
@@ -259,8 +372,24 @@ class NotificationServer:
         return response
 
 
-def create_server(host: str = "127.0.0.1", port: int = 8765):
-    server_state = NotificationServer()
+def create_server(
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    redis_client=None,
+    db_path: Optional[str] = None,
+    instance_id: Optional[str] = None,
+):
+    instance_id = instance_id or str(uuid.uuid4())
+    if redis_client is None:
+        redis_client = create_redis_client(REDIS_URL)
+    redis_backbone = RedisBackbone(redis_client, instance_id)
+
+    message_store = MessageStore(db_path or DATABASE_URL)
+    message_store.init_sync()
+
+    server_state = NotificationServer(redis_backbone, message_store, instance_id)
+    server_state.start()
+
     ws_server = serve(
         server_state.handler,
         host,
