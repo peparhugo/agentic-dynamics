@@ -229,6 +229,15 @@ from .code_ingestion import (
     ingest_codebase_graph,
 )
 
+# v1.0: producer-side code-quality derivation (source_type=report records)
+from .quality_ingestion import (
+    ACL_SCOPE as QUALITY_ACL_SCOPE,
+    EXTRACTOR_VERSION as QUALITY_EXTRACTOR_VERSION,
+    SOURCE_TYPE as QUALITY_SOURCE_TYPE,
+    build_quality_record,
+    derive_quality_records,
+)
+
 # v1.0: durable ingestion over Redis Streams (DB 2, pointer-only events)
 from .knowledge_stream import (
     CONSUMER_GROUPS,
@@ -409,6 +418,9 @@ __all__ = [
     # v1.0 code ingestion
     "derive_code_records", "build_code_record", "ingest_codebase_graph",
     "CODE_EXTRACTOR_VERSION", "CODE_SOURCE_TYPE", "CODE_ACL_SCOPE",
+    # v1.0 quality ingestion
+    "derive_quality_records", "build_quality_record",
+    "QUALITY_EXTRACTOR_VERSION", "QUALITY_SOURCE_TYPE", "QUALITY_ACL_SCOPE",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",
