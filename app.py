@@ -7,8 +7,6 @@ import asyncio
 import json
 import os
 import signal
-import threading
-import uuid
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -16,11 +14,11 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from websockets.asyncio.server import ServerConnection, serve
-from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Request, Response
 
 from broker import Broker, LocalBroker, RedisBroker
 from storage import MessageStore
+from transport import BaseTransport, ClientRegistry, WebSocketTransport, create_transport
 
 SUPPORTED_TYPES = frozenset(
     {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
@@ -41,93 +39,22 @@ def make_message(message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-class ClientRegistry:
-    """Thread-safe mapping of client IDs to WebSocket connections.
-
-    Network operations use snapshots, so the lock is never held across an
-    await and callers from other threads can still inspect or update state.
-    """
-
-    def __init__(self) -> None:
-        self._clients: dict[str, ServerConnection] = {}
-        self._channels: dict[str, set[str]] = {}
-        self._lock = threading.RLock()
-
-    def add(self, connection: ServerConnection) -> str:
-        client_id = str(uuid.uuid4())
-        with self._lock:
-            self._clients[client_id] = connection
-        return client_id
-
-    def remove(self, client_id: str) -> None:
-        with self._lock:
-            self._clients.pop(client_id, None)
-            for channel in list(self._channels):
-                subscribers = self._channels[channel]
-                subscribers.discard(client_id)
-                if not subscribers:
-                    del self._channels[channel]
-
-    def get(self, client_id: str) -> ServerConnection | None:
-        with self._lock:
-            return self._clients.get(client_id)
-
-    def snapshot(self) -> list[tuple[str, ServerConnection]]:
-        with self._lock:
-            return list(self._clients.items())
-
-    def subscribe(self, client_id: str, channel: str) -> None:
-        with self._lock:
-            if client_id in self._clients:
-                self._channels.setdefault(channel, set()).add(client_id)
-
-    def unsubscribe(self, client_id: str, channel: str) -> None:
-        with self._lock:
-            subscribers = self._channels.get(channel)
-            if subscribers is None:
-                return
-            subscribers.discard(client_id)
-            if not subscribers:
-                del self._channels[channel]
-
-    def channel_snapshot(self, channel: str) -> list[tuple[str, ServerConnection]]:
-        with self._lock:
-            return [
-                (client_id, self._clients[client_id])
-                for client_id in self._channels.get(channel, set())
-                if client_id in self._clients
-            ]
-
-    def channels(self) -> dict[str, int]:
-        with self._lock:
-            return {
-                channel: len(subscribers)
-                for channel, subscribers in sorted(self._channels.items())
-            }
-
-    def subscribers(self, channel: str) -> list[str]:
-        with self._lock:
-            return sorted(self._channels.get(channel, set()))
-
-    def is_subscribed(self, client_id: str, channel: str) -> bool:
-        with self._lock:
-            return client_id in self._channels.get(channel, set())
-
-    def __len__(self) -> int:
-        with self._lock:
-            return len(self._clients)
-
-
 class NotificationServer:
-    """Manage WebSocket clients and route notification messages."""
+    """Manage clients and route notifications independently of transport."""
 
     def __init__(
         self,
         registry: ClientRegistry | None = None,
         broker: Broker | None = None,
         store: MessageStore | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
-        self.registry = registry or ClientRegistry()
+        if transport is not None and registry is not None:
+            raise ValueError("registry must be configured on the transport")
+        self.transport = transport or create_transport(os.getenv("TRANSPORT"))
+        if registry is not None:
+            self.transport.registry = registry
+        self.registry = self.transport.registry
         redis_url = os.getenv("REDIS_URL")
         self.broker = broker or (RedisBroker(redis_url) if redis_url else LocalBroker())
         self.store = store or MessageStore(
@@ -218,34 +145,40 @@ class NotificationServer:
         return response
 
     async def handler(self, connection: ServerConnection) -> None:
+        """Handle a connection using the configured transport."""
+        await self.transport.handle_connection(
+            connection, self._on_connect, self.handle_message, self._on_disconnect
+        )
+
+    async def _on_connect(self, connection: Any) -> str:
         await self.start()
-        client_id = self.registry.add(connection)
+        client_id = await self.transport.on_connect(connection)
         await self.broker.add_client(client_id)
         try:
-            await self._send(
-                connection,
+            await self.transport.send_message(
+                client_id,
                 make_message(
-                    "system",
-                    {"event": "connected", "client_id": client_id},
+                    "system", {"event": "connected", "client_id": client_id}
                 ),
             )
-            async for raw_message in connection:
-                await self.handle_message(client_id, raw_message)
-        except ConnectionClosed:
-            pass
-        finally:
-            self.registry.remove(client_id)
+        except BaseException:
+            await self.transport.on_disconnect(client_id)
             await self.broker.remove_client(client_id)
+            raise
+        return client_id
+
+    async def _on_disconnect(self, client_id: str) -> None:
+        await self.transport.on_disconnect(client_id)
+        await self.broker.remove_client(client_id)
 
     async def handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
-        sender = self.registry.get(sender_id)
-        if sender is None:
+        if self.registry.get(sender_id) is None:
             return
 
         try:
             message = self._parse_message(raw_message)
         except ValueError as exc:
-            await self._send_error(sender, str(exc))
+            await self._send_error(sender_id, str(exc))
             return
 
         message_type = message["type"]
@@ -257,7 +190,7 @@ class NotificationServer:
             self.registry.unsubscribe(sender_id, message["channel"])
             await self.broker.unsubscribe_client(sender_id, message["channel"])
         elif message_type == "direct":
-            await self._send_direct(sender, message)
+            await self._send_direct(sender_id, message)
         else:
             await self.broadcast(message, message.get("channel"))
 
@@ -297,22 +230,24 @@ class NotificationServer:
         return message
 
     async def _send_direct(
-        self, sender: ServerConnection, message: dict[str, Any]
+        self, sender_id: str, message: dict[str, Any]
     ) -> None:
         payload = message["payload"]
         target_id = payload.get("client_id") or payload.get("target_id")
         if not isinstance(target_id, str) or not target_id:
-            await self._send_error(sender, "direct payload requires client_id")
+            await self._send_error(sender_id, "direct payload requires client_id")
             return
 
         if not await self.broker.client_exists(target_id):
-            await self._send_error(sender, "target client is not connected")
+            await self._send_error(sender_id, "target client is not connected")
             return
         channel = message.get("channel")
         if channel is not None and not await self.broker.is_subscribed(
             target_id, channel
         ):
-            await self._send_error(sender, "target client is not subscribed to channel")
+            await self._send_error(
+                sender_id, "target client is not subscribed to channel"
+            )
             return
         await self.broker.publish(
             {"message": message, "channel": channel, "target_id": target_id}
@@ -329,35 +264,18 @@ class NotificationServer:
 
     async def _deliver(self, delivery: dict[str, Any]) -> None:
         """Deliver a broker publication to sockets owned by this instance."""
-        message = delivery["message"]
-        channel = delivery.get("channel")
-        target_id = delivery.get("target_id")
-        if target_id is not None:
-            target = self.registry.get(target_id)
-            clients = [] if target is None else [(target_id, target)]
-        elif channel is None:
-            clients = self.registry.snapshot()
-        else:
-            clients = self.registry.channel_snapshot(channel)
-        results = await asyncio.gather(
-            *(self._send(connection, message) for _, connection in clients),
-            return_exceptions=True,
+        await self.transport.broadcast(
+            delivery["message"], delivery.get("channel"), delivery.get("target_id")
         )
-        for (client_id, _), result in zip(clients, results, strict=True):
-            if isinstance(result, ConnectionClosed):
-                self.registry.remove(client_id)
 
-    @staticmethod
-    async def _send(connection: ServerConnection, message: dict[str, Any]) -> None:
-        await connection.send(json.dumps(message, separators=(",", ":")))
-
-    async def _send_error(self, connection: ServerConnection, detail: str) -> None:
+    async def _send_error(self, client_id: str, detail: str) -> None:
         try:
-            await self._send(
-                connection,
+            await self.transport.send_message(
+                client_id,
                 make_message("system", {"event": "error", "detail": detail}),
             )
-        except ConnectionClosed:
+        except Exception:
+            # A client may disconnect between validation and error delivery.
             pass
 
 
