@@ -1,10 +1,11 @@
 import asyncio
 import json
 
+import fakeredis.aioredis
 import pytest
 from websockets.asyncio.client import connect
 
-from notification_server import NotificationServer
+from notification_server import NotificationServer, RedisBroker
 
 
 async def get_json(port: int, path: str) -> dict:
@@ -130,3 +131,52 @@ async def test_channel_endpoints_and_unsubscribe(running_server):
             "channel": "system",
             "subscribers": [],
         }
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_delivers_between_server_instances(tmp_path):
+    redis_server = fakeredis.FakeServer()
+    first = NotificationServer(
+        database_url=f"sqlite:///{tmp_path / 'first.db'}",
+        broker=RedisBroker(client=fakeredis.aioredis.FakeRedis(server=redis_server, decode_responses=True)),
+    )
+    second = NotificationServer(
+        database_url=f"sqlite:///{tmp_path / 'second.db'}",
+        broker=RedisBroker(client=fakeredis.aioredis.FakeRedis(server=redis_server, decode_responses=True)),
+    )
+    async with first.listen(port=0) as first_listener, second.listen(port=0) as second_listener:
+        first_port = first_listener.sockets[0].getsockname()[1]
+        second_port = second_listener.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{first_port}") as sender, connect(f"ws://127.0.0.1:{second_port}") as subscriber:
+            await sender.recv()
+            await subscriber.recv()
+            await subscriber.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+            await asyncio.sleep(0)
+            await sender.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "shared"}}))
+            received = json.loads(await asyncio.wait_for(subscriber.recv(), timeout=1))
+
+    assert received["channel"] == "alerts"
+    assert received["payload"] == {"text": "shared"}
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_persists_history_across_restart(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'messages.db'}"
+    server = NotificationServer(database_url=database_url)
+    async with server.listen(port=0) as listener:
+        port = listener.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{port}") as client:
+            await client.recv()
+            await client.send(json.dumps({"type": "subscribe", "channel": "audit", "payload": {}}))
+            await client.send(json.dumps({"type": "broadcast", "channel": "audit", "payload": {"text": "stored"}}))
+            await asyncio.wait_for(client.recv(), timeout=1)
+
+    restarted = NotificationServer(database_url=database_url)
+    async with restarted.listen(port=0) as listener:
+        port = listener.sockets[0].getsockname()[1]
+        messages = await get_json(port, "/messages?limit=50&offset=0")
+
+    assert len(messages) == 1
+    assert messages[0]["channel"] == "audit"
+    assert messages[0]["type"] == "broadcast"
+    assert messages[0]["payload"] == {"text": "stored"}
