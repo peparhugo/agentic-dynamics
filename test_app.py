@@ -1,7 +1,8 @@
 import asyncio
 import json
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 import pytest
 import pytest_asyncio
@@ -316,3 +317,142 @@ async def test_messages_are_persisted_and_paginated(tmp_path):
         assert [message["payload"]["number"] for message in broadcasts] == [2, 1]
     finally:
         reopened.close()
+
+
+@pytest.mark.asyncio
+async def test_redis_rate_limit_returns_error_without_publishing_message():
+    redis = FakeAsyncRedis(decode_responses=True)
+    notifications = NotificationServer(
+        broker=RedisBroker(client=redis), rate_limit=2
+    )
+    try:
+        async with serve(
+            notifications.handler,
+            "127.0.0.1",
+            0,
+            process_request=notifications.process_request,
+        ) as websocket_server:
+            port = websocket_server.sockets[0].getsockname()[1]
+            async with connect(f"ws://127.0.0.1:{port}") as websocket:
+                welcome = await receive_json(websocket)
+                client_id = welcome["payload"]["client_id"]
+                message = {
+                    "type": "broadcast",
+                    "payload": {"text": "allowed"},
+                    "timestamp": "2026-08-16T00:00:00Z",
+                }
+                for _ in range(2):
+                    await websocket.send(json.dumps(message))
+                    assert await receive_json(websocket) == message
+
+                await websocket.send(json.dumps(message))
+                error = await receive_json(websocket)
+
+                assert error["type"] == "system"
+                assert error["payload"] == {
+                    "event": "error",
+                    "detail": "rate limit exceeded",
+                }
+                assert await redis.get(
+                    RedisBroker._rate_limit_key(client_id)
+                ) == "3"
+                assert notifications.store.list() == [
+                    {
+                        "id": 2,
+                        "channel": None,
+                        "type": "broadcast",
+                        "payload": {"text": "allowed"},
+                        "timestamp": "2026-08-16T00:00:00Z",
+                    },
+                    {
+                        "id": 1,
+                        "channel": None,
+                        "type": "broadcast",
+                        "payload": {"text": "allowed"},
+                        "timestamp": "2026-08-16T00:00:00Z",
+                    },
+                ]
+    finally:
+        await notifications.close()
+        await redis.aclose()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_and_since_in_chronological_pages(tmp_path):
+    store = MessageStore(f"sqlite:///{tmp_path / 'history.sqlite3'}")
+    for channel, number, timestamp in (
+        ("news", 3, "2026-08-16T00:00:03Z"),
+        ("other", 2, "2026-08-16T00:00:02Z"),
+        ("news", 1, "2026-08-16T00:00:01Z"),
+        ("news", 2, "2026-08-16T00:00:02Z"),
+    ):
+        store.save(
+            {
+                "type": "broadcast",
+                "channel": channel,
+                "payload": {"number": number},
+                "timestamp": timestamp,
+            }
+        )
+    notifications = NotificationServer(store=store)
+    try:
+        async with serve(
+            notifications.handler,
+            "127.0.0.1",
+            0,
+            process_request=notifications.process_request,
+        ) as websocket_server:
+            port = websocket_server.sockets[0].getsockname()[1]
+            query = urlencode(
+                {
+                    "channel": "news",
+                    "since": "2026-08-16T00:00:01Z",
+                    "limit": 2,
+                }
+            )
+
+            def get_history():
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/history?{query}"
+                ) as response:
+                    return response.status, json.load(response)
+
+            status, body = await asyncio.to_thread(get_history)
+
+            assert status == 200
+            assert body["has_more"] is True
+            assert [message["payload"]["number"] for message in body["messages"]] == [
+                1,
+                2,
+            ]
+            assert all(message["channel"] == "news" for message in body["messages"])
+    finally:
+        await notifications.close()
+
+
+@pytest.mark.asyncio
+async def test_startup_cleanup_removes_messages_older_than_configured_ttl(tmp_path):
+    store = MessageStore(f"sqlite:///{tmp_path / 'expiry.sqlite3'}")
+    now = datetime.now(timezone.utc)
+    for age, label in ((3, "expired"), (1, "current")):
+        store.save(
+            {
+                "type": "system",
+                "channel": "maintenance",
+                "payload": {"label": label},
+                "timestamp": (now - timedelta(days=age)).isoformat(),
+            }
+        )
+    notifications = NotificationServer(store=store, message_ttl_days=2)
+    try:
+        await notifications.start()
+        for _ in range(20):
+            if len(store.list()) == 1:
+                break
+            await asyncio.sleep(0.01)
+
+        assert [message["payload"]["label"] for message in store.list()] == [
+            "current"
+        ]
+    finally:
+        await notifications.close()

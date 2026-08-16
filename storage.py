@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,10 @@ class MessageStore:
                 )
                 """
             )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS messages_channel_timestamp "
+                "ON messages (channel, timestamp)"
+            )
 
     def save(self, message: dict[str, Any]) -> int:
         with self._lock, self._connection:
@@ -65,6 +70,35 @@ class MessageStore:
                 """,
                 (limit, offset),
             ).fetchall()
+        return self._rows_to_messages(rows)
+
+    def history(
+        self, channel: str, since: str, limit: int = 50
+    ) -> tuple[list[dict[str, Any]], bool]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT id, channel, type, payload, timestamp
+                FROM messages
+                WHERE channel = ? AND julianday(timestamp) >= julianday(?)
+                ORDER BY julianday(timestamp), id
+                LIMIT ?
+                """,
+                (channel, since, limit + 1),
+            ).fetchall()
+        return self._rows_to_messages(rows[:limit]), len(rows) > limit
+
+    def delete_before(self, cutoff: datetime | str) -> int:
+        value = cutoff.isoformat() if isinstance(cutoff, datetime) else cutoff
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM messages WHERE julianday(timestamp) < julianday(?)",
+                (value,),
+            )
+            return cursor.rowcount
+
+    @staticmethod
+    def _rows_to_messages(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
         return [
             {
                 "id": row["id"],

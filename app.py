@@ -8,7 +8,7 @@ import json
 import os
 import signal
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -48,6 +48,8 @@ class NotificationServer:
         broker: Broker | None = None,
         store: MessageStore | None = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: int | None = None,
     ) -> None:
         if transport is not None and registry is not None:
             raise ValueError("registry must be configured on the transport")
@@ -60,8 +62,26 @@ class NotificationServer:
         self.store = store or MessageStore(
             os.getenv("DATABASE_URL", "sqlite:///:memory:")
         )
+        self.rate_limit = self._positive_setting(
+            "RATE_LIMIT", rate_limit, 100
+        )
+        self.message_ttl_days = self._positive_setting(
+            "MESSAGE_TTL_DAYS", message_ttl_days, 7
+        )
         self._started = False
         self._start_lock = asyncio.Lock()
+        self._cleanup_task: asyncio.Task[None] | None = None
+
+    @staticmethod
+    def _positive_setting(name: str, value: int | None, default: int) -> int:
+        raw_value: int | str = value if value is not None else os.getenv(name, default)
+        try:
+            parsed = int(raw_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be a positive integer") from exc
+        if parsed <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+        return parsed
 
     async def start(self) -> None:
         """Start this server instance's broker subscriber worker."""
@@ -70,10 +90,26 @@ class NotificationServer:
         async with self._start_lock:
             if not self._started:
                 await self.broker.start(self._deliver)
+                self._cleanup_task = asyncio.create_task(self._cleanup_messages())
                 self._started = True
+
+    async def _cleanup_messages(self) -> None:
+        try:
+            while True:
+                cutoff = datetime.now(timezone.utc) - timedelta(
+                    days=self.message_ttl_days
+                )
+                self.store.delete_before(cutoff)
+                await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            raise
 
     async def close(self) -> None:
         """Release broker and database resources."""
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            await asyncio.gather(self._cleanup_task, return_exceptions=True)
+            self._cleanup_task = None
         await self.broker.close()
         self.store.close()
         self._started = False
@@ -118,6 +154,26 @@ class NotificationServer:
                     {"error": "limit and offset must be non-negative integers"},
                 )
             body = json.dumps({"messages": self.store.list(limit, offset)})
+        elif path == "/history":
+            try:
+                query = parse_qs(parsed_url.query, keep_blank_values=True)
+                channel = self._single_query_value(query, "channel")
+                since = self._single_query_value(query, "since")
+                limit = self._query_integer(query, "limit", 50)
+                if not channel or limit <= 0:
+                    raise ValueError
+                self._parse_iso_timestamp(since)
+            except ValueError:
+                return self._json_response(
+                    connection,
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": "channel and ISO timestamp since are required; "
+                        "limit must be a positive integer"
+                    },
+                )
+            messages, has_more = self.store.history(channel, since, limit)
+            body = json.dumps({"messages": messages, "has_more": has_more})
         else:
             return None
 
@@ -131,6 +187,23 @@ class NotificationServer:
         if len(values) != 1:
             raise ValueError
         return int(values[0])
+
+    @staticmethod
+    def _single_query_value(query: dict[str, list[str]], name: str) -> str:
+        values = query.get(name)
+        if values is None or len(values) != 1:
+            raise ValueError
+        return values[0]
+
+    @staticmethod
+    def _parse_iso_timestamp(value: str) -> datetime:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError from exc
+        if parsed.tzinfo is None:
+            raise ValueError
+        return parsed
 
     @staticmethod
     def _json_response(
@@ -173,6 +246,10 @@ class NotificationServer:
 
     async def handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
         if self.registry.get(sender_id) is None:
+            return
+
+        if not await self.broker.allow_message(sender_id, self.rate_limit):
+            await self._send_error(sender_id, "rate limit exceeded")
             return
 
         try:

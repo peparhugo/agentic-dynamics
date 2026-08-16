@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
@@ -37,6 +38,8 @@ class Broker(Protocol):
 
     async def subscribers(self, channel: str) -> list[str]: ...
 
+    async def allow_message(self, client_id: str, limit: int) -> bool: ...
+
 
 class LocalBroker:
     """In-process fallback used when Redis isn't configured."""
@@ -45,6 +48,7 @@ class LocalBroker:
         self._handler: DeliveryHandler | None = None
         self._clients: set[str] = set()
         self._channels: dict[str, set[str]] = {}
+        self._rate_limits: dict[str, tuple[float, int]] = {}
 
     async def start(self, handler: DeliveryHandler) -> None:
         self._handler = handler
@@ -61,6 +65,7 @@ class LocalBroker:
 
     async def remove_client(self, client_id: str) -> None:
         self._clients.discard(client_id)
+        self._rate_limits.pop(client_id, None)
         for channel in list(self._channels):
             self._channels[channel].discard(client_id)
             if not self._channels[channel]:
@@ -95,6 +100,15 @@ class LocalBroker:
     async def subscribers(self, channel: str) -> list[str]:
         return sorted(self._channels.get(channel, set()))
 
+    async def allow_message(self, client_id: str, limit: int) -> bool:
+        now = time.monotonic()
+        window_started, count = self._rate_limits.get(client_id, (now, 0))
+        if now - window_started >= 60:
+            window_started, count = now, 0
+        count += 1
+        self._rate_limits[client_id] = (window_started, count)
+        return count <= limit
+
 
 class RedisBroker:
     """Redis pub/sub transport with Redis-backed connection metadata."""
@@ -118,6 +132,10 @@ class RedisBroker:
     @staticmethod
     def _client_channels_key(client_id: str) -> str:
         return f"notifications:client:{client_id}:channels"
+
+    @staticmethod
+    def _rate_limit_key(client_id: str) -> str:
+        return f"notifications:rate-limit:{client_id}"
 
     async def start(self, handler: DeliveryHandler) -> None:
         if self._listener is not None and not self._listener.done():
@@ -166,6 +184,7 @@ class RedisBroker:
             for channel in channels:
                 pipeline.srem(self._channel_key(channel), client_id)
             pipeline.delete(client_channels_key)
+            pipeline.delete(self._rate_limit_key(client_id))
             await pipeline.execute()
         await self._remove_empty_channels(channels)
 
@@ -208,3 +227,10 @@ class RedisBroker:
 
     async def subscribers(self, channel: str) -> list[str]:
         return sorted(await self._redis.smembers(self._channel_key(channel)))
+
+    async def allow_message(self, client_id: str, limit: int) -> bool:
+        key = self._rate_limit_key(client_id)
+        count = int(await self._redis.incr(key))
+        if count == 1:
+            await self._redis.expire(key, 60)
+        return count <= limit
