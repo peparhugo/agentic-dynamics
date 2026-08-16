@@ -30,8 +30,16 @@ _client_ids = count(1)
 TYPE_BROADCAST = "broadcast"
 TYPE_DIRECT = "direct"
 TYPE_SYSTEM = "system"
+TYPE_SUBSCRIBE = "subscribe"
+TYPE_UNSUBSCRIBE = "unsubscribe"
 
-ALLOWED_TYPES = {TYPE_BROADCAST, TYPE_DIRECT, TYPE_SYSTEM}
+ALLOWED_TYPES = {
+    TYPE_BROADCAST,
+    TYPE_DIRECT,
+    TYPE_SYSTEM,
+    TYPE_SUBSCRIBE,
+    TYPE_UNSUBSCRIBE,
+}
 
 
 def utcnow_iso() -> str:
@@ -63,6 +71,7 @@ class ClientRegistry:
 
     def __init__(self) -> None:
         self._clients: dict[str, websockets.ServerConnection] = {}
+        self._channel_subscribers: dict[str, set[str]] = {}
 
     def add(self, websocket: websockets.ServerConnection) -> str:
         """Register a client and return its unique ID."""
@@ -72,7 +81,10 @@ class ClientRegistry:
 
     def remove(self, client_id: str) -> websockets.ServerConnection | None:
         """Remove a client and return the removed connection, if any."""
-        return self._clients.pop(client_id, None)
+        removed = self._clients.pop(client_id, None)
+        if removed is not None:
+            self.unsubscribe_all(client_id)
+        return removed
 
     def get(self, client_id: str) -> websockets.ServerConnection | None:
         """Return the connection for a client ID, if present."""
@@ -82,10 +94,50 @@ class ClientRegistry:
         """Return all live connections."""
         return list(self._clients.values())
 
+    def connections_for(self, client_ids) -> list[websockets.ServerConnection]:
+        """Return connections for the given client IDs."""
+        return [self._clients[cid] for cid in client_ids if cid in self._clients]
+
     @property
     def count(self) -> int:
         """Number of connected clients."""
         return len(self._clients)
+
+    # ── channel subscriptions ────────────────────────────────
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        """Subscribe a client to a named channel."""
+        self._channel_subscribers.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        """Unsubscribe a client from a named channel."""
+        subscribers = self._channel_subscribers.get(channel)
+        if subscribers is None:
+            return
+        subscribers.discard(client_id)
+        if not subscribers:
+            del self._channel_subscribers[channel]
+
+    def unsubscribe_all(self, client_id: str) -> None:
+        """Remove a client from every channel it is subscribed to."""
+        for channel in list(self._channel_subscribers):
+            self.unsubscribe(client_id, channel)
+
+    def channel_members(self, channel: str) -> list[str]:
+        """Return the IDs of clients subscribed to a channel."""
+        return sorted(self._channel_subscribers.get(channel, set()))
+
+    def channels(self) -> list[dict]:
+        """Return all active channels with their subscriber counts."""
+        return [
+            {"name": name, "subscribers": len(subscribers)}
+            for name, subscribers in sorted(self._channel_subscribers.items())
+        ]
+
+    @property
+    def channel_names(self) -> list[str]:
+        """Return the names of all active channels."""
+        return sorted(self._channel_subscribers)
 
 
 class NotificationServer:
@@ -119,6 +171,10 @@ class NotificationServer:
 
         rest_app = web.Application()
         rest_app.router.add_get("/health", self.health_handler)
+        rest_app.router.add_get("/channels", self.channels_handler)
+        rest_app.router.add_get(
+            "/channels/{name}/subscribers", self.channel_subscribers_handler
+        )
         self._rest_runner = web.AppRunner(rest_app)
         await self._rest_runner.setup()
         self._rest_site = web.TCPSite(self._rest_runner, self.host, self.rest_port)
@@ -172,6 +228,7 @@ class NotificationServer:
 
         message_type = data.get("type")
         payload = data.get("payload") or {}
+        channel = data.get("channel") or payload.get("channel")
 
         if message_type not in ALLOWED_TYPES:
             await self._send(sender_id, make_message(
@@ -180,10 +237,38 @@ class NotificationServer:
             ))
             return
 
-        if message_type == TYPE_BROADCAST:
-            await self.broadcast(make_message(
-                TYPE_BROADCAST, {"sender": sender_id, **payload}
+        if message_type == TYPE_SUBSCRIBE:
+            if not channel:
+                await self._send(sender_id, make_message(
+                    TYPE_SYSTEM, {"error": "subscribe requires a channel"}
+                ))
+                return
+            self.registry.subscribe(sender_id, channel)
+            await self._send(sender_id, make_message(
+                TYPE_SYSTEM,
+                {"message": "subscribed", "channel": channel,
+                 "client_id": sender_id},
             ))
+        elif message_type == TYPE_UNSUBSCRIBE:
+            if not channel:
+                await self._send(sender_id, make_message(
+                    TYPE_SYSTEM, {"error": "unsubscribe requires a channel"}
+                ))
+                return
+            self.registry.unsubscribe(sender_id, channel)
+            await self._send(sender_id, make_message(
+                TYPE_SYSTEM,
+                {"message": "unsubscribed", "channel": channel,
+                 "client_id": sender_id},
+            ))
+        elif message_type == TYPE_BROADCAST:
+            message = make_message(
+                TYPE_BROADCAST, {"sender": sender_id, **payload}
+            )
+            if channel:
+                await self.channel_broadcast(channel, message)
+            else:
+                await self.broadcast(message)
         elif message_type == TYPE_DIRECT:
             target = payload.get("target_id")
             if target is None or self.registry.get(target) is None:
@@ -197,9 +282,13 @@ class NotificationServer:
                 TYPE_DIRECT, {"sender": sender_id, **payload}
             ))
         else:  # TYPE_SYSTEM
-            await self.broadcast(make_message(
+            message = make_message(
                 TYPE_SYSTEM, {"sender": sender_id, **payload}
-            ))
+            )
+            if channel:
+                await self.channel_broadcast(channel, message)
+            else:
+                await self.broadcast(message)
 
     # ── messaging primitives ───────────────────────────────────
 
@@ -224,6 +313,15 @@ class NotificationServer:
         if connections:
             websockets.broadcast(connections, serialize(message))
 
+    async def channel_broadcast(self, channel: str, message: dict) -> None:
+        """Broadcast a message dict to subscribers of a named channel."""
+        member_ids = self.registry.channel_members(channel)
+        if not member_ids:
+            return
+        connections = self.registry.connections_for(member_ids)
+        if connections:
+            websockets.broadcast(connections, serialize(message))
+
     # ── REST endpoints ─────────────────────────────────────────
 
     async def health_handler(self, request: web.Request) -> web.Response:
@@ -231,4 +329,20 @@ class NotificationServer:
         return web.json_response({
             "status": "ok",
             "clients": self.registry.count,
+        })
+
+    async def channels_handler(self, request: web.Request) -> web.Response:
+        """REST ``GET /channels`` — list channels and subscriber counts."""
+        return web.json_response({
+            "channels": self.registry.channels(),
+        })
+
+    async def channel_subscribers_handler(
+        self, request: web.Request
+    ) -> web.Response:
+        """REST ``GET /channels/{name}/subscribers`` — list subscriber IDs."""
+        name = request.match_info["name"]
+        return web.json_response({
+            "channel": name,
+            "subscribers": self.registry.channel_members(name),
         })
