@@ -1,5 +1,6 @@
 import asyncio
 import json
+from urllib.parse import quote
 
 import fakeredis.aioredis
 import pytest
@@ -180,3 +181,43 @@ async def test_messages_endpoint_persists_history_across_restart(tmp_path):
     assert messages[0]["channel"] == "audit"
     assert messages[0]["type"] == "broadcast"
     assert messages[0]["payload"] == {"text": "stored"}
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_without_publishing_excess_messages():
+    server = NotificationServer(rate_limit=2)
+    async with server.listen(port=0) as listener:
+        port = listener.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{port}") as client:
+            await client.recv()
+            for number in range(3):
+                await client.send(json.dumps({"type": "broadcast", "payload": {"number": number}}))
+
+            received = [json.loads(await client.recv()) for _ in range(3)]
+
+    broadcasts = [message for message in received if message["type"] == "broadcast"]
+    errors = [message for message in received if message["type"] == "system"]
+    assert [message["payload"] for message in broadcasts] == [{"number": 0}, {"number": 1}]
+    assert errors[0]["payload"] == {"event": "error", "detail": "rate limit exceeded"}
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_since_and_reports_pagination(running_server):
+    _, port = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as client:
+        await client.recv()
+        await client.send(json.dumps({"type": "subscribe", "channel": "audit", "payload": {}}))
+        for text in ("first", "second"):
+            await client.send(json.dumps({"type": "broadcast", "channel": "audit", "payload": {"text": text}}))
+            await client.recv()
+
+        await client.send(json.dumps({"type": "broadcast", "channel": "other", "payload": {"text": "ignored"}}))
+
+        since = quote("1970-01-01T00:00:00Z", safe="")
+        first_page = await get_json(port, f"/history?channel=audit&since={since}&limit=1")
+        second_page = await get_json(port, f"/history?channel=audit&since={since}&limit=1&offset=1")
+
+    assert [message["payload"] for message in first_page["messages"]] == [{"text": "first"}]
+    assert first_page["has_more"] is True
+    assert [message["payload"] for message in second_page["messages"]] == [{"text": "second"}]
+    assert second_page["has_more"] is False
