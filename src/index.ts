@@ -14,4 +14,7 @@ export type { TemplateEngine, PageContext } from './engine';
 export { parseArgs, printUsage, run } from './cli';
 export type { CliOptions } from './cli';
 
+export { serveSite, injectReloadScript } from './server';
+export type { ServeOptions, DevServer } from './server';
+
 export type { Page } from './types';
