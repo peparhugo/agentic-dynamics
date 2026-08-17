@@ -1,0 +1,152 @@
+name: routing_kb_experiment_design
+question: >-
+  Independently, per model, design an experiment that puts the repo's routing + knowledge-base
+  machinery to the test against a REAL, open-source, non-trivial seed repository and a real task
+  (bug fix, feature, or refactor) on it. The experiment must exercise (a) model routing
+  (recommend_route / route_step), (b) KB retrieval + scope isolation (rag_augment, the per-cell
+  repository_id scope, self-built vs historical knowledge), and (c) at least one further
+  exploratory dimension chosen by the model — a code-review strategy, a multi-model comparison, a
+  shared-scope coordination test, or a policy arm. Each of sol, fable-5, and deepseek-v4-pro
+  researches and proposes independently, in its own worktree, grounded in the existing routing /
+  KB / measurement stack. Output per cell is a proposal: the seed repo + task, the factor grid,
+  the measurement, and how it isolates routing and KB effects.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true   # chain the 3 phases' sessions so shared repo context becomes cache reads
+    context:
+      brief: >-
+        This is an EXPLORATORY design phase, not the experiment itself. We already built the
+        machinery — model routing, the knowledge base with per-cell scope isolation, the
+        rag_augment seam, and the measurement stack — and now we need a real test that tells us
+        whether routing and the KB actually pay. Each model proposes its own experiment,
+        independently, in its own worktree. The seed repository must be a REAL open-source
+        project (clonable, with a runnable test suite) and the task must be real (a genuine bug
+        fix, feature, or refactor) — not a toy. The deliverable is a proposal + how it fits (or
+        changes) this repo's infra.
+      load_bearing_rule: >-
+        This repo is an information-acquisition machine: instrument -> derive -> policy -> grid ->
+        campaign. A control rule may only consume already-measured information. The routing policy
+        (route_step / recommend_route) consumes the measured signal store; the KB (retrieve)
+        consumes measured findings. Your experiment must state which signals each arm consumes,
+        confirm they are measured (test_executed_success, cost, flail, confidence are in
+        LEDGER_FIELDS), and flag anything still unmeasured. Do not propose consuming an
+        unmeasured signal without also specifying its instrumentation.
+      prior_art:
+        - src/instrument/routing.py            # compute_routing / recommend_route / simulate_strategies
+        - src/instrument/step_routing.py       # route_step / ModelSignals / MEASURED_SIGNALS / FORBIDDEN_SIGNALS / cache_switch_penalty
+        - src/instrument/retrieval.py          # retrieve / scope_excluded / build_evidence_cards / fallback modes
+        - src/instrument/knowledge_ingestion.py # derive_records / derive_phase_record / emit_phase_finding
+        - src/instrument/workflow_runner.py    # rag_augment seam / cell_scope / emit_self (per-cell scope isolation)
+        - src/instrument/test_runner.py        # test_executed_success (independent suite runner)
+        - src/instrument/efficiency.py         # PROVIDER_PRICING / compute_efficiency
+        - src/instrument/review.py             # commit/story review strategies
+        - src/instrument/experiment_spec.py    # ExperimentSpec + validate_rules (the load-bearing gate)
+    phases:
+      - name: survey
+        kind: agent
+        prompt: |
+          Map the routing + KB + measurement machinery, and shortlist real seed repositories. Write
+          docs/routing_kb_survey.md.
+
+          GOAL:
+          {goal}
+
+          PART A — THE MACHINERY (read the code, cite file:line for every claim):
+          - Routing: src/instrument/routing.py (compute_routing / recommend_route / simulate_strategies)
+            and src/instrument/step_routing.py (route_step, ModelSignals, MEASURED_SIGNALS,
+            FORBIDDEN_SIGNALS, cache_switch_penalty, validate_preferences). How does a task type map
+            to a model today, and what signals drive it?
+          - KB: src/instrument/retrieval.py (retrieve, scope_excluded, build_evidence_cards, the
+            named fallback modes), src/instrument/knowledge_ingestion.py (derive_records,
+            derive_phase_record, emit_phase_finding — the self-build producer), and the
+            rag_augment seam + cell_scope() + emit_self in workflow_runner.py. Note the per-cell
+            repository_id scope and the shared-scope override.
+          - Measurement: src/instrument/test_runner.py (test_executed_success — the independent
+            suite), src/instrument/efficiency.py (PROVIDER_PRICING), and how flail/escape are
+            measured (src/instrument/basin.py). Confirm which signals are in LEDGER_FIELDS
+            (experiment_spec.py).
+          - Review: src/instrument/review.py — what code-review strategies exist and how they score.
+
+          PART B — SEED REPOSITORY (the real substrate):
+          - Shortlist 3-5 REAL open-source repositories that are non-trivial but tractable: clonable,
+            with a runnable test suite, sized so an experiment cell can complete in minutes-to-an-hour.
+            Favor libraries/tools with a clear issue tracker or obvious feature surface (a CLI tool, a
+            parser, a template engine, a small framework component). For each: the repo, why it is
+            non-trivial, and 1-2 concrete REAL tasks (bug fix / feature / refactor) it could host.
+          - For each candidate, note how it exercises routing (do task TYPES map to different models?)
+            and the KB (does prior knowledge about this codebase help?).
+
+          DELIVER exactly one file, docs/routing_kb_survey.md: (1) machinery map with file:line,
+          (2) the measured-signal inventory, (3) the seed-repo shortlist with real tasks, (4) the
+          open questions the design phase must resolve.
+      - name: design
+        kind: agent
+        prompt: |
+          Design the experiment. Write docs/routing_kb_design.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DESIGN REQUIREMENTS (your own choices — this is exploratory, defend them):
+          1. Seed repo + task — pick ONE real open-source repo and ONE real task (bug fix / feature /
+             refactor) from your survey shortlist. Justify: non-trivial, testable, tractable, and
+             how it is a fair substrate for routing + KB (does it have distinct task types? does
+             prior knowledge plausibly help?).
+          2. The factor grid — choose the factors that isolate the effects you care about, from at
+             least: model (the 3 in play, plus any cheap baselines), routing strategy (recommend_route
+             vs route_step vs fixed-model vs random), KB scope (bare / historical / self-built /
+             shared-scope coordination), and one further dimension (a code-review strategy, a policy
+             arm, or a perturbation condition). Declare the cross-product and the cell count.
+          3. Measurement — the primary outcome (test_executed_success, cost per accepted outcome,
+             flail, confidence) and how each cell produces it. State the comparison (arm_factor, loss)
+             and the stop criterion (budget, uncertainty).
+          4. Load-bearing rule — list every signal each arm consumes; confirm measured vs unmeasured;
+             flag anything that must be instrumented first.
+          5. How it tests routing AND the KB specifically — what result would confirm "routing pays",
+             what would confirm "the KB pays", and what a null would mean for each.
+
+          DELIVER exactly one file, docs/routing_kb_design.md: (1) seed repo + task, (2) the grid,
+          (3) measurement + comparison + stop, (4) the signal/instrumentation table, (5) the
+          "what confirms routing / KB / null" interpretation, (6) failure modes.
+      - name: proposal
+        kind: agent
+        prompt: |
+          Consolidate into a final proposal + an ExperimentSpec-shaped plan. Write docs/routing_kb_proposal.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DELIVER exactly one file, docs/routing_kb_proposal.md containing:
+          1. Executive summary — the experiment in one paragraph.
+          2. The seed repo + task — how to clone it, how to run its tests, and the exact task.
+          3. The experiment spec — factors, design (factorial), rules (measurement + control with
+             requires/produces), metrics, comparison, stop, adapt — shaped to drop into
+             experiments/specs/*.yaml and pass the requires/produces gate.
+          4. Integration plan — which existing modules it uses unchanged (routing, retrieval,
+             rag_augment, test_runner, efficiency), which config/CLI it needs, and any small wiring
+             still missing (e.g. seeding the seed repo into a worktree, task-type labels for routing).
+          5. How we read the result — what outcome confirms routing pays, KB pays, or null; and what
+             the next grid (adapt) would be after this one.
+          6. Risks — cost, the seed repo's tests being flaky, contamination, and how to bound them.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro, anthropic/claude-fable-5, openai/gpt-5.6-sol]}
+design: factorial
+# Exploratory research grid: no control rules authored yet. Proposal quality is the qualitative
+# output, scored by human or cross-model review, not auto-measured here.
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: files_created, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 25.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
