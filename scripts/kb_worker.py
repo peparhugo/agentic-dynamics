@@ -92,6 +92,11 @@ def build_handler(group: str, r: redis.Redis):
                     "source_uri": record.source_uri,
                     "commit_sha": record.commit_sha,
                     "content_hash": record.content_hash,
+                    # Scope isolation on the dense leg: retrieval.py's _dense_filter and
+                    # scope_excluded key off these, so the Chroma metadata MUST carry them or the
+                    # dense leg returns nothing under any non-empty repository scope.
+                    "repository_id": record.repository_id,
+                    "acl_scope": record.acl_scope,
                 }],
             )
 
@@ -114,7 +119,8 @@ def build_handler(group: str, r: redis.Redis):
                     "SET k.entity_id = $eid, k.text = $text, k.source_uri = $uri, "
                     "k.authority = $authority, k.commit_sha = $commit, "
                     "k.source_type = $stype, k.logical_locator = $loc, "
-                    "k.language = $lang, k.evidence_class = $ev",
+                    "k.language = $lang, k.evidence_class = $ev, "
+                    "k.repository_id = $repo, k.acl_scope = $acl",
                     {
                         "id": record.knowledge_id,
                         "eid": record.entity_id,
@@ -126,6 +132,8 @@ def build_handler(group: str, r: redis.Redis):
                         "loc": record.logical_locator,
                         "lang": record.language,
                         "ev": record.evidence_class,
+                        "repo": record.repository_id,
+                        "acl": record.acl_scope,
                     },
                 )
             finally:
