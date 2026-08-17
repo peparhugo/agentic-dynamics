@@ -1,0 +1,71 @@
+name: routing_kb_more_itertools
+question: >-
+  On a real, pinned open-source bugfix (more-itertools chunked() negative-n ValueError, PR #1223,
+  buggy-state commit 516f0a80…), does model routing (fixed / random / recommend_route / route_step)
+  lower cost-per-accepted-outcome at parity test_executed_success, and does KB scope (bare /
+  historical / self_built / shared) lower flail at parity correctness? This is the exploratory
+  SCREEN (16 cells), not the confirmatory trial — its job is to de-risk the substrate, the held-out
+  test, the signal-store warm-up, and the factor->runtime wiring before committing to a powered grid.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true                     # cache-aware fork chaining; route_step may switch model
+    model_pool:                    # the routing arms' pool (sol excluded on cost) [P]
+      - deepseek/deepseek-v4-flash
+      - deepseek/deepseek-v4-pro
+      - openai/gpt-5.6-luna
+      - openai/gpt-5.6-terra
+      - anthropic/claude-haiku-4-5
+      - anthropic/claude-sonnet-5
+    preferences:                   # route_step preference policy (validated by validate_preferences)
+      objectives:
+        - {signal: cost, direction: minimize, weight: 1.0}
+        - {signal: correctness, direction: maximize, weight: 1.0}
+    context:
+      seed_repo: https://github.com/more-itertools/more-itertools.git
+      seed_revision: 516f0a80fb7c2c8562dbb5e318fc2a3d44f4171f   # bug present, fix absent [X]
+      golden_merge: 9ddc55c57390707d97d96302eea1992919c8d930     # PR #1223 merge (held-out oracle) [X]
+      task_id: more_itertools_chunked_negative_n
+      task_type: bug_fix
+      held_out: >-
+        PR #1223 test_negative (injected AFTER the reproduce phase, never shown to the agent) is the
+        independent correctness gate; byte-identical-to-golden diffs are flagged as leakage.
+    phases:
+      - name: reproduce
+        kind: agent
+        prompt: >
+          Read more_itertools/more.py and tests/, and add a failing test that captures the
+          negative-n chunked() bug. Goal: {goal}
+      - name: fix
+        kind: agent
+        prompt: >
+          Implement the fix so chunked() raises a clear ValueError for negative n, matching sliced().
+          Prior phases: {prior_phases}
+      - name: test
+        kind: test                   # run_suite -> test_executed_success (independent, never self-report)
+factors:
+  - {name: routing, levels: [fixed, random, recommend_route, route_step]}
+  - {name: kb, levels: [bare, historical, self_built, shared]}
+design: factorial
+# The routing arms are workflow-level mechanisms (model_pool + preferences + phase selectors),
+# validated by validate_workflow_routing / validate_preferences — NOT RuleSpec control rules
+# (correctness/cost live in the signal store, not LEDGER_FIELDS). Only measurement rules here.
+rules:
+  - {name: outcome_measure, plane: measurement, evidence_class: "[M]",
+     requires: [test_executed_success, accepted, evaluator_independent], produces: [accepted_outcome]}
+  - {name: cost_measure, plane: measurement, evidence_class: "[M]",
+     requires: [cost_inference, cost_orchestration, actual_cost], produces: [cost_per_accepted_outcome]}
+  - {name: flail_measure, plane: measurement, evidence_class: "[C]",
+     requires: [tool_calls, tokens_reasoning, tokens_out], produces: [flail]}
+metrics:
+  - {name: test_executed_success, agg: mean, over: cell}
+  - {name: cost_per_accepted_outcome, agg: ratio, over: cell}
+  - {name: flail, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: routing, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, priors, grid, effect_size, uncertainty, null_interpretation]
+stop: {budget_usd: 25.0, max_attempts: 1, uncertainty_threshold: 0.15}
+adapt: {strategy: coordinate_descent, selection: highest_regret}
