@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { parseMarkdown } from './markdown';
+import { parseMarkdown, Frontmatter } from './markdown';
+import { TemplateEngine, RenderContext } from './templates';
 
 export interface Page {
   slug: string;
@@ -8,6 +9,9 @@ export interface Page {
   date: string | null;
   tags: string[];
   html: string;
+  template: string | null;
+  layout: string | null;
+  frontmatter: Frontmatter;
   sourcePath: string;
   outputPath: string;
 }
@@ -15,6 +19,7 @@ export interface Page {
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  templatesDir?: string;
 }
 
 export interface BuildResult {
@@ -85,42 +90,40 @@ function relativeIndexLink(outputPath: string): string {
   return rel.split(path.sep).join('/');
 }
 
-function renderPage(page: Page): string {
+function renderMeta(date: string | null, tags: string[]): string {
   const meta: string[] = [];
-  if (page.date) {
+  if (date) {
     meta.push(
-      `<time datetime="${escapeHtml(page.date)}">${escapeHtml(page.date)}</time>`
+      `<time datetime="${escapeHtml(date)}">${escapeHtml(date)}</time>`
     );
   }
-  if (page.tags.length > 0) {
+  if (tags.length > 0) {
     meta.push(
-      `<ul class="tags">${page.tags
+      `<ul class="tags">${tags
         .map((tag) => `<li>${escapeHtml(tag)}</li>`)
         .join('')}</ul>`
     );
   }
+  return meta.join('\n');
+}
 
-  const home = escapeHtml(relativeIndexLink(page.outputPath));
+function pageContext(page: Page): RenderContext {
+  return {
+    ...page.frontmatter,
+    title: page.title,
+    date: page.date,
+    tags: page.tags,
+    content: page.html,
+    slug: page.slug,
+    sourcePath: page.sourcePath,
+    outputPath: page.outputPath,
+    home: relativeIndexLink(page.outputPath),
+    meta: renderMeta(page.date, page.tags),
+  };
+}
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(page.title)}</title>
-</head>
-<body>
-<header><a href="${home}">Home</a></header>
-<article>
-<h1>${escapeHtml(page.title)}</h1>
-${meta.join('\n')}
-<div class="content">
-${page.html}
-</div>
-</article>
-</body>
-</html>
-`;
+function renderPage(page: Page, engine: TemplateEngine): string {
+  return engine.render(page.template, page.layout, pageContext(page));
 }
 
 function renderIndex(pages: Page[]): string {
@@ -159,8 +162,18 @@ ${items}
 `;
 }
 
+function normalizeName(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export function build(options: BuildOptions): BuildResult {
   const { contentDir, outputDir } = options;
+  const templatesDir = options.templatesDir ?? path.resolve('templates');
+  const engine = new TemplateEngine(templatesDir);
 
   const files = collectMarkdownFiles(contentDir);
   const pages: Page[] = files.map((file) => {
@@ -180,6 +193,9 @@ export function build(options: BuildOptions): BuildResult {
       date: normalizeDate(frontmatter.date),
       tags: normalizeTags(frontmatter.tags),
       html,
+      template: normalizeName(frontmatter.template),
+      layout: normalizeName(frontmatter.layout),
+      frontmatter,
       sourcePath: file,
       outputPath: `${slug}.html`,
     };
@@ -205,7 +221,7 @@ export function build(options: BuildOptions): BuildResult {
   for (const page of pages) {
     const outFile = path.join(outputDir, page.outputPath);
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
-    fs.writeFileSync(outFile, renderPage(page));
+    fs.writeFileSync(outFile, renderPage(page, engine));
   }
 
   const indexPath = path.join(outputDir, 'index.html');

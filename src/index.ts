@@ -9,6 +9,12 @@ export {
   BuildOptions,
   BuildResult,
 } from './builder';
+export {
+  TemplateEngine,
+  RenderContext,
+  DEFAULT_TEMPLATE_NAME,
+  DEFAULT_LAYOUT_NAME,
+} from './templates';
 export { parseArgs, runCli, CliOptions } from './cli';
 
 if (require.main === module) {

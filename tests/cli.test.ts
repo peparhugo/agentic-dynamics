@@ -6,6 +6,7 @@ describe('parseArgs', () => {
     expect(options.command).toBe('');
     expect(options.content).toBe('./content');
     expect(options.output).toBe('./dist');
+    expect(options.templates).toBe('./templates');
   });
 
   it('parses the build command with content and output options', () => {
@@ -45,5 +46,21 @@ describe('parseArgs', () => {
   it('parses the help flag', () => {
     expect(parseArgs(['--help']).command).toBe('help');
     expect(parseArgs(['-h']).command).toBe('help');
+  });
+
+  it('parses the templates option', () => {
+    const options = parseArgs([
+      'build',
+      '--content',
+      'docs',
+      '--output',
+      'site',
+      '--templates',
+      'theme',
+    ]);
+    expect(options.templates).toBe('theme');
+
+    expect(parseArgs(['build', '--templates=theme']).templates).toBe('theme');
+    expect(parseArgs(['build', '-t', 'theme']).templates).toBe('theme');
   });
 });
