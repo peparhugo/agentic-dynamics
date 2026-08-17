@@ -1,5 +1,6 @@
 import { build } from './builder';
 import { startServer } from './server';
+import { loadConfig } from './config';
 
 export interface CliOptions {
   command: string;
@@ -141,10 +142,12 @@ export function runCli(argv: string[]): number {
     return 1;
   }
 
+  const config = loadConfig();
   const result = build({
     contentDir: options.content,
     outputDir: options.output,
     templatesDir: options.templates,
+    plugins: config.plugins,
   });
 
   process.stdout.write(

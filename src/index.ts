@@ -23,6 +23,12 @@ export {
   DevServer,
   LIVE_RELOAD_PATH,
 } from './server';
+export { Plugin } from './plugin';
+export { Engine, EngineOptions } from './engine';
+export { loadConfig, SsgConfig } from './config';
+export { MarkdownPlugin } from './plugins/markdown';
+export { TemplatePlugin } from './plugins/templates';
+export { DevServerPlugin } from './plugins/server';
 
 if (require.main === module) {
   process.exitCode = runCli(process.argv.slice(2));
