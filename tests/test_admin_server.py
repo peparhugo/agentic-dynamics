@@ -203,6 +203,11 @@ def test_matrix_surfaces_live_workflow_phases(monkeypatch):
     body = server.app.test_client().get("/api/matrix").get_json()
 
     assert body["phases"] == {"alpha": {"name": "rerun_contaminated", "index": 4, "total": 7}}
+    # The phase is keyed by the same cell id as the fleet status, so the running
+    # cell "alpha" carries the badge "4/7 rerun_contaminated".
+    assert body["cells"]["alpha"] == "running"
+    phase = body["phases"]["alpha"]
+    assert phase["index"] == 4 and phase["total"] == 7 and phase["name"] == "rerun_contaminated"
 
 
 def test_matrix_ignores_invalid_telemetry_but_preserves_reported_zero(monkeypatch):
