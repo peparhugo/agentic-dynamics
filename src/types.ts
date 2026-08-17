@@ -4,4 +4,6 @@ export interface Page {
   date?: string;
   tags: string[];
   html: string;
+  template?: string;
+  layout?: string;
 }

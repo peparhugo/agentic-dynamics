@@ -6,6 +6,7 @@ describe('parseArgs', () => {
     expect(options.command).toBe('build');
     expect(options.content).toBe('./content');
     expect(options.output).toBe('./dist');
+    expect(options.templates).toBe('./templates');
     expect(options.help).toBe(false);
   });
 
@@ -37,5 +38,11 @@ describe('parseArgs', () => {
     const options = parseArgs(['--content', 'posts']);
     expect(options.command).toBeNull();
     expect(options.content).toBe('posts');
+  });
+
+  it('parses --templates and -t flags', () => {
+    expect(parseArgs(['build', '--templates', 'views']).templates).toBe('views');
+    expect(parseArgs(['build', '-t', 'views']).templates).toBe('views');
+    expect(parseArgs(['build', '--templates=views']).templates).toBe('views');
   });
 });

@@ -47,6 +47,26 @@ Body`);
     expect(content).toBe('# Just a body');
   });
 
+  it('parses template and layout from frontmatter', () => {
+    const { frontmatter } = extractFrontmatter(`---
+title: T
+template: post
+layout: default
+---
+Body`);
+    expect(frontmatter.template).toBe('post');
+    expect(frontmatter.layout).toBe('default');
+  });
+
+  it('leaves template and layout undefined when not specified', () => {
+    const { frontmatter } = extractFrontmatter(`---
+title: T
+---
+Body`);
+    expect(frontmatter.template).toBeUndefined();
+    expect(frontmatter.layout).toBeUndefined();
+  });
+
   it('ignores a --- that is not at the very start of the file', () => {
     const source = 'leading text\n---\ntitle: Nope\n---\n# Body';
     const { frontmatter, content } = extractFrontmatter(source);

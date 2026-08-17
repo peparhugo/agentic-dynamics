@@ -8,6 +8,9 @@ export { renderMarkdown } from './markdown';
 
 export { escapeHtml, renderIndexHtml, renderPageHtml } from './template';
 
+export { createTemplateEngine } from './engine';
+export type { TemplateEngine, PageContext } from './engine';
+
 export { parseArgs, printUsage, run } from './cli';
 export type { CliOptions } from './cli';
 

@@ -4,6 +4,8 @@ export interface Frontmatter {
   title: string;
   date?: string;
   tags: string[];
+  template?: string;
+  layout?: string;
 }
 
 export interface ParsedDocument {
@@ -22,6 +24,13 @@ function dateToString(value: unknown): string | undefined {
   }
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value.toISOString().slice(0, 10);
+  }
+  return undefined;
+}
+
+function optionalString(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
   }
   return undefined;
 }
@@ -56,6 +65,8 @@ export function extractFrontmatter(source: string): ParsedDocument {
       title: typeof raw.title === 'string' ? raw.title : '',
       date: dateToString(raw.date),
       tags: normalizeTags(raw.tags),
+      template: optionalString(raw.template),
+      layout: optionalString(raw.layout),
     },
     content: source.slice(match[0].length),
   };

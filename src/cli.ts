@@ -5,6 +5,7 @@ export interface CliOptions {
   command: string | null;
   content: string;
   output: string;
+  templates: string;
   help: boolean;
 }
 
@@ -13,6 +14,7 @@ export function parseArgs(args: string[]): CliOptions {
     command: null,
     content: './content',
     output: './dist',
+    templates: './templates',
     help: false,
   };
 
@@ -30,6 +32,11 @@ export function parseArgs(args: string[]): CliOptions {
       if (args[i + 1] !== undefined) i += 1;
     } else if (arg.startsWith('--output=')) {
       options.output = arg.slice('--output='.length);
+    } else if (arg === '--templates' || arg === '-t') {
+      options.templates = args[i + 1] ?? options.templates;
+      if (args[i + 1] !== undefined) i += 1;
+    } else if (arg.startsWith('--templates=')) {
+      options.templates = arg.slice('--templates='.length);
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
     }
@@ -47,6 +54,7 @@ export function printUsage(): string {
     'Options:',
     '  --content <dir>, -c <dir>  Markdown content directory (default: ./content)',
     '  --output <dir>,  -o <dir>  Output directory (default: ./dist)',
+    '  --templates <dir>, -t <dir> Template directory (default: ./templates)',
     '  --help, -h                 Show this help message',
   ].join('\n');
 }
@@ -59,7 +67,7 @@ export async function run(argv: string[]): Promise<void> {
     return;
   }
 
-  const result = await buildSite(options.content, options.output);
+  const result = await buildSite(options.content, options.output, options.templates);
   process.stdout.write(`Built ${result.pages.length} page(s) into ${options.output}\n`);
 }
 

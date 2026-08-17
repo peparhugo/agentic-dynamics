@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { extractFrontmatter } from './frontmatter';
 import { renderMarkdown } from './markdown';
-import { renderIndexHtml, renderPageHtml } from './template';
+import { createTemplateEngine } from './engine';
 import type { Page } from './types';
 
 export interface BuildResult {
@@ -45,6 +45,8 @@ export async function readPage(filePath: string, contentDir: string): Promise<Pa
     date: frontmatter.date,
     tags: frontmatter.tags,
     html: renderMarkdown(content),
+    template: frontmatter.template,
+    layout: frontmatter.layout,
   };
 }
 
@@ -68,7 +70,8 @@ function comparePages(a: Page, b: Page): number {
 
 export async function buildSite(
   contentDir: string,
-  outputDir: string
+  outputDir: string,
+  templatesDir = './templates'
 ): Promise<BuildResult> {
   const files = await listMarkdownFiles(contentDir);
 
@@ -78,13 +81,15 @@ export async function buildSite(
   }
   pages.sort(comparePages);
 
+  const engine = await createTemplateEngine(templatesDir);
+
   await fs.mkdir(outputDir, { recursive: true });
-  await fs.writeFile(path.join(outputDir, 'index.html'), renderIndexHtml(pages), 'utf8');
+  await fs.writeFile(path.join(outputDir, 'index.html'), engine.renderIndex(pages), 'utf8');
 
   for (const page of pages) {
     const outPath = path.join(outputDir, `${page.slug}.html`);
     await fs.mkdir(path.dirname(outPath), { recursive: true });
-    await fs.writeFile(outPath, renderPageHtml(page), 'utf8');
+    await fs.writeFile(outPath, engine.renderPage(page), 'utf8');
   }
 
   return { pages, outputDir };
