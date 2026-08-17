@@ -4,7 +4,7 @@ import { Engine } from './engine';
 import { MarkdownPlugin } from './plugins/markdown';
 import { TemplatePlugin } from './plugins/templates';
 
-export { Page, BuildOptions, BuildResult } from './plugin';
+export { Page, BuildOptions, BuildResult, BuildStats } from './plugin';
 export { escapeHtml } from './render';
 
 export function build(options: BuildOptions): BuildResult {
@@ -15,7 +15,14 @@ export function build(options: BuildOptions): BuildResult {
   }
 
   const engine = new Engine(
-    { contentDir: options.contentDir, outputDir: options.outputDir },
+    {
+      contentDir: options.contentDir,
+      outputDir: options.outputDir,
+      templatesDir,
+      incremental: options.incremental,
+      clean: options.clean,
+      cacheFile: options.cacheFile,
+    },
     plugins
   );
 

@@ -8,6 +8,7 @@ export {
   Page,
   BuildOptions,
   BuildResult,
+  BuildStats,
 } from './builder';
 export {
   TemplateEngine,
@@ -26,6 +27,17 @@ export {
 export { Plugin } from './plugin';
 export { Engine, EngineOptions } from './engine';
 export { loadConfig, SsgConfig } from './config';
+export {
+  sha256,
+  hashTemplates,
+  defaultCacheFile,
+  loadManifest,
+  saveManifest,
+  CacheEntry,
+  CacheManifest,
+  CACHE_FILE_NAME,
+  CACHE_VERSION,
+} from './cache';
 export { MarkdownPlugin } from './plugins/markdown';
 export { TemplatePlugin } from './plugins/templates';
 export { DevServerPlugin } from './plugins/server';

@@ -8,6 +8,8 @@ export interface CliOptions {
   output: string;
   templates: string;
   port: number;
+  incremental: boolean;
+  clean: boolean;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -17,6 +19,8 @@ export function parseArgs(argv: string[]): CliOptions {
     output: './dist',
     templates: './templates',
     port: 3000,
+    incremental: false,
+    clean: false,
   };
 
   let i = 0;
@@ -75,6 +79,12 @@ export function parseArgs(argv: string[]): CliOptions {
         options.port = parsed;
       }
       i += 1;
+    } else if (arg === '--incremental') {
+      options.incremental = true;
+      i += 1;
+    } else if (arg === '--clean') {
+      options.clean = true;
+      i += 1;
     } else if (arg === '--help' || arg === '-h') {
       options.command = 'help';
       i += 1;
@@ -97,6 +107,8 @@ Build options:
   --content <dir>     Directory containing Markdown files (default: ./content)
   --output <dir>      Directory to write generated HTML (default: ./dist)
   --templates <dir>   Directory containing templates (default: ./templates)
+  --incremental       Only rebuild pages whose source or template changed
+  --clean             Ignore any existing cache and force a full rebuild
   -h, --help          Show this help message
 
 Serve options:
@@ -148,10 +160,18 @@ export function runCli(argv: string[]): number {
     outputDir: options.output,
     templatesDir: options.templates,
     plugins: config.plugins,
+    incremental: options.incremental,
+    clean: options.clean,
   });
 
   process.stdout.write(
     `Built ${result.pages.length} page(s) to ${result.outputDir}\n`
   );
+  if (options.incremental) {
+    const stats = result.stats;
+    process.stdout.write(
+      `Incremental build: ${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped, ${stats.timeSavedMs}ms saved\n`
+    );
+  }
   return 0;
 }

@@ -19,12 +19,24 @@ export interface BuildOptions {
   outputDir: string;
   templatesDir?: string;
   plugins?: Plugin[];
+  incremental?: boolean;
+  clean?: boolean;
+  cacheFile?: string;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
+  durationMs: number;
+  incremental: boolean;
 }
 
 export interface BuildResult {
   pages: Page[];
   outputDir: string;
   indexPath: string;
+  stats: BuildStats;
 }
 
 export interface Plugin {

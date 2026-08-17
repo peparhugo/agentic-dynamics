@@ -89,4 +89,17 @@ describe('parseArgs', () => {
     expect(options.content).toBe('docs');
     expect(options.output).toBe('site');
   });
+
+  it('parses the --incremental flag', () => {
+    expect(parseArgs(['build', '--incremental']).incremental).toBe(true);
+    expect(parseArgs(['build']).incremental).toBe(false);
+  });
+
+  it('parses the --clean flag', () => {
+    expect(parseArgs(['build', '--clean']).clean).toBe(true);
+    expect(parseArgs(['build', '--incremental', '--clean']).clean).toBe(true);
+    expect(parseArgs(['build', '--incremental', '--clean']).incremental).toBe(
+      true
+    );
+  });
 });
