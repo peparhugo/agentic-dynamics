@@ -1,0 +1,159 @@
+name: rag_scope_emit
+question: >-
+  Make cell isolation real, not accidental. Today the augment seam reads rag_params.repository_id
+  with default "" (falsy), so retrieval.py's repository filter never fires and every augmented cell
+  reads the GLOBAL store — no isolation. This spec (1) defaults the scope to per-cell so the
+  existing filter actually isolates, (2) adds the missing self-build producer — after a phase
+  commits, emit that phase's finding into the cell's OWN scope (opt-in), so "self-built knowledge"
+  becomes testable, and (3) pins the isolation with tests. Control/telemetry (LivePublisher) stays
+  unscoped and observe-only; only the knowledge channel is scoped.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      brief: >-
+        Two channels, two rules. Knowledge (the KB) is scoped per cell: a cell reads/writes only
+        its own repository_id scope, never global, never another cell's. Control/telemetry
+        (LivePublisher + supervisor) flows upward freely and is observe-only — never touched here.
+        The default is per-cell isolation; a shared scope is the explicit opt-in for coordinated
+        parallel workstreams (two worktrees passing the same repository_id). Do NOT weaken the
+        constructor's no-fork stance or the authority ordering.
+      isolation: >-
+        Redis 6380 DB 2 only; Neo4j MERGE-only; Chroma knowledge_chunks_v1 only. Never 6379, never
+        DB 1. The self-build emit is opt-in and scoped — verify no cross-scope write before
+        finishing.
+      prior_art:
+        - src/instrument/workflow_runner.py  # _augment_prompt + run_workflow (the seam + rag_params)
+        - src/instrument/retrieval.py        # retrieve() repository_id/acl_scope filter (lines ~1058)
+        - src/instrument/knowledge_ingestion.py # derive_records / record_to_artifact / record_to_event
+        - src/instrument/knowledge_stream.py # publish_event (the write choke-point)
+        - scripts/kb_produce.py              # the batch producer (the OTHER authorized writer)
+    phases:
+      - name: retrieve
+        kind: agent
+        prompt: >
+          Fix the lexical leg so the KB is actually retrievable. Smoke-tested and confirmed broken:
+          graph.py:57 creates `CREATE FULLTEXT INDEX step_text_ft ... FOR (s:Step) ON EACH [s.text]`,
+          and retrieval.py's lexical leg calls search_fulltext on it — so it returns OLD experiment
+          reasoning steps (authority ADVISORY), never the Knowledge findings/code/policy we ingested.
+          The KB is invisible to the lexical leg.
+
+          REQUIREMENTS:
+          - graph.py create_knowledge_schema(): ADD a second full-text index over the KB records,
+            e.g. `CREATE FULLTEXT INDEX knowledge_text_ft IF NOT EXISTS FOR (k:Knowledge) ON EACH
+            [k.text]`. Keep step_text_ft as-is (do not break the Step path).
+          - graph.py: add search_knowledge_fulltext(...) that queries knowledge_text_ft and returns
+            Knowledge nodes (their knowledge_id/entity_id/text/authority/source_type/commit_sha),
+            mirroring search_fulltext's shape but over Knowledge.text.
+          - retrieval.py: point the lexical leg at search_knowledge_fulltext (NOT search_fulltext), so
+            the lexical candidates are KB records, not reasoning steps.
+          - Verify with the direct smoke: retrieve("build a task manager API...") must now return
+            Knowledge findings/code (authority MEASURED/SOURCE/POLICY), not Step reasoning (ADVISORY).
+
+          TESTS: extend tests/test_graph.py (knowledge full-text index exists + search returns Knowledge
+          nodes) and tests/test_retrieval.py (lexical leg returns Knowledge records, not Steps). Run green.
+      - name: scope
+        kind: agent
+        prompt: >
+          Thread the per-cell scope so the existing retrieval filter actually isolates.
+
+          TODAY: workflow_runner.py reads `repository_id=str(rag_params.get("repository_id", ""))`;
+          "" is falsy so retrieval.py's `if filters.get("repository_id"):` never fires and every
+          augmented cell reads the GLOBAL store. The scope fields exist but nothing sets a per-cell
+          default.
+
+          REQUIREMENTS:
+          - Add a helper (e.g. workflow_runner.cell_scope(workdir) -> str) that returns the cell's
+            scope: f"self-{workdir.name}" (the worktree basename = the cell identity), overridden by
+            FINOPS_CELL_ID when set.
+          - In run_workflow, when rag_augment is enabled and rag_params.repository_id is empty,
+            default repository_id (and acl_scope) to the cell scope BEFORE building retrieve_fn.
+            An explicitly non-empty rag_params.repository_id is PRESERVED — that is the shared-scope
+            override for coordinated parallel workstreams (document this).
+          - Document the invariant in the module docstring: default = per-cell; shared = explicit
+            repository_id; the empty scope must never again mean "global".
+
+          TESTS: tests/test_workflow_runner.py — cell_scope returns self-<worktree>; empty
+          rag_params.repository_id resolves to the per-cell scope; explicit repository_id is
+          preserved unchanged. Run green.
+      - name: emit
+        kind: agent
+        prompt: >
+          Add the self-build producer: after a phase commits, emit that phase's finding into the
+          cell's OWN scope. This is the "progressive" path that does not exist yet, and it must be
+          opt-in and scoped.
+
+          READ FIRST: knowledge_ingestion.py (record_to_artifact/record_to_event), knowledge_stream.py
+          (publish_event), workflow_runner.py (the phase loop + _git_commit), PhaseResult fields.
+
+          REQUIREMENTS:
+          - knowledge_ingestion.py: add derive_phase_record(phase_result, *, goal, repository_id,
+            revision, now=None) -> KnowledgeRecord — a one-line finding for a completed phase
+            ("<goal[:40]> phase <phase> -> test_executed_success <bool>, cost $<c>, tokens <n>").
+            authority: MEASURED when test_executed_success is True/False (independently measured);
+            ADVISORY when it is None (self-report, unverified). source_type="finding",
+            logical_locator = the cell scope, commit_sha = the phase's commit. Reuse record_to_artifact
+            (content_hash = sha256(artifact)) and the canonical identity.
+          - knowledge_ingestion.py: add emit_phase_finding(phase_result, *, goal, repository_id,
+            revision, now=None) that derives the record, writes its artifact, and publish_event's it
+            — scoped to repository_id (never global).
+          - knowledge_stream.py: add the WRITE GUARD — publish_event raises RuntimeError unless the
+            writer is authorized (an env flag FINOPS_KB_WRITE=1, or an explicit authorized= kwarg —
+            your call, document it). kb_produce.py sets it; the emit_self path sets it for the
+            duration of the emit only.
+          - workflow_runner.py: after each phase's _git_commit, if rag_params.get("emit_self") is
+            true, call emit_phase_finding with the cell scope + the phase's commit. Default OFF —
+            only the "self-built" arm opts in.
+          - Idempotent: knowledge_id = f(goal, phase, commit, scope, extractor) so re-emitting the
+            same phase is a no-op.
+
+          TESTS: tests/test_knowledge_ingestion.py — derive_phase_record authority flips on
+          test_executed_success None vs bool; emit scoped to repository_id; publish_event raises
+          without the write flag; emit idempotent. Run green.
+      - name: isolation
+        kind: agent
+        prompt: >
+          Pin the isolation with tests — the thing the whole spec exists for.
+
+          REQUIREMENTS:
+          - tests/test_retrieval.py (or a new tests/test_knowledge_isolation.py): two scopes (self-a,
+            self-b); retrieval scoped to self-a returns NO candidate whose repository_id is self-b
+            (and vice versa), even when both scopes hold findings with near-identical text.
+          - tests/test_workflow_runner.py: with rag_augment on and no explicit scope, the retrieval
+            built by the seam is scoped to the cell (not global); with an explicit repository_id, it
+            is that shared scope.
+          - A structural test: the retrieve -> construct -> render path references publish_event
+            ZERO times (grep the call graph or assert on the module), so the augment path can never
+            write except through emit_self.
+          Run all green.
+      - name: verify
+        kind: agent
+        prompt: >
+          Scoped verification — do NOT run the full pytest suite. Run
+          tests/test_workflow_runner.py tests/test_knowledge_ingestion.py tests/test_retrieval.py
+          tests/test_knowledge_stream.py tests/test_knowledge.py -q, plus an import smoke. Re-assert
+          the default-off path (rag_augment=False) is byte-identical. Leave green.
+      - name: docs
+        kind: agent
+        prompt: >
+          Sync the agent-facing surfaces (standard closing step — do not skip). Update BOTH surfaces
+          in lockstep (.opencode/instructions/mental-model.md AND .claude/rules/mental-model.md):
+          document the two-channel rule (knowledge = per-cell repository_id scope, default self-<cell>;
+          control/telemetry = LivePublisher, unscoped, observe-only), the self-build emit (opt-in
+          rag_params.emit_self, scoped, authority MEASURED when test_executed_success else ADVISORY),
+          and the publish_event write guard. Update src/instrument/CONTEXT.md (Runtime RAG section)
+          and scripts/CONTEXT.md accordingly. Keep both surfaces in lockstep.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 6.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
