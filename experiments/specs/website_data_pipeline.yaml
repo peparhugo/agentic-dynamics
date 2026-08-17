@@ -1,0 +1,133 @@
+name: website_data_pipeline
+question: >-
+  Single-model (DeepSeek) design pass: how should this repo handle its data better for building and
+  updating the public website (firebase/public + data.js) as new findings arrive? New findings now
+  flow from many sources — the measured corpus (_results_summary.json), the 19 active lab books, the
+  six peer reviews, the runtime-RAG knowledge base (finding/code/report/policy records), and the
+  routing/KB experiment grids — yet the website build path (pipeline deploy -> sync_data ->
+  build_data -> data.js -> hand-written prose) predates most of them. The output is a proposal: the
+  current data flow (with file:line), where findings are dropped or go stale, a concrete better
+  pipeline, and how the website prose stays provenance-grounded ([M]/[C]/[H]/[X]/[P]) as it is
+  regenerated.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      brief: >-
+        This is a DESIGN pass, not a rewrite. Map the existing website data pipeline exactly, then
+        propose how to make it absorb new findings (KB records, lab books, reviews, routing/KB grid
+        results) without breaking the provenance discipline or the dual-host deploy. The website is
+        served from TWO Firebase projects (ai-finops-rulebook canonical + agentic-dynamics mirror)
+        out of the SAME firebase/public/ — they must never drift. Every claim in the proposal must
+        cite file:line.
+      provenance: >-
+        The Editor discipline is load-bearing: every website claim is grounded in data.js /
+        _results_summary.json / reviews, tagged [M] measured, [C] computed, [H] heuristic, [X]
+        external, [P] policy/prior. Any proposed pipeline must preserve (or improve) this grounding —
+        never let regenerated prose become ungrounded.
+      prior_art:
+        - scripts/pipeline.py           # --plan deploy (refresh -> sync -> build -> deploy)
+        - scripts/build_data.py         # builds firebase/public/data.js
+        - scripts/sync_data.py          # story results -> parquet (before build_data)
+        - scripts/inventory.py          # the experiment inventory (inventory.json)
+        - scripts/generate_manifest.py  # data_manifest.json (schema version, hashes, commit)
+        - scripts/analyze_worktrees.py / analyze_trajectories.py  # post-hoc analysis -> game reports
+        - experiments/results/_results_summary.json   # the aggregate measured corpus
+        - experiments/lab_books/*.md    # 20 lab book plans; 19 active scripts/lab_*.py
+        - experiments/reviews/*.md      # 6 peer reviews
+        - src/instrument/retrieval.py   # build_evidence_cards (the finding unit)
+        - src/instrument/knowledge_ingestion.py  # derive_records / derive_phase_record (the KB producers)
+        - firebase/public/data.js       # the site data the prose reads
+        - firebase/public/*.html        # the hand-written, provenance-tagged prose
+    phases:
+      - name: survey
+        kind: agent
+        prompt: >
+          Map the current website data pipeline end-to-end, and find where new findings are dropped
+          or go stale. Write docs/data_pipeline_survey.md.
+
+          GOAL:
+          {goal}
+
+          PART A — THE PIPELINE (read the code, cite file:line for every claim):
+          - Trace pipeline.py --plan deploy: refresh -> sync -> build -> deploy. What does each stage
+            actually read and write?
+          - scripts/build_data.py: what does data.js contain, and what is its exact source (inventory?
+            _results_summary.json? lab books? reviews?)? List the fields.
+          - scripts/sync_data.py (story results -> parquet) and scripts/inventory.py refresh: what do
+            they normalize, and what is inventory.json's role?
+          - scripts/generate_manifest.py: what provenance (schema version, file hashes, git commit)
+            does the manifest carry, and is it wired into the deploy?
+          - scripts/analyze_worktrees.py / analyze_trajectories.py: where do game reports and
+            trajectory aggregates land, and are they surfaced on the site?
+
+          PART B — WHERE NEW FINDINGS ARE DROPPED OR STALE:
+          - The runtime-RAG KB (finding/code/report/policy records) is a NEW data plane that the
+            website knows nothing about. Is any KB-derived finding visible on the site? Where should
+            it be?
+          - The 19 active lab books and 6 reviews produce analyses — does build_data.py consume their
+            outputs, or are they disconnected?
+          - The routing/KB grids (routing_kb_more_itertools et al.) will produce task-level findings
+            with task labels — do those flow into data.js, or does the site only reflect the
+            perturbation corpus?
+          - Identify every point where a finding exists on disk/Redis but never reaches data.js or the
+            prose.
+
+          DELIVER docs/data_pipeline_survey.md: (1) pipeline map with file:line, (2) data.js schema,
+          (3) the dropped/stale findings list, (4) open questions for the design phase.
+      - name: design
+        kind: agent
+        prompt: >
+          Design the better data-handling pipeline. Write docs/data_pipeline_design.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DESIGN REQUIREMENTS (your own choices — defend them):
+          1. The target data flow — from raw results + KB records + lab books + reviews to a data.js
+             that the prose can ground on. Which sources feed which site sections, and how is each
+             kept fresh?
+          2. Freshness + automation — what triggers a rebuild (new grid cells? new lab book runs? a KB
+             emit?), and what the incremental vs full rebuild split is.
+          3. Provenance — how every regenerated number keeps its [M]/[C]/[H]/[X]/[P] tag and a
+             pointer to its source (file + commit), so the prose stays grounded.
+          4. The dual-host invariant — how a deploy stays in sync across ai-finops-rulebook and
+             agentic-dynamics, and how a partial/new-finding update can't drift the two.
+          5. Concrete changes — which existing script is extended vs replaced; a build order; and the
+             smallest change that yields the biggest freshness win.
+
+          DELIVER docs/data_pipeline_design.md: (1) the target flow, (2) freshness/automation triggers,
+          (3) provenance mechanism, (4) dual-host invariant, (5) concrete change list in build order.
+      - name: proposal
+        kind: agent
+        prompt: >
+          Consolidate into a final proposal + integration plan. Write docs/data_pipeline_proposal.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DELIVER docs/data_pipeline_proposal.md: (1) executive summary, (2) the current-vs-target
+          data flow (referencing your survey + design), (3) the concrete changes in build order with
+          file:line anchors, (4) how the provenance discipline is preserved, (5) how the dual-host
+          stays in sync, (6) risks and what to measure (e.g. a "findings reach the site" freshness
+          metric). Keep every claim file:line-cited.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: files_created, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 6.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
