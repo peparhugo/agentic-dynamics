@@ -73,6 +73,7 @@ from instrument.queue_reinterleave import (
     reinterleave_cells,
     write_queue,
 )
+from instrument.pipeline_status import stage_summary
 
 try:  # Package imports under pytest and WSGI.
     from admin.claude_agents_client import (
@@ -751,54 +752,14 @@ def _retained_telemetry(redis_client, cell_ids) -> dict[str, Any]:
     }
 
 
-def _stage_summary(
-    redis_client,
-    queue_key: str,
-    status_key: str,
-    results_key: str | None = None,
-) -> dict[str, Any]:
-    """Summarize one pipeline stage from its queue list + status hash.
-
-    ``status_key`` is a hash of ``id -> status``; ``queue_key`` is the list
-    backing the workers' BRPOP. Only the execute stage has a ``results_key``
-    (``story_results``); the post-hoc stages pass ``None`` and get
-    ``results_saved=None`` so the field reads as "not applicable" rather than
-    a fabricated zero.
-
-    A ``retry_`` status prefix (the review worker re-enqueues a failed job as
-    ``retry_N``) is reported separately in ``retry`` and also folded into
-    ``running`` — a job awaiting retry is still in flight, not terminal.
-    """
-    statuses = redis_client.hgetall(status_key)
-    counts: dict[str, int] = {}
-    for status in statuses.values():
-        counts[status] = counts.get(status, 0) + 1
-    retry = sum(value for key, value in counts.items() if key.startswith("retry_"))
-    running = counts.get("running", 0) + retry
-    completed = counts.get("done", 0) + counts.get("failed", 0) + counts.get("timeout", 0)
-    return {
-        "total": len(statuses),
-        "remaining_in_queue": redis_client.llen(queue_key),
-        "queued": counts.get("queued", 0),
-        "running": running,
-        "done": counts.get("done", 0),
-        "failed": counts.get("failed", 0),
-        "timeout": counts.get("timeout", 0),
-        "retry": retry,
-        "completed": completed,
-        "results_saved": len(redis_client.hgetall(results_key)) if results_key else None,
-        "cells": statuses,
-    }
-
-
 @app.get("/api/matrix")
 def api_matrix() -> Response:
     """Return the legacy fleet matrix plus the three-stage pipeline view."""
     try:
         r = _redis()
-        execute = _stage_summary(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY)
-        analyze = _stage_summary(r, ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY)
-        review = _stage_summary(r, REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY)
+        execute = stage_summary(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY)
+        analyze = stage_summary(r, ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY)
+        review = stage_summary(r, REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY)
     except Exception:
         return jsonify({"error": "redis_unavailable", "cells": {}}), 503
 

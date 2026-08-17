@@ -12,8 +12,12 @@ import os
 import sys
 import time
 from collections import Counter
+from pathlib import Path
 
 import redis
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from instrument.pipeline_status import stage_summary
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -47,37 +51,11 @@ def _parse_cell_id(cell_id: str) -> tuple[str, str, str, str]:
     return model, story, tier, condition
 
 
-def _stage_counts(r: redis.Redis, queue_key: str, status_key: str, results_key: str | None = None) -> dict:
-    """Summarize one pipeline stage from its queue list + status hash.
-
-    ``retry_``-prefixed statuses (the review worker re-enqueues a failed job
-    as ``retry_N``) are reported separately in ``retry`` and folded into
-    ``running``, since a job awaiting retry is still in flight.
-    """
-    statuses = r.hgetall(status_key)
-    counts = Counter(statuses.values())
-    retry = sum(value for key, value in counts.items() if key.startswith("retry_"))
-    running = counts.get("running", 0) + retry
-    return {
-        "total": len(statuses),
-        "remaining_in_queue": r.llen(queue_key),
-        "queued": counts.get("queued", 0),
-        "running": running,
-        "done": counts.get("done", 0),
-        "failed": counts.get("failed", 0),
-        "timeout": counts.get("timeout", 0),
-        "retry": retry,
-        "completed": counts.get("done", 0) + counts.get("failed", 0) + counts.get("timeout", 0),
-        "results_saved": len(r.hgetall(results_key)) if results_key else None,
-        "cells": statuses,
-    }
-
-
 def get_status(r: redis.Redis) -> dict:
     """Get current experiment status across all three pipeline stages."""
-    execute = _stage_counts(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY)
-    analyze = _stage_counts(r, ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY)
-    review = _stage_counts(r, REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY)
+    execute = stage_summary(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY)
+    analyze = stage_summary(r, ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY)
+    review = stage_summary(r, REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY)
 
     # Keep the legacy flat fields + story breakdowns so existing consumers of
     # ``--json`` keep working; the ``stages`` block is purely additive.
