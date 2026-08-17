@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>The Story — Agentic Dynamics</title>
-<meta name="description" content="How a $20 API key exposed a value-measurement gap and broadened an AI FinOps question into Agentic Dynamics, behind 249 sessions, 8 models, and 224 game reports.">
+<meta name="description" content="How a $20 API key exposed a value-measurement gap and broadened an AI FinOps question into Agentic Dynamics — from a personal anecdote to 772 story sessions, 7 models, 344 perturbation game reports, and a worker that healed its own data.">
 <meta property="og:title" content="The Story — Agentic Dynamics">
 <meta property="og:description" content="The Agentic Dynamics discovery story: how a $20 API key exposed a gap between success and durable value">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/story.html">
@@ -61,34 +61,34 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>But I had a few things I wanted to tinker with while I was away. So I did something I'd never done before: I loaded $20 USD onto the DeepSeek v4 API and pointed my tooling at it. Twenty dollars. That's less than I'd spend on a single lunch in Rome.</p>
 
-<p>That was weeks ago. I burned through <span data-stat="deepseek_cost">$2.04</span> in DeepSeek experiment costs — plus personal sessions, under $13 total for weeks of experimentation.</p>
+<p>That first stretch was weeks ago. It cost under $13 total for weeks of experimentation. The research program it became has, as of today, spent $<span data-stat="cost">219.51</span> across every model — of which DeepSeek accounts for $<span data-stat="deepseek_cost">7.37</span>. The numbers below are live: they describe the corpus as it stands right now, not just that first Italy trip.</p>
 
 <div class="stats-grid">
-<div class="stat-card"><div class="v">3</div><div class="l">Models Tested</div></div>
-<div class="stat-card"><div class="v">347</div><div class="l">Instrumented Sessions</div></div>
-<div class="stat-card"><div class="v amber">$<span data-stat="cost">12.54</span></div><div class="l">Total Research Cost</div></div>
-<div class="stat-card"><div class="v cyan"><span data-stat="costgap">17&times;</span></div><div class="l">Measured Cost Gap</div></div>
+<div class="stat-card"><div class="v">3</div><div class="l">Models Tested (that first week)</div></div>
+<div class="stat-card"><div class="v"><span data-stat="variants">7</span></div><div class="l">Models Tested (today)</div></div>
+<div class="stat-card"><div class="v amber">$<span data-stat="cost">219.51</span></div><div class="l">Total Research Cost (live)</div></div>
+<div class="stat-card"><div class="v cyan"><span data-stat="costgap">23&times;</span></div><div class="l">Measured Cost Gap</div></div>
 </div>
 
 <h2>The cost gap demanded an explanation.</h2>
 
-<p>In the time it took me to burn through $12.73, I:</p>
+<p>In the time it took me to burn through that first $12.73, I:</p>
 
 <div class="highlight">
 <ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
 <li>&rarr; Completely overhauled and refactored a Dreamlab exploratory codebase — the one that eventually became this research instrument</li>
 <li>&rarr; Built a greenfield project for downloading videos, generating subtitles, cutting them into shorts, and publishing to YouTube</li>
-<li>&rarr; Ran every experiment in the Agentic Dynamics corpus — 224 game reports across 8 models</li>
+<li>&rarr; Ran the first wave of experiments toward what's now a 344-game-report, 205-worktree perturbation corpus across 7 active models</li>
 <li>&rarr; Wrote this entire website — the instrument, the principles, the calculator, the methodology page</li>
 <li>&rarr; Debugged production issues, explored architecture decisions, refactored storage layers, and built collaboration features</li>
 </ul>
 </div>
 
 <div class="stats-grid">
-<div class="stat-card"><div class="v">347</div><div class="l">Total Sessions</div></div>
-<div class="stat-card"><div class="v amber">$<span data-stat="cost">12.54</span></div><div class="l">All-Model Experiment Cost</div></div>
-<div class="stat-card"><div class="v">$12.73</div><div class="l">DeepSeek Spend</div></div>
-<div class="stat-card"><div class="v amber"><span data-stat="claude_cost">$4.64</span></div><div class="l">Claude Sonnet 5 Spend</div></div>
+<div class="stat-card"><div class="v"><span data-stat="story_sessions">772</span></div><div class="l">Story Sessions (live)</div></div>
+<div class="stat-card"><div class="v amber">$<span data-stat="cost">219.51</span></div><div class="l">All-Model Experiment Cost (live)</div></div>
+<div class="stat-card"><div class="v">$12.73</div><div class="l">DeepSeek Spend (that first week)</div></div>
+<div class="stat-card"><div class="v amber"><span data-stat="claude_cost">$97.93</span></div><div class="l">Claude Spend (live, Haiku+Sonnet)</div></div>
 </div>
 
 <blockquote>
@@ -109,7 +109,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p>The measurement produced two dimensions:</p>
 <div class="highlight" style="padding:1.3rem">
 <ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
-<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: 11%. DeepSeek: 8%. GPT-5-nano: 14%. (Single-session perturbation experiment, 227 runs.)</li>
+<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: 11%. DeepSeek: 8%. Nano-class models: up to 14%. (Single-session perturbation experiment, 344 game reports.)</li>
 <li><strong style="color:var(--cy)">Recovery cost:</strong> When the model DOES succeed, how much extra does it cost to work through the confusion? DeepSeek: negligible narration overhead. Claude: 8.5% narration penalty on successful sessions, plus 11% flail rate. (Single-session perturbation experiment.)</li>
 </ul>
 </div>
@@ -145,7 +145,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p><strong>Campaign — change one variable and repeat.</strong> Running sessions at scale is itself a measurement problem. The queue got wiped twice because the sessions I was running deleted the lab. SonarQube processes one analysis at a time, so I stood up four. Sessions time out mid-story and must resume without losing attribution. None of this is the finding; all of it is required to make repeated comparisons possible.</p>
 </div>
 
-<p><strong>The payoff is information, not session volume.</strong> Over 2,000 sessions — 1,097 story-building runs across 221 cells and seven models, plus 911 independent reviews — made cost and verification differences visible on the same linked work. That evidence can support a proposed policy; only a controlled grid can establish whether the policy improves value.</p>
+<p><strong>The payoff is information, not session volume.</strong> Over 1,500 sessions — 772 story-building runs across 156 cells and seven models, plus 1,199 independent commit reviews and 240 story reviews — made cost and verification differences visible on the same linked work. That evidence can support a proposed policy; only a controlled grid can establish whether the policy improves value.</p>
 
 <blockquote>
 "The outcome of one session is the starting point of the next. Measure it before deciding how to route it."
@@ -209,6 +209,38 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>The immediate record answers <strong>"what did we spend last month?"</strong> The modeled question asks <strong style="color:var(--ac)">"what will we spend over the next 3 years?"</strong> Under modeled assumptions, the N&sup2; term describes how inherited codebase growth can affect cumulative cost; it remains one hypothesis to test, not a measured forecast.</p>
 
+<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 5 &middot; What Happened Next — Remediation and Self-Healing</div>
+
+<h2>The instrument found its own broken data — and fixed it.</h2>
+
+<p>The compiler's "measure before policy" rule is a good discipline for humans. It turned out to be something else entirely once an agent was handed the same rule as a goal.</p>
+
+<p>By August 2026, the ledger had a known gap: four fields the policy arms needed — <code>confidence</code>, <code>perturbation_strength</code>, <code>test_executed_success</code>, and the answer/explanation token split — had never been instrumented. Some existing cells were contaminated in ways nobody had gone back to fix: 16 cells still carried the retired <code>manifold</code>/<code>semantic</code> taxonomy label instead of the current 3-way classification, and up to 85 <code>early_degrade</code>/<code>late_degrade</code> cells turned out to have a mutation compiler that had silently fallen back to a clean, unperturbed run instead of actually degrading the spec.</p>
+
+<p>On 2026-08-15, I gave an <code>agent_task</code> workflow a single high-level goal — instrument the missing fields, recompute the derived metrics, and re-run whatever turned out to be contaminated — and let it run as an async worker in its own git worktree, with no per-step steering. It did four things, in order, entirely on its own:</p>
+
+<div class="highlight">
+<ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
+<li>&rarr; <strong>Scoped the damage.</strong> It diagnosed the repository's own data contamination and wrote a re-run inventory — the 16 stale-taxonomy cells, the ~85 fallback-to-clean cells, and a set of wrong-baseline cells — as a plan document, not a memory it would forget.</li>
+<li>&rarr; <strong>Healed the instrumentation.</strong> It added <code>confidence</code>, <code>perturbation_strength</code>, <code>test_executed_success</code>, and the answer/explanation split to the ledger schema and the result parsers — the exact fields the policy arms had been blocked on.</li>
+<li>&rarr; <strong>Recomputed the derived metrics</strong> from the existing worktrees and database, without re-running anything that didn't need it.</li>
+<li>&rarr; <strong>Authored and executed a new experiment.</strong> It decided which ~33 contaminated story cells needed a re-run, enqueued them to the Redis queue, and spawned 8 parallel workers across three providers to drain it. The queue went from 142 to 175 jobs; <code>queued</code> went from 0 to 67; <code>running</code> went from 1 to 7.</li>
+</ul>
+</div>
+
+<p>Nobody wrote that re-run script. I didn't tell it how many workers to spawn or which cells were contaminated — I told it the codebase's own measure-before-policy rule was unsatisfied and asked it to fix that. It read the same gate the compiler enforces, decided what "fixed" meant, and went and did it.</p>
+
+<div class="callout">
+<div class="icon">&#9888;</div>
+<p><strong>The one thing it had to get right:</strong> eight workers all pulling one provider's queue would burn through that provider's rate limit in minutes — a self-DoS, not a self-heal. The re-run had to enqueue with <code>--interleave</code> so the load round-robins across providers. That's now a hard constraint on any future self-recommending experiment, not a nice-to-have.</p>
+</div>
+
+<p>The spec/compiler design always reserved an <code>adapt</code> phase — observe the corpus, propose the next experiment, run it, measure the delta — as future work. What actually happened was a primitive version of that loop emerging on its own, inside a phase nobody had labeled "adapt." The architecture that made it possible isn't exotic: the spec is declarative (a goal plus constraints, not a script), the load-bearing rule made "what's unmeasured" a compiler-checkable fact instead of a remembered TODO, and the queue is just the ordinary execution substrate — enqueuing and draining is something any session can do, including one whose job is fixing the corpus it's about to be measured against.</p>
+
+<blockquote>
+"We handed an async worker a task, and it self-healed its own knowledge base and wrote a new experiment to do it."
+</blockquote>
+
 <div style="text-align:center;margin:2rem 0">
 <a href="/" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s">Follow the Discovery &rarr;</a>
 </div>
@@ -218,8 +250,8 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <div style="text-align:center;margin:2rem 0"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
 
 <footer>
-<strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-<span data-stat="sessions">347</span> story sessions · <span data-stat="variants">3</span> models · <span data-stat="stories_total">71</span> stories · $<span data-stat="cost">12.54</span> measured<br>
+<strong>Agentic Dynamics · v1.0 · August 2026</strong><br>
+<span data-stat="sessions">772</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">156</span> stories · $<span data-stat="cost">219.51</span> measured<br>
 <a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> ·
   <a href="/">Home</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>

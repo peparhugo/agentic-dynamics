@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Agentic Dynamics — No Universal Best Practices</title>
-<meta name="description" content="There are no universal AI best practices — only agent-environment systems. Agentic Dynamics measures that collision across 1,097 sessions and 7 models.">
-<meta property="og:title" content="Agentic Dynamics — No Universal Best Practices">
-<meta property="og:description" content="No universal best practices. Only agent-environment systems. Agentic Dynamics measures the collision, from 1,097 sessions and 7 models.">
+<title>Agentic Dynamics — AI Agents Don't Have a Price, They Have Dynamics</title>
+<meta name="description" content="AI agents don't have a price — they have dynamics. Cost, reliability, and debt are properties of how an agent behaves under change. Agentic Dynamics measured that across 772 story sessions and 7 models.">
+<meta property="og:title" content="Agentic Dynamics — AI Agents Don't Have a Price, They Have Dynamics">
+<meta property="og:description" content="Cost, reliability, and debt are properties of how an agent behaves under change, not a rate card. Measured across 772 story sessions, 7 models, 10 perturbation operators.">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
@@ -15,45 +15,26 @@
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-.home-hero h1{max-width:780px;font-size:clamp(1.9rem,4.2vw,3.2rem)}
+.home-hero h1{max-width:820px;font-size:clamp(1.9rem,4.2vw,3.2rem)}
 .hero-actions{display:flex;gap:0.8rem;flex-wrap:wrap;margin-top:1.5rem}
 .source-note{display:inline-flex;align-items:center;gap:0.5rem;margin-top:1.1rem;padding:0.55rem 0.8rem;border:1px solid var(--b);border-radius:999px;color:var(--t3);font-size:0.76rem;background:rgba(16,23,34,0.68)}
 .source-note strong{color:var(--t2)}
-.lever-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
-.lever-card{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:18px;padding:1.2rem;text-align:left}
-.lever-card .lever-name{font-family:'JetBrains Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--am);margin-bottom:0.7rem}
-.lever-card .lever-measure{font-weight:800;color:var(--t);font-size:1rem;margin-bottom:0.45rem;letter-spacing:-0.02em}
-.lever-card p{font-size:0.84rem;margin:0;color:var(--t2)}
-.mechanism-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
-.mechanism{display:flex;flex-direction:column;min-height:100%;background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:18px;padding:1.2rem;text-align:left}
-.mechanism .num{font-family:'JetBrains Mono',monospace;font-size:0.78rem;font-weight:800;color:var(--ac);margin-bottom:0.75rem}
-.mechanism h3{margin:0 0 0.5rem;font-size:1rem}.mechanism p{margin:0;font-size:0.83rem;color:var(--t2);line-height:1.6}
-.cost-contrast{display:grid;grid-template-columns:minmax(0,0.75fr) minmax(320px,1fr);gap:1.4rem;align-items:stretch;margin-top:1.5rem}
-.cost-panel{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:22px;padding:1.4rem;text-align:left;box-shadow:var(--panel-shadow)}
-.cost-panel h3{font-family:'JetBrains Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--t3);margin:0 0 1rem}
-.model-row{display:grid;grid-template-columns:1fr auto auto;gap:1rem;align-items:center;padding:0.85rem 0;border-bottom:1px solid var(--b);font-size:0.86rem;color:var(--t2)}
-.model-row:last-child{border-bottom:none}.model-row strong{color:var(--t)}.model-row .price{font-family:'JetBrains Mono',monospace;color:var(--ac);font-weight:800}.model-row .high{color:var(--am)}
-.route-panel{border:1px solid var(--ba);border-left:4px solid var(--ac);border-radius:0 18px 18px 0;padding:1.25rem;background:rgba(34,211,238,0.045);text-align:left}
-.route-panel p{margin:0;color:var(--t2);font-size:0.94rem}.route-panel strong{color:var(--t)}
-.pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.6rem;margin:1.5rem 0}
-.pipe-step{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0.9rem;text-align:center;font-size:0.72rem;color:var(--t2)}
-.pipe-step .ps-label{font-weight:700;color:var(--ac);font-size:0.7rem;margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:0.5px}
+.dynamics-table{width:100%;border-collapse:collapse;margin:1.2rem 0;font-size:0.86rem}
+.dynamics-table th,.dynamics-table td{padding:0.7rem 0.9rem;border-bottom:1px solid var(--b);text-align:left;vertical-align:top}
+.dynamics-table th{color:var(--t3);font-family:'JetBrains Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em}
+.dynamics-table td:first-child{color:var(--ac);font-weight:700;white-space:nowrap}
+.dynamics-table td{color:var(--t2)}
 .finding{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:14px;padding:1.3rem;margin:0.8rem 0;text-align:left}
-.finding .fn{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--ac);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem}
-.finding h3{font-size:0.95rem;margin:0 0 0.3rem;color:var(--t)}
-.finding p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
-.op-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.8rem;margin:1rem 0}
-.op-card{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1rem;text-align:left}
-.op-card h4{font-size:0.78rem;color:var(--t);margin:0 0 0.4rem}
-.op-card ul{list-style:none;padding:0;margin:0}
-.op-card li{font-size:0.7rem;color:var(--t2);padding:0.15rem 0}
-body.light .source-note,body.light .lever-card,body.light .mechanism,body.light .cost-panel,body.light .finding,body.light .op-card,body.light .pipe-step{background:linear-gradient(180deg,#ffffff,#f8fafc)}
-body.light .route-panel{background:rgba(34,211,238,0.08)}
+.finding .fn{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--ac);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;display:flex;gap:0.5rem;align-items:center}
+.finding .fn .tag{background:rgba(34,211,238,0.12);border:1px solid var(--ba);border-radius:999px;padding:0.05rem 0.5rem;color:var(--ac);font-weight:700}
+.finding h3{font-size:0.98rem;margin:0 0 0.35rem;color:var(--t)}
+.finding p{font-size:0.84rem;color:var(--t2);line-height:1.6;margin:0}
+.finding .src{display:block;margin-top:0.5rem;font-size:0.68rem;color:var(--t3);font-family:'JetBrains Mono',monospace}
 .field-map{margin:0}
 .field-map img{display:block;width:100%;max-width:760px;height:auto;margin:0 auto;border-radius:18px;border:1px solid var(--b)}
 .field-map figcaption{font-size:0.8rem;color:var(--t3);text-align:center;margin-top:0.75rem}
-@media(max-width:900px){.lever-grid,.mechanism-grid,.cost-contrast,.op-grid{grid-template-columns:1fr}.mechanism-grid{gap:0.8rem}}
-@media(max-width:768px){.hero-actions{flex-direction:column}.hero-actions .cta-btn{justify-content:center}.source-note{border-radius:14px;align-items:flex-start}.model-row{grid-template-columns:1fr;gap:0.25rem}}
+body.light .source-note,body.light .finding{background:linear-gradient(180deg,#ffffff,#f8fafc)}
+@media(max-width:768px){.hero-actions{flex-direction:column}.hero-actions .cta-btn{justify-content:center}.source-note{border-radius:14px;align-items:flex-start}.dynamics-table{font-size:0.76rem}.dynamics-table th,.dynamics-table td{padding:0.5rem}}
 </style>
 <script src="data.js"></script>
 </head>
@@ -63,123 +44,80 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 
 <section class="dossier-hero home-hero"><div class="hero-grid">
   <div>
-    <div class="section-kicker" style="font-size:0.82rem;margin-bottom:0.5rem;color:var(--ac);letter-spacing:0.12em">Why — Agentic Dynamics</div>
-    <h1>Systems are constantly evolving. Scaling agents means measuring that evolution.</h1>
-    <p class="lead">Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This repository is its founding instrument and corpus.</p>
-    <blockquote class="pullquote">&ldquo;The system shapes the agent — and the agent reshapes the system. Read that again.&rdquo;</blockquote>
+    <div class="section-kicker" style="font-size:0.82rem;margin-bottom:0.5rem;color:var(--ac);letter-spacing:0.12em">Agentic Dynamics</div>
+    <h1>AI agents don't have a price. They have dynamics.</h1>
+    <p class="lead">Cost, reliability, and debt are not a rate card — they are properties of how an agent behaves under change: how it handles churn, absorbs a regression, compounds spend across a five-session arc, and stays correct when the task shifts underneath it. Agentic Dynamics is the instrument that measures that behavior and turns it into numbers a business can act on.</p>
+    <blockquote class="pullquote">&ldquo;You cannot buy agent reliability at a fixed price. We built the instrument that measures the function it's actually a product of.&rdquo;</blockquote>
     <div class="hero-actions"><a href="methodology.html" class="cta-btn big">Examine the Method</a><a href="evidence.html" class="cta-btn ghost">Inspect the Evidence →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
+    <div class="source-note"><strong>Not a product.</strong> No tier to sell. A measurement instrument, a method, and an open corpus.</div>
   </div>
   <aside class="proof-ledger" aria-label="Key numbers">
-    <h3>Evidence behind the discovery</h3>
-    <div class="proof-card"><span class="label">Story sessions</span><div class="value"><span data-stat="story_sessions">1,097</span></div></div>
-    <div class="proof-card"><span class="label">Models</span><div class="value"><span data-stat="variants">7</span></div></div>
-    <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">221</span></div></div>
-    <div class="proof-card success"><span class="label">Total measured cost</span><div class="value">$<span data-stat="story_total_cost">288.69</span></div></div>
+    <h3>The corpus, measured</h3>
+    <div class="proof-card"><span class="label">Story sessions</span><div class="value"><span data-stat="story_sessions">772</span></div></div>
+    <div class="proof-card"><span class="label">Models instrumented</span><div class="value"><span data-stat="variants">7</span></div></div>
+    <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">156</span></div></div>
+    <div class="proof-card success"><span class="label">Total measured cost</span><div class="value">$<span data-stat="story_total_cost">219.51</span></div></div>
   </aside>
 </div></section>
 
 <!-- The field -->
 <section class="dossier-section alt"><div class="dossier-inner">
   <div class="section-kicker">What — the field</div>
-  <h2>A measurement question became Agentic Dynamics.</h2>
+  <h2>Agentic Dynamics is the empirical study of how agents behave under change.</h2>
   <figure class="field-map">
     <img src="agentic-dynamics-field-map.png" alt="Field map of Agentic Dynamics: five disciplines — AI and agentic systems, FinOps and cloud economics, software engineering and architecture, systems and reliability engineering, and experimental science — surround a core that measures how context, complexity, and uncertainty shape agent decisions and propagate into reliability, cost, and value.">
     <figcaption>Five disciplines feed one core: how context, complexity, and uncertainty shape agent decisions — and propagate into reliability, cost, and value.</figcaption>
   </figure>
-  <p class="lead">Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This instrument currently examines cost, verification, maintainability, recovery, and five-session progression in coding-agent workflows. Routing and long-horizon value remain questions for controlled experiments, not conclusions inferred from a price sheet.</p>
-  <div class="hero-actions"><a href="framework.html" class="cta-btn">Examine Policy Experiments →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
+  <p class="lead">The instrument perturbs an agent's task and environment along ten operators — corrupting the spec, mutating the objective, or disrupting the reasoning process — and measures how the agent recovers, adapts, flails, or compounds cost. Each dynamic below maps one-to-one onto a number a business already tracks.</p>
+  <table class="dynamics-table">
+    <thead><tr><th>Dynamic</th><th>Business outcome it is</th></tr></thead>
+    <tbody>
+      <tr><td>Basin escape</td><td>cost of <em>change</em> — how an agent handles churn, requirement drift, spec rot</td></tr>
+      <tr><td>Recovery cost</td><td>cost of a <em>regression</em> — what an incident costs before it's fixed</td></tr>
+      <tr><td>Snowball</td><td><em>maintenance</em> growth — why the 5th change costs more than the 1st</td></tr>
+      <tr><td>Flail</td><td><em>wasted spend</em> — runs that produce reasoning but no deliverable</td></tr>
+      <tr><td>Grit</td><td><em>reliability under stress</em> — does it stay correct as the task shifts under it</td></tr>
+      <tr><td>Technical debt</td><td><em>maintenance liability</em> — what the agent leaves behind, independently reviewed</td></tr>
+    </tbody>
+  </table>
+  <div class="hero-actions"><a href="framework.html" class="cta-btn">See the Full Reframe Table →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
 </div></section>
 
-<!-- Section 2: HOW -->
-<section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">How — the question scaled</div>
-  <h2>One question became an N x M measurement problem.</h2>
-  <p class="lead">The original question compared one model's cost and quality under degraded input. Answering it properly required N linked sessions, because each output becomes the next session's codebase, and M measurement angles, because passing tests cannot stand in for verification, maintainability, cache economics, routing risk, or long-horizon cost. The corpus is the product of that multiplication, not a larger benchmark.</p>
-  <div class="op-grid">
-    <div class="op-card">
-      <h4>N — linked sessions</h4>
-      <ul>
-        <li>Session 1: greenfield build from spec</li>
-        <li>Session 2: feature addition</li>
-        <li>Session 3: integration (auth, async, persistence)</li>
-        <li>Session 4: refactor (repository pattern, layering)</li>
-        <li>Session 5: cross-cutting (rate limiting, pagination)</li>
-      </ul>
-    </div>
-    <div class="op-card">
-      <h4>Controlled variation</h4>
-      <ul>
-        <li><strong>Clean</strong> — unmodified specifications</li>
-        <li><strong>Bad seed</strong> — the starting codebase is pre-degraded</li>
-        <li><strong>Early degrade</strong> — the first spec is corrupted, cascading through later sessions</li>
-      </ul>
-    </div>
-    <div class="op-card">
-      <h4>M — measurement angles</h4>
-      <ul>
-        <li>AST diffs, conventions, and maintainability per commit</li>
-        <li>Maintainability cost and long-horizon scalability</li>
-        <li>One-way/two-way-door routing and verification depth</li>
-        <li>Cache economics, recovery, tests, and independent review</li>
-      </ul>
-    </div>
-  </div>
-  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">221 stories across 3 codebases (CRUD API, static site generator, notification service) and 2 tiers, run against 7 models. Every token, dollar, cache hit, and test is measured and provenance-tagged. Collection creates one N x M burden; analysis creates a second across models, conditions, tasks, tiers, commits, and story positions. More sessions without analysis are volume, not information.</p>
-</div></section>
-
-<!-- Section 3: The instrument -->
+<!-- Four measured headlines -->
 <section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">How — from events to policy</div>
-  <h2>Instrument, derive, write policy, grid, campaign.</h2>
-  <div class="pipeline">
-    <div class="pipe-step"><div class="ps-label">Instrument — capture events</div>Session 1–5 traces, tokens, cache reads, cost, tests, and code changes</div>
-    <div class="pipe-step"><div class="ps-label">Derive — turn events into information</div>Static analysis, reviews, verification depth, recovery, and cost per accepted outcome</div>
-    <div class="pipe-step"><div class="ps-label">Write policy — consume measured information</div>Control rules use only fields the instrument actually produces</div>
-    <div class="pipe-step"><div class="ps-label">Grid — test policy as an arm</div>Compare policy choices across controlled factor combinations</div>
-    <div class="pipe-step"><div class="ps-label">Campaign — change one variable and repeat</div>Use the remaining uncertainty to select the next measurement</div>
-  </div>
-  <div class="hero-actions"><a href="methodology.html" class="cta-btn">Examine the Method →</a><a href="https://github.com/peparhugo/agentic-dynamics" class="cta-btn ghost">Inspect the Source →</a></div>
-</div></section>
-
-<!-- Section 4: WHAT -->
-<section class="dossier-section alt"><div class="dossier-inner">
   <div class="section-kicker">What — the evidence</div>
-  <h2>The unmeasured gap became visible.</h2>
-  <p class="lead">The supporting corpus contains 1,097 instrumented story sessions. Four findings made the gap concrete.</p>
-  <div class="finding">
-    <div class="fn">Finding 1</div>
-    <h3>Price and verification depth do not move together in this corpus.</h3>
-    <p>OpenAI spans a 41× price range — Luna at $0.09 and Sol at $3.75 — and both write ~10 tests per story. Claude spans 2.9× — Haiku at $1.59 and Sonnet 5 at $4.58 — and both write ~120. All pass their tests. In these observed tasks, the 10× verification gap appears <em>between</em> vendors rather than between price tiers; the result describes this corpus, not a universal purchasing rule.</p>
-  </div>
-  <div class="finding">
-    <div class="fn">Finding 2</div>
-    <h3>Later sessions cost more across the five-session arc.</h3>
-    <p>The measured story cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34), while tokens grow from 18.7K to 34.9K. Every session inherits a larger codebase, so per-session cost understates the observed maintenance arc by ~2×. Generalizing that mechanism beyond the measured arc remains modeled.</p>
-  </div>
-  <div class="finding">
-    <div class="fn">Finding 3</div>
-    <h3>Cache behavior separates token volume from session cost.</h3>
-    <p>The cheapest model (Flash) and the most expensive (Sol) both send ~47K tokens per session — Flash at $0.07, Sol at $3.75. Luna hits a 98% cache-hit rate and sends just 6.3K. Token volume, cache policy, and test thoroughness appear as three separate knobs in this corpus; their separation does not establish that any one predicts the other two.</p>
-  </div>
-  <div class="finding">
-    <div class="fn">Finding 4</div>
-    <h3>Degradation can leak across sessions, and recovery can be measured.</h3>
-    <p>Corrupting the session-1 spec (early_degrade) drops success to 85% and doubles the cascade rate; a pre-degraded seed (bad_seed) costs the most ($1.48/story) but succeeds 88%. Degradation raises cost and cascades slightly; it does not dominate the outcome.</p>
-  </div>
-  <div class="hero-actions"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
-</div></section>
+  <h2>Four measured headlines.</h2>
+  <p class="lead">All four are read directly off the live corpus below — 772 story sessions, 344 single-task perturbation reports, and 205 worktrees, across 7 models and 10 seeded perturbation operators.</p>
 
-<!-- Section 5: The concept -->
-<section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">What — the durable-value gap</div>
-  <h2>Correctness is not verification.</h2>
-  <p class="lead">A model can pass every test it writes and still leave a system unverified. The gap is measured by test thoroughness:</p>
-  <p style="font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:0.85rem;line-height:2;text-align:center;padding:1rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b)">
-    Tests per story: Luna 7 &middot; Terra 9 &middot; Sol 13 &middot; Flash 34 &middot; Pro 34 &middot; Haiku 117 &middot; Sonnet 122
-  </p>
-  <p>All seven models pass their own tests at roughly equal rates, but the tests differ by an order of magnitude. Luna ships ~7 tests that confirm the happy path. Sonnet 5 ships ~122 that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." One has a much broader observed verification surface.</p>
-  <p>This is the durable-value gap. Correctness asks whether code passes the tests you have. Verification asks whether you have the tests that would catch the failures that matter. In this corpus, that safety net varies by vendor family, while price alone does not explain the difference.</p>
-  <div class="hero-actions"><a href="evidence.html#story-models" class="cta-btn">Inspect the Verification Gap →</a></div>
+  <div class="finding">
+    <div class="fn"><span class="tag">[M]/[C]</span>Finding 1 — the cost spread</div>
+    <h3>The same outcome, ~33× apart in price.</h3>
+    <p>DeepSeek v4 Flash averages <strong>$0.014/session</strong> [M] with a 100% independently-run test pass rate (2,304/2,306 tests) [M]. Run solo across the routed task set, GPT-5.6 Sol averages <strong>$0.446/session</strong> [C] at the same 100% correctness [C]. Equal measured outcome, ~33× cost spread. There is no fixed price for "correct" — it depends entirely on which model does the work and how it's routed.</p>
+    <span class="src">routing.strategies (deepseek-v4-flash avg_cost_per_session vs gpt-5.6-sol_only avg_cost) · methodology.html</span>
+  </div>
+
+  <div class="finding">
+    <div class="fn"><span class="tag">[C]</span>Finding 2 — premium fails where cheap doesn't</div>
+    <h3>Paying more does not buy correctness or self-correction.</h3>
+    <p>On the <code>task_manager_api</code> story, Claude Fable 5 averages 70% correctness against DeepSeek v4 Pro's 98% [C]. Independently, the reasoning-divergence pipeline finds Claude cascades earliest under perturbation (step 1.14) and never recovers within the trace (0% of traces self-correct), where DeepSeek and GPT-5.6 self-correct 86% of the time [C]. Model tier and reliability are not the same axis.</p>
+    <span class="src">grit_matrix (task_manager) · lab_cascades.json cascade_patterns · evidence.html</span>
+  </div>
+
+  <div class="finding">
+    <div class="fn"><span class="tag">[C]</span>Finding 3 — self-reported tests barely predict quality</div>
+    <h3>Test count and independent-reviewer verdicts correlate at −0.15.</h3>
+    <p>Across 106 reviewed cells, the correlation between how many tests a model's own session reports and how often an independent reviewer later calls the change "worse" is <strong>−0.154</strong> [C] — weakly negative, nowhere near the strength that would let a "100% pass rate" self-report stand in for verification. Model families also write wildly different numbers of tests at similar pass rates (Luna ~10/story vs Haiku ~193/story) [M]. Correctness against your own tests and verification against what the codebase actually needs are different measurements.</p>
+    <span class="src">labs.verification_value (correlation_tests_vs_worse_rate, n=106) · evidence.html</span>
+  </div>
+
+  <div class="finding">
+    <div class="fn"><span class="tag">[M]</span>Finding 4 — the instrument self-heals</div>
+    <h3>An async worker diagnosed its own contaminated data and re-ran the experiment.</h3>
+    <p>On 2026-08-15, an <code>agent_task</code> worker given one high-level goal — "instrument the missing ledger fields and re-run contaminated cells" — <em>diagnosed</em> 16 stale-taxonomy cells and up to 85 mutation-fallback cells on its own, <em>authored</em> a re-run inventory, and <em>executed</em> it: it enqueued ~33 contaminated cells and spawned 8 parallel workers across 3 providers, taking the queue from 142 to 175 jobs. Nobody wrote that re-run script. The <code>adapt</code> loop's core primitive — observe, propose, execute — emerged on its own.</p>
+    <span class="src">code_reviews/2026-08-15_self-healing-remediation-finding.md · story.html</span>
+  </div>
+
+  <div class="hero-actions"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
 </div></section>
 
 <!-- Bottom links -->
@@ -189,18 +127,19 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
     <a href="methodology.html" style="color:var(--ac)">Instrument</a>
     <a href="framework.html" style="color:var(--ac)">Framework</a>
     <a href="story.html" style="color:var(--ac)">Story</a>
+    <a href="glossary.html" style="color:var(--ac)">Glossary</a>
     <a href="https://github.com/peparhugo/agentic-dynamics" style="color:var(--ac)">GitHub</a>
     <a href="databricks.html" style="color:var(--t3)">Related Work</a>
   </div>
 </div></section>
 
 <footer>
-  <strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-  <span data-stat="story_sessions">1,097</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">221</span> stories · $<span data-stat="story_total_cost">288.69</span> measured<br>
+  <strong>Agentic Dynamics · v1.0 · August 2026</strong><br>
+  <span data-stat="story_sessions">772</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">156</span> stories · $<span data-stat="story_total_cost">219.51</span> measured<br>
   <a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> ·
   <a href="story.html">Story</a> · <a href="methodology.html">Instrument</a> ·
   <a href="evidence.html">Evidence</a> · <a href="databricks.html">Related Work</a>
-</footer>
+<p class="legend">Evidence tags: [M] measured &middot; [C] computed &middot; [H] heuristic &middot; [X] external &middot; [P] policy/prior.</p></footer>
 
 <script src="app.js"></script>
 </body>

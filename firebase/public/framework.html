@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Operational Framework — Agentic Dynamics</title>
-<meta name="description" content="Operational principles derived from Agentic Dynamics: 10 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 1,097 story sessions and 227 perturbation experiments.">
+<meta name="description" content="The dynamics-to-business-outcome reframe, plus the operational rules, cost model, interactive calculator, and decision framework derived from it. Grounded in 772 story sessions and 344 perturbation game reports.">
 <meta property="og:title" content="Operational Framework — Agentic Dynamics">
 <meta property="og:description" content="Agentic Dynamics operational framework: observed patterns, derived metrics, modeled extensions">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/framework.html">
@@ -272,6 +272,22 @@
   </div>
 </div></section>
 <div class="audience-note"><strong style="color:var(--ac)">Who this is for:</strong> Organizations operating AI workflows at scale, from human-assisted engineering sessions to bounded autonomous pipelines. The current evidence is drawn from Python/Flask REST APIs and TypeScript/Node.js; validate the <a href="methodology.html" style="color:var(--ac)">instrument</a> in other domains before adopting its policy candidates.</div>
+
+<!-- The reframe: every dynamic below is a business outcome, not an abstraction. -->
+<section class="fsec" id="reframe"><div class="inr wide">
+  <div class="section-kicker kicker-why">THE CORE REFRAME</div>
+  <h2>Each dynamic is a business outcome. Not a metric — the thing itself.</h2>
+  <p class="thesis">You cannot buy agent reliability at a fixed price. Cost, correctness, and debt are functions of how the agent behaves under change, not a rate card. Every lever, rule, and calculator on the rest of this page is one operational handle on one row of this table.</p>
+  <div class="architecture-text" style="grid-template-columns:repeat(2,1fr);margin-top:1.5rem">
+    <li><strong>Basin escape → cost of change</strong>How an agent handles churn, requirement drift, spec rot. Measured per story via <code>basin_escape</code> [C] — how far the final code diverges from the seed's attractor.</li>
+    <li><strong>Recovery cost → cost of a regression</strong>What an incident costs before it's fixed. Measured via condition effects: a pre-degraded seed costs 16% more per story than clean, and doesn't always recover (94.6% success vs 100% for a spec-level regression).</li>
+    <li><strong>Snowball → maintenance growth</strong>Why the 5th change costs more than the 1st. Measured: session cost ~2.38× from greenfield to cross-cutting across the five-session arc [C].</li>
+    <li><strong>Flail → wasted spend</strong>Runs that produce reasoning but no deliverable. Measured via the narration-penalty rate — 6–50% across models, near-zero for DeepSeek and GPT-5.6, highest for Claude and small reasoning-heavy models.</li>
+    <li><strong>Grit → reliability under stress</strong>Does the agent stay correct when the task shifts under it, across the 3-way operator classification. Measured per operator class and model in <code>grit_matrix</code> / <code>perturbation_class_breakdown</code>.</li>
+    <li><strong>Technical debt → maintenance liability</strong>What the agent leaves behind. Measured via independent second-model review (1,199 commit reviews) plus static AST/SonarQube diagnostics — decoupled from whether the model's own tests passed.</li>
+  </div>
+  <p style="font-size:0.78rem;color:var(--t3);margin-top:1rem">Full evidence for each row: <a href="evidence.html" style="color:var(--ac)">the Evidence page</a>. This is the organizing table for every section below — the levers, the equation, and the rules are operational handles on these six rows, not a separate framework.</p>
+</div></section>
 
 <!-- ARCHITECTURE: Inline source keeps the system map theme-aware, printable, and dependency-free. -->
 <section class="fsec architecture-section"><div class="inr wide">
@@ -654,7 +670,7 @@
 <section class="fsec" id="levers"><div class="inr wide">
 <div class="section-kicker">ECONOMIC INPUTS / MEASURED AND MODELED</div>
 <h2>Separate what is measured,<br>controlled, and modeled.</h2>
-<p class="lead">Observed cost, outcome, and narration fields come from 227 experiment worktrees. Retry rate is a workload input until the attempt ledger measures it directly. Modeling parameters (&beta;, EPM) are calibrated to your codebase and energy market. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
+<p class="lead">Observed cost, outcome, and narration fields come from 205 experiment worktrees (344 game reports). Retry rate is a workload input until the attempt ledger measures it directly. Modeling parameters (&beta;, EPM) are calibrated to your codebase and energy market. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
 <div class="lever-console">
   <article class="lever-lane">
     <div class="lane-head"><h3>Augmented Workforce (Rules 1&ndash;5)</h3><span>human + AI / per session</span></div>
@@ -700,7 +716,7 @@
 <section class="fsec" id="cost-model"><div class="inr wide">
 <div class="section-kicker">ECONOMICS / COST MODEL</div>
 <h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
-<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
+<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 205 experiment worktrees (344 game reports). Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
 <div class="cost-station">
   <div class="formula-rail">
     <article class="formula-plate"><strong>Augmented Workforce <span style="color:var(--t3);font-size:0.7em">(Rules 1–5)</span></strong>c(t) = C&#8320;&times;EPM(t)&times;(1+&beta;&middot;v&middot;t)<br>C(N,v) = C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<br>CostPerOutcome = C(K/P, v)/K<br>C<sub>mo</sub> = E&times;C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<span class="formula-controls">Controls: C&#8320; / P / &beta; / v / EPM</span></article>
@@ -781,20 +797,20 @@
 <section class="fsec" id="rules"><div class="inr wide">
   <div class="section-kicker kicker-what">POLICY / PROPOSED CONTROL RULES</div>
   <h2>Turn observed patterns into<br>policy arms to test.</h2>
-  <p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 single-session perturbation experiments + 1,097 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
+  <p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (344 single-session perturbation game reports + 772 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
   <div class="rule-groups">
     <section class="rule-group" aria-labelledby="selection-rules">
       <div class="rule-group-head"><h3 id="selection-rules">Selection and verification</h3><p>Choose for resilience, explanation overhead, and working outcomes.</p></div>
       <div class="rules-grid">
         <div class="rule" id="rule-1"><div class="rn">1</div><div class="rt"><strong>Grit (Ground-Truth Integrity).</strong> Default to models that maintain correctness when given degraded, contradictory, or incomplete instructions. If a model flails under perturbation — producing zero code despite high token output — it has low Grit. Don't use it for unsupervised work. The 10 perturbation operators measure Grit across three perturbation classes: specification corruption, objective mutation, and process perturbation.<span class="rm">Concept: Grit (Ground-Truth Integrity) · Lever: C₀</span></div></div>
-        <div class="rule" id="rule-2"><div class="rn">2</div><div class="rt"><strong>The Explanation Tax.</strong> Rule 1 selects models that CAN code under degraded input. Rule 2 measures what their resilience COSTS — the flail rate (sessions producing zero code) and narration penalty (overhead on successful sessions). Measured: Claude 11% flail, 8% penalty. DeepSeek 8% flail, 0.0% penalty. For auditable work, the tax is insurance. For routine tasks, it's waste.<span class="rm">Concept: Explanation Tax &middot; Lever: &epsilon;</span></div></div>
+        <div class="rule" id="rule-2"><div class="rn">2</div><div class="rt"><strong>Output Decomposition.</strong> Rule 1 selects models that CAN code under degraded input. Rule 2 measures what their resilience COSTS — split output tokens into answer (code) and explanation (reasoning/narration), and measure the flail rate (sessions producing zero code) and narration penalty (overhead on successful sessions) separately per model. Measured: Claude 11% flail, 8% penalty. DeepSeek 8% flail, 0.0% penalty — the only provider that bills reasoning on a separate, cheaper channel rather than as ordinary output. For auditable work, narration is insurance. For routine tasks, it's waste.<span class="rm">Concept: Output Decomposition &middot; Lever: &epsilon;</span></div></div>
         <div class="rule" id="rule-5"><div class="rn purple">5</div><div class="rt"><strong>The First-Pass Rule.</strong> Price the accepted outcome, not the prompt. A cheaper model can lose its price advantage through failed verification, retries, and escalation. Derive first-pass quality from attempt number, acceptance, and an independent evaluator; then track it by task type, model, policy, and time window. Do not substitute a narrated report failure rate for an attempt-ledger measurement.<span class="rm">Concept: Cost-Per-Accepted-Outcome / First-Pass &middot; Lever: P, retry rate</span></div></div>
       </div>
     </section>
     <section class="rule-group" aria-labelledby="economics-rules">
       <div class="rule-group-head"><h3 id="economics-rules">Compounding economics</h3><p>Model codebase, energy, and outcome effects before they become architecture.</p></div>
       <div class="rules-grid">
-        <div class="rule" id="rule-3"><div class="rn amber">3</div><div class="rt"><strong>The Snowball Rule.</strong> Your codebase grows with every session. Each new line of generated code increases the context window for every future session. This isn't additive &ndash; it's quadratic. The more you build, the more each subsequent build costs. <strong style="color:var(--t)">Measured:</strong> story cost roughly doubles across the five-session arc ($0.16 &rarr; $0.34, a 2.13&times; Snowball). The &beta; term compounds per-session — model the curve before you commit to an architecture. This is a one-way door.<span class="rm">Concept: Snowball Effect (N&sup2;) &middot; Lever: &beta;, v &middot; Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]</span></div></div>
+        <div class="rule" id="rule-3"><div class="rn amber">3</div><div class="rt"><strong>The Snowball Rule.</strong> Your codebase grows with every session. Each new line of generated code increases the context window for every future session. This isn't additive &ndash; it's quadratic. The more you build, the more each subsequent build costs. <strong style="color:var(--t)">Measured:</strong> story cost roughly doubles across the five-session arc ($0.16 &rarr; $0.38, a 2.38&times; Snowball). The &beta; term compounds per-session — model the curve before you commit to an architecture. This is a one-way door.<span class="rm">Concept: Snowball Effect (N&sup2;) &middot; Lever: &beta;, v &middot; Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]</span></div></div>
         <div class="rule" id="rule-4"><div class="rn amber">4</div><div class="rt"><strong>The EPM Horizon Rule.</strong> Energy costs are the inflation rate of AI compute. Local energy markets &ndash; not global averages &ndash; determine your long-term prices. A team in Texas (ERCOT grid) faces different EPM growth than one in Frankfurt (ENTSO-E) or Singapore. Find the year your geographic energy costs flip your model selection. Hedge before that point. EPM(t) = 1.00 + r(t&minus;2024) where r depends on your region.<span class="rm">Concept: EPM Horizon &middot; Lever: EPM(t)</span></div></div>
         <div class="rule" id="rule-10"><div class="rn">10</div><div class="rt"><strong>The Outcome Multiplier.</strong> The goal isn't to minimize cost &ndash; it's to maximize outcomes per dollar. Business Value Index = Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. <span class="badge-ext">Extension</span><span class="rm">Concept: Business Value &middot; Lever: BVI</span></div></div>
       </div>
@@ -816,9 +832,9 @@
 <section class="fsec" id="playbook"><div class="inr wide">
 <div class="section-kicker kicker-what">CONTROL / CANDIDATE POLICY ARMS</div>
 <h2>Map provider choices to<br>cost and verification hypotheses.</h2>
-<p class="lead">Every playbook tactic below implements one or more of the 10 decision rules. Use this mapping to trace your cost savings back to the empirical evidence.</p>
+<p class="lead">These are operational hypotheses, not a vendor playbook — each candidate policy arm below implements one or more of the 10 decision rules, and belongs in a grid as a factor level to be tested, not adopted on faith. Use this mapping to trace a proposed lever back to the empirical evidence that motivates it.</p>
 <div class="policy-map" aria-label="Policy tactics mapped to framework rules">
-  <article class="policy-card"><span>RULES 1+2</span><strong>Three-layer caching</strong><p>Rule 1 (Grit) + Rule 2 (Explanation Tax)</p></article>
+  <article class="policy-card"><span>RULES 1+2</span><strong>Three-layer caching</strong><p>Rule 1 (Grit) + Rule 2 (Output Decomposition)</p></article>
   <article class="policy-card"><span>RULES 1+5</span><strong>Model routing cascade</strong><p>Rule 1 (Silent Inference) + Rule 5 (First-Pass)</p></article>
   <article class="policy-card"><span>RULES 5+7</span><strong>Budget enforcement</strong><p>Rule 5 (First-Pass) + Rule 7 (Budget Ceiling)</p></article>
   <article class="policy-card"><span>RULES 6+9</span><strong>Batch scheduling</strong><p>Rule 6 (Batch Discount) + Rule 9 (SLA Buffer)</p></article>
@@ -908,9 +924,9 @@
 <section class="fsec"><div class="campaign-strip"><div><strong>Policy is an arm, not an endpoint.</strong><span>Choose one variable, run the next grid, and let measured information revise the campaign.</span></div><a href="#calculator" class="cta-btn">Calculate Your Costs →</a></div></section>
 
 <footer>
-<strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-  <span data-stat="story_sessions">1,097</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">221</span> stories · $<span data-stat="story_total_cost">288.69</span> measured<br>
-  <a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> · <a href="framework.html">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> · <a href="#playbook">Playbook</a>
+<strong>Agentic Dynamics · v1.0 · August 2026</strong><br>
+  <span data-stat="story_sessions">772</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">156</span> stories · $<span data-stat="story_total_cost">219.51</span> measured<br>
+  <a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> · <a href="framework.html">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> · <a href="#playbook">Operational Levers</a>
 </footer>
 
 <script>

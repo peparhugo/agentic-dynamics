@@ -41,8 +41,18 @@
 </div>
 
 <div class="gcard">
-<div class="gname">Explanation Tax (&epsilon;)</div>
-<div class="gdef">The cost premium a model pays to work through confused or degraded input. Measured as flail rate (% sessions producing zero code) and narration penalty (% cost overhead on successful sessions). Claude: <span data-stat="claude_narration">11%</span> flail, <span data-stat="claude_penalty">8.0%</span> penalty. DeepSeek: <span data-stat="deepseek_narration">8%</span> flail, <span data-stat="deepseek_penalty">0.0%</span> penalty. [M]</div>
+<div class="gname">Output Decomposition (&epsilon;)</div>
+<div class="gdef">Splitting a session's output tokens into the answer (code, the deliverable) and the explanation (narration/reasoning that doesn't itself ship). The cost premium a model pays to work through confused or degraded input shows up here: flail rate (% sessions producing zero code) and narration penalty (% cost overhead on successful sessions). Claude: <span data-stat="claude_narration">11%</span> flail, <span data-stat="claude_penalty">8.0%</span> penalty. DeepSeek: <span data-stat="deepseek_narration">8%</span> flail, <span data-stat="deepseek_penalty">0.0%</span> penalty. DeepSeek is the only provider in this corpus billing the explanation portion on a separate, cheaper channel rather than as ordinary output — everywhere else, narration and code cost the same per token. This term replaces an earlier framing that treated all narration cost as a flat surcharge on reasoning. [M]/[C]</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Perturbation Strength</div>
+<div class="gdef">A 0–1 dial on how hard a perturbation operator degrades the spec, objective, or process. For append-only operators (inject_false_premise, inject_phantom_success, inject_competing_goal, shift_framing) it selects a severity tier from a small fixed stimulus pool rather than acting as a true continuous dial; for structural operators (reverse_causality, force_abandonment) it continuously scales the transformation. Now captured directly on the attempt ledger as <code>perturbation_strength</code> [M], not only in the operator's own config — so downstream rules can condition on what was actually applied to a given attempt.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Self-Healing (emergent <code>adapt</code>)</div>
+<div class="gdef">The 2026-08-15 finding: an <code>agent_task</code> worker, given one high-level goal ("instrument the missing ledger fields, re-run contaminated cells"), diagnosed its own data contamination, authored a re-run inventory, and executed it — enqueuing ~33 contaminated cells with <code>--interleave</code> across 3 providers and spawning 8 parallel workers, without per-step human steering. The spec/compiler design reserves an <code>adapt</code> phase (observe → propose the next experiment → run it → measure the delta) as future work; this was a primitive version of that loop emerging on its own. See <a href="story.html" style="color:var(--ac)">the story page</a>. [M]</div>
 </div>
 
 <div class="gcard">
@@ -62,7 +72,7 @@
 
 <div class="gcard">
 <div class="gname">WOC Ratio (Work Overhead Cost) / First-Pass</div>
-<div class="gdef">First-pass success rate: WOC = 1/(1+r) where r is retry rate. With measured r=0.115: WOC=0.90. At or above 0.90 = healthy. Below 0.70 = critical. Price the outcome, not the prompt: CostPerOutcome(K,v) = C(K/P, v) / K. A model at half the cost but half the pass rate costs the same per outcome with double the latency. The empirical basis for Rule 5.</div>
+<div class="gdef">First-pass success rate: WOC = 1/(1+r) where r is retry rate. Live measured: WOC = <span data-stat-fmt="woc">1.00</span> (0% retry rate in the current corpus). At or above 0.85 = healthy. Below 0.70 = critical. Price the outcome, not the prompt: CostPerOutcome(K,v) = C(K/P, v) / K. A model at half the cost but half the pass rate costs the same per outcome with double the latency. The empirical basis for Rule 5.</div>
 </div>
 
 <div class="gcard">
@@ -82,12 +92,12 @@
 
 <div class="gcard">
 <div class="gname">Basin Escape Score</div>
-<div class="gdef">A composite metric (0&ndash;1) measuring how far perturbation pushes a model from its default solution topology. Combines architecture divergence and structural novelty. A score of 1.0 means the model fully abandoned its default pattern. DeepSeek: higher escape scores under manifold perturbations than semantic ones.</div>
+<div class="gdef">A composite metric (0&ndash;1) measuring how far perturbation pushes a model from its default solution topology. Combines architecture divergence and structural novelty. A score of 1.0 means the model fully abandoned its default pattern. DeepSeek: higher escape scores under process-perturbation operators (alien vocab, framing shifts) than under specification-corruption operators.</div>
 </div>
 
 <div class="gcard">
 <div class="gname">Recovery Multiplier</div>
-<div class="gdef">How perturbation changes cost relative to baseline. Below 1.0: perturbation reduces cost (model explores). Above 1.0: perturbation increases cost (model recovers through narration). Values per model are in the live data (see evidence page). The empirical basis for the Explanation Tax.</div>
+<div class="gdef">How perturbation changes cost relative to baseline. Below 1.0: perturbation reduces cost (model explores). Above 1.0: perturbation increases cost (model recovers through narration). Values per model are in the live data (see evidence page). The empirical basis for Output Decomposition.</div>
 </div>
 
 <div class="gcard">
@@ -110,14 +120,29 @@
 <div class="gdef">The unified measurement of how models handle degraded input. From Flail (complete breakdown, 100% failure) through Expensive Grit (correct but costly recovery) to Efficient Grit (correct and cheap recovery).</div>
 </div>
 
+<div class="gcard">
+<div class="gname">Recovery Cost (business outcome: cost of a regression)</div>
+<div class="gdef">What an incident costs before it's fixed. Measured via the story instrument's perturbation conditions: a pre-degraded starting codebase (<code>bad_seed</code>) costs more per story than a clean run and is the only condition where some cells never recover; a corrupted session-1 spec (<code>early_degrade</code>) still reaches 100% eventual success but at a higher cascade rate. See evidence.html for current figures.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Flail (business outcome: wasted spend)</div>
+<div class="gdef">Runs that produce reasoning but no deliverable — tokens billed with zero usable code output. Measured as the narration-penalty / flail rate, 6–50% across models in the current corpus, near-zero for DeepSeek and GPT-5.6, highest for reasoning-heavy and small models.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Technical Debt (business outcome: maintenance liability)</div>
+<div class="gdef">What the agent leaves behind, independent of whether its own tests passed. Measured via a second-model independent review (architectural fit, convention adherence, "better"/"worse" commit rate) plus AST structural diffs and, where available, SonarQube static analysis — deliberately decoupled from self-reported correctness.</div>
+</div>
+
 </div>
 </section>
 
 <div style="text-align:center;margin-top:1rem"><a href="framework.html" class="cta-btn">Start with Operational Principles &rarr;</a></div>
 
 <footer>
-<strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-<span data-stat="sessions">347</span> story sessions · <span data-stat="variants">3</span> models · <span data-stat="stories_total">71</span> stories · $<span data-stat="cost">12.54</span> measured<br>
+<strong>Agentic Dynamics · v1.0 · August 2026</strong><br>
+<span data-stat="sessions">772</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">156</span> stories · $<span data-stat="cost">219.51</span> measured<br>
 <a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> ·
   <a href="/">Home</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> · <a href="glossary.html">Glossary</a>
 </footer>
