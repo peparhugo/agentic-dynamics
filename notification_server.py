@@ -1,7 +1,7 @@
-"""WebSocket-based notification server.
+"""Pluggable notification server.
 
 Core features:
-- Accept WebSocket connections and assign each client a unique ID.
+- Accept client connections and assign each client a unique ID.
 - Broadcast messages to all connected clients.
 - Route ``direct`` messages to a single client.
 - Subscribe/unsubscribe clients to named channels.
@@ -12,15 +12,19 @@ Core features:
   ``GET /channels/{name}/subscribers`` and ``GET /messages``.
 
 All messages use the JSON envelope ``{type, payload, timestamp}``.
-The websockets transport base64-encodes every frame, so incoming frames are
-base64-decoded before JSON parsing and outgoing frames are base64-encoded
-before being sent.
+
+The connection layer is pluggable: the core server delegates all
+connection-level work to a :class:`~transports.BaseTransport` implementation.
+The active transport is selected via the ``TRANSPORT`` environment variable
+(or an explicit argument) and defaults to the WebSocket transport, which
+base64-encodes every frame. Incoming frames are base64-decoded before JSON
+parsing and outgoing frames are base64-encoded before being sent.
 
 Redis pub/sub is used as the message backbone when ``REDIS_URL`` is set (or a
 Redis client is injected). The server publishes messages to a Redis channel
 and a background worker subscribes to that channel and delivers messages to
-locally-connected WebSocket clients. This allows multiple server instances to
-share a single Redis backbone, and client connection state is stored in Redis.
+locally-connected clients. This allows multiple server instances to share a
+single Redis backbone, and client connection state is stored in Redis.
 
 All distributed messages are also persisted to SQLite (``DATABASE_URL``) for
 history, exposed via ``GET /messages?limit=&offset=``.
@@ -29,38 +33,41 @@ history, exposed via ``GET /messages?limit=&offset=``.
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import os
 import sqlite3
 import threading
 import uuid
 from contextlib import closing
-from datetime import datetime, timezone
 from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
 
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.http11 import Headers, Request, Response
 
+from transports import (
+    BaseTransport,
+    WebSocketTransport,
+    create_transport,
+    decode_message,
+    encode_message,
+    now_iso,
+)
+
 SUPPORTED_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
 
-
-def now_iso() -> str:
-    """Return the current UTC time as an ISO-8601 string."""
-    return datetime.now(timezone.utc).isoformat()
-
-
-def encode_message(message: dict) -> str:
-    """Serialize a message to JSON and base64-encode it for the wire."""
-    return base64.b64encode(json.dumps(message).encode("utf-8")).decode("ascii")
-
-
-def decode_message(raw: Any) -> dict:
-    """Base64-decode an incoming frame and parse it as JSON."""
-    if isinstance(raw, (bytes, bytearray)):
-        raw = raw.decode("utf-8")
-    return json.loads(base64.b64decode(raw).decode("utf-8"))
+__all__ = [
+    "NotificationServer",
+    "ClientRegistry",
+    "RedisBus",
+    "MessageStore",
+    "encode_message",
+    "decode_message",
+    "now_iso",
+    "BaseTransport",
+    "WebSocketTransport",
+    "SUPPORTED_TYPES",
+]
 
 
 def _normalize_database_url(url: str) -> str:
@@ -194,25 +201,25 @@ class RedisBus:
 
 
 class ClientRegistry:
-    """Thread-safe registry of connected WebSocket clients."""
+    """Thread-safe registry of connected clients."""
 
     def __init__(self) -> None:
-        self._clients: dict[str, ServerConnection] = {}
+        self._clients: dict[str, Any] = {}
         self._lock = threading.Lock()
 
-    def add(self, client_id: str, connection: ServerConnection) -> None:
+    def add(self, client_id: str, connection: Any) -> None:
         with self._lock:
             self._clients[client_id] = connection
 
-    def remove(self, client_id: str) -> Optional[ServerConnection]:
+    def remove(self, client_id: str) -> Optional[Any]:
         with self._lock:
             return self._clients.pop(client_id, None)
 
-    def get(self, client_id: str) -> Optional[ServerConnection]:
+    def get(self, client_id: str) -> Optional[Any]:
         with self._lock:
             return self._clients.get(client_id)
 
-    def items(self) -> list[tuple[str, ServerConnection]]:
+    def items(self) -> list[tuple[str, Any]]:
         with self._lock:
             return list(self._clients.items())
 
@@ -230,10 +237,12 @@ class ClientRegistry:
 
 
 class NotificationServer:
-    """WebSocket notification server.
+    """Notification server with a pluggable transport layer.
 
-    Optionally backed by Redis pub/sub (``REDIS_URL`` env var or an injected
-    client) and SQLite message persistence (``DATABASE_URL`` env var).
+    The transport is selected via the ``TRANSPORT`` environment variable (or
+    an explicit ``transport`` argument) and defaults to WebSocket. Optionally
+    backed by Redis pub/sub (``REDIS_URL`` env var or an injected client) and
+    SQLite message persistence (``DATABASE_URL`` env var).
     """
 
     def __init__(
@@ -242,6 +251,7 @@ class NotificationServer:
         database_url: Optional[str] = None,
         redis_client: Any = None,
         redis_channel: str = "notifications",
+        transport: Optional[str] = None,
     ) -> None:
         self.registry = ClientRegistry()
         self._subscriptions: dict[str, set[str]] = {}
@@ -257,6 +267,7 @@ class NotificationServer:
             )
         self._worker_task: Optional[asyncio.Task] = None
         self._pubsub: Any = None
+        self.transport: BaseTransport = create_transport(transport, self)
 
     # ── Lifecycle ────────────────────────────────────────────────
 
@@ -374,31 +385,9 @@ class NotificationServer:
             return channel
         return None
 
-    async def handler(self, connection: ServerConnection) -> None:
-        """Handle a single client connection for its full lifetime."""
-        client_id = str(uuid.uuid4())
-        self.registry.add(client_id, connection)
-        if self.bus is not None:
-            await self.bus.register_client(client_id, self.server_id)
-        try:
-            connected = {
-                "type": "system",
-                "payload": {"event": "connected", "client_id": client_id},
-                "timestamp": now_iso(),
-            }
-            await connection.send(encode_message(connected))
-
-            async for raw in connection:
-                try:
-                    message = decode_message(raw)
-                except (ValueError, TypeError, json.JSONDecodeError, base64.binascii.Error):
-                    continue
-                await self.route_message(client_id, message)
-        finally:
-            self.registry.remove(client_id)
-            self.remove_client(client_id)
-            if self.bus is not None:
-                await self.bus.unregister_client(client_id)
+    async def handler(self, connection: Any) -> None:
+        """Handle a single client connection via the active transport."""
+        await self.transport.handle(connection)
 
     async def route_message(self, sender_id: str, message: dict) -> None:
         """Route an inbound message based on its type."""
@@ -440,23 +429,17 @@ class NotificationServer:
 
     async def broadcast(self, message: dict) -> None:
         """Send a message to every connected client."""
-        encoded = encode_message(message)
-        for client_id, connection in self.registry.items():
-            try:
-                await connection.send(encoded)
-            except Exception:
-                self.registry.remove(client_id)
+        await self.transport.broadcast(message)
 
     async def send_to_channel(self, channel: str, message: dict) -> None:
         """Send a message only to subscribers of the given channel."""
-        encoded = encode_message(message)
         for client_id in self.channel_subscribers(channel):
             connection = self.registry.get(client_id)
             if connection is None:
                 self.unsubscribe(client_id, channel)
                 continue
             try:
-                await connection.send(encoded)
+                await self.transport.send_message(connection, message)
             except Exception:
                 self.registry.remove(client_id)
                 self.unsubscribe(client_id, channel)
@@ -466,7 +449,7 @@ class NotificationServer:
         connection = self.registry.get(target_id)
         if connection is None:
             return False
-        await connection.send(encode_message(message))
+        await self.transport.send_message(connection, message)
         return True
 
     def process_request(
