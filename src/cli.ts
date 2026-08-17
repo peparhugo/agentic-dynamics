@@ -1,10 +1,12 @@
 import { build } from './builder';
+import { startServer } from './server';
 
 export interface CliOptions {
   command: string;
   content: string;
   output: string;
   templates: string;
+  port: number;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -13,6 +15,7 @@ export function parseArgs(argv: string[]): CliOptions {
     content: './content',
     output: './dist',
     templates: './templates',
+    port: 3000,
   };
 
   let i = 0;
@@ -21,6 +24,9 @@ export function parseArgs(argv: string[]): CliOptions {
 
     if (arg === 'build') {
       options.command = 'build';
+      i += 1;
+    } else if (arg === 'serve') {
+      options.command = 'serve';
       i += 1;
     } else if (arg === '--content' || arg === '-c') {
       if (i + 1 < argv.length) {
@@ -52,6 +58,22 @@ export function parseArgs(argv: string[]): CliOptions {
     } else if (arg.startsWith('--templates=')) {
       options.templates = arg.slice('--templates='.length);
       i += 1;
+    } else if (arg === '--port' || arg === '-p') {
+      if (i + 1 < argv.length) {
+        const parsed = Number.parseInt(argv[i + 1], 10);
+        if (!Number.isNaN(parsed)) {
+          options.port = parsed;
+        }
+        i += 2;
+      } else {
+        i += 1;
+      }
+    } else if (arg.startsWith('--port=')) {
+      const parsed = Number.parseInt(arg.slice('--port='.length), 10);
+      if (!Number.isNaN(parsed)) {
+        options.port = parsed;
+      }
+      i += 1;
     } else if (arg === '--help' || arg === '-h') {
       options.command = 'help';
       i += 1;
@@ -64,14 +86,23 @@ export function parseArgs(argv: string[]): CliOptions {
 }
 
 function printHelp(): void {
-  const text = `Usage: ssg build [options]
+  const text = `Usage: ssg <command> [options]
 
-Build a static site from a directory of Markdown files.
+Commands:
+  build               Build a static site from a directory of Markdown files.
+  serve               Start a development server with live reload.
 
-Options:
+Build options:
   --content <dir>     Directory containing Markdown files (default: ./content)
   --output <dir>      Directory to write generated HTML (default: ./dist)
   --templates <dir>   Directory containing templates (default: ./templates)
+  -h, --help          Show this help message
+
+Serve options:
+  --content <dir>     Directory containing Markdown files (default: ./content)
+  --output <dir>      Directory to write generated HTML (default: ./dist)
+  --templates <dir>   Directory containing templates (default: ./templates)
+  --port <port>       Port to listen on (default: 3000)
   -h, --help          Show this help message
 `;
   process.stdout.write(text);
@@ -88,6 +119,20 @@ export function runCli(argv: string[]): number {
   if (options.command === '') {
     printHelp();
     return 1;
+  }
+
+  if (options.command === 'serve') {
+    const devServer = startServer({
+      contentDir: options.content,
+      outputDir: options.output,
+      templatesDir: options.templates,
+      port: options.port,
+    });
+
+    process.stdout.write(
+      `Serving ${devServer.outputDir} at http://localhost:${devServer.port}\n`
+    );
+    return 0;
   }
 
   if (options.command !== 'build') {

@@ -16,6 +16,13 @@ export {
   DEFAULT_LAYOUT_NAME,
 } from './templates';
 export { parseArgs, runCli, CliOptions } from './cli';
+export {
+  startServer,
+  injectLiveReloadScript,
+  ServeOptions,
+  DevServer,
+  LIVE_RELOAD_PATH,
+} from './server';
 
 if (require.main === module) {
   process.exitCode = runCli(process.argv.slice(2));

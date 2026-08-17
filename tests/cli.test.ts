@@ -7,6 +7,7 @@ describe('parseArgs', () => {
     expect(options.content).toBe('./content');
     expect(options.output).toBe('./dist');
     expect(options.templates).toBe('./templates');
+    expect(options.port).toBe(3000);
   });
 
   it('parses the build command with content and output options', () => {
@@ -62,5 +63,30 @@ describe('parseArgs', () => {
 
     expect(parseArgs(['build', '--templates=theme']).templates).toBe('theme');
     expect(parseArgs(['build', '-t', 'theme']).templates).toBe('theme');
+  });
+
+  it('parses the serve command', () => {
+    const options = parseArgs(['serve']);
+    expect(options.command).toBe('serve');
+    expect(options.port).toBe(3000);
+  });
+
+  it('parses the --port option for serve', () => {
+    expect(parseArgs(['serve', '--port', '8080']).port).toBe(8080);
+    expect(parseArgs(['serve', '--port=9090']).port).toBe(9090);
+    expect(parseArgs(['serve', '-p', '4000']).port).toBe(4000);
+  });
+
+  it('parses content and output options for serve', () => {
+    const options = parseArgs([
+      'serve',
+      '--content',
+      'docs',
+      '--output',
+      'site',
+    ]);
+    expect(options.command).toBe('serve');
+    expect(options.content).toBe('docs');
+    expect(options.output).toBe('site');
   });
 });
