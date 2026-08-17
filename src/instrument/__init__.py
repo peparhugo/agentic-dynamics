@@ -342,6 +342,24 @@ from .workflow_runner import (
     run_workflow,
 )
 
+# v1.0: shared post-hoc job shapes + enqueue primitives (execute -> analyze -> review)
+from .posthoc import (
+    ANALYSIS_QUEUE,
+    ANALYSIS_STATUS,
+    REVIEW_QUEUE,
+    REVIEW_STATUS,
+    DEFAULT_REVIEW_MODEL,
+    analysis_job_from_result,
+    build_analysis_job,
+    build_commit_review_job,
+    build_review_jobs,
+    build_story_review_job,
+    enqueue_job,
+    trigger_analysis,
+    trigger_reviews,
+    worktree_commits,
+)
+
 __all__ = [
     "build_operators", "perturb_prompt", "PERTURBATION_CLASSES", "perturbation_class_for", "derive_seed",
     "stage_summary", "STAGE_KEYS",
@@ -445,4 +463,10 @@ __all__ = [
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",
+    # v1.0 post-hoc job shapes + enqueue primitives
+    "ANALYSIS_QUEUE", "ANALYSIS_STATUS", "REVIEW_QUEUE", "REVIEW_STATUS",
+    "DEFAULT_REVIEW_MODEL",
+    "build_analysis_job", "analysis_job_from_result",
+    "build_commit_review_job", "build_story_review_job", "build_review_jobs",
+    "worktree_commits", "enqueue_job", "trigger_analysis", "trigger_reviews",
 ]

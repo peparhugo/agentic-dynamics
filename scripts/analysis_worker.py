@@ -28,6 +28,7 @@ from instrument.commit_analysis import (
     analyze_story_worktree,
     compute_deep_metrics,
 )
+from instrument.posthoc import trigger_reviews
 from instrument.story import load_story_result
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
@@ -73,6 +74,19 @@ def _connect_redis() -> redis.Redis:
 def _safe_hset(r: redis.Redis, key: str, field: str, value: str) -> None:
     with contextlib.suppress(Exception):
         r.hset(key, field, value)
+
+
+def _trigger_reviews(r: redis.Redis, story_id: str, story_name: str, worktree: Path) -> None:
+    """Enqueue this story's review jobs after analysis completes (best-effort).
+
+    A trigger failure must not fail the analysis — ``enqueue_reviews.py`` is the
+    backfill safety net — so any error is logged and swallowed.
+    """
+    try:
+        n = trigger_reviews(r, story_id, story_name, worktree)
+        log(f"[{story_id}] enqueued {n} review jobs")
+    except Exception as e:
+        log(f"[{story_id}] review trigger failed (non-fatal): {e}")
 
 
 def main() -> None:
@@ -139,6 +153,7 @@ def main() -> None:
             _safe_hset(r, STATUS_KEY, story_id, "done")
             completed += 1
             log(f"[{story_id}] OK ({time.monotonic() - t0:.0f}s)")
+            _trigger_reviews(r, story_id, story_result.story_name, worktree)
         except Exception as e:
             _safe_hset(r, STATUS_KEY, story_id, "failed")
             failed += 1
