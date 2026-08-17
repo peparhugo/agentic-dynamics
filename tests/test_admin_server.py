@@ -34,10 +34,11 @@ class FakePubSub:
 class FakeRedis:
     """Implement only the Redis operations used by the admin routes."""
 
-    def __init__(self, *, statuses=None, results=None, logs=None, messages=None):
+    def __init__(self, *, statuses=None, results=None, logs=None, messages=None, phases=None):
         self.statuses = statuses or {}
         self.results = results or {}
         self.logs = logs or {}
+        self.phases = phases or {}
         self.pubsub_client = FakePubSub(messages)
         self.requested_logs = []
 
@@ -48,6 +49,8 @@ class FakeRedis:
     def hgetall(self, key):
         if key == "story_status":
             return self.statuses
+        if key == "story_phase":
+            return self.phases
         assert key == "story_results"
         return self.results
 
@@ -183,6 +186,23 @@ def test_matrix_preserves_legacy_fields_and_adds_retained_telemetry(monkeypatch)
     assert telemetry["output_tokens"] == 6
     assert [sample["cost"] for sample in telemetry["cells"]["alpha"]["samples"]] == [0.01, 0.02]
     assert redis.requested_logs == ["events_log:alpha", "events_log:beta", "events_log:odd"]
+
+
+def test_matrix_surfaces_live_workflow_phases(monkeypatch):
+    """The ``story_phase`` hash renders as a badge map; malformed entries are dropped."""
+    redis = FakeRedis(
+        statuses={"alpha": "running"},
+        phases={
+            "alpha": json.dumps({"name": "rerun_contaminated", "index": 4, "total": 7}),
+            "beta": "not-json",
+            "gamma": json.dumps({"index": 2, "total": 3}),  # no name -> dropped
+        },
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    body = server.app.test_client().get("/api/matrix").get_json()
+
+    assert body["phases"] == {"alpha": {"name": "rerun_contaminated", "index": 4, "total": 7}}
 
 
 def test_matrix_ignores_invalid_telemetry_but_preserves_reported_zero(monkeypatch):

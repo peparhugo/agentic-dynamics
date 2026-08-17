@@ -60,6 +60,38 @@ def test_run_workflow_phases_in_order(tmp_path):
     assert result.phases[0].cost_usd == 0.001
 
 
+def test_run_workflow_publishes_phase_per_phase(tmp_path, monkeypatch):
+    """Each phase start publishes {name, index, total} to the live publisher."""
+    import instrument.workflow_runner as wr
+
+    published = []
+
+    class FakePublisher:
+        def __init__(self, cell_id):
+            self.cell_id = cell_id
+            self.enabled = True
+
+        def set_status(self, status):
+            pass
+
+        def set_phase(self, phase):
+            published.append(phase)
+
+        def publish_event(self, event):
+            pass
+
+    monkeypatch.setattr(wr, "LivePublisher", FakePublisher)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+
+    spec = load_spec(SPEC)
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                 commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
+
+    assert [p["name"] for p in published] == ["scope", "ux_design", "implement", "verify"]
+    assert all(p["total"] == 4 for p in published)
+    assert [p["index"] for p in published] == [1, 2, 3, 4]
+
+
 def test_run_workflow_fails_fast(tmp_path):
     spec = load_spec(SPEC)
     calls = []

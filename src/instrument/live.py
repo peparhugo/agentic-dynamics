@@ -5,6 +5,7 @@ an experiment run never fails because the dashboard is down. Channels mirror
 ``scripts/monitor.py``:
 
     - status hash:      ``story_status``         (cell_id -> queued|running|done|failed|timeout)
+    - phase hash:       ``story_phase``          (cell_id -> {name,index,total})
     - pub/sub channel:  ``status``               (status transitions)
     - pub/sub channel:  ``events:{cell_id}``     (per-cell session event stream)
 """
@@ -21,6 +22,8 @@ REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 STATUS_KEY = "story_status"
+#: Current live workflow phase, keyed by cell_id (display-only badge data).
+PHASE_KEY = "story_phase"
 STATUS_CHANNEL = "status"
 EVENT_CHANNEL_PREFIX = "events:"
 EVENT_LOG_PREFIX = "events_log:"
@@ -89,6 +92,21 @@ class LivePublisher:
         try:
             self._r.hset(STATUS_KEY, self.cell_id, status)
             self._r.publish(STATUS_CHANNEL, json.dumps({"cell_id": self.cell_id, "status": status}))
+        except Exception:
+            self._disabled = True
+
+    def set_phase(self, phase: dict[str, Any]) -> None:
+        """Record the current workflow phase (name/index/total) for this cell.
+
+        Written to the ``story_phase`` hash (``cell_id -> JSON``) so the portal's
+        matrix poll can render a live phase badge without scanning the event log.
+        Display-only: it never feeds status, ledger, or control decisions, so a
+        failure here only disables the badge, never the run.
+        """
+        if not self.enabled:
+            return
+        try:
+            self._r.hset(PHASE_KEY, self.cell_id, json.dumps(phase))
         except Exception:
             self._disabled = True
 

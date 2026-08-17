@@ -32,6 +32,7 @@
 
   const state = {
     cells: {},
+    phases: {},
     statusOverrides: new Map(),
     telemetry: { cells: {}, reported_cost: null, input_tokens: null, output_tokens: null },
     liveSamplesByCell: new Map(),
@@ -333,6 +334,15 @@
       if (selected) heading.appendChild(element("span", "selected-label", "SELECTED"))
       button.appendChild(heading)
       button.appendChild(element("span", "cell-id", cellId))
+
+      // Live workflow phase badge (display-only): "4/7 rerun_contaminated".
+      const phase = state.phases[cellId]
+      if (phase && typeof phase === "object" && typeof phase.name === "string" && phase.name) {
+        const index = Number.isInteger(phase.index) ? phase.index : null
+        const total = Number.isInteger(phase.total) ? phase.total : null
+        const label = `${index !== null ? `${index}/${total ?? "?"}` : ""} ${phase.name}`.trim()
+        button.appendChild(element("span", "phase-badge", label))
+      }
 
       const samples = samplesForCell(cellId)
       const costs = samples.map((sample) => core.safeNumber(sample.cost)).filter((value) => value !== null)
@@ -1221,6 +1231,7 @@
       }
       const snapshotCells = data.cells && typeof data.cells === "object" ? data.cells : {}
       state.cells = applyStatusOverrides(snapshotCells)
+      state.phases = data.phases && typeof data.phases === "object" ? data.phases : {}
       state.telemetry = data.telemetry && typeof data.telemetry === "object"
         ? data.telemetry
         : { cells: {}, reported_cost: null, input_tokens: null, output_tokens: null }

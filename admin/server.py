@@ -56,6 +56,7 @@ from instrument.live import (
     EVENT_CHANNEL_PREFIX,
     EVENT_LOG_MAX,
     EVENT_LOG_PREFIX,
+    PHASE_KEY,
     STATUS_CHANNEL,
     STATUS_KEY,
 )
@@ -742,6 +743,29 @@ def _retained_telemetry(redis_client, cell_ids) -> dict[str, Any]:
     }
 
 
+def _parse_phases(payloads) -> dict[str, dict[str, Any]]:
+    """Decode the ``story_phase`` hash into ``{cell_id: {name, index, total}}``.
+
+    Each value is a JSON object written by ``LivePublisher.set_phase``. A malformed
+    or empty entry is dropped (the badge is display-only), so a partial write can
+    never affect the matrix status contract.
+    """
+    phases: dict[str, dict[str, Any]] = {}
+    for cell_id, raw in payloads.items():
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if not isinstance(parsed, dict) or not parsed.get("name"):
+            continue
+        phases[cell_id] = {
+            "name": parsed.get("name"),
+            "index": parsed.get("index"),
+            "total": parsed.get("total"),
+        }
+    return phases
+
+
 @app.get("/api/matrix")
 def api_matrix() -> Response:
     """Return the legacy fleet matrix plus additive retained telemetry."""
@@ -750,6 +774,7 @@ def api_matrix() -> Response:
         remaining = r.llen(QUEUE_KEY)
         statuses = r.hgetall(STATUS_KEY)
         results = r.hgetall(RESULTS_KEY)
+        phase_payloads = r.hgetall(PHASE_KEY)
     except Exception:
         return jsonify({"error": "redis_unavailable", "cells": {}}), 503
 
@@ -768,6 +793,7 @@ def api_matrix() -> Response:
         "completed": completed,
         "results_saved": len(results),
         "cells": statuses,
+        "phases": _parse_phases(phase_payloads),
     }
     design_stream_ids: list[str] = []
     try:
