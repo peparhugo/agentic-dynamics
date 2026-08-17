@@ -1,0 +1,108 @@
+name: control_room_workflow_phase
+question: >-
+  The Control Room shows a workflow cell as "running" but not WHICH phase it is on (e.g.
+  remediation 4/7 rerun_contaminated). The phase is only visible after the fact in the git
+  "[workflow] <phase>" commit. Can we publish the live phase (name + index/total) from
+  workflow_runner.py as each phase starts, and render it as a phase badge on the workflow
+  cell in the Control Room matrix/status?
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool:
+      - deepseek/deepseek-v4-pro
+      - deepseek/deepseek-v4-flash
+    context:
+      problem: >-
+        On 2026-08-17 a remediation workflow cell showed "running" with no stage information;
+        the operator had to read the worktree git log to learn it was on phase 4/7
+        (rerun_contaminated). The live phase is not published anywhere.
+      mechanism: >-
+        workflow_runner.py (run_workflow) already computes the phase list and commits each
+        phase with "[workflow] <phase>". It also publishes cell status via live.LivePublisher.
+        The fix publishes the phase (name, index, total) to Redis as each phase starts, and
+        the Control Room reads it for workflow cells.
+      design_constraint: >-
+        Reuse the existing LivePublisher / Redis telemetry (127.0.0.1:6380 db 1) — no new
+        transport. Phase is advisory display only (heuristic), never a control signal. Do not
+        disturb the phase commit or ledger logic.
+    phases:
+      - name: survey
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Map how workflow cells are published and rendered, and where the phase should slot in.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - src/instrument/workflow_runner.py  (run_workflow, PhaseResult, LivePublisher usage, _cell_id)
+          - src/instrument/live.py             (LivePublisher / status channel / event channel)
+          - admin/server.py + admin/static/    (how wf_* cells are rendered in the matrix/status)
+
+          REQUIREMENTS:
+          - Produce a touchpoint map: where the workflow cell status is published (file:line),
+            where it is rendered in the Control Room, and the exact Redis key to add the live
+            phase (name + index/total). Note which tests cover workflow publishing.
+          - Do NOT modify code.
+
+          DELIVER exactly one file: docs/workflow_phase_survey.md.
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Publish the live workflow phase and render it as a badge in the Control Room.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/workflow_phase_survey.md  (produced by the survey phase)
+
+          REQUIREMENTS:
+          - In workflow_runner.run_workflow, publish the current phase (name, phase_index, phase_total)
+            to Redis as each phase starts — reuse LivePublisher or a small hash keyed by cell_id.
+          - In admin/server.py + admin/static/, render the phase on the workflow cell as a badge
+            like "4/7 rerun_contaminated" in the matrix and/or status/SSE stream.
+          - Preserve the existing phase commit + ledger behavior. Phase is display-only.
+
+          DELIVER the implementation.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Test the phase badge and write the verification.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Extend tests/test_workflow_runner.py and tests/test_admin_server.py (or frontend) to
+            cover: the phase is published at phase start, and it is rendered on the workflow cell.
+          - Run the targeted tests explicitly and report commands + results.
+          - Write docs/workflow_phase_verify.md with PASS/FAIL per check.
+
+          DELIVER the tests plus the verification doc.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: phase_visibility, plane: measurement, evidence_class: "[M]", requires: [], produces: [workflow_phase]}
+metrics:
+  - {name: phase_published_at_start, agg: ratio, over: cell}
+  - {name: phase_rendered_on_cell,   agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, survey, implementation, verification]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
