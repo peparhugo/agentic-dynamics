@@ -249,6 +249,7 @@ class Candidate:
     authority: Authority
     locator: str                  # durable source locator (for the citation).
     commit_sha: str = ""
+    repository_id: str = ""       # the cell scope a candidate belongs to ("" = unscoped/legacy).
     observed_at: str | None = None
     lexical_rank: int | None = None     # None = absent from the lexical leg.
     dense_rank: int | None = None       # None = absent from the dense leg.
@@ -386,6 +387,22 @@ def exact_identifier_hit(candidate: Candidate, exact_terms: list[str]) -> bool:
             if t in lowered_locator or t in lowered_text:
                 return True
     return False
+
+
+def scope_excluded(candidate_repository_id: str, requested_scope: str) -> bool:
+    """Return True when a candidate is hard-excluded by the requested repository scope.
+
+    Mirrors the commit pre-filter: the requested scope is the cell's ``repository_id``. A
+    candidate carrying a *different, non-empty* scope is excluded — another cell's knowledge
+    must never surface, even when its text is near-identical. An *empty* candidate scope is
+    treated as unknown/legacy and stays eligible (back-compatible): it is unscoped data, not
+    "global". An empty requested scope disables the filter (no exclusion).
+    """
+    return bool(
+        requested_scope
+        and candidate_repository_id
+        and candidate_repository_id != requested_scope
+    )
 
 
 def graph_boost(seed_score: float, depth: int, relationship: str) -> float:
@@ -913,6 +930,7 @@ def retrieve(
             authority=authority,
             locator=meta.get("logical_locator", cid),
             commit_sha=meta.get("commit_sha", commit_sha),
+            repository_id=meta.get("repository_id", ""),
             observed_at=meta.get("observed_at"),
             dense_rank=rank,
             dense_score=hit.get("distance"),
@@ -942,6 +960,7 @@ def retrieve(
                 authority=_coerce_authority(props.get("authority")),
                 locator=props.get("logical_locator", props.get("doc_id", cid)),
                 commit_sha=props.get("commit_sha", commit_sha),
+                repository_id=props.get("repository_id", ""),
                 observed_at=props.get("observed_at"),
                 lexical_rank=rank,
                 lexical_score=hit.get("score"),
@@ -950,6 +969,15 @@ def retrieve(
         )
         ranks.setdefault(cid, {})["lexical"] = rank
         raw_scores.setdefault(cid, {})["lexical"] = hit.get("score")
+
+    # Scope isolation (HARD pre-filter): the cell's repository_id must never leak another
+    # cell's knowledge, even when the two scopes hold near-identical text. Applied before
+    # fusion so an excluded candidate can never become a graph-expansion seed.
+    requested_scope = str(filters.get("repository_id", ""))
+    if requested_scope:
+        candidates = [
+            c for c in candidates if not scope_excluded(c.repository_id, requested_scope)
+        ]
 
     # Fuse, content-hash dedupe, then cosine-redundancy collapse (conflicts survive).
     fused = fuse_candidates(
@@ -987,6 +1015,8 @@ def retrieve(
                 cid = node.get("canonical_id") or _canonical_id(props, node.get("id", ""))
                 if cid in fused_ids:
                     continue  # already a direct seed candidate — never re-added
+                if scope_excluded(props.get("repository_id", ""), requested_scope):
+                    continue  # another cell's neighbor never surfaces via expansion
                 origin = node.get("origin_seed") or ""
                 seed_score = seed_scores.get(origin)
                 if seed_score is None or seed_score <= 0:
@@ -1006,6 +1036,7 @@ def retrieve(
                         authority=_coerce_authority(props.get("authority")),
                         locator=props.get("logical_locator", cid),
                         commit_sha=props.get("commit_sha", commit_sha),
+                        repository_id=props.get("repository_id", ""),
                         observed_at=props.get("observed_at"),
                         graph_depth=depth,
                         graph_path=list(node.get("path", [])),

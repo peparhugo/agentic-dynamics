@@ -454,3 +454,32 @@ def test_rag_explicit_repository_id_is_preserved(tmp_path, monkeypatch):
     # per-cell default.
     assert captured["repository_id"] == "shared-scope"
 
+
+def test_retrieve_construct_render_path_never_writes():
+    """The augmentation seam is read-only; the sole KB writer is the opt-in emit_self path.
+
+    ``retrieve -> construct -> render`` must reference ``publish_event`` ZERO times — the
+    seam reads (dense + lexical retrieval) and constructs (one flash-model call), but it can
+    never write the knowledge plane. The only write is the self-build producer
+    (``emit_phase_finding``), reached exclusively through ``_emit_self_finding`` (gated by
+    ``rag_params.emit_self``).
+    """
+    import inspect
+
+    import instrument.prompt_constructor as pc
+    import instrument.retrieval as retrieval_mod
+    from instrument import workflow_runner as wr
+
+    # The two read-side modules never reference publish_event.
+    for mod in (retrieval_mod, pc):
+        assert "publish_event" not in inspect.getsource(mod)
+
+    # The seam's retrieve/construct/render functions never reference publish_event either.
+    for fn in (wr._augment_prompt, wr._default_retrieve_fn, wr._default_construct_fn):
+        assert "publish_event" not in inspect.getsource(fn)
+
+    # The write is funneled through emit_phase_finding (not publish_event) and lives only in
+    # the emit_self helper — so an augmented phase can never write except through emit_self.
+    assert "emit_phase_finding" in inspect.getsource(wr._emit_self_finding)
+    assert "publish_event" not in inspect.getsource(wr._emit_self_finding)
+
