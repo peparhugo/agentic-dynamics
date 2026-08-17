@@ -27,6 +27,13 @@ workflow:
         across providers. Never enqueue a single-provider block. Bound the worker count to the
         number of distinct providers (or fewer) so concurrent workers spread instead of hammering
         one provider's rate limit.
+      full_pipeline: >-
+        A cell is not "done" until the FULL post-hoc chain has run: execute (run_story/run.py)
+        -> analyze (enqueue_analysis + analysis_worker: AST + SonarQube + conventions) ->
+        review (enqueue_reviews + review_worker + finalize) -> measure. The 2026-08-15
+        remediation dropped analyze + review on its re-run cells; do NOT repeat that — the
+        enqueue phase must chain into analyze then review before the measure phase, or the
+        results lack structural and review signals.
     phases:
       - name: observe
         kind: agent
