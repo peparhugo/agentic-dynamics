@@ -1,0 +1,147 @@
+name: routing_kb_experiment_design_research
+question: >-
+  DeepSeek-only, live-research pass: design an experiment that puts the repo's routing +
+  knowledge-base machinery to the test against a REAL, open-source, non-trivial seed repository
+  and a REAL task (bug fix / feature / refactor), where the seed repo and task are VERIFIED by
+  live web research — not guessed from training corpus. Every external claim must be backed by a
+  source actually fetched (webfetch / gh api / git ls-remote / curl), with a pinned commit hash.
+  This is a re-run of the design phase with a hard research contract, because the prior pass was
+  corpus-only (no live fetch) and produced an unverified substrate.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      brief: >-
+        This pass exists to correct the prior DeepSeek pass's one real failure: it proposed a
+        seed repo + bug from training-corpus recall, with "concrete issue/commit pinned at
+        implementation time" — i.e. unverified. You are to do LIVE research. The machinery map
+        (routing, KB, measurement) is the same as before; what changes is that the seed repo and
+        task must be REAL and VERIFIED, with fetched sources. Output is still survey -> design ->
+        proposal in docs/.
+      research_contract: >-
+        HARD REQUIREMENT — this is a live-research run, not a corpus-recall run. (1) For the seed
+        repository, actually fetch it: its GitHub page / README / issue tracker via `webfetch`, and
+        `gh api repos/<owner>/<repo>` + `git ls-remote` via bash to pin a REAL commit hash. (2)
+        Verify the task is REAL: fetch the actual PR or issue that introduced/fixed the bug (gh api
+        repos/<owner>/<repo>/pulls/<n> or /issues/<n>), read the diff, and confirm it is a genuine
+        one-line-or-larger change — not something you imagined. (3) Cite EVERY external claim with
+        the URL or `gh api` endpoint you actually fetched AND the commit hash. A claim without a
+        fetched source is a failure. (4) Fetch and read at least 6 distinct sources (README, a PR,
+        an issue, the test file, docs, the project page). Tag external claims `[X]`. (5) The `gh`
+        CLI and `curl` are available via bash — use them.
+      load_bearing_rule: >-
+        A control rule may only consume already-measured information. The routing policy
+        (route_step / recommend_route) consumes the measured signal store; the KB (retrieve)
+        consumes measured findings. State which signals each arm consumes, confirm they are
+        measured (test_executed_success, cost, flail, confidence are in LEDGER_FIELDS), and flag
+        anything unmeasured.
+      prior_art:
+        - src/instrument/routing.py            # compute_routing / recommend_route / simulate_strategies
+        - src/instrument/step_routing.py       # route_step / ModelSignals / MEASURED_SIGNALS / FORBIDDEN_SIGNALS / cache_switch_penalty
+        - src/instrument/retrieval.py          # retrieve / scope_excluded / build_evidence_cards / fallback modes
+        - src/instrument/knowledge_ingestion.py # derive_records / derive_phase_record / emit_phase_finding
+        - src/instrument/workflow_runner.py    # rag_augment seam / cell_scope / emit_self (per-cell scope isolation)
+        - src/instrument/test_runner.py        # test_executed_success (independent suite runner)
+        - src/instrument/efficiency.py         # PROVIDER_PRICING / compute_efficiency
+        - src/instrument/review.py             # commit/story review strategies
+        - src/instrument/experiment_spec.py    # ExperimentSpec + validate_rules (the load-bearing gate)
+    phases:
+      - name: survey
+        kind: agent
+        prompt: |
+          Map the routing + KB + measurement machinery, and shortlist REAL seed repositories — by
+          actually fetching them. Write docs/routing_kb_survey.md.
+
+          GOAL:
+          {goal}
+
+          RESEARCH CONTRACT (HARD — every point):
+          - Use `webfetch` and bash (`gh api`, `git ls-remote`, `curl`) to research REAL, current
+            sources. Do NOT answer from training-corpus recall alone.
+          - For EACH shortlisted repo, fetch its GitHub page/README/issue tracker, and pin a REAL
+            commit hash via `git ls-remote <url>` or `gh api repos/<owner>/<repo>`. Never a guessed hash.
+          - For the task, fetch the ACTUAL issue/PR (gh api .../pulls/<n> or .../issues/<n>), read the
+            diff/body, and confirm the bug/fix is real.
+          - Cite every external claim with the fetched URL or `gh api` endpoint AND the commit hash.
+            Tag external claims `[X]`. Fetch at least 6 distinct sources.
+
+          PART A — THE MACHINERY (read the code, cite file:line for every claim):
+          - Routing: routing.py (compute_routing / recommend_route / simulate_strategies) and
+            step_routing.py (route_step, ModelSignals, MEASURED_SIGNALS, FORBIDDEN_SIGNALS,
+            cache_switch_penalty, validate_preferences).
+          - KB: retrieval.py (retrieve, scope_excluded, build_evidence_cards, fallback modes),
+            knowledge_ingestion.py (derive_records, derive_phase_record, emit_phase_finding), and the
+            rag_augment seam + cell_scope() + emit_self in workflow_runner.py. Note the per-cell
+            repository_id scope and the shared-scope override.
+          - Measurement: test_runner.py (test_executed_success), efficiency.py (PROVIDER_PRICING),
+            basin.py (flail/escape). Confirm which signals are in LEDGER_FIELDS (experiment_spec.py).
+
+          PART B — SEED REPOSITORY (REAL, verified, non-trivial but tractable):
+          - Shortlist 3-5 REAL open-source repos (clonable, runnable test suite, sized for a
+            minutes-to-an-hour cell). For each: the fetched URL, a pinned commit hash, why it is
+            non-trivial, and 1-2 concrete REAL tasks (a fetched PR/issue) it could host.
+
+          DELIVER docs/routing_kb_survey.md: (1) machinery map with file:line, (2) measured-signal
+          inventory, (3) the VERIFIED seed-repo shortlist with fetched URLs + commit hashes + real
+          tasks, (4) open questions for the design phase.
+      - name: design
+        kind: agent
+        prompt: |
+          Design the experiment, on a VERIFIED substrate. Write docs/routing_kb_design.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          RESEARCH CONTRACT (carried forward): every external claim stays cited with the fetched URL
+          and commit hash; the chosen seed repo + task must come from your survey's VERIFIED shortlist.
+
+          DESIGN REQUIREMENTS:
+          1. Seed repo + task — pick ONE verified repo + ONE real task (a fetched PR/issue) from the
+             shortlist. State the exact commit hash and the fetched source. Justify non-trivial /
+             testable / tractable, and how it is a fair substrate for routing + KB.
+          2. The factor grid — model (the pool in play), routing strategy (recommend_route vs
+             route_step vs fixed vs random), KB scope (bare / historical / self_built / shared), and
+             one further dimension (review strategy / policy / perturbation). Declare the cross-product.
+          3. Measurement — primary outcome (test_executed_success, cost per accepted outcome, flail),
+             comparison (arm_factor, loss), stop (budget, uncertainty). Include the held-out test /
+             evaluator_independent mechanism.
+          4. Load-bearing rule — every signal each arm consumes; measured vs unmeasured; what must be
+             instrumented first.
+          5. Interpretation — what confirms routing pays / KB pays / null, and the next grid (adapt).
+
+          DELIVER docs/routing_kb_design.md: (1) verified seed repo + task (URLs + hashes), (2) the
+          grid, (3) measurement + comparison + stop, (4) signal/instrumentation table, (5)
+          interpretation + adapt, (6) failure modes.
+      - name: proposal
+        kind: agent
+        prompt: |
+          Consolidate into a final proposal + an ExperimentSpec-shaped plan. Write docs/routing_kb_proposal.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DELIVER docs/routing_kb_proposal.md: (1) executive summary, (2) the VERIFIED seed repo + task
+          (clone URL, pinned commit hashes, fetched source, the held-out test), (3) the experiment spec
+          (factors/design/rules/metrics/comparison/stop/adapt, shaped to pass validate_rules), (4)
+          integration plan (unchanged modules + still-missing wiring), (5) how to read the result, (6)
+          risks. Keep every external citation with its fetched URL + commit hash.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: files_created, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
