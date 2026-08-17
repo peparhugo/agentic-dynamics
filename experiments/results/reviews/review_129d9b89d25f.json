@@ -1,0 +1,94 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "129d9b89d25f",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "5b3ee495f4ebad72d857c2728867b685b32cdd5a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "c536a73f2c7eccb6d3fa84e7036d863bcaa56811",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "5e8d3d3f058a9fbfc2bdd7dcd59daf569f0b9bb5",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "49a9b605d642e96f6c5102a7c8e2162d18fdde8e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "b7d80e8fef2523466a8ebf548eba07802e452e9d",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "The seed auth-API `index.ts` at the repo root was never removed \u2014 it survives all 5 sessions unchanged as dead code importing undeclared deps (express, jsonwebtoken, better-sqlite3, bcryptjs), a hygiene debt no later session cleaned up",
+      "Session 2 hand-rolled two regex-based template engines (Handlebars subset + EJS) instead of adding deps; the fragile, non-nested-block parser was then carried into the plugin layer and had to be supported by every subsequent session",
+      "EJS rendering uses `Function('context', 'with(context){...}')`, i.e. arbitrary code execution from template files \u2014 a latent security risk whose severity grows as template usage expands",
+      "Session 4's `require(configured)` for `ssg.config.ts` only works under ts-jest/ts-node; it will fail in the compiled `dist` CLI the package.json `bin` points at",
+      "Session 4 refactor compressed core plugin functions into dense one-liners (readability/maintainability cost) and produced an empty `DevServerPlugin implements Plugin {}` stub that never actually hooks the plugin lifecycle",
+      "Tests were written at every session but the sandbox lacked npm, so at least the final session could not execute them ('TESTS: 0 passed, 0 failed')"
+    ],
+    "key_decisions": [
+      "Session 1: adopted gray-matter + marked as the markdown parsing/rendering core, with recursive content discovery and a hand-written HTML document shell",
+      "Session 2: built a dependency-light dual template engine (Handlebars-subset and EJS) with layouts and partials instead of adding handlebars/ejs packages",
+      "Session 3: integrated a full dev server with chokidar file watching, debounced rebuilds with pending-flag coalescing, and WebSocket live-reload injection",
+      "Session 4: restructured the whole tool into a lifecycle-hook plugin architecture (onStart/beforeBuild/onFile/afterBuild/onEnd) with defineConfig and dynamic ssg.config.ts loading \u2014 the pivotal architectural choice",
+      "Session 5: added a content-hash incremental build cache (.ssg-cache.json, SHA-256 source + template invalidation, stale-page removal, --incremental/--clean) threaded through the BuildContext"
+    ],
+    "trajectory_description": "Quality improved steadily across the five sessions, tracing a textbook arc: a clean, minimal, well-tested greenfield core (S1), a feature-dense templating layer (S2) that introduced hand-rolled engine complexity, a polished live-reload dev server integration (S3), a bold but double-edged refactor into a plugin architecture (S4) that cleanly absorbed all prior work yet compressed code into unreadable one-liners and left a non-functional plugin stub, and finally a genuinely sophisticated incremental-build caching layer (S5) with strong invalidation tests. Tests were authored at every step and the design remained consistent throughout, though the S2 engine decisions and the unremoved seed file represented ongoing debt that later sessions worked around rather than eliminated.",
+    "summary": "A highly coherent, improving story that progressed logically from a clean markdown core through templating, a live-reload dev server, a plugin architecture, and a content-hash incremental cache \u2014 its main weaknesses being the orphaned auth seed left in place and the hand-rolled template engines that constrained later work."
+  }
+}

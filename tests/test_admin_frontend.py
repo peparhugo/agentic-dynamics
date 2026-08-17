@@ -139,6 +139,18 @@ def test_spend_rail_surfaces_retained_window_truncation():
     assert "#spend-provenance" in app
 
 
+def test_workflow_phase_badge_rendered_on_fleet_cards():
+    """The live phase ({index}/{total} {name}) is drawn as a badge on each fleet card."""
+    app = (STATIC / "app.js").read_text()
+    css = (STATIC / "style.css").read_text()
+
+    # The matrix snapshot feeds per-cell phase data into the fleet rendering.
+    assert "state.phases" in app
+    assert "data.phases" in app
+    assert 'element("span", "phase-badge"' in app
+    assert ".phase-badge" in css
+
+
 def test_supervisor_surface_preserves_human_action_and_single_terminal_boundaries():
     """The no-build client exposes deliberate controls without a second terminal."""
     html = (STATIC / "index.html").read_text()
@@ -162,3 +174,32 @@ def test_supervisor_surface_preserves_human_action_and_single_terminal_boundarie
     assert "confirmation !== `INTERRUPT ${flag.session_id}`" in app
     assert "grid-template-areas:" in css
     assert '"attention"' in css
+
+
+def test_pipeline_stages_surface_three_stage_view():
+    """The shell renders execute → analyze → review and the client parses them."""
+    html = (STATIC / "index.html").read_text()
+    app = (STATIC / "app.js").read_text()
+    core = (STATIC / "control-room-core.js").read_text()
+    css = (STATIC / "style.css").read_text()
+
+    # The shell exposes a dedicated pipeline region named for the three stages.
+    assert 'id="pipeline-stages"' in html
+    assert 'class="pipeline-stages"' in html
+    for stage in ("EXECUTE", "ANALYZE", "REVIEW"):
+        assert stage in html
+
+    # The client holds the stage snapshot and renders it from the matrix payload.
+    assert "stages: {}," in app
+    assert "state.stages = data.stages" in app
+    assert "function renderPipelineStages()" in app
+    assert "renderPipelineStages()" in app
+
+    # The core status vocabulary recognizes the review worker's retry_N states.
+    assert 'status.startsWith("retry_")' in core
+    assert "retry: 1" in core
+
+    # Stage cards have their own presentation styles.
+    assert ".pipeline-stages" in css
+    assert ".pipeline-stage" in css
+    assert ".stage-counts" in css

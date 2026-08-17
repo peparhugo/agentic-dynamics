@@ -1,0 +1,208 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "c1f6615093df",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "48e7df0905fed895e875c3e5f6e0f09543c391aa",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.68,
+      "convention_adherence": 0.53,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "82 naming violations across index.ts, dev-server.ts, markdown.ts (classes/interfaces not PascalCase, functions not camelCase, constants not UPPER_CASE) \u2014 convention score 0.53 in the very first scaffolding commit"
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +45 across only 3 new functions suggests over-dense logic seeded early in the greenfield codebase"
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "SonarQube reports +2 new bugs on a greenfield baseline; a clean scaffold should introduce zero"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "+3 code smells in the initial scaffold will compound across subsequent sessions"
+        }
+      ],
+      "strengths": [
+        "Sensible greenfield toolchain: ts-jest preset, jest, typescript \u2014 consistent with a CLI/SSG project shape",
+        "package-lock.json committed (lockfileVersion 3) \u2014 reproducible, pinned dependency resolution",
+        "Standard SSG stack (gray-matter + marked) fits the static-site-generation task domain",
+        "Zero duplication (0.0%) in the new code"
+      ],
+      "summary": "Architecturally reasonable greenfield scaffolding for an SSG (good stack + lockfile, zero duplication), but convention adherence is weak at 0.53 \u2014 82 naming violations and 2 bugs seeded in session 1 set a debt baseline for the rest of the story.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "a79ca2c8111ab68c9058317a9e5b18a8ce669899",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "769a5f48595c743dc6214679e7ec22b02426f4b3",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.53,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "CLI arg-parsing is duplicated: the serve branch reimplements the same flag loop as the build branch instead of sharing one parser, only adding --port handling."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Convention score 0.53 with 82 violations across new/touched files (dev-server.ts, index.ts, markdown.ts): functions not camelCase, classes/interfaces not PascalCase, constants not UPPER_CASE."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +62 from the dense serve/dev-server wiring (watcher startup, WebSocket reload, file serving) could be decomposed into smaller helpers."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "Runtime dependency surface grows by two packages (chokidar, ws) for the dev server; justified for the shipped feature, but it couples serve logic into the main bundle."
+        }
+      ],
+      "strengths": [
+        "Type-safe CLI extension: ParseResult union widened with ServeOptions and ServeOptions extends BuildOptions, so option shapes stay shared and checked.",
+        "Thorough --port validation (numeric, 1-65535, rejects missing/flag-like values) and graceful SIGINT/SIGTERM shutdown via server.close().",
+        "Clean dependency hygiene: chokidar/ws as runtime deps, @types/ws as devDependency, lockfile updated consistently.",
+        "Serve/live-reload is idiomatically isolated into its own module, keeping cli.ts focused on argument handling."
+      ],
+      "summary": "Architecturally sound integration of a serve + live-reload subcommand with type-safe CLI extension and correct dependency hygiene, but the 0.53 convention score (82 naming violations) and duplicated arg-parsing add measurable maintainability debt.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "cc867f0bb438906dc67171c78481769f418f960c",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.82,
+      "convention_adherence": 0.53,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "82 convention violations per static analysis, yielding a convention score of 0.53 \u2014 flagged across index.ts, dev-server.ts, and markdown.ts (naming rules: classes/interfaces PascalCase, functions camelCase, constants UPPER_CASE)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +30 with 1 new smell concentrated in the 248-line dev-server.ts (live-reload injection + WebSocket lifecycle); a 'refactor' commit should ideally reduce, not grow, complexity."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "loadConfig() uses require() on an arbitrary resolved path and silently swallows all errors, masking a misconfigured or non-loadable ssg.config with a fallback to defaults."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Three re-export shim files (plugins/dev-server.ts, markdown.ts, templates.ts) add an indirection layer; they preserve the public API, but every export added in src/plugins/ must now be mirrored in the shim."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "No test files appear in the +12-file diff for the new PluginPipeline/SSGEngine lifecycle, which is the commit's core new surface."
+        }
+      ],
+      "strengths": [
+        "Clean plugin architecture: a single PluginPipeline with well-named lifecycle hooks (onStart/beforeBuild/onFile/afterBuild/onEnd) mirrors established SSG patterns",
+        "SSGEngine.fromOptions() deduplicates plugins by name, giving deterministic composition of CLI/config/default plugins",
+        "Re-export shims preserve the existing public plugin API, so the refactor is backward compatible",
+        "Duplication decreased (-0.4%) and zero new bugs introduced despite +850/-403 lines of reorganization",
+        "Efficient parallel write of build outputs via Promise.all"
+      ],
+      "summary": "Strong, backward-compatible architectural refactor extracting a proper engine + plugin pipeline with zero new bugs and reduced duplication, though the measured 0.53 convention score and +30 complexity temper the score \u2014 and I flag a discrepancy: the sample violations (PascalCase classes, camelCase functions) contradict the visible code, which follows those rules correctly, suggesting the checker may be applying non-TypeScript naming rules.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "4ce408138ab08890b82c8ff229d4a8da7aa65713",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +68 for +757 lines \u2014 the BuildCache state machine (decide()/shouldSkipIndex()/removeStaleOutputs()) layers multiple conditionals and four in-memory maps, making invalidation paths hard to follow."
+        },
+        {
+          "category": "other",
+          "severity": "major",
+          "description": "SonarQube reports a +1 bug delta in the new caching code; the stale-output cleanup / index-skip logic should be verified with a correctness test."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Measured convention score is 0.53 with violations in the file this commit touches (index.ts: Classes/Interfaces should use PascalCase), alongside pre-existing dev-server.ts and markdown.ts violations."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "hashFile() re-reads every source file from disk on each build to decide cache hits \u2014 O(n) I/O per run; acceptable for small sites but scales poorly."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Convention score of 0.53 is largely cumulative: most flagged violations (dev-server.ts, markdown.ts) predate this commit, and the new cache.ts itself follows PascalCase/camelCase conventions cleanly."
+        }
+      ],
+      "strengths": [
+        "Cross-cutting cache concern cleanly extracted into a dedicated module with a static-factory + private-constructor pattern and immutable readonly fields.",
+        "Well-typed public surface (CacheManifest, CacheEntry, CacheDecision) that reuses existing Page/BuildOptions types.",
+        "Content-addressed invalidation via source + template SHA-256 hashes with atomic manifest persistence; duplications improved by -0.4%.",
+        "Fully async I/O with no blocking calls and defensive error handling around missing files."
+      ],
+      "summary": "A legitimate and well-factored incremental-build cache for the SSG, but +1 new bug and +68 cognitive complexity make it a net-neutral commit that adds technical debt despite clean module boundaries.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "Convention debt seeded in session 1 (82 naming violations, score 0.53) was never remediated \u2014 convention adherence stayed flat at 0.53-0.55 across all 5 sessions despite the session 4 refactor",
+      "The bad_seed Todo-API index.ts was ignored and left orphaned as dead code in the tree for the entire story; its deps (express, better-sqlite3) are absent from package.json, so the file is silently broken",
+      "Duplicated CLI arg-parsing between the build and serve branches (introduced session 3, flagged by review) was never unified in the session 4 refactor",
+      "Cognitive complexity accrued monotonically (+45 S1, +62 S3, +68 S5); the plugin refactor reorganized code but did not reduce overall complexity",
+      "Session 5's caching introduced a +1 bug delta (stale-output cleanup / index-skip logic) without a dedicated correctness test for that path"
+    ],
+    "key_decisions": [
+      "Standard SSG stack chosen in greenfield \u2014 gray-matter + marked + ts-jest with committed lockfile \u2014 a reproducible, task-appropriate foundation",
+      "Handlebars template engine with layouts/partials isolated in its own src/templates.ts module (session 2) rather than inlined in the builder",
+      "Dev server with live reload (chokidar + ws) implemented as a separate src/serve.ts module with type-safe CLI option extension (ServeOptions extends BuildOptions)",
+      "Plugin system refactor (session 4): PluginPipeline with lifecycle hooks, SSGEngine.fromOptions() with name-based plugin deduplication, and backward-compatible re-export shims \u2014 the strongest architectural move",
+      "Cross-cutting incremental-build caching (session 5) extracted into a dedicated BuildCache module with content-addressed SHA-256 hashing, injected via ctx.shared in the plugin pipeline"
+    ],
+    "trajectory_description": "Quality improved across the story, both architecturally and in tested correctness. The test suite grew monotonically (1\u21922\u21923\u21924\u21925 passing tests), and the peak was session 4's plugin-system refactor (architectural fit 0.82, judged 'better', with reduced duplication and a preserved public API via shims), which session 5 then built directly on by threading the BuildCache through the plugin pipeline's shared context \u2014 clear evidence of session-to-session coherence. However, the arc was flat on maintainability discipline: the convention score never climbed above 0.55, session 3's duplicated CLI parsing was left in place, and session 5's caching added a bug and +68 cognitive complexity. Net result: a functionally richer, better-factored codebase whose latent debt was inherited from the initial scaffold rather than repaired.",
+    "summary": "A coherent, progressively improving 5-session story (greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting) whose strong plugin-architecture payoff in session 4 enabled a natural caching finale, but which never paid down the naming and complexity debt seeded in session 1 or the orphaned bad_seed file."
+  }
+}

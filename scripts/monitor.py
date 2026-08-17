@@ -12,8 +12,12 @@ import os
 import sys
 import time
 from collections import Counter
+from pathlib import Path
 
 import redis
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from instrument.pipeline_status import stage_summary
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -21,6 +25,14 @@ REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
 STATUS_KEY = "story_status"
 RESULTS_KEY = "story_results"
+# Post-hoc pipeline stages (execute → analyze → review). Each is a Redis
+# list (queue) + hash (status) on the same framework Redis, written by the
+# analysis/review workers. None of them publish to a pub/sub channel, so they
+# are only visible through the poll-driven snapshot, never the SSE stream.
+ANALYSIS_QUEUE_KEY = "analysis_jobs"
+ANALYSIS_STATUS_KEY = "analysis_status"
+REVIEW_QUEUE_KEY = "review_jobs"
+REVIEW_STATUS_KEY = "review_status"
 
 # Cell ids are "<model>_<story>_<tier>_<quality>_<condition>". Underscores also
 # appear inside several of those components, so split by known values instead
@@ -40,13 +52,14 @@ def _parse_cell_id(cell_id: str) -> tuple[str, str, str, str]:
 
 
 def get_status(r: redis.Redis) -> dict:
-    """Get current experiment status from Redis."""
-    remaining = r.llen(QUEUE_KEY)
-    all_statuses = r.hgetall(STATUS_KEY)
-    results = r.hgetall(RESULTS_KEY)
+    """Get current experiment status across all three pipeline stages."""
+    execute = stage_summary(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY)
+    analyze = stage_summary(r, ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY)
+    review = stage_summary(r, REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY)
 
-    counts = Counter(all_statuses.values())
-    total = len(all_statuses)
+    # Keep the legacy flat fields + story breakdowns so existing consumers of
+    # ``--json`` keep working; the ``stages`` block is purely additive.
+    all_statuses = execute["cells"]
 
     # Count by model, story, tier, condition
     by_model = Counter()
@@ -62,19 +75,20 @@ def get_status(r: redis.Redis) -> dict:
         by_condition[condition] += 1
 
     return {
-        "total": total,
-        "remaining_in_queue": remaining,
-        "queued": counts.get("queued", 0),
-        "running": counts.get("running", 0),
-        "done": counts.get("done", 0),
-        "failed": counts.get("failed", 0),
-        "timeout": counts.get("timeout", 0),
-        "completed": counts.get("done", 0) + counts.get("failed", 0) + counts.get("timeout", 0),
-        "results_saved": len(results),
+        "total": execute["total"],
+        "remaining_in_queue": execute["remaining_in_queue"],
+        "queued": execute["queued"],
+        "running": execute["running"],
+        "done": execute["done"],
+        "failed": execute["failed"],
+        "timeout": execute["timeout"],
+        "completed": execute["completed"],
+        "results_saved": execute["results_saved"],
         "by_model": dict(by_model),
         "by_story": dict(by_story),
         "by_condition": dict(by_condition),
         "by_tier": dict(by_tier),
+        "stages": {"execute": execute, "analyze": analyze, "review": review},
     }
 
 
@@ -102,6 +116,22 @@ def print_status(status: dict, clear_screen: bool = True) -> None:
     print(f"  Results saved: {status['results_saved']}")
     print()
 
+    stages = status.get("stages")
+    if stages:
+        print("  Pipeline stages:")
+        for name, label in (("execute", "EXECUTE"), ("analyze", "ANALYZE"), ("review", "REVIEW")):
+            stage = stages.get(name, {})
+            detail = (
+                f"done {stage.get('done', 0)} | running {stage.get('running', 0)}"
+                f" | queued {stage.get('queued', 0)} | failed {stage.get('failed', 0)}"
+            )
+            if stage.get("retry"):
+                detail += f" | retry {stage['retry']}"
+            if stage.get("timeout"):
+                detail += f" | timeout {stage['timeout']}"
+            print(f"    {label:<8} {detail}")
+        print()
+
     if status.get("by_model"):
         print(f"  By model: {status['by_model']}")
     if status.get("by_story"):
@@ -118,10 +148,13 @@ def main() -> None:
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
     if clear:
-        r.delete(QUEUE_KEY)
-        r.delete(STATUS_KEY)
-        r.delete(RESULTS_KEY)
-        print("Queue cleared.")
+        for key in (
+            QUEUE_KEY, STATUS_KEY, RESULTS_KEY,
+            ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY,
+            REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY,
+        ):
+            r.delete(key)
+        print("Queue cleared (execute, analyze, review).")
         return
 
     status = get_status(r)

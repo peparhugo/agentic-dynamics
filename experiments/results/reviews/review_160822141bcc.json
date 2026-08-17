@@ -1,0 +1,138 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "160822141bcc",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "ccc5e333ca38bd6c201642f79bd58089b3cbbb95",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.45,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "36 naming violations across every core source file (index.ts, build.ts, cli.ts): snake_case functions, non-PascalCase classes/interfaces, non-UPPER_CASE constants. Being baked into the greenfield foundation, they will compound across the 5-story sessions. Mechanical score 0.55 confirms."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "SonarQube cognitive complexity +25 over only +4 functions in a scaffold commit \u2014 core logic starts life over-complex, well above typical greenfield levels."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube reports +2 bugs and +2 smells in the initial scaffold, leaving latent defects to carry into later sessions."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Discrepancy: AST diff reports +0 classes yet convention violations flag class/interface naming in 3 files \u2014 the naming linter and AST counter disagree on what constitutes a class; worth reconciling in the measurement stack."
+        }
+      ],
+      "strengths": [
+        "Idiomatic jest.config.js with ts-jest preset, node test environment, and scoped tests root",
+        "Commits package-lock.json, ensuring reproducible dependency resolution across sessions",
+        "Well-matched toolchain for a static site generator (commander + gray-matter + marked) \u2014 architecturally sound choice",
+        "Small, focused diff outside the generated lockfile (~645 lines of real code over 4 functions)"
+      ],
+      "summary": "A decent greenfield SSG scaffold (good toolchain, proper lockfile) whose 36 foundational naming violations \u2014 a snake_case/PascalCase breakdown in every core file \u2014 sink the convention score to 0.55 and seed debt that the remaining story sessions will inherit.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "691ee496628da41a468e56e7a6a9b4e6e00fc720",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "No test files changed; the new TemplateEngine, custom template/layout loading, and the new --templates CLI path are exercised without automated coverage."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Default page/index/layout sources are now embedded as raw Handlebars strings in TypeScript, duplicating markup previously written as template literals and making the defaults harder to diff against the on-disk templates they emulate."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "Adding handlebars@4.7.9 pulls a new runtime dependency (plus minimist/neo-async/source-map/uglify-js transitive) for a rendering feature that was previously dependency-free; promotes uglify-js and wordwrap from dev to prod edges in the lockfile."
+        }
+      ],
+      "strengths": [
+        "Extends the existing build pipeline cleanly by threading an engine through renderPage/renderIndex rather than rewriting the render path",
+        "Per-page frontmatter template/layout selection is consistent with the existing gray-matter parsing pattern for title/date/tags",
+        "The --templates CLI option mirrors the established --content/--output option style with sensible defaults"
+      ],
+      "summary": "A well-scoped feature addition that cleanly layers Handlebars templating onto the existing builder, though it ships with no tests for the new rendering surface.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "9f2348782f7904dbb8d344d7494056a6765c0265",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "47dea0be019f8f6bc985d655f8bad5c36eab2ba2",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "9b1284a6b582d2dba4dec0c2afa321fa8fc991da",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Session 4's refactor left a vestigial `DevServerPlugin` (empty class) \u2014 the dev server remains a standalone `startDevServer()` calling `buildSite` directly, so it was never actually wired into the plugin pipeline it was supposedly refactored into",
+      "The session-2 hand-rolled regex-based Handlebars/EJS engines persist through all 5 sessions; the EJS path uses `Function('context', 'with(context){...}')` (eval-style execution), a latent code-injection risk that was never replaced with real libraries",
+      "Orphaned dead code accumulates: the original auth-API seed `index.ts` (with a contradictory 'NestJS-like Auth API' doc comment) remains at repo root and is never deleted, alongside compat shims (`src/server.ts`, root `plugins/*.ts`) that split the final tree between root-level and src-level files",
+      "Session 5's render-cache skip in `TemplatePlugin` keys on a global `context.stats.pagesSkipped > 0` condition and relies on the subtle invariant that only skipped pages carry `renderedHtml` \u2014 functional but fragile; a changed page whose hash differs can still reuse stale cached HTML if the guard is tripped by another page"
+    ],
+    "key_decisions": [
+      "Session 1 discarded the unrelated auth-API seed and scaffolded a fresh `src/` project with CLI entrypoint, tsconfig/jest config, and a first test \u2014 establishing a clean base",
+      "Session 2 built a dependency-free regex-based Handlebars/EJS template engine with partials and layouts instead of pulling in real template libraries, trading two dependencies for a permanent custom maintenance surface",
+      "Session 3 integrated a dev server as a standalone module (chokidar watch + debounced rebuilds + WebSocket live-reload + path-traversal guard) rather than folding serving into the build core",
+      "Session 4 re-expressed the whole system as a plugin pipeline (`onStart/beforeBuild/afterBuild/onFile/onEnd` hooks with a shared `BuildContext`), shrinking the core `src/index.ts` from ~300 to ~80 lines and shipping the parser/templater as first-class plugins",
+      "Session 5 added incremental builds via sha256 content-hashing + template-hash fingerprinting persisted to `.ssg-cache.json`, threading cache/stats through `BuildContext` and adding `--incremental`/`--clean` CLI flags"
+    ],
+    "trajectory_description": "Quality improved monotonically across the five sessions. Session 1 established disciplined scaffolding and the first test; Session 2 added a substantial, well-tested templating feature (growing tests to cover Handlebars, EJS, partials, and layouts); Session 3's dev server is competent production code with debounced rebuilds, live-reload, and path-traversal protection; Session 4 was a strong architectural refactor that cut the core module by ~75% and introduced a clean plugin abstraction; Session 5 capped the arc with hash-based incremental caching backed by thorough invalidation tests (test suite grew from 1 to 6 cases spanning parse, build, both template engines, and cache invalidation). The only stumbles are cosmetic-to-moderate: the plugin refactor left a vestigial DevServerPlugin and stray compat shims, the custom eval-based template engine carried a latent security risk to the end, and the cache-skip logic leans on a fragile global guard \u2014 none of which blocked the progression.",
+    "summary": "A coherent greenfield\u2192feature\u2192integration\u2192refactor\u2192cross-cutting arc that steadily improved architecture and test coverage, marred only by leftover dead code and a partially-applied plugin refactor."
+  }
+}

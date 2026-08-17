@@ -65,6 +65,134 @@ def test_run_workflow_phases_in_order(tmp_path):
     assert result.phases[0].cost_usd == 0.001
 
 
+def test_run_workflow_publishes_phase_per_phase(tmp_path, monkeypatch):
+    """Each phase start publishes {name, index, total} to the live publisher."""
+    import instrument.workflow_runner as wr
+
+    published = []
+
+    class FakePublisher:
+        def __init__(self, cell_id):
+            self.cell_id = cell_id
+            self.enabled = True
+
+        def set_status(self, status):
+            pass
+
+        def set_phase(self, phase):
+            published.append(phase)
+
+        def publish_event(self, event):
+            pass
+
+    monkeypatch.setattr(wr, "LivePublisher", FakePublisher)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+
+    spec = load_spec(SPEC)
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                 commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
+
+    assert [p["name"] for p in published] == ["scope", "ux_design", "implement", "verify"]
+    assert all(p["total"] == 4 for p in published)
+    assert [p["index"] for p in published] == [1, 2, 3, 4]
+
+
+def test_run_workflow_publishes_phase_before_agent_runs(tmp_path, monkeypatch):
+    """The phase badge is set at phase *start*, before the agent is invoked."""
+    import instrument.workflow_runner as wr
+
+    order = []
+
+    class FakePublisher:
+        def __init__(self, cell_id):
+            self.enabled = True
+
+        def set_status(self, status):
+            pass
+
+        def set_phase(self, phase):
+            order.append(("phase", phase["name"]))
+
+        def publish_event(self, event):
+            pass
+
+    monkeypatch.setattr(wr, "LivePublisher", FakePublisher)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+
+    spec = load_spec(SPEC)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        order.append(("agent",))
+        return _fake_agent()
+
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                 commit=False, run_agentic_fn=agent)
+
+    # scope, ux_design, implement are agent phases (phase-before-agent); verify is
+    # a test phase and emits a phase start with no agent invocation.
+    assert order == [
+        ("phase", "scope"), ("agent",),
+        ("phase", "ux_design"), ("agent",),
+        ("phase", "implement"), ("agent",),
+        ("phase", "verify"),
+    ]
+
+
+def test_run_workflow_resume_publishes_original_phase_index(tmp_path, monkeypatch):
+    """On resume, the badge keeps the 1-based absolute index, not a re-based one."""
+    import instrument.workflow_runner as wr
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    captured = []
+
+    class FakePublisher:
+        def __init__(self, cell_id):
+            self.enabled = True
+
+        def set_status(self, status):
+            pass
+
+        def set_phase(self, phase):
+            captured.append(phase)
+
+        def publish_event(self, event):
+            pass
+
+    monkeypatch.setattr(wr, "LivePublisher", FakePublisher)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+
+    spec = load_spec(SPEC)
+    calls = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        calls.append(prompt)
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "x.md").write_text(str(len(calls)))  # unique -> commits
+        return _fake_agent(ok=len(calls) < 3, error="boom")
+
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    # implement (3rd agent call) failed -> only scope + ux_design committed.
+
+    captured.clear()
+    calls.clear()
+
+    def agent2(prompt, *, model, backend, workdir, **kwargs):
+        calls.append(prompt)
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "x.md").write_text(str(len(calls)))
+        return _fake_agent()
+
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                 resume=True, run_agentic_fn=agent2)
+
+    assert [p["name"] for p in captured] == ["implement", "verify"]
+    assert [p["index"] for p in captured] == [3, 4]
+    assert all(p["total"] == 4 for p in captured)
+
+
 def test_run_workflow_fails_fast(tmp_path):
     spec = load_spec(SPEC)
     calls = []

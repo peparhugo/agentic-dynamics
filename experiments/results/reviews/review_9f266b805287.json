@@ -1,0 +1,215 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "9f266b805287",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "cf82c252e2442ca4f88e760f9d764a4703936b46",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.62,
+      "convention_adherence": 0.49,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Single commit deletes the entire working Express Todo API (index.ts, -106 lines) and replaces it with an unrelated static site generator, destroying prior functionality with no migration or preservation path. This matches the greenfield story design, but as a code review it is a wholesale swap rather than an incremental change."
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "package.json declares bin -> lib/cli.js and build -> tsc, but no tsconfig.json or outDir is added in this commit, so the default tsc emit lands alongside src/ and the declared binary entry point would not resolve after a build."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Convention score 0.49 with 45 violations including Functions using snake_case, non-PascalCase interfaces/classes, and non-UPPER_CASE constants flagged in cli.ts and dev-server.test.ts. Note a discrepancy: cli.ts in this diff is visibly camelCase, and dev-server.test.ts is not part of this commit, so part of the violation set may target pre-existing or unshown files."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta shows +3 smells and +19 cognitive complexity, indicating the new modules add complexity beyond a straightforward SSG baseline."
+        }
+      ],
+      "strengths": [
+        "Clean separation of concerns: cli.ts handles argument parsing while generator.ts holds pure build logic behind a typed Page/BuildOptions interface.",
+        "Tests are colocated with source and are real integration tests (temp-dir fixtures) that assert rendered HTML output, nested paths, frontmatter, index generation, and error handling.",
+        "escapeHtml is applied to rendered output, mitigating XSS from content titles.",
+        "Minimal, appropriate dependencies (gray-matter, marked) with no superfluous packages.",
+        "In greenfield story context, replaces an irrelevant seed with code aligned to the actual task (static site generation)."
+      ],
+      "summary": "A greenfield story commit that delivers a reasonable, tested SSG structure but scores poorly on conventions (0.49, 45 violations), leaves the build config incomplete (no tsconfig for the declared lib/cli.js bin), and swaps out a working app wholesale, netting worse than the prior state.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "594aec5fa64ad3e19f2c90b9abb484dd49da1b87",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "2624623cf9576338143782c81db0a0a006754367",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The measured convention violations (45; snake_case functions, non-PascalCase classes) do NOT appear in this diff \u2014 the analyzer appears misconfigured or scanning out-of-scope files. Only the 'Constants should be UPPER_CASE' rule has merit (module constants reloadClient and contentTypes are camelCase). Flagging the measurement as unreliable."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Measured cognitive complexity +39 and +4 smells for a +188-line change is high. parseArguments now branches across two commands and five flags, and sendFile nests multiple conditionals; the CLI arg parser is growing into a small dispatcher that should be split per-command."
+        },
+        {
+          "category": "robustness",
+          "severity": "minor",
+          "description": "servedPath calls decodeURIComponent on raw request paths, which throws URIError on malformed input (e.g. '%'), and the async sendFile handler has no try/catch \u2014 an exception becomes an unhandled rejection and the socket hangs rather than returning a 4xx."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "serve mode uses the same --output directory as the served root and rebuilds in place, so pointing it at a production dist path would clobber deployed output; a temp output dir (or an --output isolation convention) would be safer."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "Request path does sync existsSync followed by a second stat() call (TOCTOU + double syscall + sync I/O in a server handler); a single async stat check would suffice."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "readFile is dynamically imported inside sendFile while stat is statically imported at module top \u2014 inconsistent style for no functional benefit."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Second test depends on chokidar's debounce timing and rebuild racing the WebSocket message; functionally sound (reload signal fires after rebuild) but has flake potential on loaded CI machines."
+        }
+      ],
+      "strengths": [
+        "Clean module separation: dev-server.ts is a self-contained unit that reuses buildSite rather than reimplementing generation.",
+        "Path traversal protection is correctly implemented via resolve() + prefix check in servedPath.",
+        "Live-reload client is injected only at serve time, keeping build output clean \u2014 the right architectural decision.",
+        "port: 0 support enables real integration tests; the two tests cover serving, HTML transformation, rebuild-on-change, and WebSocket signaling.",
+        "Sensible minimal dependencies (chokidar, ws, @types/ws) and an updated usage error string covering both commands.",
+        "Arg parsing and error handling style matches the existing cli.ts patterns."
+      ],
+      "summary": "Well-fitted, well-tested dev-server feature that respects existing generator patterns, but carries real complexity growth (cognitive +39) and minor error-handling/perf gaps \u2014 and the 0.49 convention score is largely a measurement artifact since the cited violations don't exist in this diff (only the UPPER_CASE-constants rule legitimately applies).",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "fea445a25b946bbcb5f4875f2f60447bf74d9bf3",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "engine.test.ts 'loads plugins from ssg.config.ts' writes ssg.config.ts into process.cwd() (repo root, pollutes the workspace and races parallel runs) and begins with `if (existsSync(config)) return;`, which silently no-ops the assertion whenever that file happens to exist \u2014 the test can pass without exercising anything."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "This is a 'refactor' session, yet SonarQube shows cognitive complexity +16 and the AST shows +347/-236 lines \u2014 the change grew the codebase and added branching instead of simplifying it, which is the opposite of the stated refactor intent."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "The dev server (a runtime concern) was relocated under plugins/, conflating a long-running server with build-time plugin hooks; placement inside the plugin namespace muddies the boundary between the plugin extension model and core serving infrastructure."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "engine.ts mixes synchronous (existsSync, readFileSync from 'node:fs') and promise-based (readFile, writeFile from 'node:fs/promises') filesystem APIs in the same module, an inconsistent I/O pattern."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Convention score 0.49 with 45 violations (non-PascalCase classes/interfaces, snake_case functions, non-UPPER_CASE constants across cli.ts and dev-server.test.ts, etc.) \u2014 the refactor left extensive naming-scheme debt rather than cleaning it up."
+        }
+      ],
+      "strengths": [
+        "dev-server.ts re-exports startDevelopmentServer and its types, preserving the public API surface so existing consumers are unaffected.",
+        "Bugs +0 and smells -1, and the plugin engine gets lifecycle-order unit tests."
+      ],
+      "summary": "The refactor preserves the dev-server API and removes a smell, but the +16 cognitive complexity increase, 45 naming violations (score 0.49), a test that silently skips when ssg.config.ts exists, and writing to process.cwd() during tests make it a net regression despite the cleaner plugin seam.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "888d707d8255ef6f08800ef635e10ee1ecdcfd96",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "SonarQube delta shows +1 bug and cognitive complexity +24: hash-based invalidation, template hashing, and clean/incremental semantics are all concentrated in the engine build path, making the module's control flow significantly harder to follow."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Convention score is 0.49 with 45 violations; module-level constant `cacheFileName` should be UPPER_CASE per the checker."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "`.ssg-cache.json` is written into the output directory, so it could be deployed/served to end users alongside generated pages."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "CachedPage carries `output` and `renderMs` fields that are never consumed, adding dead weight to the cache schema."
+        }
+      ],
+      "strengths": [
+        "Feature is test-driven: covers incremental rebuild of only changed sources, template-change invalidation, and clean-build semantics.",
+        "Integrates with existing patterns \u2014 extends BuildOptions, reuses the Plugin/Page contract, and threads typed BuildStats through the CLI rather than inventing a new output path.",
+        "Sound invalidation design with cache versioning and a whole-template-directory hash."
+      ],
+      "summary": "A coherent, well-tested incremental-build feature that respects existing engine patterns, but the cache logic adds real complexity (+24 cognitive, +1 bug) and mild debt (cache file in output dir, dead schema fields).",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Sessions 1-2 accumulated all logic (markdown parsing, both template engines, escaping, index generation) into a monolithic index.ts (~340 LOC), forcing Session 4 to do a large net -63 LOC extraction into src/plugins/; the refactor resolved it cleanly rather than harming later work",
+      "Hand-rolled regex-based Handlebars/EJS subsets avoided npm template dependencies, which keeps the package lean but silently limits engine features (no block helpers beyond if/each) for downstream users",
+      "The seed codebase (an Express/JWT auth API) was entirely discarded by the greenfield Session 1, so none of the starter scaffolding carried forward \u2014 expected for a greenfield story but means the seed contributed nothing"
+    ],
+    "key_decisions": [
+      "Discard the auth-API seed and build a fresh static-site generator in Session 1 rather than adapt the seed",
+      "Implement two template engines (Handlebars + EJS subsets) with partials, layouts, and frontmatter-selectable template/layout, with HTML-escaped output by default and raw output via triple-mustache/<%-",
+      "Extract a plugin architecture in Session 4 (Plugin interface with onStart/beforeBuild/onFile/afterBuild/onEnd lifecycle hooks, built-in markdown/template/dev-server plugins, and ssg.config.ts config loading) \u2014 the pivotal choice that enabled the final session",
+      "Add a content-addressed incremental cache in Session 5 (.ssg-cache.json with SHA-256 source+template hashing, render/frontmatter reuse, and stale-file cleanup) guarded by a renderCacheEnabled flag that disables HTML reuse whenever custom onFile plugins exist",
+      "Build a dev server with chokidar watching, WebSocket live-reload injection, and explicit path-traversal protection in static file serving"
+    ],
+    "trajectory_description": "Quality improved steadily across all five sessions. Session 1 delivered a functional but minimal core (markdown-to-HTML build with a CLI); Session 2 added genuine templating capability (Handlebars/EJS layouts and partials with correct escaping); Session 3 integrated a working dev server with live reload and hardened file serving; Session 4 was a large, successful refactor that shrank index.ts from roughly 340 to 120 lines while introducing a clean plugin architecture, all tests preserved; Session 5 applied a substantive cross-cutting optimization (incremental caching with source/template invalidation) and showed real correctness awareness by disabling render reuse in the presence of onFile plugins. Test coverage grew from 2 to 8 tests spanning frontmatter, both template engines, layouts, partials, incremental builds, and clean builds. The arc moves from a monolith to a modular, plugin-extensible, cache-aware system, with the mid-story refactor paying off directly in the final session; the only caveat is that tests could not be executed in the sandbox due to missing npm/pytest, so correctness rests on the code's structure rather than a verified green run.",
+    "summary": "A highly coherent five-session arc that takes a greenfield static site generator from a minimal monolith through templating, a live dev server, a clean plugin-architecture refactor, and a correctness-aware incremental cache \u2014 the strongest session (5) directly builds on the architectural investment of session 4."
+  }
+}

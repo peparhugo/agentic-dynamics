@@ -1,0 +1,178 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "0ab211aa1fa9",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "4e3a25a465b87a19375e966673f359abd47a1d5a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.65,
+      "convention_adherence": 0.45,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "69 naming-convention violations across the new modules (builder.ts, cache.ts, cli.ts): snake_case functions, camelCase classes/interfaces, non-UPPER_CASE constants; convention score 0.55."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Introduced +3.0% code duplication (SonarQube delta) in the new greenfield code."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +34 (SonarQube delta), indicating nested/conditional-heavy functions in the replacement code."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "index.ts seed (~200 LOC, a working modular auth API) was deleted wholesale rather than extended; new project identity (name 'ssg', bin dist/index.js) diverges from the seed \u2014 expected for a greenfield session but no existing pattern is carried forward."
+        }
+      ],
+      "strengths": [
+        "Bugs +0 with smells -4 (SonarQube), an improvement over the baseline.",
+        "Clean modular decomposition across dedicated files (builder.ts, cache.ts, cli.ts) instead of one monolithic module.",
+        "Jest/ts-jest testing infrastructure added (jest.config.js) with a tests/ root and coverage config."
+      ],
+      "summary": "Greenfield rewrite delivers a modular SSG with no new bugs and fewer smells, but 69 naming violations, added duplication, and higher complexity make it a net step down from the cleaner seed it replaced.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "bbf47c0ceb65a29738420bbd9fe7c8c18ea07b4e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "The new TemplateEngine module (src/templates.ts, ~163 lines) ships with no new test file; custom template/layout resolution, builtin fallback, and RenderContext population are untested paths beyond the existing build() coverage."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "BUILTIN_DEFAULT_TEMPLATE and BUILTIN_DEFAULT_LAYOUT duplicate the HTML previously inlined in renderPage (matches duplications +8.2%), creating two sources of truth for the default site markup that can drift."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "templatesDir defaults to path.resolve('templates') relative to process CWD rather than to contentDir; building from a different working directory silently falls back to builtins instead of erroring, which can mask misconfiguration."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Cognitive complexity +35 (SonarQube) concentrates in the new template resolution/rendering path; reasonable for a feature addition but worth extracting the traversal/resolution logic on a follow-up."
+        }
+      ],
+      "strengths": [
+        "Clean module separation: templating isolated in src/templates.ts with typed RenderContext and exported constants, wired through index.ts consistently with existing exports.",
+        "Refactor improves cohesion: extracting renderMeta and pageContext keeps builder.ts focused on page lifecycle while rendering delegates to the engine.",
+        "Frontmatter-driven template/layout selection reuses the existing normalize* pattern (normalizeDate/normalizeTags/normalizeName) rather than inventing new conventions.",
+        "CLI flag follows the established --content/--output pattern including the -t short form and help text update."
+      ],
+      "summary": "A well-structured, pattern-consistent feature addition (better), though the mechanical convention score of 0.55 over-counts pre-existing and mis-detected violations in untouched files like cache.ts \u2014 the commit's own additions follow the file's camelCase/PascalCase conventions \u2014 and it ships minor duplication debt (+8.2%) plus a new module without dedicated tests.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "d4060505e8aacfea86c15ca054a48a1bb33f9bf2",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Mechanical analyzer reports convention score 0.55 with 69 violations (Classes/Interfaces should use PascalCase, Constants should be UPPER_CASE, Functions should not use snake_case) across builder.ts, cache.ts, cli.ts \u2014 largely pre-existing code from Sessions 1-2, though the new server.ts lowerCamelCase consts (server, wss, watcher, rebuild) may also trip the analyzer's constant-naming rule."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "server.ts adds +45 cognitive complexity (232-line module with nested http/WS/chokidar lifecycle and an async close() teardown chain of 7 sequential awaits), making the shutdown path hard to follow."
+        }
+      ],
+      "strengths": [
+        "Integration is coherent: server.ts reuses build() from builder, is exported through index.ts, and follows the existing module/interface/named-export pattern",
+        "132 lines of new tests (tests/server.test.ts, tests/cli.test.ts); full suite green (52 tests, 6 suites) and typecheck clean",
+        "Good security hygiene: isInside() path-traversal guard returns 403, upgrade handler destroys sockets on non-matching path",
+        "Debounced rebuild (50ms) with awaitWriteFinish and a complete close() that terminates WS clients and drains server connections",
+        "Appropriate dependency choices (chokidar for watching, ws for live reload); 3 runtime deps + 1 dev dep, all used; duplications -3.0%"
+      ],
+      "summary": "A well-integrated dev-server/live-reload feature that cleanly reuses the existing build pipeline with passing tests and proper cleanup, though the mechanical convention score (0.55, 69 mostly pre-existing violations) is notably lower than the idiomatic style the new code appears to follow.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "0173ef2a8663b0683800c27a204b00ff963222b1",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "config.ts uses runtime require('typescript') + transpileModule to execute a TS config file, making typescript a runtime dependency and executing user-supplied config code dynamically \u2014 a nonstandard pattern vs. a plain JSON/JS config loader."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta shows +2 smells and +19 cognitive complexity; new complexity concentrates in engine/plugin wiring, only partially offset by duplications -1.2% and the net -450 line reduction in builder.ts."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Measured convention score 0.55 with 69 violations. Note discrepancy: several listed violations (e.g. 'builder.ts: Classes should use PascalCase', 'builder.ts: Constants should be UPPER_CASE') reference refactored-out code \u2014 the new builder.ts defines no classes/constants and only re-exports PascalCase symbols \u2014 suggesting stale-baseline scan artifacts; cache.ts and cli.ts hits appear legitimate."
+        }
+      ],
+      "strengths": [
+        "Monolithic build() decomposed into Engine + plugin system (Markdown, Template), a genuine architectural improvement separating parse/render/template concerns",
+        "Public API preserved and backward compatible: build(options) signature, Page/BuildOptions/BuildResult re-exports, escapeHtml moved to render.ts and re-exported",
+        "cli.ts integrates config-driven plugin loading cleanly, and duplications dropped 1.2% with a large net line reduction"
+      ],
+      "summary": "A well-shaped refactor that cleanly decomposes the monolithic builder into a plugin-based engine while preserving the public API, though the runtime TypeScript compilation in config.ts and the measured convention score (0.55) introduce new debt.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "a3867763c6b09f22b30919ea5e0134b5cbb41da9",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Session 3's dev server was built as a monolithic src/server.ts (232 lines mixing HTTP, file watching, and live-reload) at 10x the cost of Session 1 (continuation + 3 retries, 43 min); it became the file Session 4 had to dismantle and remains the largest module today (plugins/server.ts, 259 lines) still mixing server, live-reload, and plugin responsibilities.",
+      "Session 1 wholesale-replaced the 200-line seed index.ts rather than building on it, so the seed provided no architectural constraint or signal to later sessions.",
+      "Session 2 hand-rolled a template engine (templates.ts, 163 lines) with its own render context that was only later wrapped in a thin plugin adapter (plugins/templates.ts), leaving a parallel, standalone rendering surface that the plugin system never fully absorbed."
+    ],
+    "key_decisions": [
+      "Session 1 established a typed TypeScript + Jest project skeleton with tests written alongside the core builder/CLI/markdown \u2014 the test-first discipline carried through all 5 sessions (every commit green: 3/3, 4/4, 39/39, 5/5, 6/6).",
+      "Session 2 chose a dependency-light hand-rolled template engine (templates.ts) over adopting hbs/ejs, keeping rendering logic internal but delaying a clean rendering abstraction.",
+      "Session 4's lifecycle-hook Plugin interface (onStart/beforeBuild/onFile/afterBuild/onEnd) with engine/config/render decomposition and a facade that preserved the public API (builder.ts \u2192 thin re-export, server.ts \u2192 shim) \u2014 the pivotal architecture choice that made Session 5's cache injection drop in cleanly.",
+      "Session 5's content-hash cache manifest (.ssg-cache.json) with template-hash invalidation and skip-if-output-exists logic, integrated into the Engine's build loop rather than bolted on at the CLI layer."
+    ],
+    "trajectory_description": "Quality rose across the story with one rocky patch in the middle. Sessions 1 and 2 were clean, incremental additions (core markdown builder, then template/layout support), each with green tests. Session 3 (live-reload dev server) was the hardest and most expensive \u2014 3 retries, a continuation, ~43 minutes and $0.24 \u2014 but still landed functional with 39 passing tests. Session 4 was the strongest step: a genuine refactor that decomposed a 231-line monolithic builder into Engine + Plugin lifecycle hooks + config + render modules while preserving the public API through a facade, and Session 5 (incremental builds/caching) added a substantial cross-cutting feature with a 215-line test file that slots cleanly into the refactored engine. The codebase is visibly more modular at the end than at the start, with the plugin architecture enabling the final feature rather than constraining it.",
+    "summary": "A highly coherent and improving story \u2014 clean greenfield foundation, a costly-but-successful integration session that a strong plugin-architecture refactor redeemed, and a cross-cutting caching feature that landed cheaply on top of it, with every session green on tests."
+  }
+}

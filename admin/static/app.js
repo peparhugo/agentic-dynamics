@@ -27,11 +27,14 @@
     done: "✓",
     failed: "×",
     timeout: "◷",
+    retry: "↻",
     unknown: "?",
   }
 
   const state = {
     cells: {},
+    stages: {},
+    phases: {},
     statusOverrides: new Map(),
     telemetry: { cells: {}, reported_cost: null, input_tokens: null, output_tokens: null },
     liveSamplesByCell: new Map(),
@@ -153,7 +156,7 @@
 
   /** Return normalized status counts for both cards and the command rail. */
   function statusCounts() {
-    const counts = { queued: 0, running: 0, done: 0, failed: 0, timeout: 0, unknown: 0 }
+    const counts = { queued: 0, running: 0, done: 0, failed: 0, timeout: 0, retry: 0, unknown: 0 }
     for (const value of Object.values(state.cells)) counts[core.normalizeStatus(value)] += 1
     return counts
   }
@@ -334,6 +337,15 @@
       button.appendChild(heading)
       button.appendChild(element("span", "cell-id", cellId))
 
+      // Live workflow phase badge (display-only): "4/7 rerun_contaminated".
+      const phase = state.phases[cellId]
+      if (phase && typeof phase === "object" && typeof phase.name === "string" && phase.name) {
+        const index = Number.isInteger(phase.index) ? phase.index : null
+        const total = Number.isInteger(phase.total) ? phase.total : null
+        const label = `${index !== null ? `${index}/${total ?? "?"}` : ""} ${phase.name}`.trim()
+        button.appendChild(element("span", "phase-badge", label))
+      }
+
       const samples = samplesForCell(cellId)
       const costs = samples.map((sample) => core.safeNumber(sample.cost)).filter((value) => value !== null)
       button.appendChild(element("span", "latest-cost", costs.length ? `${formatCost(costs.at(-1))} latest reported step` : "no cost yet"))
@@ -361,6 +373,53 @@
       .join("  ·  ")
     $("#fleet-counts").textContent = countText
     renderRail()
+  }
+
+  /** Pick a border-state class for one pipeline stage from its counts. */
+  function pipelineStageClass(stage) {
+    const total = stage.total ?? 0
+    const done = stage.done ?? 0
+    const failed = stage.failed ?? 0
+    const running = stage.running ?? 0
+    if (running > 0) return "stage-running"
+    if (failed > 0) return "stage-failed"
+    if (total > 0 && done === total) return "stage-done"
+    return "stage-idle"
+  }
+
+  /** Render one stage card: name, total, and done/running/queued/failed counts. */
+  function stageCard(name, label, stage) {
+    const card = element("div", `pipeline-stage ${pipelineStageClass(stage)}`)
+    card.appendChild(element("span", "stage-name", label))
+    card.appendChild(element("span", "stage-total", `${stage.total ?? 0} ${name === "execute" ? "CELLS" : "JOBS"}`))
+    const counts = element("span", "stage-counts")
+    const addCount = (status, value) => {
+      const wrap = element("span", "count")
+      wrap.appendChild(element("span", "n", String(value ?? 0)))
+      wrap.appendChild(document.createTextNode(` ${status}`))
+      counts.appendChild(wrap)
+    }
+    addCount("done", stage.done)
+    addCount("running", stage.running)
+    addCount("queued", stage.queued)
+    addCount("failed", stage.failed)
+    if (stage.retry) addCount("retry", stage.retry)
+    if (stage.timeout) addCount("timeout", stage.timeout)
+    card.appendChild(counts)
+    return card
+  }
+
+  /** Render the execute → analyze → review pipeline summary strip. */
+  function renderPipelineStages() {
+    const container = $("#pipeline-stages")
+    if (!container) return
+    container.replaceChildren()
+    const stages = state.stages && typeof state.stages === "object" ? state.stages : {}
+    const labels = { execute: "EXECUTE", analyze: "ANALYZE", review: "REVIEW" }
+    for (const name of ["execute", "analyze", "review"]) {
+      const stage = stages[name] && typeof stages[name] === "object" ? stages[name] : {}
+      container.appendChild(stageCard(name, labels[name], stage))
+    }
   }
 
   /** Render the bounded flag rail while preserving keyboard focus by session ID. */
@@ -1221,6 +1280,8 @@
       }
       const snapshotCells = data.cells && typeof data.cells === "object" ? data.cells : {}
       state.cells = applyStatusOverrides(snapshotCells)
+      state.stages = data.stages && typeof data.stages === "object" ? data.stages : {}
+      state.phases = data.phases && typeof data.phases === "object" ? data.phases : {}
       state.telemetry = data.telemetry && typeof data.telemetry === "object"
         ? data.telemetry
         : { cells: {}, reported_cost: null, input_tokens: null, output_tokens: null }
@@ -1228,6 +1289,7 @@
       state.lastMatrixAt = Date.now()
       pruneReconciledSamples(requestSequence)
       renderFleet()
+      renderPipelineStages()
       renderSelection()
 
       // Auto-selection is intentionally limited to the unambiguous one-runner arrival case.
@@ -2205,6 +2267,7 @@
 
   bindControls()
   renderFleet()
+  renderPipelineStages()
   renderSelection()
   tick()
   loadMatrix()

@@ -1,0 +1,219 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "657d6252d936",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "b51872d9cfb79abc39ec8419e6ec84508264b376",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.52,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "45 SonarQube convention violations (score 0.52) concentrated on naming: snake_case functions, non-PascalCase classes/interfaces, and non-UPPER_CASE constants across cli.ts, config.ts and other added TypeScript files \u2014 non-idiomatic for TS/JS, which expects camelCase/PascalCase/UPPER_CASE."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +19 across only 7 added functions (~2.7 avg) suggests several new functions in the modules are doing too much and could be decomposed."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "The 200-line seed index.ts was deleted wholesale rather than built upon. Acceptable for a greenfield SSG session (seed was an unrelated auth API), but the delivered project is entirely new rather than an evolution of the baseline."
+        }
+      ],
+      "strengths": [
+        "Monolith decomposed into a modular multi-file architecture (+10 files) with clear separation of cli.ts, config.ts, and core modules",
+        "Jest/ts-jest test harness added with isolated test roots and clearMocks",
+        "SonarQube smells down 4, zero new bugs, zero code duplication introduced",
+        "package-lock.json committed, giving reproducible dependency resolution"
+      ],
+      "summary": "A strong greenfield architectural step \u2014 the agent correctly discarded the unrelated auth-API seed and scaffolded a modular SSG with tests (better than baseline), but the pervasive non-idiomatic TypeScript naming (45 violations, convention score 0.52) will require a later rename pass; my qualitative read agrees with the mechanical convention score.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "2e93f32dfce992e142c0e7056ddf4526dcd72ee8",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "New templating feature (partials, layouts, template selection) ships with zero tests; no test files in the diff despite a ~160-line behavioral surface"
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "Templates are recompiled via handlebars.compile per page inside the render loop instead of compiling once and caching; cognitive complexity +34 suggests this per-page path is overloaded"
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "loadPartials eagerly reads every .hbs file in the partials tree even when unused, adding I/O on every build"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "duplications +5.8% and +1 smell: the ENOENT try/catch guard pattern is repeated across fileExists, loadPartials, and templatePath instead of a single helper"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Mechanical convention score 0.52 with 45 violations flags PascalCase/UPPER_CASE/snake_case issues in cli.ts and config.ts; the flagged items appear pre-existing (config.ts is untouched) and the new code itself uses consistent camelCase matching the files it edits"
+        }
+      ],
+      "strengths": [
+        "Adds path-traversal protection in templatePath (resolve + prefix check) \u2014 a real security concern for template loaders handled correctly",
+        "Uses an isolated Handlebars.create() instance and registerPartial, avoiding global registry pollution",
+        "Backward compatible: templatesDir is optional with a sensible default, CLI flag added alongside the usage string update, existing build behavior unchanged when no templates dir provided",
+        "Follows existing codebase patterns: option-parsing loop, BuildOptions interface extension, fs error handling style consistent with markdownFiles",
+        "Correctly moves handlebars and its transitive deps out of devDependencies into runtime dependencies in package-lock.json"
+      ],
+      "summary": "A solid, security-conscious feature addition that fits the SSG architecture and existing patterns, held back by missing tests, per-page template recompilation, and a mechanical convention score that conflicts with my reading (flagged violations appear pre-existing).",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "851e40ac4aad2d8d6d11e91b5bf1f4f6cd925175",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.52,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "45 convention violations in cli.ts and config.ts: functions use snake_case, classes and interfaces are not PascalCase, constants are not UPPER_CASE (measured convention score 0.52)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity increased by +61 across the new integration code, adding maintainability burden to the watch/live-reload path."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "SonarQube delta reports +2 code smells introduced in the touched files."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "chokidar and ws are appropriate additions for an SSG integration session (file watching + live-reload server), but they broaden the production dependency surface."
+        }
+      ],
+      "strengths": [
+        "Dependency selection is idiomatic for the SSG integration session: chokidar for file watching and ws for a live-reload server.",
+        "package-lock.json is kept consistent with package.json, including @types/ws correctly declared as a devDependency and transitive deps correctly re-flagged as production (anymatch, braces, fsevents, etc.).",
+        "Duplications decreased by 2.1%, indicating the new integration code consolidates rather than copies existing logic."
+      ],
+      "summary": "Architecturally sound feature addition (watch + websocket integration, properly reflected in the lockfile) but it introduces naming-convention debt across cli.ts/config.ts \u2014 agreeing with the measured 0.52 convention score and +61 cognitive complexity.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "dcb80432ca1a82b502ea993b0da3ae912b766c94",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "45 convention violations concentrated in cli.ts and config.ts: functions in snake_case, classes/interfaces not PascalCase, constants not UPPER_CASE (measured convention score 0.52). Notably, the displayed diff for config.ts is clean camelCase/PascalCase, so the violations must live in the truncated cli.ts and other new files \u2014 a discrepancy between what's visible and the measurement, which I treat as ground truth."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "config.ts loadTypeScriptModule monkey-patches Module._extensions['.ts'] and clears require.cache \u2014 fragile and stateful; a dedicated loader (esbuild-register, ts-node, or a worker-based compile) would be less invasive."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "typescript moved from devDependencies to production dependencies to support .ts config loading at runtime; justified architecturally but adds a heavy runtime footprint for what is a build-time concern."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Net cognitive complexity +18 with +581/-377 lines across a 'refactor'; large blast radius, though bugs +0, smells -1, and duplications -0.7% all improve."
+        }
+      ],
+      "strengths": [
+        "Introduces a clean plugin seam with lifecycle hooks (onStart/beforeBuild/afterBuild/onEnd) and a dedicated Plugin/SsgConfig type surface in src/plugin.ts.",
+        "Extracts markdown and template concerns into separate plugin modules, reducing coupling in src/index.ts (formerly ~240 lines of mixed concerns).",
+        "Config loader supports both .js and .ts config files with default-export fallback and explicit validation error.",
+        "SsgEngine class gives an injectable, testable build entry point with resolved options."
+      ],
+      "summary": "A net-positive, well-structured plugin refactor that is architecturally sound (clean seam, extracted concerns, fewer smells/duplications, zero new bugs) but undercuts itself on conventions \u2014 a 0.52 measured convention score with 45 violations in the new files, plus a fragile Module._extensions loader and a heavier runtime dependency, making it 'better' overall while introducing modest technical debt.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "bb8338a4eb4f1669e5dc9dbcf029fbcb6c6240b7",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "SonarQube cognitive complexity +42 concentrated in build(), directoryHash() (nested recursion), and readManifest() (defensive validation). The incremental-build branching and manifest parsing are dense and should be decomposed into smaller focused helpers."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "The cache manifest (.ssg-cache.json) is written inside the output directory, so it becomes a deployed/served static artifact on every build, leaking build internals into the published site."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Measured convention score 0.52 with 45 violations, but the enumerated violations (Classes/Interfaces PascalCase, Constants UPPER_CASE, snake_case in cli.ts and config.ts) are largely pre-existing \u2014 config.ts is untouched by this commit. New code (CachedPage, CacheManifest, BuildStats, CACHE_VERSION) follows TypeScript conventions correctly."
+        }
+      ],
+      "strengths": [
+        "Versioned cache manifest (CACHE_VERSION) with defensive read validation on version, shape, and field types \u2014 no blind trust of cached state.",
+        "Correct incremental invalidation via source-content hash + template-directory hash, with output-file existence check as a final guard.",
+        "Clean refactor to createEngine()/engine.build() that reuses existing BuildContext and runHook patterns, and exposes lastBuildStats telemetry cleanly.",
+        "--incremental/--clean CLI flags gated to the build command with clear usage errors, matching existing arg-parsing style.",
+        "Zero new bugs/smells and reduced duplication (-0.6%); cache hits short-circuit the full rebuild pipeline including plugin hooks safely."
+      ],
+      "summary": "A well-structured incremental-build feature that fits the engine architecture and reuses existing patterns, but the +42 cognitive complexity spike and cache-manifest-in-output-dir placement add moderate maintainability debt; the low 0.52 convention score reflects pre-existing repo violations (e.g. untouched config.ts), not this diff.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "Convention debt (snake_case functions, non-PascalCase classes/interfaces, non-UPPER_CASE constants) introduced in Session 1 was never remediated \u2014 convention score stuck at 0.523 across all 5 sessions and every reviewer flagged it.",
+      "Session 2's per-page Handlebars recompilation and eager partial loading persisted into the plugin era (TemplatePlugin still recompiles per page after the S4 refactor).",
+      "Session 3 shipped the dev server as a dense standalone module (+61 cognitive complexity) with untyped `require('chokidar')`/`require('ws')`, forcing Session 4 to relocate it into the plugin system.",
+      "Session 4 introduced a fragile `Module._extensions` monkey-patch TypeScript config loader \u2014 a new architectural fragility traded for TS-config support.",
+      "Session 5 writes the `.ssg-cache.json` manifest inside the output dir, leaking build internals into the served/deployed site."
+    ],
+    "key_decisions": [
+      "Session 1 discarded the unrelated auth-API seed entirely and scaffolded a fresh modular buildSite() core \u2014 correct given the seed mismatch, but it also fixed the codebase's non-idiomatic naming style.",
+      "Session 2 chose Handlebars over EJS, establishing frontmatter template selection plus partials/layouts conventions.",
+      "Session 3 built the dev server (chokidar watch + WebSocket live reload) as a standalone module wired into the CLI, before the plugin system existed.",
+      "Session 4 extracted the Plugin lifecycle interface (onStart/beforeBuild/onFile/afterBuild/onEnd) and split markdown/template/dev-server into plugins \u2014 the pivotal seam that made Session 5's incremental builds clean and testable.",
+      "Session 5 implemented hash-based `.ssg-cache.json` caching with source + template-hash invalidation, integrated through the plugin build pipeline rather than bypassing it."
+    ],
+    "trajectory_description": "Quality followed a dip-then-rebound arc. Session 1 started strong with a modular, tested greenfield core (2 tests passing); Session 2 delivered a large templating surface with only light test coverage and per-page compile costs; Session 3 pushed cognitive complexity to +61 with a dense, untyped dev-server module and was the weakest commit. Session 4 was the turning point: the plugin refactor cut complexity and smells, gave the system a clean extension seam, and paid down Session 3's debt by relocating the server into DevServerPlugin. Session 5 then delivered the hardest cross-cutting feature (incremental builds with cache invalidation, stale-output removal, and template-change invalidation) with the strongest test suite in the story. The final state is healthy \u2014 all 26 tests across 5 suites pass \u2014 though the flat 0.523 convention score persisted as the single unaddressed defect throughout.",
+    "summary": "A textbook 5-session arc (greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting) where an early complexity dip and pervasive naming-convention debt were largely redeemed by a pivotal Session 4 plugin refactor and a strong Session 5 that landed a clean, well-tested incremental-build system."
+  }
+}

@@ -1,0 +1,205 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "86122da06969",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "f1a7cf1ef116fcdde84a7d0d0cb5a3d7b0c71aa5",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "0d60832fac955ab6dfffba51f0f9506ef444a753",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Frontmatter interface gains a `[key: string]: unknown` index signature and every raw frontmatter field is spread into each Page, loosening the previously curated/typed contract and pushing untyped data downstream to template consumers."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "TemplateEngine is instantiated and loaded eagerly on every build even when no page references a template, coupling render() to an engine the common path may not use."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta shows cognitive complexity +36 and duplications +4.1%; the new frontmatter parse loop and template rendering path duplicate escaping/layout logic previously centralized in layout()."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "handlebars is promoted to runtime dependencies (correct, since it is now required at build runtime), but its transitive lockfile entries (minimist, neo-async, source-map, uglify-js, wordwrap) are correctly re-flagged as non-dev."
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "No test files appear in the diff for the new TemplateEngine or the modified build/frontmatter/render paths."
+        }
+      ],
+      "strengths": [
+        "Coherent feature design: per-page `template`/`layout` frontmatter keys with a clean new `src/templates.ts` module, exported through index.ts following the existing barrel pattern.",
+        "Removes the hardcoded `layout()` HTML string from render.ts in favor of data-driven templates, reducing hardcoding and enabling user-defined layouts.",
+        "Non-template frontmatter keys are preserved generically, so the engine can accept arbitrary data without schema churn per feature."
+      ],
+      "summary": "A reasonable, well-scoped template-engine feature that replaces the hardcoded layout and slots into the existing module structure, offset by a type-safety regression (wildcard Frontmatter + raw data spread into Page), +36 cognitive complexity / +4.1% duplication, and no added tests \u2014 and note the 0.60 convention score appears noisy since the flagged violations (PascalCase/UPPER_CASE/snake_case on untouched cache.ts/cli.ts) contradict standard TypeScript conventions, so I grounded the score in the measurement while flagging the discrepancy.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "f13067afd3d38379cc35230dcff5916470ff786e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.82,
+      "convention_adherence": 0.62,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "@types/chokidar@^1.7.5 is a deprecated stub describing the v1 API while chokidar@3.6.0 (which bundles its own v3 types) is the runtime dependency \u2014 the type versions are mismatched and can mask or corrupt type-checking for the watcher."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Measurement reports 69 convention violations (snake_case functions, non-PascalCase classes/interfaces, lowercase constants) in build.ts/cache.ts/cli.ts \u2014 but build.ts and cache.ts do not exist in this commit's tree, so the scan is stale or from another story; cli.ts (actually modified here) uses camelCase functions and UPPER_CASE constants."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube cognitive complexity +32 and smells +3: serve.ts bundles HTTP static serving, WebSocket broadcast, chokidar watching, and rebuild coalescing into one module; the request-handling and rebuild logic could be factored into smaller units."
+        },
+        {
+          "category": "other",
+          "severity": "minor",
+          "description": "parseArgs does not validate --port (Number.parseInt on arbitrary input yields NaN, which then fails at server.listen), and cli.ts has no --host flag even though ServeOptions exposes host."
+        }
+      ],
+      "strengths": [
+        "The serve/live-reload integration reuses the existing build() and BuildOptions from ssg.ts instead of re-implementing generation \u2014 clean architectural seam for the story's integration session.",
+        "New functionality isolated in a dedicated src/serve.ts module with 216 lines of tests added (5/5 passing in the inspected cell); proper jest/ts-jest usage consistent with the repo's test layout.",
+        "Rebuild is debounced (50ms) with a rebuilding/pending coalescing flag, avoiding rebuild storms under rapid file changes.",
+        "Security-aware: path traversal guard (filePath.startsWith(outputDir + path.sep)) plus 403/404 handling in the static server."
+      ],
+      "summary": "A solid 'integration' commit that cleanly wires a live-reload dev server (chokidar + ws) into the existing build pipeline with good tests; the main blemishes are the stale @types/chokidar dependency and a convention-scan result that references files (build.ts/cache.ts) absent from this commit, so the 0.60 convention score should be treated cautiously.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "0faa3468cd537b664832c953394141d09142570f",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "69 naming-convention violations across build.ts, cache.ts, cli.ts (Classes/Interfaces should use PascalCase, Constants UPPER_CASE, Functions not snake_case); convention score 0.60 falls well short of a healthy refactor."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Silent error swallowing in loadConfig() and resolvePluginEntry() (`catch { continue }` / return []) means a misconfigured config or plugin path fails invisibly with no diagnostic, making debugging harder."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +94 with nested try/catch, recursive flattenPluginExport, and multi-candidate resolvePluginPath \u2014 the config/plugin resolver is more complex than the code it replaces."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "resolvePluginEntry silently returns [] for BUILTIN_PLUGIN_NAMES and unresolvable paths, so a typo'd or unsupported plugin string is dropped without warning instead of failing loudly."
+        }
+      ],
+      "strengths": [
+        "build.ts shrinks from 86 to 33 lines; config loading and plugin resolution are extracted into dedicated modules (config.ts, engine.ts) with clear typed interfaces (BuildInput, SsgConfig).",
+        "Idiomatic config system via defineConfig/normalizeConfig with robust multi-format discovery (ts/mts/js/cjs/mjs/json) mirroring established SSG/tooling patterns.",
+        "Flexible plugin loading that flattens functions, objects, arrays, and module paths into a normalized Plugin[] list, enabling clean extension points."
+      ],
+      "summary": "A directionally sound architectural refactor that decouples config/plugin concerns from the build orchestrator, but it ships with heavy convention violations (69, score 0.60), +94 cognitive complexity, and silent-failure error handling that offset the structural gains.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "6f9e7f8b83269a323acda454d194e7a5eab1f9b7",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.82,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "CachedPage overlaps Page with redundant/ambiguous fields (contentHtml, content, html all present) and cachedToPage() is a manual mapping layer that can drift out of sync with Page as the domain model evolves."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Incremental correctness keys only on sourceHash + templateHash; plugin-derived output (Plugin API) is not hashed, so a plugin whose behavior changes without touching sources/templates will serve stale cached pages."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "The new cache module (hash logic, manifest round-trip, skip-vs-rebuild decision) has no test coverage visible in the diff despite being the most bug-prone new logic."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "hashFile() swallows read errors and returns '', silently degrading cache invalidation instead of surfacing the failure."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Discrepancy flagged per instructions: the reported 69 convention violations (score 0.60) appear to be analyzer false positives \u2014 the diff uses PascalCase classes/interfaces (BuildResult, CachedPage, CacheManager), UPPER_CASE constants (CACHE_VERSION, CACHE_FILENAME, TEMPLATE_EXTS), and camelCase functions throughout, matching the repo's existing TypeScript style."
+        }
+      ],
+      "strengths": [
+        "Backward-compatible API: build() is preserved as a thin wrapper over buildWithStats(), so existing callers and the serve command are unaffected.",
+        "Follows the established module-per-concern layout and reuses existing types (Page, BuildOptions, Frontmatter, Plugin, SsgConfig) rather than inventing parallel abstractions.",
+        "Sound invalidation design: deterministic sha256 over a sorted, recursively collected template tree makes the manifest reproducible across runs.",
+        "Cleanly isolates the feature behind --incremental/--clean CLI flags with an opt-in default, and measurably reduces duplication (-0.7%)."
+      ],
+      "summary": "Well-fitted, backward-compatible incremental-build feature that slots into the existing engine/plugin architecture with clean conventions as written \u2014 the low mechanical convention score (0.60) looks like a misconfigured-analyzer false positive, since the diff consistently uses correct PascalCase/camelCase/UPPER_CASE, with only minor cache-correctness and test-coverage concerns worth addressing.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Session 1 committed compiled dist/ output (and package-lock/node_modules churn) into git; dist/ artifacts carry through all 5 sessions, bloating every diff (session 1 files_changed=5306) and polluting the repo.",
+      "Session 3's live-reload dev server was built monolithically in serve.ts, forcing session 4 to fully rewrite it into the DevServerPlugin (build.ts shrank 86->33 lines, serve.ts was split) \u2014 integration had to be reworked rather than extended.",
+      "The seed codebase (an unrelated Auth API, early_degrade condition) was effectively discarded by session 1's greenfield build, so no carryover value from the tier2 seed.",
+      "Session 2's template engine and session 1's render.ts both own HTML emission, leaving overlapping render responsibilities (render.ts coexists with TemplatePlugin) that the refactor only partially consolidated."
+    ],
+    "key_decisions": [
+      "Plugin lifecycle-hook architecture (onStart/beforeBuild/onFile/afterBuild/onEnd) in session 4 \u2014 markdown, template, and dev-server were all absorbed as plugins, making session 5's incremental engine extension trivial.",
+      "SsgEngine core class with per-build stats and a build context (config, cwd, options) \u2014 separated engine from CLI/build entry points and enabled incremental skip metrics.",
+      "SHA-256 hash-based incremental cache (.ssg-cache.json manifest) with template-directory hash invalidation, wired into the engine as the session-5 cross-cutting feature.",
+      "Handlebars template engine with per-page frontmatter template selection (default template + fallback), built in session 2 and preserved through refactor.",
+      "Config loader (loadConfig/loadConfigFile/resolvePlugins) supporting an ssg config file, introduced in the refactor to unify build and serve entry points.",
+      "chokidar + ws live-reload dev server (session 3) with rebuild debouncing and WebSocket reload broadcast."
+    ],
+    "trajectory_description": "Quality improved steadily and non-monotonically. Session 1 produced a clean, working greenfield SSG (monolithic build.ts, 1/1 tests passing) that served as a sound foundation. Sessions 2 and 3 layered real features \u2014 a Handlebars template engine (2/2 tests) and a chokidar/ws live-reload dev server (3/3 tests) \u2014 but accumulated structural weight in build.ts and serve.ts. Session 4 was the pivotal refactor: a plugin system with lifecycle hooks plus a dedicated SsgEngine core, which cut build.ts from 86 to 33 lines and folded markdown/template/devServer into plugins while keeping all 3 tests green. Session 5 then exploited that architecture to deliver the largest feature (incremental builds + hash cache, engine rewritten, 4/4 tests) at lower cost ($0.033 vs $0.052) and shorter duration (302s vs 614s) than the refactor itself \u2014 evidence the refactor paid off. Across the arc, tests monotonically grew 1->2->3->3->4 with zero retries, cache hit rate held ~0.94-0.96, and confidence stayed at 1.0.",
+    "summary": "A near-textbook story arc \u2014 greenfield to feature growth to a well-timed plugin refactor to a cross-cutting incremental-build capstone \u2014 where the session-4 refactor demonstrably enabled a cheaper, faster session 5, marred only by committed build artifacts and a dev server that needed rework rather than extension."
+  }
+}

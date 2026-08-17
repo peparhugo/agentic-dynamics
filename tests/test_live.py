@@ -60,6 +60,29 @@ def test_publish_status_and_event(monkeypatch):
     assert json.loads(fake.published[1][1])["type"] == "text"
 
 
+def test_set_phase_writes_phase_hash(monkeypatch):
+    """The workflow phase badge writes to the ``story_phase`` hash, keyed by cell."""
+    class PhaseRedis:
+        def __init__(self):
+            self.phases = {}
+
+        def ping(self):
+            return True
+
+        def hset(self, key, field, value):
+            self.phases[(key, field)] = value
+
+    fake = PhaseRedis()
+    monkeypatch.setattr(live_module, "_connect", lambda: fake)
+    pub = LivePublisher("cell_abc")
+
+    pub.set_phase({"name": "rerun_contaminated", "index": 4, "total": 7})
+
+    assert fake.phases[("story_phase", "cell_abc")] == json.dumps(
+        {"name": "rerun_contaminated", "index": 4, "total": 7}
+    )
+
+
 def test_publish_event_maintains_history_log(monkeypatch):
     fake = FakeRedis()
     monkeypatch.setattr(live_module, "_connect", lambda: fake)

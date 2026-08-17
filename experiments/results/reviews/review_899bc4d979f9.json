@@ -1,0 +1,165 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "899bc4d979f9",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "98ca70677a37b13b985fabad8185705b6db8b772",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "8c2bcee60656d38496f3e709a56880eb41c0f830",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "37 convention violations (PascalCase classes/interfaces, camelCase functions, UPPER_CASE constants) push convention score to 0.49"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "+6 SonarQube smells and cognitive complexity +15 indicate the rendering/registration logic is more convoluted than necessary"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "4.4% duplication introduced, likely shared template/engine setup repeated across test blocks"
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "Missing-layout test asserts 'Template not found', which masks a misleading error message rather than distinguishing layout vs template failures"
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "New runtime dependency handlebars is justified, but pins only major version (^4.7.8) with no package-lock check for the added transitive surface"
+        }
+      ],
+      "strengths": [
+        "Feature is a natural architectural extension: TemplateEngine consumes the existing ParsedPage type from parser, preserving the pipeline shape",
+        "Types correctly separated \u2014 @types/handlebars added to devDependencies, not dependencies",
+        "Comprehensive coverage: 404 lines of tests exercising templates, layouts, partials, and error paths",
+        "No new bugs (SonarQube bugs +0); follows existing test layout (src/__tests__, matching cli.test.ts/generator.test.ts)"
+      ],
+      "summary": "A well-fit feature addition that extends the parser pipeline with a tested Handlebars rendering layer and respects existing patterns, though the low 0.49 convention score and added smells/complexity hold back an otherwise clean commit \u2014 with the caveat that the listed naming violations appear concentrated in pre-existing files (index.ts, cli.test.ts, generator.test.ts) rather than the new template-engine files.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "6a69e48251cc5fe2df1399991bc0293689f11fdf",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "serve.ts re-implements the full build loop (readdir, parseMarkdown, generatePageHTML/generateIndexHTML, TemplateEngine) instead of extracting the shared build routine from cli.ts \u2014 violates single-source-of-truth and matches the SonarQube +2.3% duplications / +1 smell delta."
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Cognitive complexity +33 concentrated in serve()/rebuild() \u2014 the HTTP handler, rebuild orchestration, and live-reload broadcast should be decomposed rather than one async closure; this feature is a thin dev-server wrapper but carries the project's largest single complexity spike."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "WebSocket port is implicitly http port + 1 and the injected client script hardcodes 'window.location.port + 1' \u2014 couples client script to server config and breaks if that port is occupied."
+        },
+        {
+          "category": "security",
+          "severity": "minor",
+          "description": "Path-traversal guard uses startsWith on path.normalize(output) without a trailing separator, so a sibling path like '<output>-evil' would pass the prefix check; guard is otherwise present and correct for the common case."
+        },
+        {
+          "category": "correctness",
+          "severity": "minor",
+          "description": "Non-HTML files are served as application/octet-stream, which breaks CSS/asset loading in the dev server; mixed sync fs calls (readdirSync/statSync) inside async build() also diverge from the promise-based flow in cli.ts."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "The new serve/build/live-reload logic has no test coverage; the reported convention violations (37, score 0.49) all reference index.ts, cli.test.ts, generator.test.ts \u2014 files untouched by this diff \u2014 so the low score appears to reflect pre-existing repo state rather than this commit's new code, which itself uses camelCase/PascalCase/UPPER_CASE correctly."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "Adds two runtime deps (chokidar, ws) plus @types/ws for a dev-only feature \u2014 acceptable, but chokidar + ws could be devDependencies since the published package's build command doesn't need them."
+        }
+      ],
+      "strengths": [
+        "serve.ts correctly reuses the existing parser, generator, and template engine rather than writing new rendering code",
+        "path-traversal protection and HTML-only live-reload script injection show security awareness",
+        "rebuild is guarded by an isBuilding flag to prevent concurrent rebuild storms",
+        "CLI integration follows the existing command-dispatch pattern with consistent --port arg parsing and updated usage text"
+      ],
+      "summary": "A reasonable dev-server feature that respects the existing module layering and CLI conventions but introduces debt by duplicating the build pipeline instead of extracting it, and the low convention score (0.49) is flagged as likely pre-existing since all reported violations are in files outside this diff.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "86168212fb3a977f8be918d5aae68809dfd3f21c",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "9e63cdd6f11bbde6917fee841f594a01c32f1a53",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Hand-rolled regex-based Handlebars/EJS template engine introduced in Session 2 (mishandles nested blocks like {{#if}} inside {{#if}}) was never replaced by a real templating library; it was carried verbatim into the Session 4 plugin refactor and remained in the codebase through Session 5",
+      "Template parsing/loading logic shipped in Session 2 with zero test coverage (AST diff showed +0 test files), and the untested status persisted through the Session 4 refactor \u2014 test count only grew from 2 to 4 across sessions 2-4",
+      "Session 2's redundant partial-resolution lookup and double template reads (page template then layout) were flagged as minor debt and re-emerged in the plugin copies in Session 4 rather than being consolidated",
+      "Port validation was duplicated between cli.ts and serve.ts in Session 3, and the duplication carried into the DevServerPlugin in Session 4",
+      "The seed codebase was an unrelated Express Todo API, so Session 1 (greenfield) discarded it entirely \u2014 the generated HTML/config was never tested against the seed's conventions, leaving index.ts and src/serve.ts convention violations that later reviewers (S4, S5) had to repeatedly explain as pre-existing"
+    ],
+    "key_decisions": [
+      "Session 1: replaced the unrelated Todo-API seed outright and built a strict-TypeScript SSG library+CLI (buildSite, markdown frontmatter, recursive discovery, index.html generation) rather than adapting the seed",
+      "Session 2: added a hand-rolled regex-based Handlebars/EJS renderer with layouts and partials instead of pulling in handlebars/ejs \u2014 the single most consequential and most debt-laden choice, balancing zero-dependency simplicity against fragile parsing",
+      "Session 3: integrated a live-reload dev server (http + chokidar + WebSocket /__ssg_ws) that reuses buildSite and serializes rebuilds via a promise chain, plus a 'serve' CLI command \u2014 a path-traversal-safe integration that strengthened the product",
+      "Session 4: extracted a plugin architecture with lifecycle hooks (onStart/onFile/beforeBuild/afterBuild/onEnd) and BuildContext, splitting markdown/templating/dev-server into separate plugin modules and trimming ~335 lines while keeping buildSite's public API",
+      "Session 5: implemented incremental builds with a .ssg-cache.json manifest (source + template hashes, triple-level staleness guard) behind an additive buildSiteWithStats wrapper, preserving backward compatibility"
+    ],
+    "trajectory_description": "Quality climbed steadily from a clean Session 1 greenfield foundation through a well-fitted Session 2 feature and a strong Session 3 dev-server integration (fit scores 0.5 \u2192 0.72 \u2192 0.85), then dipped in Session 4's large refactor (fit 0.6, convention 0.47, +41 cognitive complexity) where the hand-rolled template engine and compressed one-line functions were flagged as maintainability debt, before recovering in Session 5 with a well-contained, backward-compatible incremental-build feature (fit 0.8, convention 0.7). Across the run the agent consistently improved architectural structure \u2014 each session slotted cleanly into the existing seams and extended rather than forked the build pipeline \u2014 but the refactor re-exposed rather than fixed the regex template-engine debt, and tests lagged behind the code throughout.",
+    "summary": "A highly coherent five-session arc (build \u2192 template \u2192 serve \u2192 pluginize \u2192 cache) that improved overall quality, though it never retired the hand-rolled template engine debt it created in Session 2 and kept test coverage trailing the features."
+  }
+}

@@ -6,149 +6,142 @@
     {
       "commit_hash": "0bab9b3fa3ae2dd5c4e59e15a12ea03182d12d06",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.72,
+      "architectural_fit": 0.68,
       "convention_adherence": 0.53,
       "introduces_technical_debt": true,
-      "respects_existing_patterns": true,
+      "respects_existing_patterns": false,
       "better_or_worse": "neutral",
       "problems": [
         {
           "category": "convention",
           "severity": "major",
-          "description": "44 convention violations across index.ts, build.ts, generator.ts: Classes/Interfaces not PascalCase, Constants not UPPER_CASE, and Functions using snake_case in TypeScript. Convention score 0.53."
+          "description": "44 naming violations (convention score 0.53): snake_case functions in build.ts, non-PascalCase classes/interfaces in index.ts/build.ts/generator.ts, and non-UPPER_CASE constants in build.ts. These break idiomatic TypeScript naming and were established as the project's own baseline convention in this greenfield commit."
         },
         {
           "category": "maintainability",
           "severity": "major",
-          "description": "Cognitive complexity +54 across only +4 functions (~13.5 avg per function) in a small greenfield codebase indicates overly dense logic that will be hard to extend."
+          "description": "Cognitive complexity +54 concentrated in only 4 functions across ~600 lines of actual source (4555 total minus 3952-line package-lock.json). The SSG logic is under-decomposed into few large functions, which will compound in the Session 4 refactor and Session 5 incremental-builds sessions."
         },
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "5 new code smells introduced in the initial scaffold, typically premature from the start."
-        },
-        {
-          "category": "architecture",
-          "severity": "info",
-          "description": "Single-package layout with 3 runtime deps (commander, gray-matter, marked) is reasonable for session 1; no layering or boundaries established yet, so future session commits may drift."
-        },
-        {
-          "category": "testing",
-          "severity": "info",
-          "description": "Jest/ts-jest configured with test root and .test.ts match, but zero tests and zero test files appear in the added 12-file set."
+          "description": "SonarQube reports 5 new code smells. Positive: zero bugs and 0.0% duplication."
         }
       ],
       "strengths": [
-        "SonarQube reports 0 bugs and 0% duplication in the new code",
-        "Clean greenfield scaffold: jest/ts-jest config with standard testMatch/roots convention",
-        "Minimal, sensible runtime dependency footprint (commander, gray-matter, marked) and a consistent tsconfig-driven preset",
-        "TypeScript-only module resolution and roots keep the test boundary explicit"
+        "Stack exactly matches the Session 1 spec: commander CLI, marked for Markdown, gray-matter for frontmatter, jest + ts-jest, TypeScript strict mode",
+        "Sensible module split (index.ts entry, build.ts orchestration, generator.ts rendering) and correct jest config (roots/tests, **/*.test.ts)",
+        "package-lock.json committed for reproducible installs; no bugs or duplication introduced"
       ],
-      "summary": "A solid greenfield scaffold with zero bugs and a clean dependency footprint, but naming-convention violations (44, score 0.53) and high per-function cognitive complexity already seed technical debt from the first session.",
+      "summary": "A spec-compliant greenfield Session 1 commit for the static_site_gen story with a sound library choice and testing scaffold, but weak convention adherence (0.53, driven by snake_case functions and non-PascalCase types) and complexity packed into only 4 large functions introduce naming and maintainability debt that will complicate later sessions.",
       "session_number": 1
     },
     {
       "commit_hash": "45ee869ea287cc016f58a97e47a15e85ca00d534",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.62,
-      "convention_adherence": 0.53,
-      "introduces_technical_debt": true,
-      "respects_existing_patterns": true,
-      "better_or_worse": "better",
-      "problems": [
-        {
-          "category": "architecture",
-          "severity": "major",
-          "description": "Dual code paths for HTML generation: the new optional TemplateEngine forks generatePageHtml/generateIndexHtml, and templates.ts hardcodes DEFAULT_PAGE_TEMPLATE/DEFAULT_INDEX_TEMPLATE that duplicate the HTML already emitted by generator.ts, creating two sources of truth for page markup."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "The parser adds both template and layout frontmatter fields, but only template is visibly consumed; layout appears parsed but unwired, suggesting half-finished feature wiring."
-        },
-        {
-          "category": "dependency",
-          "severity": "minor",
-          "description": "New handlebars dependency is added while the feature is fully optional; if templatesDir is unset the engine is never constructed, yet the dependency is unconditional in package.json."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "Mechanical convention score is low (0.53, 44 violations), but several listed violations appear to be false positives (e.g. 'Functions should not use snake_case' on camelCase build.ts; 'Classes should use PascalCase' on PascalCase TemplateEngine), so the low score likely overstates the real style problem."
-        }
-      ],
-      "strengths": [
-        "Change is fully additive and backward-compatible: existing CLI, BuildOptions, and generator output are unchanged when no --templates dir is provided.",
-        "Optional-parameter wiring is clean and threaded consistently through BuildOptions, parser, generator, CLI, and the new module.",
-        "New functionality is isolated in a dedicated src/templates.ts module consistent with the existing src/ module layout."
-      ],
-      "summary": "A reasonable additive template-engine feature that fits the existing src/ module layout, but it introduces a second HTML-generation path that duplicates generator.ts markup and carries a low mechanical convention score, largely driven by analyzer false positives.",
-      "session_number": 2
-    },
-    {
-      "commit_hash": "ab83cda493a898dfc5037d87818e8f0cdc7c89b2",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
       "architectural_fit": 0.7,
-      "convention_adherence": 0.55,
+      "convention_adherence": 0.53,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
       "better_or_worse": "neutral",
       "problems": [
         {
-          "category": "convention",
-          "severity": "major",
-          "description": "Measured convention score 0.53 with 44 violations (interfaces/classes not PascalCase, snake_case functions, non-UPPER_CASE constants) across index.ts, build.ts, generator.ts. Discrepancy: the actual new code in this commit (server.ts, cli.ts) uses camelCase functions and PascalCase interfaces matching the existing parser/generator style; the measured violations are concentrated in files outside this commit's diff, so the score partly reflects cumulative story state rather than this change."
-        },
-        {
           "category": "maintainability",
           "severity": "major",
-          "description": "RELOAD_SCRIPT embeds a 3-level-deep reconnection closure chain inlined as a string; the onclose reconnection handler duplicates the onmessage reload logic, consistent with the +140 cognitive complexity and +1.7% duplication deltas."
+          "description": "Dual rendering paths introduced in generator.ts: every page now has two parallel implementations (hardcoded HTML branch and TemplateEngine branch). This duplicates layout logic and is the likely driver of the +28 cognitive complexity and +3 smells reported by SonarQube; the hardcoded generators could have been expressed as default templates instead."
         },
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "Dev server hand-rolls static file serving (MIME table, traversal guard, script injection) instead of composing an existing static-file middleware, adding custom surface to maintain."
+          "description": "The parser now extracts both `template` and `layout` frontmatter, but the truncated templates.ts shows only DEFAULT_LAYOUT='{{{body}}}', leaving the relationship between page templates and layout nesting ambiguous/incompletely wired \u2014 the layout path appears half-implemented."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "handlebars (^4.7.9) is a new runtime dependency, correctly demoting its transitive deps (minimist, neo-async, source-map, uglify-js, wordwrap) from dev to prod in the lockfile \u2014 but this grows the production dependency surface for what is a build-time-only template feature."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Convention score 0.53 with 44 violations per static analysis. Discrepancy flagged: the cited violations (PascalCase class/interface naming, snake_case functions) contradict the visible diff, which uses correct PascalCase (TemplateEngine) and camelCase \u2014 the analyzer's violation list appears misattributed, yet the low aggregate score stands as ground truth."
+        }
+      ],
+      "strengths": [
+        "Feature isolated in a dedicated templates.ts module that mirrors the existing parser.ts/generator.ts structure, respecting the established module-per-concern pattern",
+        "Backward compatible integration: templatesDir/engine are optional, so existing callers and CLI usage work unchanged",
+        "Optional dependency injection keeps generatePageHtml/generateIndexHtml signatures stable while adding capability",
+        "Frontmatter-driven template/layout selection follows the existing gray-matter configuration pattern in parser.ts",
+        "package-lock.json correctly reflects handlebars and its transitive deps moving from devDependencies to runtime dependencies"
+      ],
+      "summary": "A clean, backward-compatible template-engine feature that fits the existing modular architecture, but it introduces dual rendering paths and notable convention/complexity regressions per static analysis.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "88b0eb503270b4b52b4756f31f0261e4e1f1be1b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.62,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "The fixed wait(1000) is replaced with a 20x500ms existence-polling loop and test timeouts are inflated to 30s \u2014 a generous polling strategy that stabilizes flaky integration tests but can mask genuine regressions and slows the suite; consistent with the measured +50 cognitive complexity."
         },
         {
           "category": "performance",
           "severity": "minor",
-          "description": "chokidar forced to usePolling:true with 100ms interval on all platforms and a full site rebuild on every change; acceptable for a dev tool but wasteful where fs events are available."
+          "description": "jest maxWorkers:1 serializes the entire suite as a blunt fix for parallel test interference (shared content/dist dirs, WS ports) rather than making the serve tests parallel-safe; it also disables parallelism for the unrelated build/CLI tests."
         },
         {
-          "category": "testing",
+          "category": "maintainability",
           "severity": "minor",
-          "description": "No tests added for the new integration surface (startServer, path-traversal guard, injectReloadScript) in this commit, despite the story test suite existing."
+          "description": "close() invokes watcher.close() but does not await its returned promise (chokidar v3 close is async), so the ServerInstance may resolve before the watcher is fully shut down."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "watcher.on('all', (event, filePath) => ...) accepts event/filePath but ignores them \u2014 dead parameters that signal an intended per-path optimization (e.g. skip non-md) that was not implemented."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Discrepancy: the measured 0.53 convention score (44 violations) is driven entirely by pre-existing violations in index.ts/build.ts/generator.ts \u2014 files untouched by this diff. This commit's own changes (serve.ts, jest.config.js, serve.test.ts) introduce no new naming violations and reduce smells by 4, so the score overstates this commit's convention debt."
         }
       ],
       "strengths": [
-        "Reuses existing parseDirectory/generateSite instead of duplicating build logic",
-        "Path traversal protection in static serving (403 check) shows sound security instinct",
-        "Clean lifecycle: startServer returns ServerInstance with close(); watcher, ws clients, and http server are all properly torn down",
-        "Debounced rebuild (150ms) decouples file events from build/broadcast",
-        "Dependency hygiene correct: chokidar/ws as runtime deps, @types/ws as devDep"
+        "Switches the watcher from forced usePolling (200ms interval) to native fs events with awaitWriteFinish \u2014 a real reliability and efficiency improvement confirmed by the transcript (10/10 test runs, faster rebuild detection).",
+        "Reorders close() to terminate WS clients and clear them before wss.close(), correctly fixing a teardown hang instead of layering on workarounds.",
+        "Zero new bugs, 0% duplication, and a net reduction of 4 code smells per SonarQube; a tight +26/-16 line diff confined to the serve integration.",
+        "TestBase renamed to serve-integration avoids colliding with a real integration directory, and the WS-message timeout is raised alongside the port-0/random-port pattern."
       ],
-      "summary": "A functionally solid session-3 integration \u2014 a cohesive live-reload dev server reusing the existing pipeline with correct dependency and cleanup handling \u2014 but the inline reconnect script and low measured convention score (0.53) introduce maintainability debt, with the convention violations stemming mostly from files outside this commit's diff.",
+      "summary": "A focused, correct stabilization pass \u2014 native file watching, proper WS teardown ordering, and reduced flakiness \u2014 that improves the serve integration, though it papers over residual test fragility with generous polling/timeouts and a suite-wide maxWorkers:1.",
       "session_number": 3
     }
   ],
   "story_review": {
     "story_name": "static_site_gen",
     "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.88,
+    "overall_coherence": 0.76,
     "compounding_issues": [
-      "Seed codebase (310a9ea) was an unrelated Express Todo API, not a static site generator; session 1 discarded it wholesale and rebuilt from scratch, so it provided zero reuse value and also carried its own bug (createTask inserts status 'done' but returns 'pending').",
-      "Template engine compiled with Handlebars { noEscape: true } (src/templates.ts:67-68), silently dropping the escapeHtml protection the default generator path provides \u2014 raw title/tag/body injection when templates are used; introduced in session 2 and never addressed in session 3.",
-      "Session 3 integration tests were initially timing-fragile (8s reload timeouts, hard-coded sleeps, polling watcher); session 3-continued papered over flakiness with generous polling loops and longer timeouts rather than deterministic waits, and Jest still reports leaked async handles at the final commit.",
-      "Session 2 split logic: build() takes an optional templatesDir so behavior diverges between default codegen and template paths (two parallel HTML-generation code paths that must be kept in sync)."
+      "Session 1 committed node_modules/ and dist/ (~5,248 files, ~978K lines) with no .gitignore, permanently bloating every later commit and polluting AST/convention analysis",
+      "The story truncated after Session 3 \u2014 the planned Session 4 (plugin refactor) and Session 5 (incremental builds) never executed, so the full 5-session arc was unrealized",
+      "Session 3's live-reload feature was over-scoped, hit the 900s timeout, and required a continuation commit (maxWorkers:1, awaitWriteFinish, WS teardown reorder, inflated timers) to stabilize flaky tests",
+      "generator.ts retains a parallel non-template HTML fallback path even after the TemplateEngine was integrated, creating two sources of truth for rendering",
+      "TemplateEngine uses a two-step init() lifecycle instead of constructor injection, and default page/index markup is duplicated between templates.ts and generator.ts",
+      "The bad_seed condition provided a mismatched Express Todo API seed for a static-site-generator task, forcing a full greenfield throwaway in Session 1"
     ],
     "key_decisions": [
-      "Session 1: clean module decomposition (parser/generator/build/types.ts) on gray-matter + marked, with the Page interface as the single data contract every later session extended.",
-      "Session 2: introduce a Handlebars TemplateEngine behind an optional templatesDir seam in build(), keeping the original generator as the default path \u2014 a backward-compatible feature addition.",
-      "Session 2: per-page frontmatter template/layout fields plus layouts/partials directories, establishing an extensible theming model.",
-      "Session 3: add a serve command with chokidar file watching and ws live-reload injected into served HTML, reusing build() as the rebuild unit rather than forking the pipeline.",
-      "Session 3-continued: switch the watcher from polling to awaitWriteFinish, reorder close() to terminate clients before closing the server, and set jest maxWorkers=1 \u2014 a stabilization pass targeting flaky integration tests."
+      "Clean module decomposition (parser, generator, templates, build, serve, types) with an optional TemplateEngine injected into generator functions",
+      "Handlebars template engine with layouts, partials, and per-page frontmatter template selection, wired through build/generator",
+      "Optional --templates CLI flag so build stays functional without templates, falling back to default HTML generation",
+      "Chokidar watcher + ws WebSocket live-reload server with debounced rebuilds, awaitWriteFinish stability handling, and a path-traversal guard (403) in the dev server",
+      "Jest config pinned to maxWorkers:1 with extended timeouts in the continuation commit to fix test flakiness",
+      "Committing build artifacts (dist/) and node_modules as part of the greenfield commit, which became a permanent tax on every subsequent commit"
     ],
-    "trajectory_description": "Quality improved across the story. Session 1 established a well-layered, fully-tested core (parser/generator/build + CLI) that everything else built on. Session 2 added the largest feature surface \u2014 a Handlebars template engine with layouts and partials, backed by a 384-line test file \u2014 and integrated it cleanly behind an optional flag. Session 3 pushed the most ambitious change, a live-reload dev server with watcher + WebSocket, but landed with flaky timing-dependent tests and awkward shutdown logic; the follow-up commit was a focused stabilization/debugging pass that made all 56 tests pass and tightened the watcher and close() ordering. The arc is a steady rise with one integration dip that was explicitly repaired, leaving a coherent, tested CLI at the final commit; the residual regressions are the dropped HTML escaping in the template path and continued reliance on generous test sleeps.",
-    "summary": "A coherent four-session build-out (greenfield core \u2192 template engine \u2192 live-reload integration + stabilization) that ends with all 56 tests passing and quality generally rising, despite a mismatched seed that was discarded and an unaddressed noEscape regression in the template path."
+    "trajectory_description": "Quality rose steadily for the sessions that completed. Session 1 laid a coherent greenfield architecture (parser/generator/build/types) with a thorough test suite, though it committed dependency bloat that haunted every later commit. Session 2 was the cleanest step: a 154-line Handlebars template engine with layouts and partials covered by 384 lines of tests. Session 3 added a well-designed live-reload server (chokidar + ws, debounced rebuilds, path-traversal guard) but over-reached, timing out at 900s with complexity spiking to 140; the continuation commit then demonstrated genuine debugging by tightening the watcher config and test timing to stabilize the suite (smells -4, complexity -50). The visible arc improves feature-by-feature and ends on a stabilizing bug-fix, but the sequence terminates at Session 3, so we never see how the architecture would compound through the planned refactor and cross-cutting caching phases.",
+    "summary": "A logically progressive, well-architected build for the three sessions it completed, undermined by Session 1's committed dependency bloat and an over-scoped Session 3 that required a continuation commit, with the run ending before the planned refactor and caching sessions."
   }
 }

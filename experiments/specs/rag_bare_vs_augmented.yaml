@@ -1,0 +1,63 @@
+name: rag_bare_vs_augmented
+question: >-
+  Does runtime RAG augmentation (retrieve prior findings + construct an optimized prompt) shift the
+  correctness-per-dollar frontier for agents, net of the constructor's own cost? Prior P1 says
+  correctness is flat (prompt quality is not the binding constraint); P2 says flail/cost should drop;
+  P4 says the current thin KB caps the effect, so a null here is expected and is information.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag_augment: false   # default OFF; the `policy` factor flips this to true for the augmented arm
+    context:
+      prior: >-
+        P1 correctness ~ flat (perturbation barely moves correctness 0.92->0.91). P2 flail/cost
+        should drop (better starting prompt = less exploration waste). P3 net effect small (constructor
+        ~$0.004/cell). P4 current KB is thin (model-level findings, no task ids, no confidence) so the
+        effect is capped — a null here says "enrich the KB", not "augmentation is useless".
+      prerequisites: >-
+        Two wiring items precede the grid: (0a) enrich the finding text with the task/config
+        identifier (the entry's worktree_name) so retrieval is task-relevant, then re-derive +
+        re-ingest; (0b) the compiler must map policy=augmented -> workflow.params.rag_augment=true
+        (and task=X -> the cell goal) when generating cells.
+    phases:
+      - name: enrich
+        kind: agent
+        prompt: >
+          Enrich the finding path with task identifiers so retrieval is task-relevant. Today the
+          finding text is model-level ("deepseek-v4-pro under baseline -> correctness ...") with NO
+          task name, so a "build a task manager API" work item cannot match prior task-manager
+          findings. In src/instrument/knowledge_ingestion.py (and retrieval.build_evidence_cards):
+          render the task/config identifier from the entry's worktree_name (or config name) into the
+          card text and set it into the record symbols, then re-derive + re-ingest the 201 findings
+          (wipe the finding nodes + DEL checkpoint entries for them, then kb_produce + drain). Verify
+          a sampled finding now names its task. Run the KB tests green.
+      - name: measure
+        kind: agent
+        prompt: >
+          After the grid drains (the execute phase, below), compute the effect size of the augmented
+          arm over bare: delta test_executed_success, delta cost-per-accepted-outcome (total cost /
+          passing cells), delta flail — all net of the constructor overhead (augmented cost already
+          includes it). Report the effect size AND its uncertainty; state explicitly whether a null
+          is consistent with prior P4 (thin KB) vs evidence against augmentation. Append the finding
+          to code_reviews/ as a dated, [M]/[C]/[H]/[P]-tagged note.
+factors:
+  - {name: model,  levels: [deepseek/deepseek-v4-pro]}
+  - {name: policy, levels: [bare, augmented]}    # bare = rag_augment false; augmented = true
+  - {name: task,   levels: [task_manager_api, static_site_gen, notification_service]}
+design: factorial
+rules:
+  - {name: measure_outcome, plane: measurement, evidence_class: "[M]", requires: [], produces: [test_executed_success, cost, flail]}
+  - {name: augment_prompt,  plane: control,     evidence_class: "[P]", requires: [test_executed_success, cost, flail], produces: [augmented_prompt]}
+metrics:
+  - {name: test_executed_success,         agg: mean,         over: cell}
+  - {name: cost_per_accepted_outcome,     agg: ratio,        over: cell}
+  - {name: flail,                         agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: policy, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, priors, grid, effect_size, uncertainty, null_interpretation]
+stop: {budget_usd: 15.0, max_attempts: 1, uncertainty_threshold: 0.15}
+adapt: {strategy: coordinate_descent, selection: highest_regret}

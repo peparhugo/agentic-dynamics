@@ -1,0 +1,206 @@
+{
+  "story_name": "notification_service",
+  "story_id": "c9a0b25dd1ff",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "b6faab33c7306b7403f17282901f3b1bafb31a9e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "d7e5a8b599f47e0e545e90f4e3b0d51bd9c537d2",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Channel location is inconsistent across the protocol: broadcast routing reads message['channel'] at the top level, while subscribe/unsubscribe resolve the channel from message['payload']['channel'] with a top-level fallback. A broadcast that names its channel inside payload (as the subscribe flow does) silently degrades to a global broadcast instead of routing to subscribers."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Measured cognitive complexity +24 is concentrated in health_response(), which now stacks three HTTP route branches with nested locking and URL parsing. The /health, /channels, and /channels/{name}/subscribers handlers would be cleaner as a small route-dispatch table or separate methods, matching the existing per-method handler style."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The two measured convention violations (PascalCase class, UPPER_CASE module constant) are in test_app.py but are not introduced by this commit's diff, which only adds async test functions. They pre-date this session; the commit's own additions are convention-clean."
+        }
+      ],
+      "strengths": [
+        "Extends the existing protocol naturally by widening the SUPPORTED_MESSAGE_TYPES frozenset and dispatching through the established handle_connection pattern rather than adding a parallel path.",
+        "Reuses the codebase's lock + snapshot discipline: _channel_client_snapshot mirrors _client_snapshot, and all channel mutations happen under the existing _clients_lock.",
+        "Correct subscription lifecycle: both explicit unsubscribe and disconnect cleanup prune empty channels, so no zombie subscriber sets leak.",
+        "Solid test coverage for subscriber-only delivery, unsubscribe behavior, and the two new REST endpoints; 0 bugs, 0 smells, 0% duplication per SonarQube.",
+        "Focused, minimal change (+124/-8 lines, 2 new methods) with correct use of unquote for URL-decoded channel names."
+      ],
+      "summary": "Clean, pattern-faithful channel-subscription feature that strengthens the codebase with good tests and lifecycle correctness; its 0.82 convention score reflects pre-existing test-file style violations rather than anything this commit introduces.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "e6eb2482e639d181f9e79fee3c644cff31ce531c",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Dead condition in MessageStore.__init__: after removeprefix(\"sqlite:///\"), the path can never equal \"sqlite:///:memory:\", so the in-memory branch is unreachable (masked because the fallback happens to yield the same value)."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "InMemoryBroker stores shared state on class attributes with a single class-level asyncio.Lock, coupling all broker instances; a process-local singleton would be cleaner and avoids cross-instance lock contention semantics."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "The broker interface is structural \u2014 duplicated method signatures between InMemoryBroker and RedisBroker with Any typing; a shared Protocol/base class would prevent signature drift."
+        },
+        {
+          "category": "performance",
+          "severity": "info",
+          "description": "RedisBroker.channels() issues one scard call per channel (N+1 pattern over scan_iter)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Cognitive complexity increased by +24 in the server integration methods, suggesting dense branching in message routing/cleanup logic."
+        }
+      ],
+      "strengths": [
+        "Clean broker abstraction with two interchangeable implementations (Redis for production, in-memory for tests/local dev) behind an identical async interface",
+        "Correct async design: blocking SQLite I/O via asyncio.to_thread, async Redis client, and pipelined subscription cleanup for efficiency",
+        "Persistence layer uses parameterized SQL queries, safe against injection",
+        "Story-appropriate Session 3 integration that coherently composes message distribution and durable storage without disturbing existing WebSocket delivery",
+        "Production code adheres to framework conventions (snake_case functions, PascalCase classes, typed public signatures) \u2014 the measured 0.82 convention score is dragged down only by two minor test_app.py issues (PascalCase class names, UPPER_CASE module constants)"
+      ],
+      "summary": "A solid integration session that adds a Redis/in-memory broker abstraction and SQLite persistence with sound async handling and only minor structural nits (a dead condition, class-level broker state, and protocolless typing), netting an improvement over the previous session.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "87aa3c5859a766cfeb02029365586488fdfaf5f2",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.88,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "WebSocketTransport.handle_connection orchestrates the full application session loop and reaches into NotificationServer private methods (_validate_message, register, unregister, send_to_client), inverting the transport boundary. Message validation and routing are application logic and should live on the server; the transport should be a pure I/O adapter."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "_remove_failed_clients widened failure detection from Exception to BaseException; since asyncio.CancelledError is a BaseException (3.8+), cancellation during a send may now be misclassified as a client failure and spuriously unregister a live connection \u2014 a behavior regression vs the pre-refactor code."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "BaseTransport.broadcast duplicates the gather + return_exceptions + failure-cleanup logic already in NotificationServer._send, yielding two near-identical send/exception paths."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "BaseTransport.on_connect returns an arbitrary string client_id with no uniqueness guarantee; _connection_ids maps identity correctly but collision handling across transports is implicit."
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "The diff touches only app.py (+1 file); no tests were added for BaseTransport, WebSocketTransport, or configured_transport(), so the new abstraction and factory are uncovered."
+        }
+      ],
+      "strengths": [
+        "Introduces a clean BaseTransport ABC that decouples NotificationServer from websockets, enabling alternate transports and straightforward unit testing.",
+        "configured_transport() factory with env-driven selection, case-insensitive parsing, sensible websocket default, and a clear error on unsupported transports.",
+        "_connection_ids map decouples unregister from transport-specific client_id derivation, making cleanup robust and transport-agnostic.",
+        "Failed-client removal extracted into _remove_failed_clients and reused across both send paths; _deliver simplified via the new send_to_client helper.",
+        "Docstrings and type hints on public signatures match project conventions; the register/unregister/_local_clients surface becomes transport-agnostic (Any) without breaking callers."
+      ],
+      "summary": "Well-scoped transport abstraction that meaningfully decouples the server from websockets and improves testability, but carries a minor leaky-abstraction concern (transport reaching into server internals) and a BaseException widening that can treat cancellation as a client failure.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "3be54c2cc261364f696e03a9dc269c2aa17c5c93",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.88,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube reports cognitive complexity +19 (smells +1); the new /history branch extends an already-long if/elif request handler in NotificationServer.handle_request, which is the main readability drag of this commit."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "The TTL cleanup worker is only started lazily via start(), which is invoked on first client register() \u2014 a server that never receives a connection never runs cleanup, and the fixed 24h interval has no jitter."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "InMemoryBroker._rate_limits never removes expired client_id entries, so the dict grows unbounded over a long-lived process (RedisBroker is fine \u2014 keys get a one-minute TTL)."
+        },
+        {
+          "category": "performance",
+          "severity": "info",
+          "description": "Rate-limited messages return before store.save(), so a burst client's messages are silently dropped (not persisted) while the 100/min ceiling counts them \u2014 acceptable but worth documenting as intended behavior."
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "Convention score 0.82 driven by 2 violations in test_app.py (Classes should use PascalCase; module-level constants should be UPPER_CASE). Both are confined to tests and possibly pre-existing, so the violations carry little real weight."
+        }
+      ],
+      "strengths": [
+        "Rate limiting implemented at the broker abstraction so both InMemoryBroker and RedisBroker expose the identical increment_rate_limit interface, preserving the existing two-broker pattern."
+      ],
+      "summary": "Strong cross-cutting commit: rate limiting, per-channel history with has_more pagination, and TTL cleanup all follow established patterns (to_thread, respond, env-var config with validation, broker abstraction), and the measured convention score of 0.82 slightly understates the code quality since both flagged violations live in tests.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.82,
+    "compounding_issues": [
+      "Session 4's pluggable Transport abstraction is never exercised: only WebSocketTransport is implemented, and Session 5's tests add rate-limiting/history without any alternative transport, leaving the interface as scaffold",
+      "Session 4 accidentally committed the runtime SQLite artifact 'notifications.db' into the repo, an artifact that persisted through Session 5",
+      "Two convention violations in tests/test_app.py (camelCase class, lowercase module constants) were introduced in Session 1 and never fixed in any later session (convention score frozen at 0.818)",
+      "Channel/subscription state was built directly into NotificationServer in Session 2, then had to be reworked into the broker abstraction in Session 3, a mid-flight refactor that the Redis integration had to absorb"
+    ],
+    "key_decisions": [
+      "Session 1 discarded the Flask/JWT/SQLite seed entirely for a purpose-built asyncio WebSocket server on the `websockets` library, establishing the single-file app.py design that all later sessions extended",
+      "Session 3 introduced a broker abstraction (InMemoryBroker/RedisBroker) with an in-memory fallback, so multi-instance pub/sub is testable without a live Redis \u2014 this seam later carried rate-limit counters cleanly",
+      "Session 3 added a SQLite MessageStore with pagination, which Session 5 reused directly for persistent history with TTL cleanup",
+      "Session 4 factored connection handling behind a BaseTransport ABC with a TRANSPORT env-var factory, decoupling delivery logic from the transport",
+      "Session 5 implemented rate limiting at the broker level (increment_rate_limit on both broker variants) and gate-checked in handle_message, keeping enforcement consistent across transports"
+    ],
+    "trajectory_description": "The codebase grew monotonically and healthily: code from 112 to 504 lines, tests from 4 to 10, with every session green (0 bugs, 0 net smells added per Sonar, all tests passing). Session 1 established a clean asyncio server; Session 2 added channels with a sharp complexity jump (+24); Session 3 was the pivotal integration, introducing the broker + MessageStore abstractions that made multi-instance delivery and persistence possible; Session 4's transport refactor was solid but structurally inert since no alternate transport was ever built; Session 5 was the largest and longest (728s, one retry) yet landed rate limiting and history with minimal churn, demonstrating the earlier abstractions paid off. Quality was flat-to-improving \u2014 never degraded \u2014 though the persistent convention violations and the committed notifications.db artifact show the agent did not self-clean.",
+    "summary": "A coherent five-session arc \u2014 greenfield WebSocket server, channels, Redis pub/sub backbone, transport abstraction, then cross-cutting rate limiting and history \u2014 that stayed green throughout and showed real architectural pay-off by Session 5, though the transport pluggability and style hygiene were left half-realized."
+  }
+}

@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-.home-hero h1{max-width:780px}
+.home-hero h1{max-width:780px;font-size:clamp(1.9rem,4.2vw,3.2rem)}
 .hero-actions{display:flex;gap:0.8rem;flex-wrap:wrap;margin-top:1.5rem}
 .source-note{display:inline-flex;align-items:center;gap:0.5rem;margin-top:1.1rem;padding:0.55rem 0.8rem;border:1px solid var(--b);border-radius:999px;color:var(--t3);font-size:0.76rem;background:rgba(16,23,34,0.68)}
 .source-note strong{color:var(--t2)}
@@ -49,6 +49,9 @@
 .op-card li{font-size:0.7rem;color:var(--t2);padding:0.15rem 0}
 body.light .source-note,body.light .lever-card,body.light .mechanism,body.light .cost-panel,body.light .finding,body.light .op-card,body.light .pipe-step{background:linear-gradient(180deg,#ffffff,#f8fafc)}
 body.light .route-panel{background:rgba(34,211,238,0.08)}
+.field-map{margin:0}
+.field-map img{display:block;width:100%;max-width:760px;height:auto;margin:0 auto;border-radius:18px;border:1px solid var(--b)}
+.field-map figcaption{font-size:0.8rem;color:var(--t3);text-align:center;margin-top:0.75rem}
 @media(max-width:900px){.lever-grid,.mechanism-grid,.cost-contrast,.op-grid{grid-template-columns:1fr}.mechanism-grid{gap:0.8rem}}
 @media(max-width:768px){.hero-actions{flex-direction:column}.hero-actions .cta-btn{justify-content:center}.source-note{border-radius:14px;align-items:flex-start}.model-row{grid-template-columns:1fr;gap:0.25rem}}
 </style>
@@ -61,10 +64,9 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 <section class="dossier-hero home-hero"><div class="hero-grid">
   <div>
     <div class="section-kicker" style="font-size:0.82rem;margin-bottom:0.5rem;color:var(--ac);letter-spacing:0.12em">Why — Agentic Dynamics</div>
-    <h1>There are no universal best practices. Only agent-environment systems.</h1>
-    <p class="lead">Generic governance fails because context is everything. Agentic Dynamics is the empirical lens that observes your specific collision of agent and environment—so you can govern what actually exists, not what a checklist predicts.</p>
-    <blockquote class="pullquote">&ldquo;If you change the environment, you change the agent. Read that again.&rdquo;</blockquote>
-    <p class="lead" style="margin-bottom:0.5rem"><strong style="color:var(--ac)">This is the science of that collision. Welcome to Agentic Dynamics.</strong></p>
+    <h1>Systems are constantly evolving. Scaling agents means measuring that evolution.</h1>
+    <p class="lead">Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This repository is its founding instrument and corpus.</p>
+    <blockquote class="pullquote">&ldquo;The system shapes the agent — and the agent reshapes the system. Read that again.&rdquo;</blockquote>
     <div class="hero-actions"><a href="methodology.html" class="cta-btn big">Examine the Method</a><a href="evidence.html" class="cta-btn ghost">Inspect the Evidence →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
   </div>
   <aside class="proof-ledger" aria-label="Key numbers">
@@ -74,6 +76,18 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
     <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">221</span></div></div>
     <div class="proof-card success"><span class="label">Total measured cost</span><div class="value">$<span data-stat="story_total_cost">288.69</span></div></div>
   </aside>
+</div></section>
+
+<!-- The field -->
+<section class="dossier-section alt"><div class="dossier-inner">
+  <div class="section-kicker">What — the field</div>
+  <h2>A measurement question became Agentic Dynamics.</h2>
+  <figure class="field-map">
+    <img src="agentic-dynamics-field-map.png" alt="Field map of Agentic Dynamics: five disciplines — AI and agentic systems, FinOps and cloud economics, software engineering and architecture, systems and reliability engineering, and experimental science — surround a core that measures how context, complexity, and uncertainty shape agent decisions and propagate into reliability, cost, and value.">
+    <figcaption>Five disciplines feed one core: how context, complexity, and uncertainty shape agent decisions — and propagate into reliability, cost, and value.</figcaption>
+  </figure>
+  <p class="lead">Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This instrument currently examines cost, verification, maintainability, recovery, and five-session progression in coding-agent workflows. Routing and long-horizon value remain questions for controlled experiments, not conclusions inferred from a price sheet.</p>
+  <div class="hero-actions"><a href="framework.html" class="cta-btn">Examine Policy Experiments →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
 </div></section>
 
 <!-- Section 2: HOW -->
@@ -166,14 +180,6 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   <p>All seven models pass their own tests at roughly equal rates, but the tests differ by an order of magnitude. Luna ships ~7 tests that confirm the happy path. Sonnet 5 ships ~122 that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." One has a much broader observed verification surface.</p>
   <p>This is the durable-value gap. Correctness asks whether code passes the tests you have. Verification asks whether you have the tests that would catch the failures that matter. In this corpus, that safety net varies by vendor family, while price alone does not explain the difference.</p>
   <div class="hero-actions"><a href="evidence.html#story-models" class="cta-btn">Inspect the Verification Gap →</a></div>
-</div></section>
-
-<!-- Section 6: What this means -->
-<section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">What — the field</div>
-  <h2>A measurement question became Agentic Dynamics.</h2>
-  <p class="lead">Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This instrument currently examines cost, verification, maintainability, recovery, and five-session progression in coding-agent workflows. Routing and long-horizon value remain questions for controlled experiments, not conclusions inferred from a price sheet.</p>
-  <div class="hero-actions"><a href="framework.html" class="cta-btn">Examine Policy Experiments →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
 </div></section>
 
 <!-- Bottom links -->

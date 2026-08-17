@@ -608,7 +608,10 @@ def run_workflow(
         spec_name=spec.name, model=model, workdir=str(wd), goal=goal, started_at=_now()
     )
 
-    cell_id = _cell_id(spec.name, model)
+    # Prefer the launch envelope's cell id (set by the Control Room via
+    # ``FINOPS_CELL_ID``) so status, phase, and events land on the single cell the
+    # operator is watching; fall back to the deterministic per-spec id for CLI runs.
+    cell_id = os.environ.get("FINOPS_CELL_ID", "").strip() or _cell_id(spec.name, model)
     publisher = LivePublisher(cell_id) if publish else None
     if publisher is not None and publisher.enabled:
         publisher.set_status("running")
@@ -648,11 +651,16 @@ def run_workflow(
     prev_model = ""
     prev_cache_read_tokens = 0
 
-    for phase_def in phases[start_idx:]:
+    total = len(phases)
+    for phase_idx, phase_def in enumerate(phases[start_idx:], start=start_idx):
         name = str(phase_def.get("name", "?"))
         kind = str(phase_def.get("kind", "agent"))
         phase_timeout = int(phase_def.get("timeout", timeout))
         pr = PhaseResult(phase=name, kind=kind, status="ok")
+        # Publish the live phase as each phase *starts* (1-based index over the full
+        # list, so resume keeps the original position). Display-only badge data.
+        if publisher is not None and publisher.enabled:
+            publisher.set_phase({"name": name, "index": phase_idx + 1, "total": total})
         t0 = time.time()
 
         try:

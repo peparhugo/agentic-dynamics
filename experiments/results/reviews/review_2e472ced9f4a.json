@@ -1,0 +1,209 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "2e472ced9f4a",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "2526f31a462336312295d5bc388354295750a5ad",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.35,
+      "convention_adherence": 0.45,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "critical",
+          "description": "Wholesale deletion of the seeded index.ts (Express Todo API) and replacement with an unrelated static-site-generator project (package-lock.json name/deps: gray-matter, markdown-it, yaml) rather than building on the existing structure. Nothing in the seed architecture is reused."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "49 measured convention violations (convention score 0.48): snake_case function names, non-PascalCase classes/interfaces, and non-UPPER_CASE constants across cli.ts, config.ts, and index.ts."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "SonarQube delta shows +39 cognitive complexity and +2 code smells introduced in a single greenfield session, indicating over-large or tangled logic."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "Project identity silently changed in package-lock.json (typescript-static-site-generator) while the baseline was a Todo API; bin target dist-src/cli.js implies a build step with no corresponding build config visible in the diff."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "No evidence the agent attempted incremental integration (models/routes/separation from the seed) \u2014 a from-scratch rewrite in session 1 maximizes rework risk for later sessions."
+        }
+      ],
+      "strengths": [
+        "Zero new bugs and zero duplication introduced (SonarQube delta bugs +0, duplications +0.0%)",
+        "Dependency tree committed via package-lock.json for reproducible installs",
+        "Clean git hygiene: single coherent session commit with the deletion tracked explicitly",
+        "Structured multi-file layout (11 files) rather than continuing the single-file seed"
+      ],
+      "summary": "Architectural fit is poor because the agent threw away the existing seed structure for an unrelated rewrite; convention adherence is correspondingly weak at 0.48 (49 violations) \u2014 though the qualitative architectural assessment is judgment-based since no mechanical architecture measurement exists, the +39 cognitive complexity and +2 smells corroborate the 'worse than baseline' verdict.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "4043aa0b2d44f72cef2b5f7cf4ef597b85c1eee0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.65,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta shows +29 cognitive complexity and +1 smell for only +5 functions (~6 complexity per function), driven mostly by the recursive registerPartials and layout-normalization logic in index.ts."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "Handlebars (^4.7.9) is a heavyweight runtime for what is a thin template/layout feature; a lighter engine would carry less supply-chain surface, though the choice is defensible."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Page now carries title/date/tags both top-level and inside data: { ...data, title }, and templateContext spreads page.data before re-setting the same keys \u2014 a redundant surface that invites shadowing bugs."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Mechanical convention score of 0.48 (49 violations) appears inflated by pre-existing violations: config.ts is untouched by this diff and the cli.ts class/interface/constant complaints target the pre-existing CliOptions interface \u2014 this diff adds +0 classes and its new functions are camelCase."
+        }
+      ],
+      "strengths": [
+        "templatePath enforces path containment against directory traversal before resolving templates",
+        "The --templates CLI flag mirrors the existing --content/--output parsing pattern exactly, and the Frontmatter/Page extension is fully backward-compatible (optional fields)",
+        "Graceful ENOENT handling in readOptional and registerPartials keeps template resolution robust",
+        "Recursive partial registration with prefix scoping fits the SSG architecture without new abstractions"
+      ],
+      "summary": "A well-integrated, pattern-consistent feature addition that extends the existing SSG CLI and frontmatter conventions cleanly with defensive template resolution, though its 0.48 mechanical convention score is misleading since the violations are dominated by pre-existing code not touched in this commit.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "770c8b861d6e22bcf9c19fc9a20148abcd4515a2",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube reports cognitive complexity +53 across the diff (mostly the new server.ts live-reload handler); the nested watch/WebSocket broadcast logic should be extracted into smaller helpers."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "No tests added for the new serve command, --port validation, or server module despite jest/ts-jest already configured; the CLI dispatch branches are exactly the kind of logic worth covering."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "Adds two runtime dependencies (chokidar, ws) and @types/ws as a devDependency (correctly placed); reasonable for a watch + live-reload dev server but expands the dependency surface for a CLI tool."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The 0.48 convention score and 49 violations are dominated by Python-style rules (Functions should not use snake_case, Constants should be UPPER_CASE, Classes should use PascalCase) being applied to a TypeScript codebase; the violations listed for config.ts/index.ts are pre-existing and untouched by this diff."
+        }
+      ],
+      "strengths": [
+        "Clean CLI dispatch extending the existing build pattern \u2014 build/serve branching with a clear error when --port is passed to build",
+        "Solid input validation for --port (integer bounds 1-65535), better than typical agent output",
+        "New server logic isolated in its own module (server.ts), keeping concerns separated",
+        "Dependencies (chokidar, ws) are standard, well-scoped choices for file watching and live reload"
+      ],
+      "summary": "A well-structured dev-server feature that fits the SSG architecture, but the low convention score is a measurement artifact (Python rules misapplied to TypeScript) and the high cognitive complexity in server.ts warrants a refactor.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "5bb97cd7acf66ff351768f98e92ab725b1dbb16f",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "5890b9119a2339b23f745379e37fd6c76df40a75",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.48,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "build() in src/index.ts grows by a large inline cache-control block (cognitive complexity +52, +257 lines). The cache logic \u2014 manifest read/write, fingerprinting, skip decisions \u2014 should be extracted into a dedicated cache module or exposed as a plugin rather than bloating the engine's core loop."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Convention score 0.48 with 49 violations. Discrepancy to flag: several listed violations are in config.ts, which is not touched by this diff, so the score likely overstates what this commit introduces \u2014 but the delta still contributes, so grounding the score at the measured 0.48."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "onBuildStats is threaded through BuildOptions as a callback even though build() already returns Page[]. Returning a stats object (or a {pages, stats} result) would be more idiomatic; the optional callback preserves backward compatibility but adds a non-standard API surface."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "The cache manifest (.ssg-cache.json) is written to path.dirname(contentDir), outside outputDir, so it persists in the source tree and survives --clean. It also stores full rendered HTML and Page objects, which can grow unboundedly."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "templateFingerprint() re-reads and hashes template/layout files for every cached page on each build, and hashDirectory() hashes all partials every run, partially negating the incremental-build time savings the feature claims."
+        }
+      ],
+      "strengths": [
+        "Extends BuildOptions and the CLI flags backward-compatibly, following the existing options pattern and error-handling style.",
+        "Cache correctness is well considered: content, template, layout, and partials are fingerprinted and --clean wipes the output directory.",
+        "Robust error tolerance in readManifest/hashDirectory (ENOENT and SyntaxError handled explicitly).",
+        "Good UX: build stats are only printed when --incremental or --clean is requested."
+      ],
+      "summary": "Adds a correct incremental-build cache to the SSG engine with clean CLI flags, but the callback-based stats API and +52 inline complexity introduce architectural debt that would be better extracted into a module or plugin.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "S1 deleted the seeded Express Todo API entirely and rebuilt as an unrelated SSG, flagged 'critical' by the reviewer; nothing from the seed was reused, so the story's foundation carried a permanent architecture debt tag",
+      "The 0.48 convention score established in S1 (49 naming violations) was never remediated across all 5 sessions, dragging every subsequent review down even when the code quality itself was high",
+      "Cognitive complexity accumulated monotonically across sessions (sonar deltas +39, +29, +53, +20, +52); S4's plugin refactor contained it only partially, and S5's inline cache logic bloated the engine's core build() loop",
+      "S2 introduced a redundant Page surface (title/date/tags both top-level and inside data) that persisted into S5's templateContext and cache storage, adding needless cross-cutting surface",
+      "S4's review failed ('Review unavailable'), leaving the largest refactor of the story without a qualitative checkpoint"
+    ],
+    "key_decisions": [
+      "S1: Rebuild the SSG from scratch in a structured multi-file layout (src/, tests/, strict tsconfig) rather than extending the seeded single-file Express app",
+      "S1: Custom raw-HTML tokenization around markdown-it + gray-matter with failsafe YAML, correctly preserving intentionally escaped HTML (agent self-corrected a global-decode bug)",
+      "S1: Jest with a deterministic alphabetical sequencer to guarantee integration-first test ordering",
+      "S2: Handlebars template engine with layouts/partials directory conventions, recursive partial registration, and template path containment against directory traversal",
+      "S3: Self-contained dev-server module (chokidar + WebSocket live reload) with strict --port validation (1-65535)",
+      "S4: Plugin lifecycle interface (onStart/beforeBuild/onFile/afterBuild/onEnd) plus a TS config loader, turning markdown/template/dev-server into composable plugins and the engine into a pipeline",
+      "S5: SHA-256 content + template/layout/partial fingerprinting with a .ssg-cache.json manifest, giving correct cache invalidation for incremental builds"
+    ],
+    "trajectory_description": "Quality started rocky and then improved to a strong plateau, ending correct but slightly debt-heavy. S1 was a rough, sprawling greenfield commit (fit 0.35, worse than baseline) that built a fully functional, well-tested SSG but discarded the seed and racked up +39 complexity and 49 convention violations that shadowed the rest of the story. S2 (fit 0.85) and S3 (fit 0.75) were clean, pattern-consistent additions \u2014 the template engine with defensive path handling and the dev server with solid validation \u2014 showing the agent working comfortably within its own architecture. S4's plugin-system refactor was the story's most consequential session: a large net-negative line refactor (584 added / 326 removed) that decomposed the monolith into extensible plugins and a TS config loader, though its review check failed. S5 landed the hardest cross-cutting feature \u2014 incremental builds with correct template-sensitive invalidation and strong test coverage (87 new lines) \u2014 but was flagged for piling +52 inline complexity and a callback-based stats API into the engine core. Net arc: rapid early improvement, a strong mid-story peak, and a final session that is functionally right but architecturally accumulating.",
+    "summary": "A textbook greenfield-to-cross-cutting arc that rebuilt cleanly, compounded early convention and complexity debt it never repaid, and ended with a correct but bloated engine core."
+  }
+}
