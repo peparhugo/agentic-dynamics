@@ -11,6 +11,8 @@ import os
 import time
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 
 from notifications import send_notification_email
@@ -25,8 +27,28 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_TTL_SECONDS = 3600
+RATE_LIMIT_STORAGE_URI = os.environ.get(
+    "RATE_LIMIT_STORAGE_URI", os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+)
 VALID_STATUSES = {"pending", "done", "completed"}
 STATUS_ERROR = "status must be either 'pending', 'done', or 'completed'"
+
+
+def rate_limit_key():
+    """Use the authenticated user as the bucket, or the client IP before login."""
+    user = getattr(g, "user", None)
+    if user is None:
+        user = current_user()
+    return f"user:{user['id']}" if user else get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+    headers_enabled=True,
+)
 
 
 def init_db():
@@ -120,7 +142,33 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @auth_required
 def list_tasks():
-    return jsonify(task_repository().list_for_owner(g.user["id"]))
+    raw_limit = request.args.get("limit", "20")
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer between 1 and 100"}), 400
+    if not 1 <= limit <= 100:
+        return jsonify({"error": "limit must be an integer between 1 and 100"}), 400
+
+    raw_cursor = request.args.get("cursor")
+    if raw_cursor is None:
+        cursor = None
+    else:
+        try:
+            cursor = int(raw_cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "cursor must be an integer"}), 400
+        if cursor < 1:
+            return jsonify({"error": "cursor must be an integer"}), 400
+
+    tasks, total = task_repository().list_for_owner(g.user["id"], cursor, limit)
+    has_next_page = len(tasks) > limit
+    tasks = tasks[:limit]
+    return jsonify({
+        "data": tasks,
+        "next_cursor": str(tasks[-1]["id"]) if has_next_page else None,
+        "total": total,
+    })
 
 
 @app.route("/tasks", methods=["POST"])
