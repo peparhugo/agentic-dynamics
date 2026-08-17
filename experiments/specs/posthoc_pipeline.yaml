@@ -1,0 +1,113 @@
+name: posthoc_pipeline
+question: >-
+  Can the post-hoc pipeline — code analysis (AST + SonarQube + conventions) then DeepSeek
+  review (flash reviewer) then data regeneration — run as a reusable workflow so that when an
+  experiment finishes, ALL results (raw + analysis + review + regenerated data) are ready, with
+  no manual gap like the 2026-08-15 remediation?
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool:
+      - deepseek/deepseek-v4-flash
+    context:
+      motivation: >-
+        The 2026-08-15 remediation spec wired only rerun -> regenerate, dropping the AST/SonarQube
+        analysis and the LLM review on its re-run cells; both had to be run by hand afterward.
+        This spec is the reusable post-hoc completion: analyze -> review -> regenerate, so a
+        workflow that ends here leaves nothing unfinished.
+      pipeline: >-
+        Full cell lifecycle: execute (run_story/run.py) -> analyze (AST + SonarQube + conventions)
+        -> review (DeepSeek flash reviewer, per-session + story) -> regenerate (sync_data ->
+        build_data -> manifest). This spec owns the last three stages; run it after any
+        execute stage (or append its phases to the experiment spec, as remediation now does).
+      redis: >-
+        Queues on 127.0.0.1:6380 db 1: analysis_jobs/analysis_status, review_jobs/review_status.
+        Analysis is LLM-free (tree-sitter + SonarQube); review uses deepseek/deepseek-v4-flash.
+        enqueue_analysis/enqueue_reviews scan ALL result JSONs and skip anything already done,
+        so this spec is idempotent — it completes only what is missing.
+    phases:
+      - name: analyze
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the code analysis stage (AST + SonarQube + conventions) via the queue.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - scripts/enqueue_analysis.py / analysis_worker.py  (analysis_jobs -> analysis_status)
+          - scripts/monitor.py  (status; but analysis_status is a separate hash)
+
+          REQUIREMENTS:
+          - Enqueue analysis for every story result without existing analysis:
+            `python scripts/enqueue_analysis.py` (skips existing by default).
+          - Start N analysis workers (`python scripts/analysis_worker.py &`), then poll
+            `analysis_status` until queued and running both hit 0. SonarQube scans are ~6 min/story.
+          - Analysis is LLM-free — no provider rate-limit concern; worker count is not
+            provider-bound.
+
+          DELIVER the analysis drain record (cells analyzed, any SonarQube/LSP gaps noted).
+      - name: review
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Run the DeepSeek review stage (flash reviewer) via the queue, then finalize.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/enqueue_reviews.py / review_worker.py / finalize_reviews.py  (review_jobs)
+
+          REQUIREMENTS:
+          - Enqueue reviews (`python scripts/enqueue_reviews.py`), start review workers
+            (`python scripts/review_worker.py &`), poll until the queue drains, then run
+            `python scripts/finalize_reviews.py` to merge per-session reviews into aggregates.
+          - The reviewer is deepseek/deepseek-v4-flash (single provider) — bound the worker count
+            to a modest value (<= 4) to stay under rate limits.
+
+          DELIVER the review drain + finalize record.
+      - name: regenerate
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Regenerate the derived data from the completed corpus.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/sync_data.py / build_data.py / generate_manifest.py
+
+          REQUIREMENTS:
+          - Run `python scripts/sync_data.py`, then `python scripts/build_data.py`, then
+            `python scripts/generate_manifest.py`, and confirm the outputs are written
+            (data.js, parquet, manifest) with no fabricated 100% pass rate or provenance drift.
+
+          DELIVER the regeneration record.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - {name: posthoc_complete, plane: measurement, evidence_class: "[M]", requires: [test_executed_success, first_pass], produces: [posthoc_ready]}
+  - {name: review_admit,     plane: control,     evidence_class: "[P]", requires: [posthoc_ready], produces: [ready_for_policy]}
+metrics:
+  - {name: analysis_coverage,  agg: ratio, over: cell}
+  - {name: review_coverage,    agg: ratio, over: cell}
+  - {name: data_regenerated,   agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, analyze, review, regenerate]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
