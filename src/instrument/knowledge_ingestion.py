@@ -27,11 +27,14 @@ Relationship to the other KB modules (one line each):
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import math
+import os
 from dataclasses import replace
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from .knowledge import (
@@ -95,6 +98,22 @@ ACL_SCOPE = "public"
 #: of fabricating a commit. A future producer that stamps ``git_sha``/``commit``/``commit_sha``
 #: on each entry will replace this wholesale (see :func:`_git_sha`).
 RESULT_VERSION = "results/v1"
+
+#: Repo root, resolved from this module's location (``src/instrument/`` → repo root). The
+#: self-build emit path needs an absolute filesystem path to write the per-record artifact
+#: regardless of the process cwd (``artifact_uri`` is repo-root-*relative*).
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+#: Extractor generation for the self-build ("progressive") phase-finding path. Distinct from
+#: :data:`EXTRACTOR_VERSION` so a workflow-phase finding and a summary-derived finding never
+#: collide on identity even for identical text (each folds its own extractor into
+#: ``knowledge_id``).
+PHASE_EXTRACTOR_VERSION = "phase-finding/v1"
+
+#: Logical ``source_uri`` for phase findings. A workflow phase has no aggregate source file —
+#: the durable per-record artifact *is* the source — so this is a stable namespace constant
+#: folded into ``entity_id``; the real bytes are pointed at by ``artifact_uri`` on the event.
+PHASE_SOURCE_URI = "file://workflow/phase"
 
 
 # ── Entry-field derivation (pure, testable) ─────────────────────
@@ -413,3 +432,168 @@ def derive_records(
             continue
         records.append(build_record(entry, repository_id=repository_id))
     return records
+
+
+# ── Self-build (progressive) phase findings ─────────────────────
+
+
+def _artifact_path(knowledge_id: str) -> Path:
+    """Absolute filesystem path of a record's durable per-record artifact.
+
+    ``artifact_uri`` / ``record_to_event`` point at the repo-root-relative
+    ``file://experiments/results/kb/<knowledge_id>.json``; writing needs the absolute path
+    regardless of the process cwd, so it is anchored to :data:`PROJECT_ROOT`.
+    """
+    return PROJECT_ROOT / ARTIFACT_DIR / f"{knowledge_id}.json"
+
+
+def _phase_tokens(phase_result: Any) -> int:
+    """Return the phase's total token count (input+output fallback when ``total`` is absent).
+
+    ``PhaseResult.tokens`` carries ``in/out/reasoning/answer/explanation/total``; the finding
+    reports ``total`` (or the in+out best-effort sum) so the token component of the idempotence
+    text stays deterministic.
+    """
+    tokens = getattr(phase_result, "tokens", None) or {}
+    total = tokens.get("total", 0)
+    if total:
+        return int(total)
+    return int(tokens.get("in", 0)) + int(tokens.get("out", 0))
+
+
+@contextlib.contextmanager
+def _authorized_kb_write():
+    """Authorize a knowledge-stream write for the duration of the context (env flag only).
+
+    ``knowledge_stream.publish_event`` raises unless ``FINOPS_KB_WRITE=1``; the self-build
+    emit path sets the flag for *just* the emit (then restores it) so the authorization does
+    not leak to any other writer in the process.
+    """
+    prev = os.environ.get("FINOPS_KB_WRITE")
+    os.environ["FINOPS_KB_WRITE"] = "1"
+    try:
+        yield
+    finally:
+        if prev is None:
+            os.environ.pop("FINOPS_KB_WRITE", None)
+        else:
+            os.environ["FINOPS_KB_WRITE"] = prev
+
+
+def derive_phase_record(
+    phase_result: Any,
+    *,
+    goal: str,
+    repository_id: str,
+    revision: str,
+    now: datetime | None = None,
+) -> KnowledgeRecord:
+    """Derive ONE phase-finding record for a completed workflow phase.
+
+    The self-build ("progressive") producer path: after a phase commits, its outcome becomes a
+    scoped finding in the cell's OWN knowledge scope — never the global summary corpus. The
+    finding text is the one-liner::
+
+        "<goal[:40]> phase <phase> -> test_executed_success <bool>, cost $<c>, tokens <n>"
+
+    Authority is ``MEASURED`` when ``test_executed_success`` is a real ``bool`` (the independent
+    test runner measured it) and ``ADVISORY`` when it is ``None`` (self-report, unverified) — an
+    unverified phase must never read as a measured finding.
+
+    ``logical_locator`` is the cell scope (the ``repository_id`` value here — the workflow seam
+    passes the cell scope as the repository id, so every scoping field is the cell scope, never
+    global). ``commit_sha`` is ``revision`` (the phase's commit), which is also the
+    ``source_revision`` folded into ``knowledge_id``. Idempotence follows from the canonical
+    identity: ``knowledge_id`` folds goal (text) + phase (text) + commit (revision) + scope
+    (repository_id / logical_locator / acl_scope) + extractor version, so re-emitting the same
+    phase yields the same id.
+    """
+    ts = _now_iso(now)
+    success = getattr(phase_result, "test_executed_success", None)
+    # A bool is an independent measurement (test runner); None is self-report → ADVISORY.
+    authority = Authority.MEASURED if isinstance(success, bool) else Authority.ADVISORY
+
+    phase = str(getattr(phase_result, "phase", ""))
+    cost = float(getattr(phase_result, "cost_usd", 0.0) or 0.0)
+    tokens = _phase_tokens(phase_result)
+    text = (
+        f"{goal[:40]} phase {phase} -> "
+        f"test_executed_success {success}, cost ${cost:.4f}, tokens {tokens}"
+    )
+
+    # logical_locator = the cell scope (== repository_id on the self-build path).
+    entity_id = compute_entity_id(repository_id, PHASE_SOURCE_URI, repository_id)
+
+    record = KnowledgeRecord(
+        knowledge_id="",  # back-filled below (folds content_hash)
+        entity_id=entity_id,
+        source_uri=PHASE_SOURCE_URI,
+        source_type=SOURCE_TYPE,  # "finding"
+        logical_locator=repository_id,
+        repository_id=repository_id,
+        branch="",
+        worktree_id=repository_id,
+        commit_sha=revision,
+        content_hash="",  # back-filled below (sha256 of the artifact)
+        extractor_version=PHASE_EXTRACTOR_VERSION,
+        embedding_version="",
+        authority=authority,
+        valid_from=ts,
+        valid_to=None,
+        observed_at=ts,
+        indexed_at=ts,
+        acl_scope=repository_id,  # scoped to the cell, never global
+        contains_sensitive_data=False,
+        text=text,
+        token_count=max(1, len(text.split())),
+        language="",
+        symbols=[],
+        outcome_id=phase,  # the phase name is the outcome unit
+        test_executed_success=success,
+        evidence_class="[M]" if authority is Authority.MEASURED else "[H]",
+        confidence=None,
+        perturbation_strength=None,
+    )
+    content_hash = _sha256_bytes(record_to_artifact(record))
+    knowledge_id = compute_knowledge_id(
+        entity_id, revision, content_hash, PHASE_EXTRACTOR_VERSION
+    )
+    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
+
+
+def emit_phase_finding(
+    phase_result: Any,
+    *,
+    goal: str,
+    repository_id: str,
+    revision: str,
+    now: datetime | None = None,
+) -> KnowledgeRecord:
+    """Derive, durably write, and publish a phase finding into the cell's OWN scope.
+
+    The progressive producer: the record is scoped to ``repository_id`` (the cell scope — never
+    global), its durable artifact is written to ``experiments/results/kb/<id>.json``, and a
+    pointer-only event is published to the change stream. The write guard in
+    ``knowledge_stream.publish_event`` is satisfied for the duration of the emit only (the
+    ``FINOPS_KB_WRITE`` flag is set and restored here), so the phase emit is an authorized
+    writer while the rest of the process stays read-only.
+
+    Returns the derived record; its ``knowledge_id`` is the idempotence key, so re-emitting the
+    same phase derives the same id and the consumer's keyed upsert is a no-op.
+    """
+    from . import knowledge_stream as _ks
+
+    record = derive_phase_record(
+        phase_result, goal=goal, repository_id=repository_id, revision=revision, now=now
+    )
+    # Durable artifact first — the consumer must be able to read + verify the bytes the
+    # event's content_hash covers the moment the pointer lands (mirrors kb_produce ordering).
+    artifact = record_to_artifact(record)
+    path = _artifact_path(record.knowledge_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(artifact)
+
+    with _authorized_kb_write():
+        r = _ks.connect()
+        _ks.publish_event(r, record_to_event(record, now=now))
+    return record

@@ -484,6 +484,22 @@ def cell_scope(workdir: str | Path) -> str:
     return f"self-{identity}"
 
 
+def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
+    """Emit a completed phase's finding into the cell's own scope (self-build producer).
+
+    Best-effort: emission failure (Redis down, write guard off, artifact path issue) is
+    swallowed — a self-build finding is a progressive enhancement, never a gate on the phase.
+    ``scope`` is ``cell_scope(wd)`` (``self-<worktree>``), so the record lands in the cell's own
+    retrieval scope, never the global store.
+    """
+    try:
+        from .knowledge_ingestion import emit_phase_finding
+
+        emit_phase_finding(pr, goal=goal, repository_id=scope, revision=pr.commit_hash)
+    except Exception:
+        pass  # progressive path — never block or fail the phase on emission
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -533,6 +549,12 @@ def run_workflow(
     carries budgets, ``constructor_model``, ``pinned_policy``, ``inherited_tools``, and
     ``user_constraints``. Test phases are never augmented; any retrieval/constructor
     failure falls back to the base prompt and records a named fallback mode.
+
+    Self-build producer (``rag_params.emit_self``): when true, each successful phase that
+    produced a commit also emits its one-line finding into the cell's OWN scope (default OFF).
+    The finding is scoped via ``repository_id``/``acl_scope`` = ``cell_scope(wd)`` (never
+    global) and keyed by ``f(goal, phase, commit, scope, extractor)``, so re-emitting is a
+    no-op.
 
     Per-step routing (``docs/routing_design.md``): when the spec declares
     ``workflow.params.model_pool``, each agent phase's model is chosen by
@@ -754,6 +776,12 @@ def run_workflow(
         pr.duration_s = round(time.time() - t0, 2)
         if commit and pr.status == "ok":
             pr.commit_hash = _git_commit(wd, name, goal)
+            # Self-build ("progressive") producer — opt-in via rag_params.emit_self. After the
+            # phase commits, emit its finding into the cell's OWN scope so the cell's retrieval
+            # filter can later read its own progress (default OFF: only the "self-built" arm
+            # opts in).
+            if rag_params.get("emit_self") and pr.commit_hash:
+                _emit_self_finding(pr, goal=goal, scope=cell_scope(wd))
 
         prior.append(f"{name} ({pr.status})")
         result.phases.append(pr)

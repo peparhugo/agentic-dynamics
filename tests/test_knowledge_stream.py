@@ -22,6 +22,17 @@ except Exception:
 
 pytestmark = pytest.mark.skipif(not _REDIS_OK, reason="Redis not available on 6380")
 
+
+@pytest.fixture(autouse=True)
+def _authorize_writes(monkeypatch):
+    """Satisfy the publish_event write guard for this module's producer-side tests.
+
+    ``publish_event`` raises without ``FINOPS_KB_WRITE=1``; these tests exercise the
+    producer-side publish/reconcile paths, so the flag is set for the whole module. The
+    guard itself is unit-tested in ``tests/test_knowledge_ingestion.py``.
+    """
+    monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+
 STREAM = ks.STREAM_KEY
 DEAD_LETTER = ks.DEAD_LETTER_KEY
 

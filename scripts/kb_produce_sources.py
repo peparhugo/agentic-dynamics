@@ -270,6 +270,9 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     # 3. Emit — fail fast on connection (knowledge_stream.connect raises on a downed stream).
+    # The producer is an authorized writer: satisfy publish_event's write guard (FINOPS_KB_WRITE)
+    # for the whole run — this script exists solely to emit pointers.
+    os.environ["FINOPS_KB_WRITE"] = "1"
     r = ks.connect(host=REDIS_HOST, port=REDIS_PORT)
     emitted, skipped = emit_records(r, plan)
     log(f"emitted={emitted} skipped={skipped} (already checkpointed) total={len(plan)}")

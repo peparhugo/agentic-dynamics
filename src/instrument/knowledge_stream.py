@@ -98,9 +98,26 @@ def decode_event(data: dict[str, Any]) -> KnowledgeEvent:
 
 
 def publish_event(
-    r: Any, event: KnowledgeEvent, *, stream: str = STREAM_KEY
+    r: Any,
+    event: KnowledgeEvent,
+    *,
+    stream: str = STREAM_KEY,
+    authorized: bool = False,
 ) -> str:
-    """Append a pointer event to the change stream; return its entry id."""
+    """Append a pointer event to the change stream; return its entry id.
+
+    WRITE GUARD: appending mutates the durable ingestion plane, so the caller must be an
+    authorized writer. Authorization is granted when ``authorized=True`` is passed explicitly
+    OR the ``FINOPS_KB_WRITE`` env flag is ``"1"``; otherwise this raises ``RuntimeError`` so a
+    read-mostly process can never accidentally emit. ``scripts/kb_produce.py`` (and
+    ``scripts/kb_produce_sources.py``) set the env flag for their whole run; the self-build
+    emit path (``knowledge_ingestion.emit_phase_finding``) sets it only for the duration of the
+    emit and restores it afterward.
+    """
+    if not authorized and os.environ.get("FINOPS_KB_WRITE") != "1":
+        raise RuntimeError(
+            "knowledge write not authorized: set FINOPS_KB_WRITE=1 or pass authorized=True"
+        )
     return r.xadd(stream, event.to_dict())
 
 

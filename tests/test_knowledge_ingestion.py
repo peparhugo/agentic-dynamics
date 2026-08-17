@@ -15,6 +15,7 @@ import subprocess
 import sys
 from dataclasses import fields
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -35,6 +36,7 @@ from instrument.knowledge_ingestion import (
     SOURCE_URI,
     artifact_uri,
     build_record,
+    derive_phase_record,
     derive_records,
     extract_record,
     record_to_artifact,
@@ -525,4 +527,163 @@ def test_producer_emitted_event_verifies_and_lands_measured(tmp_path, monkeypatc
     assert upserted.text == record.text
     assert upserted.knowledge_id == record.knowledge_id
     assert upserted.content_hash == record.content_hash
+
+
+# ── Self-build (progressive) phase findings ─────────────────────
+
+
+def _phase_result(**overrides) -> SimpleNamespace:
+    """A minimal completed-phase double (mirrors ``workflow_runner.PhaseResult``)."""
+    base = dict(
+        phase="implement",
+        status="ok",
+        tokens={"in": 10, "out": 20, "total": 30},
+        cost_usd=0.0123,
+        test_executed_success=True,
+        commit_hash="abc1234",
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def test_derive_phase_record_authority_flips_on_test_executed_success():
+    # A bool is an independent measurement → MEASURED; None is self-report → ADVISORY.
+    measured = derive_phase_record(
+        _phase_result(test_executed_success=True), goal="g", repository_id="self-1", revision="abc"
+    )
+    assert measured.authority is Authority.MEASURED
+    assert measured.evidence_class == "[M]"
+    assert measured.test_executed_success is True
+
+    failed = derive_phase_record(
+        _phase_result(test_executed_success=False), goal="g", repository_id="self-1", revision="abc"
+    )
+    assert failed.authority is Authority.MEASURED
+    assert failed.test_executed_success is False
+
+    advisory = derive_phase_record(
+        _phase_result(test_executed_success=None), goal="g", repository_id="self-1", revision="abc"
+    )
+    assert advisory.authority is Authority.ADVISORY
+    assert advisory.evidence_class == "[H]"
+    assert advisory.test_executed_success is None
+
+
+def test_derive_phase_record_text_and_scoping():
+    goal = "build a task manager api with many details"
+    rec = derive_phase_record(
+        _phase_result(phase="scope", cost_usd=0.01, tokens={"total": 42}, test_executed_success=True),
+        goal=goal,
+        repository_id="self-cell-1",
+        revision="abc1234",
+    )
+    # goal is truncated at 40 chars; the tail ("details") is dropped.
+    assert len(goal) > 40
+    assert rec.text.startswith(goal[:40] + " phase scope -> test_executed_success True")
+    assert "cost $0.0100" in rec.text
+    assert "tokens 42" in rec.text
+    assert "details" not in rec.text
+    # Every scoping field is the cell scope, never global.
+    assert rec.source_type == "finding"
+    assert rec.logical_locator == "self-cell-1"
+    assert rec.repository_id == "self-cell-1"
+    assert rec.acl_scope == "self-cell-1"
+    assert rec.commit_sha == "abc1234"
+    assert rec.extractor_version == "phase-finding/v1"
+
+
+def test_derive_phase_record_idempotent():
+    a = derive_phase_record(_phase_result(), goal="g", repository_id="self-1", revision="abc")
+    b = derive_phase_record(_phase_result(), goal="g", repository_id="self-1", revision="abc")
+    assert a.knowledge_id == b.knowledge_id
+    assert a.entity_id == b.entity_id
+    assert a.content_hash == b.content_hash
+    # The idempotence key is f(goal, phase, commit, scope, extractor): each input change
+    # yields a new knowledge_id.
+    assert derive_phase_record(_phase_result(), goal="other", repository_id="self-1", revision="abc").knowledge_id != a.knowledge_id
+    assert derive_phase_record(_phase_result(phase="scope"), goal="g", repository_id="self-1", revision="abc").knowledge_id != a.knowledge_id
+    assert derive_phase_record(_phase_result(), goal="g", repository_id="self-1", revision="xyz").knowledge_id != a.knowledge_id
+    assert derive_phase_record(_phase_result(), goal="g", repository_id="self-2", revision="abc").knowledge_id != a.knowledge_id
+
+
+def test_publish_event_write_guard(monkeypatch):
+    import instrument.knowledge_stream as ks
+
+    monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
+    event = record_to_event(build_record(_entry()))
+
+    class _R:
+        def xadd(self, *a, **kw):
+            return "0-1"
+
+    # No flag, no explicit auth → raise.
+    with pytest.raises(RuntimeError):
+        ks.publish_event(_R(), event)
+    # Env flag authorizes.
+    monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+    assert ks.publish_event(_R(), event) == "0-1"
+    # Explicit kwarg authorizes even without the flag.
+    monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
+    assert ks.publish_event(_R(), event, authorized=True) == "0-1"
+
+
+def test_emit_phase_finding_scoped_to_repository_id(tmp_path, monkeypatch):
+    import hashlib as _hashlib
+
+    import instrument.knowledge_ingestion as ki
+    import instrument.knowledge_stream as ks
+
+    monkeypatch.setattr(ki, "PROJECT_ROOT", tmp_path)
+    published = {}
+
+    def _fake_connect():
+        return object()
+
+    def _fake_publish(r, event, **kwargs):
+        published["event"] = event
+        return "0-1"
+
+    monkeypatch.setattr(ks, "connect", _fake_connect)
+    monkeypatch.setattr(ks, "publish_event", _fake_publish)
+
+    record = ki.emit_phase_finding(
+        _phase_result(test_executed_success=True),
+        goal="build a task manager api",
+        repository_id="self-cell-1",
+        revision="abc1234",
+    )
+
+    # Every scoping field is the cell scope — never global.
+    assert record.repository_id == "self-cell-1"
+    assert record.logical_locator == "self-cell-1"
+    assert record.acl_scope == "self-cell-1"
+    assert record.commit_sha == "abc1234"
+
+    ev = published["event"]
+    assert ev.knowledge_id == record.knowledge_id
+    assert ev.source_revision == "abc1234"
+
+    # The durable artifact was written under the (tmp) repo kb dir and its bytes are what
+    # content_hash covers.
+    artifact_path = tmp_path / "experiments" / "results" / "kb" / f"{record.knowledge_id}.json"
+    assert artifact_path.exists()
+    assert _hashlib.sha256(artifact_path.read_bytes()).hexdigest() == record.content_hash
+
+
+def test_emit_phase_finding_idempotent(tmp_path, monkeypatch):
+    import instrument.knowledge_ingestion as ki
+    import instrument.knowledge_stream as ks
+
+    monkeypatch.setattr(ki, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(ks, "connect", lambda: object())
+    events = []
+    monkeypatch.setattr(ks, "publish_event", lambda r, e, **kw: events.append(e) or "0-1")
+
+    a = ki.emit_phase_finding(_phase_result(), goal="g", repository_id="self-1", revision="abc")
+    b = ki.emit_phase_finding(_phase_result(), goal="g", repository_id="self-1", revision="abc")
+
+    # Re-emitting the same phase derives the same id → the consumer's keyed upsert is a no-op.
+    assert a.knowledge_id == b.knowledge_id
+    assert len(events) == 2  # both emits published ...
+    assert events[0].knowledge_id == events[1].knowledge_id  # ... the same idempotence key.
 
