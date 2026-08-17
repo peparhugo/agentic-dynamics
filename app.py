@@ -13,6 +13,7 @@ import os
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
+VALID_STATUSES = {"pending", "done"}
 
 
 def get_db():
@@ -27,10 +28,15 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS tasks ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
+            "  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done')),"
             "  created_at TEXT NOT NULL"
             ")"
         )
+
+
+# The API is usable when imported by a WSGI server or a test suite as well as
+# when this module is run directly.
+init_db()
 
 
 # ── Models ────────────────────────────────────────────────────
@@ -67,6 +73,8 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
     task = get_task(task_id)
     if task is None:
         return None
+    if status is not None and status not in VALID_STATUSES:
+        raise ValueError("status must be either 'pending' or 'done'")
     with get_db() as conn:
         updates = []
         params = []
@@ -95,9 +103,15 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
+    if not isinstance(data, dict):
+        data = {}
+    status = data.get("status")
+    if status is not None and status not in VALID_STATUSES:
+        return jsonify({"error": "status must be either 'pending' or 'done'"}), 422
+    title = data.get("title")
+    if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
+    title = title.strip()
     task = create_task(title)
     return jsonify(task), 201
 
@@ -113,11 +127,15 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
-    task = update_task(
-        task_id,
-        title=data.get("title"),
-        status=data.get("status"),
-    )
+    if not isinstance(data, dict):
+        data = {}
+    status = data.get("status")
+    if status is not None and status not in VALID_STATUSES:
+        return jsonify({"error": "status must be either 'pending' or 'done'"}), 422
+    title = data.get("title")
+    if title is not None and (not isinstance(title, str) or not title.strip()):
+        return jsonify({"error": "title must be a non-empty string"}), 400
+    task = update_task(task_id, title=title.strip() if isinstance(title, str) else title, status=status)
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
