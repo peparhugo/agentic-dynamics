@@ -17,6 +17,7 @@ export interface Page {
   date?: string;
   tags: string[];
   html: string;
+  content?: string;
   template?: string;
   layout?: string;
   frontmatter: Frontmatter;

@@ -1,7 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { BuildOptions, Page, markdownToHtml, normalizeTags, parseFrontmatter } from './ssg';
-import { TemplateEngine } from './template-engine';
+import { BuildOptions, Page, normalizeTags, parseFrontmatter } from './ssg';
+import { Plugin, PluginContext, applyOnFile, createPluginContext, runSyncHooks } from './plugin';
+import { MarkdownPlugin } from './plugins/markdown';
+import { TemplatePlugin } from './plugins/template';
+import { loadConfiguredPlugins } from './load-plugins';
 
 function slugFromFilename(filename: string): string {
   const ext = path.extname(filename);
@@ -31,21 +34,21 @@ export function findMarkdownFiles(contentDir: string): string[] {
   return results;
 }
 
-export function loadPages(contentDir: string): Page[] {
+function loadRawPages(contentDir: string): Page[] {
   const files = findMarkdownFiles(contentDir);
   const pages: Page[] = [];
 
   for (const file of files) {
     const raw = fs.readFileSync(file, 'utf8');
     const { frontmatter, content } = parseFrontmatter(raw);
-    const html = markdownToHtml(content);
     const slug = slugFromFilename(path.basename(file));
     pages.push({
       slug,
       title: frontmatter.title || slug,
       date: frontmatter.date,
       tags: normalizeTags(frontmatter.tags),
-      html,
+      html: '',
+      content,
       template: frontmatter.template,
       layout: frontmatter.layout,
       frontmatter,
@@ -62,31 +65,50 @@ export function loadPages(contentDir: string): Page[] {
   });
 }
 
+export function loadPages(contentDir: string): Page[] {
+  const markdown = new MarkdownPlugin();
+  return loadRawPages(contentDir).map((page) => markdown.render(page));
+}
+
 export interface BuildResult {
   outputDir: string;
   writtenFiles: string[];
 }
 
 export function build(options: BuildOptions): BuildResult {
-  const { contentDir, outputDir, templatesDir } = options;
-  const pages = loadPages(contentDir);
-  const engine = new TemplateEngine({ templatesDir });
+  const markdown = new MarkdownPlugin();
+  const template = new TemplatePlugin({ templatesDir: options.templatesDir });
+  const plugins: Plugin[] = [markdown, template, ...loadConfiguredPlugins()];
 
-  fs.mkdirSync(outputDir, { recursive: true });
+  const context: PluginContext = createPluginContext(options);
+
+  runSyncHooks(plugins, 'onStart', context);
+  runSyncHooks(plugins, 'beforeBuild', context);
+
+  const pages: Page[] = loadRawPages(options.contentDir).map((page) =>
+    applyOnFile(plugins, page, context)
+  );
+  context.pages = pages;
+
+  fs.mkdirSync(options.outputDir, { recursive: true });
 
   const writtenFiles: string[] = [];
 
-  const indexHtml = engine.renderIndex(pages);
-  const indexPath = path.join(outputDir, 'index.html');
+  const indexHtml = template.renderIndex(pages);
+  const indexPath = path.join(options.outputDir, 'index.html');
   fs.writeFileSync(indexPath, indexHtml, 'utf8');
   writtenFiles.push(indexPath);
 
   for (const page of pages) {
-    const pageHtml = engine.renderPage(page);
-    const pagePath = path.join(outputDir, `${page.slug}.html`);
+    const pageHtml = template.renderPage(page);
+    const pagePath = path.join(options.outputDir, `${page.slug}.html`);
     fs.writeFileSync(pagePath, pageHtml, 'utf8');
     writtenFiles.push(pagePath);
   }
 
-  return { outputDir, writtenFiles };
+  context.writtenFiles = writtenFiles;
+  runSyncHooks(plugins, 'afterBuild', context);
+  runSyncHooks(plugins, 'onEnd', context);
+
+  return { outputDir: options.outputDir, writtenFiles };
 }
