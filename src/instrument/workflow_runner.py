@@ -13,6 +13,16 @@ Phase kinds (from ``workflow.params.phases``):
 
 The agent works directly in ``workdir``; prior-phase artifacts are committed there, so
 later phases read them from the repo. Fails fast by default (``stop_on_error``).
+
+RAG scope isolation (the load-bearing invariant): by default the retrieval filter is
+scoped per cell — :func:`cell_scope` yields ``self-<worktree basename>`` (the cell
+identity), overridden by ``FINOPS_CELL_ID`` when set — so an augmented cell reads only
+its own worktree's knowledge, never the global store. ``run_workflow`` defaults both
+``repository_id`` and ``acl_scope`` to that cell scope *before* the retrieve fn is
+built, whenever ``rag_augment`` is enabled and ``repository_id`` is empty. An
+explicitly non-empty ``rag_params.repository_id`` is preserved unchanged — that is the
+*shared-scope* override for coordinated parallel workstreams. The empty scope must
+never again mean "global".
 """
 
 from __future__ import annotations
@@ -462,6 +472,18 @@ def _cell_id(spec_name: str, model: str) -> str:
     return f"wf_{slug.lower().strip('_')}"
 
 
+def cell_scope(workdir: str | Path) -> str:
+    """Return the per-cell retrieval scope for a worktree.
+
+    The cell identity is the worktree basename (``f"self-{workdir.name}"``) — each
+    augmented cell reads only its own worktree's knowledge, never the global store.
+    ``FINOPS_CELL_ID`` overrides the basename when set (a worker that already pinned a
+    cell id keeps that identity), so the scope stays ``self-<identity>`` either way.
+    """
+    identity = os.environ.get("FINOPS_CELL_ID") or Path(workdir).name
+    return f"self-{identity}"
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -548,6 +570,15 @@ def run_workflow(
         spec.workflow.params.get("rag_augment", False)
     )
     rag_params = dict(rag_params or spec.workflow.params.get("rag", {}) or {})
+    # Thread the per-cell scope through the retrieval filter: an augmented cell reads
+    # only its own worktree's knowledge. Both repository_id and acl_scope default to
+    # the cell scope BEFORE the retrieve fn is built; an explicitly non-empty
+    # repository_id is the shared-scope override (coordinated parallel workstreams)
+    # and is preserved unchanged — the empty scope never again means "global".
+    if rag_augment and not str(rag_params.get("repository_id", "")).strip():
+        scope = cell_scope(wd)
+        rag_params["repository_id"] = scope
+        rag_params["acl_scope"] = scope
     pinned_policy = str(rag_params.get("pinned_policy", ""))
     inherited_tools = list(rag_params.get("inherited_tools") or DEFAULT_INHERITED_TOOLS)
 

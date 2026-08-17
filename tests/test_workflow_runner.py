@@ -5,7 +5,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from instrument.experiment_spec import load_spec, validate_spec
-from instrument.workflow_runner import _build_phase_prompt, _default_retrieve_fn, run_workflow
+from instrument.workflow_runner import (
+    _build_phase_prompt,
+    _default_retrieve_fn,
+    cell_scope,
+    run_workflow,
+)
 
 SPEC = Path(__file__).resolve().parent.parent / "experiments" / "specs" / "control_room_portal.yaml"
 
@@ -394,4 +399,58 @@ def test_default_retrieve_fn_degrades_to_no_rag_when_stores_down(tmp_path, monke
 
     assert result.phases[0].fallback_mode == "no_rag"
     assert result.phases[0].status == "ok"
+
+
+# ── Per-cell retrieval scope threading ──────────────────────────
+
+def test_cell_scope_uses_worktree_basename(tmp_path, monkeypatch):
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    assert cell_scope(tmp_path) == f"self-{tmp_path.name}"
+
+
+def test_cell_scope_overridden_by_finops_cell_id(tmp_path, monkeypatch):
+    monkeypatch.setenv("FINOPS_CELL_ID", "wf_override")
+    assert cell_scope(tmp_path) == "self-wf_override"
+
+
+def test_rag_empty_repository_id_defaults_to_cell_scope(tmp_path, monkeypatch):
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    spec = load_spec(SPEC)
+    captured = {}
+
+    def retrieve_fn(**kwargs):
+        captured["repository_id"] = kwargs.get("repository_id")
+        captured["acl_scope"] = kwargs.get("acl_scope")
+        return _FakeAttempt([_FakeEvidence("k1", "x")])
+
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                 rag_augment=True, retrieve_fn=retrieve_fn,
+                 construct_fn=lambda request: _FakeAugmented("AUG"),
+                 run_agentic_fn=lambda *a, **k: _fake_agent())
+
+    # The empty scope resolves to the per-cell scope, not the global store.
+    expected = f"self-{tmp_path.name}"
+    assert captured["repository_id"] == expected
+    assert captured["acl_scope"] == expected
+
+
+def test_rag_explicit_repository_id_is_preserved(tmp_path, monkeypatch):
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    spec = load_spec(SPEC)
+    captured = {}
+
+    def retrieve_fn(**kwargs):
+        captured["repository_id"] = kwargs.get("repository_id")
+        captured["acl_scope"] = kwargs.get("acl_scope")
+        return _FakeAttempt([_FakeEvidence("k1", "x")])
+
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                 rag_augment=True, rag_params={"repository_id": "shared-scope"},
+                 retrieve_fn=retrieve_fn,
+                 construct_fn=lambda request: _FakeAugmented("AUG"),
+                 run_agentic_fn=lambda *a, **k: _fake_agent())
+
+    # The shared-scope override is preserved unchanged — never overwritten by the
+    # per-cell default.
+    assert captured["repository_id"] == "shared-scope"
 
