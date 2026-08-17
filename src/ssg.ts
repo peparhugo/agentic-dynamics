@@ -6,6 +6,9 @@ export interface Frontmatter {
   title?: string;
   date?: string;
   tags?: string[] | string;
+  template?: string;
+  layout?: string;
+  [key: string]: unknown;
 }
 
 export interface Page {
@@ -14,11 +17,15 @@ export interface Page {
   date?: string;
   tags: string[];
   html: string;
+  template?: string;
+  layout?: string;
+  frontmatter: Frontmatter;
 }
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  templatesDir?: string;
 }
 
 const FRONTMATTER_DELIMITER = /^\uFEFF?---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/;

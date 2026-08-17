@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { BuildOptions, Page, markdownToHtml, normalizeTags, parseFrontmatter } from './ssg';
-import { renderIndex, renderPage } from './templates';
+import { TemplateEngine } from './template-engine';
 
 function slugFromFilename(filename: string): string {
   const ext = path.extname(filename);
@@ -39,12 +39,16 @@ export function loadPages(contentDir: string): Page[] {
     const raw = fs.readFileSync(file, 'utf8');
     const { frontmatter, content } = parseFrontmatter(raw);
     const html = markdownToHtml(content);
+    const slug = slugFromFilename(path.basename(file));
     pages.push({
-      slug: slugFromFilename(path.basename(file)),
-      title: frontmatter.title || slugFromFilename(path.basename(file)),
+      slug,
+      title: frontmatter.title || slug,
       date: frontmatter.date,
       tags: normalizeTags(frontmatter.tags),
       html,
+      template: frontmatter.template,
+      layout: frontmatter.layout,
+      frontmatter,
     });
   }
 
@@ -64,20 +68,21 @@ export interface BuildResult {
 }
 
 export function build(options: BuildOptions): BuildResult {
-  const { contentDir, outputDir } = options;
+  const { contentDir, outputDir, templatesDir } = options;
   const pages = loadPages(contentDir);
+  const engine = new TemplateEngine({ templatesDir });
 
   fs.mkdirSync(outputDir, { recursive: true });
 
   const writtenFiles: string[] = [];
 
-  const indexHtml = renderIndex(pages);
+  const indexHtml = engine.renderIndex(pages);
   const indexPath = path.join(outputDir, 'index.html');
   fs.writeFileSync(indexPath, indexHtml, 'utf8');
   writtenFiles.push(indexPath);
 
   for (const page of pages) {
-    const pageHtml = renderPage(page);
+    const pageHtml = engine.renderPage(page);
     const pagePath = path.join(outputDir, `${page.slug}.html`);
     fs.writeFileSync(pagePath, pageHtml, 'utf8');
     writtenFiles.push(pagePath);
