@@ -1,0 +1,165 @@
+name: routing_kb_wiring
+question: >-
+  Build the wiring that makes the routing_kb_more_itertools grid (16 cells, experiments/specs/
+  routing_kb_more_itertools.yaml) actually runnable. The substrate is proven (a smoke cell fixed
+  the more-itertools chunked() negative-n bug at $0.03); what is missing is the plumbing: (1) seed
+  an external repo into a worktree, (2) inject the held-out golden test after the reproduce phase,
+  (3) a launcher that maps factor levels to run_workflow kwargs and writes signal-store-readable
+  results, and (4) seed the historical KB arm's corpus without leaking the answer. Each piece is
+  small and uses existing machinery; none touches the transport or measurement core.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      brief: >-
+        The grid spec exists (routing_kb_more_itertools.yaml, validated, 16 cells). The routing
+        arms are workflow mechanisms (model_pool + preferences), NOT RuleSpec control rules —
+        correctness/cost/cache_hit_rate live in the signal store, not LEDGER_FIELDS. The
+        recommend_route/route_step arms cold-start to a fixed model when the signal store is empty,
+        so a warm-up of the fixed-model cells must run first and write signal-store-readable rows.
+        The held-out golden test (PR #1223 test_negative) is the independent correctness gate and
+        must never be shown to the agent before the test phase. Reuse the smoke test's proven
+        substrate (more-itertools @ 516f0a80, golden @ 9ddc55c5).
+      isolation: >-
+        Redis 6380 DB 2 only; Neo4j MERGE-only; Chroma knowledge_chunks_v1 only. The historical KB
+        seeding must NEVER ingest the PR #1223 diff or test text (answer leakage). Never 6379,
+        never DB 1.
+      prior_art:
+        - experiments/specs/routing_kb_more_itertools.yaml  # the grid being wired (16 cells)
+        - src/instrument/routing.py            # recommend_route / compute_routing / normalize_task
+        - src/instrument/step_routing.py       # route_step / ModelSignals / cache_switch_penalty
+        - src/instrument/signal_store.py       # build_signal_store / load_results (the _results_summary shape)
+        - src/instrument/code_ingestion.py     # derive_code_records (the historical arm's corpus)
+        - src/instrument/workflow_runner.py    # run_workflow / rag_augment seam / cell_scope / emit_self
+        - src/instrument/test_runner.py        # run_suite (the independent test phase)
+        - scripts/run_workflow.py              # the per-cell executor the launcher wraps
+    phases:
+      - name: provision
+        kind: agent
+        prompt: >
+          Implement seed-repo provisioning: clone an external repo at a pinned commit into a
+          worktree, install it, and verify the suite runs.
+
+          READ FIRST: scripts/run_workflow.py (what it assumes about workdir), src/instrument/
+          workflow_runner.py run_workflow (wd.is_dir + _git_commit in the workdir).
+
+          REQUIREMENTS:
+          - Add scripts/seed_repo.py: `seed_repo(url, revision, dest, *, install=True)` that clones
+            the repo (no tags), checks out --detach <revision>, and when install=True runs
+            `python3 -m pip install -q -e <dest>`. It must VERIFY: print the resulting HEAD sha and
+            a one-line confirmation that `python3 -c "import <pkg>"` works.
+          - Idempotent: re-running against an existing dest re-checks the revision, does not re-clone.
+          - The smoke test proved this works manually for more-itertools @ 516f0a80 — encode exactly
+            those steps (clone -> checkout --detach -> pip install -e .).
+          TESTS: tests/test_seed_repo.py — clones a local fixture repo at a pinned rev, installs,
+          idempotent re-run, wrong-revision error. Run green.
+      - name: held_out
+        kind: agent
+        prompt: >
+          Implement held-out test injection: land the golden regression test after the reproduce
+          phase commits and before the test phase runs, so the agent can never see it.
+
+          READ FIRST: scripts/run_workflow.py (--resume semantics), src/instrument/workflow_runner.py
+          (_completed_phases + phase kinds agent/test).
+
+          REQUIREMENTS:
+          - The held-out oracle for this grid is PR #1223's test_negative (asserts the exact message
+            "n must be at least 0"); the golden fix is merge 9ddc55c5. Keep the test text OUT of the
+            agent's prompts and worktree until the reproduce phase has committed.
+          - Add a mechanism (a wrapper around run_workflow --resume, or a documented helper) that:
+            runs reproduce -> fix normally, then writes the golden test file into the worktree,
+            commits it as "[harness] inject held-out test", then resumes into the test phase.
+          - Record evaluator_independent=True and the golden source hash so leakage can be flagged.
+          TESTS: tests/test_held_out.py — the golden test is absent during reproduce/fix, present
+          before test, and its content hash matches the pinned golden. Run green.
+      - name: launcher
+        kind: agent
+        prompt: >
+          Implement the campaign launcher: map factor levels to run_workflow kwargs and write
+          signal-store-readable results.
+
+          READ FIRST: experiments/specs/routing_kb_more_itertools.yaml (the factors + rules),
+          src/instrument/routing.py (normalize_task + recommend_route), src/instrument/signal_store.py
+          (build_signal_store + load_results — the exact row shape it consumes),
+          scripts/run_workflow.py (the per-cell executor).
+
+          REQUIREMENTS:
+          - Add scripts/run_routing_kb.py with `--spec` + `--stage` (smoke|warmup|grid). It:
+            load_spec -> experiment_matrix (16 cells) -> for each cell, map levels to kwargs:
+              routing fixed -> model=deepseek/deepseek-v4-pro; random -> seeded uniform draw from
+              model_pool; recommend_route -> compute_routing(entries) cheapest-qualified (cold-start
+              fallback documented); route_step -> model_pool + preferences (no pin).
+              kb bare -> rag_augment=False; historical -> rag_augment=True + repository_id
+              "more-itertools"; self_built -> rag_augment=True + emit_self=True + repository_id
+              "self-<worktree>"; shared -> rag_augment=True + explicit shared repository_id.
+            provision each cell's worktree via seed_repo, inject the held-out test, run run_workflow,
+            then write the result as a _results_summary.json-SHAPED row carrying task=
+            "more_itertools_chunked_negative_n" (the task_label) so signal_store + recommend_route
+            can read it. Cold-start note: recommend_route/route_step need the warmup rows first.
+          - The launcher must NOT reimplement routing/retrieval/testing/pricing — it only maps
+            levels to existing kwargs and shapes results.
+          TESTS: tests/test_launcher.py — factor->kwargs mapping for all 4x4 levels; the result row
+          has the task field; cold-start fallback resolves to a documented model. Run green.
+      - name: seeding
+        kind: agent
+        prompt: >
+          Implement the historical-arm KB seeding: ingest more-itertools code records WITHOUT
+          leaking the answer.
+
+          READ FIRST: src/instrument/code_ingestion.py (derive_code_records), src/instrument/
+          knowledge_stream.py (the pointer/artifact contract), scripts/kb_produce.py (the batch
+          producer), scripts/kb_worker.py (the consumers).
+
+          REQUIREMENTS:
+          - Add a small seeding step (extend seed_repo.py or a scripts/seed_historical.py) that runs
+            code_ingestion.derive_code_records over the pinned more-itertools tree (repository_id=
+            "more-itertools") and emits them through the existing producer/consumer path.
+          - LEAK GUARD (load-bearing): the PR #1223 diff and test text must NEVER be ingested. Before
+            emitting, assert no record text contains "n must be at least 0" or the chunked negative-n
+            test body. Document this as a pre-flight check.
+          - The historical arm retrieves only these SOURCE [C] records; no MEASURED findings yet.
+          TESTS: tests/test_seeding.py — records carry repository_id "more-itertools"; the leak
+          guard rejects a record containing the golden message. Run green.
+      - name: smoke
+        kind: agent
+        prompt: >
+          Run the wiring end-to-end on ONE cell (routing=fixed, kb=bare) and prove every piece fires.
+
+          REQUIREMENTS:
+          - scripts/seed_repo.py more-itertools @ 516f0a80 into a fresh worktree.
+          - scripts/run_routing_kb.py --stage smoke -> the fixed/bare cell runs reproduce -> fix ->
+            [inject held-out] -> test.
+          - Verify: test_executed_success True; the held-out test discriminates (fails pre-fix,
+            passes post-fix); the result row carries task=more_itertools_chunked_negative_n; the
+            launcher logged the resolved model (deepseek/deepseek-v4-pro) and rag_augment=False.
+          - Report the per-cell cost and the held-out test's pass/fail.
+      - name: verify
+        kind: agent
+        prompt: >
+          Scoped verification — do NOT run the full pytest suite. Run
+          tests/test_seed_repo.py tests/test_held_out.py tests/test_launcher.py tests/test_seeding.py
+          tests/test_workflow_runner.py -q, plus an import smoke of scripts/run_routing_kb.py and
+          scripts/seed_repo.py. Leave green.
+      - name: docs
+        kind: agent
+        prompt: >
+          Sync the agent-facing surfaces (standard closing step — do not skip). Update BOTH surfaces
+          in lockstep (.opencode/instructions/mental-model.md AND .claude/rules/mental-model.md):
+          document scripts/run_routing_kb.py (the campaign launcher) and scripts/seed_repo.py (the
+          external-repo provisioner), and note the held-out test injection + the signal-store warm-up
+          contract. Update scripts/CONTEXT.md with the two new scripts. Keep both surfaces in
+          lockstep.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
