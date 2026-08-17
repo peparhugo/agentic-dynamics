@@ -1,14 +1,14 @@
-/* Generated 2026-08-17 13:45:23 UTC by build_data.py */
+/* Generated 2026-08-17 18:14:10 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-17T13:45:23.457667+00:00",
+    "generated_at": "2026-08-17T18:14:10.713607+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
     "worktrees_total": 205,
     "sessions_total": 772,
-    "game_reports": 273,
+    "game_reports": 275,
     "total_cost": 219.5112,
     "architectures": 3,
     "variants": 7,
@@ -97,7 +97,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 22,
+      "strategy_expl": 24,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 24,
@@ -120,19 +120,19 @@ window.DYNAMICS_DATA = {
       "avg_test_code_ratio": 0.805,
       "avg_tok_per_session": 37865.0,
       "avg_duration_s": 1771.0,
-      "avg_code_lines": 1337.0,
+      "avg_code_lines": 2148.0,
       "tests_total": 1692,
       "tests_passed": 2966,
       "tests_run": 2967,
       "pass_rate": "100% (2966/2967)",
       "avg_cost_per_session": 0.033196,
-      "avg_loc": 1337.0,
+      "avg_loc": 2148.0,
       "avg_energy_j": 38925.4,
-      "avg_energy_j_per_loc": 29.11,
+      "avg_energy_j_per_loc": 18.12,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 21,
+      "strategy_expl": 37,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 37,
@@ -202,7 +202,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 2,
-      "strategy_expl": 10,
+      "strategy_expl": 12,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 14,
@@ -272,7 +272,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 2,
-      "strategy_expl": 13,
+      "strategy_expl": 14,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 16,
@@ -1102,7 +1102,7 @@ window.DYNAMICS_DATA = {
     "locData": [
       2197.0,
       796.0,
-      1337.0,
+      2148.0,
       693.0,
       2211.0,
       1255.0,
@@ -1885,6 +1885,14 @@ window.DYNAMICS_DATA = {
       "avg_loc": 796.0
     },
     {
+      "id": "deepseek/deepseek-v4-pro",
+      "label": "DeepSeek v4 Pro",
+      "avg_energy_j": 38925.4,
+      "avg_energy_j_per_loc": 18.12,
+      "avg_cost": 0.158801,
+      "avg_loc": 2148.0
+    },
+    {
       "id": "openai/gpt-5.6-sol",
       "label": "openai/gpt-5.6-sol",
       "avg_energy_j": 28959.4,
@@ -1907,14 +1915,6 @@ window.DYNAMICS_DATA = {
       "avg_energy_j_per_loc": 26.88,
       "avg_cost": 1.015182,
       "avg_loc": 693.0
-    },
-    {
-      "id": "deepseek/deepseek-v4-pro",
-      "label": "DeepSeek v4 Pro",
-      "avg_energy_j": 38925.4,
-      "avg_energy_j_per_loc": 29.11,
-      "avg_cost": 0.158801,
-      "avg_loc": 1337.0
     }
   ],
   "strategy_distribution": {
@@ -5655,40 +5655,73 @@ window.DYNAMICS_DATA = {
       "successful": 758,
       "failed": 14
     },
-    "generated_at": "2026-08-17T13:45:23.493679+00:00"
+    "generated_at": "2026-08-17T18:14:10.749347+00:00"
   },
   "reviews": {
     "models": [
       {
-        "model": "claude-sonnet-5",
-        "label": "Claude Sonnet 5",
-        "stories": 2,
-        "overall_coherence": 0.925,
-        "architectural_fit": 0.814,
-        "convention_adherence": 0.681,
-        "better_pct": 80.0,
-        "worse_pct": 0.0,
-        "neutral_pct": 20.0,
+        "model": "gpt-5.6-terra",
+        "label": "gpt-5.6-terra",
+        "stories": 20,
+        "overall_coherence": 0.908,
+        "architectural_fit": 0.749,
+        "convention_adherence": 0.699,
+        "better_pct": 75.0,
+        "worse_pct": 14.0,
+        "neutral_pct": 8.0,
         "top_issues": [
           {
-            "theme": "security",
-            "count": 2
-          },
-          {
             "theme": "other",
-            "count": 1
+            "count": 38
           },
           {
-            "theme": "missing surface",
-            "count": 1
+            "theme": "security",
+            "count": 17
           },
           {
             "theme": "incomplete refactor",
-            "count": 1
+            "count": 16
           },
           {
-            "theme": "schema drift",
-            "count": 1
+            "theme": "test gaps",
+            "count": 7
+          },
+          {
+            "theme": "missing surface",
+            "count": 6
+          }
+        ]
+      },
+      {
+        "model": "gpt-5.6-sol",
+        "label": "gpt-5.6-sol",
+        "stories": 23,
+        "overall_coherence": 0.899,
+        "architectural_fit": 0.738,
+        "convention_adherence": 0.665,
+        "better_pct": 73.9,
+        "worse_pct": 8.7,
+        "neutral_pct": 13.9,
+        "top_issues": [
+          {
+            "theme": "other",
+            "count": 47
+          },
+          {
+            "theme": "security",
+            "count": 21
+          },
+          {
+            "theme": "test gaps",
+            "count": 15
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 12
+          },
+          {
+            "theme": "missing surface",
+            "count": 6
           }
         ]
       },
@@ -5697,11 +5730,11 @@ window.DYNAMICS_DATA = {
         "label": "GPT-5.6 Luna",
         "stories": 22,
         "overall_coherence": 0.897,
-        "architectural_fit": 0.745,
-        "convention_adherence": 0.693,
-        "better_pct": 72.7,
-        "worse_pct": 7.3,
-        "neutral_pct": 13.6,
+        "architectural_fit": 0.749,
+        "convention_adherence": 0.696,
+        "better_pct": 74.2,
+        "worse_pct": 6.7,
+        "neutral_pct": 12.5,
         "top_issues": [
           {
             "theme": "other",
@@ -5726,31 +5759,97 @@ window.DYNAMICS_DATA = {
         ]
       },
       {
-        "model": "deepseek-v4-pro",
-        "label": "DeepSeek v4 Pro",
+        "model": "deepseek-v4-flash",
+        "label": "DeepSeek v4 Flash",
         "stories": 21,
-        "overall_coherence": 0.883,
-        "architectural_fit": 0.748,
-        "convention_adherence": 0.726,
-        "better_pct": 60.8,
-        "worse_pct": 13.4,
-        "neutral_pct": 20.6,
+        "overall_coherence": 0.892,
+        "architectural_fit": 0.754,
+        "convention_adherence": 0.673,
+        "better_pct": 65.7,
+        "worse_pct": 7.6,
+        "neutral_pct": 18.1,
         "top_issues": [
           {
             "theme": "other",
-            "count": 30
+            "count": 39
           },
           {
             "theme": "incomplete refactor",
-            "count": 20
-          },
-          {
-            "theme": "security",
-            "count": 18
+            "count": 15
           },
           {
             "theme": "test gaps",
-            "count": 12
+            "count": 15
+          },
+          {
+            "theme": "security",
+            "count": 13
+          },
+          {
+            "theme": "missing surface",
+            "count": 7
+          }
+        ]
+      },
+      {
+        "model": "claude-haiku-4-5",
+        "label": "claude-haiku-4-5",
+        "stories": 14,
+        "overall_coherence": 0.881,
+        "architectural_fit": 0.756,
+        "convention_adherence": 0.769,
+        "better_pct": 67.1,
+        "worse_pct": 4.3,
+        "neutral_pct": 25.7,
+        "top_issues": [
+          {
+            "theme": "other",
+            "count": 24
+          },
+          {
+            "theme": "security",
+            "count": 11
+          },
+          {
+            "theme": "test gaps",
+            "count": 9
+          },
+          {
+            "theme": "schema drift",
+            "count": 8
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 7
+          }
+        ]
+      },
+      {
+        "model": "deepseek-v4-pro",
+        "label": "DeepSeek v4 Pro",
+        "stories": 37,
+        "overall_coherence": 0.876,
+        "architectural_fit": 0.745,
+        "convention_adherence": 0.705,
+        "better_pct": 64.4,
+        "worse_pct": 13.0,
+        "neutral_pct": 18.1,
+        "top_issues": [
+          {
+            "theme": "other",
+            "count": 68
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 31
+          },
+          {
+            "theme": "security",
+            "count": 26
+          },
+          {
+            "theme": "test gaps",
+            "count": 18
           },
           {
             "theme": "schema drift",
@@ -5759,41 +5858,74 @@ window.DYNAMICS_DATA = {
         ]
       },
       {
-        "model": "?",
-        "label": "?",
-        "stories": 27,
-        "overall_coherence": 0.877,
-        "architectural_fit": 0.763,
-        "convention_adherence": 0.715,
-        "better_pct": 69.7,
-        "worse_pct": 9.8,
-        "neutral_pct": 18.2,
+        "model": "claude-sonnet-5",
+        "label": "Claude Sonnet 5",
+        "stories": 16,
+        "overall_coherence": 0.824,
+        "architectural_fit": 0.822,
+        "convention_adherence": 0.763,
+        "better_pct": 68.8,
+        "worse_pct": 5.0,
+        "neutral_pct": 21.2,
         "top_issues": [
           {
-            "theme": "other",
-            "count": 45
+            "theme": "test gaps",
+            "count": 12
           },
           {
             "theme": "security",
-            "count": 25
+            "count": 12
           },
           {
-            "theme": "test gaps",
-            "count": 25
+            "theme": "other",
+            "count": 12
           },
           {
             "theme": "incomplete refactor",
-            "count": 13
+            "count": 8
           },
           {
             "theme": "missing surface",
-            "count": 9
+            "count": 8
+          }
+        ]
+      },
+      {
+        "model": "?",
+        "label": "?",
+        "stories": 87,
+        "overall_coherence": 0.753,
+        "architectural_fit": 0.817,
+        "convention_adherence": 0.783,
+        "better_pct": 51.9,
+        "worse_pct": 7.4,
+        "neutral_pct": 38.0,
+        "top_issues": [
+          {
+            "theme": "other",
+            "count": 172
+          },
+          {
+            "theme": "security",
+            "count": 74
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 55
+          },
+          {
+            "theme": "test gaps",
+            "count": 53
+          },
+          {
+            "theme": "missing surface",
+            "count": 24
           }
         ]
       }
     ],
-    "commit_reviews": 349,
-    "story_reviews": 72,
+    "commit_reviews": 1199,
+    "story_reviews": 240,
     "reviewer": "deepseek/deepseek-v4-flash"
   },
   "analysis": {
@@ -5828,6 +5960,34 @@ window.DYNAMICS_DATA = {
         }
       },
       {
+        "model": "deepseek-v4-pro",
+        "label": "DeepSeek v4 Pro",
+        "commits": 179,
+        "lines_added": 121407,
+        "lines_removed": 9090,
+        "functions_added": 1410,
+        "classes_added": 198,
+        "imports_added": 1703,
+        "sonar_available": 72,
+        "sonar_bugs_delta": 6,
+        "sonar_smells_delta": 114,
+        "sonar_complexity_delta": 2152,
+        "avg_convention": 0.712,
+        "deep_cells": 37,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": 0.0,
+        "lsp_warnings_per_cell": 0.0,
+        "solution_correctness": 1.0,
+        "solution_constraints": 1.0,
+        "solution_quality": 0.045,
+        "solution_novelty": 0.845,
+        "solution_composite": 0.786,
+        "basin_escape": 0.712,
+        "strategies": {
+          "exploratory": 37
+        }
+      },
+      {
         "model": "deepseek-v4-flash",
         "label": "DeepSeek v4 Flash",
         "commits": 110,
@@ -5836,10 +5996,10 @@ window.DYNAMICS_DATA = {
         "functions_added": 1363,
         "classes_added": 81,
         "imports_added": 1364,
-        "sonar_available": 0,
+        "sonar_available": 4,
         "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
+        "sonar_smells_delta": 1,
+        "sonar_complexity_delta": 51,
         "avg_convention": 0.686,
         "deep_cells": 22,
         "lsp_available": 0,
@@ -5884,117 +6044,89 @@ window.DYNAMICS_DATA = {
         }
       },
       {
-        "model": "deepseek-v4-pro",
-        "label": "DeepSeek v4 Pro",
-        "commits": 99,
-        "lines_added": 57302,
-        "lines_removed": 3752,
-        "functions_added": 650,
-        "classes_added": 155,
-        "imports_added": 710,
-        "sonar_available": 0,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
-        "avg_convention": 0.747,
-        "deep_cells": 21,
-        "lsp_available": 0,
-        "lsp_errors_per_cell": 0.0,
-        "lsp_warnings_per_cell": 0.0,
-        "solution_correctness": 1.0,
-        "solution_constraints": 1.0,
-        "solution_quality": 0.048,
-        "solution_novelty": 0.797,
-        "solution_composite": 0.779,
-        "basin_escape": 0.659,
-        "strategies": {
-          "exploratory": 21
-        }
-      },
-      {
         "model": "claude-sonnet-5",
         "label": "Claude Sonnet 5",
-        "commits": 75,
-        "lines_added": 34841,
-        "lines_removed": 2164,
-        "functions_added": 1164,
-        "classes_added": 83,
-        "imports_added": 803,
-        "sonar_available": 0,
+        "commits": 80,
+        "lines_added": 36187,
+        "lines_removed": 2266,
+        "functions_added": 1267,
+        "classes_added": 86,
+        "imports_added": 839,
+        "sonar_available": 4,
         "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
-        "avg_convention": 0.734,
-        "deep_cells": 15,
+        "sonar_smells_delta": 2,
+        "sonar_complexity_delta": 43,
+        "avg_convention": 0.732,
+        "deep_cells": 16,
         "lsp_available": 0,
         "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
-        "solution_correctness": 0.867,
-        "solution_constraints": 0.956,
+        "solution_correctness": 0.875,
+        "solution_constraints": 0.958,
         "solution_quality": 0.052,
-        "solution_novelty": 0.784,
-        "solution_composite": 0.718,
-        "basin_escape": 0.639,
+        "solution_novelty": 0.789,
+        "solution_composite": 0.722,
+        "basin_escape": 0.641,
         "strategies": {
-          "exploratory": 13,
+          "exploratory": 14,
           "conservative": 2
         }
       },
       {
         "model": "claude-haiku-4-5",
         "label": "claude-haiku-4-5",
-        "commits": 60,
-        "lines_added": 30229,
-        "lines_removed": 2094,
-        "functions_added": 281,
-        "classes_added": 160,
-        "imports_added": 377,
-        "sonar_available": 0,
+        "commits": 71,
+        "lines_added": 33618,
+        "lines_removed": 2496,
+        "functions_added": 332,
+        "classes_added": 188,
+        "imports_added": 422,
+        "sonar_available": 10,
         "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
-        "avg_convention": 0.762,
-        "deep_cells": 12,
+        "sonar_smells_delta": 18,
+        "sonar_complexity_delta": 133,
+        "avg_convention": 0.754,
+        "deep_cells": 14,
         "lsp_available": 0,
         "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
-        "solution_correctness": 0.833,
-        "solution_constraints": 0.972,
-        "solution_quality": 0.036,
-        "solution_novelty": 0.841,
-        "solution_composite": 0.717,
-        "basin_escape": 0.714,
+        "solution_correctness": 0.857,
+        "solution_constraints": 0.976,
+        "solution_quality": 0.037,
+        "solution_novelty": 0.842,
+        "solution_composite": 0.726,
+        "basin_escape": 0.706,
         "strategies": {
-          "exploratory": 10,
+          "exploratory": 12,
           "conservative": 2
         }
       },
       {
         "model": "gpt-5.6-luna",
         "label": "GPT-5.6 Luna",
-        "commits": 110,
-        "lines_added": 18041,
-        "lines_removed": 6258,
-        "functions_added": 543,
-        "classes_added": 60,
-        "imports_added": 711,
-        "sonar_available": 0,
+        "commits": 120,
+        "lines_added": 19442,
+        "lines_removed": 6657,
+        "functions_added": 620,
+        "classes_added": 67,
+        "imports_added": 759,
+        "sonar_available": 8,
         "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
-        "avg_convention": 0.691,
-        "deep_cells": 22,
+        "sonar_smells_delta": 11,
+        "sonar_complexity_delta": 87,
+        "avg_convention": 0.693,
+        "deep_cells": 24,
         "lsp_available": 0,
         "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
         "solution_correctness": 1.0,
-        "solution_constraints": 0.985,
-        "solution_quality": 0.086,
-        "solution_novelty": 0.879,
-        "solution_composite": 0.794,
+        "solution_constraints": 0.986,
+        "solution_quality": 0.087,
+        "solution_novelty": 0.876,
+        "solution_composite": 0.795,
         "basin_escape": 0.694,
         "strategies": {
-          "exploratory": 22
+          "exploratory": 24
         }
       },
       {
@@ -6026,14 +6158,14 @@ window.DYNAMICS_DATA = {
         }
       }
     ],
-    "stories_analyzed": 222,
-    "commits_analyzed": 1102,
-    "sonar_commits_available": 0
+    "stories_analyzed": 243,
+    "commits_analyzed": 1208,
+    "sonar_commits_available": 98
   },
   "labs": {
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-15T22:14:29.429029",
+      "generated_at": "2026-08-17T20:12:28.375355",
       "summary": {
         "models": 7,
         "cheapest": "deepseek-v4-flash",
@@ -6056,21 +6188,21 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "gpt-5.6-luna",
-          "cells": 23,
-          "cost_cells": 23,
-          "avg_cost": 0.091,
-          "avg_tests": 7.739,
-          "total_cost": 2.1003,
-          "total_tests": 178
+          "cells": 24,
+          "cost_cells": 24,
+          "avg_cost": 0.092,
+          "avg_tests": 10.0,
+          "total_cost": 2.2045,
+          "total_tests": 240
         },
         {
           "model": "deepseek-v4-pro",
-          "cells": 31,
-          "cost_cells": 31,
-          "avg_cost": 0.15,
-          "avg_tests": 47.774,
-          "total_cost": 4.6626,
-          "total_tests": 1481
+          "cells": 37,
+          "cost_cells": 37,
+          "avg_cost": 0.159,
+          "avg_tests": 45.73,
+          "total_cost": 5.8756,
+          "total_tests": 1692
         },
         {
           "model": "gpt-5.6-terra",
@@ -6083,10 +6215,10 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 20,
+          "cells": 14,
           "cost_cells": 14,
           "avg_cost": 1.537,
-          "avg_tests": 135.35,
+          "avg_tests": 193.357,
           "total_cost": 21.5168,
           "total_tests": 2707
         },
@@ -6101,10 +6233,10 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 20,
+          "cells": 16,
           "cost_cells": 16,
           "avg_cost": 4.776,
-          "avg_tests": 122.55,
+          "avg_tests": 153.188,
           "total_cost": 76.4179,
           "total_tests": 2451
         }
@@ -6112,85 +6244,85 @@ window.DYNAMICS_DATA = {
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-15T22:14:18.112053",
+      "generated_at": "2026-08-17T20:12:24.596009",
       "summary": {
         "snowball_factor": 2.38,
-        "session1_cost": 0.1557,
-        "session5_cost": 0.3706
+        "session1_cost": 0.1597,
+        "session5_cost": 0.3795
       },
       "sessions": [
         {
           "session_number": 1,
           "task_type": "greenfield",
-          "n": 159,
-          "avg_cost": 0.1557,
-          "avg_tokens": 19980.0,
-          "avg_tests": 4.6
+          "n": 156,
+          "avg_cost": 0.1597,
+          "avg_tokens": 21775.0,
+          "avg_tests": 4.8
         },
         {
           "session_number": 2,
           "task_type": "feature",
-          "n": 159,
-          "avg_cost": 0.2126,
-          "avg_tokens": 25786.0,
-          "avg_tests": 8.7
+          "n": 156,
+          "avg_cost": 0.2181,
+          "avg_tokens": 28341.0,
+          "avg_tests": 9.2
         },
         {
           "session_number": 3,
           "task_type": "integration",
-          "n": 159,
-          "avg_cost": 0.3433,
-          "avg_tokens": 32558.0,
-          "avg_tests": 11.4
+          "n": 156,
+          "avg_cost": 0.3527,
+          "avg_tokens": 35572.0,
+          "avg_tests": 12.2
         },
         {
           "session_number": 4,
           "task_type": "refactor",
-          "n": 155,
-          "avg_cost": 0.3072,
-          "avg_tokens": 32313.0,
-          "avg_tests": 11.5
+          "n": 152,
+          "avg_cost": 0.315,
+          "avg_tokens": 35173.0,
+          "avg_tests": 12.2
         },
         {
           "session_number": 5,
           "task_type": "cross_cutting",
-          "n": 155,
-          "avg_cost": 0.3706,
-          "avg_tokens": 38607.0,
-          "avg_tests": 15.3
+          "n": 152,
+          "avg_cost": 0.3795,
+          "avg_tokens": 41751.0,
+          "avg_tests": 16.2
         }
       ],
       "by_condition": {
-        "bad_seed_s1": 0.1928,
-        "bad_seed_s2": 0.2459,
-        "bad_seed_s3": 0.3771,
-        "bad_seed_s4": 0.2936,
-        "bad_seed_s5": 0.372,
-        "clean_s1": 0.1398,
-        "clean_s2": 0.2011,
-        "clean_s3": 0.3269,
-        "clean_s4": 0.2753,
-        "clean_s5": 0.3587,
-        "early_degrade_s1": 0.1562,
-        "early_degrade_s2": 0.2028,
-        "early_degrade_s3": 0.3505,
-        "early_degrade_s4": 0.4437,
-        "early_degrade_s5": 0.411
+        "bad_seed_s1": 0.2085,
+        "bad_seed_s2": 0.2658,
+        "bad_seed_s3": 0.4077,
+        "bad_seed_s4": 0.3175,
+        "bad_seed_s5": 0.4022,
+        "clean_s1": 0.151,
+        "clean_s2": 0.2172,
+        "clean_s3": 0.3532,
+        "clean_s4": 0.2986,
+        "clean_s5": 0.3889,
+        "early_degrade_s1": 0.127,
+        "early_degrade_s2": 0.1652,
+        "early_degrade_s3": 0.2875,
+        "early_degrade_s4": 0.3547,
+        "early_degrade_s5": 0.3288
       },
       "by_model": {
         "claude-haiku-4-5": {
-          "1": 0.1364,
-          "2": 0.1799,
-          "3": 0.2324,
-          "4": 0.1694,
-          "5": 0.3577
+          "1": 0.1948,
+          "2": 0.2571,
+          "3": 0.332,
+          "4": 0.242,
+          "5": 0.5111
         },
         "claude-sonnet-5": {
-          "1": 0.3688,
-          "2": 0.5352,
-          "3": 1.068,
-          "4": 0.6568,
-          "5": 1.1921
+          "1": 0.461,
+          "2": 0.669,
+          "3": 1.335,
+          "4": 0.8211,
+          "5": 1.4901
         },
         "deepseek-v4-flash": {
           "1": 0.0058,
@@ -6200,18 +6332,18 @@ window.DYNAMICS_DATA = {
           "5": 0.0231
         },
         "deepseek-v4-pro": {
-          "1": 0.0177,
-          "2": 0.0227,
-          "3": 0.0401,
-          "4": 0.0292,
-          "5": 0.0511
+          "1": 0.0187,
+          "2": 0.0241,
+          "3": 0.0449,
+          "4": 0.0311,
+          "5": 0.0486
         },
         "gpt-5.6-luna": {
           "1": 0.0129,
-          "2": 0.0168,
+          "2": 0.0173,
           "3": 0.0185,
-          "4": 0.0211,
-          "5": 0.022
+          "4": 0.021,
+          "5": 0.0221
         },
         "gpt-5.6-sol": {
           "1": 0.4785,
@@ -6231,51 +6363,156 @@ window.DYNAMICS_DATA = {
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-15T22:09:58.344415",
+      "generated_at": "2026-08-17T20:12:26.445186",
       "summary": {
         "conditions": 3
       },
       "conditions": [
         {
           "condition": "bad_seed",
-          "cells": 40,
-          "success_rate": 0.875,
-          "cascade_rate": 0.025,
-          "avg_cost": 1.4815,
+          "cells": 37,
+          "success_rate": 0.946,
+          "cascade_rate": 0.027,
+          "avg_cost": 1.6016,
           "total_cost": 59.2605
         },
         {
           "condition": "clean",
-          "cells": 94,
-          "success_rate": 0.904,
+          "cells": 87,
+          "success_rate": 0.977,
           "cascade_rate": 0.0,
-          "avg_cost": 1.2748,
+          "avg_cost": 1.3773,
           "total_cost": 119.8285
         },
         {
           "condition": "early_degrade",
-          "cells": 25,
+          "cells": 32,
           "success_rate": 1.0,
-          "cascade_rate": 0.08,
-          "avg_cost": 1.5642,
-          "total_cost": 39.105
+          "cascade_rate": 0.062,
+          "avg_cost": 1.2632,
+          "total_cost": 40.4222
         }
       ]
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-15T22:14:29.488567",
+      "generated_at": "2026-08-17T20:12:30.613926",
       "summary": {
-        "correlation_tests_vs_worse_rate": -0.077,
-        "cells": 30
+        "correlation_tests_vs_worse_rate": -0.154,
+        "cells": 106
       },
       "rows": [
         {
           "model": "?",
           "tests": 0,
-          "reviews": 132,
-          "better_rate": 0.697,
-          "worse_rate": 0.098
+          "reviews": 432,
+          "better_rate": 0.519,
+          "worse_rate": 0.074
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 0,
+          "reviews": 5,
+          "better_rate": 0.2,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 136,
+          "reviews": 5,
+          "better_rate": 0.2,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 153,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 173,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 177,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 188,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 191,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 195,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 201,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 210,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 233,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 248,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 294,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "tests": 308,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 0,
+          "reviews": 15,
+          "better_rate": 0.2,
+          "worse_rate": 0.133
         },
         {
           "model": "claude-sonnet-5",
@@ -6289,6 +6526,174 @@ window.DYNAMICS_DATA = {
           "tests": 76,
           "reviews": 5,
           "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 152,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 164,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 165,
+          "reviews": 10,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 193,
+          "reviews": 10,
+          "better_rate": 0.9,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 196,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 213,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 227,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 291,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 346,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 5,
+          "reviews": 5,
+          "better_rate": 0.2,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 7,
+          "reviews": 25,
+          "better_rate": 0.36,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 8,
+          "reviews": 5,
+          "better_rate": 0.0,
+          "worse_rate": 0.4
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 35,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 37,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 39,
+          "reviews": 10,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 40,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 45,
+          "reviews": 10,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 46,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 47,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 49,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 52,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 54,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 55,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "tests": 67,
+          "reviews": 5,
+          "better_rate": 0.8,
           "worse_rate": 0.0
         },
         {
@@ -6315,9 +6720,16 @@ window.DYNAMICS_DATA = {
         {
           "model": "deepseek-v4-pro",
           "tests": 4,
+          "reviews": 20,
+          "better_rate": 0.55,
+          "worse_rate": 0.3
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 5,
           "reviews": 5,
-          "better_rate": 0.4,
-          "worse_rate": 0.6
+          "better_rate": 0.8,
+          "worse_rate": 0.2
         },
         {
           "model": "deepseek-v4-pro",
@@ -6325,6 +6737,20 @@ window.DYNAMICS_DATA = {
           "reviews": 5,
           "better_rate": 0.4,
           "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 7,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 9,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.4
         },
         {
           "model": "deepseek-v4-pro",
@@ -6350,9 +6776,9 @@ window.DYNAMICS_DATA = {
         {
           "model": "deepseek-v4-pro",
           "tests": 39,
-          "reviews": 7,
-          "better_rate": 0.714,
-          "worse_rate": 0.0
+          "reviews": 12,
+          "better_rate": 0.667,
+          "worse_rate": 0.083
         },
         {
           "model": "deepseek-v4-pro",
@@ -6360,6 +6786,13 @@ window.DYNAMICS_DATA = {
           "reviews": 5,
           "better_rate": 0.8,
           "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 44,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.2
         },
         {
           "model": "deepseek-v4-pro",
@@ -6372,7 +6805,7 @@ window.DYNAMICS_DATA = {
           "model": "deepseek-v4-pro",
           "tests": 47,
           "reviews": 10,
-          "better_rate": 0.7,
+          "better_rate": 0.9,
           "worse_rate": 0.0
         },
         {
@@ -6412,9 +6845,65 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "deepseek-v4-pro",
+          "tests": 75,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 78,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 80,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
           "tests": 82,
           "reviews": 5,
           "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 90,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 111,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 128,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 129,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 145,
+          "reviews": 5,
+          "better_rate": 0.8,
           "worse_rate": 0.0
         },
         {
@@ -6479,12 +6968,187 @@ window.DYNAMICS_DATA = {
           "reviews": 5,
           "better_rate": 0.8,
           "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 25,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 62,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 0,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 1,
+          "reviews": 10,
+          "better_rate": 0.6,
+          "worse_rate": 0.1
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 2,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 3,
+          "reviews": 10,
+          "better_rate": 0.5,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 4,
+          "reviews": 10,
+          "better_rate": 0.5,
+          "worse_rate": 0.5
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 5,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 13,
+          "reviews": 10,
+          "better_rate": 0.9,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 14,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 15,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 17,
+          "reviews": 20,
+          "better_rate": 0.8,
+          "worse_rate": 0.05
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 20,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 21,
+          "reviews": 15,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 22,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "tests": 24,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "tests": 0,
+          "reviews": 30,
+          "better_rate": 0.533,
+          "worse_rate": 0.233
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "tests": 9,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "tests": 10,
+          "reviews": 10,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "tests": 11,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "tests": 12,
+          "reviews": 10,
+          "better_rate": 0.9,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "tests": 15,
+          "reviews": 10,
+          "better_rate": 0.9,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "tests": 16,
+          "reviews": 15,
+          "better_rate": 0.733,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "tests": 17,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "tests": 18,
+          "reviews": 10,
+          "better_rate": 0.7,
+          "worse_rate": 0.3
         }
       ]
     },
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-15T22:09:58.250797",
+      "generated_at": "2026-08-17T20:12:32.870170",
       "summary": {
         "models": 7
       },
@@ -6502,25 +7166,25 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "gpt-5.6-luna",
-          "cells": 23,
-          "avg_cost": 0.091,
-          "avg_cache_hit": 0.971,
-          "cache_reads": 29738784,
+          "cells": 24,
+          "avg_cost": 0.092,
+          "avg_cache_hit": 0.967,
+          "cache_reads": 31182624,
           "cache_writes": 2378880,
-          "read_write_ratio": 12.5,
-          "avg_context_per_cell": 1331475.0,
-          "avg_tokens_per_cell": 38484.0
+          "read_write_ratio": 13.1,
+          "avg_context_per_cell": 1345394.0,
+          "avg_tokens_per_cell": 46118.0
         },
         {
           "model": "deepseek-v4-pro",
-          "cells": 31,
-          "avg_cost": 0.15,
-          "avg_cache_hit": 0.762,
-          "cache_reads": 105461376,
+          "cells": 37,
+          "avg_cost": 0.159,
+          "avg_cache_hit": 0.793,
+          "cache_reads": 137745280,
           "cache_writes": 0,
           "read_write_ratio": null,
-          "avg_context_per_cell": 3578946.0,
-          "avg_tokens_per_cell": 176966.0
+          "avg_context_per_cell": 3912173.0,
+          "avg_tokens_per_cell": 189327.0
         },
         {
           "model": "gpt-5.6-terra",
@@ -6535,14 +7199,14 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 20,
+          "cells": 14,
           "avg_cost": 1.537,
-          "avg_cache_hit": 0.692,
+          "avg_cache_hit": 0.989,
           "cache_reads": 102433886,
           "cache_writes": 2753242,
           "read_write_ratio": 37.2,
-          "avg_context_per_cell": 5176520.0,
-          "avg_tokens_per_cell": 54825.0
+          "avg_context_per_cell": 7395028.0,
+          "avg_tokens_per_cell": 78322.0
         },
         {
           "model": "gpt-5.6-sol",
@@ -6557,20 +7221,20 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 20,
+          "cells": 16,
           "avg_cost": 4.776,
-          "avg_cache_hit": 0.789,
+          "avg_cache_hit": 0.986,
           "cache_reads": 115254797,
           "cache_writes": 3460787,
           "read_write_ratio": 33.3,
-          "avg_context_per_cell": 5843628.0,
-          "avg_tokens_per_cell": 80888.0
+          "avg_context_per_cell": 7304535.0,
+          "avg_tokens_per_cell": 101110.0
         }
       ]
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-15T22:14:18.060885",
+      "generated_at": "2026-08-17T20:12:34.885574",
       "summary": {
         "models": 7
       },
@@ -6586,21 +7250,21 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "gpt-5.6-luna",
-          "cells": 22,
-          "avg_cost": 0.091,
+          "cells": 24,
+          "avg_cost": 0.092,
           "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.086,
-          "cyclomatic_complexity": 266.091,
-          "novelty_score": 0.879
+          "code_quality_score": 0.087,
+          "cyclomatic_complexity": 262.583,
+          "novelty_score": 0.876
         },
         {
           "model": "deepseek-v4-pro",
-          "cells": 21,
-          "avg_cost": 0.128,
+          "cells": 37,
+          "avg_cost": 0.159,
           "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.048,
-          "cyclomatic_complexity": 262.143,
-          "novelty_score": 0.797
+          "code_quality_score": 0.045,
+          "cyclomatic_complexity": 309.378,
+          "novelty_score": 0.845
         },
         {
           "model": "gpt-5.6-terra",
@@ -6613,12 +7277,12 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 12,
-          "avg_cost": 1.5,
+          "cells": 14,
+          "avg_cost": 1.537,
           "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.143,
-          "cyclomatic_complexity": 275.0,
-          "novelty_score": 0.561
+          "code_quality_score": 0.037,
+          "cyclomatic_complexity": 381.571,
+          "novelty_score": 0.842
         },
         {
           "model": "gpt-5.6-sol",
@@ -6631,12 +7295,12 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 15,
-          "avg_cost": 4.807,
+          "cells": 16,
+          "avg_cost": 4.776,
           "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.114,
-          "cyclomatic_complexity": 314.789,
-          "novelty_score": 0.619
+          "code_quality_score": 0.052,
+          "cyclomatic_complexity": 375.375,
+          "novelty_score": 0.789
         }
       ]
     }
