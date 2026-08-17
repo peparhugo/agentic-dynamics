@@ -37,8 +37,10 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
 from contextlib import closing
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -56,10 +58,13 @@ from transports import (
 
 SUPPORTED_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
 
+CLEANUP_INTERVAL_SECONDS = 3600
+
 __all__ = [
     "NotificationServer",
     "ClientRegistry",
     "RedisBus",
+    "RateLimiter",
     "MessageStore",
     "encode_message",
     "decode_message",
@@ -68,6 +73,14 @@ __all__ = [
     "WebSocketTransport",
     "SUPPORTED_TYPES",
 ]
+
+
+def _int_env(name: str, default: int) -> int:
+    """Read an integer environment variable, falling back to ``default``."""
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
 
 
 def _normalize_database_url(url: str) -> str:
@@ -147,6 +160,114 @@ class MessageStore:
             }
             for row in rows
         ]
+
+    def query_history(
+        self,
+        channel: Optional[str] = None,
+        since: Optional[str] = None,
+        limit: int = 50,
+    ) -> tuple[list[dict], bool]:
+        """Return messages for a channel/time range in chronological order.
+
+        Returns a ``(messages, has_more)`` tuple. ``messages`` are ordered by
+        timestamp ascending (then id ascending). ``has_more`` is ``True`` when
+        more than ``limit`` messages match the query.
+        """
+        try:
+            limit = max(0, int(limit))
+        except (TypeError, ValueError):
+            limit = 50
+
+        conditions: list[str] = []
+        params: list[Any] = []
+        if channel:
+            conditions.append("channel = ?")
+            params.append(channel)
+        if since:
+            conditions.append("timestamp >= ?")
+            params.append(since)
+        where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        with closing(self._connect()) as conn:
+            rows = conn.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages"
+                f"{where} ORDER BY timestamp ASC, id ASC LIMIT ?",
+                (*params, limit + 1),
+            ).fetchall()
+
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        messages = [
+            {
+                "id": row["id"],
+                "channel": row["channel"],
+                "type": row["type"],
+                "payload": json.loads(row["payload"]) if row["payload"] else None,
+                "timestamp": row["timestamp"],
+            }
+            for row in rows
+        ]
+        return messages, has_more
+
+    def delete_older_than(self, ttl_days: int) -> int:
+        """Delete messages older than ``ttl_days`` days. Returns count deleted."""
+        try:
+            ttl_days = max(0, int(ttl_days))
+        except (TypeError, ValueError):
+            ttl_days = 7
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
+        with closing(self._connect()) as conn:
+            cursor = conn.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+            conn.commit()
+            return cursor.rowcount
+
+
+class RateLimiter:
+    """Fixed-window rate limiter keyed by client ID.
+
+    Uses Redis counters (``INCR`` + ``EXPIRE``) when a Redis client is
+    supplied; otherwise falls back to in-memory counters so the server keeps
+    working without a Redis backbone.
+    """
+
+    KEY_PREFIX = "notifications:ratelimit:"
+
+    def __init__(
+        self,
+        limit: Any = 100,
+        window_seconds: Any = 60,
+    ) -> None:
+        try:
+            self.limit = max(1, int(limit))
+        except (TypeError, ValueError):
+            self.limit = 100
+        try:
+            self.window_seconds = max(1, int(window_seconds))
+        except (TypeError, ValueError):
+            self.window_seconds = 60
+        self._local: dict[str, list[float]] = {}
+
+    async def allow(self, client_id: str, redis_client: Any = None) -> bool:
+        """Return ``True`` if the client may send another message."""
+        if redis_client is None:
+            return self._allow_local(client_id)
+        key = self.KEY_PREFIX + client_id
+        try:
+            count = await redis_client.incr(key)
+            if count == 1:
+                await redis_client.expire(key, self.window_seconds)
+        except Exception:
+            return self._allow_local(client_id)
+        return count <= self.limit
+
+    def _allow_local(self, client_id: str) -> bool:
+        now = time.monotonic()
+        stamps = self._local.setdefault(client_id, [])
+        stamps[:] = [t for t in stamps if now - t < self.window_seconds]
+        if len(stamps) >= self.limit:
+            return False
+        stamps.append(now)
+        return True
 
 
 class RedisBus:
@@ -252,12 +373,23 @@ class NotificationServer:
         redis_client: Any = None,
         redis_channel: str = "notifications",
         transport: Optional[str] = None,
+        rate_limit: Any = None,
+        message_ttl_days: Any = None,
     ) -> None:
         self.registry = ClientRegistry()
         self._subscriptions: dict[str, set[str]] = {}
         self._sub_lock = threading.Lock()
         self.server_id = str(uuid.uuid4())
         self.store = MessageStore(database_url)
+        self.rate_limit = (
+            rate_limit if rate_limit is not None else _int_env("RATE_LIMIT", 100)
+        )
+        self.rate_limiter = RateLimiter(self.rate_limit)
+        self.message_ttl_days = (
+            message_ttl_days
+            if message_ttl_days is not None
+            else _int_env("MESSAGE_TTL_DAYS", 7)
+        )
         self.bus: Optional[RedisBus] = None
         if redis_client is not None or redis_url or os.environ.get("REDIS_URL"):
             self.bus = RedisBus(
@@ -267,6 +399,7 @@ class NotificationServer:
             )
         self._worker_task: Optional[asyncio.Task] = None
         self._pubsub: Any = None
+        self._cleanup_task: Optional[asyncio.Task] = None
         self.transport: BaseTransport = create_transport(transport, self)
 
     # ── Lifecycle ────────────────────────────────────────────────
@@ -276,6 +409,8 @@ class NotificationServer:
         if self.bus is not None and self._worker_task is None:
             self._pubsub = await self.bus.subscribe()
             self._worker_task = asyncio.create_task(self._run_worker(self._pubsub))
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def stop(self) -> None:
         """Stop the delivery worker and close the pub/sub subscription."""
@@ -288,6 +423,31 @@ class NotificationServer:
             except (asyncio.CancelledError, Exception):
                 pass
         self._pubsub = None
+        cleanup_task = self._cleanup_task
+        self._cleanup_task = None
+        if cleanup_task is not None:
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+    async def cleanup(self) -> int:
+        """Delete messages older than the configured TTL. Returns count removed."""
+        if self.store is None:
+            return 0
+        return await asyncio.to_thread(
+            self.store.delete_older_than, self.message_ttl_days
+        )
+
+    async def _cleanup_loop(self) -> None:
+        """Background task: clean expired messages, then periodically repeat."""
+        while True:
+            try:
+                await self.cleanup()
+            except Exception:
+                pass
+            await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
 
     async def _run_worker(self, pubsub: Any) -> None:
         """Consume messages from Redis and deliver them to local clients."""
@@ -385,6 +545,18 @@ class NotificationServer:
             return channel
         return None
 
+    async def _check_rate_limit(self, client_id: str) -> bool:
+        """Return ``True`` if the client is allowed to send another message."""
+        if self.rate_limiter is None:
+            return True
+        redis_client = None
+        if self.bus is not None:
+            try:
+                redis_client = await self.bus._get_client()
+            except Exception:
+                redis_client = None
+        return await self.rate_limiter.allow(client_id, redis_client)
+
     async def handler(self, connection: Any) -> None:
         """Handle a single client connection via the active transport."""
         await self.transport.handle(connection)
@@ -393,6 +565,20 @@ class NotificationServer:
         """Route an inbound message based on its type."""
         mtype = message.get("type")
         if not isinstance(message, dict) or mtype not in SUPPORTED_TYPES:
+            return
+
+        if not await self._check_rate_limit(sender_id):
+            await self.send_to(
+                sender_id,
+                {
+                    "type": "error",
+                    "payload": {
+                        "error": "rate limit exceeded",
+                        "code": "rate_limited",
+                    },
+                    "timestamp": now_iso(),
+                },
+            )
             return
 
         message.setdefault("timestamp", now_iso())
@@ -474,6 +660,17 @@ class NotificationServer:
             limit = query.get("limit", ["50"])[0]
             offset = query.get("offset", ["0"])[0]
             body = json.dumps(self.store.list_messages(limit, offset)).encode("utf-8")
+            headers = Headers([("Content-Type", "application/json")])
+            return Response(200, "OK", headers, body)
+
+        if path == "/history":
+            channel = query.get("channel", [None])[0]
+            since = query.get("since", [None])[0]
+            limit = query.get("limit", ["50"])[0]
+            messages, has_more = self.store.query_history(channel, since, limit)
+            body = json.dumps(
+                {"messages": messages, "has_more": has_more}
+            ).encode("utf-8")
             headers = Headers([("Content-Type", "application/json")])
             return Response(200, "OK", headers, body)
 
