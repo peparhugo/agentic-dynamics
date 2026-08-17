@@ -260,6 +260,52 @@ def test_matrix_surfaces_three_stage_pipeline(monkeypatch):
     assert stages["review"]["done"] == 1
 
 
+def test_matrix_posthoc_queues_report_remaining_and_empty_stages(monkeypatch):
+    """Empty post-hoc stages still appear with queue lengths and zero counts."""
+    redis = FakeRedis(
+        statuses={"alpha": "done"},
+        analysis_statuses={},
+        review_statuses={},
+        analysis_queue=4,
+        review_queue=1,
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    stages = server.app.test_client().get("/api/matrix").get_json()["stages"]
+
+    # Execute remains independent of the post-hoc stages.
+    assert stages["execute"]["total"] == 1
+    assert stages["execute"]["remaining_in_queue"] == 2
+
+    # Analyze: a backlog with no status hash yet (jobs waiting to be picked up).
+    assert stages["analyze"]["total"] == 0
+    assert stages["analyze"]["remaining_in_queue"] == 4
+    assert stages["analyze"]["queued"] == 0
+    assert stages["analyze"]["results_saved"] is None
+    assert stages["analyze"]["cells"] == {}
+
+    # Review: same shape, its own queue length.
+    assert stages["review"]["total"] == 0
+    assert stages["review"]["remaining_in_queue"] == 1
+    assert stages["review"]["results_saved"] is None
+
+
+def test_matrix_review_retry_folds_multiple_into_running(monkeypatch):
+    """Every retry_N status folds into ``running`` and is counted in ``retry``."""
+    redis = FakeRedis(
+        statuses={"alpha": "done"},
+        review_statuses={"a": "running", "b": "retry_1", "c": "retry_2"},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    review = server.app.test_client().get("/api/matrix").get_json()["stages"]["review"]
+
+    assert review["retry"] == 2
+    assert review["running"] == 3  # 1 running + 2 retries, still in flight
+    assert review["total"] == 3
+    assert review["done"] == 0
+
+
 def test_matrix_redis_failure_keeps_existing_503_contract(monkeypatch):
     """Redis startup failures retain the established response shape."""
     monkeypatch.setattr(server, "_redis", lambda: (_ for _ in ()).throw(RuntimeError("down")))
