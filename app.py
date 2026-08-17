@@ -24,7 +24,7 @@ import asyncio
 import json
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from itertools import count
 from urllib.parse import parse_qs
 
@@ -33,6 +33,7 @@ from websockets.datastructures import Headers
 from websockets.http11 import Response
 
 from broker import Broker, make_broker
+from ratelimit import RateLimiter, make_rate_limiter
 from store import MessageStore
 from transport import BaseTransport, decode_message, encode_message, make_transport
 
@@ -42,6 +43,11 @@ BROKER_CHANNEL = "notifications"
 def utcnow_iso() -> str:
     """Return the current UTC time as an ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat()
+
+
+def ttl_cutoff_iso(ttl_days: int) -> str:
+    """Return the ISO-8601 timestamp ``ttl_days`` ago (UTC)."""
+    return (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
 
 
 class ClientRegistry:
@@ -157,22 +163,58 @@ class NotificationServer:
         broker: Broker | None = None,
         store: MessageStore | None = None,
         transport: BaseTransport | None = None,
+        rate_limiter: RateLimiter | None = None,
+        message_ttl_days: int | None = None,
+        cleanup_interval: float | None = None,
     ) -> None:
         self.registry = registry or ClientRegistry()
         self.broker = broker or make_broker()
         self.store = store or MessageStore()
         self.transport = transport or make_transport(self.registry)
+        self.rate_limiter = rate_limiter or make_rate_limiter()
+        if message_ttl_days is None:
+            message_ttl_days = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+        self.message_ttl_days = message_ttl_days
+        if cleanup_interval is None:
+            cleanup_interval = float(os.environ.get("CLEANUP_INTERVAL", "3600"))
+        self.cleanup_interval = cleanup_interval
         self._broker_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         """Subscribe to the broker channel and begin delivering messages."""
         self._broker_task = await self.broker.subscribe(
             [BROKER_CHANNEL], self.deliver
         )
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def close(self) -> None:
-        """Stop the broker listener and release resources."""
+        """Stop the broker listener, cleanup worker, and release resources."""
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
         await self.broker.close()
+
+    async def _cleanup_loop(self) -> None:
+        """Background task that periodically purges expired messages."""
+        while True:
+            try:
+                self.cleanup_expired()
+            except Exception:
+                pass
+            try:
+                await asyncio.sleep(self.cleanup_interval)
+            except asyncio.CancelledError:
+                raise
+
+    def cleanup_expired(self) -> int:
+        """Delete messages older than the configured TTL and return the count."""
+        cutoff = ttl_cutoff_iso(self.message_ttl_days)
+        return self.store.delete_older_than(cutoff)
 
     async def send(self, connection, message: dict) -> None:
         """Encode and send a message to a single client via the transport."""
@@ -212,6 +254,14 @@ class NotificationServer:
 
     async def dispatch(self, connection: ServerConnection, client_id: int, message: dict) -> None:
         """Route an incoming message based on its type."""
+        if not await self.rate_limiter.check(client_id):
+            error = make_message(
+                "error",
+                {"code": "rate_limited", "message": "rate limit exceeded"},
+            )
+            await self.send(connection, error)
+            return
+
         message_type = message.get("type")
         message.setdefault("timestamp", utcnow_iso())
         self.store.save(message)
@@ -289,6 +339,23 @@ class NotificationServer:
             body = json.dumps({"messages": messages}).encode("utf-8")
             return Response(200, "OK", headers, body)
 
+        if path == "/history":
+            params = parse_qs(query)
+            channel = params.get("channel", [None])[0]
+            if not channel:
+                body = json.dumps({"error": "channel is required"}).encode("utf-8")
+                return Response(400, "Bad Request", headers, body)
+            since = params.get("since", [None])[0]
+            try:
+                limit = int(params.get("limit", ["50"])[0])
+            except (TypeError, ValueError):
+                limit = 50
+            result = self.store.query_history(channel=channel, since=since, limit=limit)
+            body = json.dumps(
+                {"messages": result["messages"], "has_more": result["has_more"]}
+            ).encode("utf-8")
+            return Response(200, "OK", headers, body)
+
         prefix = "/channels/"
         suffix = "/subscribers"
         if path.startswith(prefix) and path.endswith(suffix):
@@ -308,6 +375,7 @@ def create_server(
     db_url: str | None = None,
     broker: Broker | None = None,
     store: MessageStore | None = None,
+    rate_limiter: RateLimiter | None = None,
 ):
     """Create a websockets server for a fresh NotificationServer instance."""
     if redis_url is None:
@@ -318,6 +386,7 @@ def create_server(
     notification_server = NotificationServer(
         broker=broker or make_broker(redis_url),
         store=store or MessageStore(db_url),
+        rate_limiter=rate_limiter or make_rate_limiter(redis_url),
     )
     return notification_server, _serve(notification_server, host, port)
 

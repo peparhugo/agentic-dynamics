@@ -70,20 +70,65 @@ class MessageStore:
                 """,
                 (limit, offset),
             ).fetchall()
-        return [
-            {
-                "id": row[0],
-                "channel": row[1],
-                "type": row[2],
-                "payload": json.loads(row[3]),
-                "timestamp": row[4],
-            }
-            for row in rows
-        ]
+        return [self._row_to_message(row) for row in rows]
+
+    def query_history(
+        self, channel: str, since: Optional[str] = None, limit: int = 50
+    ) -> dict:
+        """Return messages for a channel in chronological order, paginated.
+
+        Returns ``{"messages": [...], "has_more": bool}``. When ``since`` is
+        provided, only messages with a timestamp >= ``since`` are included.
+        """
+        with self._lock:
+            if since is None:
+                rows = self._conn.execute(
+                    """
+                    SELECT id, channel, type, payload, timestamp
+                    FROM messages
+                    WHERE channel = ?
+                    ORDER BY id ASC
+                    LIMIT ?
+                    """,
+                    (channel, limit + 1),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    """
+                    SELECT id, channel, type, payload, timestamp
+                    FROM messages
+                    WHERE channel = ? AND timestamp >= ?
+                    ORDER BY id ASC
+                    LIMIT ?
+                    """,
+                    (channel, since, limit + 1),
+                ).fetchall()
+        has_more = len(rows) > limit
+        messages = [self._row_to_message(row) for row in rows[:limit]]
+        return {"messages": messages, "has_more": has_more}
+
+    def delete_older_than(self, cutoff: str) -> int:
+        """Delete messages whose timestamp is strictly older than ``cutoff``."""
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM messages WHERE timestamp < ?", (cutoff,)
+            )
+            self._conn.commit()
+            return cursor.rowcount
 
     def count(self) -> int:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+
+    @staticmethod
+    def _row_to_message(row) -> dict:
+        return {
+            "id": row[0],
+            "channel": row[1],
+            "type": row[2],
+            "payload": json.loads(row[3]),
+            "timestamp": row[4],
+        }
 
     def close(self) -> None:
         with self._lock:
