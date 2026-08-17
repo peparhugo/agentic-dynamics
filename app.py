@@ -5,11 +5,16 @@ Features:
 - Accept WebSocket connections from clients
 - Assign each client a unique ID on connect
 - Broadcast a message to ALL connected clients
+- Route messages with a 'channel' field to that channel's subscribers
+- Subscribe/unsubscribe clients to named channels
 - Handle client disconnect (clean removal)
-- REST endpoint: GET /health -> connected client count
+- REST endpoints:
+    GET /health -> connected client count
+    GET /channels -> active channels and subscriber counts
+    GET /channels/{name}/subscribers -> subscriber IDs
 
-Message format (JSON): {type: str, payload: dict, timestamp: str}
-Supported types: 'broadcast', 'direct', 'system'
+Message format (JSON): {type: str, payload: dict, timestamp: str, channel?: str}
+Supported types: 'broadcast', 'direct', 'system', 'subscribe', 'unsubscribe'
 """
 
 import asyncio
@@ -40,12 +45,14 @@ def decode_message(raw: str) -> dict:
 
 
 class ClientRegistry:
-    """Thread-safe registry of connected WebSocket clients."""
+    """Thread-safe registry of connected WebSocket clients and their channel subscriptions."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._clients: dict[int, ServerConnection] = {}
         self._ids = count(1)
+        self._subscriptions: dict[int, set[str]] = {}
+        self._channels: dict[str, set[int]] = {}
 
     def add(self, connection: ServerConnection) -> int:
         """Register a connection and return its unique client ID."""
@@ -58,6 +65,12 @@ class ClientRegistry:
         """Remove a client from the registry (idempotent)."""
         with self._lock:
             self._clients.pop(client_id, None)
+            for channel in self._subscriptions.pop(client_id, set()):
+                members = self._channels.get(channel)
+                if members is not None:
+                    members.discard(client_id)
+                    if not members:
+                        self._channels.pop(channel, None)
 
     def get(self, client_id: int):
         """Return a client's connection by ID, or None."""
@@ -74,6 +87,42 @@ class ClientRegistry:
         with self._lock:
             return len(self._clients)
 
+    def subscribe(self, client_id: int, channel: str) -> None:
+        """Subscribe a client to a channel (idempotent)."""
+        with self._lock:
+            if client_id not in self._clients:
+                return
+            self._subscriptions.setdefault(client_id, set()).add(channel)
+            self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: int, channel: str) -> None:
+        """Unsubscribe a client from a channel (idempotent)."""
+        with self._lock:
+            subs = self._subscriptions.get(client_id)
+            if subs is not None:
+                subs.discard(channel)
+                if not subs:
+                    self._subscriptions.pop(client_id, None)
+            members = self._channels.get(channel)
+            if members is not None:
+                members.discard(client_id)
+                if not members:
+                    self._channels.pop(channel, None)
+
+    def channel_subscribers(self, channel: str) -> list[int]:
+        """Return the client IDs currently subscribed to a channel."""
+        with self._lock:
+            return sorted(self._channels.get(channel, set()))
+
+    def list_channels(self) -> dict[str, int]:
+        """Return a mapping of active channel names to their subscriber counts."""
+        with self._lock:
+            return {
+                name: len(members)
+                for name, members in sorted(self._channels.items())
+                if members
+            }
+
 
 def make_message(message_type: str, payload: dict, timestamp: str | None = None) -> dict:
     """Build a well-formed message."""
@@ -82,6 +131,16 @@ def make_message(message_type: str, payload: dict, timestamp: str | None = None)
         "payload": payload,
         "timestamp": timestamp or utcnow_iso(),
     }
+
+
+def message_channel(message: dict) -> str | None:
+    """Extract the channel name from a message (top-level or inside payload)."""
+    channel = message.get("channel")
+    if channel is None:
+        payload = message.get("payload")
+        if isinstance(payload, dict):
+            channel = payload.get("channel")
+    return channel
 
 
 class NotificationServer:
@@ -103,13 +162,40 @@ class NotificationServer:
             except Exception:
                 self.registry.remove(client_id)
 
+    async def broadcast_to_channel(self, channel: str, message: dict) -> None:
+        """Send a message to every client subscribed to a channel."""
+        encoded = encode_message(message)
+        for client_id in self.registry.channel_subscribers(channel):
+            connection = self.registry.get(client_id)
+            if connection is None:
+                continue
+            try:
+                await connection.send(encoded)
+            except Exception:
+                self.registry.remove(client_id)
+
     async def dispatch(self, connection: ServerConnection, client_id: int, message: dict) -> None:
         """Route an incoming message based on its type."""
         message_type = message.get("type")
         message.setdefault("timestamp", utcnow_iso())
 
+        if message_type == "subscribe":
+            channel = message_channel(message)
+            if channel is not None:
+                self.registry.subscribe(client_id, channel)
+            return
+        elif message_type == "unsubscribe":
+            channel = message_channel(message)
+            if channel is not None:
+                self.registry.unsubscribe(client_id, channel)
+            return
+
+        channel = message_channel(message)
         if message_type == "broadcast":
-            await self.broadcast(message)
+            if channel is not None:
+                await self.broadcast_to_channel(channel, message)
+            else:
+                await self.broadcast(message)
         elif message_type == "direct":
             payload = message.get("payload") or {}
             target = payload.get("to", payload.get("id"))
@@ -135,11 +221,26 @@ class NotificationServer:
             )
 
     def process_request(self, connection: ServerConnection, request) -> Response | None:
-        """Serve the /health REST endpoint and pass WebSocket upgrades through."""
+        """Serve REST endpoints and pass WebSocket upgrades through."""
+        headers = Headers({"Content-Type": "application/json"})
+
         if request.path == "/health":
             body = json.dumps({"connected_clients": self.registry.count()}).encode("utf-8")
-            headers = Headers({"Content-Type": "application/json"})
             return Response(200, "OK", headers, body)
+
+        if request.path == "/channels":
+            body = json.dumps({"channels": self.registry.list_channels()}).encode("utf-8")
+            return Response(200, "OK", headers, body)
+
+        prefix = "/channels/"
+        suffix = "/subscribers"
+        if request.path.startswith(prefix) and request.path.endswith(suffix):
+            name = request.path[len(prefix):-len(suffix)]
+            body = json.dumps(
+                {"subscribers": self.registry.channel_subscribers(name)}
+            ).encode("utf-8")
+            return Response(200, "OK", headers, body)
+
         return None
 
 
