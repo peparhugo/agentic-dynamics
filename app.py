@@ -1,8 +1,8 @@
 """
-WebSocket-based notification server.
+Transport-agnostic notification server.
 
 Features:
-- Accept WebSocket connections from clients
+- Accept client connections via a pluggable transport (WebSocket by default)
 - Assign each client a unique ID on connect
 - Broadcast a message to ALL connected clients
 - Route messages with a 'channel' field to that channel's subscribers
@@ -13,12 +13,14 @@ Features:
     GET /channels -> active channels and subscriber counts
     GET /channels/{name}/subscribers -> subscriber IDs
 
+The wire protocol is provided by a :class:`transport.BaseTransport` selected via
+the ``TRANSPORT`` environment variable; ``WebSocketTransport`` is the default.
+
 Message format (JSON): {type: str, payload: dict, timestamp: str, channel?: str}
 Supported types: 'broadcast', 'direct', 'system', 'subscribe', 'unsubscribe'
 """
 
 import asyncio
-import base64
 import json
 import os
 import threading
@@ -32,6 +34,7 @@ from websockets.http11 import Response
 
 from broker import Broker, make_broker
 from store import MessageStore
+from transport import BaseTransport, decode_message, encode_message, make_transport
 
 BROKER_CHANNEL = "notifications"
 
@@ -39,16 +42,6 @@ BROKER_CHANNEL = "notifications"
 def utcnow_iso() -> str:
     """Return the current UTC time as an ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat()
-
-
-def encode_message(message: dict) -> str:
-    """Serialize a message to JSON and base64-encode it for the wire."""
-    return base64.b64encode(json.dumps(message).encode("utf-8")).decode("ascii")
-
-
-def decode_message(raw: str) -> dict:
-    """Base64-decode an incoming frame and parse it as JSON."""
-    return json.loads(base64.b64decode(raw.encode("ascii")).decode("utf-8"))
 
 
 class ClientRegistry:
@@ -163,10 +156,12 @@ class NotificationServer:
         registry: ClientRegistry | None = None,
         broker: Broker | None = None,
         store: MessageStore | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.registry = registry or ClientRegistry()
         self.broker = broker or make_broker()
         self.store = store or MessageStore()
+        self.transport = transport or make_transport(self.registry)
         self._broker_task: asyncio.Task | None = None
 
     async def start(self) -> None:
@@ -179,28 +174,22 @@ class NotificationServer:
         """Stop the broker listener and release resources."""
         await self.broker.close()
 
-    async def send(self, connection: ServerConnection, message: dict) -> None:
-        """Encode and send a message to a single client."""
-        await connection.send(encode_message(message))
+    async def send(self, connection, message: dict) -> None:
+        """Encode and send a message to a single client via the transport."""
+        await self.transport.send_message(connection, message)
 
     async def broadcast(self, message: dict) -> None:
-        """Send a message to every connected client."""
-        encoded = encode_message(message)
-        for client_id, connection in self.registry.snapshot():
-            try:
-                await connection.send(encoded)
-            except Exception:
-                self.registry.remove(client_id)
+        """Send a message to every connected client via the transport."""
+        await self.transport.broadcast(message)
 
     async def broadcast_to_channel(self, channel: str, message: dict) -> None:
         """Send a message to every client subscribed to a channel."""
-        encoded = encode_message(message)
         for client_id in self.registry.channel_subscribers(channel):
             connection = self.registry.get(client_id)
             if connection is None:
                 continue
             try:
-                await connection.send(encoded)
+                await self.transport.send_message(connection, message)
             except Exception:
                 self.registry.remove(client_id)
 
@@ -250,15 +239,15 @@ class NotificationServer:
         )
 
     async def handle(self, connection: ServerConnection) -> None:
-        """Handle a single WebSocket connection lifecycle."""
+        """Handle a single client connection lifecycle via the transport."""
+        await self.transport.on_connect(connection)
         client_id = self.registry.add(connection)
         await self.broker.set_client_state(client_id, {"id": client_id, "channels": []})
         try:
             connected = make_message("system", {"event": "connected", "id": client_id})
             self.store.save(connected)
             await self.send(connection, connected)
-            async for raw in connection:
-                message = decode_message(raw)
+            async for message in self.transport.receive(connection):
                 await self.dispatch(connection, client_id, message)
         finally:
             self.registry.remove(client_id)
@@ -266,6 +255,7 @@ class NotificationServer:
             disconnected = make_message("system", {"event": "disconnected", "id": client_id})
             self.store.save(disconnected)
             await self.broadcast(disconnected)
+            await self.transport.on_disconnect(connection)
 
     def process_request(self, connection: ServerConnection, request) -> Response | None:
         """Serve REST endpoints and pass WebSocket upgrades through."""
