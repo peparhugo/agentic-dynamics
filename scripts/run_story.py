@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -179,6 +180,9 @@ def main():
     if result.cascade_recovery is not None:
         print(f"  Cascade recovery: {'yes' if result.cascade_recovery else 'no'}")
     print(f"  Results: {out_path}")
+    # Machine-readable handoff: worker.py parses this JSON line (not the human
+    # summary above) to auto-enqueue the analysis job for this worktree.
+    print(json.dumps({"result_path": str(out_path)}))
     if result.error:
         print(f"  ERROR: {result.error}")
 

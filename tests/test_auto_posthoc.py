@@ -118,8 +118,16 @@ def story_result_file(tmp_path: Path, story_worktree: Path) -> Path:
 
 # ── 1. worker auto-enqueues analysis after a cell ──────────────────────────
 
-def test_result_path_from_stdout_parses_run_story_line():
-    """The worker locates the saved result path from run_story.py's stdout."""
+def test_result_path_from_stdout_parses_json_line():
+    """The worker reads the machine-readable JSON handoff line."""
+    stdout = 'Story complete: x\n{"result_path": "experiments/results/stories/x.json"}\n'
+    assert worker._result_path_from_stdout(stdout) == Path(
+        "experiments/results/stories/x.json"
+    )
+
+
+def test_result_path_from_stdout_falls_back_to_results_line():
+    """Backward compatibility: the older ``Results: <path>`` line still works."""
     stdout = "Story complete: x\n  Results: experiments/results/stories/x.json\n"
     assert worker._result_path_from_stdout(stdout) == Path(
         "experiments/results/stories/x.json"

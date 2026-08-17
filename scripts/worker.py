@@ -82,11 +82,21 @@ def _safe_hset(r: redis.Redis, key: str, field: str, value: str) -> bool:
 def _result_path_from_stdout(stdout: str) -> Path | None:
     """Extract the saved result path from run_story.py's stdout.
 
-    run_story.py prints ``  Results: <path>`` once it has saved the cell, so the
-    worker can enqueue that worktree's analysis job without re-scanning the
-    corpus. Returns ``None`` when no result line is present.
+    run_story.py emits a machine-readable JSON line ``{"result_path": "..."}``
+    once it has saved the cell, so the worker can enqueue that worktree's
+    analysis job without re-scanning the corpus. Falls back to the older
+    human-readable ``Results: <path>`` line for backward compatibility.
+    Returns ``None`` when no result line is present.
     """
     for line in (stdout or "").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("{"):
+            try:
+                obj = json.loads(stripped)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict) and obj.get("result_path"):
+                return Path(obj["result_path"])
         if "Results:" in line:
             path = line.split("Results:", 1)[1].strip()
             if path:
