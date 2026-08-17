@@ -2,6 +2,8 @@ export interface Frontmatter {
     title?: string;
     date?: string;
     tags?: string[];
+    template?: string;
+    layout?: string | false;
     [key: string]: unknown;
 }
 export interface Page {
@@ -11,10 +13,16 @@ export interface Page {
     tags: string[];
     html: string;
     sourcePath: string;
+    frontmatter: Frontmatter;
+    template?: string;
+    layout?: string | false;
 }
 export interface BuildOptions {
     contentDir: string;
     outputDir: string;
+    templatesDir?: string;
+    defaultTemplate?: string;
+    defaultLayout?: string;
 }
 export interface Site {
     pages: Page[];

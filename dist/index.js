@@ -11,8 +11,10 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const gray_matter_1 = __importDefault(require("gray-matter"));
 const marked_1 = require("marked");
+const templates_1 = require("./templates");
 const DEFAULT_CONTENT_DIR = 'content';
 const DEFAULT_OUTPUT_DIR = 'dist';
+const DEFAULT_TEMPLATES_DIR = 'templates';
 // Matches a YAML frontmatter block. The opening `---` may be preceded only by
 // optional leading whitespace so that marked never sees the delimiters.
 const FRONTMATTER_REGEX = /^\s*---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?/;
@@ -110,32 +112,28 @@ function deriveSlug(filePath, contentDir) {
     const parsed = path_1.default.parse(relative);
     return path_1.default.join(parsed.dir, parsed.name).split(path_1.default.sep).join('/');
 }
-function renderPage(page, pages) {
-    const meta = [];
-    if (page.date) {
-        meta.push(`<p class="date">${escapeHtml(page.date)}</p>`);
-    }
-    if (page.tags.length > 0) {
-        const tagItems = page.tags
-            .map((tag) => `<li>${escapeHtml(tag)}</li>`)
-            .join('');
-        meta.push(`<ul class="tags">${tagItems}</ul>`);
-    }
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>${escapeHtml(page.title)}</title>
-</head>
-<body>
-<h1>${escapeHtml(page.title)}</h1>
-${meta.join('\n')}
-<div class="content">
-${page.html}
-</div>
-</body>
-</html>
-`;
+function pageSummary(page) {
+    return {
+        slug: page.slug,
+        title: page.title,
+        date: page.date,
+        tags: page.tags,
+        url: `${page.slug}.html`,
+    };
+}
+function buildPageContext(page, pages) {
+    return {
+        ...page.frontmatter,
+        title: page.title,
+        date: page.date,
+        tags: page.tags,
+        slug: page.slug,
+        content: page.html,
+        body: page.html,
+        site: {
+            pages: pages.map(pageSummary),
+        },
+    };
 }
 function renderIndex(pages) {
     const items = pages
@@ -166,6 +164,7 @@ ${items}
 function buildSite(options) {
     const contentDir = path_1.default.resolve(options.contentDir ?? DEFAULT_CONTENT_DIR);
     const outputDir = path_1.default.resolve(options.outputDir ?? DEFAULT_OUTPUT_DIR);
+    const templatesDir = options.templatesDir ?? DEFAULT_TEMPLATES_DIR;
     const files = listMarkdownFiles(contentDir).sort();
     const pages = files.map((file) => {
         const raw = fs_1.default.readFileSync(file, 'utf8');
@@ -178,6 +177,9 @@ function buildSite(options) {
             tags: normalizeTags(frontmatter.tags),
             html,
             sourcePath: file,
+            frontmatter,
+            template: typeof frontmatter.template === 'string' ? frontmatter.template : undefined,
+            layout: frontmatter.layout,
         };
     });
     pages.sort((a, b) => {
@@ -191,10 +193,15 @@ function buildSite(options) {
         return a.title.localeCompare(b.title);
     });
     fs_1.default.mkdirSync(outputDir, { recursive: true });
+    const engine = new templates_1.TemplateEngine(templatesDir, {
+        defaultTemplate: options.defaultTemplate ?? templates_1.DEFAULT_TEMPLATE_NAME,
+        defaultLayout: options.defaultLayout ?? templates_1.DEFAULT_LAYOUT_NAME,
+    });
     for (const page of pages) {
+        const rendered = engine.render(page.template, page.layout, buildPageContext(page, pages));
         const outFile = path_1.default.join(outputDir, `${page.slug}.html`);
         fs_1.default.mkdirSync(path_1.default.dirname(outFile), { recursive: true });
-        fs_1.default.writeFileSync(outFile, renderPage(page, pages));
+        fs_1.default.writeFileSync(outFile, rendered);
     }
     fs_1.default.writeFileSync(path_1.default.join(outputDir, 'index.html'), renderIndex(pages));
     return { pages, outputDir };
