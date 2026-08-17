@@ -12,39 +12,26 @@
       "baseline_cost": 0.0151,
       "perturbed_cost": 0.0168,
       "overall_cost": 0.0158,
-      "baseline_correctness": 0.95,
+      "baseline_correctness": 0.91,
       "perturbed_correctness": 0.87,
-      "overall_correctness": 0.92,
+      "overall_correctness": 0.9,
       "recovery_multiplier": 1.11,
       "flail_rate": 0.084,
       "total_sessions": 119,
       "valid_sessions": 109
     },
-    "GPT-5-nano": {
-      "model_id": "openai/gpt-5-nano",
-      "baseline_cost": 0.0037,
-      "perturbed_cost": 0.0061,
-      "overall_cost": 0.0057,
-      "baseline_correctness": 0.7,
-      "perturbed_correctness": 0.7,
-      "overall_correctness": 0.7,
-      "recovery_multiplier": 1.64,
-      "flail_rate": 0.143,
-      "total_sessions": 7,
-      "valid_sessions": 6
-    },
-    "GPT-5-mini": {
-      "model_id": "openai/gpt-5-mini",
-      "baseline_cost": 0.0309,
-      "perturbed_cost": 0.0207,
-      "overall_cost": 0.0258,
-      "baseline_correctness": 0.8,
-      "perturbed_correctness": 0.85,
-      "overall_correctness": 0.83,
-      "recovery_multiplier": 0.67,
-      "flail_rate": 0.077,
-      "total_sessions": 13,
-      "valid_sessions": 12
+    "Claude Fable 5": {
+      "model_id": "anthropic/claude-fable-5",
+      "baseline_cost": 0.9596,
+      "perturbed_cost": 1.2646,
+      "overall_cost": 1.0847,
+      "baseline_correctness": 0.96,
+      "perturbed_correctness": 0.92,
+      "overall_correctness": 0.95,
+      "recovery_multiplier": 1.32,
+      "flail_rate": 0.114,
+      "total_sessions": 44,
+      "valid_sessions": 39
     },
     "GPT-5": {
       "model_id": "openai/gpt-5",
@@ -52,12 +39,38 @@
       "perturbed_cost": 0.1449,
       "overall_cost": 0.159,
       "baseline_correctness": 0.83,
-      "perturbed_correctness": 0.9,
-      "overall_correctness": 0.88,
+      "perturbed_correctness": 1.0,
+      "overall_correctness": 0.95,
       "recovery_multiplier": 0.74,
       "flail_rate": 0.154,
       "total_sessions": 13,
       "valid_sessions": 11
+    },
+    "GPT-5-mini": {
+      "model_id": "openai/gpt-5-mini",
+      "baseline_cost": 0.0309,
+      "perturbed_cost": 0.0207,
+      "overall_cost": 0.0258,
+      "baseline_correctness": 0.87,
+      "perturbed_correctness": 0.95,
+      "overall_correctness": 0.91,
+      "recovery_multiplier": 0.67,
+      "flail_rate": 0.077,
+      "total_sessions": 13,
+      "valid_sessions": 12
+    },
+    "GPT-5-nano": {
+      "model_id": "openai/gpt-5-nano",
+      "baseline_cost": 0.0037,
+      "perturbed_cost": 0.0061,
+      "overall_cost": 0.0057,
+      "baseline_correctness": 0.7,
+      "perturbed_correctness": 0.77,
+      "overall_correctness": 0.76,
+      "recovery_multiplier": 1.64,
+      "flail_rate": 0.143,
+      "total_sessions": 7,
+      "valid_sessions": 6
     },
     "GPT-5.5": {
       "model_id": "openai/gpt-5.5",
@@ -77,9 +90,9 @@
       "baseline_cost": 0.5174,
       "perturbed_cost": 0.3424,
       "overall_cost": 0.4474,
-      "baseline_correctness": 0.93,
-      "perturbed_correctness": 0.95,
-      "overall_correctness": 0.94,
+      "baseline_correctness": 1.0,
+      "perturbed_correctness": 1.0,
+      "overall_correctness": 1.0,
       "recovery_multiplier": 0.66,
       "flail_rate": 0.062,
       "total_sessions": 16,
@@ -97,19 +110,6 @@
       "flail_rate": 0.333,
       "total_sessions": 9,
       "valid_sessions": 6
-    },
-    "Claude Fable 5": {
-      "model_id": "anthropic/claude-fable-5",
-      "baseline_cost": 0.9596,
-      "perturbed_cost": 1.2646,
-      "overall_cost": 1.0847,
-      "baseline_correctness": 0.89,
-      "perturbed_correctness": 0.87,
-      "overall_correctness": 0.88,
-      "recovery_multiplier": 1.32,
-      "flail_rate": 0.114,
-      "total_sessions": 44,
-      "valid_sessions": 39
     }
   },
   "scenarios": [
@@ -124,10 +124,16 @@
           "effective_cost_per_session": 0.0153,
           "status": "sustainable"
         },
-        "GPT-5-nano": {
-          "sessions": 250797,
-          "days_at_100_per_day": 2508.0,
-          "effective_cost_per_session": 0.004,
+        "Claude Fable 5": {
+          "sessions": 1007,
+          "days_at_100_per_day": 10.1,
+          "effective_cost_per_session": 0.9928,
+          "status": "sustainable"
+        },
+        "GPT-5": {
+          "sessions": 5196,
+          "days_at_100_per_day": 52.0,
+          "effective_cost_per_session": 0.1924,
           "status": "sustainable"
         },
         "GPT-5-mini": {
@@ -136,10 +142,10 @@
           "effective_cost_per_session": 0.0301,
           "status": "sustainable"
         },
-        "GPT-5": {
-          "sessions": 5196,
-          "days_at_100_per_day": 52.0,
-          "effective_cost_per_session": 0.1924,
+        "GPT-5-nano": {
+          "sessions": 250797,
+          "days_at_100_per_day": 2508.0,
+          "effective_cost_per_session": 0.004,
           "status": "sustainable"
         },
         "GPT-5.5": {
@@ -157,12 +163,6 @@
           "sessions": null,
           "days": null,
           "status": "no_baseline_data"
-        },
-        "Claude Fable 5": {
-          "sessions": 1007,
-          "days_at_100_per_day": 10.1,
-          "effective_cost_per_session": 0.9928,
-          "status": "sustainable"
         }
       }
     },
@@ -177,10 +177,16 @@
           "effective_cost_per_session": 0.0158,
           "status": "sustainable"
         },
-        "GPT-5-nano": {
-          "sessions": 2062218,
-          "days_at_100_per_day": 20622.2,
-          "effective_cost_per_session": 0.0048,
+        "Claude Fable 5": {
+          "sessions": 9154,
+          "days_at_100_per_day": 91.5,
+          "effective_cost_per_session": 1.0923,
+          "status": "sustainable"
+        },
+        "GPT-5": {
+          "sessions": 55590,
+          "days_at_100_per_day": 555.9,
+          "effective_cost_per_session": 0.1799,
           "status": "sustainable"
         },
         "GPT-5-mini": {
@@ -189,10 +195,10 @@
           "effective_cost_per_session": 0.0276,
           "status": "sustainable"
         },
-        "GPT-5": {
-          "sessions": 55590,
-          "days_at_100_per_day": 555.9,
-          "effective_cost_per_session": 0.1799,
+        "GPT-5-nano": {
+          "sessions": 2062218,
+          "days_at_100_per_day": 20622.2,
+          "effective_cost_per_session": 0.0048,
           "status": "sustainable"
         },
         "GPT-5.5": {
@@ -210,12 +216,6 @@
           "sessions": null,
           "days": null,
           "status": "no_baseline_data"
-        },
-        "Claude Fable 5": {
-          "sessions": 9154,
-          "days_at_100_per_day": 91.5,
-          "effective_cost_per_session": 1.0923,
-          "status": "sustainable"
         }
       }
     },
@@ -230,10 +230,16 @@
           "effective_cost_per_session": 0.0168,
           "status": "sustainable"
         },
-        "GPT-5-nano": {
-          "sessions": 1521406,
-          "days_at_100_per_day": 15214.1,
-          "effective_cost_per_session": 0.0066,
+        "Claude Fable 5": {
+          "sessions": 7743,
+          "days_at_100_per_day": 77.4,
+          "effective_cost_per_session": 1.2914,
+          "status": "sustainable"
+        },
+        "GPT-5": {
+          "sessions": 64593,
+          "days_at_100_per_day": 645.9,
+          "effective_cost_per_session": 0.1548,
           "status": "sustainable"
         },
         "GPT-5-mini": {
@@ -242,10 +248,10 @@
           "effective_cost_per_session": 0.0226,
           "status": "sustainable"
         },
-        "GPT-5": {
-          "sessions": 64593,
-          "days_at_100_per_day": 645.9,
-          "effective_cost_per_session": 0.1548,
+        "GPT-5-nano": {
+          "sessions": 1521406,
+          "days_at_100_per_day": 15214.1,
+          "effective_cost_per_session": 0.0066,
           "status": "sustainable"
         },
         "GPT-5.5": {
@@ -263,12 +269,6 @@
           "sessions": null,
           "days": null,
           "status": "no_baseline_data"
-        },
-        "Claude Fable 5": {
-          "sessions": 7743,
-          "days_at_100_per_day": 77.4,
-          "effective_cost_per_session": 1.2914,
-          "status": "sustainable"
         }
       }
     },
@@ -283,10 +283,16 @@
           "effective_cost_per_session": 0.0178,
           "status": "sustainable"
         },
-        "GPT-5-nano": {
-          "sessions": 120531,
-          "days_at_100_per_day": 1205.3,
-          "effective_cost_per_session": 0.0083,
+        "Claude Fable 5": {
+          "sessions": 670,
+          "days_at_100_per_day": 6.7,
+          "effective_cost_per_session": 1.4904,
+          "status": "limited"
+        },
+        "GPT-5": {
+          "sessions": 7707,
+          "days_at_100_per_day": 77.1,
+          "effective_cost_per_session": 0.1297,
           "status": "sustainable"
         },
         "GPT-5-mini": {
@@ -295,10 +301,10 @@
           "effective_cost_per_session": 0.0177,
           "status": "sustainable"
         },
-        "GPT-5": {
-          "sessions": 7707,
-          "days_at_100_per_day": 77.1,
-          "effective_cost_per_session": 0.1297,
+        "GPT-5-nano": {
+          "sessions": 120531,
+          "days_at_100_per_day": 1205.3,
+          "effective_cost_per_session": 0.0083,
           "status": "sustainable"
         },
         "GPT-5.5": {
@@ -316,12 +322,6 @@
           "sessions": null,
           "days": null,
           "status": "no_baseline_data"
-        },
-        "Claude Fable 5": {
-          "sessions": 670,
-          "days_at_100_per_day": 6.7,
-          "effective_cost_per_session": 1.4904,
-          "status": "limited"
         }
       }
     },
@@ -336,10 +336,16 @@
           "effective_cost_per_session": 0.0158,
           "status": "sustainable"
         },
-        "GPT-5-nano": {
-          "sessions": 20622189,
-          "days_at_100_per_day": 206221.9,
-          "effective_cost_per_session": 0.0048,
+        "Claude Fable 5": {
+          "sessions": 91549,
+          "days_at_100_per_day": 915.5,
+          "effective_cost_per_session": 1.0923,
+          "status": "sustainable"
+        },
+        "GPT-5": {
+          "sessions": 555908,
+          "days_at_100_per_day": 5559.1,
+          "effective_cost_per_session": 0.1799,
           "status": "sustainable"
         },
         "GPT-5-mini": {
@@ -348,10 +354,10 @@
           "effective_cost_per_session": 0.0276,
           "status": "sustainable"
         },
-        "GPT-5": {
-          "sessions": 555908,
-          "days_at_100_per_day": 5559.1,
-          "effective_cost_per_session": 0.1799,
+        "GPT-5-nano": {
+          "sessions": 20622189,
+          "days_at_100_per_day": 206221.9,
+          "effective_cost_per_session": 0.0048,
           "status": "sustainable"
         },
         "GPT-5.5": {
@@ -369,12 +375,6 @@
           "sessions": null,
           "days": null,
           "status": "no_baseline_data"
-        },
-        "Claude Fable 5": {
-          "sessions": 91549,
-          "days_at_100_per_day": 915.5,
-          "effective_cost_per_session": 1.0923,
-          "status": "sustainable"
         }
       }
     },
@@ -389,10 +389,16 @@
           "effective_cost_per_session": 0.0158,
           "status": "sustainable"
         },
-        "GPT-5-nano": {
-          "sessions": 206221896,
-          "days_at_100_per_day": 2062219.0,
-          "effective_cost_per_session": 0.0048,
+        "Claude Fable 5": {
+          "sessions": 915492,
+          "days_at_100_per_day": 9154.9,
+          "effective_cost_per_session": 1.0923,
+          "status": "sustainable"
+        },
+        "GPT-5": {
+          "sessions": 5559089,
+          "days_at_100_per_day": 55590.9,
+          "effective_cost_per_session": 0.1799,
           "status": "sustainable"
         },
         "GPT-5-mini": {
@@ -401,10 +407,10 @@
           "effective_cost_per_session": 0.0276,
           "status": "sustainable"
         },
-        "GPT-5": {
-          "sessions": 5559089,
-          "days_at_100_per_day": 55590.9,
-          "effective_cost_per_session": 0.1799,
+        "GPT-5-nano": {
+          "sessions": 206221896,
+          "days_at_100_per_day": 2062219.0,
+          "effective_cost_per_session": 0.0048,
           "status": "sustainable"
         },
         "GPT-5.5": {
@@ -422,12 +428,6 @@
           "sessions": null,
           "days": null,
           "status": "no_baseline_data"
-        },
-        "Claude Fable 5": {
-          "sessions": 915492,
-          "days_at_100_per_day": 9154.9,
-          "effective_cost_per_session": 1.0923,
-          "status": "sustainable"
         }
       }
     }

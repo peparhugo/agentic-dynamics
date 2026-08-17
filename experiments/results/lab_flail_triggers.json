@@ -13,11 +13,35 @@
       "flail_rate": 8.4,
       "avg_cost_when_flailing": 0.0068
     },
-    "GPT-5-nano": {
-      "total": 7,
-      "flail_count": 1,
-      "flail_rate": 14.3,
-      "avg_cost_when_flailing": 0.0005
+    "GPT-5.6 Luna": {
+      "total": 0,
+      "flail_count": 0,
+      "flail_rate": 0,
+      "avg_cost_when_flailing": 0
+    },
+    "Claude Sonnet 5": {
+      "total": 0,
+      "flail_count": 0,
+      "flail_rate": 0,
+      "avg_cost_when_flailing": 0
+    },
+    "DeepSeek v4 Flash": {
+      "total": 0,
+      "flail_count": 0,
+      "flail_rate": 0,
+      "avg_cost_when_flailing": 0
+    },
+    "Claude Fable 5": {
+      "total": 44,
+      "flail_count": 5,
+      "flail_rate": 11.4,
+      "avg_cost_when_flailing": 0.2231
+    },
+    "GPT-5": {
+      "total": 13,
+      "flail_count": 2,
+      "flail_rate": 15.4,
+      "avg_cost_when_flailing": 0.0216
     },
     "GPT-5-mini": {
       "total": 13,
@@ -25,11 +49,11 @@
       "flail_rate": 7.7,
       "avg_cost_when_flailing": 0.0021
     },
-    "GPT-5": {
-      "total": 13,
-      "flail_count": 2,
-      "flail_rate": 15.4,
-      "avg_cost_when_flailing": 0.0216
+    "GPT-5-nano": {
+      "total": 7,
+      "flail_count": 1,
+      "flail_rate": 14.3,
+      "avg_cost_when_flailing": 0.0005
     },
     "GPT-5.5": {
       "total": 6,
@@ -48,12 +72,6 @@
       "flail_count": 3,
       "flail_rate": 33.3,
       "avg_cost_when_flailing": 0.1343
-    },
-    "Claude Fable 5": {
-      "total": 44,
-      "flail_count": 5,
-      "flail_rate": 11.4,
-      "avg_cost_when_flailing": 0.2231
     }
   },
   "by_perturbation_class": {
@@ -154,7 +172,7 @@
     "total_flail_entries": 26,
     "produced_reasoning_but_no_code": 14,
     "never_wrote_files": 19,
-    "short_sessions_under_5_steps": 18,
+    "short_sessions_under_5_steps": 20,
     "read_only_no_writes": 2
   },
   "flail_details": [
@@ -359,8 +377,8 @@
       "model": "Claude Fable 5",
       "cost": 0.285395,
       "reasoning_chars": 0,
-      "step_count": 0,
-      "output_tokens": 0,
+      "step_count": 1,
+      "output_tokens": 2811,
       "write_calls": 0,
       "read_calls": 0,
       "bash_calls": 0,
@@ -457,8 +475,8 @@
       "model": "GPT-5",
       "cost": 0.033154,
       "reasoning_chars": 0,
-      "step_count": 0,
-      "output_tokens": 0,
+      "step_count": 1,
+      "output_tokens": 378,
       "write_calls": 0,
       "read_calls": 0,
       "bash_calls": 0,
@@ -498,7 +516,7 @@
       "worktree": "exp_xbxssi1k",
       "model": "GPT-5.5",
       "cost": 0.052955999999999996,
-      "reasoning_chars": 1801,
+      "reasoning_chars": 1802,
       "step_count": 6,
       "output_tokens": 471,
       "write_calls": 0,

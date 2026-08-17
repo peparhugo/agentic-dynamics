@@ -217,8 +217,8 @@
     "infrastructure": "Neo4j 5.26 + graph.py (Neo4jClient)",
     "graph_statistics": {
       "models": 9,
-      "runs": 227,
-      "configs": 31,
+      "runs": 239,
+      "configs": 36,
       "run_on": 227,
       "classified_as": 203
     }

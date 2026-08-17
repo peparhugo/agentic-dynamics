@@ -1,22 +1,22 @@
-/* Generated 2026-08-14 15:40:01 UTC by build_data.py */
+/* Generated 2026-08-17 13:45:23 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-14T15:40:01.241740+00:00",
+    "generated_at": "2026-08-17T13:45:23.457667+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
     "worktrees_total": 205,
-    "sessions_total": 1097,
-    "game_reports": 224,
-    "total_cost": 288.6909,
+    "sessions_total": 772,
+    "game_reports": 273,
+    "total_cost": 219.5112,
     "architectures": 3,
     "variants": 7,
-    "stories_total": 221,
-    "stories_unique": 210,
-    "stories_re_runs": 11,
-    "story_sessions": 1097,
-    "story_total_cost": 288.6909,
+    "stories_total": 156,
+    "stories_unique": 141,
+    "stories_re_runs": 15,
+    "story_sessions": 772,
+    "story_total_cost": 219.5112,
     "configs": 35,
     "_provenance": {
       "worktrees_total": "M",
@@ -38,245 +38,245 @@ window.DYNAMICS_DATA = {
       "id": "deepseek/deepseek-v4-flash",
       "label": "DeepSeek v4 Flash",
       "provider": "deepseek",
-      "cells": 30,
-      "unique_cells": 30,
-      "re_runs": 0,
-      "sessions": 150,
-      "total_cost": 2.044974,
-      "avg_cost": 0.068166,
-      "cost_cells": 30,
-      "avg_cache_hit": 0.964,
-      "avg_tests": 33.5,
+      "cells": 22,
+      "unique_cells": 21,
+      "re_runs": 1,
+      "sessions": 110,
+      "total_cost": 1.499069,
+      "avg_cost": 0.06814,
+      "cost_cells": 22,
+      "avg_cache_hit": 0.965,
+      "avg_tests": 36.4,
       "avg_test_code_ratio": 0.658,
-      "avg_tok_per_session": 46576.0,
-      "avg_duration_s": 1386.0,
-      "avg_code_lines": 2294.0,
-      "tests_total": 1006,
-      "tests_passed": 3112,
-      "tests_run": 3114,
-      "pass_rate": "100% (3112/3114)",
-      "avg_cost_per_session": 0.013633,
-      "avg_loc": 2294.0,
-      "avg_energy_j": 52973.5,
-      "avg_energy_j_per_loc": 23.09,
+      "avg_tok_per_session": 46515.0,
+      "avg_duration_s": 1290.0,
+      "avg_code_lines": 2197.0,
+      "tests_total": 800,
+      "tests_passed": 2304,
+      "tests_run": 2306,
+      "pass_rate": "100% (2304/2306)",
+      "avg_cost_per_session": 0.013628,
+      "avg_loc": 2197.0,
+      "avg_energy_j": 52422.3,
+      "avg_energy_j_per_loc": 23.86,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 30,
+      "strategy_expl": 22,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 30,
-      "reports_valid": 30,
+      "reports": 22,
+      "reports_valid": 22,
       "reports_narrated": 0
     },
     {
       "id": "openai/gpt-5.6-luna",
       "label": "GPT-5.6 Luna",
       "provider": "openai",
-      "cells": 34,
-      "unique_cells": 30,
+      "cells": 24,
+      "unique_cells": 20,
       "re_runs": 4,
-      "sessions": 170,
-      "total_cost": 3.085027,
-      "avg_cost": 0.090736,
-      "cost_cells": 34,
-      "avg_cache_hit": 0.975,
-      "avg_tests": 7.3,
-      "avg_test_code_ratio": 0.275,
-      "avg_tok_per_session": 6324.0,
-      "avg_duration_s": 528.0,
-      "avg_code_lines": 714.0,
-      "tests_total": 249,
-      "tests_passed": 861,
-      "tests_run": 861,
-      "pass_rate": "100% (861/861)",
-      "avg_cost_per_session": 0.018147,
-      "avg_loc": 714.0,
-      "avg_energy_j": 9295.3,
-      "avg_energy_j_per_loc": 13.02,
+      "sessions": 120,
+      "total_cost": 2.204489,
+      "avg_cost": 0.091854,
+      "cost_cells": 24,
+      "avg_cache_hit": 0.967,
+      "avg_tests": 10.0,
+      "avg_test_code_ratio": 0.282,
+      "avg_tok_per_session": 9224.0,
+      "avg_duration_s": 553.0,
+      "avg_code_lines": 796.0,
+      "tests_total": 240,
+      "tests_passed": 618,
+      "tests_run": 618,
+      "pass_rate": "100% (618/618)",
+      "avg_cost_per_session": 0.018371,
+      "avg_loc": 796.0,
+      "avg_energy_j": 10515.7,
+      "avg_energy_j_per_loc": 13.21,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 34,
+      "strategy_expl": 22,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 34,
-      "reports_valid": 34,
+      "reports": 24,
+      "reports_valid": 24,
       "reports_narrated": 0
     },
     {
       "id": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "provider": "deepseek",
-      "cells": 35,
-      "unique_cells": 30,
-      "re_runs": 5,
-      "sessions": 167,
-      "total_cost": 4.822804,
-      "avg_cost": 0.137794,
-      "cost_cells": 35,
-      "avg_cache_hit": 0.778,
-      "avg_tests": 34.4,
-      "avg_test_code_ratio": 1.087,
-      "avg_tok_per_session": 34702.0,
-      "avg_duration_s": 1675.0,
-      "avg_code_lines": 1384.0,
-      "tests_total": 1204,
-      "tests_passed": 3489,
-      "tests_run": 3499,
-      "pass_rate": "100% (3489/3499)",
-      "avg_cost_per_session": 0.028879,
-      "avg_loc": 1384.0,
-      "avg_energy_j": 33592.0,
-      "avg_energy_j_per_loc": 24.27,
+      "cells": 37,
+      "unique_cells": 28,
+      "re_runs": 9,
+      "sessions": 177,
+      "total_cost": 5.875648,
+      "avg_cost": 0.158801,
+      "cost_cells": 37,
+      "avg_cache_hit": 0.793,
+      "avg_tests": 45.7,
+      "avg_test_code_ratio": 0.805,
+      "avg_tok_per_session": 37865.0,
+      "avg_duration_s": 1771.0,
+      "avg_code_lines": 1337.0,
+      "tests_total": 1692,
+      "tests_passed": 2966,
+      "tests_run": 2967,
+      "pass_rate": "100% (2966/2967)",
+      "avg_cost_per_session": 0.033196,
+      "avg_loc": 1337.0,
+      "avg_energy_j": 38925.4,
+      "avg_energy_j_per_loc": 29.11,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 35,
+      "strategy_expl": 21,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 35,
-      "reports_valid": 35,
+      "reports": 37,
+      "reports_valid": 37,
       "reports_narrated": 0
     },
     {
       "id": "openai/gpt-5.6-terra",
       "label": "openai/gpt-5.6-terra",
       "provider": "openai",
-      "cells": 30,
-      "unique_cells": 30,
+      "cells": 20,
+      "unique_cells": 20,
       "re_runs": 0,
-      "sessions": 150,
-      "total_cost": 30.640397,
-      "avg_cost": 1.021347,
-      "cost_cells": 30,
-      "avg_cache_hit": 0.819,
-      "avg_tests": 8.8,
-      "avg_test_code_ratio": 0.331,
-      "avg_tok_per_session": 33004.0,
-      "avg_duration_s": 775.0,
-      "avg_code_lines": 708.0,
-      "tests_total": 265,
-      "tests_passed": 1033,
-      "tests_run": 1033,
-      "pass_rate": "100% (1033/1033)",
-      "avg_cost_per_session": 0.204269,
-      "avg_loc": 708.0,
-      "avg_energy_j": 19012.1,
-      "avg_energy_j_per_loc": 26.85,
+      "sessions": 100,
+      "total_cost": 20.303648,
+      "avg_cost": 1.015182,
+      "cost_cells": 20,
+      "avg_cache_hit": 0.821,
+      "avg_tests": 9.8,
+      "avg_test_code_ratio": 0.361,
+      "avg_tok_per_session": 32400.0,
+      "avg_duration_s": 731.0,
+      "avg_code_lines": 693.0,
+      "tests_total": 195,
+      "tests_passed": 770,
+      "tests_run": 770,
+      "pass_rate": "100% (770/770)",
+      "avg_cost_per_session": 0.203036,
+      "avg_loc": 693.0,
+      "avg_energy_j": 18629.5,
+      "avg_energy_j_per_loc": 26.88,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 30,
+      "strategy_expl": 20,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 30,
-      "reports_valid": 30,
+      "reports": 20,
+      "reports_valid": 20,
       "reports_narrated": 0
     },
     {
       "id": "anthropic/claude-haiku-4-5",
       "label": "anthropic/claude-haiku-4-5",
       "provider": "anthropic",
-      "cells": 31,
-      "unique_cells": 30,
-      "re_runs": 1,
-      "sessions": 155,
-      "total_cost": 30.216397,
-      "avg_cost": 1.590337,
-      "cost_cells": 19,
-      "avg_cache_hit": 0.606,
-      "avg_tests": 117.4,
-      "avg_test_code_ratio": 1.022,
-      "avg_tok_per_session": 10082.0,
-      "avg_duration_s": 632.0,
-      "avg_code_lines": 1862.0,
-      "tests_total": 3638,
+      "cells": 14,
+      "unique_cells": 14,
+      "re_runs": 0,
+      "sessions": 70,
+      "total_cost": 21.516785,
+      "avg_cost": 1.536913,
+      "cost_cells": 14,
+      "avg_cache_hit": 0.989,
+      "avg_tests": 193.4,
+      "avg_test_code_ratio": 1.819,
+      "avg_tok_per_session": 15664.0,
+      "avg_duration_s": 1003.0,
+      "avg_code_lines": 2211.0,
+      "tests_total": 2707,
       "tests_passed": 0,
       "tests_run": 0,
       "pass_rate": "unknown",
-      "avg_cost_per_session": 0.318067,
-      "avg_loc": 1862.0,
-      "avg_energy_j": 11472.9,
-      "avg_energy_j_per_loc": 6.16,
+      "avg_cost_per_session": 0.307383,
+      "avg_loc": 2211.0,
+      "avg_energy_j": 17820.5,
+      "avg_energy_j_per_loc": 8.06,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 12,
-      "strategy_expl": 17,
-      "strategy_waste": 2,
+      "strategy_cons": 2,
+      "strategy_expl": 10,
+      "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 31,
-      "reports_valid": 31,
+      "reports": 14,
+      "reports_valid": 14,
       "reports_narrated": 0
     },
     {
       "id": "openai/gpt-5.6-sol",
       "label": "openai/gpt-5.6-sol",
       "provider": "openai",
-      "cells": 30,
-      "unique_cells": 30,
+      "cells": 23,
+      "unique_cells": 23,
       "re_runs": 0,
-      "sessions": 150,
-      "total_cost": 112.46246,
-      "avg_cost": 3.748749,
-      "cost_cells": 30,
-      "avg_cache_hit": 0.843,
-      "avg_tests": 12.9,
-      "avg_test_code_ratio": 0.423,
-      "avg_tok_per_session": 46888.0,
-      "avg_duration_s": 1203.0,
-      "avg_code_lines": 1166.0,
-      "tests_total": 387,
-      "tests_passed": 1776,
-      "tests_run": 1776,
-      "pass_rate": "100% (1776/1776)",
-      "avg_cost_per_session": 0.74975,
-      "avg_loc": 1166.0,
-      "avg_energy_j": 27904.9,
-      "avg_energy_j_per_loc": 23.93,
+      "sessions": 115,
+      "total_cost": 91.693651,
+      "avg_cost": 3.98668,
+      "cost_cells": 23,
+      "avg_cache_hit": 0.849,
+      "avg_tests": 12.0,
+      "avg_test_code_ratio": 0.402,
+      "avg_tok_per_session": 48229.0,
+      "avg_duration_s": 1233.0,
+      "avg_code_lines": 1255.0,
+      "tests_total": 275,
+      "tests_passed": 1289,
+      "tests_run": 1289,
+      "pass_rate": "100% (1289/1289)",
+      "avg_cost_per_session": 0.797336,
+      "avg_loc": 1255.0,
+      "avg_energy_j": 28959.4,
+      "avg_energy_j_per_loc": 23.08,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 30,
+      "strategy_expl": 23,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 30,
-      "reports_valid": 30,
+      "reports": 23,
+      "reports_valid": 23,
       "reports_narrated": 0
     },
     {
       "id": "anthropic/claude-sonnet-5",
       "label": "Claude Sonnet 5",
       "provider": "anthropic",
-      "cells": 31,
-      "unique_cells": 30,
+      "cells": 16,
+      "unique_cells": 15,
       "re_runs": 1,
-      "sessions": 155,
-      "total_cost": 105.418795,
-      "avg_cost": 4.583426,
-      "cost_cells": 23,
-      "avg_cache_hit": 0.731,
-      "avg_tests": 122.1,
-      "avg_test_code_ratio": 0.647,
-      "avg_tok_per_session": 14312.0,
-      "avg_duration_s": 844.0,
-      "avg_code_lines": 2129.0,
-      "tests_total": 3786,
+      "sessions": 80,
+      "total_cost": 76.417905,
+      "avg_cost": 4.776119,
+      "cost_cells": 16,
+      "avg_cache_hit": 0.986,
+      "avg_tests": 153.2,
+      "avg_test_code_ratio": 0.909,
+      "avg_tok_per_session": 20222.0,
+      "avg_duration_s": 1194.0,
+      "avg_code_lines": 2646.0,
+      "tests_total": 2451,
       "tests_passed": 455,
       "tests_run": 455,
       "pass_rate": "100% (455/455)",
-      "avg_cost_per_session": 0.916685,
-      "avg_loc": 2129.0,
-      "avg_energy_j": 16416.3,
-      "avg_energy_j_per_loc": 7.71,
+      "avg_cost_per_session": 0.955224,
+      "avg_loc": 2646.0,
+      "avg_energy_j": 23185.1,
+      "avg_energy_j_per_loc": 8.76,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 8,
-      "strategy_expl": 18,
-      "strategy_waste": 5,
+      "strategy_cons": 2,
+      "strategy_expl": 13,
+      "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 31,
-      "reports_valid": 31,
+      "reports": 16,
+      "reports_valid": 16,
       "reports_narrated": 0
     }
   ],
@@ -1082,13 +1082,13 @@ window.DYNAMICS_DATA = {
       "Claude Sonnet 5"
     ],
     "costData": [
-      0.068166,
-      0.090736,
-      0.137794,
-      1.021347,
-      1.590337,
-      3.748749,
-      4.583426
+      0.06814,
+      0.091854,
+      0.158801,
+      1.015182,
+      1.536913,
+      3.98668,
+      4.776119
     ],
     "narrData": [
       null,
@@ -1100,68 +1100,68 @@ window.DYNAMICS_DATA = {
       null
     ],
     "locData": [
-      2294.0,
-      714.0,
-      1384.0,
-      708.0,
-      1862.0,
-      1166.0,
-      2129.0
+      2197.0,
+      796.0,
+      1337.0,
+      693.0,
+      2211.0,
+      1255.0,
+      2646.0
     ],
     "costY": [
-      0.068166,
-      0.090736,
-      0.137794,
-      1.021347,
-      1.590337,
-      3.748749,
-      4.583426
+      0.06814,
+      0.091854,
+      0.158801,
+      1.015182,
+      1.536913,
+      3.98668,
+      4.776119
     ],
     "reports": [
-      30,
-      34,
-      35,
-      30,
-      31,
-      30,
-      31
+      22,
+      24,
+      37,
+      20,
+      14,
+      23,
+      16
     ]
   },
   "calculator": {
     "model_costs": [
       {
         "n": "DeepSeek v4 Flash",
-        "c": 0.068166,
+        "c": 0.06814,
         "p": 1.0
       },
       {
         "n": "GPT-5.6 Luna",
-        "c": 0.090736,
+        "c": 0.091854,
         "p": 1.0
       },
       {
         "n": "DeepSeek v4 Pro",
-        "c": 0.137794,
+        "c": 0.158801,
         "p": 1.0
       },
       {
         "n": "openai/gpt-5.6-terra",
-        "c": 1.021347,
+        "c": 1.015182,
         "p": 1.0
       },
       {
         "n": "anthropic/claude-haiku-4-5",
-        "c": 1.590337,
+        "c": 1.536913,
         "p": 0
       },
       {
         "n": "openai/gpt-5.6-sol",
-        "c": 3.748749,
+        "c": 3.98668,
         "p": 1.0
       },
       {
         "n": "Claude Sonnet 5",
-        "c": 4.583426,
+        "c": 4.776119,
         "p": 1.0
       }
     ],
@@ -1172,23 +1172,23 @@ window.DYNAMICS_DATA = {
       },
       {
         "m": "DS\u2192Pro",
-        "e": 2.0
+        "e": 2.3
       },
       {
         "m": "DS\u2192openai/gpt-5.6-terra",
-        "e": 15.0
+        "e": 14.9
       },
       {
         "m": "DS\u2192anthropic/claude-haiku-4-5",
-        "e": 23.3
+        "e": 22.6
       },
       {
         "m": "DS\u2192openai/gpt-5.6-sol",
-        "e": 55.0
+        "e": 58.5
       },
       {
         "m": "DS\u21925",
-        "e": 67.2
+        "e": 70.1
       },
       {
         "m": "\u2192Human ($5/job)",
@@ -1200,16 +1200,16 @@ window.DYNAMICS_DATA = {
   },
   "derived": {
     "cost_gap": "23\u00d7",
-    "cost_gap_computation": "$1.590337 / $0.068166 = 23.3\u00d7",
-    "overall_pass_rate": "99.9% (10726/10738) [tests]",
-    "total_tests_passed": 10726,
-    "total_tests_run": 10738,
-    "total_cost_all_models": 288.6909,
-    "total_cost_deepseek": 6.8678,
-    "total_cost_claude": 135.6352,
+    "cost_gap_computation": "$1.536913 / $0.06814 = 22.6\u00d7",
+    "overall_pass_rate": "100.0% (8402/8405) [tests]",
+    "total_tests_passed": 8402,
+    "total_tests_run": 8405,
+    "total_cost_all_models": 219.5112,
+    "total_cost_deepseek": 7.3747,
+    "total_cost_claude": 97.9347,
     "total_narrated": 0,
-    "total_valid_reports": 221,
-    "total_reports_analyzed": 221,
+    "total_valid_reports": 156,
+    "total_reports_analyzed": 156,
     "_provenance": {
       "cost_gap": "C",
       "overall_pass_rate": "C",
@@ -1863,58 +1863,58 @@ window.DYNAMICS_DATA = {
     {
       "id": "anthropic/claude-haiku-4-5",
       "label": "anthropic/claude-haiku-4-5",
-      "avg_energy_j": 11472.9,
-      "avg_energy_j_per_loc": 6.16,
-      "avg_cost": 1.590337,
-      "avg_loc": 1862.0
+      "avg_energy_j": 17820.5,
+      "avg_energy_j_per_loc": 8.06,
+      "avg_cost": 1.536913,
+      "avg_loc": 2211.0
     },
     {
       "id": "anthropic/claude-sonnet-5",
       "label": "Claude Sonnet 5",
-      "avg_energy_j": 16416.3,
-      "avg_energy_j_per_loc": 7.71,
-      "avg_cost": 4.583426,
-      "avg_loc": 2129.0
+      "avg_energy_j": 23185.1,
+      "avg_energy_j_per_loc": 8.76,
+      "avg_cost": 4.776119,
+      "avg_loc": 2646.0
     },
     {
       "id": "openai/gpt-5.6-luna",
       "label": "GPT-5.6 Luna",
-      "avg_energy_j": 9295.3,
-      "avg_energy_j_per_loc": 13.02,
-      "avg_cost": 0.090736,
-      "avg_loc": 714.0
-    },
-    {
-      "id": "deepseek/deepseek-v4-flash",
-      "label": "DeepSeek v4 Flash",
-      "avg_energy_j": 52973.5,
-      "avg_energy_j_per_loc": 23.09,
-      "avg_cost": 0.068166,
-      "avg_loc": 2294.0
+      "avg_energy_j": 10515.7,
+      "avg_energy_j_per_loc": 13.21,
+      "avg_cost": 0.091854,
+      "avg_loc": 796.0
     },
     {
       "id": "openai/gpt-5.6-sol",
       "label": "openai/gpt-5.6-sol",
-      "avg_energy_j": 27904.9,
-      "avg_energy_j_per_loc": 23.93,
-      "avg_cost": 3.748749,
-      "avg_loc": 1166.0
+      "avg_energy_j": 28959.4,
+      "avg_energy_j_per_loc": 23.08,
+      "avg_cost": 3.98668,
+      "avg_loc": 1255.0
     },
     {
-      "id": "deepseek/deepseek-v4-pro",
-      "label": "DeepSeek v4 Pro",
-      "avg_energy_j": 33592.0,
-      "avg_energy_j_per_loc": 24.27,
-      "avg_cost": 0.137794,
-      "avg_loc": 1384.0
+      "id": "deepseek/deepseek-v4-flash",
+      "label": "DeepSeek v4 Flash",
+      "avg_energy_j": 52422.3,
+      "avg_energy_j_per_loc": 23.86,
+      "avg_cost": 0.06814,
+      "avg_loc": 2197.0
     },
     {
       "id": "openai/gpt-5.6-terra",
       "label": "openai/gpt-5.6-terra",
-      "avg_energy_j": 19012.1,
-      "avg_energy_j_per_loc": 26.85,
-      "avg_cost": 1.021347,
-      "avg_loc": 708.0
+      "avg_energy_j": 18629.5,
+      "avg_energy_j_per_loc": 26.88,
+      "avg_cost": 1.015182,
+      "avg_loc": 693.0
+    },
+    {
+      "id": "deepseek/deepseek-v4-pro",
+      "label": "DeepSeek v4 Pro",
+      "avg_energy_j": 38925.4,
+      "avg_energy_j_per_loc": 29.11,
+      "avg_cost": 0.158801,
+      "avg_loc": 1337.0
     }
   ],
   "strategy_distribution": {
@@ -2626,21 +2626,21 @@ window.DYNAMICS_DATA = {
       "loc": 407,
       "thinking_ratio": 0.03,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 0.8,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.0241,
       "perturbation_class": "semantic",
       "task": "exp_0s36_d3n",
       "loc": 1008,
       "thinking_ratio": 0.11,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2654,7 +2654,7 @@ window.DYNAMICS_DATA = {
       "loc": 960,
       "thinking_ratio": 0.51,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
@@ -2668,21 +2668,21 @@ window.DYNAMICS_DATA = {
       "loc": 407,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.76,
       "cost": 0.0214,
       "perturbation_class": "semantic",
       "task": "exp_1erxln69",
       "loc": 1266,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -2696,14 +2696,14 @@ window.DYNAMICS_DATA = {
       "loc": 485,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-nano",
       "label": "GPT-5-nano",
       "color": "rgba(239,68,68,0.75)",
       "escape": 0.43,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 0.0059,
       "perturbation_class": "semantic",
       "task": "std_final",
@@ -2716,7 +2716,7 @@ window.DYNAMICS_DATA = {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 2.2412,
       "perturbation_class": "semantic",
@@ -2724,13 +2724,13 @@ window.DYNAMICS_DATA = {
       "loc": 1327,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.751,
       "perturbation_class": "semantic",
@@ -2738,21 +2738,21 @@ window.DYNAMICS_DATA = {
       "loc": 436,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.4696,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 159,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2794,27 +2794,27 @@ window.DYNAMICS_DATA = {
       "loc": 1275,
       "thinking_ratio": 0.12,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.94,
       "cost": 0.0087,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 211,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0104,
       "perturbation_class": "semantic",
@@ -2822,13 +2822,13 @@ window.DYNAMICS_DATA = {
       "loc": 207,
       "thinking_ratio": 0.09,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0217,
       "perturbation_class": "semantic",
@@ -2836,13 +2836,13 @@ window.DYNAMICS_DATA = {
       "loc": 796,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 1.2564,
       "perturbation_class": "semantic",
@@ -2850,13 +2850,13 @@ window.DYNAMICS_DATA = {
       "loc": 581,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.8723,
       "perturbation_class": "semantic",
@@ -2864,27 +2864,27 @@ window.DYNAMICS_DATA = {
       "loc": 463,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.89,
       "cost": 0.0163,
       "perturbation_class": "semantic",
       "task": "exp_3zxicj_v",
       "loc": 840,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0237,
       "perturbation_class": "semantic",
@@ -2892,7 +2892,7 @@ window.DYNAMICS_DATA = {
       "loc": 1446,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6-fast",
@@ -2906,7 +2906,7 @@ window.DYNAMICS_DATA = {
       "loc": 305,
       "thinking_ratio": 0.04,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2920,7 +2920,7 @@ window.DYNAMICS_DATA = {
       "loc": 1052,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -2940,7 +2940,7 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.017,
       "perturbation_class": "semantic",
@@ -2948,13 +2948,13 @@ window.DYNAMICS_DATA = {
       "loc": 748,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-nano",
       "label": "GPT-5-nano",
       "color": "rgba(239,68,68,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.7,
       "cost": 0.0037,
       "perturbation_class": "semantic",
@@ -2962,7 +2962,7 @@ window.DYNAMICS_DATA = {
       "loc": 182,
       "thinking_ratio": 0.15,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-nano",
@@ -2990,7 +2990,7 @@ window.DYNAMICS_DATA = {
       "loc": 292,
       "thinking_ratio": 0.09,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -3004,21 +3004,21 @@ window.DYNAMICS_DATA = {
       "loc": 562,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.3907,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 126,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -3046,7 +3046,7 @@ window.DYNAMICS_DATA = {
       "loc": 202,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -3088,13 +3088,13 @@ window.DYNAMICS_DATA = {
       "loc": 453,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0059,
       "perturbation_class": "semantic",
@@ -3102,7 +3102,7 @@ window.DYNAMICS_DATA = {
       "loc": 92,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -3123,7 +3123,7 @@ window.DYNAMICS_DATA = {
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
       "escape": 0.72,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.2067,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5",
@@ -3136,7 +3136,7 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0214,
       "perturbation_class": "semantic",
@@ -3144,7 +3144,7 @@ window.DYNAMICS_DATA = {
       "loc": 1030,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -3164,15 +3164,15 @@ window.DYNAMICS_DATA = {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.4122,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 133,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -3200,13 +3200,13 @@ window.DYNAMICS_DATA = {
       "loc": 364,
       "thinking_ratio": 0.05,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0104,
       "perturbation_class": "semantic",
@@ -3214,7 +3214,7 @@ window.DYNAMICS_DATA = {
       "loc": 385,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.5",
@@ -3228,7 +3228,7 @@ window.DYNAMICS_DATA = {
       "loc": 251,
       "thinking_ratio": 0.01,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6-fast",
@@ -3242,13 +3242,13 @@ window.DYNAMICS_DATA = {
       "loc": 322,
       "thinking_ratio": 0.09,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0337,
       "perturbation_class": "semantic",
@@ -3256,7 +3256,7 @@ window.DYNAMICS_DATA = {
       "loc": 910,
       "thinking_ratio": 0.31,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.5",
@@ -3270,27 +3270,27 @@ window.DYNAMICS_DATA = {
       "loc": 247,
       "thinking_ratio": 0.02,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.79,
       "cost": 0.0142,
       "perturbation_class": "semantic",
       "task": "perturbed",
       "loc": 706,
       "thinking_ratio": 0.13,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.8,
       "cost": 0.0217,
       "perturbation_class": "semantic",
@@ -3298,13 +3298,13 @@ window.DYNAMICS_DATA = {
       "loc": 1220,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.2,
       "cost": 0.0185,
       "perturbation_class": "semantic",
@@ -3312,7 +3312,7 @@ window.DYNAMICS_DATA = {
       "loc": 4,
       "thinking_ratio": 0.75,
       "strategy": "wasteful",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -3340,13 +3340,13 @@ window.DYNAMICS_DATA = {
       "loc": 330,
       "thinking_ratio": 0.05,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.7,
       "cost": 1.3795,
       "perturbation_class": "semantic",
@@ -3354,13 +3354,13 @@ window.DYNAMICS_DATA = {
       "loc": 729,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0047,
       "perturbation_class": "semantic",
@@ -3368,14 +3368,14 @@ window.DYNAMICS_DATA = {
       "loc": 95,
       "thinking_ratio": 0.02,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
       "escape": 0.24,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 0.0309,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5_r2",
@@ -3388,35 +3388,35 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.98,
       "cost": 0.018,
       "perturbation_class": "semantic",
       "task": "autocomplete_search",
       "loc": 1186,
       "thinking_ratio": 0.16,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 2.4895,
       "perturbation_class": "semantic",
       "task": "collaborative_editor",
       "loc": 1074,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.7001,
       "perturbation_class": "semantic",
@@ -3424,13 +3424,13 @@ window.DYNAMICS_DATA = {
       "loc": 40,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 2.0531,
       "perturbation_class": "semantic",
@@ -3438,27 +3438,27 @@ window.DYNAMICS_DATA = {
       "loc": 313,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
-      "correctness": 0.8,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.7978,
       "perturbation_class": "semantic",
       "task": "data_table",
       "loc": 52,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.7,
       "cost": 2.0222,
       "perturbation_class": "semantic",
@@ -3466,13 +3466,13 @@ window.DYNAMICS_DATA = {
       "loc": 1093,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.4985,
       "perturbation_class": "semantic",
@@ -3480,13 +3480,13 @@ window.DYNAMICS_DATA = {
       "loc": 602,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0198,
       "perturbation_class": "semantic",
@@ -3494,13 +3494,13 @@ window.DYNAMICS_DATA = {
       "loc": 386,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0221,
       "perturbation_class": "semantic",
@@ -3508,27 +3508,27 @@ window.DYNAMICS_DATA = {
       "loc": 1227,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
-      "correctness": 0.6,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.6613,
       "perturbation_class": "semantic",
       "task": "data_table",
       "loc": 29,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.6,
       "cost": 0.0194,
       "perturbation_class": "semantic",
@@ -3536,27 +3536,27 @@ window.DYNAMICS_DATA = {
       "loc": 839,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.92,
       "cost": 0.0215,
       "perturbation_class": "semantic",
       "task": "factorial_compound",
       "loc": 1537,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0303,
       "perturbation_class": "semantic",
@@ -3564,13 +3564,13 @@ window.DYNAMICS_DATA = {
       "loc": 3021,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.8,
       "cost": 0.0203,
       "perturbation_class": "semantic",
@@ -3578,13 +3578,13 @@ window.DYNAMICS_DATA = {
       "loc": 405,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0175,
       "perturbation_class": "semantic",
@@ -3592,13 +3592,13 @@ window.DYNAMICS_DATA = {
       "loc": 1530,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.6,
       "cost": 0.0089,
       "perturbation_class": "semantic",
@@ -3606,13 +3606,13 @@ window.DYNAMICS_DATA = {
       "loc": 120,
       "thinking_ratio": 0.18,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0177,
       "perturbation_class": "semantic",
@@ -3620,55 +3620,55 @@ window.DYNAMICS_DATA = {
       "loc": 1239,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.98,
       "cost": 0.013,
       "perturbation_class": "semantic",
       "task": "social_graph",
       "loc": 1333,
       "thinking_ratio": 0.11,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.93,
       "cost": 0.01,
       "perturbation_class": "semantic",
       "task": "task_manager",
       "loc": 533,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.94,
       "cost": 0.0095,
       "perturbation_class": "semantic",
       "task": "twitter_timeline",
       "loc": 439,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0116,
       "perturbation_class": "semantic",
@@ -3676,14 +3676,14 @@ window.DYNAMICS_DATA = {
       "loc": 320,
       "thinking_ratio": 0.21,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
       "escape": 0.7,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.1477,
       "perturbation_class": "semantic",
       "task": "inject_phantom_success_s0.5",
@@ -3697,7 +3697,7 @@ window.DYNAMICS_DATA = {
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
       "escape": 0.68,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.1849,
       "perturbation_class": "semantic",
       "task": "invert_constraint_s0.5",
@@ -3711,7 +3711,7 @@ window.DYNAMICS_DATA = {
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
       "escape": 0.75,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.0243,
       "perturbation_class": "semantic",
       "task": "invert_constraint_s0.5",
@@ -3724,7 +3724,7 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.8,
       "cost": 0.0098,
       "perturbation_class": "semantic",
@@ -3732,7 +3732,7 @@ window.DYNAMICS_DATA = {
       "loc": 146,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -3746,13 +3746,13 @@ window.DYNAMICS_DATA = {
       "loc": 702,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.8,
       "cost": 0.0126,
       "perturbation_class": "semantic",
@@ -3760,7 +3760,7 @@ window.DYNAMICS_DATA = {
       "loc": 227,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
@@ -3774,7 +3774,7 @@ window.DYNAMICS_DATA = {
       "loc": 469,
       "thinking_ratio": 0.05,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -3802,7 +3802,7 @@ window.DYNAMICS_DATA = {
       "loc": 310,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6-fast",
@@ -3816,7 +3816,7 @@ window.DYNAMICS_DATA = {
       "loc": 441,
       "thinking_ratio": 0.08,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -3844,13 +3844,13 @@ window.DYNAMICS_DATA = {
       "loc": 799,
       "thinking_ratio": 0.07,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.9975,
       "perturbation_class": "semantic",
@@ -3858,7 +3858,7 @@ window.DYNAMICS_DATA = {
       "loc": 459,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -3872,13 +3872,13 @@ window.DYNAMICS_DATA = {
       "loc": 615,
       "thinking_ratio": 0.04,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.9377,
       "perturbation_class": "semantic",
@@ -3886,14 +3886,14 @@ window.DYNAMICS_DATA = {
       "loc": 456,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
       "escape": 0.38,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 0.0211,
       "perturbation_class": "semantic",
       "task": "inject_phantom_success_s0.5_r1",
@@ -3906,29 +3906,29 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.0044,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 62,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.97,
       "cost": 0.0191,
       "perturbation_class": "semantic",
       "task": "exp_er1n2rx3",
       "loc": 945,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
@@ -3948,7 +3948,7 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0156,
       "perturbation_class": "semantic",
@@ -3956,13 +3956,13 @@ window.DYNAMICS_DATA = {
       "loc": 838,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0167,
       "perturbation_class": "semantic",
@@ -3970,7 +3970,7 @@ window.DYNAMICS_DATA = {
       "loc": 1178,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -3984,13 +3984,13 @@ window.DYNAMICS_DATA = {
       "loc": 1015,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.011,
       "perturbation_class": "semantic",
@@ -3998,13 +3998,13 @@ window.DYNAMICS_DATA = {
       "loc": 551,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.4637,
       "perturbation_class": "semantic",
@@ -4012,7 +4012,7 @@ window.DYNAMICS_DATA = {
       "loc": 638,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4026,14 +4026,14 @@ window.DYNAMICS_DATA = {
       "loc": 947,
       "thinking_ratio": 0.25,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.67,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 1.3343,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5",
@@ -4054,7 +4054,7 @@ window.DYNAMICS_DATA = {
       "loc": 558,
       "thinking_ratio": 0.11,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4068,7 +4068,7 @@ window.DYNAMICS_DATA = {
       "loc": 1133,
       "thinking_ratio": 0.09,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4088,35 +4088,35 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.78,
       "cost": 0.021,
       "perturbation_class": "semantic",
       "task": "exp_hcnattl6",
       "loc": 1070,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.4972,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 161,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0159,
       "perturbation_class": "semantic",
@@ -4124,7 +4124,7 @@ window.DYNAMICS_DATA = {
       "loc": 726,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -4138,7 +4138,7 @@ window.DYNAMICS_DATA = {
       "loc": 747,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4152,13 +4152,13 @@ window.DYNAMICS_DATA = {
       "loc": 415,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0053,
       "perturbation_class": "semantic",
@@ -4166,7 +4166,7 @@ window.DYNAMICS_DATA = {
       "loc": 63,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4208,13 +4208,13 @@ window.DYNAMICS_DATA = {
       "loc": 369,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.9687,
       "perturbation_class": "semantic",
@@ -4222,27 +4222,27 @@ window.DYNAMICS_DATA = {
       "loc": 432,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.96,
       "cost": 0.0109,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 444,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0081,
       "perturbation_class": "semantic",
@@ -4250,7 +4250,7 @@ window.DYNAMICS_DATA = {
       "loc": 281,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
@@ -4264,7 +4264,7 @@ window.DYNAMICS_DATA = {
       "loc": 268,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4284,7 +4284,7 @@ window.DYNAMICS_DATA = {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.8868,
       "perturbation_class": "semantic",
@@ -4292,7 +4292,7 @@ window.DYNAMICS_DATA = {
       "loc": 387,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-nano",
@@ -4313,7 +4313,7 @@ window.DYNAMICS_DATA = {
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.66,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 1.6062,
       "perturbation_class": "semantic",
       "task": "inject_competing_goal_s0.5",
@@ -4334,13 +4334,13 @@ window.DYNAMICS_DATA = {
       "loc": 203,
       "thinking_ratio": 0.06,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0169,
       "perturbation_class": "semantic",
@@ -4348,13 +4348,13 @@ window.DYNAMICS_DATA = {
       "loc": 891,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0056,
       "perturbation_class": "semantic",
@@ -4362,13 +4362,13 @@ window.DYNAMICS_DATA = {
       "loc": 111,
       "thinking_ratio": 0.02,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0145,
       "perturbation_class": "semantic",
@@ -4376,13 +4376,13 @@ window.DYNAMICS_DATA = {
       "loc": 697,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0148,
       "perturbation_class": "semantic",
@@ -4390,13 +4390,13 @@ window.DYNAMICS_DATA = {
       "loc": 756,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0081,
       "perturbation_class": "semantic",
@@ -4404,7 +4404,7 @@ window.DYNAMICS_DATA = {
       "loc": 221,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4424,7 +4424,7 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0206,
       "perturbation_class": "semantic",
@@ -4432,7 +4432,7 @@ window.DYNAMICS_DATA = {
       "loc": 694,
       "thinking_ratio": 0.32,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
@@ -4446,13 +4446,13 @@ window.DYNAMICS_DATA = {
       "loc": 241,
       "thinking_ratio": 0.04,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.8,
       "cost": 0.0126,
       "perturbation_class": "semantic",
@@ -4460,7 +4460,7 @@ window.DYNAMICS_DATA = {
       "loc": 472,
       "thinking_ratio": 0.12,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4474,7 +4474,7 @@ window.DYNAMICS_DATA = {
       "loc": 504,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6-fast",
@@ -4488,28 +4488,28 @@ window.DYNAMICS_DATA = {
       "loc": 407,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.63,
       "cost": 0.0104,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 386,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.44,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 1.1104,
       "perturbation_class": "semantic",
       "task": "standardized_build",
@@ -4530,7 +4530,7 @@ window.DYNAMICS_DATA = {
       "loc": 245,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -4544,7 +4544,7 @@ window.DYNAMICS_DATA = {
       "loc": 1212,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4564,7 +4564,7 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0229,
       "perturbation_class": "semantic",
@@ -4572,13 +4572,13 @@ window.DYNAMICS_DATA = {
       "loc": 607,
       "thinking_ratio": 0.25,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.7,
       "cost": 0.1773,
       "perturbation_class": "semantic",
@@ -4586,14 +4586,14 @@ window.DYNAMICS_DATA = {
       "loc": 327,
       "thinking_ratio": 0.13,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.61,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 1.5805,
       "perturbation_class": "semantic",
       "task": "inject_phantom_success_s0.5",
@@ -4628,13 +4628,13 @@ window.DYNAMICS_DATA = {
       "loc": 1005,
       "thinking_ratio": 0.0,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.6456,
       "perturbation_class": "semantic",
@@ -4642,7 +4642,7 @@ window.DYNAMICS_DATA = {
       "loc": 267,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4656,13 +4656,13 @@ window.DYNAMICS_DATA = {
       "loc": 948,
       "thinking_ratio": 0.06,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0197,
       "perturbation_class": "semantic",
@@ -4670,13 +4670,13 @@ window.DYNAMICS_DATA = {
       "loc": 925,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0097,
       "perturbation_class": "semantic",
@@ -4684,13 +4684,13 @@ window.DYNAMICS_DATA = {
       "loc": 391,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.8,
       "cost": 0.9408,
       "perturbation_class": "semantic",
@@ -4698,7 +4698,7 @@ window.DYNAMICS_DATA = {
       "loc": 562,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4712,7 +4712,7 @@ window.DYNAMICS_DATA = {
       "loc": 770,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4726,13 +4726,13 @@ window.DYNAMICS_DATA = {
       "loc": 782,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.1924,
       "perturbation_class": "semantic",
@@ -4740,7 +4740,7 @@ window.DYNAMICS_DATA = {
       "loc": 397,
       "thinking_ratio": 0.09,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -4754,13 +4754,13 @@ window.DYNAMICS_DATA = {
       "loc": 758,
       "thinking_ratio": 0.15,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0203,
       "perturbation_class": "semantic",
@@ -4768,13 +4768,13 @@ window.DYNAMICS_DATA = {
       "loc": 1139,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0167,
       "perturbation_class": "semantic",
@@ -4782,7 +4782,7 @@ window.DYNAMICS_DATA = {
       "loc": 899,
       "thinking_ratio": 0.02,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.5",
@@ -4796,7 +4796,7 @@ window.DYNAMICS_DATA = {
       "loc": 288,
       "thinking_ratio": 0.03,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
@@ -4810,13 +4810,13 @@ window.DYNAMICS_DATA = {
       "loc": 221,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.3088,
       "perturbation_class": "semantic",
@@ -4824,13 +4824,13 @@ window.DYNAMICS_DATA = {
       "loc": 427,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.3937,
       "perturbation_class": "semantic",
@@ -4838,13 +4838,13 @@ window.DYNAMICS_DATA = {
       "loc": 477,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.4235,
       "perturbation_class": "semantic",
@@ -4852,27 +4852,27 @@ window.DYNAMICS_DATA = {
       "loc": 618,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.0271,
       "perturbation_class": "semantic",
       "task": "baseline",
       "loc": 227,
       "thinking_ratio": 0.1,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0323,
       "perturbation_class": "semantic",
@@ -4880,41 +4880,41 @@ window.DYNAMICS_DATA = {
       "loc": 281,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 0.75,
       "cost": 0.0595,
       "perturbation_class": "semantic",
       "task": "baseline",
       "loc": 342,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 0.75,
       "cost": 0.0284,
       "perturbation_class": "semantic",
       "task": "perturbed",
       "loc": 342,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.1629,
       "perturbation_class": "semantic",
@@ -4922,13 +4922,13 @@ window.DYNAMICS_DATA = {
       "loc": 48,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.3609,
       "perturbation_class": "semantic",
@@ -4936,27 +4936,27 @@ window.DYNAMICS_DATA = {
       "loc": 230,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.38,
       "cost": 0.0064,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 227,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0158,
       "perturbation_class": "semantic",
@@ -4964,7 +4964,7 @@ window.DYNAMICS_DATA = {
       "loc": 903,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -4984,15 +4984,15 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.8,
       "cost": 0.0213,
       "perturbation_class": "semantic",
       "task": "exp_u9zvdibz",
       "loc": 1127,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -5006,13 +5006,13 @@ window.DYNAMICS_DATA = {
       "loc": 372,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.4089,
       "perturbation_class": "semantic",
@@ -5020,13 +5020,13 @@ window.DYNAMICS_DATA = {
       "loc": 455,
       "thinking_ratio": 0.05,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.005,
       "perturbation_class": "semantic",
@@ -5034,14 +5034,14 @@ window.DYNAMICS_DATA = {
       "loc": 141,
       "thinking_ratio": 0.01,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "color": "rgba(59,130,246,0.75)",
       "escape": 0.37,
-      "correctness": 0.7,
+      "correctness": 1.0,
       "cost": 0.374,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5",
@@ -5055,7 +5055,7 @@ window.DYNAMICS_DATA = {
       "label": "GPT-5-nano",
       "color": "rgba(239,68,68,0.75)",
       "escape": 0.38,
-      "correctness": 0.7,
+      "correctness": 0.75,
       "cost": 0.0064,
       "perturbation_class": "semantic",
       "task": "remove_critical_constraint_s0.5",
@@ -5068,15 +5068,15 @@ window.DYNAMICS_DATA = {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 0.7,
+      "escape": null,
+      "correctness": 1.0,
       "cost": 0.4021,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 130,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -5118,27 +5118,27 @@ window.DYNAMICS_DATA = {
       "loc": 291,
       "thinking_ratio": 0.04,
       "strategy": "exploratory",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.88,
       "cost": 0.3002,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 117,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0103,
       "perturbation_class": "semantic",
@@ -5146,7 +5146,7 @@ window.DYNAMICS_DATA = {
       "loc": 527,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -5160,28 +5160,28 @@ window.DYNAMICS_DATA = {
       "loc": 962,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.98,
       "cost": 0.0219,
       "perturbation_class": "semantic",
       "task": "task_manager",
       "loc": 1295,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
       "escape": 0.7,
-      "correctness": 0.8,
+      "correctness": 1.0,
       "cost": 0.1685,
       "perturbation_class": "manifold",
       "task": "inject_alien_vocab_s0.5",
@@ -5194,15 +5194,15 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.98,
       "cost": 0.0157,
       "perturbation_class": "semantic",
       "task": "exp_wkclt_vt",
       "loc": 853,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -5222,7 +5222,7 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0145,
       "perturbation_class": "semantic",
@@ -5230,13 +5230,13 @@ window.DYNAMICS_DATA = {
       "loc": 750,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "color": "rgba(6,182,212,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.6322,
       "perturbation_class": "semantic",
@@ -5244,13 +5244,13 @@ window.DYNAMICS_DATA = {
       "loc": 298,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.8,
       "cost": 0.0185,
       "perturbation_class": "semantic",
@@ -5258,13 +5258,13 @@ window.DYNAMICS_DATA = {
       "loc": 883,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "color": "rgba(239,68,68,0.60)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.7,
       "cost": 0.018,
       "perturbation_class": "semantic",
@@ -5272,13 +5272,13 @@ window.DYNAMICS_DATA = {
       "loc": 187,
       "thinking_ratio": 0.06,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0142,
       "perturbation_class": "semantic",
@@ -5286,7 +5286,7 @@ window.DYNAMICS_DATA = {
       "loc": 809,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "anthropic/claude-fable-5",
@@ -5314,13 +5314,13 @@ window.DYNAMICS_DATA = {
       "loc": 634,
       "thinking_ratio": 0.0,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0073,
       "perturbation_class": "semantic",
@@ -5328,21 +5328,21 @@ window.DYNAMICS_DATA = {
       "loc": 169,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
-      "correctness": 1.0,
+      "escape": null,
+      "correctness": 0.32,
       "cost": 0.01,
       "perturbation_class": "semantic",
       "task": "url_shortener",
       "loc": 375,
       "thinking_ratio": 0.04,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -5362,7 +5362,7 @@ window.DYNAMICS_DATA = {
       "model": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
       "color": "rgba(52,211,153,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 1.0,
       "cost": 0.0165,
       "perturbation_class": "semantic",
@@ -5370,7 +5370,7 @@ window.DYNAMICS_DATA = {
       "loc": 885,
       "thinking_ratio": 0.07,
       "strategy": "conservative",
-      "quadrant": "high_grit"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -5384,13 +5384,13 @@ window.DYNAMICS_DATA = {
       "loc": 314,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     },
     {
       "model": "openai/gpt-5",
       "label": "GPT-5",
       "color": "rgba(251,191,36,0.75)",
-      "escape": 0.0,
+      "escape": null,
       "correctness": 0.8,
       "cost": 0.2201,
       "perturbation_class": "semantic",
@@ -5398,7 +5398,7 @@ window.DYNAMICS_DATA = {
       "loc": 514,
       "thinking_ratio": 0.08,
       "strategy": "conservative",
-      "quadrant": "conservative_fail"
+      "quadrant": "wasteful"
     },
     {
       "model": "deepseek/deepseek-v4-pro",
@@ -5412,7 +5412,7 @@ window.DYNAMICS_DATA = {
       "loc": 484,
       "thinking_ratio": 0.03,
       "strategy": "conservative",
-      "quadrant": "explorative"
+      "quadrant": "wasteful"
     }
   ],
   "sonar": {},
@@ -5491,195 +5491,187 @@ window.DYNAMICS_DATA = {
     "models": [
       {
         "model": "deepseek/deepseek-v4-flash",
-        "cells": 30,
-        "total_cost": 2.044974,
-        "avg_cost": 0.068166,
-        "total_tokens": 6986407,
-        "avg_cache_hit": 0.964,
-        "avg_duration_s": 1386.0
+        "cells": 22,
+        "total_cost": 1.499069,
+        "avg_cost": 0.06814,
+        "total_tokens": 5116663,
+        "avg_cache_hit": 0.965,
+        "avg_duration_s": 1290.0
       },
       {
         "model": "openai/gpt-5.6-luna",
-        "cells": 34,
-        "total_cost": 3.085027,
-        "avg_cost": 0.090736,
-        "total_tokens": 1075066,
-        "avg_cache_hit": 0.975,
-        "avg_duration_s": 528.0
+        "cells": 24,
+        "total_cost": 2.204489,
+        "avg_cost": 0.091854,
+        "total_tokens": 1106826,
+        "avg_cache_hit": 0.967,
+        "avg_duration_s": 553.0
       },
       {
         "model": "deepseek/deepseek-v4-pro",
-        "cells": 35,
-        "total_cost": 4.822804,
-        "avg_cost": 0.137794,
-        "total_tokens": 6072866,
-        "avg_cache_hit": 0.778,
-        "avg_duration_s": 1675.0
-      },
-      {
-        "model": "anthropic/claude-haiku-4-5",
-        "cells": 31,
-        "total_cost": 30.216397,
-        "avg_cost": 0.974722,
-        "total_tokens": 1562780,
-        "avg_cache_hit": 0.606,
-        "avg_duration_s": 632.0
+        "cells": 37,
+        "total_cost": 5.875648,
+        "avg_cost": 0.158801,
+        "total_tokens": 7005112,
+        "avg_cache_hit": 0.793,
+        "avg_duration_s": 1771.0
       },
       {
         "model": "openai/gpt-5.6-terra",
-        "cells": 30,
-        "total_cost": 30.640397,
-        "avg_cost": 1.021347,
-        "total_tokens": 4950585,
-        "avg_cache_hit": 0.819,
-        "avg_duration_s": 775.0
+        "cells": 20,
+        "total_cost": 20.303648,
+        "avg_cost": 1.015182,
+        "total_tokens": 3239989,
+        "avg_cache_hit": 0.821,
+        "avg_duration_s": 731.0
+      },
+      {
+        "model": "anthropic/claude-haiku-4-5",
+        "cells": 14,
+        "total_cost": 21.516785,
+        "avg_cost": 1.536913,
+        "total_tokens": 1096509,
+        "avg_cache_hit": 0.989,
+        "avg_duration_s": 1003.0
       },
       {
         "model": "anthropic/claude-sonnet-5",
-        "cells": 31,
-        "total_cost": 105.418795,
-        "avg_cost": 3.400606,
-        "total_tokens": 2218404,
-        "avg_cache_hit": 0.731,
-        "avg_duration_s": 844.0
+        "cells": 16,
+        "total_cost": 76.417905,
+        "avg_cost": 4.776119,
+        "total_tokens": 1617762,
+        "avg_cache_hit": 0.986,
+        "avg_duration_s": 1194.0
       },
       {
         "model": "openai/gpt-5.6-sol",
-        "cells": 30,
-        "total_cost": 112.46246,
-        "avg_cost": 3.748749,
-        "total_tokens": 7033139,
-        "avg_cache_hit": 0.843,
-        "avg_duration_s": 1203.0
+        "cells": 23,
+        "total_cost": 91.693651,
+        "avg_cost": 3.98668,
+        "total_tokens": 5546328,
+        "avg_cache_hit": 0.849,
+        "avg_duration_s": 1233.0
       }
     ],
     "conditions": [
       {
         "condition": "bad_seed",
-        "cells": 44,
+        "cells": 41,
         "variants": 6,
         "total_cost": 59.719593,
-        "avg_cost": 1.357263,
+        "avg_cost": 1.456575,
         "success": 39,
-        "fail": 5
+        "fail": 2
       },
       {
         "condition": "clean",
-        "cells": 89,
+        "cells": 83,
         "variants": 12,
-        "total_cost": 119.322572,
-        "avg_cost": 1.340703,
-        "success": 80,
-        "fail": 9
+        "total_cost": 119.36938,
+        "avg_cost": 1.438185,
+        "success": 81,
+        "fail": 2
       },
       {
         "condition": "early_degrade",
-        "cells": 88,
+        "cells": 32,
         "variants": 12,
-        "total_cost": 109.648689,
-        "avg_cost": 1.246008,
-        "success": 75,
-        "fail": 13
+        "total_cost": 40.422222,
+        "avg_cost": 1.263194,
+        "success": 32,
+        "fail": 0
       }
     ],
     "stories": [
       {
         "story": "task_manager_api",
-        "cells": 78,
-        "total_cost": 87.807082,
-        "avg_cost": 1.125732,
-        "sessions": 388,
-        "avg_duration_s": 867.0,
-        "avg_tokens_per_session": 22031.0
-      },
-      {
-        "story": "static_site_gen",
-        "cells": 70,
-        "total_cost": 95.841249,
-        "avg_cost": 1.369161,
-        "sessions": 346,
-        "avg_duration_s": 1007.0,
-        "avg_tokens_per_session": 30255.0
+        "cells": 60,
+        "total_cost": 62.889575,
+        "avg_cost": 1.04816,
+        "sessions": 298,
+        "avg_duration_s": 896.0,
+        "avg_tokens_per_session": 22589.0
       },
       {
         "story": "notification_service",
-        "cells": 73,
-        "total_cost": 105.042523,
-        "avg_cost": 1.438939,
-        "sessions": 363,
-        "avg_duration_s": 1166.0,
-        "avg_tokens_per_session": 29364.0
+        "cells": 50,
+        "total_cost": 75.742204,
+        "avg_cost": 1.514844,
+        "sessions": 248,
+        "avg_duration_s": 1258.0,
+        "avg_tokens_per_session": 33237.0
+      },
+      {
+        "story": "static_site_gen",
+        "cells": 46,
+        "total_cost": 80.879416,
+        "avg_cost": 1.758248,
+        "sessions": 226,
+        "avg_duration_s": 1449.0,
+        "avg_tokens_per_session": 41928.0
       }
     ],
     "tiers": [
       {
         "tier": "tier1_minimal",
         "quality": "bad",
-        "cells": 44,
-        "avg_cost": 1.319078,
-        "avg_tokens_per_session": 27258.0,
-        "avg_session_duration_s": 212.0
+        "cells": 30,
+        "avg_cost": 1.317823,
+        "avg_tokens_per_session": 33501.0,
+        "avg_session_duration_s": 253.0
       },
       {
         "tier": "tier1_minimal",
         "quality": "good",
-        "cells": 69,
-        "avg_cost": 1.466812,
-        "avg_tokens_per_session": 27010.0,
-        "avg_session_duration_s": 219.0
+        "cells": 56,
+        "avg_cost": 1.466017,
+        "avg_tokens_per_session": 30338.0,
+        "avg_session_duration_s": 243.0
       },
       {
         "tier": "tier2_small",
         "quality": "bad",
-        "cells": 43,
-        "avg_cost": 1.058701,
-        "avg_tokens_per_session": 26729.0,
-        "avg_session_duration_s": 200.0
+        "cells": 25,
+        "avg_cost": 1.125309,
+        "avg_tokens_per_session": 30805.0,
+        "avg_session_duration_s": 240.0
       },
       {
         "tier": "tier2_small",
         "quality": "good",
-        "cells": 65,
-        "avg_cost": 1.291035,
-        "avg_tokens_per_session": 27192.0,
-        "avg_session_duration_s": 189.0
+        "cells": 45,
+        "avg_cost": 1.54993,
+        "avg_tokens_per_session": 32706.0,
+        "avg_session_duration_s": 226.0
       }
     ],
     "sessions": {
-      "total": 1097,
-      "total_cost": 288.69085364000034,
-      "total_tokens": 29899247,
-      "total_cache_reads": 715852100,
+      "total": 772,
+      "total_cost": 219.51119483000002,
+      "total_tokens": 24297099,
+      "total_cache_reads": 586717067,
       "cache_hit_rate": 0.977,
-      "duration_s": 223261.00070005076,
-      "successful": 976,
-      "failed": 121
+      "duration_s": 183334.276113817,
+      "successful": 758,
+      "failed": 14
     },
-    "generated_at": "2026-08-14T15:40:01.279117+00:00"
+    "generated_at": "2026-08-17T13:45:23.493679+00:00"
   },
   "reviews": {
     "models": [
       {
         "model": "claude-sonnet-5",
         "label": "Claude Sonnet 5",
-        "stories": 3,
-        "overall_coherence": 0.927,
-        "architectural_fit": 0.823,
-        "convention_adherence": 0.716,
+        "stories": 2,
+        "overall_coherence": 0.925,
+        "architectural_fit": 0.814,
+        "convention_adherence": 0.681,
         "better_pct": 80.0,
         "worse_pct": 0.0,
         "neutral_pct": 20.0,
         "top_issues": [
           {
-            "theme": "test gaps",
-            "count": 4
-          },
-          {
             "theme": "security",
-            "count": 3
-          },
-          {
-            "theme": "incomplete refactor",
             "count": 2
           },
           {
@@ -5689,72 +5681,113 @@ window.DYNAMICS_DATA = {
           {
             "theme": "missing surface",
             "count": 1
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 1
+          },
+          {
+            "theme": "schema drift",
+            "count": 1
           }
         ]
       },
       {
         "model": "gpt-5.6-luna",
         "label": "GPT-5.6 Luna",
-        "stories": 34,
-        "overall_coherence": 0.888,
-        "architectural_fit": 0.753,
-        "convention_adherence": 0.701,
-        "better_pct": 74.1,
-        "worse_pct": 8.8,
-        "neutral_pct": 11.8,
+        "stories": 22,
+        "overall_coherence": 0.897,
+        "architectural_fit": 0.745,
+        "convention_adherence": 0.693,
+        "better_pct": 72.7,
+        "worse_pct": 7.3,
+        "neutral_pct": 13.6,
         "top_issues": [
           {
             "theme": "other",
-            "count": 59
-          },
-          {
-            "theme": "security",
-            "count": 29
+            "count": 32
           },
           {
             "theme": "incomplete refactor",
-            "count": 24
+            "count": 18
+          },
+          {
+            "theme": "security",
+            "count": 18
           },
           {
             "theme": "test gaps",
-            "count": 23
+            "count": 13
           },
           {
             "theme": "coupling",
-            "count": 11
+            "count": 8
           }
         ]
       },
       {
         "model": "deepseek-v4-pro",
         "label": "DeepSeek v4 Pro",
-        "stories": 35,
-        "overall_coherence": 0.881,
-        "architectural_fit": 0.75,
-        "convention_adherence": 0.72,
-        "better_pct": 61.6,
-        "worse_pct": 11.6,
-        "neutral_pct": 23.2,
+        "stories": 21,
+        "overall_coherence": 0.883,
+        "architectural_fit": 0.748,
+        "convention_adherence": 0.726,
+        "better_pct": 60.8,
+        "worse_pct": 13.4,
+        "neutral_pct": 20.6,
         "top_issues": [
           {
             "theme": "other",
-            "count": 48
-          },
-          {
-            "theme": "security",
-            "count": 31
+            "count": 30
           },
           {
             "theme": "incomplete refactor",
-            "count": 26
+            "count": 20
+          },
+          {
+            "theme": "security",
+            "count": 18
           },
           {
             "theme": "test gaps",
-            "count": 24
+            "count": 12
           },
           {
             "theme": "schema drift",
-            "count": 11
+            "count": 9
+          }
+        ]
+      },
+      {
+        "model": "?",
+        "label": "?",
+        "stories": 27,
+        "overall_coherence": 0.877,
+        "architectural_fit": 0.763,
+        "convention_adherence": 0.715,
+        "better_pct": 69.7,
+        "worse_pct": 9.8,
+        "neutral_pct": 18.2,
+        "top_issues": [
+          {
+            "theme": "other",
+            "count": 45
+          },
+          {
+            "theme": "security",
+            "count": 25
+          },
+          {
+            "theme": "test gaps",
+            "count": 25
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 13
+          },
+          {
+            "theme": "missing surface",
+            "count": 9
           }
         ]
       }
@@ -5766,339 +5799,365 @@ window.DYNAMICS_DATA = {
   "analysis": {
     "models": [
       {
-        "model": "deepseek-v4-flash",
-        "label": "DeepSeek v4 Flash",
-        "commits": 150,
-        "lines_added": 111951,
-        "lines_removed": 8474,
-        "functions_added": 1872,
-        "classes_added": 110,
-        "imports_added": 1870,
-        "sonar_available": 150,
-        "sonar_bugs_delta": 27,
-        "sonar_smells_delta": 201,
-        "sonar_complexity_delta": 4881,
-        "avg_convention": 0.673,
-        "deep_cells": 30,
-        "lsp_available": 30,
-        "lsp_errors_per_cell": 13.5,
+        "model": "?",
+        "label": "?",
+        "commits": 434,
+        "lines_added": 145141,
+        "lines_removed": 17723,
+        "functions_added": 2954,
+        "classes_added": 359,
+        "imports_added": 2641,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.732,
+        "deep_cells": 87,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
-        "solution_correctness": 1.0,
-        "solution_constraints": 1.0,
-        "solution_quality": 0.035,
-        "solution_novelty": 0.877,
-        "solution_composite": 0.789,
-        "basin_escape": 0.738,
+        "solution_correctness": 0.736,
+        "solution_constraints": 0.893,
+        "solution_quality": 0.129,
+        "solution_novelty": 0.67,
+        "solution_composite": 0.652,
+        "basin_escape": 0.558,
         "strategies": {
-          "exploratory": 30
+          "exploratory": 64,
+          "conservative": 23
         }
       },
       {
-        "model": "deepseek-v4-pro",
-        "label": "DeepSeek v4 Pro",
-        "commits": 166,
-        "lines_added": 97420,
-        "lines_removed": 7199,
-        "functions_added": 1238,
-        "classes_added": 247,
-        "imports_added": 1179,
-        "sonar_available": 166,
-        "sonar_bugs_delta": 6,
-        "sonar_smells_delta": 78,
-        "sonar_complexity_delta": 4111,
-        "avg_convention": 0.713,
-        "deep_cells": 35,
-        "lsp_available": 35,
-        "lsp_errors_per_cell": 11.3,
+        "model": "deepseek-v4-flash",
+        "label": "DeepSeek v4 Flash",
+        "commits": 110,
+        "lines_added": 79561,
+        "lines_removed": 5859,
+        "functions_added": 1363,
+        "classes_added": 81,
+        "imports_added": 1364,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.686,
+        "deep_cells": 22,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
         "solution_correctness": 1.0,
-        "solution_constraints": 0.99,
-        "solution_quality": 0.048,
-        "solution_novelty": 0.815,
-        "solution_composite": 0.779,
-        "basin_escape": 0.678,
+        "solution_constraints": 1.0,
+        "solution_quality": 0.037,
+        "solution_novelty": 0.87,
+        "solution_composite": 0.788,
+        "basin_escape": 0.733,
         "strategies": {
-          "exploratory": 35
+          "exploratory": 22
         }
       },
       {
         "model": "gpt-5.6-sol",
         "label": "gpt-5.6-sol",
-        "commits": 150,
-        "lines_added": 76959,
-        "lines_removed": 11671,
-        "functions_added": 1085,
-        "classes_added": 108,
-        "imports_added": 1251,
-        "sonar_available": 150,
-        "sonar_bugs_delta": 4,
-        "sonar_smells_delta": 90,
-        "sonar_complexity_delta": 3603,
-        "avg_convention": 0.657,
-        "deep_cells": 30,
-        "lsp_available": 30,
-        "lsp_errors_per_cell": 9.2,
+        "commits": 114,
+        "lines_added": 64264,
+        "lines_removed": 9317,
+        "functions_added": 789,
+        "classes_added": 76,
+        "imports_added": 1017,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.674,
+        "deep_cells": 23,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
         "solution_correctness": 1.0,
         "solution_constraints": 1.0,
-        "solution_quality": 0.056,
-        "solution_novelty": 0.912,
+        "solution_quality": 0.054,
+        "solution_novelty": 0.917,
         "solution_composite": 0.798,
-        "basin_escape": 0.776,
+        "basin_escape": 0.783,
         "strategies": {
-          "exploratory": 30
+          "exploratory": 23
         }
       },
       {
-        "model": "claude-haiku-4-5",
-        "label": "claude-haiku-4-5",
-        "commits": 157,
-        "lines_added": 54775,
-        "lines_removed": 3809,
-        "functions_added": 521,
-        "classes_added": 254,
-        "imports_added": 701,
-        "sonar_available": 147,
-        "sonar_bugs_delta": 2,
-        "sonar_smells_delta": 176,
-        "sonar_complexity_delta": 1795,
-        "avg_convention": 0.745,
-        "deep_cells": 31,
-        "lsp_available": 31,
-        "lsp_errors_per_cell": 9.0,
+        "model": "deepseek-v4-pro",
+        "label": "DeepSeek v4 Pro",
+        "commits": 99,
+        "lines_added": 57302,
+        "lines_removed": 3752,
+        "functions_added": 650,
+        "classes_added": 155,
+        "imports_added": 710,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.747,
+        "deep_cells": 21,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
-        "solution_correctness": 0.548,
-        "solution_constraints": 0.839,
-        "solution_quality": 0.167,
-        "solution_novelty": 0.521,
-        "solution_composite": 0.555,
-        "basin_escape": 0.444,
+        "solution_correctness": 1.0,
+        "solution_constraints": 1.0,
+        "solution_quality": 0.048,
+        "solution_novelty": 0.797,
+        "solution_composite": 0.779,
+        "basin_escape": 0.659,
         "strategies": {
-          "exploratory": 17,
-          "conservative": 12,
-          "wasteful": 2
+          "exploratory": 21
         }
       },
       {
         "model": "claude-sonnet-5",
         "label": "Claude Sonnet 5",
-        "commits": 155,
-        "lines_added": 51447,
-        "lines_removed": 2996,
-        "functions_added": 1876,
-        "classes_added": 122,
-        "imports_added": 1211,
-        "sonar_available": 152,
-        "sonar_bugs_delta": 5,
-        "sonar_smells_delta": 159,
-        "sonar_complexity_delta": 2245,
-        "avg_convention": 0.718,
-        "deep_cells": 31,
-        "lsp_available": 31,
-        "lsp_errors_per_cell": 9.4,
+        "commits": 75,
+        "lines_added": 34841,
+        "lines_removed": 2164,
+        "functions_added": 1164,
+        "classes_added": 83,
+        "imports_added": 803,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.734,
+        "deep_cells": 15,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
-        "solution_correctness": 0.581,
-        "solution_constraints": 0.882,
-        "solution_quality": 0.125,
-        "solution_novelty": 0.59,
-        "solution_composite": 0.581,
-        "basin_escape": 0.484,
+        "solution_correctness": 0.867,
+        "solution_constraints": 0.956,
+        "solution_quality": 0.052,
+        "solution_novelty": 0.784,
+        "solution_composite": 0.718,
+        "basin_escape": 0.639,
         "strategies": {
-          "conservative": 8,
-          "wasteful": 5,
-          "exploratory": 18
+          "exploratory": 13,
+          "conservative": 2
+        }
+      },
+      {
+        "model": "claude-haiku-4-5",
+        "label": "claude-haiku-4-5",
+        "commits": 60,
+        "lines_added": 30229,
+        "lines_removed": 2094,
+        "functions_added": 281,
+        "classes_added": 160,
+        "imports_added": 377,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.762,
+        "deep_cells": 12,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": 0.0,
+        "lsp_warnings_per_cell": 0.0,
+        "solution_correctness": 0.833,
+        "solution_constraints": 0.972,
+        "solution_quality": 0.036,
+        "solution_novelty": 0.841,
+        "solution_composite": 0.717,
+        "basin_escape": 0.714,
+        "strategies": {
+          "exploratory": 10,
+          "conservative": 2
         }
       },
       {
         "model": "gpt-5.6-luna",
         "label": "GPT-5.6 Luna",
-        "commits": 170,
-        "lines_added": 27509,
-        "lines_removed": 9481,
-        "functions_added": 843,
-        "classes_added": 102,
-        "imports_added": 1033,
-        "sonar_available": 170,
-        "sonar_bugs_delta": 2,
-        "sonar_smells_delta": 89,
-        "sonar_complexity_delta": 4750,
-        "avg_convention": 0.679,
-        "deep_cells": 34,
-        "lsp_available": 34,
-        "lsp_errors_per_cell": 5.1,
+        "commits": 110,
+        "lines_added": 18041,
+        "lines_removed": 6258,
+        "functions_added": 543,
+        "classes_added": 60,
+        "imports_added": 711,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.691,
+        "deep_cells": 22,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
         "solution_correctness": 1.0,
-        "solution_constraints": 0.971,
+        "solution_constraints": 0.985,
         "solution_quality": 0.086,
-        "solution_novelty": 0.88,
-        "solution_composite": 0.79,
-        "basin_escape": 0.704,
+        "solution_novelty": 0.879,
+        "solution_composite": 0.794,
+        "basin_escape": 0.694,
         "strategies": {
-          "exploratory": 34
+          "exploratory": 22
         }
       },
       {
         "model": "gpt-5.6-terra",
         "label": "gpt-5.6-terra",
-        "commits": 150,
-        "lines_added": 25843,
-        "lines_removed": 9946,
-        "functions_added": 825,
-        "classes_added": 97,
-        "imports_added": 1079,
-        "sonar_available": 150,
-        "sonar_bugs_delta": 5,
-        "sonar_smells_delta": 75,
-        "sonar_complexity_delta": 2724,
-        "avg_convention": 0.67,
-        "deep_cells": 30,
-        "lsp_available": 30,
-        "lsp_errors_per_cell": 13.7,
+        "commits": 100,
+        "lines_added": 17263,
+        "lines_removed": 6550,
+        "functions_added": 582,
+        "classes_added": 69,
+        "imports_added": 722,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.695,
+        "deep_cells": 20,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": 0.0,
         "lsp_warnings_per_cell": 0.0,
         "solution_correctness": 1.0,
-        "solution_constraints": 0.967,
+        "solution_constraints": 0.983,
         "solution_quality": 0.088,
-        "solution_novelty": 0.905,
-        "solution_composite": 0.793,
-        "basin_escape": 0.743,
+        "solution_novelty": 0.901,
+        "solution_composite": 0.798,
+        "basin_escape": 0.741,
         "strategies": {
-          "exploratory": 30
+          "exploratory": 20
         }
       }
     ],
-    "stories_analyzed": 221,
-    "commits_analyzed": 1098,
-    "sonar_commits_available": 1085
+    "stories_analyzed": 222,
+    "commits_analyzed": 1102,
+    "sonar_commits_available": 0
   },
   "labs": {
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-13T21:21:51.439198",
+      "generated_at": "2026-08-15T22:14:29.429029",
       "summary": {
         "models": 7,
         "cheapest": "deepseek-v4-flash",
-        "most_verified": "claude-sonnet-5",
+        "most_verified": "claude-haiku-4-5",
         "pareto_frontier": [
           "deepseek-v4-flash",
           "deepseek-v4-pro",
-          "claude-haiku-4-5",
-          "claude-sonnet-5"
+          "claude-haiku-4-5"
         ]
       },
       "models": [
         {
           "model": "deepseek-v4-flash",
-          "cells": 30,
-          "cost_cells": 30,
+          "cells": 22,
+          "cost_cells": 22,
           "avg_cost": 0.068,
-          "avg_tests": 33.533,
-          "total_cost": 2.045,
-          "total_tests": 1006
+          "avg_tests": 36.364,
+          "total_cost": 1.4991,
+          "total_tests": 800
         },
         {
           "model": "gpt-5.6-luna",
-          "cells": 34,
-          "cost_cells": 34,
+          "cells": 23,
+          "cost_cells": 23,
           "avg_cost": 0.091,
-          "avg_tests": 7.324,
-          "total_cost": 3.085,
-          "total_tests": 249
+          "avg_tests": 7.739,
+          "total_cost": 2.1003,
+          "total_tests": 178
         },
         {
           "model": "deepseek-v4-pro",
-          "cells": 35,
-          "cost_cells": 35,
-          "avg_cost": 0.138,
-          "avg_tests": 34.4,
-          "total_cost": 4.8228,
-          "total_tests": 1204
+          "cells": 31,
+          "cost_cells": 31,
+          "avg_cost": 0.15,
+          "avg_tests": 47.774,
+          "total_cost": 4.6626,
+          "total_tests": 1481
         },
         {
           "model": "gpt-5.6-terra",
-          "cells": 30,
-          "cost_cells": 30,
-          "avg_cost": 1.021,
-          "avg_tests": 8.833,
-          "total_cost": 30.6404,
-          "total_tests": 265
+          "cells": 20,
+          "cost_cells": 20,
+          "avg_cost": 1.015,
+          "avg_tests": 9.75,
+          "total_cost": 20.3036,
+          "total_tests": 195
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 31,
-          "cost_cells": 19,
-          "avg_cost": 1.59,
-          "avg_tests": 117.355,
-          "total_cost": 30.2164,
-          "total_tests": 3638
+          "cells": 20,
+          "cost_cells": 14,
+          "avg_cost": 1.537,
+          "avg_tests": 135.35,
+          "total_cost": 21.5168,
+          "total_tests": 2707
         },
         {
           "model": "gpt-5.6-sol",
-          "cells": 30,
-          "cost_cells": 30,
-          "avg_cost": 3.749,
-          "avg_tests": 12.9,
-          "total_cost": 112.4625,
-          "total_tests": 387
+          "cells": 23,
+          "cost_cells": 23,
+          "avg_cost": 3.987,
+          "avg_tests": 11.957,
+          "total_cost": 91.6937,
+          "total_tests": 275
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 31,
-          "cost_cells": 23,
-          "avg_cost": 4.583,
-          "avg_tests": 122.129,
-          "total_cost": 105.4188,
-          "total_tests": 3786
+          "cells": 20,
+          "cost_cells": 16,
+          "avg_cost": 4.776,
+          "avg_tests": 122.55,
+          "total_cost": 76.4179,
+          "total_tests": 2451
         }
       ]
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-13T21:12:55.849893",
+      "generated_at": "2026-08-15T22:14:18.112053",
       "summary": {
-        "snowball_factor": 2.13,
-        "session1_cost": 0.1594,
-        "session5_cost": 0.3391
+        "snowball_factor": 2.38,
+        "session1_cost": 0.1557,
+        "session5_cost": 0.3706
       },
       "sessions": [
         {
           "session_number": 1,
           "task_type": "greenfield",
-          "n": 221,
-          "avg_cost": 0.1594,
-          "avg_tokens": 19307.0,
-          "avg_tests": 4.4
+          "n": 159,
+          "avg_cost": 0.1557,
+          "avg_tokens": 19980.0,
+          "avg_tests": 4.6
         },
         {
           "session_number": 2,
           "task_type": "feature",
-          "n": 221,
-          "avg_cost": 0.2101,
-          "avg_tokens": 24312.0,
-          "avg_tests": 8.4
+          "n": 159,
+          "avg_cost": 0.2126,
+          "avg_tokens": 25786.0,
+          "avg_tests": 8.7
         },
         {
           "session_number": 3,
           "task_type": "integration",
-          "n": 221,
-          "avg_cost": 0.3194,
-          "avg_tokens": 30588.0,
-          "avg_tests": 10.6
+          "n": 159,
+          "avg_cost": 0.3433,
+          "avg_tokens": 32558.0,
+          "avg_tests": 11.4
         },
         {
           "session_number": 4,
           "task_type": "refactor",
-          "n": 217,
-          "avg_cost": 0.2896,
-          "avg_tokens": 30235.0,
-          "avg_tests": 10.9
+          "n": 155,
+          "avg_cost": 0.3072,
+          "avg_tokens": 32313.0,
+          "avg_tests": 11.5
         },
         {
           "session_number": 5,
           "task_type": "cross_cutting",
-          "n": 217,
-          "avg_cost": 0.3391,
-          "avg_tokens": 35490.0,
-          "avg_tests": 14.8
+          "n": 155,
+          "avg_cost": 0.3706,
+          "avg_tokens": 38607.0,
+          "avg_tests": 15.3
         }
       ],
       "by_condition": {
@@ -6107,72 +6166,72 @@ window.DYNAMICS_DATA = {
         "bad_seed_s3": 0.3771,
         "bad_seed_s4": 0.2936,
         "bad_seed_s5": 0.372,
-        "clean_s1": 0.1374,
-        "clean_s2": 0.1975,
-        "clean_s3": 0.3206,
-        "clean_s4": 0.2699,
-        "clean_s5": 0.3519,
-        "early_degrade_s1": 0.1686,
-        "early_degrade_s2": 0.2075,
-        "early_degrade_s3": 0.2909,
-        "early_degrade_s4": 0.3091,
-        "early_degrade_s5": 0.3097
+        "clean_s1": 0.1398,
+        "clean_s2": 0.2011,
+        "clean_s3": 0.3269,
+        "clean_s4": 0.2753,
+        "clean_s5": 0.3587,
+        "early_degrade_s1": 0.1562,
+        "early_degrade_s2": 0.2028,
+        "early_degrade_s3": 0.3505,
+        "early_degrade_s4": 0.4437,
+        "early_degrade_s5": 0.411
       },
       "by_model": {
         "claude-haiku-4-5": {
-          "1": 0.1312,
-          "2": 0.1695,
-          "3": 0.2035,
-          "4": 0.1705,
-          "5": 0.3001
+          "1": 0.1364,
+          "2": 0.1799,
+          "3": 0.2324,
+          "4": 0.1694,
+          "5": 0.3577
         },
         "claude-sonnet-5": {
-          "1": 0.3773,
-          "2": 0.4972,
-          "3": 0.9467,
-          "4": 0.6161,
-          "5": 0.9633
+          "1": 0.3688,
+          "2": 0.5352,
+          "3": 1.068,
+          "4": 0.6568,
+          "5": 1.1921
         },
         "deepseek-v4-flash": {
-          "1": 0.006,
-          "2": 0.0097,
-          "3": 0.016,
-          "4": 0.0147,
-          "5": 0.0218
+          "1": 0.0058,
+          "2": 0.0099,
+          "3": 0.0154,
+          "4": 0.014,
+          "5": 0.0231
         },
         "deepseek-v4-pro": {
-          "1": 0.0179,
-          "2": 0.0228,
-          "3": 0.0311,
-          "4": 0.028,
-          "5": 0.0464
+          "1": 0.0177,
+          "2": 0.0227,
+          "3": 0.0401,
+          "4": 0.0292,
+          "5": 0.0511
         },
         "gpt-5.6-luna": {
-          "1": 0.013,
-          "2": 0.0164,
-          "3": 0.0195,
-          "4": 0.02,
-          "5": 0.0218
+          "1": 0.0129,
+          "2": 0.0168,
+          "3": 0.0185,
+          "4": 0.0211,
+          "5": 0.022
         },
         "gpt-5.6-sol": {
-          "1": 0.4671,
-          "2": 0.6464,
-          "3": 0.8765,
-          "4": 0.9728,
-          "5": 0.7859
+          "1": 0.4785,
+          "2": 0.6551,
+          "3": 0.9675,
+          "4": 1.0774,
+          "5": 0.8082
         },
         "gpt-5.6-terra": {
-          "1": 0.1404,
-          "2": 0.1574,
-          "3": 0.2136,
-          "4": 0.2431,
-          "5": 0.267
+          "1": 0.1337,
+          "2": 0.1564,
+          "3": 0.2156,
+          "4": 0.2367,
+          "5": 0.2728
         }
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-13T21:12:55.899760",
+      "generated_at": "2026-08-15T22:09:58.344415",
       "summary": {
         "conditions": 3
       },
@@ -6187,30 +6246,37 @@ window.DYNAMICS_DATA = {
         },
         {
           "condition": "clean",
-          "cells": 96,
-          "success_rate": 0.906,
+          "cells": 94,
+          "success_rate": 0.904,
           "cascade_rate": 0.0,
-          "avg_cost": 1.2514,
-          "total_cost": 120.1318
+          "avg_cost": 1.2748,
+          "total_cost": 119.8285
         },
         {
           "condition": "early_degrade",
-          "cells": 85,
-          "success_rate": 0.847,
-          "cascade_rate": 0.035,
-          "avg_cost": 1.2859,
-          "total_cost": 109.2986
+          "cells": 25,
+          "success_rate": 1.0,
+          "cascade_rate": 0.08,
+          "avg_cost": 1.5642,
+          "total_cost": 39.105
         }
       ]
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-13T21:12:55.967813",
+      "generated_at": "2026-08-15T22:14:29.488567",
       "summary": {
-        "correlation_tests_vs_worse_rate": -0.226,
-        "cells": 38
+        "correlation_tests_vs_worse_rate": -0.077,
+        "cells": 30
       },
       "rows": [
+        {
+          "model": "?",
+          "tests": 0,
+          "reviews": 132,
+          "better_rate": 0.697,
+          "worse_rate": 0.098
+        },
         {
           "model": "claude-sonnet-5",
           "tests": 70,
@@ -6226,25 +6292,11 @@ window.DYNAMICS_DATA = {
           "worse_rate": 0.0
         },
         {
-          "model": "claude-sonnet-5",
-          "tests": 165,
-          "reviews": 5,
-          "better_rate": 0.8,
-          "worse_rate": 0.0
-        },
-        {
           "model": "deepseek-v4-pro",
           "tests": 0,
           "reviews": 6,
           "better_rate": 0.333,
           "worse_rate": 0.0
-        },
-        {
-          "model": "deepseek-v4-pro",
-          "tests": 1,
-          "reviews": 5,
-          "better_rate": 0.4,
-          "worse_rate": 0.2
         },
         {
           "model": "deepseek-v4-pro",
@@ -6256,16 +6308,16 @@ window.DYNAMICS_DATA = {
         {
           "model": "deepseek-v4-pro",
           "tests": 3,
-          "reviews": 12,
-          "better_rate": 0.417,
-          "worse_rate": 0.083
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
         },
         {
           "model": "deepseek-v4-pro",
           "tests": 4,
-          "reviews": 10,
-          "better_rate": 0.2,
-          "worse_rate": 0.5
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.6
         },
         {
           "model": "deepseek-v4-pro",
@@ -6283,13 +6335,6 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "deepseek-v4-pro",
-          "tests": 32,
-          "reviews": 5,
-          "better_rate": 0.4,
-          "worse_rate": 0.2
-        },
-        {
-          "model": "deepseek-v4-pro",
           "tests": 36,
           "reviews": 4,
           "better_rate": 1.0,
@@ -6298,8 +6343,8 @@ window.DYNAMICS_DATA = {
         {
           "model": "deepseek-v4-pro",
           "tests": 38,
-          "reviews": 10,
-          "better_rate": 0.6,
+          "reviews": 5,
+          "better_rate": 0.4,
           "worse_rate": 0.2
         },
         {
@@ -6311,13 +6356,6 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "deepseek-v4-pro",
-          "tests": 40,
-          "reviews": 5,
-          "better_rate": 0.8,
-          "worse_rate": 0.2
-        },
-        {
-          "model": "deepseek-v4-pro",
           "tests": 43,
           "reviews": 5,
           "better_rate": 0.8,
@@ -6325,35 +6363,21 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "deepseek-v4-pro",
-          "tests": 45,
-          "reviews": 10,
-          "better_rate": 0.5,
-          "worse_rate": 0.0
-        },
-        {
-          "model": "deepseek-v4-pro",
           "tests": 46,
-          "reviews": 10,
-          "better_rate": 0.8,
-          "worse_rate": 0.1
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.2
         },
         {
           "model": "deepseek-v4-pro",
           "tests": 47,
-          "reviews": 15,
-          "better_rate": 0.8,
+          "reviews": 10,
+          "better_rate": 0.7,
           "worse_rate": 0.0
         },
         {
           "model": "deepseek-v4-pro",
           "tests": 49,
-          "reviews": 10,
-          "better_rate": 0.9,
-          "worse_rate": 0.0
-        },
-        {
-          "model": "deepseek-v4-pro",
-          "tests": 50,
           "reviews": 5,
           "better_rate": 1.0,
           "worse_rate": 0.0
@@ -6375,9 +6399,9 @@ window.DYNAMICS_DATA = {
         {
           "model": "deepseek-v4-pro",
           "tests": 61,
-          "reviews": 10,
+          "reviews": 5,
           "better_rate": 0.6,
-          "worse_rate": 0.2
+          "worse_rate": 0.4
         },
         {
           "model": "deepseek-v4-pro",
@@ -6396,56 +6420,49 @@ window.DYNAMICS_DATA = {
         {
           "model": "gpt-5.6-luna",
           "tests": 0,
-          "reviews": 50,
-          "better_rate": 0.6,
-          "worse_rate": 0.14
-        },
-        {
-          "model": "gpt-5.6-luna",
-          "tests": 6,
-          "reviews": 5,
-          "better_rate": 0.6,
-          "worse_rate": 0.4
+          "reviews": 35,
+          "better_rate": 0.571,
+          "worse_rate": 0.114
         },
         {
           "model": "gpt-5.6-luna",
           "tests": 7,
-          "reviews": 10,
-          "better_rate": 0.7,
-          "worse_rate": 0.1
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.2
         },
         {
           "model": "gpt-5.6-luna",
           "tests": 8,
-          "reviews": 15,
+          "reviews": 10,
           "better_rate": 0.8,
           "worse_rate": 0.0
         },
         {
           "model": "gpt-5.6-luna",
           "tests": 9,
-          "reviews": 25,
-          "better_rate": 0.8,
-          "worse_rate": 0.04
+          "reviews": 20,
+          "better_rate": 0.85,
+          "worse_rate": 0.0
         },
         {
           "model": "gpt-5.6-luna",
           "tests": 10,
-          "reviews": 25,
-          "better_rate": 0.88,
-          "worse_rate": 0.08
-        },
-        {
-          "model": "gpt-5.6-luna",
-          "tests": 11,
-          "reviews": 10,
-          "better_rate": 0.7,
+          "reviews": 20,
+          "better_rate": 0.85,
           "worse_rate": 0.1
         },
         {
           "model": "gpt-5.6-luna",
+          "tests": 11,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "gpt-5.6-luna",
           "tests": 13,
-          "reviews": 10,
+          "reviews": 5,
           "better_rate": 0.8,
           "worse_rate": 0.0
         },
@@ -6458,182 +6475,168 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "gpt-5.6-luna",
-          "tests": 15,
-          "reviews": 5,
-          "better_rate": 1.0,
-          "worse_rate": 0.0
-        },
-        {
-          "model": "gpt-5.6-luna",
           "tests": 16,
           "reviews": 5,
           "better_rate": 0.8,
           "worse_rate": 0.0
-        },
-        {
-          "model": "gpt-5.6-luna",
-          "tests": 17,
-          "reviews": 5,
-          "better_rate": 0.8,
-          "worse_rate": 0.2
         }
       ]
     },
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-13T21:21:51.489397",
+      "generated_at": "2026-08-15T22:09:58.250797",
       "summary": {
         "models": 7
       },
       "models": [
         {
           "model": "deepseek-v4-flash",
-          "cells": 30,
+          "cells": 22,
           "avg_cost": 0.068,
-          "avg_cache_hit": 0.964,
-          "cache_reads": 202925952,
+          "avg_cache_hit": 0.965,
+          "cache_reads": 150797952,
           "cache_writes": 0,
           "read_write_ratio": null,
-          "avg_context_per_cell": 6997079.0,
-          "avg_tokens_per_cell": 232880.0
+          "avg_context_per_cell": 7087028.0,
+          "avg_tokens_per_cell": 232576.0
         },
         {
           "model": "gpt-5.6-luna",
-          "cells": 34,
+          "cells": 23,
           "avg_cost": 0.091,
-          "avg_cache_hit": 0.975,
-          "cache_reads": 43900353,
-          "cache_writes": 3703149,
-          "read_write_ratio": 11.9,
-          "avg_context_per_cell": 1322806.0,
-          "avg_tokens_per_cell": 31620.0
+          "avg_cache_hit": 0.971,
+          "cache_reads": 29738784,
+          "cache_writes": 2378880,
+          "read_write_ratio": 12.5,
+          "avg_context_per_cell": 1331475.0,
+          "avg_tokens_per_cell": 38484.0
         },
         {
           "model": "deepseek-v4-pro",
-          "cells": 35,
-          "avg_cost": 0.138,
-          "avg_cache_hit": 0.778,
-          "cache_reads": 105729792,
+          "cells": 31,
+          "avg_cost": 0.15,
+          "avg_cache_hit": 0.762,
+          "cache_reads": 105461376,
           "cache_writes": 0,
           "read_write_ratio": null,
-          "avg_context_per_cell": 3194362.0,
-          "avg_tokens_per_cell": 173510.0
+          "avg_context_per_cell": 3578946.0,
+          "avg_tokens_per_cell": 176966.0
         },
         {
           "model": "gpt-5.6-terra",
-          "cells": 30,
-          "avg_cost": 1.021,
-          "avg_cache_hit": 0.819,
-          "cache_reads": 22476288,
+          "cells": 20,
+          "avg_cost": 1.015,
+          "avg_cache_hit": 0.821,
+          "cache_reads": 14951424,
           "cache_writes": 0,
           "read_write_ratio": null,
-          "avg_context_per_cell": 914229.0,
-          "avg_tokens_per_cell": 165020.0
+          "avg_context_per_cell": 909571.0,
+          "avg_tokens_per_cell": 161999.0
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 31,
-          "avg_cost": 1.59,
-          "avg_cache_hit": 0.606,
-          "cache_reads": 144011879,
-          "cache_writes": 3862280,
-          "read_write_ratio": 37.3,
-          "avg_context_per_cell": 4695957.0,
-          "avg_tokens_per_cell": 50412.0
+          "cells": 20,
+          "avg_cost": 1.537,
+          "avg_cache_hit": 0.692,
+          "cache_reads": 102433886,
+          "cache_writes": 2753242,
+          "read_write_ratio": 37.2,
+          "avg_context_per_cell": 5176520.0,
+          "avg_tokens_per_cell": 54825.0
         },
         {
           "model": "gpt-5.6-sol",
-          "cells": 30,
-          "avg_cost": 3.749,
-          "avg_cache_hit": 0.843,
-          "cache_reads": 41913344,
+          "cells": 23,
+          "avg_cost": 3.987,
+          "avg_cache_hit": 0.849,
+          "cache_reads": 34351104,
           "cache_writes": 0,
           "read_write_ratio": null,
-          "avg_context_per_cell": 1631549.0,
-          "avg_tokens_per_cell": 234438.0
+          "avg_context_per_cell": 1734671.0,
+          "avg_tokens_per_cell": 241145.0
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 31,
-          "avg_cost": 4.583,
-          "avg_cache_hit": 0.731,
-          "cache_reads": 154894492,
-          "cache_writes": 4809267,
-          "read_write_ratio": 32.2,
-          "avg_context_per_cell": 5068158.0,
-          "avg_tokens_per_cell": 71561.0
+          "cells": 20,
+          "avg_cost": 4.776,
+          "avg_cache_hit": 0.789,
+          "cache_reads": 115254797,
+          "cache_writes": 3460787,
+          "read_write_ratio": 33.3,
+          "avg_context_per_cell": 5843628.0,
+          "avg_tokens_per_cell": 80888.0
         }
       ]
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-13T21:21:51.567150",
+      "generated_at": "2026-08-15T22:14:18.060885",
       "summary": {
         "models": 7
       },
       "models": [
         {
           "model": "deepseek-v4-flash",
-          "cells": 30,
+          "cells": 22,
           "avg_cost": 0.068,
-          "lsp_errors_per_cell": 13.467,
-          "code_quality_score": 0.035,
-          "cyclomatic_complexity": 481.4,
-          "novelty_score": 0.877
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.037,
+          "cyclomatic_complexity": 475.455,
+          "novelty_score": 0.87
         },
         {
           "model": "gpt-5.6-luna",
-          "cells": 34,
+          "cells": 22,
           "avg_cost": 0.091,
-          "lsp_errors_per_cell": 5.118,
+          "lsp_errors_per_cell": 0.0,
           "code_quality_score": 0.086,
-          "cyclomatic_complexity": 262.647,
-          "novelty_score": 0.88
+          "cyclomatic_complexity": 266.091,
+          "novelty_score": 0.879
         },
         {
           "model": "deepseek-v4-pro",
-          "cells": 35,
-          "avg_cost": 0.138,
-          "lsp_errors_per_cell": 11.343,
+          "cells": 21,
+          "avg_cost": 0.128,
+          "lsp_errors_per_cell": 0.0,
           "code_quality_score": 0.048,
-          "cyclomatic_complexity": 261.514,
-          "novelty_score": 0.815
+          "cyclomatic_complexity": 262.143,
+          "novelty_score": 0.797
         },
         {
           "model": "gpt-5.6-terra",
-          "cells": 30,
-          "avg_cost": 1.021,
-          "lsp_errors_per_cell": 13.7,
+          "cells": 20,
+          "avg_cost": 1.015,
+          "lsp_errors_per_cell": 0.0,
           "code_quality_score": 0.088,
-          "cyclomatic_complexity": 232.133,
-          "novelty_score": 0.905
+          "cyclomatic_complexity": 233.8,
+          "novelty_score": 0.901
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 19,
-          "avg_cost": 1.59,
-          "lsp_errors_per_cell": 9.0,
-          "code_quality_score": 0.167,
-          "cyclomatic_complexity": 282.484,
-          "novelty_score": 0.521
+          "cells": 12,
+          "avg_cost": 1.5,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.143,
+          "cyclomatic_complexity": 275.0,
+          "novelty_score": 0.561
         },
         {
           "model": "gpt-5.6-sol",
-          "cells": 30,
-          "avg_cost": 3.749,
-          "lsp_errors_per_cell": 9.233,
-          "code_quality_score": 0.056,
-          "cyclomatic_complexity": 298.067,
-          "novelty_score": 0.912
+          "cells": 23,
+          "avg_cost": 3.987,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.054,
+          "cyclomatic_complexity": 297.348,
+          "novelty_score": 0.917
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 23,
-          "avg_cost": 4.583,
-          "lsp_errors_per_cell": 9.419,
-          "code_quality_score": 0.125,
-          "cyclomatic_complexity": 289.194,
-          "novelty_score": 0.59
+          "cells": 15,
+          "avg_cost": 4.807,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.114,
+          "cyclomatic_complexity": 314.789,
+          "novelty_score": 0.619
         }
       ]
     }

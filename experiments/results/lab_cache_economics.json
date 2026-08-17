@@ -1,86 +1,86 @@
 {
   "experiment_id": "lab_cache_economics",
-  "generated_at": "2026-08-13T21:21:51.489397",
+  "generated_at": "2026-08-15T22:09:58.250797",
   "summary": {
     "models": 7
   },
   "models": [
     {
       "model": "deepseek-v4-flash",
-      "cells": 30,
+      "cells": 22,
       "avg_cost": 0.068,
-      "avg_cache_hit": 0.964,
-      "cache_reads": 202925952,
+      "avg_cache_hit": 0.965,
+      "cache_reads": 150797952,
       "cache_writes": 0,
       "read_write_ratio": null,
-      "avg_context_per_cell": 6997079.0,
-      "avg_tokens_per_cell": 232880.0
+      "avg_context_per_cell": 7087028.0,
+      "avg_tokens_per_cell": 232576.0
     },
     {
       "model": "gpt-5.6-luna",
-      "cells": 34,
+      "cells": 23,
       "avg_cost": 0.091,
-      "avg_cache_hit": 0.975,
-      "cache_reads": 43900353,
-      "cache_writes": 3703149,
-      "read_write_ratio": 11.9,
-      "avg_context_per_cell": 1322806.0,
-      "avg_tokens_per_cell": 31620.0
+      "avg_cache_hit": 0.971,
+      "cache_reads": 29738784,
+      "cache_writes": 2378880,
+      "read_write_ratio": 12.5,
+      "avg_context_per_cell": 1331475.0,
+      "avg_tokens_per_cell": 38484.0
     },
     {
       "model": "deepseek-v4-pro",
-      "cells": 35,
-      "avg_cost": 0.138,
-      "avg_cache_hit": 0.778,
-      "cache_reads": 105729792,
+      "cells": 31,
+      "avg_cost": 0.15,
+      "avg_cache_hit": 0.762,
+      "cache_reads": 105461376,
       "cache_writes": 0,
       "read_write_ratio": null,
-      "avg_context_per_cell": 3194362.0,
-      "avg_tokens_per_cell": 173510.0
+      "avg_context_per_cell": 3578946.0,
+      "avg_tokens_per_cell": 176966.0
     },
     {
       "model": "gpt-5.6-terra",
-      "cells": 30,
-      "avg_cost": 1.021,
-      "avg_cache_hit": 0.819,
-      "cache_reads": 22476288,
+      "cells": 20,
+      "avg_cost": 1.015,
+      "avg_cache_hit": 0.821,
+      "cache_reads": 14951424,
       "cache_writes": 0,
       "read_write_ratio": null,
-      "avg_context_per_cell": 914229.0,
-      "avg_tokens_per_cell": 165020.0
+      "avg_context_per_cell": 909571.0,
+      "avg_tokens_per_cell": 161999.0
     },
     {
       "model": "claude-haiku-4-5",
-      "cells": 31,
-      "avg_cost": 1.59,
-      "avg_cache_hit": 0.606,
-      "cache_reads": 144011879,
-      "cache_writes": 3862280,
-      "read_write_ratio": 37.3,
-      "avg_context_per_cell": 4695957.0,
-      "avg_tokens_per_cell": 50412.0
+      "cells": 20,
+      "avg_cost": 1.537,
+      "avg_cache_hit": 0.692,
+      "cache_reads": 102433886,
+      "cache_writes": 2753242,
+      "read_write_ratio": 37.2,
+      "avg_context_per_cell": 5176520.0,
+      "avg_tokens_per_cell": 54825.0
     },
     {
       "model": "gpt-5.6-sol",
-      "cells": 30,
-      "avg_cost": 3.749,
-      "avg_cache_hit": 0.843,
-      "cache_reads": 41913344,
+      "cells": 23,
+      "avg_cost": 3.987,
+      "avg_cache_hit": 0.849,
+      "cache_reads": 34351104,
       "cache_writes": 0,
       "read_write_ratio": null,
-      "avg_context_per_cell": 1631549.0,
-      "avg_tokens_per_cell": 234438.0
+      "avg_context_per_cell": 1734671.0,
+      "avg_tokens_per_cell": 241145.0
     },
     {
       "model": "claude-sonnet-5",
-      "cells": 31,
-      "avg_cost": 4.583,
-      "avg_cache_hit": 0.731,
-      "cache_reads": 154894492,
-      "cache_writes": 4809267,
-      "read_write_ratio": 32.2,
-      "avg_context_per_cell": 5068158.0,
-      "avg_tokens_per_cell": 71561.0
+      "cells": 20,
+      "avg_cost": 4.776,
+      "avg_cache_hit": 0.789,
+      "cache_reads": 115254797,
+      "cache_writes": 3460787,
+      "read_write_ratio": 33.3,
+      "avg_context_per_cell": 5843628.0,
+      "avg_tokens_per_cell": 80888.0
     }
   ]
 }

@@ -270,3 +270,262 @@ propagation requires the genuine re-runs listed there, not a recompute.
 - `experiments/results/analysis/analysis_*.json` — 222 files, corrected convention scores +
   behavioral strategy labels.
 - `experiments/results/verified_tests.json` — per-cell independent `test_executed_success`.
+
+---
+
+## 5. Re-run record — enqueue/worker + delta (re-run phase)
+
+Contaminated-cell identification was re-derived from the live data (not taken on
+trust from §3), then each category was re-run through the prescribed mechanism:
+**story cells via the Redis queue** (port 6380, never 6379), **single-task cells via a
+parallel runner** (never one-by-one inline).
+
+### 5.1 Contaminated-cell identification (verified against current data)
+
+| Category | Finding | Cells |
+|---|---|---|
+| Manifold (§3.1) | `perturbation_class == "manifold"` in `_results_summary.json` — stale 2-way label. 10 × `inject_alien_vocab_s0.5` + 6 × `shift_framing_s0.5`, both now `process_perturbation`. | **16** |
+| P0-7 (§3.2) | early_degrade story cells whose session-1 mutation silently fell back to clean (`mutated_spec == original_spec`). Identified by recovering the full session-1 prompt (opencode `part` records for deepseek/openai; `~/.claude/projects/-tmp-story-<hash>/` for anthropic) and comparing against the canonical `BUILTIN_STORIES[*].sessions[0]` spec: byte-identical ⇒ contaminated. | **52 confirmed + 25 anthropic-unverifiable = 77 files → 73 unique cells** (4 duplicate result pairs) |
+| P0-8 (§3.3) | perturbed `_results_summary.json` entries whose `experiment` is an operator tag (`inject_alien_vocab_s0.5`, …) that never maps to a same-experiment baseline key — **all 92** perturbed entries are orphans (0 same-name baseline counterparts), so they could only match via the removed Priority-4 cross-experiment fallback / loose 0.25 fingerprint. | **92** (incl. the 16 manifold) |
+
+**Not re-run (correctly excluded):** 11 early_degrade cells whose session-1 prompt
+*does* carry the injected false premise (genuinely mutated, not contaminated).
+
+### 5.2 P0-7 story re-run — queued (enqueue → worker → monitor)
+
+The 77 contaminated result files (73 unique cells) were moved to
+`experiments/results/stories/_remediation_contaminated/`, so `--missing-only` re-enqueues
+exactly those cells. Enqueue, per model:
+
+| Model | Cells enqueued |
+|---|---|
+| deepseek/deepseek-v4-pro | 12 |
+| deepseek/deepseek-v4-flash | 9 |
+| openai/gpt-5.6-luna | 11 |
+| openai/gpt-5.6-sol | 7 |
+| openai/gpt-5.6-terra | 10 |
+| anthropic/claude-haiku-4-5 | 12 |
+| anthropic/claude-sonnet-5 | 12 |
+| **Total** | **73** |
+
+- Queue: `story_jobs` on Redis **6380** (framework queue; `finops-redis` on 6379 never
+  touched). `python scripts/enqueue.py --missing-only --model <m>` × 7.
+- Workers: **6 × `python scripts/worker.py`** (nohup, logs under
+  `experiments/results/stories/logs/worker_{1..6}.stdout.log`).
+- Each re-run cell now exercises the **fixed** `mutation.py` (`_compile_spec_mutation`
+  raises `ValueError` on empty compiler output — no silent clean fallback is possible).
+
+### 5.3 Single-task re-run — batched (manifold + P0-8)
+
+The 92 orphaned single-task cells span 6 perturbed operators
+(`inject_alien_vocab`, `shift_framing`, `remove_critical_constraint`,
+`inject_phantom_success`, `invert_constraint`, `inject_competing_goal`). These were
+re-run in parallel (3 workers, ThreadPool — never one-by-one inline) via
+`run.py experiments/configs/task_manager.yaml` across the current 7-model roster:
+
+| Model | Result | Duration |
+|---|---|---|
+| deepseek/deepseek-v4-pro | ok | 1665s |
+| deepseek/deepseek-v4-flash | ok | 1690s |
+| openai/gpt-5.6-luna | ok | 1260s |
+| openai/gpt-5.6-sol | ok | 1807s |
+| openai/gpt-5.6-terra | ok | 1194s |
+| anthropic/claude-haiku-4-5 | ok | 1804s |
+| anthropic/claude-sonnet-5 | ok | 1567s |
+
+Output: `experiments/results/task_manager_<model>.json` × 7. Each run is
+`baseline + 6 perturbed`, now correctly labelled under the 3-way taxonomy and carrying
+the four instrumented fields (see §5.5). (The 12 `standardized_*` orphan entries are a
+distinct multi-phase experiment type, not covered by this batch.)
+
+### 5.4 Queue state (at report time)
+
+- Enqueued **73** story cells; **6** workers spawned; **14** cells re-run + instrumented,
+  **~53** still queued/in-flight, **4** workers still active — drain continues in
+  background (each cell is a 5-session story, `SESSION_TIMEOUT` 1200s/session).
+- 2 pre-existing `failed` statuses (`deepseek_v4_flash_static_site_gen_tier1_minimal_good_clean`,
+  `wf_claude_background_sessions_anthropic_claude_fable_5`) are from the *prior* matrix run,
+  not this re-run.
+
+### 5.5 Delta — before vs after on the affected metrics
+
+| Metric | Before (contaminated) | After (re-run) |
+|---|---|---|
+| `perturbation_class` — manifold | `"manifold"` × 16 (stale 2-way label) | `process_perturbation` (via `perturbation_class_for`) |
+| `perturbation_class` — other operators | `"semantic"` × 187 (stale 2-way label) | `specification_corruption` / `objective_mutation` |
+| early_degrade mutation fidelity (P0-7) | ran as CLEAN (silent `mutated_spec = mutated or specification`) | genuine Flash-authored mutation (`mutation_id` set, no error) |
+| single-task baseline (P0-8) | cross-experiment / loose-fingerprint match | true same-experiment baseline (`run.py` runs baseline+perturbed together) |
+| `confidence` | absent (`None` on every attempt) | measured `[H]` (`AgenticResult.confidence`) |
+| `perturbation_strength` (story path) | absent (only `perturbation_condition` string) | `0.5` early_degrade / `0.0` clean |
+| `test_executed_success` | absent (only model self-report) | independent `test_runner.run_suite` bool |
+| `answer` / `explanation` token split | absent | `answer_tokens` / `explanation_tokens` per run |
+
+All four formerly-missing ledger fields are now populated in the re-run artifacts, which
+unblocks the `grit` rule (`perturbation_strength` + `test_executed_success`) and the
+`model_cascade` / `dynamics` control arms (`confidence`).
+
+### 5.6 Downstream regeneration (next)
+
+After the story queue drains: `scripts/sync_data.py` → `scripts/build_data.py` →
+`generate_manifest.py`, and re-run `analyze_worktrees.py` to fold the re-run worktrees
+into `_results_summary.json` (replacing the stale `manifold`/`semantic` labels and the
+cross-matched basin numbers).
+
+---
+
+## 6. Regenerate — derived artifacts, website data, provenance spot-check
+
+Regenerated the derived artifacts and website data from the corrected corpus, then
+spot-checked the four P0 data-integrity invariants in the emitted `data.js`.
+
+### 6.1 Lab books re-run (18/19 active)
+
+Re-ran every active `lab_*.py` against the corrected corpus (recompute-phase
+`analysis/*.json` + re-synced `stories.parquet` + `_results_summary.json`):
+
+| Lab | Status |
+|---|---|
+| basin_topology, cache_economics, claude_audit, condition_effects, correctness_premium, flail_triggers, grit_matrix, quality_frontier, story_arc, story_review, survival_horizon, task_routing, think_do_coupling, tool_archetypes, verification_frontier, verification_value, basin_topology_neo4j | **re-generated** (fresh output) |
+| sonar_quality | **no output** — `_results_summary.json` has 0 `sonar_analyzed=True` entries (Sonar backfill never ran) |
+| opencode_meta_analysis | **skipped** — spawns 6 real `deepseek-v4-flash` analysis sessions (meta-experiment, not a numeric aggregation) |
+
+`strategy_distribution` in `data.js` now reads `conservative 141 · exploratory 59 ·
+wasteful 3` (the story-side `wasteful 7 → 0` reclassification from §4.1 carries through
+`analysis/*.json`; the residual 3 are stale single-task labels — see §6.4).
+
+### 6.2 `sync_data.py` → `build_data.py`
+
+- `sync_data.py`: **787 sessions, 159 story cells** → `experiments/data/{sessions,stories}.parquet`
+  (reflects the re-run `early_degrade` cells + genuinely-mutated cells; the 77
+  contaminated results remain in `_remediation_contaminated/` pending queue drain).
+- `build_data.py`: emitted `firebase/public/data.js` (178,878 bytes).
+
+### 6.3 Provenance spot-check — the four P0 invariants
+
+| Check | Verdict | Evidence |
+|---|---|---|
+| **P0-1** no fabricated 100% pass rate | ✅ | `overall_pass_rate = "100.0% (8076/8079) [tests]"` — measured from `sessions.parquet`, not fabricated. `_honest_pass_rate` returns `"unknown"` when `run <= 0`. The old fabricated marker `10412` is absent. |
+| **P0-2** single pricing source | ✅ | `PROVIDER_PRICING` defined **only** in `src/instrument/efficiency.py` (grep across `scripts/`+`src/`). `_constants.py` carries only the "do not re-add" comment. |
+| **P0-3** no resurrected arch constants | ✅ | `energy_model_available: {value:false, provenance:"X"}`; `deepseek_active_params: {value:"49e9", provenance:"X"}`. No `claude_active_params`, no `500B`/`500e9`, no `37B`/`37e9`. |
+| **P0-11** correct provenance tags | ✅ | `game_report.py:159` tags correctness `[M]` only when `evaluator_independent`, else `[H]`. `pass_rate` uses `[tests]` (measured) / `[H]` (heuristic) / `"unknown"`. Arch/energy values tagged `[X]` (externally sourced). |
+
+### 6.4 Regenerated manifest
+
+`experiments/data_manifest.json` (first generation):
+
+- `git_commit`: `8db06078` (rerun_contaminated HEAD — the runner advances this on phase commit)
+- `data.js` sha256: `ae04b7648a3b…` (dataset hash)
+- `inventory.json` sha256: `a2aa4974de23…` · `_results_summary.json`: `5c5fa588d310…` · `_trajectory_aggregate.json`: `2a13a3e2c633…`
+
+### 6.5 Residual staleness (honest accounting)
+
+- `_results_summary.json` single-task corpus still carries `"semantic"` × 187 /
+  `"manifold"` × 16 labels and pre-P0-8 basin numbers — its worktrees are gone, so a
+  clean regeneration needs the **full** single-task matrix re-run (`task_manager.yaml`
+  was the first tranche). `analyze_worktrees.py` was deliberately **not** re-run: it would
+  overwrite the 227-entry corpus with 126 worktrees, ~88 of them `meta_batch_*` sessions.
+- `lab_sonar_quality` and the single-task `strategy_distribution` inherit that staleness.
+
+---
+
+## 7. Re-admit the gated policy arms — validation + grid writeup
+
+The load-bearing rule is now satisfied end-to-end: the four formerly-missing ledger
+fields are measured, so the `grit` rule and the `model_cascade`/`dynamics` control arms
+compile. The flagship spec materialized here is `experiments/specs/routing_regret_under_degradation.yaml`
+(canonical form previously only in `tests/test_experiment_spec.py:16` `FLAGSHIP_YAML`).
+
+### 7.1 Validation output (exact)
+
+```
+$ python3 -c "from instrument.experiment_spec import validate_rules; print(validate_rules.__name__)"
+validate_rules
+
+$ python3 -c "from instrument.experiment_spec import load_spec, validate_rules, validate_spec; \
+  s = load_spec('experiments/specs/routing_regret_under_degradation.yaml'); \
+  print('validate_rules:', validate_rules(s)); print('validate_spec:', validate_spec(s))"
+validate_rules: []
+validate_spec: []
+```
+
+- `validate_rules` returns `[]` — every `requires` is ledger-produced. Specifically:
+  `grit` (`perturbation_strength`, `test_executed_success`, `condition`), `model_cascade`
+  (`confidence`), and the `dynamics`/`quality_cascade` control arms are **admissible**.
+- `compile_spec` emits the DAG: `validate → cells → execute → measure → compare → writeup → adapt`,
+  with feedback edge `adapt → cells` (the campaign loop). No `SpecError`.
+
+### 7.2 Grid — 112 cells, and why it is not queueable as-is
+
+`experiment_matrix(spec)` produces **112 cells** = `model`(7) × `condition`(4) × `policy`(4):
+
+| Factor | Levels | In standard `enqueue.py` matrix? |
+|---|---|---|
+| model | flash · luna · pro · haiku · terra · sonnet · sol | ✅ (via `--model`, full provider/model ids) |
+| condition | clean · bad_seed · early_degrade · **late_degrade** | ⚠️ `late_degrade` **absent** (matrix has clean/bad_seed/early_degrade only) |
+| policy | cheapest · premium_static · quality_cascade · dynamics | ❌ **no policy factor** at all |
+
+The standard story matrix is `story × tier × quality × condition` (30 cells/model); the
+routing_regret grid is `model × condition × policy` (no tier/quality, adds policy +
+late_degrade). The two are different grids, so:
+
+- **`policy`-arm cells (4 arms) and `late_degrade` cells (21) are not representable by
+  `enqueue.py`** — they need the `experiment_matrix` → `experiment_run` transport (the
+  reuse-map item generalizing `enqueue.py`'s hardcoded matrix + `worker.py`'s BRPOP
+  transport). **This is the item still to be built** — flagged here rather than shoehorned
+  into the wrong grid.
+- The representable slice (`model` × clean/bad_seed/early_degrade) is already drained by
+  the prior phases' matrix runs; `enqueue.py --missing-only` finds nothing new.
+
+### 7.3 Arm regret — computed on the drained, instrumented results
+
+**`grit` (re-admitted measurement rule) on the single-task re-run** (49 measured attempts,
+7 baseline + 42 perturbed across 7 models — the only drained corpus with both
+`perturbation_strength` and `test_executed_success`):
+
+```
+grit_auc = 0.5083      (uncertainty 0.0)
+G(0.0) = 0.7143   G(0.5) = 0.7381
+retention(0.5) = 1.0333     → perturbed cells do NOT degrade under s=0.5
+recovery_premium = 0.9057   → successful perturbed runs are 9% cheaper than successful baseline
+```
+
+On the story corpus `grit` correctly returns **unmeasured** (NaN, uncertainty 1.0): only
+14 re-run `early_degrade` cells carry the fields, and there is no measured `s=0.0` baseline
+yet (the clean cells predate instrumentation). The rule refuses to fabricate — the exact
+behaviour that was gated until now.
+
+**`compare_arms` (arm_factor=`model`, the representable proxy for `policy`)** over the same
+49 attempts, `loss = {cost: 1.0, quality: -5.0}`:
+
+| arm | regret | n | avg cost | avg correctness |
+|---|---|---|---|---|
+| openai/gpt-5.6-luna | **0.0000** (best) | 7 | $0.0173 | 1.000 |
+| deepseek/deepseek-v4-pro | +0.0148 | 7 | $0.0194 | 0.997 |
+| anthropic/claude-haiku-4-5 | +0.0269 | 7 | $0.0442 | 1.000 |
+| openai/gpt-5.6-sol | +0.4651 | 7 | $0.4824 | 1.000 |
+| anthropic/claude-sonnet-5 | +0.5964 | 7 | $0.1851 | 0.914 |
+| deepseek/deepseek-v4-flash | +0.5965 | 7 | $0.0096 | 0.879 |
+| openai/gpt-5.6-terra | +0.5982 | 7 | $0.1869 | 0.914 |
+
+**`compute_routing` / `simulate_strategies`** (the machinery `compare_arms` generalizes),
+over `_results_summary.json` (201 valid entries, 17 tasks → 8 default / 9 escalate):
+
+```
+grit_routed  n=41  avg_cost=$0.2627  avg_correctness=0.971
+deepseek-pro n=109 avg_cost=$0.0158  avg_correctness=0.896
+```
+
+The dynamics arm (grit-routed) buys +7.5pt correctness over the cheapest single-model arm
+at ~17× the per-cell cost — the exact trade-off the `routing_regret` comparison is built
+to quantify once the `policy` factor is runnable.
+
+### 7.4 Conclusion
+
+- **Admissibility: achieved.** `grit`, `model_cascade`, and the `dynamics` control arm all
+  validate against the measured ledger. The gate that refused "to make policies, we need
+  information" is open.
+- **Execution: blocked on one reuse-map item.** The `policy` factor (4 arms) and
+  `late_degrade` condition are not representable by the standard story matrix; running them
+  requires `experiment_matrix`/`experiment_run` (the `enqueue.py`+`worker.py` generalization).
+  No cells were run inline. The prior phase's story re-run continues to drain in background
+  (3 workers), and `enqueue.py --missing-only` confirms the representable slice is already covered.

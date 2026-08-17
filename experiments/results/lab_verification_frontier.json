@@ -1,80 +1,79 @@
 {
   "experiment_id": "lab_verification_frontier",
-  "generated_at": "2026-08-13T21:21:51.439198",
+  "generated_at": "2026-08-15T22:14:29.429029",
   "summary": {
     "models": 7,
     "cheapest": "deepseek-v4-flash",
-    "most_verified": "claude-sonnet-5",
+    "most_verified": "claude-haiku-4-5",
     "pareto_frontier": [
       "deepseek-v4-flash",
       "deepseek-v4-pro",
-      "claude-haiku-4-5",
-      "claude-sonnet-5"
+      "claude-haiku-4-5"
     ]
   },
   "models": [
     {
       "model": "deepseek-v4-flash",
-      "cells": 30,
-      "cost_cells": 30,
+      "cells": 22,
+      "cost_cells": 22,
       "avg_cost": 0.068,
-      "avg_tests": 33.533,
-      "total_cost": 2.045,
-      "total_tests": 1006
+      "avg_tests": 36.364,
+      "total_cost": 1.4991,
+      "total_tests": 800
     },
     {
       "model": "gpt-5.6-luna",
-      "cells": 34,
-      "cost_cells": 34,
+      "cells": 23,
+      "cost_cells": 23,
       "avg_cost": 0.091,
-      "avg_tests": 7.324,
-      "total_cost": 3.085,
-      "total_tests": 249
+      "avg_tests": 7.739,
+      "total_cost": 2.1003,
+      "total_tests": 178
     },
     {
       "model": "deepseek-v4-pro",
-      "cells": 35,
-      "cost_cells": 35,
-      "avg_cost": 0.138,
-      "avg_tests": 34.4,
-      "total_cost": 4.8228,
-      "total_tests": 1204
+      "cells": 31,
+      "cost_cells": 31,
+      "avg_cost": 0.15,
+      "avg_tests": 47.774,
+      "total_cost": 4.6626,
+      "total_tests": 1481
     },
     {
       "model": "gpt-5.6-terra",
-      "cells": 30,
-      "cost_cells": 30,
-      "avg_cost": 1.021,
-      "avg_tests": 8.833,
-      "total_cost": 30.6404,
-      "total_tests": 265
+      "cells": 20,
+      "cost_cells": 20,
+      "avg_cost": 1.015,
+      "avg_tests": 9.75,
+      "total_cost": 20.3036,
+      "total_tests": 195
     },
     {
       "model": "claude-haiku-4-5",
-      "cells": 31,
-      "cost_cells": 19,
-      "avg_cost": 1.59,
-      "avg_tests": 117.355,
-      "total_cost": 30.2164,
-      "total_tests": 3638
+      "cells": 20,
+      "cost_cells": 14,
+      "avg_cost": 1.537,
+      "avg_tests": 135.35,
+      "total_cost": 21.5168,
+      "total_tests": 2707
     },
     {
       "model": "gpt-5.6-sol",
-      "cells": 30,
-      "cost_cells": 30,
-      "avg_cost": 3.749,
-      "avg_tests": 12.9,
-      "total_cost": 112.4625,
-      "total_tests": 387
+      "cells": 23,
+      "cost_cells": 23,
+      "avg_cost": 3.987,
+      "avg_tests": 11.957,
+      "total_cost": 91.6937,
+      "total_tests": 275
     },
     {
       "model": "claude-sonnet-5",
-      "cells": 31,
-      "cost_cells": 23,
-      "avg_cost": 4.583,
-      "avg_tests": 122.129,
-      "total_cost": 105.4188,
-      "total_tests": 3786
+      "cells": 20,
+      "cost_cells": 16,
+      "avg_cost": 4.776,
+      "avg_tests": 122.55,
+      "total_cost": 76.4179,
+      "total_tests": 2451
     }
   ]
 }
