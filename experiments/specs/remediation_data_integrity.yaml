@@ -182,6 +182,52 @@ workflow:
             final drained queue state, and the before/after delta on the affected metrics.
 
           DELIVER the enqueue/worker record plus a delta table appended to docs/remediation_plan.md.
+      - name: analyze
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Analyze the re-run worktrees (AST + SonarQube + conventions) — via the queue.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/enqueue_analysis.py / analysis_worker.py  (queue: analysis_jobs → analysis_status)
+
+          REQUIREMENTS:
+          - Enqueue analysis for every re-run story that has NO existing analysis:
+            `python scripts/enqueue_analysis.py` (skips existing by default).
+          - Start N analysis workers (`python scripts/analysis_worker.py &`), then poll
+            `analysis_status` (or `python scripts/monitor.py --json`) until queued/running hit 0.
+          - Analysis is LLM-free (tree-sitter AST + SonarQube) — no provider rate-limit concern.
+
+          DELIVER the analysis drain record (cells analyzed, any SonarQube/LSP gaps noted).
+      - name: review
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Review the re-run story commits (LLM code review) — via the queue.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/enqueue_reviews.py / review_worker.py / finalize_reviews.py  (review_jobs)
+
+          REQUIREMENTS:
+          - Enqueue reviews for the re-run stories (`python scripts/enqueue_reviews.py`).
+          - Start review workers (`python scripts/review_worker.py &`), poll until the queue
+            drains, then run `python scripts/finalize_reviews.py` to merge per-session reviews.
+          - Reviews use an LLM reviewer — interleave providers and cap worker count to avoid
+            hammering one provider.
+
+          DELIVER the review drain + finalize record.
       - name: regenerate
         kind: agent
         timeout: 7200
