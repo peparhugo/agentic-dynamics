@@ -1,14 +1,14 @@
-/* Generated 2026-08-17 18:14:10 UTC by build_data.py */
+/* Generated 2026-08-17 19:38:39 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-17T18:14:10.713607+00:00",
+    "generated_at": "2026-08-17T19:38:39.581047+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
     "worktrees_total": 205,
     "sessions_total": 772,
-    "game_reports": 275,
+    "game_reports": 344,
     "total_cost": 219.5112,
     "architectures": 3,
     "variants": 7,
@@ -286,53 +286,53 @@ window.DYNAMICS_DATA = {
       "label": "DeepSeek v4 Pro",
       "provider": "deepseek",
       "sessions": 201,
-      "n_reports": 119,
-      "n_valid": 109,
-      "n_narrated": 10,
-      "reports": 119,
-      "reports_valid": 109,
-      "reports_narrated": 10,
-      "avg_cost": 0.0158,
+      "n_reports": 13,
+      "n_valid": 13,
+      "n_narrated": 0,
+      "reports": 13,
+      "reports_valid": 13,
+      "reports_narrated": 0,
+      "avg_cost": 0.0177,
       "total_cost": 5.7444,
       "cost_ci95": [
-        0.0147,
-        0.017
+        0.0149,
+        0.0205
       ],
-      "pass_rate": "84% (976/1163) [tests]",
-      "strategy_cons": 78,
-      "strategy_expl": 29,
-      "strategy_waste": 2,
-      "strategy_efficient": 0,
-      "avg_loc": 706,
-      "avg_thinking_ratio": 0.087,
+      "pass_rate": "98% [H]",
+      "strategy_cons": 3,
+      "strategy_expl": 0,
+      "strategy_waste": 0,
+      "strategy_efficient": 10,
+      "avg_loc": 646,
+      "avg_thinking_ratio": 0.206,
       "avg_escape": null,
-      "avg_narration_penalty": 0.0,
+      "avg_narration_penalty": 0.02,
       "avg_arch_divergence": null,
       "avg_struct_divergence": null,
-      "avg_composite_score": 0.615,
+      "avg_composite_score": 0.634,
       "avg_code_quality": 0.246,
-      "avg_comment_ratio": 0.02,
-      "avg_energy_j": 4091.8,
-      "avg_energy_j_per_loc": 5.8,
-      "correctness_per_dollar": 28.6092,
-      "avg_quality_per_joule": 0.0002,
-      "narration_rate": 8,
-      "ast_files": 22.7,
-      "ast_functions": 74,
-      "ast_classes": 13,
-      "ast_type_hint_pct": 10,
-      "ast_docstring_pct": 2,
-      "avg_constraints_met": 3.3,
-      "avg_constraints_total": 6.8,
-      "cost_input": 0.1294,
-      "cost_output": 0.4233,
-      "cost_reasoning": 0.0234,
-      "cost_cache": 1.1452,
-      "tokens_total": 2462590,
-      "tokens_input": 1186808,
-      "tokens_output": 1035636,
-      "tokens_reasoning": 240146,
-      "tokens_cache_read": 26248192,
+      "avg_comment_ratio": 0.024,
+      "avg_energy_j": 5167.4,
+      "avg_energy_j_per_loc": 8.0,
+      "correctness_per_dollar": 61.4652,
+      "avg_quality_per_joule": 0.0001,
+      "narration_rate": 0,
+      "ast_files": 11.0,
+      "ast_functions": 66,
+      "ast_classes": 3,
+      "ast_type_hint_pct": 8,
+      "ast_docstring_pct": 3,
+      "avg_constraints_met": 3.9,
+      "avg_constraints_total": 7.0,
+      "cost_input": 0.0537,
+      "cost_output": 0.1021,
+      "cost_reasoning": 0.0561,
+      "cost_cache": 0.0188,
+      "tokens_total": 305253,
+      "tokens_input": 123431,
+      "tokens_output": 117313,
+      "tokens_reasoning": 64509,
+      "tokens_cache_read": 5190016,
       "tokens_cache_write": 0,
       "_provenance": {
         "sessions": "M",
@@ -377,61 +377,58 @@ window.DYNAMICS_DATA = {
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
-        "pass_rate": "M"
+        "pass_rate": "H"
       }
     },
     {
       "id": "openai/gpt-5-nano",
       "label": "GPT-5-nano",
       "provider": "openai",
-      "sessions": 7,
-      "n_reports": 7,
-      "n_valid": 6,
-      "n_narrated": 1,
-      "reports": 7,
-      "reports_valid": 6,
-      "reports_narrated": 1,
-      "avg_cost": 0.0057,
-      "total_cost": 0.0345,
-      "cost_ci95": [
-        0.0044,
-        0.0072
-      ],
-      "pass_rate": "89% (8/9) [tests]",
-      "strategy_cons": 4,
-      "strategy_expl": 2,
+      "sessions": 0,
+      "n_reports": 0,
+      "n_valid": 0,
+      "n_narrated": 0,
+      "reports": 0,
+      "reports_valid": 0,
+      "reports_narrated": 0,
+      "avg_cost": 0.0,
+      "total_cost": 0,
+      "cost_ci95": null,
+      "pass_rate": "N/A",
+      "strategy_cons": 0,
+      "strategy_expl": 0,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "avg_loc": 199,
-      "avg_thinking_ratio": 0.19,
-      "avg_escape": null,
-      "avg_narration_penalty": 0.3,
-      "avg_arch_divergence": null,
-      "avg_struct_divergence": null,
-      "avg_composite_score": 0.688,
-      "avg_code_quality": 0.487,
-      "avg_comment_ratio": 0.072,
-      "avg_energy_j": 4689.4,
-      "avg_energy_j_per_loc": 23.56,
-      "correctness_per_dollar": 3.6094,
-      "avg_quality_per_joule": 0.0002,
-      "narration_rate": 14,
-      "ast_files": 3.3,
-      "ast_functions": 21,
-      "ast_classes": 2,
-      "ast_type_hint_pct": 27,
+      "avg_loc": 0,
+      "avg_thinking_ratio": 0.0,
+      "avg_escape": 0.0,
+      "avg_narration_penalty": 0.0,
+      "avg_arch_divergence": 0.0,
+      "avg_struct_divergence": 0.0,
+      "avg_composite_score": 0.0,
+      "avg_code_quality": 0.0,
+      "avg_comment_ratio": 0.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "correctness_per_dollar": 0.0,
+      "avg_quality_per_joule": 0.0,
+      "narration_rate": 0,
+      "ast_files": 0.0,
+      "ast_functions": 0,
+      "ast_classes": 0,
+      "ast_type_hint_pct": 0,
       "ast_docstring_pct": 0,
       "avg_constraints_met": 0.0,
-      "avg_constraints_total": 7.0,
-      "cost_input": 0.0029,
-      "cost_output": 0.0074,
-      "cost_reasoning": 0.0074,
-      "cost_cache": 0.0162,
-      "tokens_total": 152892,
-      "tokens_input": 93961,
-      "tokens_output": 29491,
-      "tokens_reasoning": 29440,
-      "tokens_cache_read": 1142656,
+      "avg_constraints_total": 0.0,
+      "cost_input": 0,
+      "cost_output": 0,
+      "cost_reasoning": 0,
+      "cost_cache": 0,
+      "tokens_total": 0,
+      "tokens_input": 0,
+      "tokens_output": 0,
+      "tokens_reasoning": 0,
+      "tokens_cache_read": 0,
       "tokens_cache_write": 0,
       "_provenance": {
         "sessions": "M",
@@ -476,61 +473,58 @@ window.DYNAMICS_DATA = {
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
-        "pass_rate": "M"
+        "pass_rate": "H"
       }
     },
     {
       "id": "openai/gpt-5-mini",
       "label": "GPT-5-mini",
       "provider": "openai",
-      "sessions": 13,
-      "n_reports": 13,
-      "n_valid": 12,
-      "n_narrated": 1,
-      "reports": 13,
-      "reports_valid": 12,
-      "reports_narrated": 1,
-      "avg_cost": 0.0258,
-      "total_cost": 0.3115,
-      "cost_ci95": [
-        0.0206,
-        0.0333
-      ],
-      "pass_rate": "94% (30/32) [tests]",
-      "strategy_cons": 11,
-      "strategy_expl": 1,
+      "sessions": 0,
+      "n_reports": 0,
+      "n_valid": 0,
+      "n_narrated": 0,
+      "reports": 0,
+      "reports_valid": 0,
+      "reports_narrated": 0,
+      "avg_cost": 0.0,
+      "total_cost": 0,
+      "cost_ci95": null,
+      "pass_rate": "N/A",
+      "strategy_cons": 0,
+      "strategy_expl": 0,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "avg_loc": 264,
-      "avg_thinking_ratio": 0.066,
-      "avg_escape": null,
-      "avg_narration_penalty": 0.18,
-      "avg_arch_divergence": null,
-      "avg_struct_divergence": null,
-      "avg_composite_score": 0.694,
-      "avg_code_quality": 0.407,
-      "avg_comment_ratio": 0.063,
-      "avg_energy_j": 3838.6,
-      "avg_energy_j_per_loc": 14.54,
-      "correctness_per_dollar": 4.5089,
-      "avg_quality_per_joule": 0.0002,
-      "narration_rate": 8,
-      "ast_files": 5.1,
-      "ast_functions": 25,
-      "ast_classes": 3,
-      "ast_type_hint_pct": 9,
-      "ast_docstring_pct": 1,
-      "avg_constraints_met": 2.0,
-      "avg_constraints_total": 7.0,
-      "cost_input": 0.0341,
-      "cost_output": 0.0751,
-      "cost_reasoning": 0.0244,
-      "cost_cache": 0.1759,
-      "tokens_total": 339450,
-      "tokens_input": 249447,
-      "tokens_output": 67475,
-      "tokens_reasoning": 22528,
-      "tokens_cache_read": 2678784,
+      "avg_loc": 0,
+      "avg_thinking_ratio": 0.0,
+      "avg_escape": 0.0,
+      "avg_narration_penalty": 0.0,
+      "avg_arch_divergence": 0.0,
+      "avg_struct_divergence": 0.0,
+      "avg_composite_score": 0.0,
+      "avg_code_quality": 0.0,
+      "avg_comment_ratio": 0.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "correctness_per_dollar": 0.0,
+      "avg_quality_per_joule": 0.0,
+      "narration_rate": 0,
+      "ast_files": 0.0,
+      "ast_functions": 0,
+      "ast_classes": 0,
+      "ast_type_hint_pct": 0,
+      "ast_docstring_pct": 0,
+      "avg_constraints_met": 0.0,
+      "avg_constraints_total": 0.0,
+      "cost_input": 0,
+      "cost_output": 0,
+      "cost_reasoning": 0,
+      "cost_cache": 0,
+      "tokens_total": 0,
+      "tokens_input": 0,
+      "tokens_output": 0,
+      "tokens_reasoning": 0,
+      "tokens_cache_read": 0,
       "tokens_cache_write": 0,
       "_provenance": {
         "sessions": "M",
@@ -575,61 +569,58 @@ window.DYNAMICS_DATA = {
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
-        "pass_rate": "M"
+        "pass_rate": "H"
       }
     },
     {
       "id": "openai/gpt-5",
       "label": "GPT-5",
       "provider": "openai",
-      "sessions": 13,
-      "n_reports": 13,
-      "n_valid": 11,
-      "n_narrated": 2,
-      "reports": 13,
-      "reports_valid": 11,
-      "reports_narrated": 2,
-      "avg_cost": 0.159,
-      "total_cost": 1.7921,
-      "cost_ci95": [
-        0.1303,
-        0.1846
-      ],
-      "pass_rate": "70% (16/23) [tests]",
-      "strategy_cons": 3,
-      "strategy_expl": 8,
+      "sessions": 0,
+      "n_reports": 0,
+      "n_valid": 0,
+      "n_narrated": 0,
+      "reports": 0,
+      "reports_valid": 0,
+      "reports_narrated": 0,
+      "avg_cost": 0.0,
+      "total_cost": 0,
+      "cost_ci95": null,
+      "pass_rate": "N/A",
+      "strategy_cons": 0,
+      "strategy_expl": 0,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "avg_loc": 403,
-      "avg_thinking_ratio": 0.083,
-      "avg_escape": null,
-      "avg_narration_penalty": 0.03,
-      "avg_arch_divergence": null,
-      "avg_struct_divergence": null,
-      "avg_composite_score": 0.639,
-      "avg_code_quality": 0.273,
-      "avg_comment_ratio": 0.063,
-      "avg_energy_j": 4816.7,
-      "avg_energy_j_per_loc": 11.95,
-      "correctness_per_dollar": 4.1783,
-      "avg_quality_per_joule": 0.0002,
-      "narration_rate": 15,
-      "ast_files": 8.6,
-      "ast_functions": 13,
-      "ast_classes": 2,
-      "ast_type_hint_pct": 18,
-      "ast_docstring_pct": 1,
-      "avg_constraints_met": 2.8,
-      "avg_constraints_total": 7.0,
-      "cost_input": 0.1903,
-      "cost_output": 0.4842,
-      "cost_reasoning": 0.1877,
-      "cost_cache": 0.8867,
-      "tokens_total": 358967,
-      "tokens_input": 246343,
-      "tokens_output": 81904,
-      "tokens_reasoning": 30720,
-      "tokens_cache_read": 2517888,
+      "avg_loc": 0,
+      "avg_thinking_ratio": 0.0,
+      "avg_escape": 0.0,
+      "avg_narration_penalty": 0.0,
+      "avg_arch_divergence": 0.0,
+      "avg_struct_divergence": 0.0,
+      "avg_composite_score": 0.0,
+      "avg_code_quality": 0.0,
+      "avg_comment_ratio": 0.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "correctness_per_dollar": 0.0,
+      "avg_quality_per_joule": 0.0,
+      "narration_rate": 0,
+      "ast_files": 0.0,
+      "ast_functions": 0,
+      "ast_classes": 0,
+      "ast_type_hint_pct": 0,
+      "ast_docstring_pct": 0,
+      "avg_constraints_met": 0.0,
+      "avg_constraints_total": 0.0,
+      "cost_input": 0,
+      "cost_output": 0,
+      "cost_reasoning": 0,
+      "cost_cache": 0,
+      "tokens_total": 0,
+      "tokens_input": 0,
+      "tokens_output": 0,
+      "tokens_reasoning": 0,
+      "tokens_cache_read": 0,
       "tokens_cache_write": 0,
       "_provenance": {
         "sessions": "M",
@@ -674,58 +665,58 @@ window.DYNAMICS_DATA = {
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
-        "pass_rate": "M"
+        "pass_rate": "H"
       }
     },
     {
       "id": "openai/gpt-5.5",
       "label": "GPT-5.5",
       "provider": "openai",
-      "sessions": 6,
-      "n_reports": 6,
-      "n_valid": 3,
-      "n_narrated": 3,
-      "reports": 6,
-      "reports_valid": 3,
-      "reports_narrated": 3,
-      "avg_cost": 0.282,
-      "total_cost": 0.9688,
+      "sessions": 0,
+      "n_reports": 0,
+      "n_valid": 0,
+      "n_narrated": 0,
+      "reports": 0,
+      "reports_valid": 0,
+      "reports_narrated": 0,
+      "avg_cost": 0.0,
+      "total_cost": 0,
       "cost_ci95": null,
-      "pass_rate": "100% (27/27) [tests]",
-      "strategy_cons": 1,
-      "strategy_expl": 2,
+      "pass_rate": "N/A",
+      "strategy_cons": 0,
+      "strategy_expl": 0,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "avg_loc": 262,
-      "avg_thinking_ratio": 0.021,
-      "avg_escape": 0.64,
+      "avg_loc": 0,
+      "avg_thinking_ratio": 0.0,
+      "avg_escape": 0.0,
       "avg_narration_penalty": 0.0,
-      "avg_arch_divergence": 0.683,
-      "avg_struct_divergence": 0.287,
-      "avg_composite_score": 0.852,
-      "avg_code_quality": 0.383,
-      "avg_comment_ratio": 0.01,
-      "avg_energy_j": 2553.6,
-      "avg_energy_j_per_loc": 9.75,
-      "correctness_per_dollar": 7.7529,
-      "avg_quality_per_joule": 0.0004,
-      "narration_rate": 50,
-      "ast_files": 3.0,
-      "ast_functions": 33,
-      "ast_classes": 1,
-      "ast_type_hint_pct": 37,
+      "avg_arch_divergence": 0.0,
+      "avg_struct_divergence": 0.0,
+      "avg_composite_score": 0.0,
+      "avg_code_quality": 0.0,
+      "avg_comment_ratio": 0.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "correctness_per_dollar": 0.0,
+      "avg_quality_per_joule": 0.0,
+      "narration_rate": 0,
+      "ast_files": 0.0,
+      "ast_functions": 0,
+      "ast_classes": 0,
+      "ast_type_hint_pct": 0,
       "ast_docstring_pct": 0,
-      "avg_constraints_met": 6.7,
-      "avg_constraints_total": 7.0,
-      "cost_input": 0.1298,
-      "cost_output": 0.3085,
-      "cost_reasoning": 0.0256,
-      "cost_cache": 0.3821,
-      "tokens_total": 63015,
-      "tokens_input": 47475,
-      "tokens_output": 14338,
-      "tokens_reasoning": 1202,
-      "tokens_cache_read": 284672,
+      "avg_constraints_met": 0.0,
+      "avg_constraints_total": 0.0,
+      "cost_input": 0,
+      "cost_output": 0,
+      "cost_reasoning": 0,
+      "cost_cache": 0,
+      "tokens_total": 0,
+      "tokens_input": 0,
+      "tokens_output": 0,
+      "tokens_reasoning": 0,
+      "tokens_cache_read": 0,
       "tokens_cache_write": 0,
       "_provenance": {
         "sessions": "M",
@@ -770,62 +761,62 @@ window.DYNAMICS_DATA = {
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
-        "pass_rate": "M"
+        "pass_rate": "H"
       }
     },
     {
       "id": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "provider": "openai",
-      "sessions": 16,
-      "n_reports": 16,
-      "n_valid": 15,
+      "sessions": 19,
+      "n_reports": 19,
+      "n_valid": 18,
       "n_narrated": 1,
-      "reports": 16,
-      "reports_valid": 15,
+      "reports": 19,
+      "reports_valid": 18,
       "reports_narrated": 1,
-      "avg_cost": 0.4474,
-      "total_cost": 6.7513,
+      "avg_cost": 0.3674,
+      "total_cost": 6.6126,
       "cost_ci95": [
-        0.3763,
-        0.5175
+        0.3085,
+        0.4244
       ],
-      "pass_rate": "100% (166/166) [tests]",
-      "strategy_cons": 14,
-      "strategy_expl": 1,
+      "pass_rate": "92% [H]",
+      "strategy_cons": 0,
+      "strategy_expl": 0,
       "strategy_waste": 0,
-      "strategy_efficient": 0,
-      "avg_loc": 367,
-      "avg_thinking_ratio": 0.064,
+      "strategy_efficient": 18,
+      "avg_loc": 458,
+      "avg_thinking_ratio": 0.022,
       "avg_escape": null,
-      "avg_narration_penalty": 0.02,
+      "avg_narration_penalty": 0.08,
       "avg_arch_divergence": null,
       "avg_struct_divergence": null,
-      "avg_composite_score": 0.726,
-      "avg_code_quality": 0.37,
-      "avg_comment_ratio": 0.009,
-      "avg_energy_j": 2286.5,
-      "avg_energy_j_per_loc": 6.23,
-      "correctness_per_dollar": 5.0078,
-      "avg_quality_per_joule": 0.0004,
-      "narration_rate": 6,
-      "ast_files": 4.9,
-      "ast_functions": 37,
-      "ast_classes": 2,
-      "ast_type_hint_pct": 5,
-      "ast_docstring_pct": 0,
-      "avg_constraints_met": 4.7,
-      "avg_constraints_total": 6.4,
-      "cost_input": 0.0013,
-      "cost_output": 2.7502,
-      "cost_reasoning": 0.1924,
-      "cost_cache": 3.7669,
-      "tokens_total": 139957,
-      "tokens_input": 516,
-      "tokens_output": 130337,
-      "tokens_reasoning": 9104,
-      "tokens_cache_read": 1870459,
-      "tokens_cache_write": 254361,
+      "avg_composite_score": 0.557,
+      "avg_code_quality": 0.238,
+      "avg_comment_ratio": 0.012,
+      "avg_energy_j": 4017.3,
+      "avg_energy_j_per_loc": 8.77,
+      "correctness_per_dollar": 2.7493,
+      "avg_quality_per_joule": 0.0002,
+      "narration_rate": 5,
+      "ast_files": 7.0,
+      "ast_functions": 43,
+      "ast_classes": 1,
+      "ast_type_hint_pct": 10,
+      "ast_docstring_pct": 1,
+      "avg_constraints_met": 2.6,
+      "avg_constraints_total": 7.0,
+      "cost_input": 1.7037,
+      "cost_output": 3.7896,
+      "cost_reasoning": 0.3,
+      "cost_cache": 0.8193,
+      "tokens_total": 569703,
+      "tokens_input": 410336,
+      "tokens_output": 147573,
+      "tokens_reasoning": 11794,
+      "tokens_cache_read": 2082816,
+      "tokens_cache_write": 0,
       "_provenance": {
         "sessions": "M",
         "n_reports": "M",
@@ -869,62 +860,59 @@ window.DYNAMICS_DATA = {
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
-        "pass_rate": "M"
+        "pass_rate": "H"
       }
     },
     {
       "id": "openai/gpt-5.6-fast",
       "label": "GPT-5.6-fast",
       "provider": "openai",
-      "sessions": 9,
-      "n_reports": 9,
-      "n_valid": 6,
-      "n_narrated": 3,
-      "reports": 9,
-      "reports_valid": 6,
-      "reports_narrated": 3,
-      "avg_cost": 0.6625,
-      "total_cost": 4.3781,
-      "cost_ci95": [
-        0.6082,
-        0.7169
-      ],
-      "pass_rate": "100% (73/73) [tests]",
-      "strategy_cons": 2,
-      "strategy_expl": 4,
+      "sessions": 0,
+      "n_reports": 0,
+      "n_valid": 0,
+      "n_narrated": 0,
+      "reports": 0,
+      "reports_valid": 0,
+      "reports_narrated": 0,
+      "avg_cost": 0.0,
+      "total_cost": 0,
+      "cost_ci95": null,
+      "pass_rate": "N/A",
+      "strategy_cons": 0,
+      "strategy_expl": 0,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "avg_loc": 343,
-      "avg_thinking_ratio": 0.071,
-      "avg_escape": 0.58,
+      "avg_loc": 0,
+      "avg_thinking_ratio": 0.0,
+      "avg_escape": 0.0,
       "avg_narration_penalty": 0.0,
-      "avg_arch_divergence": 0.565,
-      "avg_struct_divergence": 0.29,
-      "avg_composite_score": 0.76,
-      "avg_code_quality": 0.299,
-      "avg_comment_ratio": 0.008,
-      "avg_energy_j": 1598.7,
-      "avg_energy_j_per_loc": 4.66,
-      "correctness_per_dollar": 6.1925,
-      "avg_quality_per_joule": 0.0005,
-      "narration_rate": 33,
-      "ast_files": 3.3,
-      "ast_functions": 34,
+      "avg_arch_divergence": 0.0,
+      "avg_struct_divergence": 0.0,
+      "avg_composite_score": 0.0,
+      "avg_code_quality": 0.0,
+      "avg_comment_ratio": 0.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "correctness_per_dollar": 0.0,
+      "avg_quality_per_joule": 0.0,
+      "narration_rate": 0,
+      "ast_files": 0.0,
+      "ast_functions": 0,
       "ast_classes": 0,
-      "ast_type_hint_pct": 28,
+      "ast_type_hint_pct": 0,
       "ast_docstring_pct": 0,
-      "avg_constraints_met": 5.0,
-      "avg_constraints_total": 7.0,
-      "cost_input": 0.0011,
-      "cost_output": 1.4601,
-      "cost_reasoning": 0.1126,
-      "cost_cache": 2.4013,
-      "tokens_total": 38930,
-      "tokens_input": 210,
-      "tokens_output": 35930,
-      "tokens_reasoning": 2790,
-      "tokens_cache_read": 619431,
-      "tokens_cache_write": 82432,
+      "avg_constraints_met": 0.0,
+      "avg_constraints_total": 0.0,
+      "cost_input": 0,
+      "cost_output": 0,
+      "cost_reasoning": 0,
+      "cost_cache": 0,
+      "tokens_total": 0,
+      "tokens_input": 0,
+      "tokens_output": 0,
+      "tokens_reasoning": 0,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
       "_provenance": {
         "sessions": "M",
         "n_reports": "M",
@@ -968,62 +956,59 @@ window.DYNAMICS_DATA = {
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
-        "pass_rate": "M"
+        "pass_rate": "H"
       }
     },
     {
       "id": "anthropic/claude-fable-5",
       "label": "Claude Fable 5",
       "provider": "anthropic",
-      "sessions": 44,
-      "n_reports": 44,
-      "n_valid": 39,
-      "n_narrated": 5,
-      "reports": 44,
-      "reports_valid": 39,
-      "reports_narrated": 5,
-      "avg_cost": 1.0847,
-      "total_cost": 43.4191,
-      "cost_ci95": [
-        0.9058,
-        1.2585
-      ],
-      "pass_rate": "99% (276/279) [tests]",
-      "strategy_cons": 27,
-      "strategy_expl": 12,
+      "sessions": 0,
+      "n_reports": 0,
+      "n_valid": 0,
+      "n_narrated": 0,
+      "reports": 0,
+      "reports_valid": 0,
+      "reports_narrated": 0,
+      "avg_cost": 0.0,
+      "total_cost": 0,
+      "cost_ci95": null,
+      "pass_rate": "N/A",
+      "strategy_cons": 0,
+      "strategy_expl": 0,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "avg_loc": 568,
+      "avg_loc": 0,
       "avg_thinking_ratio": 0.0,
-      "avg_escape": null,
-      "avg_narration_penalty": 0.08,
-      "avg_arch_divergence": null,
-      "avg_struct_divergence": null,
-      "avg_composite_score": 0.636,
-      "avg_code_quality": 0.278,
-      "avg_comment_ratio": 0.033,
-      "avg_energy_j": 2857.6,
-      "avg_energy_j_per_loc": 5.03,
-      "correctness_per_dollar": 3.891,
-      "avg_quality_per_joule": 0.0006,
-      "narration_rate": 11,
-      "ast_files": 10.5,
-      "ast_functions": 30,
-      "ast_classes": 6,
-      "ast_type_hint_pct": 18,
-      "ast_docstring_pct": 6,
-      "avg_constraints_met": 2.6,
-      "avg_constraints_total": 6.6,
-      "cost_input": 0.0078,
-      "cost_output": 24.214,
-      "cost_reasoning": 0.0,
-      "cost_cache": 18.0817,
-      "tokens_total": 485063,
-      "tokens_input": 784,
-      "tokens_output": 484279,
+      "avg_escape": 0.0,
+      "avg_narration_penalty": 0.0,
+      "avg_arch_divergence": 0.0,
+      "avg_struct_divergence": 0.0,
+      "avg_composite_score": 0.0,
+      "avg_code_quality": 0.0,
+      "avg_comment_ratio": 0.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "correctness_per_dollar": 0.0,
+      "avg_quality_per_joule": 0.0,
+      "narration_rate": 0,
+      "ast_files": 0.0,
+      "ast_functions": 0,
+      "ast_classes": 0,
+      "ast_type_hint_pct": 0,
+      "ast_docstring_pct": 0,
+      "avg_constraints_met": 0.0,
+      "avg_constraints_total": 0.0,
+      "cost_input": 0,
+      "cost_output": 0,
+      "cost_reasoning": 0,
+      "cost_cache": 0,
+      "tokens_total": 0,
+      "tokens_input": 0,
+      "tokens_output": 0,
       "tokens_reasoning": 0,
-      "tokens_cache_read": 6289478,
-      "tokens_cache_write": 943380,
+      "tokens_cache_read": 0,
+      "tokens_cache_write": 0,
       "_provenance": {
         "sessions": "M",
         "n_reports": "M",
@@ -1067,7 +1052,7 @@ window.DYNAMICS_DATA = {
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
-        "pass_rate": "M"
+        "pass_rate": "H"
       }
     }
   ],
@@ -1224,221 +1209,15 @@ window.DYNAMICS_DATA = {
     }
   },
   "operator_comparison": {
-    "perturbed": {
-      "perturbation_class": "semantic",
-      "models": {
-        "DeepSeek v4 Pro": {
-          "n": 12,
-          "avg_cost": 0.0167,
-          "cost_ci95": [
-            0.0136,
-            0.0197
-          ],
-          "avg_escape": 0.7595,
-          "escape_ci95": [
-            0.7302,
-            0.8062
-          ],
-          "avg_correctness": 0.7667,
-          "correctness_ci95": [
-            0.6167,
-            0.8667
-          ],
-          "avg_thinking_ratio": 0.0981,
-          "avg_energy_j": 4355.4208,
-          "low_n": false
-        },
-        "GPT-5.6": {
-          "n": 6,
-          "avg_cost": 0.3424,
-          "cost_ci95": [
-            0.2968,
-            0.393
-          ],
-          "avg_escape": 0.4097,
-          "escape_ci95": [
-            0.2944,
-            0.5432
-          ],
-          "avg_correctness": 1.0,
-          "correctness_ci95": [
-            1.0,
-            1.0
-          ],
-          "avg_thinking_ratio": 0.0603,
-          "avg_energy_j": 1628.735,
-          "low_n": false
-        },
-        "Claude Fable 5": {
-          "n": 3,
-          "avg_cost": 1.2892,
-          "cost_ci95": [
-            0.9862,
-            1.8753
-          ],
-          "avg_escape": 0.6214,
-          "escape_ci95": [
-            0.5937,
-            0.6432
-          ],
-          "avg_correctness": 0.8667,
-          "correctness_ci95": [
-            0.8,
-            1.0
-          ],
-          "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 3553.32,
-          "low_n": true
-        },
-        "GPT-5-nano": {
-          "n": 5,
-          "avg_cost": 0.0061,
-          "cost_ci95": [
-            0.0046,
-            0.0079
-          ],
-          "avg_escape": 0.5408,
-          "escape_ci95": [
-            0.419,
-            0.6641
-          ],
-          "avg_correctness": 0.77,
-          "correctness_ci95": [
-            0.7,
-            0.88
-          ],
-          "avg_thinking_ratio": 0.1984,
-          "avg_energy_j": 5010.78,
-          "low_n": false
-        },
-        "GPT-5.6-fast": {
-          "n": 6,
-          "avg_cost": 0.6625,
-          "cost_ci95": [
-            0.6082,
-            0.7169
-          ],
-          "avg_escape": 0.5846,
-          "escape_ci95": [
-            0.4395,
-            0.707
-          ],
-          "avg_correctness": 1.0,
-          "correctness_ci95": [
-            1.0,
-            1.0
-          ],
-          "avg_thinking_ratio": 0.0706,
-          "avg_energy_j": 1598.6667,
-          "low_n": false
-        },
-        "GPT-5-mini": {
-          "n": 6,
-          "avg_cost": 0.0207,
-          "cost_ci95": [
-            0.0169,
-            0.0253
-          ],
-          "avg_escape": 0.3912,
-          "escape_ci95": [
-            0.3152,
-            0.4779
-          ],
-          "avg_correctness": 0.95,
-          "correctness_ci95": [
-            0.85,
-            1.0
-          ],
-          "avg_thinking_ratio": 0.0651,
-          "avg_energy_j": 3131.795,
-          "low_n": false
-        },
-        "GPT-5": {
-          "n": 1,
-          "avg_cost": 0.1685,
-          "cost_ci95": null,
-          "avg_escape": 0.7032,
-          "escape_ci95": null,
-          "avg_correctness": 1.0,
-          "correctness_ci95": null,
-          "avg_thinking_ratio": 0.0833,
-          "avg_energy_j": 4568.33,
-          "low_n": true
-        },
-        "GPT-5.5": {
-          "n": 3,
-          "avg_cost": 0.282,
-          "cost_ci95": [
-            0.2251,
-            0.3159
-          ],
-          "avg_escape": 0.6383,
-          "escape_ci95": [
-            0.468,
-            0.7321
-          ],
-          "avg_correctness": 1.0,
-          "correctness_ci95": [
-            1.0,
-            1.0
-          ],
-          "avg_thinking_ratio": 0.0205,
-          "avg_energy_j": 2553.56,
-          "low_n": true
-        }
-      }
-    },
     "unknown": {
       "perturbation_class": "unknown",
       "models": {
-        "GPT-5": {
-          "n": 2,
-          "avg_cost": 0.0216,
+        "DeepSeek v4 Flash": {
+          "n": 94,
+          "avg_cost": 0.0014,
           "cost_ci95": [
-            0.01,
-            0.0332
-          ],
-          "avg_escape": 0,
-          "escape_ci95": null,
-          "avg_correctness": 0,
-          "correctness_ci95": null,
-          "avg_thinking_ratio": 0,
-          "avg_energy_j": 0,
-          "low_n": true
-        },
-        "GPT-5.6-fast": {
-          "n": 3,
-          "avg_cost": 0.1343,
-          "cost_ci95": [
-            0.0809,
-            0.1683
-          ],
-          "avg_escape": 0,
-          "escape_ci95": null,
-          "avg_correctness": 0,
-          "correctness_ci95": null,
-          "avg_thinking_ratio": 0,
-          "avg_energy_j": 0,
-          "low_n": true
-        },
-        "GPT-5-nano": {
-          "n": 1,
-          "avg_cost": 0.0005,
-          "cost_ci95": null,
-          "avg_escape": 0,
-          "escape_ci95": null,
-          "avg_correctness": 0,
-          "correctness_ci95": null,
-          "avg_thinking_ratio": 0,
-          "avg_energy_j": 0,
-          "low_n": true
-        },
-        "DeepSeek v4 Pro": {
-          "n": 9,
-          "avg_cost": 0.0071,
-          "cost_ci95": [
-            0.0049,
-            0.0095
+            0.0013,
+            0.0015
           ],
           "avg_escape": 0,
           "escape_ci95": null,
@@ -1448,51 +1227,9 @@ window.DYNAMICS_DATA = {
           "avg_energy_j": 0,
           "low_n": false
         },
-        "GPT-5.5": {
-          "n": 3,
-          "avg_cost": 0.041,
-          "cost_ci95": [
-            0.0325,
-            0.053
-          ],
-          "avg_escape": 0,
-          "escape_ci95": null,
-          "avg_correctness": 0,
-          "correctness_ci95": null,
-          "avg_thinking_ratio": 0,
-          "avg_energy_j": 0,
-          "low_n": true
-        },
-        "GPT-5-mini": {
+        "openai/gpt-5.6-terra": {
           "n": 1,
-          "avg_cost": 0.0021,
-          "cost_ci95": null,
-          "avg_escape": 0,
-          "escape_ci95": null,
-          "avg_correctness": 0,
-          "correctness_ci95": null,
-          "avg_thinking_ratio": 0,
-          "avg_energy_j": 0,
-          "low_n": true
-        },
-        "Claude Fable 5": {
-          "n": 4,
-          "avg_cost": 0.2238,
-          "cost_ci95": [
-            0.1688,
-            0.2688
-          ],
-          "avg_escape": 0,
-          "escape_ci95": null,
-          "avg_correctness": 0,
-          "correctness_ci95": null,
-          "avg_thinking_ratio": 0,
-          "avg_energy_j": 0,
-          "low_n": true
-        },
-        "GPT-5.6": {
-          "n": 1,
-          "avg_cost": 0.0405,
+          "avg_cost": 0.0,
           "cost_ci95": null,
           "avg_escape": 0,
           "escape_ci95": null,
@@ -1504,69 +1241,89 @@ window.DYNAMICS_DATA = {
         }
       }
     },
-    "baseline": {
-      "perturbation_class": "semantic",
+    "perturbed": {
+      "perturbation_class": "process_perturbation",
       "models": {
+        "GPT-5.6 Luna": {
+          "n": 2,
+          "avg_cost": 0.0156,
+          "cost_ci95": null,
+          "avg_escape": null,
+          "escape_ci95": null,
+          "avg_correctness": 0.85,
+          "correctness_ci95": null,
+          "avg_thinking_ratio": 0.0238,
+          "avg_energy_j": 3555.375,
+          "low_n": true
+        },
+        "DeepSeek v4 Flash": {
+          "n": 3,
+          "avg_cost": 0.0064,
+          "cost_ci95": [
+            0.0033,
+            0.0082
+          ],
+          "avg_escape": null,
+          "escape_ci95": [
+            null,
+            null
+          ],
+          "avg_correctness": 1.0,
+          "correctness_ci95": [
+            1.0,
+            1.0
+          ],
+          "avg_thinking_ratio": 0.1125,
+          "avg_energy_j": 4719.33,
+          "low_n": true
+        },
+        "openai/gpt-5.6-sol": {
+          "n": 2,
+          "avg_cost": 0.5344,
+          "cost_ci95": null,
+          "avg_escape": null,
+          "escape_ci95": null,
+          "avg_correctness": 1.0,
+          "correctness_ci95": null,
+          "avg_thinking_ratio": 0.0123,
+          "avg_energy_j": 4939.785,
+          "low_n": true
+        },
         "DeepSeek v4 Pro": {
-          "n": 68,
-          "avg_cost": 0.015,
-          "cost_ci95": [
-            0.0134,
-            0.0165
-          ],
-          "avg_escape": null,
-          "escape_ci95": [
-            null,
-            null
-          ],
-          "avg_correctness": 0.8988,
-          "correctness_ci95": [
-            0.8486,
-            0.9405
-          ],
-          "avg_thinking_ratio": 0.0786,
-          "avg_energy_j": 3843.4185,
-          "low_n": false
+          "n": 2,
+          "avg_cost": 0.0247,
+          "cost_ci95": null,
+          "avg_escape": 0.231,
+          "escape_ci95": null,
+          "avg_correctness": 1.0,
+          "correctness_ci95": null,
+          "avg_thinking_ratio": 0.2866,
+          "avg_energy_j": 7845.66,
+          "low_n": true
         },
-        "Claude Fable 5": {
-          "n": 24,
-          "avg_cost": 0.9288,
-          "cost_ci95": [
-            0.6883,
-            1.1929
-          ],
-          "avg_escape": null,
-          "escape_ci95": [
-            null,
-            null
-          ],
-          "avg_correctness": 0.924,
-          "correctness_ci95": [
-            0.8344,
-            0.9833
-          ],
-          "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 2335.8121,
-          "low_n": false
-        },
-        "GPT-5-nano": {
+        "openai/gpt-5.6-terra": {
           "n": 1,
-          "avg_cost": 0.0037,
+          "avg_cost": 0.207,
           "cost_ci95": null,
           "avg_escape": null,
           "escape_ci95": null,
           "avg_correctness": 0.7,
           "correctness_ci95": null,
-          "avg_thinking_ratio": 0.1482,
-          "avg_energy_j": 3082.71,
+          "avg_thinking_ratio": 0.0151,
+          "avg_energy_j": 3788.26,
           "low_n": true
-        },
-        "GPT-5.6": {
-          "n": 9,
-          "avg_cost": 0.5174,
+        }
+      }
+    },
+    "baseline": {
+      "perturbation_class": "baseline",
+      "models": {
+        "DeepSeek v4 Pro": {
+          "n": 3,
+          "avg_cost": 0.0181,
           "cost_ci95": [
-            0.4159,
-            0.6236
+            0.0098,
+            0.0275
           ],
           "avg_escape": null,
           "escape_ci95": [
@@ -1578,202 +1335,116 @@ window.DYNAMICS_DATA = {
             1.0,
             1.0
           ],
-          "avg_thinking_ratio": 0.0669,
-          "avg_energy_j": 2725.0289,
-          "low_n": false
+          "avg_thinking_ratio": 0.147,
+          "avg_energy_j": 4703.6033,
+          "low_n": true
         },
-        "GPT-5-mini": {
-          "n": 6,
-          "avg_cost": 0.0309,
-          "cost_ci95": [
-            0.0219,
-            0.0435
-          ],
+        "GPT-5.6 Luna": {
+          "n": 2,
+          "avg_cost": 0.0182,
+          "cost_ci95": null,
           "avg_escape": null,
-          "escape_ci95": [
-            null,
-            null
-          ],
-          "avg_correctness": 0.8667,
-          "correctness_ci95": [
-            0.7667,
-            0.9583
-          ],
-          "avg_thinking_ratio": 0.066,
-          "avg_energy_j": 4545.4,
-          "low_n": false
+          "escape_ci95": null,
+          "avg_correctness": 0.7,
+          "correctness_ci95": null,
+          "avg_thinking_ratio": 0.0158,
+          "avg_energy_j": 4451.655,
+          "low_n": true
         },
-        "GPT-5": {
+        "openai/gpt-5.6-sol": {
+          "n": 2,
+          "avg_cost": 0.458,
+          "cost_ci95": null,
+          "avg_escape": null,
+          "escape_ci95": null,
+          "avg_correctness": 1.0,
+          "correctness_ci95": null,
+          "avg_thinking_ratio": 0.0212,
+          "avg_energy_j": 4111.115,
+          "low_n": true
+        },
+        "DeepSeek v4 Flash": {
           "n": 3,
-          "avg_cost": 0.1966,
+          "avg_cost": 0.0082,
           "cost_ci95": [
-            0.1773,
-            0.2201
+            0.0056,
+            0.012
           ],
           "avg_escape": null,
           "escape_ci95": [
             null,
             null
           ],
-          "avg_correctness": 0.8333,
+          "avg_correctness": 1.0,
           "correctness_ci95": [
-            0.7,
+            1.0,
             1.0
           ],
-          "avg_thinking_ratio": 0.1019,
-          "avg_energy_j": 6593.97,
+          "avg_thinking_ratio": 0.1283,
+          "avg_energy_j": 5925.8633,
+          "low_n": true
+        },
+        "openai/gpt-5.6-terra": {
+          "n": 1,
+          "avg_cost": 0.2095,
+          "cost_ci95": null,
+          "avg_escape": null,
+          "escape_ci95": null,
+          "avg_correctness": 0.7,
+          "correctness_ci95": null,
+          "avg_thinking_ratio": 0.0172,
+          "avg_energy_j": 3602.75,
           "low_n": true
         }
       }
     }
   },
   "perturbation_class_breakdown": {
-    "semantic": {
-      "DeepSeek v4 Pro": {
-        "n": 97,
-        "low_n": false,
-        "avg_cost": 0.0157,
-        "cost_ci95": [
-          0.0144,
-          0.017
-        ],
+    "process_perturbation": {
+      "GPT-5.6 Luna": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.0196,
+        "cost_ci95": null,
         "avg_escape": null,
-        "escape_ci95": [
-          null,
-          null
-        ],
-        "avg_correctness": 0.91,
-        "correctness_ci95": [
-          0.8791,
-          0.9426
-        ],
-        "avg_thinking_ratio": 0.085,
-        "avg_loc": 703,
-        "avg_tokens": 22558,
-        "avg_narration_penalty": 0.0
-      },
-      "GPT-5.6": {
-        "n": 15,
-        "low_n": false,
-        "avg_cost": 0.4474,
-        "cost_ci95": [
-          0.3763,
-          0.5175
-        ],
-        "avg_escape": null,
-        "escape_ci95": [
-          null,
-          null
-        ],
-        "avg_correctness": 1.0,
-        "correctness_ci95": [
-          1.0,
-          1.0
-        ],
-        "avg_thinking_ratio": 0.064,
-        "avg_loc": 367,
-        "avg_tokens": 9330,
-        "avg_narration_penalty": 0.02
-      },
-      "Claude Fable 5": {
-        "n": 36,
-        "low_n": false,
-        "avg_cost": 1.0677,
-        "cost_ci95": [
-          0.8761,
-          1.2718
-        ],
-        "avg_escape": null,
-        "escape_ci95": [
-          null,
-          null
-        ],
-        "avg_correctness": 0.95,
-        "correctness_ci95": [
-          0.9132,
-          0.9826
-        ],
-        "avg_thinking_ratio": 0.0,
-        "avg_loc": 545,
-        "avg_tokens": 12185,
-        "avg_narration_penalty": 0.09
-      },
-      "GPT-5-nano": {
-        "n": 6,
-        "low_n": false,
-        "avg_cost": 0.0057,
-        "cost_ci95": [
-          0.0044,
-          0.0072
-        ],
-        "avg_escape": null,
-        "escape_ci95": [
-          0.4464,
-          null
-        ],
-        "avg_correctness": 0.76,
-        "correctness_ci95": [
-          0.7,
-          0.8583
-        ],
-        "avg_thinking_ratio": 0.19,
-        "avg_loc": 199,
-        "avg_tokens": 25482,
+        "escape_ci95": null,
+        "avg_correctness": 0.7,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.016,
+        "avg_loc": 293,
+        "avg_tokens": 45713,
         "avg_narration_penalty": 0.3
       },
-      "GPT-5.6-fast": {
+      "openai/gpt-5.6-sol": {
         "n": 6,
         "low_n": false,
-        "avg_cost": 0.6625,
+        "avg_cost": 0.3894,
         "cost_ci95": [
-          0.6082,
-          0.7169
-        ],
-        "avg_escape": 0.58,
-        "escape_ci95": [
-          0.4395,
-          0.707
-        ],
-        "avg_correctness": 1.0,
-        "correctness_ci95": [
-          1.0,
-          1.0
-        ],
-        "avg_thinking_ratio": 0.071,
-        "avg_loc": 343,
-        "avg_tokens": 6488,
-        "avg_narration_penalty": 0.0
-      },
-      "GPT-5-mini": {
-        "n": 12,
-        "low_n": false,
-        "avg_cost": 0.0258,
-        "cost_ci95": [
-          0.0206,
-          0.0333
+          0.3487,
+          0.4235
         ],
         "avg_escape": null,
         "escape_ci95": [
           null,
           null
         ],
-        "avg_correctness": 0.91,
+        "avg_correctness": 1.0,
         "correctness_ci95": [
-          0.8333,
-          0.975
+          1.0,
+          1.0
         ],
-        "avg_thinking_ratio": 0.066,
-        "avg_loc": 264,
-        "avg_tokens": 28288,
-        "avg_narration_penalty": 0.18
+        "avg_thinking_ratio": 0.029,
+        "avg_loc": 436,
+        "avg_tokens": 29168,
+        "avg_narration_penalty": 0.0
       },
-      "GPT-5": {
-        "n": 10,
+      "DeepSeek v4 Pro": {
+        "n": 6,
         "low_n": false,
-        "avg_cost": 0.158,
+        "avg_cost": 0.0162,
         "cost_ci95": [
-          0.1241,
-          0.1865
+          0.0135,
+          0.0186
         ],
         "avg_escape": null,
         "escape_ci95": [
@@ -1782,80 +1453,257 @@ window.DYNAMICS_DATA = {
         ],
         "avg_correctness": 0.95,
         "correctness_ci95": [
-          0.87,
+          0.85,
           1.0
         ],
-        "avg_thinking_ratio": 0.083,
-        "avg_loc": 396,
-        "avg_tokens": 33055,
-        "avg_narration_penalty": 0.03
+        "avg_thinking_ratio": 0.254,
+        "avg_loc": 502,
+        "avg_tokens": 21811,
+        "avg_narration_penalty": 0.05
       },
-      "GPT-5.5": {
+      "DeepSeek v4 Flash": {
         "n": 3,
         "low_n": true,
-        "avg_cost": 0.282,
+        "avg_cost": 0.0064,
         "cost_ci95": null,
-        "avg_escape": 0.64,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 1.0,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.113,
+        "avg_loc": 870,
+        "avg_tokens": 23195,
+        "avg_narration_penalty": 0.0
+      },
+      "openai/gpt-5.6-terra": {
+        "n": 1,
+        "low_n": true,
+        "avg_cost": 0.207,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 0.7,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.015,
+        "avg_loc": 348,
+        "avg_tokens": 31496,
+        "avg_narration_penalty": 0.3
+      }
+    },
+    "baseline": {
+      "DeepSeek v4 Pro": {
+        "n": 3,
+        "low_n": true,
+        "avg_cost": 0.0181,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 1.0,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.147,
+        "avg_loc": 653,
+        "avg_tokens": 24004,
+        "avg_narration_penalty": 0.0
+      },
+      "GPT-5.6 Luna": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.0182,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 0.7,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.016,
+        "avg_loc": 284,
+        "avg_tokens": 39960,
+        "avg_narration_penalty": 0.3
+      },
+      "openai/gpt-5.6-sol": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.458,
+        "cost_ci95": null,
+        "avg_escape": null,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
         "avg_thinking_ratio": 0.021,
-        "avg_loc": 262,
-        "avg_tokens": 21005,
-        "avg_narration_penalty": 0.0
-      }
-    },
-    "manifold": {
-      "DeepSeek v4 Pro": {
-        "n": 12,
-        "low_n": false,
-        "avg_cost": 0.0167,
-        "cost_ci95": [
-          0.0136,
-          0.0197
-        ],
-        "avg_escape": 0.76,
-        "escape_ci95": [
-          0.7302,
-          0.8062
-        ],
-        "avg_correctness": 0.77,
-        "correctness_ci95": [
-          0.6167,
-          0.8667
-        ],
-        "avg_thinking_ratio": 0.098,
-        "avg_loc": 729,
-        "avg_tokens": 22870,
+        "avg_loc": 516,
+        "avg_tokens": 31681,
         "avg_narration_penalty": 0.0
       },
-      "Claude Fable 5": {
+      "DeepSeek v4 Flash": {
         "n": 3,
         "low_n": true,
-        "avg_cost": 1.2892,
+        "avg_cost": 0.0082,
         "cost_ci95": null,
-        "avg_escape": 0.62,
-        "escape_ci95": null,
-        "avg_correctness": 0.87,
-        "correctness_ci95": null,
-        "avg_thinking_ratio": 0.0,
-        "avg_loc": 841,
-        "avg_tokens": 15464,
-        "avg_narration_penalty": 0.0
-      },
-      "GPT-5": {
-        "n": 1,
-        "low_n": true,
-        "avg_cost": 0.1685,
-        "cost_ci95": null,
-        "avg_escape": 0.7,
+        "avg_escape": null,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
-        "avg_thinking_ratio": 0.083,
-        "avg_loc": 473,
-        "avg_tokens": 28417,
+        "avg_thinking_ratio": 0.128,
+        "avg_loc": 924,
+        "avg_tokens": 28071,
         "avg_narration_penalty": 0.0
+      },
+      "openai/gpt-5.6-terra": {
+        "n": 1,
+        "low_n": true,
+        "avg_cost": 0.2095,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 0.7,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.017,
+        "avg_loc": 295,
+        "avg_tokens": 29140,
+        "avg_narration_penalty": 0.3
+      }
+    },
+    "objective_mutation": {
+      "DeepSeek v4 Flash": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.0101,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 1.0,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.294,
+        "avg_loc": 1050,
+        "avg_tokens": 35268,
+        "avg_narration_penalty": 0.0
+      },
+      "openai/gpt-5.6-sol": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.515,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 1.0,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.016,
+        "avg_loc": 708,
+        "avg_tokens": 33576,
+        "avg_narration_penalty": 0.0
+      },
+      "DeepSeek v4 Pro": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.0247,
+        "cost_ci95": null,
+        "avg_escape": 0.23,
+        "escape_ci95": null,
+        "avg_correctness": 1.0,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.287,
+        "avg_loc": 988,
+        "avg_tokens": 30844,
+        "avg_narration_penalty": 0.0
+      },
+      "openai/gpt-5.6-terra": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.225,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 0.7,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.023,
+        "avg_loc": 352,
+        "avg_tokens": 30637,
+        "avg_narration_penalty": 0.3
+      },
+      "GPT-5.6 Luna": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.0169,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 0.7,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.024,
+        "avg_loc": 284,
+        "avg_tokens": 28330,
+        "avg_narration_penalty": 0.3
+      }
+    },
+    "specification_corruption": {
+      "DeepSeek v4 Flash": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.0096,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 1.0,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.292,
+        "avg_loc": 900,
+        "avg_tokens": 32778,
+        "avg_narration_penalty": 0.0
+      },
+      "DeepSeek v4 Pro": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.0147,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 1.0,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.068,
+        "avg_loc": 726,
+        "avg_tokens": 20344,
+        "avg_narration_penalty": 0.0
+      },
+      "openai/gpt-5.6-sol": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.5344,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 1.0,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.012,
+        "avg_loc": 616,
+        "avg_tokens": 39448,
+        "avg_narration_penalty": 0.0
+      },
+      "openai/gpt-5.6-terra": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.1974,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 0.85,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.019,
+        "avg_loc": 304,
+        "avg_tokens": 31686,
+        "avg_narration_penalty": 0.15
+      },
+      "GPT-5.6 Luna": {
+        "n": 2,
+        "low_n": true,
+        "avg_cost": 0.0156,
+        "cost_ci95": null,
+        "avg_escape": null,
+        "escape_ci95": null,
+        "avg_correctness": 0.85,
+        "correctness_ci95": null,
+        "avg_thinking_ratio": 0.024,
+        "avg_loc": 302,
+        "avg_tokens": 28792,
+        "avg_narration_penalty": 0.15
       }
     }
   },
@@ -1918,20 +1766,19 @@ window.DYNAMICS_DATA = {
     }
   ],
   "strategy_distribution": {
-    "exploratory": 59,
-    "?": 24,
-    "conservative": 141,
-    "wasteful": 3
+    "?": 95,
+    "efficient": 44,
+    "conservative": 5
   },
   "routing": {
     "_meta": {
-      "tasks_analyzed": 17,
-      "total_valid_entries": 201
+      "tasks_analyzed": 9,
+      "total_valid_entries": 49
     },
     "per_task": [
       {
-        "task": "baseline",
-        "models_tested": 4,
+        "task": "force_abandonment",
+        "models_tested": 2,
         "best_correctness_model": "deepseek/deepseek-v4-pro",
         "best_efficiency_model": "deepseek/deepseek-v4-pro",
         "default_model": "deepseek/deepseek-v4-pro",
@@ -1940,663 +1787,376 @@ window.DYNAMICS_DATA = {
         "recommendation": "default deepseek/deepseek-v4-pro",
         "models": {
           "deepseek/deepseek-v4-pro": {
-            "n": 3,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.015557,
-            "efficiency": 64.28
-          },
-          "openai/gpt-5.6": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.386228,
-            "efficiency": 2.59
-          },
-          "openai/gpt-5-mini": {
-            "n": 2,
-            "avg_correctness": 0.875,
-            "avg_cost": 0.043339,
-            "efficiency": 20.19
-          },
-          "anthropic/claude-fable-5": {
             "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.162945,
-            "efficiency": 6.14
-          }
-        }
-      },
-      {
-        "task": "collaborative_editor",
-        "models_tested": 3,
-        "best_correctness_model": "anthropic/claude-fable-5",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "anthropic/claude-fable-5",
-        "routing": "default",
-        "recommendation": "default deepseek/deepseek-v4-pro",
-        "models": {
-          "anthropic/claude-fable-5": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 2.489478,
-            "efficiency": 0.4
+            "avg_cost": 0.016107,
+            "efficiency": 62.09
           },
-          "openai/gpt-5.6": {
+          "openai/gpt-5.6-sol": {
             "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.700061,
-            "efficiency": 1.43
-          },
-          "deepseek/deepseek-v4-pro": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.022099,
-            "efficiency": 45.25
-          }
-        }
-      },
-      {
-        "task": "data_table",
-        "models_tested": 3,
-        "best_correctness_model": "anthropic/claude-fable-5",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "openai/gpt-5.6",
-        "escalate_model": "anthropic/claude-fable-5",
-        "routing": "default",
-        "recommendation": "default openai/gpt-5.6",
-        "models": {
-          "anthropic/claude-fable-5": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 2.053133,
-            "efficiency": 0.49
-          },
-          "openai/gpt-5.6": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.729557,
-            "efficiency": 1.37
-          },
-          "deepseek/deepseek-v4-pro": {
-            "n": 1,
-            "avg_correctness": 0.6,
-            "avg_cost": 0.019413,
-            "efficiency": 30.91
+            "avg_cost": 0.358608,
+            "efficiency": 2.79
           }
         }
       },
       {
         "task": "inject_alien_vocab",
-        "models_tested": 3,
-        "best_correctness_model": "openai/gpt-5",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "openai/gpt-5",
-        "routing": "escalate",
-        "recommendation": "escalate to openai/gpt-5",
+        "models_tested": 5,
+        "best_correctness_model": "openai/gpt-5.6-sol",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "openai/gpt-5.6-sol",
+        "routing": "default",
+        "recommendation": "default deepseek/deepseek-v4-flash",
         "models": {
-          "deepseek/deepseek-v4-pro": {
-            "n": 7,
-            "avg_correctness": 0.7429,
-            "avg_cost": 0.017329,
-            "efficiency": 42.87
-          },
-          "anthropic/claude-fable-5": {
+          "openai/gpt-5.6-sol": {
             "n": 2,
-            "avg_correctness": 0.9,
-            "avg_cost": 1.430752,
-            "efficiency": 0.63
-          },
-          "openai/gpt-5": {
-            "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.168483,
-            "efficiency": 5.94
+            "avg_cost": 0.367647,
+            "efficiency": 2.72
+          },
+          "deepseek/deepseek-v4-pro": {
+            "n": 2,
+            "avg_correctness": 0.85,
+            "avg_cost": 0.018327,
+            "efficiency": 46.38
+          },
+          "deepseek/deepseek-v4-flash": {
+            "n": 2,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.00574,
+            "efficiency": 174.22
+          },
+          "openai/gpt-5.6-terra": {
+            "n": 1,
+            "avg_correctness": 0.7,
+            "avg_cost": 0.207043,
+            "efficiency": 3.38
+          },
+          "openai/gpt-5.6-luna": {
+            "n": 1,
+            "avg_correctness": 0.7,
+            "avg_cost": 0.01544,
+            "efficiency": 45.34
           }
         }
       },
       {
         "task": "inject_competing_goal",
-        "models_tested": 3,
-        "best_correctness_model": "openai/gpt-5",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "openai/gpt-5",
-        "routing": "escalate",
-        "recommendation": "escalate to openai/gpt-5",
+        "models_tested": 5,
+        "best_correctness_model": "openai/gpt-5.6-sol",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "openai/gpt-5.6-sol",
+        "routing": "default",
+        "recommendation": "default deepseek/deepseek-v4-flash",
         "models": {
-          "deepseek/deepseek-v4-pro": {
-            "n": 3,
-            "avg_correctness": 0.8667,
-            "avg_cost": 0.015738,
-            "efficiency": 55.07
-          },
-          "openai/gpt-5": {
+          "openai/gpt-5.6-sol": {
             "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.159429,
-            "efficiency": 6.27
+            "avg_cost": 0.519669,
+            "efficiency": 1.92
           },
-          "anthropic/claude-fable-5": {
-            "n": 2,
+          "deepseek/deepseek-v4-pro": {
+            "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 1.482016,
-            "efficiency": 0.67
+            "avg_cost": 0.026724,
+            "efficiency": 37.42
+          },
+          "openai/gpt-5.6-terra": {
+            "n": 1,
+            "avg_correctness": 0.7,
+            "avg_cost": 0.264607,
+            "efficiency": 2.65
+          },
+          "deepseek/deepseek-v4-flash": {
+            "n": 1,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.012513,
+            "efficiency": 79.92
+          },
+          "openai/gpt-5.6-luna": {
+            "n": 1,
+            "avg_correctness": 0.7,
+            "avg_cost": 0.016816,
+            "efficiency": 41.63
           }
         }
       },
       {
         "task": "inject_phantom_success",
-        "models_tested": 4,
-        "best_correctness_model": "openai/gpt-5",
-        "best_efficiency_model": "openai/gpt-5-nano",
-        "default_model": "openai/gpt-5-nano",
-        "escalate_model": "openai/gpt-5",
-        "routing": "escalate",
-        "recommendation": "escalate to openai/gpt-5",
+        "models_tested": 5,
+        "best_correctness_model": "openai/gpt-5.6-sol",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "openai/gpt-5.6-sol",
+        "routing": "default",
+        "recommendation": "default deepseek/deepseek-v4-flash",
         "models": {
-          "deepseek/deepseek-v4-pro": {
-            "n": 5,
-            "avg_correctness": 0.92,
-            "avg_cost": 0.020589,
-            "efficiency": 44.68
+          "openai/gpt-5.6-sol": {
+            "n": 1,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.542567,
+            "efficiency": 1.84
           },
-          "openai/gpt-5-nano": {
+          "deepseek/deepseek-v4-flash": {
+            "n": 1,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.010797,
+            "efficiency": 92.62
+          },
+          "openai/gpt-5.6-terra": {
             "n": 1,
             "avg_correctness": 0.7,
-            "avg_cost": 0.004173,
-            "efficiency": 167.74
-          },
-          "openai/gpt-5": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.147749,
-            "efficiency": 6.77
-          },
-          "anthropic/claude-fable-5": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 1.720768,
-            "efficiency": 0.58
-          }
-        }
-      },
-      {
-        "task": "inject_phantom_success_s0.5",
-        "models_tested": 8,
-        "best_correctness_model": "openai/gpt-5.6",
-        "best_efficiency_model": "openai/gpt-5-nano",
-        "default_model": "openai/gpt-5-nano",
-        "escalate_model": "openai/gpt-5.6",
-        "routing": "escalate",
-        "recommendation": "escalate to openai/gpt-5.6",
-        "models": {
-          "openai/gpt-5.6": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.309446,
-            "efficiency": 3.23
-          },
-          "anthropic/claude-fable-5": {
-            "n": 2,
-            "avg_correctness": 0.85,
-            "avg_cost": 0.949532,
-            "efficiency": 0.9
-          },
-          "openai/gpt-5-mini": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.017839,
-            "efficiency": 56.06
-          },
-          "openai/gpt-5.5": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.270472,
-            "efficiency": 3.7
-          },
-          "openai/gpt-5-nano": {
-            "n": 1,
-            "avg_correctness": 0.7,
-            "avg_cost": 0.004373,
-            "efficiency": 160.06
-          },
-          "openai/gpt-5": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.063435,
-            "efficiency": 15.76
+            "avg_cost": 0.18023,
+            "efficiency": 3.88
           },
           "deepseek/deepseek-v4-pro": {
-            "n": 4,
+            "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.01328,
-            "efficiency": 75.3
+            "avg_cost": 0.018778,
+            "efficiency": 53.25
           },
-          "openai/gpt-5.6-fast": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.658125,
-            "efficiency": 1.52
+          "openai/gpt-5.6-luna": {
+            "n": 1,
+            "avg_correctness": 0.7,
+            "avg_cost": 0.018458,
+            "efficiency": 37.92
           }
         }
       },
       {
         "task": "invert_constraint",
-        "models_tested": 3,
-        "best_correctness_model": "anthropic/claude-fable-5",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "anthropic/claude-fable-5",
-        "routing": "escalate",
-        "recommendation": "escalate to anthropic/claude-fable-5",
+        "models_tested": 5,
+        "best_correctness_model": "deepseek/deepseek-v4-flash",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "",
+        "routing": "default",
+        "recommendation": "default deepseek/deepseek-v4-flash",
         "models": {
-          "anthropic/claude-fable-5": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 1.046811,
-            "efficiency": 0.96
-          },
-          "deepseek/deepseek-v4-pro": {
-            "n": 5,
-            "avg_correctness": 0.76,
-            "avg_cost": 0.018165,
-            "efficiency": 41.84
-          },
-          "openai/gpt-5": {
+          "deepseek/deepseek-v4-flash": {
             "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.184944,
-            "efficiency": 5.41
-          }
-        }
-      },
-      {
-        "task": "perturbed",
-        "models_tested": 4,
-        "best_correctness_model": "openai/gpt-5.6",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "openai/gpt-5.6",
-        "routing": "escalate",
-        "recommendation": "escalate to openai/gpt-5.6",
-        "models": {
+            "avg_cost": 0.007774,
+            "efficiency": 128.63
+          },
           "deepseek/deepseek-v4-pro": {
-            "n": 3,
-            "avg_correctness": 0.9297,
-            "avg_cost": 0.016884,
-            "efficiency": 55.06
-          },
-          "openai/gpt-5.6": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.408636,
-            "efficiency": 2.45
-          },
-          "openai/gpt-5-mini": {
-            "n": 2,
-            "avg_correctness": 0.875,
-            "avg_cost": 0.030346,
-            "efficiency": 28.83
-          },
-          "anthropic/claude-fable-5": {
             "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.360892,
-            "efficiency": 2.77
+            "avg_cost": 0.022742,
+            "efficiency": 43.97
+          },
+          "openai/gpt-5.6-luna": {
+            "n": 1,
+            "avg_correctness": 0.7,
+            "avg_cost": 0.017025,
+            "efficiency": 41.12
+          },
+          "openai/gpt-5.6-sol": {
+            "n": 1,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.510231,
+            "efficiency": 1.96
+          },
+          "openai/gpt-5.6-terra": {
+            "n": 1,
+            "avg_correctness": 0.7,
+            "avg_cost": 0.185437,
+            "efficiency": 3.77
           }
         }
       },
       {
         "task": "remove_critical_constraint",
         "models_tested": 5,
-        "best_correctness_model": "openai/gpt-5",
-        "best_efficiency_model": "openai/gpt-5-nano",
-        "default_model": "openai/gpt-5-nano",
-        "escalate_model": "openai/gpt-5",
-        "routing": "escalate",
-        "recommendation": "escalate to openai/gpt-5",
+        "best_correctness_model": "deepseek/deepseek-v4-flash",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "",
+        "routing": "default",
+        "recommendation": "default deepseek/deepseek-v4-flash",
         "models": {
+          "deepseek/deepseek-v4-flash": {
+            "n": 1,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.008413,
+            "efficiency": 118.87
+          },
           "deepseek/deepseek-v4-pro": {
-            "n": 5,
-            "avg_correctness": 0.88,
-            "avg_cost": 0.019426,
-            "efficiency": 45.3
-          },
-          "openai/gpt-5": {
             "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.206743,
-            "efficiency": 4.84
+            "avg_cost": 0.010704,
+            "efficiency": 93.42
           },
-          "anthropic/claude-fable-5": {
-            "n": 2,
-            "avg_correctness": 0.9,
-            "avg_cost": 1.091805,
-            "efficiency": 0.82
-          },
-          "openai/gpt-5.6": {
+          "openai/gpt-5.6-terra": {
             "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.374009,
-            "efficiency": 2.67
+            "avg_cost": 0.214649,
+            "efficiency": 4.66
           },
-          "openai/gpt-5-nano": {
+          "openai/gpt-5.6-sol": {
             "n": 1,
-            "avg_correctness": 0.75,
-            "avg_cost": 0.006376,
-            "efficiency": 117.63
+            "avg_correctness": 1.0,
+            "avg_cost": 0.526209,
+            "efficiency": 1.9
+          },
+          "openai/gpt-5.6-luna": {
+            "n": 1,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.012829,
+            "efficiency": 77.95
           }
         }
       },
       {
-        "task": "remove_critical_constraint_s0.5",
-        "models_tested": 7,
-        "best_correctness_model": "openai/gpt-5.6",
+        "task": "reverse_causality",
+        "models_tested": 2,
+        "best_correctness_model": "openai/gpt-5.6-sol",
         "best_efficiency_model": "deepseek/deepseek-v4-pro",
         "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "openai/gpt-5.6",
+        "escalate_model": "openai/gpt-5.6-sol",
         "routing": "default",
         "recommendation": "default deepseek/deepseek-v4-pro",
         "models": {
-          "openai/gpt-5.6": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.397594,
-            "efficiency": 2.52
-          },
-          "openai/gpt-5.6-fast": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.685522,
-            "efficiency": 1.46
-          },
-          "deepseek/deepseek-v4-pro": {
-            "n": 4,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.014286,
-            "efficiency": 70.0
-          },
-          "openai/gpt-5.5": {
+          "openai/gpt-5.6-sol": {
             "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.304967,
-            "efficiency": 3.28
+            "avg_cost": 0.398313,
+            "efficiency": 2.51
           },
-          "openai/gpt-5": {
-            "n": 2,
+          "deepseek/deepseek-v4-pro": {
+            "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.114151,
-            "efficiency": 8.76
-          },
-          "openai/gpt-5-mini": {
-            "n": 2,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.024369,
-            "efficiency": 41.04
-          },
-          "anthropic/claude-fable-5": {
-            "n": 2,
-            "avg_correctness": 0.85,
-            "avg_cost": 1.336673,
-            "efficiency": 0.64
+            "avg_cost": 0.015205,
+            "efficiency": 65.77
           }
         }
       },
       {
         "task": "shift_framing",
-        "models_tested": 2,
-        "best_correctness_model": "deepseek/deepseek-v4-pro",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "",
-        "routing": "default",
-        "recommendation": "default deepseek/deepseek-v4-pro",
-        "models": {
-          "deepseek/deepseek-v4-pro": {
-            "n": 5,
-            "avg_correctness": 0.8,
-            "avg_cost": 0.015839,
-            "efficiency": 50.51
-          },
-          "anthropic/claude-fable-5": {
-            "n": 1,
-            "avg_correctness": 0.8,
-            "avg_cost": 1.006182,
-            "efficiency": 0.8
-          }
-        }
-      },
-      {
-        "task": "standardized_build",
         "models_tested": 4,
         "best_correctness_model": "deepseek/deepseek-v4-pro",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "deepseek/deepseek-v4-pro",
         "routing": "default",
-        "recommendation": "default deepseek/deepseek-v4-pro",
+        "recommendation": "default deepseek/deepseek-v4-flash",
         "models": {
-          "openai/gpt-5-mini": {
+          "openai/gpt-5.6-luna": {
             "n": 1,
             "avg_correctness": 0.7,
-            "avg_cost": 0.023859,
-            "efficiency": 29.34
+            "avg_cost": 0.023735,
+            "efficiency": 29.49
           },
           "deepseek/deepseek-v4-pro": {
-            "n": 1,
+            "n": 2,
             "avg_correctness": 1.0,
-            "avg_cost": 0.020049,
-            "efficiency": 49.88
+            "avg_cost": 0.01476,
+            "efficiency": 67.75
           },
-          "openai/gpt-5.6": {
+          "deepseek/deepseek-v4-flash": {
             "n": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.266403,
-            "efficiency": 3.75
+            "avg_cost": 0.00758,
+            "efficiency": 131.93
           },
-          "anthropic/claude-fable-5": {
-            "n": 1,
+          "openai/gpt-5.6-sol": {
+            "n": 2,
             "avg_correctness": 1.0,
-            "avg_cost": 1.110397,
-            "efficiency": 0.9
-          }
-        }
-      },
-      {
-        "task": "standardized_retry",
-        "models_tested": 3,
-        "best_correctness_model": "openai/gpt-5.6-fast",
-        "best_efficiency_model": "openai/gpt-5-nano",
-        "default_model": "openai/gpt-5-nano",
-        "escalate_model": "openai/gpt-5.6-fast",
-        "routing": "escalate",
-        "recommendation": "escalate to openai/gpt-5.6-fast",
-        "models": {
-          "openai/gpt-5-nano": {
-            "n": 1,
-            "avg_correctness": 0.7,
-            "avg_cost": 0.009503,
-            "efficiency": 73.66
-          },
-          "openai/gpt-5.6-fast": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.661033,
-            "efficiency": 1.51
-          },
-          "deepseek/deepseek-v4-pro": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.013816,
-            "efficiency": 72.38
-          }
-        }
-      },
-      {
-        "task": "std_final",
-        "models_tested": 4,
-        "best_correctness_model": "openai/gpt-5-nano",
-        "best_efficiency_model": "openai/gpt-5-nano",
-        "default_model": "openai/gpt-5-nano",
-        "escalate_model": "",
-        "routing": "default",
-        "recommendation": "default openai/gpt-5-nano",
-        "models": {
-          "openai/gpt-5-nano": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.005871,
-            "efficiency": 170.32
-          },
-          "openai/gpt-5.6-fast": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.626804,
-            "efficiency": 1.6
-          },
-          "deepseek/deepseek-v4-pro": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.01493,
-            "efficiency": 66.98
-          },
-          "openai/gpt-5-mini": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.015874,
-            "efficiency": 63.0
+            "avg_cost": 0.422168,
+            "efficiency": 2.37
           }
         }
       },
       {
         "task": "task_manager",
-        "models_tested": 4,
-        "best_correctness_model": "openai/gpt-5.6",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "openai/gpt-5.6",
+        "models_tested": 5,
+        "best_correctness_model": "openai/gpt-5.6-sol",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "openai/gpt-5.6-sol",
         "routing": "default",
-        "recommendation": "default deepseek/deepseek-v4-pro",
+        "recommendation": "default deepseek/deepseek-v4-flash",
         "models": {
-          "deepseek/deepseek-v4-pro": {
-            "n": 5,
-            "avg_correctness": 0.9828,
-            "avg_cost": 0.019124,
-            "efficiency": 51.39
+          "openai/gpt-5.6-luna": {
+            "n": 2,
+            "avg_correctness": 0.7,
+            "avg_cost": 0.018193,
+            "efficiency": 38.48
           },
-          "anthropic/claude-fable-5": {
+          "openai/gpt-5.6-sol": {
+            "n": 1,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.525433,
+            "efficiency": 1.9
+          },
+          "deepseek/deepseek-v4-flash": {
+            "n": 2,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.009497,
+            "efficiency": 105.3
+          },
+          "deepseek/deepseek-v4-pro": {
+            "n": 2,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.022232,
+            "efficiency": 44.98
+          },
+          "openai/gpt-5.6-terra": {
             "n": 1,
             "avg_correctness": 0.7,
-            "avg_cost": 2.022152,
-            "efficiency": 0.35
-          },
-          "openai/gpt-5.6": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.498459,
-            "efficiency": 2.01
-          },
-          "openai/gpt-5-mini": {
-            "n": 1,
-            "avg_correctness": 1.0,
-            "avg_cost": 0.019817,
-            "efficiency": 50.46
-          }
-        }
-      },
-      {
-        "task": "url_shortener",
-        "models_tested": 2,
-        "best_correctness_model": "anthropic/claude-fable-5",
-        "best_efficiency_model": "deepseek/deepseek-v4-pro",
-        "default_model": "deepseek/deepseek-v4-pro",
-        "escalate_model": "anthropic/claude-fable-5",
-        "routing": "escalate",
-        "recommendation": "escalate to anthropic/claude-fable-5",
-        "models": {
-          "anthropic/claude-fable-5": {
-            "n": 8,
-            "avg_correctness": 0.9844,
-            "avg_cost": 0.513726,
-            "efficiency": 1.92
-          },
-          "deepseek/deepseek-v4-pro": {
-            "n": 21,
-            "avg_correctness": 0.896,
-            "avg_cost": 0.008336,
-            "efficiency": 107.48
+            "avg_cost": 0.209516,
+            "efficiency": 3.34
           }
         }
       }
     ],
     "strategies": {
-      "anthropic/claude-fable-5_only": {
-        "n": 39,
-        "total_cost": 42.303518,
-        "avg_cost": 1.084706,
-        "avg_correctness": 0.9455
+      "deepseek/deepseek-v4-flash_only": {
+        "n": 10,
+        "total_cost": 0.083118,
+        "avg_cost": 0.008312,
+        "avg_correctness": 1.0
       },
       "deepseek/deepseek-v4-pro_only": {
-        "n": 109,
-        "total_cost": 1.721342,
-        "avg_cost": 0.015792,
-        "avg_correctness": 0.8965
+        "n": 13,
+        "total_cost": 0.230691,
+        "avg_cost": 0.017745,
+        "avg_correctness": 0.9769
       },
-      "openai/gpt-5_only": {
-        "n": 11,
-        "total_cost": 1.748905,
-        "avg_cost": 0.158991,
-        "avg_correctness": 0.9545
+      "openai/gpt-5.6-luna_only": {
+        "n": 8,
+        "total_cost": 0.140689,
+        "avg_cost": 0.017586,
+        "avg_correctness": 0.7375
       },
-      "openai/gpt-5-mini_only": {
+      "openai/gpt-5.6-sol_only": {
         "n": 12,
-        "total_cost": 0.309337,
-        "avg_cost": 0.025778,
-        "avg_correctness": 0.9083
+        "total_cost": 5.351133,
+        "avg_cost": 0.445928,
+        "avg_correctness": 1.0
       },
-      "openai/gpt-5-nano_only": {
+      "openai/gpt-5.6-terra_only": {
         "n": 6,
-        "total_cost": 0.033984,
-        "avg_cost": 0.005664,
-        "avg_correctness": 0.7583
-      },
-      "openai/gpt-5.5_only": {
-        "n": 3,
-        "total_cost": 0.845911,
-        "avg_cost": 0.28197,
-        "avg_correctness": 1.0
-      },
-      "openai/gpt-5.6_only": {
-        "n": 15,
-        "total_cost": 6.710796,
-        "avg_cost": 0.447386,
-        "avg_correctness": 1.0
-      },
-      "openai/gpt-5.6-fast_only": {
-        "n": 6,
-        "total_cost": 3.975131,
-        "avg_cost": 0.662522,
-        "avg_correctness": 1.0
+        "total_cost": 1.261483,
+        "avg_cost": 0.210247,
+        "avg_correctness": 0.75
       },
       "grit_routed": {
-        "n": 41,
-        "total_cost": 10.768792,
-        "avg_cost": 0.262653,
-        "avg_correctness": 0.9705,
+        "n": 11,
+        "total_cost": 0.10886,
+        "avg_cost": 0.009896,
+        "avg_correctness": 1.0,
         "routing_distribution": {
-          "deepseek/deepseek-v4-pro": 19,
-          "openai/gpt-5.6": 6,
-          "openai/gpt-5": 4,
-          "anthropic/claude-fable-5": 10,
-          "openai/gpt-5.6-fast": 1,
-          "openai/gpt-5-nano": 1
+          "deepseek/deepseek-v4-pro": 2,
+          "deepseek/deepseek-v4-flash": 9
         }
       }
     },
     "routing_distribution": {
-      "default": 8,
-      "escalate": 9
+      "default": 9
     }
   },
   "grit_matrix": [
@@ -5655,7 +5215,7 @@ window.DYNAMICS_DATA = {
       "successful": 758,
       "failed": 14
     },
-    "generated_at": "2026-08-17T18:14:10.749347+00:00"
+    "generated_at": "2026-08-17T19:38:39.616907+00:00"
   },
   "reviews": {
     "models": [
