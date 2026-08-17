@@ -1,5 +1,6 @@
 import pytest
 import sqlite3
+from unittest.mock import patch
 
 import app as app_module
 
@@ -95,6 +96,28 @@ def test_update_task_title_and_status(client, auth_headers):
     assert response.status_code == 200
     assert response.get_json()["title"] == "New title"
     assert response.get_json()["status"] == "done"
+
+
+def test_completed_task_queues_owner_notification(client, auth_headers):
+    created = client.post("/tasks", json={"title": "Ship feature"}, headers=auth_headers).get_json()
+    with patch.object(app_module.send_notification_email, "delay") as delay:
+        response = client.put(
+            f"/tasks/{created['id']}",
+            json={"status": "completed"},
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 200
+    delay.assert_called_once_with("alice", "Ship feature")
+
+
+def test_completed_notification_is_only_sent_on_transition(client, auth_headers):
+    created = client.post("/tasks", json={"title": "Already complete"}, headers=auth_headers).get_json()
+    with patch.object(app_module.send_notification_email, "delay") as delay:
+        client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_headers)
+        client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_headers)
+
+    delay.assert_called_once_with("alice", "Already complete")
 
 
 def test_invalid_status_is_rejected(client, auth_headers):

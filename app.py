@@ -15,11 +15,14 @@ import time
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notifications import send_notification_email
+
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_TTL_SECONDS = 3600
-VALID_STATUSES = {"pending", "done"}
+VALID_STATUSES = {"pending", "done", "completed"}
+STATUS_ERROR = "status must be either 'pending', 'done', or 'completed'"
 
 
 def get_db():
@@ -38,12 +41,29 @@ def init_db():
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tasks ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, "
-            "status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done')), "
+            "status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'completed')), "
             "created_at TEXT NOT NULL)"
         )
         columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
         if "owner_id" not in columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        schema = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tasks'"
+        ).fetchone()[0]
+        if "completed" not in schema:
+            conn.execute("ALTER TABLE tasks RENAME TO tasks_old")
+            conn.execute(
+                "CREATE TABLE tasks ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, "
+                "status TEXT NOT NULL DEFAULT 'pending' "
+                "CHECK (status IN ('pending', 'done', 'completed')), "
+                "created_at TEXT NOT NULL, owner_id INTEGER)"
+            )
+            conn.execute(
+                "INSERT INTO tasks (id, title, status, created_at, owner_id) "
+                "SELECT id, title, status, created_at, owner_id FROM tasks_old"
+            )
+            conn.execute("DROP TABLE tasks_old")
         # Backfill old rows without making the existing database unusable.
         conn.execute(
             "INSERT OR IGNORE INTO users (username, password_hash) VALUES (?, ?)",
@@ -108,7 +128,7 @@ def update_task(task_id, owner_id, title=None, status=None):
     if get_task(task_id, owner_id) is None:
         return None
     if status is not None and status not in VALID_STATUSES:
-        raise ValueError("status must be either 'pending' or 'done'")
+        raise ValueError(STATUS_ERROR)
     updates, params = [], []
     if title is not None:
         updates.append("title = ?")
@@ -214,7 +234,7 @@ def add_task():
         data = {}
     status = data.get("status")
     if status is not None and status not in VALID_STATUSES:
-        return jsonify({"error": "status must be either 'pending' or 'done'"}), 422
+        return jsonify({"error": STATUS_ERROR}), 422
     title = data.get("title")
     if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
@@ -238,12 +258,15 @@ def edit_task(task_id):
         data = {}
     status, title = data.get("status"), data.get("title")
     if status is not None and status not in VALID_STATUSES:
-        return jsonify({"error": "status must be either 'pending' or 'done'"}), 422
+        return jsonify({"error": STATUS_ERROR}), 422
     if title is not None and (not isinstance(title, str) or not title.strip()):
         return jsonify({"error": "title must be a non-empty string"}), 400
+    previous_task = get_task(task_id, g.user["id"])
     task = update_task(task_id, g.user["id"], title.strip() if isinstance(title, str) else title, status)
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if previous_task["status"] != "completed" and task["status"] == "completed":
+        send_notification_email.delay(g.user["username"], task["title"])
     return jsonify(task)
 
 
