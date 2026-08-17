@@ -11,7 +11,7 @@ workflow:
     operators: [inject_alien_vocab, shift_framing, reverse_causality, force_abandonment]
     strengths: [0.5]
 factors:
-  - {name: model,    levels: [deepseek/deepseek-v4-pro, anthropic/claude-fable-5, openai/gpt-5.6]}
+  - {name: model,    levels: [deepseek/deepseek-v4-pro, anthropic/claude-fable-5, openai/gpt-5.6-sol]}
   - {name: operator, levels: [inject_alien_vocab, shift_framing, reverse_causality, force_abandonment]}
   - {name: strength, levels: ["0.5"]}
 design: factorial
