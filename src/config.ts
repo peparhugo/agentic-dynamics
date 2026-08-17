@@ -12,6 +12,9 @@ export interface SSGConfig {
 export interface BuildOptions {
   config?: string | SSGConfig;
   plugins?: Plugin[];
+  incremental?: boolean;
+  clean?: boolean;
+  cacheFile?: string;
 }
 
 async function fileExists(file: string): Promise<boolean> {

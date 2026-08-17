@@ -9,6 +9,8 @@ export interface CliOptions {
   templates: string;
   port: number;
   help: boolean;
+  incremental: boolean;
+  clean: boolean;
 }
 
 export function parseArgs(args: string[]): CliOptions {
@@ -19,6 +21,8 @@ export function parseArgs(args: string[]): CliOptions {
     templates: './templates',
     port: 3000,
     help: false,
+    incremental: false,
+    clean: false,
   };
 
   for (let i = 0; i < args.length; i += 1) {
@@ -50,6 +54,10 @@ export function parseArgs(args: string[]): CliOptions {
     } else if (arg.startsWith('--port=')) {
       const parsed = Number.parseInt(arg.slice('--port='.length), 10);
       if (!Number.isNaN(parsed)) options.port = parsed;
+    } else if (arg === '--incremental') {
+      options.incremental = true;
+    } else if (arg === '--clean') {
+      options.clean = true;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
     }
@@ -71,6 +79,8 @@ export function printUsage(): string {
     '  --output <dir>,  -o <dir>  Output directory (default: ./dist)',
     '  --templates <dir>, -t <dir> Template directory (default: ./templates)',
     '  --port <port>,   -p <port> Port for the dev server (default: 3000)',
+    '  --incremental               Rebuild only pages whose source or template changed.',
+    '  --clean                     Force a full rebuild (ignore the cache manifest).',
     '  --help, -h                 Show this help message',
   ].join('\n');
 }
@@ -94,8 +104,17 @@ export async function run(argv: string[]): Promise<void> {
     return;
   }
 
-  const result = await buildSite(options.content, options.output, options.templates);
-  process.stdout.write(`Built ${result.pages.length} page(s) into ${options.output}\n`);
+  const result = await buildSite(options.content, options.output, options.templates, {
+    incremental: options.incremental,
+    clean: options.clean,
+  });
+  if (options.incremental) {
+    process.stdout.write(
+      `Built ${result.stats.pagesBuilt} page(s), skipped ${result.stats.pagesSkipped} page(s) into ${options.output}\n`
+    );
+  } else {
+    process.stdout.write(`Built ${result.pages.length} page(s) into ${options.output}\n`);
+  }
 }
 
 if (require.main === module) {

@@ -1,5 +1,8 @@
 export { buildSite, listMarkdownFiles, readPage, setupBuild, runBuild } from './generate';
-export type { BuildResult, BuildSetup } from './generate';
+export type { BuildResult, BuildSetup, BuildStats } from './generate';
+
+export { hashString, computeTemplatesHash, loadManifest, saveManifest, MANIFEST_VERSION } from './cache';
+export type { CacheManifest, CachedPage } from './cache';
 
 export { extractFrontmatter } from './frontmatter';
 export type { Frontmatter, ParsedDocument } from './frontmatter';
@@ -8,7 +11,7 @@ export { renderMarkdown } from './markdown';
 
 export { escapeHtml, renderIndexHtml, renderPageHtml } from './template';
 
-export { createTemplateEngine } from './engine';
+export { createTemplateEngine, BUILTIN_TEMPLATE_SOURCE } from './engine';
 export type { TemplateEngine, PageContext } from './engine';
 
 export { parseArgs, printUsage, run } from './cli';

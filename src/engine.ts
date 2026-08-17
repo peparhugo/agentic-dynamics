@@ -66,6 +66,8 @@ ${STYLE}
 </html>
 `;
 
+export const BUILTIN_TEMPLATE_SOURCE = `${BUILTIN_LAYOUT}\n${BUILTIN_PAGE_TEMPLATE}\n${BUILTIN_INDEX_TEMPLATE}`;
+
 export interface PageContext {
   title: string;
   date?: string;

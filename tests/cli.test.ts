@@ -61,4 +61,11 @@ describe('parseArgs', () => {
   it('ignores an invalid --port value and keeps the default', () => {
     expect(parseArgs(['serve', '--port', 'not-a-number']).port).toBe(3000);
   });
+
+  it('parses the --incremental and --clean flags', () => {
+    expect(parseArgs(['build', '--incremental']).incremental).toBe(true);
+    expect(parseArgs(['build', '--clean']).clean).toBe(true);
+    expect(parseArgs(['build']).incremental).toBe(false);
+    expect(parseArgs(['build']).clean).toBe(false);
+  });
 });
