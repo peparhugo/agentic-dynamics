@@ -95,7 +95,7 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 | Module | Lines | Purpose | Key Exports |
 |--------|-------|---------|-------------|
 | `supervisor.py` | 171 | Shared Redis contracts for human-reviewed supervisor flags — observation metadata only; deliberately no OpenCode client dependency, so observation can't become control | `canonical_json()`, `normalize_flag()`, `parse_mapping()`, `register_session_mapping()`, `register_event_mapping()` |
-| `workflow_runner.py` | 706 | Executes an `agent_task` workflow's phases inside a git worktree, committing + ledgering (tokens, cost, `test_executed_success`) after each phase; the `execute` phase of the spec/compiler DAG; hosts the off-by-default RAG augmentation seam | `PhaseResult`, `WorkflowRunResult`, `AugmentationOutcome`, `run_workflow()` |
+| `workflow_runner.py` | 812 | Executes an `agent_task` workflow's phases inside a git worktree, committing + ledgering (tokens, cost, `test_executed_success`) after each phase; the `execute` phase of the spec/compiler DAG; hosts the off-by-default RAG augmentation seam and the opt-in self-build emit (`rag_params.emit_self`) | `PhaseResult`, `WorkflowRunResult`, `AugmentationOutcome`, `cell_scope()`, `run_workflow()` |
 | `test_runner.py` | 140 | Independent pytest/jest/go-test/cargo-test runner, keyed off `language.py`; sole source of truth for `test_executed_success` — never taken from the model's self-reported pass/fail | `resolve_node()`, `run_suite()`, `suite_succeeded()` |
 
 ### Backend, Telemetry & Routing
@@ -105,7 +105,7 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 | `streaming.py` | 123 | Shared line-by-line subprocess runner (live telemetry, timeout-safe) | `stream_subprocess()`, `StreamResult` |
 | `claude_adapter.py` | 346 | Drives the Claude CLI (`stream-json`) and translates to opencode events | `run_claude_agentic()`, `ClaudeStreamAdapter`, `adapt_usage()` |
 | `backends.py` | 56 | Routes `anthropic/*` → Claude CLI, else opencode | `run_agentic()`, `get_backend_for_model()` |
-| `live.py` | 101 | Redis Pub/Sub telemetry (status + per-cell event stream + replay log) | `LivePublisher`, `make_publisher()` |
+| `live.py` | 101 | Redis Pub/Sub telemetry (status + per-cell event stream + replay log) — unscoped, observe-only; never writes the KB | `LivePublisher`, `make_publisher()` |
 | `routing.py` | 187 | Task-optimal routing: per-task model recommendation + strategy simulation | `compute_routing()`, `recommend_route()`, `simulate_strategies()` |
 | `signal_store.py` | — | Per-step routing signal store (field/id mismatches, portal validation wiring) | — |
 | `step_routing.py` | — | Per-step model routing across workflow phases | — |
@@ -142,9 +142,9 @@ which path ran in `dedup_path`) → allowlisted graph expansion (real seed score
 | Module | Lines | Purpose | Key Exports |
 |--------|-------|---------|-------------|
 | `knowledge.py` | 288 | Canonical identity + authority contract — two sha256 ids (`entity_id`, `knowledge_id`), ordered `Authority` (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY), frozen `KnowledgeRecord`/`KnowledgeEvent` (pointer-only). `KnowledgeRecord` carries the structured measured-or-`None` ledger signals `confidence` [H], `perturbation_strength` [M], and `test_executed_success` [M] (never a fabricated `0.0`) | `Authority`, `KnowledgeRecord`, `KnowledgeEvent`, `compute_entity_id()`, `compute_knowledge_id()`, `compute_content_hash()` |
-| `retrieval.py` | 963 | Deterministic retrieval — regex query planner, parallel dense (Chroma) + lexical (Neo4j full-text) legs, RRF fusion × authority/freshness/exact-id/conflict (hard commit pre-filter), content-hash `deduplicate`, cosine `collapse_redundant` (embeddings-optional), allowlisted decayed graph expansion, token-budgeted whole-chunk selection, `RetrievalAttempt` (`dedup_path` records the collapse leg), offline `build_evidence_cards()` | `QueryPlan`, `Candidate`, `RetrievalAttempt`, `build_query_plan()`, `retrieve()`, `rrf_base()`, `compute_fused_score()`, `graph_boost()`, `deduplicate()`, `collapse_redundant()`, `select_evidence()`, `build_evidence_cards()`, `FallbackMode` |
+| `retrieval.py` | 1121 | Deterministic retrieval — regex query planner, parallel dense (Chroma) + lexical (Neo4j full-text) legs, RRF fusion × authority/freshness/exact-id/conflict (hard commit pre-filter), per-cell `repository_id` scope pre-filter (`scope_excluded()`), content-hash `deduplicate`, cosine `collapse_redundant` (embeddings-optional), allowlisted decayed graph expansion, token-budgeted whole-chunk selection, `RetrievalAttempt` (`dedup_path` records the collapse leg), offline `build_evidence_cards()` | `QueryPlan`, `Candidate`, `RetrievalAttempt`, `build_query_plan()`, `retrieve()`, `rrf_base()`, `compute_fused_score()`, `graph_boost()`, `scope_excluded()`, `deduplicate()`, `collapse_redundant()`, `select_evidence()`, `build_evidence_cards()`, `FallbackMode` |
 | `prompt_constructor.py` | 456 | Typed prompt-constructor — `PromptConstructor` protocol, `prompt-plan/v1` schema, deterministic validator, one-repair + deterministic fallback renderer, no-fork cache keying, default `deepseek/deepseek-v4-flash` | `PromptConstructor`, `ModelPromptConstructor`, `ConstructionRequest`, `AugmentedPrompt`, `PromptPlan`, `validate_plan()`, `render_prompt()`, `construction_cache_key()`, `hash_work_item()` |
-| `knowledge_ingestion.py` | 278 | Producer-side measured-finding derivation — turns a `_results_summary.json` entry into a MEASURED-authority `KnowledgeRecord` whose text is the evidence-card one-liner, keyed by the canonical dual-id; the richer extractor that supersedes `knowledge_stream.default_extract` | `EXTRACTOR_VERSION` (`"measured-finding/v1"`), `derive_records()`, `build_record()`, `record_to_artifact()`, `record_to_event()`, `extract_record()` |
+| `knowledge_ingestion.py` | 599 | Producer-side measured-finding derivation — turns a `_results_summary.json` entry into a MEASURED-authority `KnowledgeRecord` whose text is the evidence-card one-liner, keyed by the canonical dual-id; the richer extractor that supersedes `knowledge_stream.default_extract`. Also the self-build (progressive) phase-finding producer: `derive_phase_record()` / `emit_phase_finding()` emit a completed phase's one-line finding into its OWN cell scope (`MEASURED` when `test_executed_success` is a bool, else `ADVISORY`) | `EXTRACTOR_VERSION` (`"measured-finding/v1"`), `PHASE_EXTRACTOR_VERSION` (`"phase-finding/v1"`), `derive_records()`, `build_record()`, `record_to_artifact()`, `record_to_event()`, `extract_record()`, `derive_phase_record()`, `emit_phase_finding()` |
 | `code_ingestion.py` | 403 | Producer-side code-structure derivation — one `source_type=code` `KnowledgeRecord` per function/class (signature + docstring head, no body), `SOURCE`/`[C]`, keyed by the canonical dual-id; `ingest_codebase_graph()` wires the orphaned `graph.load_codebase_graph` so `CodeModule` + IMPORTS/IMPORTED_BY/TOUCHED populate | `EXTRACTOR_VERSION` (`"code/v1"`), `derive_code_records()`, `build_code_record()`, `ingest_codebase_graph()` |
 | `quality_ingestion.py` | 308 | Producer-side code-quality derivation — one `source_type=report` `KnowledgeRecord` per available signal (SonarQube/LSP → `MEASURED`/`[M]`, entropy → `DERIVED`/`[C]`), graceful skip-and-note when a tool is absent (never fabricated) | `EXTRACTOR_VERSION` (`"quality/v1"`), `derive_quality_records()`, `build_quality_record()` |
 | `policy_ingestion.py` | 288 | Producer-side policy ingestion — one `source_type=policy` `KnowledgeRecord` per pinned policy artifact (`AGENTS.md`, `conventions/*.yaml`, `experiments/specs/*.yaml`, mental-model files), `POLICY`/`[P]`; discoverability/citation only, never RRF candidates | `EXTRACTOR_VERSION` (`"policy/v1"`), `derive_policy_records()`, `build_policy_record()`, `discover_policy_paths()` |
@@ -157,6 +157,24 @@ persists augmentation provenance on `PhaseResult` (`raw_prompt_hash`, `pre_phase
 `retrieval_attempt_id`, `constructor_attempt_id`, `selected_evidence_ids`, `augmentation_versions`,
 `augmentation_tokens`, `augmentation_cost_usd`, `augmentation_latency_ms`, `fallback_mode`). Any
 retrieval/constructor failure falls back to the base prompt and records a named fallback mode.
+
+Scope isolation (the load-bearing invariant): the retrieval filter is **per-cell**. `retrieve()`
+carries `Candidate.repository_id` and hard-pre-filters via `scope_excluded()`, dropping any
+candidate with a *different, non-empty* `repository_id` before fusion/graph-expansion. The cell
+scope is `cell_scope(workdir)` (`self-<worktree>`, `FINOPS_CELL_ID` overrides); an explicitly
+non-empty `rag_params.repository_id` is the shared-scope override for coordinated parallel
+workstreams. The empty scope never means "global".
+
+Two-channel rule (do not conflate the two Redis planes): the **knowledge** plane is per-cell
+scoped (`repository_id`, default `self-<cell>`); the **control/telemetry** plane
+(`live.LivePublisher`, pub/sub, DB 1) is unscoped and observe-only — it never writes the KB. The
+self-build (progressive) producer is opt-in (`rag_params.emit_self`, default OFF): after a phase
+commits, `emit_phase_finding()` emits that phase's one-line finding into the cell's OWN scope
+(authority `MEASURED` when `test_executed_success` is a bool, else `ADVISORY`; idempotent key
+`f(goal, phase, commit, scope, extractor)`). `knowledge_stream.publish_event` carries a WRITE
+GUARD — it raises `RuntimeError` unless `FINOPS_KB_WRITE=1` or `authorized=True`; `kb_produce.py`
+/ `kb_produce_sources.py` set the flag for the run, and the emit_self path sets it only for the
+duration of the emit. `retrieve → construct → render` references `publish_event` ZERO times.
 
 Two wiring gaps fixed (both live in `retrieval.py`, covered end-to-end in
 `tests/test_retrieval.py` with store doubles — no live Chroma/Neo4j required):

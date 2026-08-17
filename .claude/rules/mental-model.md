@@ -186,6 +186,7 @@ compute_entity_id(), compute_knowledge_id(), compute_content_hash()
 # retrieval.py — deterministic retrieval (dense Chroma + lexical Neo4j full-text → RRF fusion)
 QueryPlan, Candidate, RetrievalAttempt, FallbackMode
 build_query_plan(), retrieve(), select_evidence(), build_evidence_cards()
+  # Candidate.repository_id + scope_excluded(): HARD per-cell scope pre-filter (default self-<worktree>)
 
 # prompt_constructor.py — typed prompt-constructor (one flash-model call + validator)
 PromptConstructor, ModelPromptConstructor, PromptPlan, AugmentedPrompt, render_prompt()
@@ -193,6 +194,7 @@ PromptConstructor, ModelPromptConstructor, PromptPlan, AugmentedPrompt, render_p
 # knowledge_stream.py — durable Redis Streams ingestion (DB 2 on 6380)
 connect(), publish_event(), process_entry(), reconcile_missing()
   CONSUMER_GROUPS: kb-chroma-v1 | kb-neo4j-v1 | kb-ledger-v1
+  # WRITE GUARD: publish_event raises RuntimeError unless FINOPS_KB_WRITE=1 or authorized=True
 
 # knowledge_ingestion.py — producer-side measured-finding derivation (richer extractor)
 EXTRACTOR_VERSION = "measured-finding/v1"
@@ -204,6 +206,11 @@ record_to_event(record, *, now=None) -> KnowledgeEvent
   #   content_hash = sha256(record_to_artifact(record)); event_id = knowledge_id (tracing, not the key)
 extract_record(event, artifact_bytes) -> KnowledgeRecord
   # measured-result extractor — supersedes default_extract; wired in kb_worker.py
+PHASE_EXTRACTOR_VERSION = "phase-finding/v1"
+derive_phase_record(phase_result, *, goal, repository_id, revision, now=None) -> KnowledgeRecord
+emit_phase_finding(phase_result, *, goal, repository_id, revision, now=None) -> KnowledgeRecord
+  # self-build (progressive) producer: scoped to repository_id (never global); authority MEASURED
+  #   when test_executed_success is a bool, else ADVISORY; idempotent key f(goal, phase, commit, scope, extractor)
 
 # code_ingestion.py — producer-side code-structure derivation (source_type=code)
 EXTRACTOR_VERSION = "code/v1"
@@ -226,8 +233,11 @@ discover_policy_paths(repo_root) -> list[Path]
   # authority=POLICY (top tier), evidence_class="[P]"; discoverability/citation only — never RRF candidates
 
 # workflow_runner.py — the rag_augment seam (default OFF)
+cell_scope(workdir) -> str   # f"self-{workdir.name}"; FINOPS_CELL_ID overrides — the cell's KB scope
 run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=None,
              construct_fn=None, rag_params=None) -> WorkflowRunResult
+  # rag_params.emit_self (opt-in, default OFF): after a phase commits, emit its finding into
+  #   the cell's OWN scope via emit_phase_finding (best-effort — never blocks the phase)
 
 # one agent phase (only when rag_augment enabled):
 route_step ──▶ retrieve ──▶ construct ──▶ render ──▶ run_agent
@@ -237,6 +247,13 @@ route_step ──▶ retrieve ──▶ construct ──▶ render ──▶ run
 #   stream ──▶ process_entry (read → verify sha256(artifact) → extract_record → upsert)
 # four record types, over the authority ordering (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY):
 #   finding → MEASURED [M] | code → SOURCE [C] | report → MEASURED [M] (Sonar/LSP) or DERIVED [C] (entropy) | policy → POLICY [P]
+
+# two-channel rule (do not conflate the two Redis planes):
+#   knowledge = per-cell repository_id scope (default self-<worktree>); an explicit non-empty
+#               repository_id is the SHARED-scope override (parallel workstreams). Empty never
+#               means "global". retrieve→construct→render references publish_event ZERO times —
+#               the ONLY KB writer is the opt-in emit_self path.
+#   control/telemetry = live.LivePublisher (pub/sub, DB 1) — UNscoped, observe-only, never writes KB.
 ```
 
 ### Ledger (the data model rules consume) — schema WRITTEN; the four formerly-missing fields are now MEASURED
