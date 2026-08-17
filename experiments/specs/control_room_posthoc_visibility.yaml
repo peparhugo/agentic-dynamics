@@ -1,0 +1,115 @@
+name: control_room_posthoc_visibility
+question: >-
+  The Control Room matrix (and monitor.py --json) surface only the story queue
+  (story_jobs/story_status) and hide the post-hoc pipeline (analysis_jobs/analysis_status and
+  review_jobs/review_status). Can we surface all three pipeline stages — execute, analyze,
+  review — in the Control Room matrix and monitor so the post-hoc phases are no longer a blind
+  spot?
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool:
+      - deepseek/deepseek-v4-pro
+      - deepseek/deepseek-v4-flash
+    context:
+      problem: >-
+        On 2026-08-17 the remediation re-run's analysis + review workers were draining but
+        invisible in the Control Room — the matrix renders only story_jobs/story_status. The
+        post-hoc stages (analysis_jobs/analysis_status, review_jobs/review_status) are separate
+        Redis keys that neither admin/server.py nor monitor.py --json surfaces.
+      redis_layout: >-
+        All on 127.0.0.1:6380 db 1 (FINOPS_REDIS_*). Keys: story_jobs/story_status,
+        analysis_jobs/analysis_status, review_jobs/review_status. enqueue.py/worker.py manage
+        the story pair; enqueue_analysis.py/analysis_worker.py the analysis pair;
+        enqueue_reviews.py/review_worker.py the review pair.
+      design_constraint: >-
+        The Control Room is a human-facing live dashboard; monitor.py --json is the
+        machine-readable canonical. Do not add a new transport — read the same Redis the
+        workers already write. Keep the existing matrix shape for the story queue and add the
+        two post-hoc stages alongside it (a three-stage pipeline view), not a separate page.
+    phases:
+      - name: survey
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Map exactly where the story queue is surfaced, and where the post-hoc queues are absent.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - admin/server.py  (/api/matrix and /api/status — the story queue rendering)
+          - admin/static/    (the dashboard JS that renders the matrix)
+          - scripts/monitor.py  (the --json + human-readable story status)
+
+          REQUIREMENTS:
+          - Produce a precise touchpoint map: every place story_jobs/story_status is read and
+            rendered, with file:line, and mark where analysis_status/analysis_jobs and
+            review_status/review_jobs should slot in to form a three-stage pipeline view.
+          - Note any existing tests (tests/test_admin_server.py, tests/test_admin_frontend.py)
+            that will need updating.
+          - Do NOT modify code.
+
+          DELIVER exactly one file: docs/control_room_survey.md.
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Surface the analysis + review queues in the Control Room matrix and monitor.py.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/control_room_survey.md  (produced by the survey phase)
+          - admin/server.py, admin/static/, scripts/monitor.py
+
+          REQUIREMENTS:
+          - Add analysis_status/analysis_jobs and review_status/review_jobs to the Control Room
+            matrix (admin/server.py /api/matrix + admin/static/ rendering) as a three-stage
+            pipeline view: execute (story) → analyze → review, each with done/running/queued/failed.
+          - Add the same two stages to monitor.py --json (and the human-readable output) so the
+            machine-readable dashboard no longer hides the post-hoc pipeline.
+          - Follow the existing conventions (Redis reads on 6380 db 1, the matrix JSON shape,
+            the vanilla-JS rendering). Do not add a new transport or page.
+
+          DELIVER the implementation.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Test the new three-stage matrix and write the verification.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Update/extend tests/test_admin_server.py and tests/test_admin_frontend.py (and any
+            monitor test) to cover the analysis + review stages in the matrix.
+          - Run the targeted tests explicitly and report the exact commands + results.
+          - Write docs/control_room_posthoc_verify.md with PASS/FAIL per check.
+
+          DELIVER the tests plus the verification doc.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: pipeline_visibility, plane: measurement, evidence_class: "[M]", requires: [], produces: [posthoc_visible]}
+metrics:
+  - {name: pipeline_stages_rendered, agg: ratio, over: cell}
+  - {name: queue_status_coverage,     agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, survey, implementation, verification]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
