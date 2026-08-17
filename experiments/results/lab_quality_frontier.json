@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_quality_frontier",
-  "generated_at": "2026-08-15T22:14:18.060885",
+  "generated_at": "2026-08-17T20:12:34.885574",
   "summary": {
     "models": 7
   },
@@ -16,21 +16,21 @@
     },
     {
       "model": "gpt-5.6-luna",
-      "cells": 22,
-      "avg_cost": 0.091,
+      "cells": 24,
+      "avg_cost": 0.092,
       "lsp_errors_per_cell": 0.0,
-      "code_quality_score": 0.086,
-      "cyclomatic_complexity": 266.091,
-      "novelty_score": 0.879
+      "code_quality_score": 0.087,
+      "cyclomatic_complexity": 262.583,
+      "novelty_score": 0.876
     },
     {
       "model": "deepseek-v4-pro",
-      "cells": 21,
-      "avg_cost": 0.128,
+      "cells": 37,
+      "avg_cost": 0.159,
       "lsp_errors_per_cell": 0.0,
-      "code_quality_score": 0.048,
-      "cyclomatic_complexity": 262.143,
-      "novelty_score": 0.797
+      "code_quality_score": 0.045,
+      "cyclomatic_complexity": 309.378,
+      "novelty_score": 0.845
     },
     {
       "model": "gpt-5.6-terra",
@@ -43,12 +43,12 @@
     },
     {
       "model": "claude-haiku-4-5",
-      "cells": 12,
-      "avg_cost": 1.5,
+      "cells": 14,
+      "avg_cost": 1.537,
       "lsp_errors_per_cell": 0.0,
-      "code_quality_score": 0.143,
-      "cyclomatic_complexity": 275.0,
-      "novelty_score": 0.561
+      "code_quality_score": 0.037,
+      "cyclomatic_complexity": 381.571,
+      "novelty_score": 0.842
     },
     {
       "model": "gpt-5.6-sol",
@@ -61,12 +61,12 @@
     },
     {
       "model": "claude-sonnet-5",
-      "cells": 15,
-      "avg_cost": 4.807,
+      "cells": 16,
+      "avg_cost": 4.776,
       "lsp_errors_per_cell": 0.0,
-      "code_quality_score": 0.114,
-      "cyclomatic_complexity": 314.789,
-      "novelty_score": 0.619
+      "code_quality_score": 0.052,
+      "cyclomatic_complexity": 375.375,
+      "novelty_score": 0.789
     }
   ]
 }

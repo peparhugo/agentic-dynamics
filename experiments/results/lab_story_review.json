@@ -1,46 +1,46 @@
 {
   "experiment_id": "lab_story_review",
-  "generated_at": "2026-08-15T22:14:18.265132",
+  "generated_at": "2026-08-17T20:12:43.332802",
   "summary": {
-    "cells": 159,
-    "sessions": 787,
-    "total_cost": 218.193946,
-    "total_tokens": 23839731,
+    "cells": 156,
+    "sessions": 772,
+    "total_cost": 219.511195,
+    "total_tokens": 25580573,
     "by_condition": {
       "bad_seed": {
-        "count": 40,
-        "success_rate": 0.88,
-        "avg_cost": 1.481513
+        "count": 37,
+        "success_rate": 0.95,
+        "avg_cost": 1.601635
       },
       "clean": {
-        "count": 94,
-        "success_rate": 0.9,
-        "avg_cost": 1.274771
+        "count": 87,
+        "success_rate": 0.98,
+        "avg_cost": 1.377339
       },
       "early_degrade": {
-        "count": 25,
+        "count": 32,
         "success_rate": 1.0,
-        "avg_cost": 1.564199
+        "avg_cost": 1.263194
       }
     },
     "by_story": {
       "notification_service": {
-        "count": 49,
-        "success_rate": 0.94,
-        "avg_correctness": 0.73,
-        "avg_cost": 1.539839
+        "count": 50,
+        "success_rate": 0.96,
+        "avg_correctness": 0.76,
+        "avg_cost": 1.514844
       },
       "static_site_gen": {
-        "count": 51,
-        "success_rate": 0.78,
-        "avg_correctness": 0.39,
-        "avg_cost": 1.567774
+        "count": 46,
+        "success_rate": 0.96,
+        "avg_correctness": 0.52,
+        "avg_cost": 1.758248
       },
       "task_manager_api": {
-        "count": 59,
+        "count": 60,
         "success_rate": 1.0,
-        "avg_correctness": 0.7,
-        "avg_cost": 1.064158
+        "avg_correctness": 0.71,
+        "avg_cost": 1.04816
       }
     }
   },
@@ -124,26 +124,6 @@
       "total_tokens": 77340,
       "worktree": "/tmp/story_5840e9783c6a",
       "result_file": "experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_clean_5840e9783c6a.json"
-    },
-    {
-      "story": "notification_service",
-      "condition": "clean",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_6bc71fa28f35",
-      "result_file": "experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_clean_6bc71fa28f35.json"
     },
     {
       "story": "notification_service",
@@ -562,6 +542,46 @@
       "total_tokens": 413870,
       "worktree": "/tmp/story_11f53fd41422",
       "result_file": "experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_11f53fd41422.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.13969073,
+      "total_tokens": 191282,
+      "worktree": "/tmp/story_448c77192639",
+      "result_file": "experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_448c77192639.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.15038649,
+      "total_tokens": 206234,
+      "worktree": "/tmp/story_a7bd48a35962",
+      "result_file": "experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_a7bd48a35962.json"
     },
     {
       "story": "notification_service",
@@ -1025,86 +1045,6 @@
     },
     {
       "story": "static_site_gen",
-      "condition": "bad_seed",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_4e7abddc43f1",
-      "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-haiku-4-5_bad_seed_4e7abddc43f1.json"
-    },
-    {
-      "story": "static_site_gen",
-      "condition": "bad_seed",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_4f80a9ea38aa",
-      "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-haiku-4-5_bad_seed_4f80a9ea38aa.json"
-    },
-    {
-      "story": "static_site_gen",
-      "condition": "clean",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_7005f70e2fd6",
-      "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-haiku-4-5_clean_7005f70e2fd6.json"
-    },
-    {
-      "story": "static_site_gen",
-      "condition": "clean",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_890584be7186",
-      "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-haiku-4-5_clean_890584be7186.json"
-    },
-    {
-      "story": "static_site_gen",
       "condition": "clean",
       "sessions": 5,
       "correctness": 0.0,
@@ -1122,26 +1062,6 @@
       "total_tokens": 68016,
       "worktree": "/tmp/story_899bc4d979f9",
       "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-haiku-4-5_clean_899bc4d979f9.json"
-    },
-    {
-      "story": "static_site_gen",
-      "condition": "clean",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_98507441e613",
-      "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-haiku-4-5_clean_98507441e613.json"
     },
     {
       "story": "static_site_gen",
@@ -1165,26 +1085,6 @@
     },
     {
       "story": "static_site_gen",
-      "condition": "bad_seed",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_5be412dd5b87",
-      "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-sonnet-5_bad_seed_5be412dd5b87.json"
-    },
-    {
-      "story": "static_site_gen",
       "condition": "clean",
       "sessions": 5,
       "correctness": 0.0,
@@ -1202,66 +1102,6 @@
       "total_tokens": 145135,
       "worktree": "/tmp/story_09a5ba798bd1",
       "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-sonnet-5_clean_09a5ba798bd1.json"
-    },
-    {
-      "story": "static_site_gen",
-      "condition": "clean",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_5196e779c1ca",
-      "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-sonnet-5_clean_5196e779c1ca.json"
-    },
-    {
-      "story": "static_site_gen",
-      "condition": "clean",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_5b87673f0d7a",
-      "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-sonnet-5_clean_5b87673f0d7a.json"
-    },
-    {
-      "story": "static_site_gen",
-      "condition": "clean",
-      "sessions": 5,
-      "correctness": 0.0,
-      "correctness_values": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_5d7640124ed4",
-      "result_file": "experiments/results/stories/static_site_gen_anthropic_claude-sonnet-5_clean_5d7640124ed4.json"
     },
     {
       "story": "static_site_gen",
@@ -1554,10 +1394,70 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
+      "total_cost": 0.38886005,
+      "total_tokens": 416479,
+      "worktree": "/tmp/story_0ab211aa1fa9",
+      "result_file": "experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_0ab211aa1fa9.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.17871647000000002,
+      "total_tokens": 239403,
+      "worktree": "/tmp/story_1050e650b2f1",
+      "result_file": "experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_1050e650b2f1.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
       "total_cost": 0.1720967,
       "total_tokens": 225972,
       "worktree": "/tmp/story_86122da06969",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_86122da06969.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.19008377,
+      "total_tokens": 247907,
+      "worktree": "/tmp/story_8e1f9fc56390",
+      "result_file": "experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_8e1f9fc56390.json"
     },
     {
       "story": "static_site_gen",
@@ -1598,6 +1498,26 @@
       "total_tokens": 448875,
       "worktree": "/tmp/story_97751a9bf9bc",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_97751a9bf9bc.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.16528134,
+      "total_tokens": 217853,
+      "worktree": "/tmp/story_ba5ddd74f014",
+      "result_file": "experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_ba5ddd74f014.json"
     },
     {
       "story": "static_site_gen",
@@ -2796,6 +2716,26 @@
       "total_tokens": 178594,
       "worktree": "/tmp/story_06be5dd3e3d0",
       "result_file": "experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_06be5dd3e3d0.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.1042296,
+      "total_tokens": 221684,
+      "worktree": "/tmp/story_b6f6e3ff9c26",
+      "result_file": "experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_b6f6e3ff9c26.json"
     },
     {
       "story": "task_manager_api",

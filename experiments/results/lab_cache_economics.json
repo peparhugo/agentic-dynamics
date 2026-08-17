@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_cache_economics",
-  "generated_at": "2026-08-15T22:09:58.250797",
+  "generated_at": "2026-08-17T20:12:32.870170",
   "summary": {
     "models": 7
   },
@@ -18,25 +18,25 @@
     },
     {
       "model": "gpt-5.6-luna",
-      "cells": 23,
-      "avg_cost": 0.091,
-      "avg_cache_hit": 0.971,
-      "cache_reads": 29738784,
+      "cells": 24,
+      "avg_cost": 0.092,
+      "avg_cache_hit": 0.967,
+      "cache_reads": 31182624,
       "cache_writes": 2378880,
-      "read_write_ratio": 12.5,
-      "avg_context_per_cell": 1331475.0,
-      "avg_tokens_per_cell": 38484.0
+      "read_write_ratio": 13.1,
+      "avg_context_per_cell": 1345394.0,
+      "avg_tokens_per_cell": 46118.0
     },
     {
       "model": "deepseek-v4-pro",
-      "cells": 31,
-      "avg_cost": 0.15,
-      "avg_cache_hit": 0.762,
-      "cache_reads": 105461376,
+      "cells": 37,
+      "avg_cost": 0.159,
+      "avg_cache_hit": 0.793,
+      "cache_reads": 137745280,
       "cache_writes": 0,
       "read_write_ratio": null,
-      "avg_context_per_cell": 3578946.0,
-      "avg_tokens_per_cell": 176966.0
+      "avg_context_per_cell": 3912173.0,
+      "avg_tokens_per_cell": 189327.0
     },
     {
       "model": "gpt-5.6-terra",
@@ -51,14 +51,14 @@
     },
     {
       "model": "claude-haiku-4-5",
-      "cells": 20,
+      "cells": 14,
       "avg_cost": 1.537,
-      "avg_cache_hit": 0.692,
+      "avg_cache_hit": 0.989,
       "cache_reads": 102433886,
       "cache_writes": 2753242,
       "read_write_ratio": 37.2,
-      "avg_context_per_cell": 5176520.0,
-      "avg_tokens_per_cell": 54825.0
+      "avg_context_per_cell": 7395028.0,
+      "avg_tokens_per_cell": 78322.0
     },
     {
       "model": "gpt-5.6-sol",
@@ -73,14 +73,14 @@
     },
     {
       "model": "claude-sonnet-5",
-      "cells": 20,
+      "cells": 16,
       "avg_cost": 4.776,
-      "avg_cache_hit": 0.789,
+      "avg_cache_hit": 0.986,
       "cache_reads": 115254797,
       "cache_writes": 3460787,
       "read_write_ratio": 33.3,
-      "avg_context_per_cell": 5843628.0,
-      "avg_tokens_per_cell": 80888.0
+      "avg_context_per_cell": 7304535.0,
+      "avg_tokens_per_cell": 101110.0
     }
   ]
 }

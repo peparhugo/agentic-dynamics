@@ -1,33 +1,33 @@
 {
   "experiment_id": "lab_condition_effects",
-  "generated_at": "2026-08-15T22:09:58.344415",
+  "generated_at": "2026-08-17T20:12:26.445186",
   "summary": {
     "conditions": 3
   },
   "conditions": [
     {
       "condition": "bad_seed",
-      "cells": 40,
-      "success_rate": 0.875,
-      "cascade_rate": 0.025,
-      "avg_cost": 1.4815,
+      "cells": 37,
+      "success_rate": 0.946,
+      "cascade_rate": 0.027,
+      "avg_cost": 1.6016,
       "total_cost": 59.2605
     },
     {
       "condition": "clean",
-      "cells": 94,
-      "success_rate": 0.904,
+      "cells": 87,
+      "success_rate": 0.977,
       "cascade_rate": 0.0,
-      "avg_cost": 1.2748,
+      "avg_cost": 1.3773,
       "total_cost": 119.8285
     },
     {
       "condition": "early_degrade",
-      "cells": 25,
+      "cells": 32,
       "success_rate": 1.0,
-      "cascade_rate": 0.08,
-      "avg_cost": 1.5642,
-      "total_cost": 39.105
+      "cascade_rate": 0.062,
+      "avg_cost": 1.2632,
+      "total_cost": 40.4222
     }
   ]
 }

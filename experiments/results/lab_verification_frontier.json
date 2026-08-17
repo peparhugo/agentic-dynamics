@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_verification_frontier",
-  "generated_at": "2026-08-15T22:14:29.429029",
+  "generated_at": "2026-08-17T20:12:28.375355",
   "summary": {
     "models": 7,
     "cheapest": "deepseek-v4-flash",
@@ -23,21 +23,21 @@
     },
     {
       "model": "gpt-5.6-luna",
-      "cells": 23,
-      "cost_cells": 23,
-      "avg_cost": 0.091,
-      "avg_tests": 7.739,
-      "total_cost": 2.1003,
-      "total_tests": 178
+      "cells": 24,
+      "cost_cells": 24,
+      "avg_cost": 0.092,
+      "avg_tests": 10.0,
+      "total_cost": 2.2045,
+      "total_tests": 240
     },
     {
       "model": "deepseek-v4-pro",
-      "cells": 31,
-      "cost_cells": 31,
-      "avg_cost": 0.15,
-      "avg_tests": 47.774,
-      "total_cost": 4.6626,
-      "total_tests": 1481
+      "cells": 37,
+      "cost_cells": 37,
+      "avg_cost": 0.159,
+      "avg_tests": 45.73,
+      "total_cost": 5.8756,
+      "total_tests": 1692
     },
     {
       "model": "gpt-5.6-terra",
@@ -50,10 +50,10 @@
     },
     {
       "model": "claude-haiku-4-5",
-      "cells": 20,
+      "cells": 14,
       "cost_cells": 14,
       "avg_cost": 1.537,
-      "avg_tests": 135.35,
+      "avg_tests": 193.357,
       "total_cost": 21.5168,
       "total_tests": 2707
     },
@@ -68,10 +68,10 @@
     },
     {
       "model": "claude-sonnet-5",
-      "cells": 20,
+      "cells": 16,
       "cost_cells": 16,
       "avg_cost": 4.776,
-      "avg_tests": 122.55,
+      "avg_tests": 153.188,
       "total_cost": 76.4179,
       "total_tests": 2451
     }

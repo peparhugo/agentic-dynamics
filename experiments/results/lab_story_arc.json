@@ -1,84 +1,84 @@
 {
   "experiment_id": "lab_story_arc",
-  "generated_at": "2026-08-15T22:14:18.112053",
+  "generated_at": "2026-08-17T20:12:24.596009",
   "summary": {
     "snowball_factor": 2.38,
-    "session1_cost": 0.1557,
-    "session5_cost": 0.3706
+    "session1_cost": 0.1597,
+    "session5_cost": 0.3795
   },
   "sessions": [
     {
       "session_number": 1,
       "task_type": "greenfield",
-      "n": 159,
-      "avg_cost": 0.1557,
-      "avg_tokens": 19980.0,
-      "avg_tests": 4.6
+      "n": 156,
+      "avg_cost": 0.1597,
+      "avg_tokens": 21775.0,
+      "avg_tests": 4.8
     },
     {
       "session_number": 2,
       "task_type": "feature",
-      "n": 159,
-      "avg_cost": 0.2126,
-      "avg_tokens": 25786.0,
-      "avg_tests": 8.7
+      "n": 156,
+      "avg_cost": 0.2181,
+      "avg_tokens": 28341.0,
+      "avg_tests": 9.2
     },
     {
       "session_number": 3,
       "task_type": "integration",
-      "n": 159,
-      "avg_cost": 0.3433,
-      "avg_tokens": 32558.0,
-      "avg_tests": 11.4
+      "n": 156,
+      "avg_cost": 0.3527,
+      "avg_tokens": 35572.0,
+      "avg_tests": 12.2
     },
     {
       "session_number": 4,
       "task_type": "refactor",
-      "n": 155,
-      "avg_cost": 0.3072,
-      "avg_tokens": 32313.0,
-      "avg_tests": 11.5
+      "n": 152,
+      "avg_cost": 0.315,
+      "avg_tokens": 35173.0,
+      "avg_tests": 12.2
     },
     {
       "session_number": 5,
       "task_type": "cross_cutting",
-      "n": 155,
-      "avg_cost": 0.3706,
-      "avg_tokens": 38607.0,
-      "avg_tests": 15.3
+      "n": 152,
+      "avg_cost": 0.3795,
+      "avg_tokens": 41751.0,
+      "avg_tests": 16.2
     }
   ],
   "by_condition": {
-    "bad_seed_s1": 0.1928,
-    "bad_seed_s2": 0.2459,
-    "bad_seed_s3": 0.3771,
-    "bad_seed_s4": 0.2936,
-    "bad_seed_s5": 0.372,
-    "clean_s1": 0.1398,
-    "clean_s2": 0.2011,
-    "clean_s3": 0.3269,
-    "clean_s4": 0.2753,
-    "clean_s5": 0.3587,
-    "early_degrade_s1": 0.1562,
-    "early_degrade_s2": 0.2028,
-    "early_degrade_s3": 0.3505,
-    "early_degrade_s4": 0.4437,
-    "early_degrade_s5": 0.411
+    "bad_seed_s1": 0.2085,
+    "bad_seed_s2": 0.2658,
+    "bad_seed_s3": 0.4077,
+    "bad_seed_s4": 0.3175,
+    "bad_seed_s5": 0.4022,
+    "clean_s1": 0.151,
+    "clean_s2": 0.2172,
+    "clean_s3": 0.3532,
+    "clean_s4": 0.2986,
+    "clean_s5": 0.3889,
+    "early_degrade_s1": 0.127,
+    "early_degrade_s2": 0.1652,
+    "early_degrade_s3": 0.2875,
+    "early_degrade_s4": 0.3547,
+    "early_degrade_s5": 0.3288
   },
   "by_model": {
     "claude-haiku-4-5": {
-      "1": 0.1364,
-      "2": 0.1799,
-      "3": 0.2324,
-      "4": 0.1694,
-      "5": 0.3577
+      "1": 0.1948,
+      "2": 0.2571,
+      "3": 0.332,
+      "4": 0.242,
+      "5": 0.5111
     },
     "claude-sonnet-5": {
-      "1": 0.3688,
-      "2": 0.5352,
-      "3": 1.068,
-      "4": 0.6568,
-      "5": 1.1921
+      "1": 0.461,
+      "2": 0.669,
+      "3": 1.335,
+      "4": 0.8211,
+      "5": 1.4901
     },
     "deepseek-v4-flash": {
       "1": 0.0058,
@@ -88,18 +88,18 @@
       "5": 0.0231
     },
     "deepseek-v4-pro": {
-      "1": 0.0177,
-      "2": 0.0227,
-      "3": 0.0401,
-      "4": 0.0292,
-      "5": 0.0511
+      "1": 0.0187,
+      "2": 0.0241,
+      "3": 0.0449,
+      "4": 0.0311,
+      "5": 0.0486
     },
     "gpt-5.6-luna": {
       "1": 0.0129,
-      "2": 0.0168,
+      "2": 0.0173,
       "3": 0.0185,
-      "4": 0.0211,
-      "5": 0.022
+      "4": 0.021,
+      "5": 0.0221
     },
     "gpt-5.6-sol": {
       "1": 0.4785,
