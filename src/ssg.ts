@@ -27,6 +27,10 @@ export interface BuildOptions {
   contentDir: string;
   outputDir: string;
   templatesDir?: string;
+  /** Only rebuild pages whose source or template changed. */
+  incremental?: boolean;
+  /** Ignore any existing cache and perform a clean build. */
+  clean?: boolean;
 }
 
 const FRONTMATTER_DELIMITER = /^\uFEFF?---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/;

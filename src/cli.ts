@@ -7,6 +7,8 @@ export interface ParsedArgs {
   output: string;
   templates: string;
   port: number;
+  incremental: boolean;
+  clean: boolean;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {
@@ -16,6 +18,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let output = './dist';
   let templates = './templates';
   let port = 3000;
+  let incremental = false;
+  let clean = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -42,6 +46,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
       }
     } else if (arg.startsWith('--port=')) {
       port = Number(arg.slice('--port='.length));
+    } else if (arg === '--incremental') {
+      incremental = true;
+    } else if (arg === '--clean') {
+      clean = true;
     }
   }
 
@@ -49,15 +57,25 @@ export function parseArgs(argv: string[]): ParsedArgs {
     port = 3000;
   }
 
-  return { command, content, output, templates, port };
+  return { command, content, output, templates, port, incremental, clean };
 }
 
 export function run(argv: string[]): void {
-  const { command, content, output, templates, port } = parseArgs(argv);
+  const { command, content, output, templates, port, incremental, clean } = parseArgs(argv);
 
   if (command === 'build') {
-    const result = build({ contentDir: content, outputDir: output, templatesDir: templates });
-    console.log(`Built ${result.writtenFiles.length} files into ${result.outputDir}`);
+    const result = build({
+      contentDir: content,
+      outputDir: output,
+      templatesDir: templates,
+      incremental,
+      clean,
+    });
+    const { pagesBuilt, pagesSkipped, timeSavedMs } = result.stats;
+    console.log(
+      `Built ${result.writtenFiles.length} file(s) into ${result.outputDir} ` +
+        `(${pagesBuilt} built, ${pagesSkipped} skipped, ~${timeSavedMs}ms saved)`
+    );
     return;
   }
 
