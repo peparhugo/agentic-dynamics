@@ -1,0 +1,90 @@
+name: labbook_refresh
+question: >-
+  After the post-hoc pipeline (analyze + review) lands new story data, can the downstream
+  refresh — re-run the story-side lab books, then regenerate data.js/parquet/manifest — be a
+  reproducible workflow rather than an ad-hoc sequence of script calls?
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool:
+      - deepseek/deepseek-v4-flash
+    context:
+      motivation: >-
+        The 21 re-run early_degrade cells now carry instrumented fields + AST/SonarQube
+        analysis + DeepSeek reviews, but the lab books and the website data.js were last
+        generated before those landed. This spec re-runs the downstream consumers so the
+        website reflects the corrected, instrumented corpus.
+      scope: >-
+        STORY-SIDE lab books only (consume stories + analysis + reviews):
+        cache_economics, condition_effects, quality_frontier, sonar_quality, story_arc,
+        story_review, think_do_coupling, verification_frontier, verification_value.
+        The SINGLE-TASK lab books (grit_matrix, basin_topology, survival_horizon,
+        task_routing, flail_triggers, tool_archetypes, claude_audit, correctness_premium)
+        remain gated on the still-stale _results_summary.json single-task corpus and are
+        deliberately OUT of scope until that corpus is re-run.
+      data: >-
+        build_data.py already reads analysis/*.json (_load_analysis_data) and reviews/*.json
+        (_load_review_data), so no new build_data feature is required — regenerate is enough.
+    phases:
+      - name: lab_books
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Re-run the story-side lab books against the refreshed corpus.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - scripts/lab_story_arc.py, lab_condition_effects.py, lab_verification_frontier.py,
+            lab_verification_value.py, lab_cache_economics.py, lab_quality_frontier.py,
+            lab_sonar_quality.py, lab_story_review.py, lab_think_do_coupling.py
+
+          REQUIREMENTS:
+          - Run each of the nine story-side lab books (the scripts above) in turn. Each writes
+            experiments/results/lab_<name>.json (and .md where applicable).
+          - Do NOT run the single-task lab books — they are gated on the stale single-task
+            corpus and must stay frozen until that corpus is re-run.
+          - Report each lab's output path and any error.
+
+          DELIVER the lab-book run record.
+      - name: regenerate
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Regenerate the website data and manifest from the refreshed corpus.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/sync_data.py / build_data.py / generate_manifest.py
+
+          REQUIREMENTS:
+          - Run `python scripts/sync_data.py`, `python scripts/build_data.py`, then
+            `python scripts/generate_manifest.py`, and confirm data.js/parquet/manifest are
+            written with the refreshed story + analysis + review numbers (no fabricated 100%
+            pass rate, no provenance drift).
+
+          DELIVER the regeneration record.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - {name: labbooks_fresh,  plane: measurement, evidence_class: "[M]", requires: [test_executed_success, first_pass], produces: [story_side_fresh]}
+  - {name: data_regenerated, plane: control,     evidence_class: "[P]", requires: [story_side_fresh], produces: [site_ready]}
+metrics:
+  - {name: labbooks_rerun,   agg: ratio, over: cell}
+  - {name: datajs_regenerated, agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, lab_books, regenerate]
+stop: {budget_usd: 3.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
