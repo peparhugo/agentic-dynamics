@@ -2,12 +2,27 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { extractFrontmatter } from './frontmatter';
 import { renderMarkdown } from './markdown';
-import { createTemplateEngine } from './engine';
+import { createPipeline } from './plugin';
+import type { Plugin, PluginContext, PluginPipeline } from './plugin';
+import { createBuiltInPlugins, loadUserPlugins, resolveConfig } from './config';
+import type { BuildOptions } from './config';
+import { TemplatePlugin } from './plugins/template';
 import type { Page } from './types';
 
 export interface BuildResult {
   pages: Page[];
   outputDir: string;
+}
+
+export interface BuildSetup {
+  context: PluginContext;
+  pipeline: PluginPipeline;
+  templatePlugin: TemplatePlugin;
+  plugins: Plugin[];
+}
+
+interface RawPage extends Page {
+  markdown: string;
 }
 
 export async function listMarkdownFiles(dir: string): Promise<string[]> {
@@ -33,8 +48,17 @@ function toTitle(slug: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export async function readPage(filePath: string, contentDir: string): Promise<Page> {
-  const source = await fs.readFile(filePath, 'utf8');
+interface ParsedSource {
+  slug: string;
+  title: string;
+  date?: string;
+  tags: string[];
+  markdown: string;
+  template?: string;
+  layout?: string;
+}
+
+function parseSource(source: string, filePath: string, contentDir: string): ParsedSource {
   const { frontmatter, content } = extractFrontmatter(source);
   const rel = path.relative(contentDir, filePath).split(path.sep).join('/');
   const slug = rel.replace(/\.md$/i, '');
@@ -44,9 +68,38 @@ export async function readPage(filePath: string, contentDir: string): Promise<Pa
     title,
     date: frontmatter.date,
     tags: frontmatter.tags,
-    html: renderMarkdown(content),
+    markdown: content,
     template: frontmatter.template,
     layout: frontmatter.layout,
+  };
+}
+
+export async function readPage(filePath: string, contentDir: string): Promise<Page> {
+  const source = await fs.readFile(filePath, 'utf8');
+  const parsed = parseSource(source, filePath, contentDir);
+  return {
+    slug: parsed.slug,
+    title: parsed.title,
+    date: parsed.date,
+    tags: parsed.tags,
+    html: renderMarkdown(parsed.markdown),
+    template: parsed.template,
+    layout: parsed.layout,
+  };
+}
+
+async function parseRawPage(filePath: string, contentDir: string): Promise<RawPage> {
+  const source = await fs.readFile(filePath, 'utf8');
+  const parsed = parseSource(source, filePath, contentDir);
+  return {
+    slug: parsed.slug,
+    title: parsed.title,
+    date: parsed.date,
+    tags: parsed.tags,
+    html: '',
+    markdown: parsed.markdown,
+    template: parsed.template,
+    layout: parsed.layout,
   };
 }
 
@@ -68,29 +121,78 @@ function comparePages(a: Page, b: Page): number {
   return a.title.localeCompare(b.title);
 }
 
+export async function setupBuild(
+  contentDir: string,
+  outputDir: string,
+  templatesDir = './templates',
+  options: BuildOptions = {}
+): Promise<BuildSetup> {
+  const config = await resolveConfig(options);
+  const plugins: Plugin[] = [
+    ...createBuiltInPlugins(),
+    ...loadUserPlugins(config),
+    ...(options.plugins ?? []),
+  ];
+  const context: PluginContext = {
+    contentDir,
+    outputDir,
+    templatesDir,
+    pages: [],
+    config,
+  };
+  const pipeline = createPipeline(plugins, context);
+  const templatePlugin = plugins.find((p): p is TemplatePlugin => p instanceof TemplatePlugin);
+  if (!templatePlugin) {
+    throw new Error('The built-in TemplatePlugin is required');
+  }
+  return { context, pipeline, templatePlugin, plugins };
+}
+
+export async function runBuild(
+  context: PluginContext,
+  pipeline: PluginPipeline,
+  templatePlugin: TemplatePlugin
+): Promise<Page[]> {
+  const files = await listMarkdownFiles(context.contentDir);
+  const pages: Page[] = [];
+  for (const file of files) {
+    const page = await parseRawPage(file, context.contentDir);
+    await pipeline.onFile(page);
+    pages.push(page);
+  }
+  pages.sort(comparePages);
+  context.pages = pages;
+
+  await fs.mkdir(context.outputDir, { recursive: true });
+  await fs.writeFile(path.join(context.outputDir, 'index.html'), templatePlugin.renderIndex(pages), 'utf8');
+
+  for (const page of pages) {
+    const outPath = path.join(context.outputDir, `${page.slug}.html`);
+    await fs.mkdir(path.dirname(outPath), { recursive: true });
+    await fs.writeFile(outPath, templatePlugin.renderPage(page), 'utf8');
+  }
+
+  return pages;
+}
+
 export async function buildSite(
   contentDir: string,
   outputDir: string,
-  templatesDir = './templates'
+  templatesDir = './templates',
+  options: BuildOptions = {}
 ): Promise<BuildResult> {
-  const files = await listMarkdownFiles(contentDir);
+  const { context, pipeline, templatePlugin } = await setupBuild(
+    contentDir,
+    outputDir,
+    templatesDir,
+    options
+  );
 
-  const pages: Page[] = [];
-  for (const file of files) {
-    pages.push(await readPage(file, contentDir));
-  }
-  pages.sort(comparePages);
-
-  const engine = await createTemplateEngine(templatesDir);
-
-  await fs.mkdir(outputDir, { recursive: true });
-  await fs.writeFile(path.join(outputDir, 'index.html'), engine.renderIndex(pages), 'utf8');
-
-  for (const page of pages) {
-    const outPath = path.join(outputDir, `${page.slug}.html`);
-    await fs.mkdir(path.dirname(outPath), { recursive: true });
-    await fs.writeFile(outPath, engine.renderPage(page), 'utf8');
-  }
+  await pipeline.onStart();
+  await pipeline.beforeBuild();
+  const pages = await runBuild(context, pipeline, templatePlugin);
+  await pipeline.afterBuild();
+  await pipeline.onEnd();
 
   return { pages, outputDir };
 }

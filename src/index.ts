@@ -1,5 +1,5 @@
-export { buildSite, listMarkdownFiles, readPage } from './generate';
-export type { BuildResult } from './generate';
+export { buildSite, listMarkdownFiles, readPage, setupBuild, runBuild } from './generate';
+export type { BuildResult, BuildSetup } from './generate';
 
 export { extractFrontmatter } from './frontmatter';
 export type { Frontmatter, ParsedDocument } from './frontmatter';
@@ -16,5 +16,15 @@ export type { CliOptions } from './cli';
 
 export { serveSite, injectReloadScript } from './server';
 export type { ServeOptions, DevServer } from './server';
+
+export { createPipeline } from './plugin';
+export type { Plugin, PluginContext, PluginHook, PluginPipeline } from './plugin';
+
+export { loadConfig, loadPlugin, loadUserPlugins, createBuiltInPlugins } from './config';
+export type { SSGConfig, BuildOptions } from './config';
+
+export { MarkdownPlugin } from './plugins/markdown';
+export { TemplatePlugin } from './plugins/template';
+export { DevServerPlugin } from './plugins/dev-server';
 
 export type { Page } from './types';
