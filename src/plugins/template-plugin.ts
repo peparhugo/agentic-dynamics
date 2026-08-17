@@ -54,6 +54,9 @@ export class TemplatePlugin implements Plugin {
   afterBuild(): void {
     const { pages, outputDir } = this.context;
     for (const page of pages) {
+      if (page.cached) {
+        continue;
+      }
       const rendered = this.engine.render(page.template, page.layout, buildPageContext(page, pages));
       const outFile = path.join(outputDir, `${page.slug}.html`);
       fs.mkdirSync(path.dirname(outFile), { recursive: true });

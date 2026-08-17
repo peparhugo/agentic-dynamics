@@ -8,13 +8,20 @@ interface CliOptions {
   output?: string;
   templates?: string;
   port?: string;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
-const VALUE_OPTIONS: Record<string, keyof CliOptions> = {
+const VALUE_OPTIONS: Record<string, 'content' | 'output' | 'templates' | 'port'> = {
   '--content': 'content',
   '--output': 'output',
   '--templates': 'templates',
   '--port': 'port',
+};
+
+const FLAG_OPTIONS: Record<string, 'incremental' | 'clean'> = {
+  '--incremental': 'incremental',
+  '--clean': 'clean',
 };
 
 function printHelp(command?: string): void {
@@ -38,9 +45,12 @@ Options:
 Generate a static site from Markdown files.
 
 Options:
-  --content <dir>   Content directory containing Markdown files (default: ./content)
-  --output <dir>    Output directory for generated HTML (default: ./dist)
-  -h, --help        Show this help message
+  --content <dir>     Content directory containing Markdown files (default: ./content)
+  --output <dir>      Output directory for generated HTML (default: ./dist)
+  --templates <dir>   Templates directory (default: ./templates)
+  --incremental       Only rebuild pages whose source or template changed
+  --clean             Ignore the build cache and rebuild every page
+  -h, --help          Show this help message
 
 Commands:
   build             Generate a static site from Markdown files
@@ -54,6 +64,11 @@ function parseArgs(args: string[]): { options: CliOptions; help: boolean } {
     const arg = args[i];
     if (arg === '-h' || arg === '--help') {
       return { options, help: true };
+    }
+
+    if (arg in FLAG_OPTIONS) {
+      options[FLAG_OPTIONS[arg]] = true;
+      continue;
     }
 
     const eq = arg.indexOf('=');
@@ -140,9 +155,14 @@ function main(): void {
     contentDir: options.content ?? 'content',
     outputDir: options.output ?? 'dist',
     templatesDir: options.templates ?? 'templates',
+    incremental: options.incremental === true,
+    clean: options.clean === true,
   });
 
   console.log(`Generated ${site.pages.length} page(s) in ${site.outputDir}`);
+  console.log(
+    `Built ${site.stats.built}, skipped ${site.stats.skipped}, saved ~${site.stats.timeSavedMs}ms`
+  );
 }
 
 main();

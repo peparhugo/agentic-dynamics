@@ -9,6 +9,10 @@ const VALUE_OPTIONS = {
     '--templates': 'templates',
     '--port': 'port',
 };
+const FLAG_OPTIONS = {
+    '--incremental': 'incremental',
+    '--clean': 'clean',
+};
 function printHelp(command) {
     if (command === 'serve') {
         console.log(`Usage: npx ssg serve [options]
@@ -29,9 +33,12 @@ Options:
 Generate a static site from Markdown files.
 
 Options:
-  --content <dir>   Content directory containing Markdown files (default: ./content)
-  --output <dir>    Output directory for generated HTML (default: ./dist)
-  -h, --help        Show this help message
+  --content <dir>     Content directory containing Markdown files (default: ./content)
+  --output <dir>      Output directory for generated HTML (default: ./dist)
+  --templates <dir>   Templates directory (default: ./templates)
+  --incremental       Only rebuild pages whose source or template changed
+  --clean             Ignore the build cache and rebuild every page
+  -h, --help          Show this help message
 
 Commands:
   build             Generate a static site from Markdown files
@@ -44,6 +51,10 @@ function parseArgs(args) {
         const arg = args[i];
         if (arg === '-h' || arg === '--help') {
             return { options, help: true };
+        }
+        if (arg in FLAG_OPTIONS) {
+            options[FLAG_OPTIONS[arg]] = true;
+            continue;
         }
         const eq = arg.indexOf('=');
         if (arg.startsWith('--') && eq !== -1) {
@@ -120,8 +131,11 @@ function main() {
         contentDir: options.content ?? 'content',
         outputDir: options.output ?? 'dist',
         templatesDir: options.templates ?? 'templates',
+        incremental: options.incremental === true,
+        clean: options.clean === true,
     });
     console.log(`Generated ${site.pages.length} page(s) in ${site.outputDir}`);
+    console.log(`Built ${site.stats.built}, skipped ${site.stats.skipped}, saved ~${site.stats.timeSavedMs}ms`);
 }
 main();
 //# sourceMappingURL=cli.js.map

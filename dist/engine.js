@@ -14,6 +14,7 @@ const markdown_1 = require("./markdown");
 const config_1 = require("./config");
 const markdown_plugin_1 = require("./plugins/markdown-plugin");
 const template_plugin_1 = require("./plugins/template-plugin");
+const cache_1 = require("./cache");
 exports.DEFAULT_CONTENT_DIR = 'content';
 exports.DEFAULT_OUTPUT_DIR = 'dist';
 exports.DEFAULT_TEMPLATES_DIR = 'templates';
@@ -114,27 +115,84 @@ function createEngine(options) {
  * (one per page plus an index.html) into outputDir. The core engine only
  * orchestrates the plugin pipeline; parsing and rendering are delegated to the
  * built-in MarkdownPlugin and TemplatePlugin.
+ *
+ * When `incremental` is set (and `clean` is not), the engine compares each
+ * page's source and template fingerprints against the `.ssg-cache.json`
+ * manifest and skips pages whose inputs are unchanged. Skipped pages are
+ * reconstructed from the cache, so plugins (and the index) still see the full
+ * page set while avoiding re-parsing and re-rendering.
  */
 function buildSite(options) {
     const { context, pipeline } = createEngine(options);
     pipeline.runSync('onStart');
     pipeline.runSync('beforeBuild');
     const files = listMarkdownFiles(context.contentDir).sort();
-    const pages = files.map((file) => {
-        const page = {
-            slug: deriveSlug(file, context.contentDir),
-            title: '',
-            date: undefined,
-            tags: [],
-            html: '',
-            sourcePath: file,
-            frontmatter: {},
-            template: undefined,
-            layout: undefined,
-        };
-        pipeline.runFileSync(page);
-        return page;
-    });
+    const cacheFile = options.cacheFile
+        ? path_1.default.resolve(options.cacheFile)
+        : path_1.default.join(context.outputDir, cache_1.CACHE_FILENAME);
+    const incremental = options.incremental === true && options.clean !== true;
+    const manifest = incremental ? (0, cache_1.loadManifest)(cacheFile) : (0, cache_1.defaultManifest)();
+    const startedAt = Date.now();
+    const pages = [];
+    const nextManifest = { version: manifest.version, pages: {} };
+    let built = 0;
+    let skipped = 0;
+    for (const file of files) {
+        const slug = deriveSlug(file, context.contentDir);
+        const sourceHash = (0, cache_1.hashFile)(file) ?? '';
+        const cached = manifest.pages[slug];
+        const sourceUnchanged = cached !== undefined && cached.sourceHash === sourceHash;
+        let templateName;
+        let layoutName;
+        if (sourceUnchanged) {
+            templateName = cached.template;
+            layoutName = cached.layout;
+        }
+        else {
+            const raw = fs_1.default.readFileSync(file, 'utf8');
+            const { data } = (0, markdown_1.splitFrontmatter)(raw);
+            templateName = typeof data.template === 'string' ? data.template : undefined;
+            layoutName = data.layout;
+        }
+        const templateHash = (0, cache_1.computeTemplateHash)(context.options, templateName, layoutName);
+        const outFile = path_1.default.join(context.outputDir, `${slug}.html`);
+        const skip = incremental &&
+            sourceUnchanged &&
+            cached.templateHash === templateHash &&
+            fs_1.default.existsSync(outFile);
+        if (skip) {
+            pages.push(pageFromCache(cached, slug, file));
+            nextManifest.pages[slug] = cached;
+            skipped++;
+        }
+        else {
+            const page = {
+                slug,
+                title: '',
+                date: undefined,
+                tags: [],
+                html: '',
+                sourcePath: file,
+                frontmatter: {},
+                template: undefined,
+                layout: undefined,
+            };
+            pipeline.runFileSync(page);
+            pages.push(page);
+            nextManifest.pages[slug] = {
+                sourceHash,
+                templateHash,
+                title: page.title,
+                date: page.date,
+                tags: page.tags,
+                html: page.html,
+                frontmatter: page.frontmatter,
+                template: page.template,
+                layout: page.layout,
+            };
+            built++;
+        }
+    }
     pages.sort((a, b) => {
         if (a.date && b.date) {
             return b.date.localeCompare(a.date);
@@ -149,7 +207,29 @@ function buildSite(options) {
     fs_1.default.mkdirSync(context.outputDir, { recursive: true });
     pipeline.runSync('afterBuild');
     fs_1.default.writeFileSync(path_1.default.join(context.outputDir, 'index.html'), renderIndex(pages));
+    (0, cache_1.saveManifest)(cacheFile, nextManifest);
     pipeline.runSync('onEnd');
-    return { pages, outputDir: context.outputDir };
+    const elapsed = Date.now() - startedAt;
+    const total = built + skipped;
+    const timeSavedMs = total > 0 ? Math.round((elapsed / total) * skipped) : 0;
+    return {
+        pages,
+        outputDir: context.outputDir,
+        stats: { built, skipped, timeSavedMs },
+    };
+}
+function pageFromCache(entry, slug, file) {
+    return {
+        slug,
+        title: entry.title,
+        date: entry.date,
+        tags: entry.tags,
+        html: entry.html,
+        sourcePath: file,
+        frontmatter: entry.frontmatter,
+        template: entry.template,
+        layout: entry.layout,
+        cached: true,
+    };
 }
 //# sourceMappingURL=engine.js.map

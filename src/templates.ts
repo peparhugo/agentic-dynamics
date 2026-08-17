@@ -26,6 +26,57 @@ export const DEFAULT_LAYOUT_SOURCE = `<!DOCTYPE html>
 
 const TEMPLATE_EXTENSIONS = ['.hbs', '.handlebars'];
 
+/**
+ * Resolve a template/layout/partial name to a file path within `dir`. Names
+ * may include an extension or omit it (in which case `.hbs`/`.handlebars` are
+ * tried). Returns null when no matching file exists.
+ */
+export function resolveFile(dir: string, name: string): string | null {
+  const candidates: string[] = [];
+  if (path.extname(name)) {
+    candidates.push(name);
+  } else {
+    for (const ext of TEMPLATE_EXTENSIONS) {
+      candidates.push(name + ext);
+    }
+  }
+  for (const candidate of candidates) {
+    const full = path.join(dir, candidate);
+    if (fs.existsSync(full) && fs.statSync(full).isFile()) {
+      return full;
+    }
+  }
+  return null;
+}
+
+export function resolveTemplateFile(
+  templatesDir: string,
+  name: string | undefined,
+  defaultName: string
+): string | null {
+  const resolved = name && name.length > 0 ? name : defaultName;
+  return resolveFile(templatesDir, resolved);
+}
+
+export function resolveLayoutFile(
+  layoutsDir: string,
+  name: string | undefined,
+  defaultName: string
+): string | null {
+  const resolved = name && name.length > 0 ? name : defaultName;
+  return resolveFile(layoutsDir, resolved);
+}
+
+export function listPartialFiles(partialsDir: string): string[] {
+  if (!fs.existsSync(partialsDir)) {
+    return [];
+  }
+  return fs
+    .readdirSync(partialsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && TEMPLATE_EXTENSIONS.includes(path.extname(entry.name)))
+    .map((entry) => path.join(partialsDir, entry.name));
+}
+
 export interface TemplateEngineOptions {
   defaultTemplate?: string;
   defaultLayout?: string;
@@ -79,8 +130,7 @@ export class TemplateEngine {
   }
 
   private resolveTemplate(name: string | undefined): string {
-    const resolved = name && name.length > 0 ? name : this.defaultTemplate;
-    const file = this.resolveFile(this.templatesDir, resolved);
+    const file = resolveTemplateFile(this.templatesDir, name, this.defaultTemplate);
     if (file) {
       return fs.readFileSync(file, 'utf8');
     }
@@ -88,30 +138,11 @@ export class TemplateEngine {
   }
 
   private resolveLayout(name: string | undefined): string {
-    const resolved = name && name.length > 0 ? name : this.defaultLayout;
-    const file = this.resolveFile(this.layoutsDir, resolved);
+    const file = resolveLayoutFile(this.layoutsDir, name, this.defaultLayout);
     if (file) {
       return fs.readFileSync(file, 'utf8');
     }
     return DEFAULT_LAYOUT_SOURCE;
-  }
-
-  private resolveFile(dir: string, name: string): string | null {
-    const candidates: string[] = [];
-    if (path.extname(name)) {
-      candidates.push(name);
-    } else {
-      for (const ext of TEMPLATE_EXTENSIONS) {
-        candidates.push(name + ext);
-      }
-    }
-    for (const candidate of candidates) {
-      const full = path.join(dir, candidate);
-      if (fs.existsSync(full) && fs.statSync(full).isFile()) {
-        return full;
-      }
-    }
-    return null;
   }
 
   private compile(source: string): Handlebars.TemplateDelegate {
@@ -125,20 +156,10 @@ export class TemplateEngine {
   }
 
   private registerPartials(): void {
-    if (!fs.existsSync(this.partialsDir)) {
-      return;
-    }
-    const entries = fs.readdirSync(this.partialsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isFile()) {
-        continue;
-      }
-      const ext = path.extname(entry.name);
-      if (!TEMPLATE_EXTENSIONS.includes(ext)) {
-        continue;
-      }
-      const name = path.basename(entry.name, ext);
-      const source = fs.readFileSync(path.join(this.partialsDir, entry.name), 'utf8');
+    for (const file of listPartialFiles(this.partialsDir)) {
+      const ext = path.extname(file);
+      const name = path.basename(file, ext);
+      const source = fs.readFileSync(file, 'utf8');
       this.handlebars.registerPartial(name, source);
     }
   }

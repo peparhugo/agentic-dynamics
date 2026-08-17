@@ -18,6 +18,7 @@ export interface Page {
     frontmatter: Frontmatter;
     template?: string;
     layout?: string | false;
+    cached?: boolean;
 }
 export interface BuildOptions {
     contentDir: string;
@@ -25,10 +26,19 @@ export interface BuildOptions {
     templatesDir?: string;
     defaultTemplate?: string;
     defaultLayout?: string;
+    incremental?: boolean;
+    clean?: boolean;
+    cacheFile?: string;
+}
+export interface BuildStats {
+    built: number;
+    skipped: number;
+    timeSavedMs: number;
 }
 export interface Site {
     pages: Page[];
     outputDir: string;
+    stats: BuildStats;
 }
 export interface ServeOptions {
     contentDir?: string;
