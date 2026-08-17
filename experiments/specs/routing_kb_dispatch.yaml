@@ -1,0 +1,116 @@
+name: routing_kb_dispatch
+question: >-
+  Make the more-itertools grid cells flow through the Control-Room-visible queue instead of running
+  inline. The prior routing_kb_wiring run built the inline launcher (scripts/run_routing_kb.py) plus
+  provision/held_out/seeding; this follow-up (1) changes the launcher to ENQUEUE kind=agent_task job
+  payloads to the story_jobs queue, and (2) extends scripts/worker.py to dispatch those jobs to
+  run_workflow and write status/results to the same keys the Control Room /api/matrix reads. Then it
+  smokes one queued cell end-to-end and verifies the cell shows up in the matrix.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      brief: >-
+        The queue is the Control Room's data source: admin/server.py /api/matrix reads QUEUE_KEY=
+        story_jobs, STATUS_KEY, RESULTS_KEY. Story cells already flow through it (enqueue.py ->
+        worker.py -> run_story). agent_task cells currently run inline, so they are invisible to the
+        Control Room. This pass makes agent_task cells a first-class queue citizen via a `kind`
+        discriminator: launcher enqueues {kind: agent_task, spec, goal, model/phase-selector, rag
+        kwargs, workdir, task_label, cell_id}; worker.py dispatches kind=story -> run_story (unchanged)
+        and kind=agent_task -> provision + held-out inject + run_workflow, then writes the
+        signal-store-shaped result row + status transition. Do NOT change the story path.
+      isolation: >-
+        Redis 6380 DB 1 (the queue); DB 2 for the KB. Never 6379. The agent_task path shares the
+        story status/results keys but is distinguished by kind — verify the story path behavior is
+        byte-for-byte unchanged.
+      prior_art:
+        - scripts/worker.py            # BRPOP + run_story + status/results writes (the dispatch target)
+        - scripts/enqueue.py           # the job payload shape
+        - scripts/run_routing_kb.py    # the launcher (currently inline — change to enqueue)
+        - scripts/run_workflow.py      # the agent_task executor
+        - admin/server.py              # QUEUE_KEY/STATUS_KEY/RESULTS_KEY the matrix reads
+        - scripts/seed_repo.py         # external-repo provisioning (already built)
+    phases:
+      - name: enqueue
+        kind: agent
+        prompt: >
+          Change scripts/run_routing_kb.py to ENQUEUE instead of running inline.
+
+          READ FIRST: scripts/run_routing_kb.py (current inline path), scripts/enqueue.py (the job
+          payload shape + queue push), admin/server.py (QUEUE_KEY=story_jobs).
+
+          REQUIREMENTS:
+          - Each cell's factor levels are mapped to a JOB PAYLOAD: {kind: "agent_task", spec, goal,
+            model/phase-selector (routing level), rag kwargs (kb level), workdir, task_label:
+            "more_itertools_chunked_negative_n", cell_id}. Push to story_jobs (6380 DB 1) exactly as
+            enqueue.py does.
+          - The launcher NO LONGER calls run_workflow itself — it enqueues and stops. (The worker
+            runs the cell; the dispatch phase extends it.)
+          - Keep the factor->payload mapping table (routing fixed/random/recommend_route/route_step;
+            kb bare/historical/self_built/shared) and the cold-start note (recommend_route/route_step
+            need warmup rows first).
+          TESTS: tests/test_launcher.py — the payload carries kind/task_label/cell_id; no inline
+          run_workflow call remains. Run green.
+      - name: dispatch
+        kind: agent
+        prompt: >
+          Extend scripts/worker.py to dispatch agent_task jobs.
+
+          READ FIRST: scripts/worker.py (the BRPOP loop + run_story + status/results writes),
+          scripts/run_workflow.py, scripts/seed_repo.py, scripts/run_routing_kb.py (the payload).
+
+          REQUIREMENTS:
+          - On BRPOP, read the job's `kind`: kind=story -> existing run_story path (UNCHANGED);
+            kind=agent_task -> seed_repo provision (if not already), inject the held-out test,
+            run_workflow(spec, goal, model, workdir, **rag kwargs).
+          - After run_workflow returns, write the result as a _results_summary.json-SHAPED row
+            (task = the job's task_label) into story_results, and set story_status
+            queued->running->done|failed — so admin/server.py /api/matrix shows the cell's status
+            transition + telemetry exactly like a story cell.
+          - Do NOT alter run_story behavior or the story status/results key semantics.
+          TESTS: tests/test_dispatch.py — kind=agent_task dispatched to run_workflow (not run_story);
+          status queued->running->done written; result row carries task_label; story path unchanged.
+          Run green.
+      - name: smoke
+        kind: agent
+        prompt: >
+          Run ONE cell (routing=fixed, kb=bare) through the queue end-to-end and prove it is
+          Control-Room-visible.
+
+          REQUIREMENTS:
+          - scripts/seed_repo.py more-itertools @ 516f0a80 into a fresh worktree.
+          - scripts/run_routing_kb.py --stage smoke (enqueues the fixed/bare agent_task cell), then
+            run scripts/worker.py once to drain it.
+          - Verify: test_executed_success True; held-out test discriminates; result row carries
+            task=more_itertools_chunked_negative_n; story_status shows queued->running->done; and
+            admin/server.py /api/matrix reflects the cell (curl it and assert the cell_id appears).
+          - Report per-cell cost + held-out pass/fail.
+      - name: verify
+        kind: agent
+        prompt: >
+          Scoped verification — do NOT run the full pytest suite. Run
+          tests/test_launcher.py tests/test_dispatch.py tests/test_held_out.py tests/test_seed_repo.py
+          -q, plus an import smoke of scripts/run_routing_kb.py and scripts/worker.py. Leave green.
+      - name: docs
+        kind: agent
+        prompt: >
+          Sync the agent-facing surfaces (standard closing step — do not skip). Update BOTH surfaces
+          in lockstep (.opencode/instructions/mental-model.md AND .claude/rules/mental-model.md):
+          document the `kind` discriminator on the queue (story vs agent_task) and that agent_task
+          cells now flow through enqueue -> worker -> run_workflow, Control-Room-visible. Update
+          scripts/CONTEXT.md for run_routing_kb.py (enqueue) and worker.py (dispatch). Keep both
+          surfaces in lockstep.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
