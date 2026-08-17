@@ -34,22 +34,38 @@ class FakePubSub:
 class FakeRedis:
     """Implement only the Redis operations used by the admin routes."""
 
-    def __init__(self, *, statuses=None, results=None, logs=None, messages=None):
+    def __init__(self, *, statuses=None, results=None, logs=None, messages=None,
+                 analysis_statuses=None, review_statuses=None,
+                 analysis_queue=0, review_queue=0):
         self.statuses = statuses or {}
         self.results = results or {}
+        self.analysis_statuses = analysis_statuses or {}
+        self.review_statuses = review_statuses or {}
+        self.analysis_queue = analysis_queue
+        self.review_queue = review_queue
         self.logs = logs or {}
         self.pubsub_client = FakePubSub(messages)
         self.requested_logs = []
 
     def llen(self, key):
-        assert key == "story_jobs"
-        return 2
+        if key == "story_jobs":
+            return 2
+        if key == "analysis_jobs":
+            return self.analysis_queue
+        if key == "review_jobs":
+            return self.review_queue
+        raise AssertionError(f"unexpected llen key: {key}")
 
     def hgetall(self, key):
         if key == "story_status":
             return self.statuses
-        assert key == "story_results"
-        return self.results
+        if key == "story_results":
+            return self.results
+        if key == "analysis_status":
+            return self.analysis_statuses
+        if key == "review_status":
+            return self.review_statuses
+        raise AssertionError(f"unexpected hgetall key: {key}")
 
     def lrange(self, key, start, end):
         assert (start, end) == (0, -1)
@@ -206,6 +222,42 @@ def test_matrix_ignores_invalid_telemetry_but_preserves_reported_zero(monkeypatc
     assert telemetry["cost_samples"] == 1
     assert telemetry["cells"]["empty"]["reported_cost"] is None
     assert telemetry["cells"]["empty"]["samples"] == []
+
+
+def test_matrix_surfaces_three_stage_pipeline(monkeypatch):
+    """The matrix exposes execute, analyze, and review as one pipeline view."""
+    redis = FakeRedis(
+        statuses={"alpha": "running", "beta": "done"},
+        results={"beta": "result.json"},
+        analysis_statuses={"alpha": "done", "beta": "running"},
+        review_statuses={"alpha_S1": "done", "alpha_story": "queued", "beta_S1": "retry_1"},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    body = server.app.test_client().get("/api/matrix").get_json()
+
+    stages = body["stages"]
+    # Flask's JSON_SORT_KEYS default reorders dict keys alphabetically; the
+    # client iterates its own fixed stage list, so assert membership, not order.
+    assert set(stages) == {"execute", "analyze", "review"}
+
+    # Execute stage keeps the legacy flat fields.
+    assert stages["execute"]["total"] == 2
+    assert stages["execute"]["running"] == 1
+    assert stages["execute"]["results_saved"] == 1
+
+    # Analyze stage has no results hash.
+    assert stages["analyze"]["total"] == 2
+    assert stages["analyze"]["running"] == 1
+    assert stages["analyze"]["done"] == 1
+    assert stages["analyze"]["results_saved"] is None
+
+    # Review stage folds retry_N into running and reports the retry count.
+    assert stages["review"]["total"] == 3
+    assert stages["review"]["retry"] == 1
+    assert stages["review"]["running"] == 1
+    assert stages["review"]["queued"] == 1
+    assert stages["review"]["done"] == 1
 
 
 def test_matrix_redis_failure_keeps_existing_503_contract(monkeypatch):

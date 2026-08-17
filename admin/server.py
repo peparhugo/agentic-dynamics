@@ -102,6 +102,15 @@ REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
 RESULTS_KEY = "story_results"
+# Post-hoc pipeline stages. The execute stage is the story queue above; the
+# analyze and review stages are separate Redis pairs written by
+# enqueue_analysis.py/analysis_worker.py and enqueue_reviews.py/review_worker.py.
+# None of the post-hoc workers publish to a pub/sub channel, so these are only
+# visible through the poll-driven /api/matrix snapshot (see §0 of the survey).
+ANALYSIS_QUEUE_KEY = "analysis_jobs"
+ANALYSIS_STATUS_KEY = "analysis_status"
+REVIEW_QUEUE_KEY = "review_jobs"
+REVIEW_STATUS_KEY = "review_status"
 HEARTBEAT_SECONDS = 15
 MAX_DESIGN_REQUEST_BYTES = 64 * 1024
 MAX_DESIGN_PROMPT_CHARS = 12_000
@@ -742,33 +751,73 @@ def _retained_telemetry(redis_client, cell_ids) -> dict[str, Any]:
     }
 
 
-@app.get("/api/matrix")
-def api_matrix() -> Response:
-    """Return the legacy fleet matrix plus additive retained telemetry."""
-    try:
-        r = _redis()
-        remaining = r.llen(QUEUE_KEY)
-        statuses = r.hgetall(STATUS_KEY)
-        results = r.hgetall(RESULTS_KEY)
-    except Exception:
-        return jsonify({"error": "redis_unavailable", "cells": {}}), 503
+def _stage_summary(
+    redis_client,
+    queue_key: str,
+    status_key: str,
+    results_key: str | None = None,
+) -> dict[str, Any]:
+    """Summarize one pipeline stage from its queue list + status hash.
 
+    ``status_key`` is a hash of ``id -> status``; ``queue_key`` is the list
+    backing the workers' BRPOP. Only the execute stage has a ``results_key``
+    (``story_results``); the post-hoc stages pass ``None`` and get
+    ``results_saved=None`` so the field reads as "not applicable" rather than
+    a fabricated zero.
+
+    A ``retry_`` status prefix (the review worker re-enqueues a failed job as
+    ``retry_N``) is reported separately in ``retry`` and also folded into
+    ``running`` — a job awaiting retry is still in flight, not terminal.
+    """
+    statuses = redis_client.hgetall(status_key)
     counts: dict[str, int] = {}
     for status in statuses.values():
         counts[status] = counts.get(status, 0) + 1
+    retry = sum(value for key, value in counts.items() if key.startswith("retry_"))
+    running = counts.get("running", 0) + retry
     completed = counts.get("done", 0) + counts.get("failed", 0) + counts.get("timeout", 0)
-    response = {
+    return {
         "total": len(statuses),
-        "remaining_in_queue": remaining,
+        "remaining_in_queue": redis_client.llen(queue_key),
         "queued": counts.get("queued", 0),
-        "running": counts.get("running", 0),
+        "running": running,
         "done": counts.get("done", 0),
         "failed": counts.get("failed", 0),
         "timeout": counts.get("timeout", 0),
+        "retry": retry,
         "completed": completed,
-        "results_saved": len(results),
+        "results_saved": len(redis_client.hgetall(results_key)) if results_key else None,
         "cells": statuses,
     }
+
+
+@app.get("/api/matrix")
+def api_matrix() -> Response:
+    """Return the legacy fleet matrix plus the three-stage pipeline view."""
+    try:
+        r = _redis()
+        execute = _stage_summary(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY)
+        analyze = _stage_summary(r, ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY)
+        review = _stage_summary(r, REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY)
+    except Exception:
+        return jsonify({"error": "redis_unavailable", "cells": {}}), 503
+
+    # Keep the legacy flat fields (``total``, ``queued``, ``cells``, …) derived
+    # from the execute stage so existing clients keep working; the three-stage
+    # ``stages`` block is purely additive.
+    response = {
+        "total": execute["total"],
+        "remaining_in_queue": execute["remaining_in_queue"],
+        "queued": execute["queued"],
+        "running": execute["running"],
+        "done": execute["done"],
+        "failed": execute["failed"],
+        "timeout": execute["timeout"],
+        "completed": execute["completed"],
+        "results_saved": execute["results_saved"],
+        "cells": execute["cells"],
+    }
+    response["stages"] = {"execute": execute, "analyze": analyze, "review": review}
     design_stream_ids: list[str] = []
     try:
         for payload in r.hgetall(DESIGN_SESSIONS_KEY).values():
@@ -779,7 +828,7 @@ def api_matrix() -> Response:
     except Exception:
         # Fleet telemetry remains useful if optional design metadata is absent.
         pass
-    response["telemetry"] = _retained_telemetry(r, [*statuses, *design_stream_ids])
+    response["telemetry"] = _retained_telemetry(r, [*execute["cells"], *design_stream_ids])
     return jsonify(response)
 
 

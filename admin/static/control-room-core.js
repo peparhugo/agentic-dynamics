@@ -8,7 +8,7 @@
  */
 (function exposeControlRoomCore(root) {
   const TERMINAL_STATUSES = new Set(["done", "failed", "timeout"])
-  const STATUS_ORDER = { running: 0, failed: 1, timeout: 2, queued: 3, done: 4, unknown: 5 }
+  const STATUS_ORDER = { running: 0, retry: 1, failed: 2, timeout: 3, queued: 4, done: 5, unknown: 6 }
 
   /** Return only finite, non-negative numeric telemetry. */
   function safeNumber(value) {
@@ -18,6 +18,9 @@
   /** Map producer status variants into the finite visual state vocabulary. */
   function normalizeStatus(value) {
     const status = typeof value === "string" ? value.toLowerCase() : ""
+    // The review worker re-enqueues a failed job under a ``retry_N`` status;
+    // collapse that prefix into the single ``retry`` visual state.
+    if (status.startsWith("retry_")) return "retry"
     return Object.prototype.hasOwnProperty.call(STATUS_ORDER, status) ? status : "unknown"
   }
 
