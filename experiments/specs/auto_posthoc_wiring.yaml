@@ -1,0 +1,123 @@
+name: auto_posthoc_wiring
+question: >-
+  Can the post-hoc stages be auto-triggered per worktree so they literally run inside the
+  experiment workflow — each finished story cell enqueues its own analysis, and each finished
+  analysis enqueues its own review — so that when the workflow completes, analysis + review
+  results are already ready with no manual enqueue step (the 2026-08-15 gap removed by
+  construction)?
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool:
+      - deepseek/deepseek-v4-pro
+      - deepseek/deepseek-v4-flash
+    context:
+      problem: >-
+        Today the pipeline is execute -> [manual] analyze -> [manual] review -> regenerate. The
+        enqueue_analysis.py and enqueue_reviews.py scripts must be run by hand after the cells
+        finish; the 2026-08-15 remediation forgot, leaving new cells without analysis + review.
+      target: >-
+        Wire the handoff INTO the workers so it is automatic and async per worktree:
+          * worker.py, after a story cell completes and saves its result, enqueues that
+            worktree's analysis job directly (no full-corpus scan).
+          * analysis_worker.py, after an analysis completes, enqueues that story's review job.
+        The existing analysis_worker/review_worker already drain in parallel — only the
+        TRIGGER is missing. enqueue_analysis.py/enqueue_reviews.py stay as backfill tools.
+      redis: >-
+        analysis_jobs/analysis_status and review_jobs/review_status on 127.0.0.1:6380 db 1.
+        Analysis is LLM-free; review uses deepseek/deepseek-v4-flash.
+      constraint: >-
+        Do NOT change run_story.py's result schema or the ledger. Reuse the existing
+        enqueue_analysis/enqueue_reviews job-building logic (extract it into a shared helper if
+        needed) rather than duplicating it. A trigger failure must not fail the cell — log and
+        continue; the backfill scripts remain the safety net.
+    phases:
+      - name: survey
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Map the execute -> analyze -> review handoff and the exact trigger points.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - scripts/worker.py           (where a story cell completes + saves its result)
+          - scripts/analysis_worker.py  (where an analysis job completes)
+          - scripts/enqueue_analysis.py + enqueue_reviews.py  (the job-building logic to reuse)
+          - scripts/review_worker.py + finalize_reviews.py
+
+          REQUIREMENTS:
+          - Produce a touchpoint map with file:line for: (a) where worker.py can auto-enqueue the
+            analysis job after run_story saves its result; (b) where analysis_worker.py can
+            auto-enqueue the review job after analysis completes; (c) the shared helper to extract
+            so enqueue_analysis/enqueue_reviews and the workers use the same job shape.
+          - Do NOT modify code.
+
+          DELIVER exactly one file: docs/auto_posthoc_survey.md.
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Wire the auto-triggers so analyze + review run per worktree, async.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/auto_posthoc_survey.md  (produced by the survey phase)
+
+          REQUIREMENTS:
+          - worker.py: after a story cell completes and its result is saved, enqueue that
+            worktree's analysis job (lpush analysis_jobs + hset analysis_status) — reuse the
+            extracted job-building helper, never re-scan the whole corpus.
+          - analysis_worker.py: after an analysis job completes, enqueue that story's review job
+            (lpush review_jobs + hset review_status).
+          - Extract the shared job-building helper(s) so enqueue_analysis.py/enqueue_reviews.py
+            and the workers cannot drift. Leave those scripts working as backfill tools.
+          - A trigger failure must NOT fail the cell: log it and continue (the backfill scripts
+            are the safety net).
+
+          DELIVER the implementation.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Test the auto-triggered pipeline and write the verification.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Add/extend tests covering: worker auto-enqueues analysis after a cell; analysis
+            worker auto-enqueues review after analysis; trigger failure does not fail the cell;
+            backfill scripts still work.
+          - Run the targeted tests explicitly and report commands + results.
+          - Write docs/auto_posthoc_verify.md with PASS/FAIL per check.
+
+          DELIVER the tests plus the verification doc.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: posthoc_autotrigger, plane: measurement, evidence_class: "[M]", requires: [first_pass, test_executed_success], produces: [posthoc_auto]}
+  - {name: ready_for_policy,    plane: control,     evidence_class: "[P]", requires: [posthoc_auto], produces: [admit_policy]}
+metrics:
+  - {name: analysis_auto_triggered, agg: ratio, over: cell}
+  - {name: review_auto_triggered,   agg: ratio, over: cell}
+  - {name: cell_survives_trigger_failure, agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, survey, implementation, verification]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
