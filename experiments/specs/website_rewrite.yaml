@@ -1,20 +1,16 @@
 name: website_rewrite
 question: >-
-  Can three models — DeepSeek v4 Pro, Claude Fable 5, and GPT-5.6 Sol — EACH independently
-  rewrite the public site to introduce Agentic Dynamics as a field and instrument expressed as
-  BUSINESS OUTCOMES (not SaaS, not abstract), producing three comparable proposals, with the
-  dead taxonomy/counts/Explanation-Tax/100% framing removed and the instrumented fields +
-  self-healing finding added, preserving the front diagram and framework SVG?
-version: "0.2"
+  Can a single model rewrite the public site to introduce Agentic Dynamics as a field and
+  instrument expressed as BUSINESS OUTCOMES (not SaaS, not abstract) — with the dead taxonomy/
+  counts/Explanation-Tax/100% framing removed and the instrumented fields + self-healing finding
+  added, preserving the front diagram and framework SVG? Run once per model to produce three
+  independent, pull-able branches.
+version: "0.3"
 workflow:
   kind: agent_task
   params:
     language: html
     fork: true
-    model_pool:
-      - deepseek/deepseek-v4-pro
-      - anthropic/claude-fable-5
-      - openai/gpt-5.6-sol
     context:
       positioning: >-
         Read docs/agentic_dynamics_vision.md FIRST. The thesis: "AI agents don't have a price —
@@ -41,118 +37,43 @@ workflow:
         correctness 0.39. [C] verification correlation -0.077. [H] self-healing re-run.
       keep: >-
         Preserve the front-page diagram and the framework-page SVG. Do not delete them.
-      output_layout: >-
-        Each model writes its own proposal to firebase/rewrites/<model>/ (NOT firebase/public/),
-        so the three never overwrite each other. firebase/public/ is untouched until a human
-        picks the winner.
+      run_shape: >-
+        This spec is SINGLE-model: the model is selected by --model (no model_pool, no per-phase
+        pin). Run it THREE times — deepseek/deepseek-v4-pro, anthropic/claude-fable-5,
+        openai/gpt-5.6-sol — each in its own worktree/branch, so each branch is an independent
+        complete rewrite of firebase/public/ the operator can pull from.
     phases:
-      - name: rewrite_deepseek
+      - name: rewrite
         kind: agent
         timeout: 14400
-        allowed_models: [deepseek/deepseek-v4-pro]
         prompt: |
-          Rewrite the public site per docs/agentic_dynamics_vision.md — YOUR proposal.
+          Rewrite the public site per docs/agentic_dynamics_vision.md — YOUR independent proposal.
 
           GOAL:
           {goal}
 
           READ FIRST:
           - docs/agentic_dynamics_vision.md
-          - firebase/public/*.html        (the 8 pages to rewrite)
+          - firebase/public/*.html        (the 8 pages to rewrite, in place)
           - firebase/public/data.js       (generated, provenance-tagged data)
 
           REQUIREMENTS:
-          - Write your full 8-page rewrite to firebase/rewrites/deepseek/*.html (NOT
-            firebase/public/). Cover: index (keep the diagram, thesis up top, four headlines),
-            evidence (full rewrite), methodology (10 operators 3-way + ledger fields +
-            measure-before-policy gate + queue pipeline), framework (reorganize around the
-            dynamics->business-outcome table, KEEP the SVG), story (extend through remediation +
-            self-healing), accelerator + databricks (refresh, frame as operational hypotheses +
-            related work), glossary (drop manifold/semantic, add grit/perturbation_strength/
-            output decomposition/self-healing).
+          - Rewrite all 8 pages IN PLACE under firebase/public/ per the vision doc's per-page plan:
+            index (KEEP the diagram; thesis up top; the four headlines as body), evidence (full
+            rewrite), methodology (10 operators 3-way + ledger fields + measure-before-policy gate
+            + queue pipeline), framework (reorganize around the dynamics->business-outcome table,
+            KEEP the SVG), story (extend through remediation + self-healing), accelerator +
+            databricks (refresh, frame as operational hypotheses + related work), glossary (drop
+            manifold/semantic; add grit/perturbation_strength/output decomposition/self-healing).
           - Every number provenance-tagged [M]/[C]/[H]/[X]/[P], grounded in data.js. Remove the
-            stale taxonomy, counts, "Explanation Tax", and the self-reported-100% overclaim.
+            stale taxonomy, stale counts, "Explanation Tax", and the self-reported-100% overclaim.
 
-          DELIVER firebase/rewrites/deepseek/*.html.
-      - name: rewrite_fable5
-        kind: agent
-        timeout: 14400
-        allowed_models: [anthropic/claude-fable-5]
-        prompt: |
-          Rewrite the public site per docs/agentic_dynamics_vision.md — YOUR proposal.
-
-          GOAL:
-          {goal}
-
-          READ FIRST:
-          - docs/agentic_dynamics_vision.md
-          - firebase/public/*.html
-          - firebase/public/data.js
-
-          REQUIREMENTS:
-          - Write your full 8-page rewrite to firebase/rewrites/fable5/*.html (NOT
-            firebase/public/). Same coverage as the vision doc's per-page plan: index (keep
-            diagram), evidence (full rewrite), methodology, framework (keep SVG), story,
-            accelerator + databricks, glossary.
-          - Every number provenance-tagged, grounded in data.js. Remove stale taxonomy/counts/
-            "Explanation Tax"/self-reported-100%.
-
-          DELIVER firebase/rewrites/fable5/*.html.
-      - name: rewrite_openai
-        kind: agent
-        timeout: 14400
-        allowed_models: [openai/gpt-5.6-sol]
-        prompt: |
-          Rewrite the public site per docs/agentic_dynamics_vision.md — YOUR proposal.
-
-          GOAL:
-          {goal}
-
-          READ FIRST:
-          - docs/agentic_dynamics_vision.md
-          - firebase/public/*.html
-          - firebase/public/data.js
-
-          REQUIREMENTS:
-          - Write your full 8-page rewrite to firebase/rewrites/openai/*.html (NOT
-            firebase/public/). Same coverage as the vision doc's per-page plan: index (keep
-            diagram), evidence (full rewrite), methodology, framework (keep SVG), story,
-            accelerator + databricks, glossary.
-          - Every number provenance-tagged, grounded in data.js. Remove stale taxonomy/counts/
-            "Explanation Tax"/self-reported-100%.
-
-          DELIVER firebase/rewrites/openai/*.html.
-      - name: consolidate
-        kind: agent
-        timeout: 7200
-        allowed_models: [deepseek/deepseek-v4-pro]
-        prompt: |
-          Compare the three rewrite proposals and write a decision-ready comparison.
-
-          GOAL:
-          {goal}
-
-          PRIOR PHASES:
-          {prior_phases}
-
-          READ FIRST:
-          - firebase/rewrites/deepseek/*.html, firebase/rewrites/fable5/*.html,
-            firebase/rewrites/openai/*.html
-          - docs/agentic_dynamics_vision.md
-
-          REQUIREMENTS:
-          - For each of the 8 pages, note which proposal best expresses "business outcomes, not
-            SaaS, not abstract", which is most provenance-honest, and where each is strong/weak.
-          - Do NOT write to firebase/public/ — the human picks the winner. Produce a comparison
-            table + a per-page recommendation.
-
-          DELIVER docs/website_rewrite_compare.md.
+          DELIVER the rewritten firebase/public/*.html.
       - name: verify
         kind: agent
         timeout: 7200
-        allowed_models: [deepseek/deepseek-v4-pro]
         prompt: |
-          Verify the three proposals before human review.
+          Verify your rewrite before it is pulled.
 
           GOAL:
           {goal}
@@ -161,25 +82,25 @@ workflow:
           {prior_phases}
 
           REQUIREMENTS:
-          - For each proposal (deepseek/fable5/openai), grep for stale terms (manifold, semantic,
-            227, 249, "Explanation Tax", unqualified "100% pass rate") — none should remain.
-          - Confirm each proposal preserves the front diagram + framework SVG.
-          - Confirm firebase/public/ is UNTOUCHED (no winner selected yet).
-          - Write docs/website_rewrite_verify.md with PASS/FAIL per proposal per check.
+          - Grep firebase/public/*.html for stale terms (manifold, semantic, 227, 249,
+            "Explanation Tax", unqualified "100% pass rate") — none should remain.
+          - Confirm the front-page diagram and the framework-page SVG are intact.
+          - Confirm every number traces to data.js with a provenance tag.
+          - Write docs/website_rewrite_verify.md with PASS/FAIL per check.
 
           DELIVER docs/website_rewrite_verify.md.
 factors:
   - {name: model, levels: [deepseek/deepseek-v4-pro]}
 design: factorial
 rules:
-  - {name: site_consistency,  plane: measurement, evidence_class: "[M]", requires: [], produces: [provenance_clean]}
-  - {name: publish_ready,     plane: control,     evidence_class: "[P]", requires: [provenance_clean], produces: [deployable]}
+  - {name: site_consistency, plane: measurement, evidence_class: "[M]", requires: [], produces: [provenance_clean]}
+  - {name: publish_ready,    plane: control,     evidence_class: "[P]", requires: [provenance_clean], produces: [deployable]}
 metrics:
   - {name: stale_terms_removed, agg: ratio, over: cell}
   - {name: numbers_provenance_tagged, agg: ratio, over: cell}
 comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
 writeup:
   format: lab_book
-  sections: [question, rewrite, review, verify]
-stop: {budget_usd: 12.0, max_attempts: 1}
+  sections: [question, rewrite, verify]
+stop: {budget_usd: 6.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
