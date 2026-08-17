@@ -1,0 +1,246 @@
+{
+  "story_name": "notification_service",
+  "story_id": "7ccdb0d21a19",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "071399bfe9010b202d550d8876046e71d70d0764",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "GET /health is served through the websockets HTTP handshake hook rather than a real HTTP layer. Sessions 2-4 of this story add /channels and /channels/{name}/subscribers REST endpoints, which this approach cannot cleanly serve, so session 2 will need to rework the REST surface."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Inconsistent validation exceptions: make_message raises ValueError while parse_client_message raises MessageError for the same class of protocol violation; server.py's _dispatch catches only MessageError, so a ValueError raised via make_message path would escape the handler."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Direct messages do not validate target_id presence before routing; a 'direct' message without target_id produces an 'unknown target_id: None' error to the sender instead of a clear protocol error."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Discrepancy flag: the listed convention violations for __init__.py ('Classes should use PascalCase', 'Functions should use snake_case') reference empty files containing no such symbols and appear to be linter false positives; the visible substantive code (messages.py, registry.py, server.py) follows snake_case functions and PascalCase classes consistently."
+        },
+        {
+          "category": "performance",
+          "severity": "info",
+          "description": "registry.all() returns a dict copy on every broadcast so messages can be sent concurrently; acceptable at current scale but the copy-per-message cost grows linearly with fan-out in later sessions."
+        }
+      ],
+      "strengths": [
+        "Clean module decomposition (messages/registry/server/storage) that maps directly onto the 5-session story arc, separating protocol, connection state, and persistence concerns.",
+        "Message envelope matches the story spec exactly: {type, payload, timestamp} with broadcast/direct/system types and validation on parse.",
+        "Thread-safe ClientRegistry with a lock, and _safe_send guards against ConnectionClosed during fan-out, so a single dead client cannot break a broadcast.",
+        "Public signatures carry type hints and follow snake_case/PascalCase naming per project conventions.",
+        "Measured zero new bugs, zero duplication, and a compact event-based design that makes later Redis/SQLite sessions a natural extension."
+      ],
+      "summary": "A clean, spec-conformant greenfield session with a sensible module split and honest measurements (no bugs, no duplication), though the websockets-handshake-hook REST surface is a minor forward-looking liability for later sessions.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "3075cb25a2241d7b1256ef29526da16854e333d6",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "_handle_subscribe and _handle_unsubscribe duplicate the channel-validation + error/ack pattern; a shared helper (and the resulting conditional branches) are largely responsible for the +16 cognitive complexity and 6 smells."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "The only test change in the visible diff updates the SUPPORTED_TYPES constant; no tests are shown covering ChannelRegistry, the subscribe/unsubscribe handlers, channel-scoped broadcast, or the new /channels REST endpoints (new test files may exist outside the truncated diff)."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Channel-scoped broadcast routes by filtering the full client registry against the subscriber set on every send, coupling message delivery to subscription lookups; acceptable at this scale, but a per-channel fan-out map would be cleaner as channels grow."
+        },
+        {
+          "category": "security",
+          "severity": "info",
+          "description": "Channel names are unvalidated client input (no length/character limits) and the REST path regex does not URL-decode the channel segment before lookup."
+        }
+      ],
+      "strengths": [
+        "ChannelRegistry mirrors the existing lock-based ClientRegistry pattern in registry.py, a strong convention match.",
+        "Clean lifecycle handling: unsubscribe_all is invoked on disconnect, preventing stale channel membership.",
+        "The _json_response helper refactor removes duplication across the REST handlers.",
+        "New message types and REST endpoints follow the established dispatch and section-comment conventions."
+      ],
+      "summary": "A well-fitted feature addition that mirrors existing registry and dispatch patterns, with only minor handler duplication and a test-coverage gap; the measured 0.75 convention score and listed violations largely reference untouched files (app.py, storage.py, __init__.py), so they are pre-existing rather than introduced by this commit.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "e30f03dc8188bdb41f2a49fa7bfdfd08ed41deaa",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "The service now maintains three overlapping persistence mechanisms for message state \u2014 the flat JSON-Lines audit trail, the new SQLite history store, and the Redis presence hash \u2014 with no clear ownership boundary, risking drift and redundant writes."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "The module docstring previously stated 'no database is used anywhere in this service'; this commit silently flips that design contract, and the old JSONL audit trail is retained alongside SQLite rather than being consolidated."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "MessageStore opens a fresh SQLite connection on every save_message/list_messages/clear call instead of reusing a connection, which is wasteful under load and reflects the +38 cognitive-complexity and +4 smells reported by SonarQube."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "list_messages uses LIMIT/OFFSET pagination against an unbounded messages table with no index on channel/timestamp and no retention policy, so history grows without bound and deep pagination degrades."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The measured convention score of 0.75 is dragged down by violations in files outside this diff (app.py, __init__.py, registry.py, storage.py); the new db.py and redis_backend.py code itself follows snake_case/PascalCase/UPPER_CASE conventions correctly, so the score over-penalizes this commit."
+        },
+        {
+          "category": "security",
+          "severity": "info",
+          "description": "clear() issues an unconditional DELETE with no guardrails, making accidental production data loss trivial if ever wired to an exposed endpoint."
+        }
+      ],
+      "strengths": [
+        "Clean module separation: db.py (SQLite history), redis_backend.py (pub/sub + presence), server.py (integration) each have a single focused responsibility.",
+        "All SQL uses parameterized queries, so there is no injection surface in the new persistence code.",
+        "Graceful environment-driven configuration: falls back to fakeredis when REDIS_URL is unset, keeping standalone dev and tests working (matching the project's operational conventions).",
+        "The presence hash in Redis is a sound design \u2014 client-to-server mapping survives any single server restart and is visible across instances.",
+        "The listen() loop defensively skips non-message pub/sub frames and silently drops malformed payloads instead of crashing the worker."
+      ],
+      "summary": "A coherent multi-instance integration (Redis pub/sub backbone + SQLite history) with clean module boundaries and injection-safe SQL, but it silently overturns the documented 'no database' design, stacks a third persistence layer on top of the JSONL audit trail, and accrues moderate maintainability/performance debt.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "b4f1f21ff178cf2beddf3fc69f885917192f997b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "In the shown variant the transport owns the client registry (`self.registry = self.transport.registry`), coupling client_id-to-connection bookkeeping into the transport layer. The BaseTransport docstring correctly claims connections are opaque to the core, but this wiring leaks registry semantics through the seam; the server (not the transport) should own the registry and hand connections back through send/broadcast."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "The new transport seam (BaseTransport/WebSocketTransport, TRANSPORTS selection) has no dedicated unit tests \u2014 the added tests cover broker, store, and redis, but nothing exercises a fake transport to prove the routing core stays transport-agnostic."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Module-level constants in __init__.py, registry.py, and storage.py remain non-UPPER_CASE (part of the 30 violations / 0.75 score), though these are pre-existing files this commit did not modify."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Cognitive complexity increased by +7 from splitting the handler into _on_client_connect/_on_client_disconnect/_on_client_message; acceptable for the abstraction split, but the dispatch method still holds several branches."
+        }
+      ],
+      "strengths": [
+        "Clean dependency inversion: the routing core depends only on the BaseTransport ABC and never imports a network library, making SSE/long-polling additions a single-file change.",
+        "Consistent dependency injection across the constructor (broker, presence, store, rate_limiter, transport), matching the existing module layout and helper patterns.",
+        "TRANSPORT env var plus the TRANSPORTS registry in server.py is a simple, discoverable extension point with a clear error on unknown names.",
+        "Measured quality delta is clean: bugs +0, smells +0, duplications -0.2% \u2014 the refactor removes more than it adds."
+      ],
+      "summary": "A well-grounded strategy-pattern refactor that cleanly decouples routing from WebSocket I/O with injectable dependencies and a pluggable transport registry; the 0.75 convention score reflects mostly pre-existing debt in untouched files, while the only real gap is a lack of direct tests for the new transport seam.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "dae87ec278bed9dced27eb613e42f8b269cbbe42",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "RateLimiter reaches through self.redis.client, coupling to the raw redis client instead of going through the RedisBackend abstraction the rest of the server uses (presence mirroring, etc.). Bypasses the established seam."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Single session's diff adds +34 cognitive complexity and +13 smells; background cleanup task plus rate-limiting wiring are concentrated in server.py's constructor/lifecycle and could be extracted into dedicated components."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "resolve_message_ttl_days() returns a float for a day count that is semantically an integer, causing type drift between the config resolver and its use in cutoff_iso(timedelta)."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Measured convention score 0.75 is dragged down by pre-existing violations in files this commit does not touch (app.py, __init__.py, registry.py, storage.py PascalCase/snake_case/UPPER_CASE); the new code itself (rate_limit.py, db.py additions) follows PascalCase classes, snake_case functions, and UPPER_CASE constants correctly. Flagging this discrepancy between the codebase-wide score and the commit's own output."
+        },
+        {
+          "category": "other",
+          "severity": "minor",
+          "description": "Fixed-window counter only sets EXPIRE when INCR returns 1; if expire fails (or the key pre-exists without TTL), the counter persists and the client is permanently rate-limited rather than getting a fresh window."
+        }
+      ],
+      "strengths": [
+        "resolve_rate_limit()/resolve_message_ttl_days() mirror the existing resolve_database_path() env-resolution pattern exactly",
+        "Rate limiting lives in its own module (rate_limit.py) with UPPER_CASE constants, cleanly separated from transport concerns",
+        "Redis-based counters correctly share the limit across server instances, matching the existing presence-mirroring design",
+        "Pagination with has_more flag is well-formed and backed by a matching (channel, timestamp) index added to the schema",
+        "Over-limit clients receive an explicit 'system'/'error' reply rather than a silent drop",
+        "Background TTL purge is configurable via env, consistent with the codebase's resolve_* convention"
+      ],
+      "summary": "A coherent, pattern-consistent feature session (rate limiting, paginated history, TTL cleanup) that fits the existing architecture well but adds meaningful cognitive complexity and slightly bypasses the RedisBackend abstraction seam.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "threading.RLock guards the client registry inside a single-threaded asyncio event loop (introduced S1, persisted through S5) \u2014 unnecessary and signals concurrency-model confusion, though harmless at this scale.",
+      "Dual inverse maps (channels -> _client_channels) must be updated symmetrically in _set_subscription, the disconnect path, and Redis bookkeeping (S2/S3), creating drift risk as feature surface grew.",
+      "Redis coupling in S3: when Redis is present, even local delivery routes through pub/sub (self-listener), so a mid-run Redis outage silently breaks broadcast; the graceful-degradation fallback only covers the no-Redis-at-startup case.",
+      "Hand-rolled asyncio HTTP parsing (S1) persisted across all sessions, so every added endpoint (/messages, /channels, /history) required manual query-string/route parsing and error handling rather than a framework."
+    ],
+    "key_decisions": [
+      "S1 replaced the Flask seed with a dependency-light asyncio + websockets implementation and a hand-rolled HTTP server, committing to that stack for all five sessions.",
+      "S2 added a channel subscription model with dual bookkeeping maps and a wire format supporting channel in top-level or payload.",
+      "S3 integrated Redis pub/sub and SQLite persistence as an optional, env-configured operational backbone with graceful degradation when Redis is absent.",
+      "S4 extracted a pluggable transport seam (BaseTransport/WebSocketTransport) into transport.py, decoupling connection lifecycle from notification routing and keeping all tests green.",
+      "S5 layered cross-cutting concerns onto existing seams: Redis-backed per-client rate limiting with local fallback, message TTL cleanup loop, and a paginated /history endpoint reading the S3 messages table."
+    ],
+    "trajectory_description": "Quality arcs steadily upward. S1 delivers a clean, well-separated greenfield server (architectural fit 0.75, zero new bugs), S2 cleanly adds channels with regression tests (0.88, no debt), S3 makes the largest feature jump with Redis/SQLite integration that introduces moderate complexity and coupling, S4 is a disciplined pure refactor that pays down structure without regressing any of the 8 tests, and S5 finishes with thoughtful cross-cutting work \u2014 rate limiting, TTL cleanup, history \u2014 that directly reuses the S3 persistence and S4 transport seams. Test coverage grew monotonically 4->6->8->8->10, all passing at the final state.",
+    "summary": "A textbook multi-session arc (greenfield -> feature -> integration -> refactor -> cross-cutting) where every later session builds on prior seams, quality improves monotonically, and final tests all pass."
+  }
+}

@@ -139,6 +139,18 @@ def test_spend_rail_surfaces_retained_window_truncation():
     assert "#spend-provenance" in app
 
 
+def test_workflow_phase_badge_rendered_on_fleet_cards():
+    """The live phase ({index}/{total} {name}) is drawn as a badge on each fleet card."""
+    app = (STATIC / "app.js").read_text()
+    css = (STATIC / "style.css").read_text()
+
+    # The matrix snapshot feeds per-cell phase data into the fleet rendering.
+    assert "state.phases" in app
+    assert "data.phases" in app
+    assert 'element("span", "phase-badge"' in app
+    assert ".phase-badge" in css
+
+
 def test_supervisor_surface_preserves_human_action_and_single_terminal_boundaries():
     """The no-build client exposes deliberate controls without a second terminal."""
     html = (STATIC / "index.html").read_text()

@@ -1,0 +1,90 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "7005f70e2fd6",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "161bd5eb46cd04b8b5230e234be5004c9336652f",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "431a15fc59652daf3df57736c52d99b3ed74d0a5",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "f1cb483f42aadefb45fb8e550adb62cde24c1386",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "c6d0fbf962f20e34f334bc6655501c7857ac0b7e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "67997a5b9b770fff9a07f82467e13d29acf7a68e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.05,
+    "compounding_issues": [
+      "Every one of the 5 sessions aborted in <2s with exit_code 1 before a single tool call: the Claude CLI subscription cap returned 'You've hit your session limit \u00b7 resets 7:30am (Europe/Berlin)' (0 tokens, 0 cost across all sessions)",
+      "No code was ever written: index.ts is byte-identical (6851 bytes) across all 6 commits; the only per-session commit artifact is a 3-line .instrument/session_N.jsonl stub holding the session-limit error",
+      "The seed codebase (experiments/codebases/typescript/tier2_small/good) is a JWT-auth Express API (users/items/admin), not a static site generator, so it never matched the SSG story premise and provided no usable baseline",
+      "No continuation or cascade recovery fired, so the harness recorded 5 failed cells ($0.00, all_successful=false) instead of re-running on a working backend"
+    ],
+    "key_decisions": [
+      "Ran the story on the claude_cli backend (anthropic/claude-haiku-4-5), which was rate-limited by the subscription session cap and produced zero output",
+      "Reused the tier2_small/good auth-API template as the SSG seed rather than seeding a static-site-generator codebase, compounding the prompt/base mismatch",
+      "The 5 session prompts do define a sensible arc (core markdown\u2192HTML CLI, template engine, live-reload dev server, plugin system, incremental builds/caching), but the arc exists only as instructions, never as implementation"
+    ],
+    "trajectory_description": "Quality is flat at zero across the entire run. Sessions 1-5 each lasted ~2 seconds, made no edits, wrote no tests, and recorded no tokens or cost; the sole artifact of each session is a transcript stub containing the Claude CLI session-limit error. Because no implementation, diff, or tests exist, there is no measurable improvement or degradation between sessions \u2014 the commits are empty shells whose messages narrate a progression that never occurred.",
+    "summary": "This is a failed run rather than a story: all five sessions were aborted by a Claude CLI session-cap before doing any work, leaving the seeded auth-API code untouched and the 'greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting' progression entirely nominal."
+  }
+}

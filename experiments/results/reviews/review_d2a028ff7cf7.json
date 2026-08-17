@@ -1,0 +1,222 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "d2a028ff7cf7",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "98d04a6d871b6281a52b4e9e87cb3292a1f9f121",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.42,
+      "convention_adherence": 0.53,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Greenfield rewrite deletes the entire existing seed (index.ts, -106 lines) instead of extending or reusing it, erasing the baseline's established structure and seams in a single session; +4363 lines across 10 files land with no reuse of prior code."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "41 convention violations across cli.ts, config.ts, and engine.ts: functions in snake_case, classes/interfaces not PascalCase, constants not UPPER_CASE \u2014 convention score 0.53 per static analysis."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity delta +39 across the new modules, indicating several functions exceed reasonable branching/depth thresholds."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Three new code smells introduced per SonarQube delta, consistent with the wholesale replacement of a clean baseline."
+        }
+      ],
+      "strengths": [
+        "Zero new bugs and zero duplication reported by SonarQube (bugs +0, duplications +0.0%).",
+        "Scaffolds the SSG project with modular separation of concerns across cli, config, and engine modules.",
+        "Brings proper tooling (TypeScript, jest, ts-jest, gray-matter, marked) into the project in one pass."
+      ],
+      "summary": "Session 1 erases the working baseline with a high-volume greenfield rewrite that advances the SSG goal but lands with a convention score of 0.53, 41 violations, and +39 cognitive complexity, introducing technical debt and ignoring existing patterns.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "dc1fa173798a1256d6b6e39668e39306e7c6ddb8",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.65,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "package.json bin entry was moved from dist/cli.js to lib/cli.js with no build-config change in this commit; tsc outDir is dist in this codebase, so the ssg entry point may be broken and the change is unrelated to the templating feature (scope creep)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "renderPage's `let rendered = page.template || hasDefaultTemplate ? ... : ...` conflates a condition and a value, and the layout branch re-wraps body; SonarQube cognitive complexity +24 supports splitting this into small helpers."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "No tests accompany the new templating feature (AST diff shows +0 files); partial/layout/traversal-guard paths are untested."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Measured convention score 0.53 cites violations in config.ts and engine.ts, files untouched by this commit; the 41 violations appear pre-existing and largely do not reflect this diff's code, which is itself PascalCase/camelCase/UPPER_CASE compliant."
+        }
+      ],
+      "strengths": [
+        "handlebars correctly added as a runtime dependency (not devDependency) with consistent lockfile updates including transitive deps",
+        "findTemplateFile rejects paths escaping the templates directory \u2014 a proper path-traversal guard",
+        "new handlebars.SafeString content avoids double-escaping, and the template/layout/partial layering follows standard SSG architecture (Eleventy-style)",
+        "CLI and API surfaces extended symmetrically (--templates option, templatesDir, DEFAULT_TEMPLATES_DIR) reusing existing option-parsing patterns"
+      ],
+      "summary": "A coherent, well-scoped templating feature that follows existing patterns and includes a real security guard, but it carries minor debt (convoluted renderPage ternary, no tests, and an unexplained dist\u2192lib bin change) while the low convention score of 0.53 is mostly pre-existing noise from untouched files, not this commit's code.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "93b36e8a58db05cf0a297a7e726606434d443295",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +72 in the new server.ts (~155 lines) is very high for one module: HTTP server, WS broadcast, chokidar debounce, HTML reload-injection, MIME mapping, and path-traversal security are all nested in a single file with multi-level handlers (upgrade, request, watcher 'all'). Should be decomposed (e.g., static handler, watcher, ws hub) and matches the 2 smells reported."
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "No tests added for the new serve command or server module despite +343 lines; port parsing/validation, path-traversal guard, and reload injection are all untested."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "ws and chokidar are added as runtime dependencies but are only used by the dev-serve feature; consumers using only 'build' pull them unnecessarily. Could be devDependencies or optional, though defensible for a shipped CLI."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Mechanical convention score is 0.53 with 41 violations, but most flagged files (config.ts, engine.ts) are NOT touched by this commit \u2014 the score conflates repo-wide pre-existing violations with this change. The commit's own new code is camelCase/PascalCase compliant; existing violations remain unaddressed."
+        }
+      ],
+      "strengths": [
+        "Command-dispatch refactor to { command, options } cleanly extends the CLI without breaking the existing build path.",
+        "Path-traversal guard in the static file server and strict --port integer/range validation show security-consciousness.",
+        "Feature is self-contained in a new module that reuses the existing build pipeline (buildSite) \u2014 zero changes to existing engine logic.",
+        "Live reload via chokidar + ws is the idiomatic implementation, and index.ts re-export matches the existing export pattern."
+      ],
+      "summary": "A well-scoped, pattern-respecting dev-server feature with solid input validation and path security, held back by a monolithic high-complexity module, missing tests, and a mechanical convention score that mostly reflects pre-existing violations outside this diff.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "96ef07d183ef01d572d01a1fde1fb246fb1b6018",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.68,
+      "convention_adherence": 0.53,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "config.ts monkey-patches require.extensions['.ts'] to transpile TS config files at runtime \u2014 this bypasses the tsc build pipeline, is incompatible with ESM/tsx, and couples runtime behavior to transpileModule semantics; the reason typescript had to move to production dependencies."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "The refactor adds +11 functions and +5 cognitive complexity (AST delta) for a small site builder \u2014 the plugin-hook pipeline (onStart/beforeBuild/onFile/afterBuild/onEnd plus loadPlugins) introduces indirection that may exceed the tool's needs."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Convention score 0.53; violations reported in cli.ts, config.ts, engine.ts for PascalCase/interface/UPPER_CASE/snake_case naming. Note: no snake_case identifiers are visible in the new code, so the static analysis likely reflects pre-existing codebase-wide issues rather than this commit's additions."
+        }
+      ],
+      "strengths": [
+        "Decomposes a 256-line monolithic index.ts into focused modules (config.ts, engine.ts, plugins/) with clear single responsibilities.",
+        "Plugin hooks (onStart/beforeBuild/onFile/afterBuild/onEnd) provide a coherent extension seam while preserving the public buildSite API.",
+        "Config loader restores require.extensions in a finally block, avoiding leaked loader pollution on error paths."
+      ],
+      "summary": "A net-positive modularization that respects the existing public API, but ships a fragile runtime TS loader hack (require.extensions monkey-patch) that constitutes real technical debt despite the cleaner architecture.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "8929536f998ba140d7ecd88011b67d0d67527249",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.72,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +30 and a new smell on the skip-decision chain (cached?.sourceHash === sourceHash && cached.templateHash === templateHash && await fs.stat(...).then(...).catch(...)); the dense single-line predicate is hard to read and reason about."
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Cache manifest (.ssg-cache.json) is written inside outputDir, so it ships with the deployed site artifact and is wiped by the existing clean-build rm(outputDir), meaning any incremental build after a clean build is always cold."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "BuildStats is plumbed through two redundant channels \u2014 the onStats callback added to BuildOptions and buildStats embedded in PluginContext \u2014 duplicating the same data flow."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Skipped pages reuse stale rendered content/html/output from the cache, relying entirely on source/template hash agreement staying in sync; the canSkipPages guard correctly blocks custom plugins, but the coupling is subtle and fragile to future plugin additions."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Mechanical convention score of 0.53 appears driven by pre-existing whole-repo violations (config.ts, etc., untouched by this diff); the added code itself uses camelCase functions, PascalCase interfaces (CachedPage, BuildManifest), and UPPER_CASE constants correctly."
+        }
+      ],
+      "strengths": [
+        "Conservative cache-validity gate: pages are only skipped when source hash, template hash, and output file all agree AND no user/configured plugins are active, preserving plugin semantics.",
+        "Type-safe caching via CachedPage using Omit<PluginPage, 'sourcePath'|'outputPath'> so stale path fields are never reused; skipped pages get live sourcePath/outputPath/url/source re-injected.",
+        "Cache format is versioned (CACHE_VERSION) and validated on read, so incompatible manifests fail safe to a full rebuild.",
+        "CLI integration mirrors the existing parseArguments pattern and validates --incremental/--clean are only accepted for the build command.",
+        "Net-positive feature: incremental rebuild with stats reporting integrated through the established BuildOptions/PluginContext pipeline rather than a parallel mechanism."
+      ],
+      "summary": "Strong architectural fit and a net-positive incremental-build feature that respects existing patterns, though the cache-in-dist placement, dual stats plumbing, and +30 cognitive-complexity skip logic introduce modest technical debt (and the 0.53 convention score reflects pre-existing whole-repo violations, not this diff).",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "Session 1's greenfield rewrite discarded the seed wholesale (deleted the 106-line baseline) and seeded repo-wide convention debt (41 violations, score 0.529) that was never remediated \u2014 every later commit was measured against the same flat 0.529, masking each diff's real quality",
+      "Session 4's require.extensions['.ts'] runtime TS-loader monkey-patch became a permanent dependency (typescript moved to production deps) and is ESM/tsx-incompatible and coupled to transpileModule semantics",
+      "Session 4's plugin architecture directly constrained session 5: incremental page-skip is silently disabled whenever any configured plugin is active (canSkipPages guard), so the headline caching feature degrades for exactly the plugin users session 4 created",
+      "Session 3's monolithic server.ts (+72 cognitive complexity) was touched by the session 4 refactor but never decomposed; complexity deltas stayed positive every session (+39/+24/+72/+5/+30)",
+      "Session 5's cache manifest (.ssg-cache.json) is written inside outputDir, so it ships in the deploy artifact and is wiped by the existing clean-build rm(outputDir) \u2014 incremental-after-clean is always cold, partially defeating the feature; additionally the 88 lines of new incremental-build tests were never executed (node/npm unavailable in the sandbox; the 'Run Jest' todo was closed without running)"
+    ],
+    "key_decisions": [
+      "Session 1: greenfield TypeScript scaffold (jest/ts-jest, marked, gray-matter, strict tsconfig) replacing the unrelated Express-todo seed \u2014 established the toolchain and file layout every later session built on",
+      "Session 2: Handlebars template/layout/partial architecture with a path-traversal guard confining template selection to the templates dir",
+      "Session 3: CLI refactor to {command, options} dispatch plus a self-contained dev-server module reusing buildSite \u2014 the extension pattern sessions 4 and 5 reused",
+      "Session 4: plugin system with onStart/beforeBuild/onFile/afterBuild/onEnd lifecycle hooks, decomposing the monolith into config/engine/output/plugins modules while preserving the public buildSite API",
+      "Session 5: incremental builds via a versioned hash-based .ssg-cache.json manifest with a conservative canSkipPages gate (only when no plugins configured) and BuildStats reporting plumbed through BuildOptions/PluginContext"
+    ],
+    "trajectory_description": "The arc starts rough: session 1 lands as a high-volume, convention-ignoring rewrite (architectural fit 0.42, 41 violations, +39 complexity, reviewer verdict 'worse'). From session 2 onward quality rises steadily \u2014 each feature respects existing patterns (fit 0.8, 0.8, 0.68, 0.85), keeps the public API stable, and adds genuine security/value (template path guard, strict port validation, plugin hooks, conservative cache validity). The session-4 modularization and session-5 incremental build show the strongest design maturity, but the trajectory is improvement in architecture, not hygiene: genuine debt accumulates (monkey-patch TS loader, monolithic server, cache-in-dist, dual BuildStats plumbing, +30-complexity skip predicate), the final session shipped without running its new tests, and the convention score stayed pinned at 0.529 across all five commits \u2014 early formatting debt was never cleaned up.",
+    "summary": ""
+  }
+}

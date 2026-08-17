@@ -36,7 +36,7 @@ class FakeRedis:
 
     def __init__(self, *, statuses=None, results=None, logs=None, messages=None,
                  analysis_statuses=None, review_statuses=None,
-                 analysis_queue=0, review_queue=0):
+                 analysis_queue=0, review_queue=0, phases=None):
         self.statuses = statuses or {}
         self.results = results or {}
         self.analysis_statuses = analysis_statuses or {}
@@ -44,6 +44,7 @@ class FakeRedis:
         self.analysis_queue = analysis_queue
         self.review_queue = review_queue
         self.logs = logs or {}
+        self.phases = phases or {}
         self.pubsub_client = FakePubSub(messages)
         self.requested_logs = []
 
@@ -65,6 +66,8 @@ class FakeRedis:
             return self.analysis_statuses
         if key == "review_status":
             return self.review_statuses
+        if key == "story_phase":
+            return self.phases
         raise AssertionError(f"unexpected hgetall key: {key}")
 
     def lrange(self, key, start, end):
@@ -199,6 +202,28 @@ def test_matrix_preserves_legacy_fields_and_adds_retained_telemetry(monkeypatch)
     assert telemetry["output_tokens"] == 6
     assert [sample["cost"] for sample in telemetry["cells"]["alpha"]["samples"]] == [0.01, 0.02]
     assert redis.requested_logs == ["events_log:alpha", "events_log:beta", "events_log:odd"]
+
+
+def test_matrix_surfaces_live_workflow_phases(monkeypatch):
+    """The ``story_phase`` hash renders as a badge map; malformed entries are dropped."""
+    redis = FakeRedis(
+        statuses={"alpha": "running"},
+        phases={
+            "alpha": json.dumps({"name": "rerun_contaminated", "index": 4, "total": 7}),
+            "beta": "not-json",
+            "gamma": json.dumps({"index": 2, "total": 3}),  # no name -> dropped
+        },
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    body = server.app.test_client().get("/api/matrix").get_json()
+
+    assert body["phases"] == {"alpha": {"name": "rerun_contaminated", "index": 4, "total": 7}}
+    # The phase is keyed by the same cell id as the fleet status, so the running
+    # cell "alpha" carries the badge "4/7 rerun_contaminated".
+    assert body["cells"]["alpha"] == "running"
+    phase = body["phases"]["alpha"]
+    assert phase["index"] == 4 and phase["total"] == 7 and phase["name"] == "rerun_contaminated"
 
 
 def test_matrix_ignores_invalid_telemetry_but_preserves_reported_zero(monkeypatch):

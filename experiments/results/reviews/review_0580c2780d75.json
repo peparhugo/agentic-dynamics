@@ -1,0 +1,204 @@
+{
+  "story_name": "notification_service",
+  "story_id": "0580c2780d75",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "cd7d0cc72a0619cdb0306fb827b19c69f4f28f3b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.4,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Wholesale replacement: the entire Flask/Blueprint/JWT/SQLite baseline was deleted and swapped for an async websockets stack in a single commit, discarding existing patterns, auth infrastructure, and modular structure instead of extending them."
+        },
+        {
+          "category": "security",
+          "severity": "minor",
+          "description": "The baseline JWT auth layer was removed and the new broadcast/direct message transport exposes no visible authentication for delivery; auth story for the notification server is absent or unverifiable in this diff."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "4 convention violations: test classes in test_app.py, test_features.py, test_transport.py use non-PascalCase names, and module-level constants in test_transport.py are not UPPER_CASE."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +25 introduced in a single session, suggesting the message-routing/delivery logic is growing denser than the codebase's typical pattern."
+        }
+      ],
+      "strengths": [
+        "Added 3 test files (app, features, transport) covering the new server",
+        "Zero new bugs, smells, or duplications per SonarQube",
+        "Coherent JSON message framing protocol (type/payload/timestamp) with broadcast/direct/system types documented in the module docstring",
+        "Convention score 0.82 maintained despite a +526/-241 line footprint"
+      ],
+      "summary": "The commit delivers a clean, well-tested websocket notification design but achieves it by obliterating the existing Flask architecture rather than fitting into it, so the code is healthy by static metrics while the architectural fit is a net regression.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "b5256ae333ac33d27769693fbe1a39c99f07faf1",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Channel is read from two locations (`payload.get(\"channel\")` or top-level `data.get(\"channel\")`), making the message schema ambiguous \u2014 the codebase previously had exactly one place each field could live. Pick one location for the channel field."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "The `subscribe` and `unsubscribe` handler branches are near-identical (validation, error response, dispatch, ack message); they could share a helper. This is the main driver of the +42 cognitive complexity."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "New `channels()` and `channel_subscribers()` return unparameterized `dict`/`set`, whereas the module already types these as `dict[str, set[str]]` on the attributes \u2014 inconsistent with the codebase's typed-signature convention."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Diff only touches app.py; no tests added for subscribe/unsubscribe/channel delivery semantics or the new REST endpoints, despite this being the core new surface."
+        }
+      ],
+      "strengths": [
+        "Bidirectional channel index (`_channels` + `_client_channels`) with membership cleanup in `remove()` guarantees no orphaned subscribers on disconnect \u2014 clean, correct bookkeeping.",
+        "Lock discipline maintained: snapshot methods return copies under the lock and `broadcast_to_channel` never holds the lock across an `await`, avoiding a deadlock/blocking hazard.",
+        "`broadcast_to_channel` mirrors the existing `broadcast` pattern including dead-connection removal, respecting established conventions.",
+        "Malformed subscribe/unsubscribe messages get framed `system` error responses consistent with existing error handling.",
+        "No new dependencies, no schema-breaking change to existing message types \u2014 purely additive feature."
+      ],
+      "summary": "A well-executed, purely additive channel-subscription feature that extends the existing registry/dispatch/health-handler patterns cleanly; the minor debt is a duplicated subscribe/unsubscribe handler and a two-location channel field, while the flagged convention violations (PascalCase classes, UPPER_CASE constants) are in pre-existing test files outside this diff \u2014 the commit's own app.py code adheres to conventions, so the 0.82 measurement slightly understates this commit's actual compliance.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "4d6bade7704cf0c97798fb1f9be8cbba28b16cc9",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.88,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity jumps +136 and 835 lines land in a single app.py module, pushing it toward god-file territory; SonarQube flags 2 new smells. Session 4's planned transport refactor will have to carve this back out."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Convention score 0.82: 4 violations, all in test files \u2014 test_app.py and test_features.py use non-PascalCase test classes, test_transport.py also has a module-level constant that is not UPPER_CASE."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "MessageStore.payload normalization falls back to str() for non-JSON types, silently degrading numeric/boolean payload fidelity in persisted history (e.g. a 5 becomes '5')."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Thread/event-loop boundary now touches three subsystems (asyncio handlers, HTTP thread, background Redis subscriber) sharing one SQLite connection guarded by a single threading.Lock \u2014 correct per the existing pattern, but a growing concurrency surface."
+        }
+      ],
+      "strengths": [
+        "On-spec for Session 3: implements the Redis pub/sub backbone, multi-instance delivery, client-state mirroring with ClientRegistry.restore_state, and the SQLite messages table exactly as specified",
+        "Respects existing patterns \u2014 the threading.Lock discipline established for ClientRegistry is extended consistently to MessageStore, and the REST/env-var config style is preserved",
+        "Non-breaking: build_message and the existing message format are untouched, Sonar shows zero new bugs, and integration tests for pub/sub + persistence were added as the spec required",
+        "Clean module-level constants and small resolve_redis_url/resolve_db_path helpers keep configuration explicit and testable"
+      ],
+      "summary": "A faithful, well-structured Session-3 integration that delivers every required Redis/SQLite capability without breaking existing behavior, at the cost of a sharply larger and more complex app.py that the planned Session-4 refactor will need to split.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "641d7fd0926661a1025cf2cba763b41226c793cc",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "b14364aee3d369f3410079e80a9b88fec652e9e9",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +79 in a single session \u2014 list_history, delete_older_than, and the rate-limiter fallback carry deep try/except and condition-branching nesting; several new helpers could be extracted."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "WHERE clause is assembled via f-string in list_history; values are parameterized and columns are fixed literals so there is no injection risk, but the pattern is more brittle than building the query as a list of clause parts."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "delete_older_than runs a full DELETE over the messages table with no timestamp index, and 'ORDER BY id ASC' assumes id monotonicity as a chronological proxy; acceptable but worth an index/contract note."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "4 SonarQube convention violations (test_app.py, test_features.py, test_transport.py): classes not PascalCase, module-level constants not UPPER_CASE."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "+785/-5 lines in one commit (31 functions, 1 class, 10 imports) is a large single-session surface for a cross-cutting feature; the rate-limiting and TTL work are separable concerns."
+        }
+      ],
+      "strengths": [
+        "New features slot into existing seams: resolve_rate_limit/resolve_ttl_days mirror the resolve_transport config pattern, and store methods follow the established lock-guarded SQLite pattern.",
+        "Graceful degradation \u2014 rate limiter falls back to an in-process counter when Redis is unavailable, matching the service's resilience posture.",
+        "Parameterized SQL with fixed column literals and limit+1 has_more pagination are clean, efficient choices.",
+        "Zero new SonarQube bugs; all new keys/constants follow the established ntf:* prefix naming convention."
+      ],
+      "summary": "Architecturally sound cross-cutting session that extends the service along existing config/store/Redis seams with graceful degradation, though the +79 cognitive-complexity jump and 4 test-file convention violations make it net-positive-but-not-clean.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "Monolithic app.py creep: grew from 264 to 1436 LOC across 5 sessions; Session 4's pluggable-transport refactor extracted BaseTransport but did not split the file, so Session 5 added 350 more lines to a single module",
+      "Binary/artifact hygiene: notifications.db and __pycache__/*.pyc files were committed to git and re-committed every session, polluting the repo as the codebase grew",
+      "Session 3 (Redis integration) was a complexity and cost spike: 917 LOC, 30-minute duration, continuation required, and flaky tests that the agent chased with 10-20x repeated pytest runs, leaving residual nondeterminism that Session 4 had to absorb",
+      "Seed codebase discarded wholesale: Session 1's greenfield rewrite obliterated the Flask auth API seed (architectural_fit 0.4), so the planned tier-2 incremental foundation contributed nothing downstream",
+      "Dual-path state duplication: Redis and in-memory fallback mirrors in ClientStateStore, RateLimiter, and RedisBroker add three ways for state to drift, and this pattern only expanded with each cross-cutting feature",
+      "Session 4 review degraded (architectural_fit 0.5, convention 0.5, 'Review unavailable') \u2014 the single most important refactor of the story received the weakest oversight"
+    ],
+    "key_decisions": [
+      "Greenfield rewrite in Session 1 discarding the Flask seed and adopting websockets + asyncio with a threading.Lock-guarded ClientRegistry shared across the event loop and a background HTTP health thread",
+      "Fixed JSON message framing contract {type, payload, timestamp} with a strict SUPPORTED_TYPES whitelist, kept consistent across all 5 sessions",
+      "Session 3: Redis pub/sub as the message backbone (RedisBroker) with a single-thread-safe SQLite MessageStore and Redis-mirrored client state (ClientStateStore) for restart survivability \u2014 all with best-effort degradation when Redis is unavailable",
+      "Session 4: BaseTransport abstract class + WebSocketTransport default selected via TRANSPORT env var, so core notification logic becomes transport-agnostic",
+      "Session 5: per-client Redis counter rate limiting (ntf:rate:{id}:{bucket}) with in-process fallback and non-dropping error responses, plus SQLite message history with channel/time filtering, pagination, and a background TTL cleanup task"
+    ],
+    "trajectory_description": "Quality improved steadily and monotonically across all five sessions. Test coverage grew every session (16 \u2192 24 \u2192 34 \u2192 46 \u2192 66 tests) with all tests passing at each checkpoint and all_successful=true at the end; code grew from 264 to 1436 lines with a test:code ratio of 0.89. The arc was stable and additive \u2014 Session 1 delivered a clean minimal server, Session 2 layered channels purely additively (best review, architectural_fit 0.9), Session 3 was the highest-risk integration (longest runtime, continuation used, flaky-test debugging) that introduced real complexity, Session 4's transport extraction reined some of it in, and Session 5 closed strongly by adding rate limiting, history queries, and TTL expiry on top of the established Redis/SQLite seams. The primary weakness is structural: app.py became a 1436-line monolith that the refactor session contained but never actually decomposed, so the codebase grew in breadth and correctness but not in modularity.",
+    "summary": "A coherent, well-sequenced story that builds a full WebSocket notification service through the intended greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting arc with all tests passing at every step, held back only by single-file monolith growth and weak hygiene (committed .pyc/.db artifacts, degraded Session-4 review)."
+  }
+}

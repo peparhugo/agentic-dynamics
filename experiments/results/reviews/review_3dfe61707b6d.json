@@ -1,0 +1,166 @@
+{
+  "story_name": "notification_service",
+  "story_id": "3dfe61707b6d",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "d7f41110fe23e8986b43418408566582609502a9",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.87,
+      "convention_adherence": 0.81,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "21 convention violations per static analysis (score 0.81): module-level constants in store.py, transport.py, and multiple __init__.py files are not UPPER_CASE, and naming rules (snake_case functions / PascalCase classes) are missed in __init__.py modules."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "app.py contains a class that does not follow the PascalCase pattern required by conventions/python.yaml."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Visible module layout (messages/registry/server) is clean, but the full 18-file commit adds app.py, store.py, and transport.py whose exact roles are not visible in the truncated diff \u2014 worth confirming they map to the story's forward sessions (Redis pub/sub, persistence) rather than dead scaffolding."
+        }
+      ],
+      "strengths": [
+        "Session-1 spec compliance is exact: websockets library (not Flask-SocketIO), asyncio, unique per-client IDs, broadcast, clean disconnect handling, and GET /health returning connected client count.",
+        "Wire contract matches the story prompt precisely: {type: str, payload: dict, timestamp: str} with only broadcast/direct/system types, enforced by InvalidMessage validation on both build and parse.",
+        "Good separation of concerns \u2014 messages.py (schema), registry.py (concurrency), server.py (transport) \u2014 with the ClientRegistry guarding all mutation/iteration behind an asyncio.Lock.",
+        "Defensive broadcast: dead clients are detected via asyncio.gather(return_exceptions=True) and dropped from the registry, and system events (connected/joined/left) are broadcast on lifecycle changes.",
+        "Strong typing discipline throughout: full type hints, `from __future__ import annotations`, module docstrings, and exceptions wrapped with `from exc`."
+      ],
+      "summary": "A well-structured, spec-faithful greenfield session-1 implementation whose visible modules are convention-clean, but the full commit carries measurable naming debt (0.81 / 21 violations concentrated in app.py, store.py, transport.py, and __init__.py files not shown in the diff).",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "fbb8dbc81d9bca1d419e9b5545f1e7fccdc94b50",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.9,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "New subscribe/unsubscribe protocol messages, two new HTTP endpoints (/channels, /channels/{name}/subscribers), and channel-scoped broadcast ship with no tests (+0 files, source-only diff)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "broadcast_channel duplicates the target-selection-then-dead-client-drop logic already present in broadcast; the two could share a common send-and-drop helper."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Channel names accept any non-empty string with no charset restriction, yet are URL-decoded and matched by regex in the /channels/{name}/subscribers endpoint \u2014 loose validation on a surface that becomes path-like."
+        }
+      ],
+      "strengths": [
+        "Extends the existing ClientRegistry pattern faithfully: broadcast_channel mirrors broadcast including dead-client drop semantics and reuses unregister, which correctly cleans up channel subscriptions.",
+        "Adds a _json_response static method that removes duplicated Content-Type header boilerplate across HTTP handlers.",
+        "Message-type dispatch follows the established if/elif chain, with system messages still correctly rejected from clients and subscribe/unsubscribe returning explicit acknowledgements.",
+        "Consistent snake_case methods, PascalCase classes, type hints, and docstrings; module-level compiled regex with urllib unquote for safe channel decoding.",
+        "Good lock discipline \u2014 registry mutations stay under the asyncio.Lock while I/O is hoisted outside it, matching existing patterns."
+      ],
+      "summary": "A clean, pattern-following extension adding channel subscriptions to the notification server, consistent with the existing registry/broadcast design and improving HTTP response handling, though shipped without tests and with some duplicated broadcast logic. Note: the measured 0.81 convention score and listed violations come from files this commit never touched (app.py, __init__.py, store.py, transport.py) \u2014 the commit's own code adheres to codebase conventions.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "235b0eaed37d8833b5e668dc0bf9fcc6468e3705",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.88,
+      "convention_adherence": 0.81,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Redis-mirrored cluster state (CLIENTS_KEY / channel sets) is only reaped on graceful unregister; a crashed server instance leaves orphaned client/channel entries, so global_count() and exists() can report stale connections with no TTL/heartbeat or reaping mechanism."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "subscribe() and register() await Redis round-trips while holding the asyncio.Lock, serializing local mutations behind network I/O; collecting state under the lock and issuing Redis calls after release would keep the hot path non-blocking."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Per static analysis, the commit's wider footprint (app.py, __init__.py, store.py, transport.py) accumulates 21 naming violations \u2014 module-level constants not UPPER_CASE, mixed snake_case/PascalCase for functions and classes \u2014 dragging the convention score to 0.81; these lie outside the shown redis_bus.py/registry.py diff, which itself conforms."
+        }
+      ],
+      "strengths": [
+        "RedisBus is a clean asyncio pub/sub fan-out with proper cancellation, graceful teardown via contextlib.suppress, and malformed-message handling that drops and logs rather than crashing.",
+        "Backward-compatible extension: ClientRegistry preserves exact local-only behavior when redis_client is omitted, retaining the existing lock-based concurrency pattern.",
+        "Architectural intent is well documented in docstrings (envelope fan-out, every-instance-including-self delivery), and Redis keys use consistent namespacing with centralized _srem_channel cleanup."
+      ],
+      "summary": "A solid, well-documented Redis pub/sub integration that cleanly extends the existing registry with backward compatibility, offset by a 0.81 convention score (21 naming violations concentrated outside the shown diff) and a minor cluster-state staleness gap on instance crash.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "17600028ede0c5dda7862e7744029ac4da7d157c",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "5303c5f7261649c81ae6fa1799aca748fa8cda29",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Rate limiting counts every inbound message (including rejected ones and non-content system traffic like subscribe/unsubscribe) against the same window; the docstring notes this is intentional, but it means a client past the limit stays rejected until the window rolls over with no grace path."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "The /history HTTP endpoint is implemented inside the WebSocket transport's process_request seam; it works and reuses the existing seam, but couples transport and storage concerns slightly."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Measured convention score 0.81 is dragged down almost entirely by pre-existing seed-code violations in app.py, __init__.py and transport.py (untouched by this commit); the code this commit introduces (PascalCase RateLimiter, snake_case methods, UPPER_CASE DEFAULT_LIMIT/WINDOW_SECONDS/DEFAULT_MESSAGE_TTL_DAYS/CLEANUP_INTERVAL_SECONDS) adheres cleanly \u2014 flagging the discrepancy."
+        }
+      ],
+      "strengths": [
+        "RateLimiter mirrors the established RedisBus/ClientRegistry optional-redis pattern exactly (shared cluster-wide counters with local in-memory fallback, key prefix consistent with existing notification_server:* keys).",
+        "Message expiry sweep is managed with the same lifecycle discipline as the bus listen task (cancel + contextlib.suppress(CancelledError) in close()), and blocking SQLite work is correctly offloaded via asyncio.to_thread like _persist.",
+        "store.py refactor extracts _row_to_dict and adds get_history with an efficient limit+1 has_more trick and a delete_older_than method \u2014 clean, well-documented, no redundant COUNT query.",
+        "Extensive test coverage added (test_rate_limiter, 272-line test_server, test_store, test_server_redis updates) with env-var-driven configuration consistent with the existing DATABASE_URL/REDIS_URL pattern."
+      ],
+      "summary": "A well-fitted cross-cutting session that adds cluster-wide rate limiting and message TTL expiry by faithfully reusing the codebase's optional-Redis dependency-injection pattern and task-lifecycle discipline, with the modest 0.81 convention score attributable to pre-existing seed-code violations rather than the new code.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.5,
+    "compounding_issues": [],
+    "key_decisions": [],
+    "trajectory_description": "",
+    "summary": "Review unavailable."
+  }
+}

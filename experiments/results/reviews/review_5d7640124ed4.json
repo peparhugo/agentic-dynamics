@@ -1,0 +1,87 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "5d7640124ed4",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "f6a63e1fa25d749d8fd25d0beb1bfd2647612d0f",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "533f8d63437902bbfb4516683b3e3c5a176df5b7",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "57613d0093a9269439212402df2c71b0f7519080",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "e20cd52ad7344262dbfd0f68c7df3dcc4a5ba899",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "49b52d2ffbeca4a6ac531e2e6dacca10cfd474c7",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.0,
+    "compounding_issues": [
+      "All 5 sessions immediately terminated on provider rate limit ('You've hit your session limit \u00b7 resets 7:30am') \u2014 zero tokens, zero cost, zero code written",
+      "The seed codebase (index.ts) was never modified; every story commit is an empty .instrument/session_N.jsonl marker",
+      "Backend/rate-limit scheduling was not validated before launching the 5-session story, so the entire run is a wasted matrix cell"
+    ],
+    "key_decisions": [
+      "None \u2014 the only consequential choice is the seed commit (index.ts, 200 lines), which the agent never touched"
+    ],
+    "trajectory_description": "There is no trajectory. Sessions 1-5 fired back-to-back within 12 seconds of each other and each recorded only a rate-limit rejection before any model interaction. The codebase remained frozen at the seed state across all five commits; there is nothing to measure for quality, improvement, or degradation. This is a failed run, not a progression.",
+    "summary": "This story produced no work whatsoever \u2014 every session was aborted by a provider session limit before emitting a single token, so coherence, decisions, and trajectory are all unassessable and the run must be retried outside the rate-limit window."
+  }
+}

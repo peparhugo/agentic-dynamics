@@ -1,0 +1,89 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "0622f803e187",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "f3e1710710fdbdeace8608ecb00c92dd8fb523a5",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "f5eca2bc1cd7042b3a8e47f04346cb3d0cbd42dd",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "ddaa93272331f989780e4f5f88e216c7f741b573",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "894432b1838c1010c7e6a3f88679e2d9902ead48",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "1ce9a00f424c536d5c92ca3256b98a60dc3f415a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.1,
+    "compounding_issues": [
+      "Every session terminated in ~2s on the same provider error ('You've hit your session limit \u00b7 resets 7:30am'), so no session could ever build on its predecessor; the 5-commit chain is only a scaffolding of empty .instrument transcripts",
+      "Wrong seed codebase: the static_site_gen story ran against experiments/codebases/typescript/tier1_minimal/good, whose index.ts is an Express Todo API (tasks/todos.sqlite), not a static site generator \u2014 the greenfield prompt and the code it was applied to were mismatched from the start",
+      "Zero cumulative work: 0 files created, 0 tests, 0 tokens, exit_code 1 on all 5 sessions, so there is no accumulated code for later sessions to refactor, integrate, or extend",
+      "Total duration was 10.19s across all 5 sessions \u2014 the run never actually engaged the model beyond the rate-limit refusal"
+    ],
+    "key_decisions": [
+      "The intended task arc (greenfield \u2192 feature_addition \u2192 integration \u2192 refactor \u2192 cross_cutting) was a reasonable incremental plan, but it was never realized \u2014 no architectural choices exist because no code was written",
+      "Scheduling this cell on a subscription-bound backend (claude-haiku-4-5 via Claude CLI) at a moment when the session quota was exhausted, which silently turned all sessions into no-ops rather than failing the cell visibly"
+    ],
+    "trajectory_description": "There is no measurable quality arc: all five sessions are byte-identical 2-second failures that record the same rate-limit message into .instrument/session_N.jsonl and exit with code 1. No source lines, tests, or commits containing real changes were produced at any point, so quality neither improved nor degraded across the sequence \u2014 it was uniformly zero, blocked entirely at the infrastructure layer rather than by model competence.",
+    "summary": "This run is a total infrastructure failure, not a story: all 5 sessions aborted on a provider session-limit error (and were seeded with the wrong codebase), so the commit sequence contains no build, no decisions, and no coherent progression to evaluate."
+  }
+}

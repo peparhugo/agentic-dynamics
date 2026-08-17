@@ -56,6 +56,7 @@ from instrument.live import (
     EVENT_CHANNEL_PREFIX,
     EVENT_LOG_MAX,
     EVENT_LOG_PREFIX,
+    PHASE_KEY,
     STATUS_CHANNEL,
     STATUS_KEY,
 )
@@ -752,6 +753,29 @@ def _retained_telemetry(redis_client, cell_ids) -> dict[str, Any]:
     }
 
 
+def _parse_phases(payloads) -> dict[str, dict[str, Any]]:
+    """Decode the ``story_phase`` hash into ``{cell_id: {name, index, total}}``.
+
+    Each value is a JSON object written by ``LivePublisher.set_phase``. A malformed
+    or empty entry is dropped (the badge is display-only), so a partial write can
+    never affect the matrix status contract.
+    """
+    phases: dict[str, dict[str, Any]] = {}
+    for cell_id, raw in payloads.items():
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if not isinstance(parsed, dict) or not parsed.get("name"):
+            continue
+        phases[cell_id] = {
+            "name": parsed.get("name"),
+            "index": parsed.get("index"),
+            "total": parsed.get("total"),
+        }
+    return phases
+
+
 @app.get("/api/matrix")
 def api_matrix() -> Response:
     """Return the legacy fleet matrix plus the three-stage pipeline view."""
@@ -760,12 +784,13 @@ def api_matrix() -> Response:
         execute = stage_summary(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY)
         analyze = stage_summary(r, ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY)
         review = stage_summary(r, REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY)
+        phase_payloads = r.hgetall(PHASE_KEY)
     except Exception:
         return jsonify({"error": "redis_unavailable", "cells": {}}), 503
 
     # Keep the legacy flat fields (``total``, ``queued``, ``cells``, …) derived
     # from the execute stage so existing clients keep working; the three-stage
-    # ``stages`` block is purely additive.
+    # ``stages`` block and the ``phases`` block are purely additive.
     response = {
         "total": execute["total"],
         "remaining_in_queue": execute["remaining_in_queue"],
@@ -777,6 +802,7 @@ def api_matrix() -> Response:
         "completed": execute["completed"],
         "results_saved": execute["results_saved"],
         "cells": execute["cells"],
+        "phases": _parse_phases(phase_payloads),
     }
     response["stages"] = {"execute": execute, "analyze": analyze, "review": review}
     design_stream_ids: list[str] = []
