@@ -1,0 +1,27 @@
+# Re-sample the process_perturbation operators (formerly the "manifold" class) under
+# the current 3-way taxonomy with the fixed operators + deterministic seed, to close the
+# n=16 undersample and clear the stale "manifold"/"semantic" labels in _results_summary.json.
+name: process_perturbation_resample
+task: >
+  Build a Python/Flask URL shortener with REST API, collision-resistant short codes,
+  persistent storage, rate limiting, and click analytics. Write the code and pytest tests.
+  Be thorough but concise.
+
+constraints:
+  - REST API endpoints for create and redirect
+  - Short code generation with collision handling
+  - Persistent storage (SQLite or PostgreSQL)
+  - Rate limiting per IP
+  - Click analytics tracking
+  - Test suite with pytest
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - reverse_causality
+  - force_abandonment
+
+strengths: [0.5]
+
+model: deepseek
+model_id: deepseek/deepseek-v4-pro
