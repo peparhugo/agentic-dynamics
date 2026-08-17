@@ -34,6 +34,7 @@ REDIS_BASE_DELAY = 2.0  # seconds, doubled each retry
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from instrument.live import LivePublisher  # noqa: E402
+from instrument.posthoc import trigger_analysis  # noqa: E402
 
 
 def log(msg: str) -> None:
@@ -76,6 +77,40 @@ def _safe_hset(r: redis.Redis, key: str, field: str, value: str) -> bool:
             log(f"Redis hset error (attempt {attempt+1}/3): {e}")
             time.sleep(2 ** attempt)
     return False
+
+
+def _result_path_from_stdout(stdout: str) -> Path | None:
+    """Extract the saved result path from run_story.py's stdout.
+
+    run_story.py prints ``  Results: <path>`` once it has saved the cell, so the
+    worker can enqueue that worktree's analysis job without re-scanning the
+    corpus. Returns ``None`` when no result line is present.
+    """
+    for line in (stdout or "").splitlines():
+        if "Results:" in line:
+            path = line.split("Results:", 1)[1].strip()
+            if path:
+                return Path(path)
+    return None
+
+
+def _trigger_analysis(r: redis.Redis, stdout: str, cell_id: str) -> None:
+    """Enqueue the just-completed cell's analysis job (best-effort).
+
+    A trigger failure must not fail the cell — ``enqueue_analysis.py`` is the
+    backfill safety net — so any error is logged and swallowed.
+    """
+    try:
+        result_path = _result_path_from_stdout(stdout)
+        if result_path is None:
+            log(f"[{cell_id}] no result path in stdout — skipping analysis trigger")
+            return
+        if trigger_analysis(r, result_path):
+            log(f"[{cell_id}] enqueued analysis job")
+        else:
+            log(f"[{cell_id}] analysis job not enqueued (missing story_id/worktree)")
+    except Exception as e:
+        log(f"[{cell_id}] analysis trigger failed (non-fatal): {e}")
 
 
 def main() -> None:
@@ -161,6 +196,7 @@ def main() -> None:
                 log(f"[{cell_id}] OK ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "done")
                 publisher.publish_status("done")
+                _trigger_analysis(r, proc.stdout, cell_id)
                 completed += 1
             else:
                 log(f"[{cell_id}] FAILED ret={proc.returncode} ({elapsed:.0f}s)")

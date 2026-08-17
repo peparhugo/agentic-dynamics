@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -20,41 +19,22 @@ import redis
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from instrument.posthoc import (  # noqa: E402
+    REVIEW_QUEUE,
+    REVIEW_STATUS,
+    DEFAULT_REVIEW_MODEL,
+    build_commit_review_job,
+    build_story_review_job,
+    enqueue_job,
+    worktree_commits,
+)
 from instrument.story import load_story_result
 
 REDIS_HOST = "127.0.0.1"
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
-QUEUE_KEY = "review_jobs"
-STATUS_KEY = "review_status"
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "stories"
 REVIEWS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "reviews"
-
-MODEL = "deepseek/deepseek-v4-flash"
-
-
-def _get_worktree_commits(worktree: Path) -> list[tuple[str, str, int]]:
-    """Get story session commits from a worktree. Returns [(hash, msg, session_num), ...]."""
-    try:
-        log = subprocess.run(
-            ["git", "-C", str(worktree), "log", "--reverse", "--format=%H|%s"],
-            capture_output=True, text=True, timeout=10,
-        ).stdout
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return []
-
-    commits = []
-    for line in log.strip().splitlines():
-        if "|" not in line:
-            continue
-        ch, cm = line.split("|", 1)
-        if "Session" not in cm:
-            continue
-        import re
-        m = re.search(r"Session\s+(\d+)", cm)
-        sn = int(m.group(1)) if m else 0
-        commits.append((ch, cm, sn))
-    return commits
 
 
 def main() -> None:
@@ -85,7 +65,7 @@ def main() -> None:
             continue
 
         stories_with_worktrees += 1
-        commits = _get_worktree_commits(worktree)
+        commits = worktree_commits(worktree)
         if not commits:
             continue
 
@@ -101,43 +81,27 @@ def main() -> None:
                 pass
 
         for ch, cm, sn in commits:
-            job = {
-                "job_id": f"{story.story_id}_{sn}",
-                "story_name": story.story_name,
-                "story_id": story.story_id,
-                "worktree": str(worktree),
-                "commit_hash": ch,
-                "commit_message": cm,
-                "session_number": sn,
-                "model": MODEL,
-            }
+            job = build_commit_review_job(
+                story.story_id, story.story_name, worktree, ch, cm, sn,
+                DEFAULT_REVIEW_MODEL,
+            )
             if not dry_run:
-                r.lpush(QUEUE_KEY, json.dumps(job))
-                r.hset(STATUS_KEY, job["job_id"], "queued")
+                enqueue_job(r, REVIEW_QUEUE, REVIEW_STATUS, job, job["job_id"])
             total_jobs += 1
 
         # Also enqueue story-level review job
-        story_job = {
-            "job_id": f"{story.story_id}_story",
-            "story_name": story.story_name,
-            "story_id": story.story_id,
-            "worktree": str(worktree),
-            "commit_hash": "",
-            "commit_message": "",
-            "session_number": 0,
-            "model": MODEL,
-            "job_type": "story_review",
-        }
+        story_job = build_story_review_job(
+            story.story_id, story.story_name, worktree, DEFAULT_REVIEW_MODEL,
+        )
         if not dry_run:
-            r.lpush(QUEUE_KEY, json.dumps(story_job))
-            r.hset(STATUS_KEY, story_job["job_id"], "queued")
+            enqueue_job(r, REVIEW_QUEUE, REVIEW_STATUS, story_job, story_job["job_id"])
         total_jobs += 1
 
     if dry_run:
         print(f"Would enqueue {total_jobs} review jobs ({stories_with_worktrees} stories)")
     else:
         print(f"Enqueued {total_jobs} review jobs ({stories_with_worktrees} stories)")
-        print(f"Queue: {r.llen(QUEUE_KEY)} pending")
+        print(f"Queue: {r.llen(REVIEW_QUEUE)} pending")
         print("Start workers: nohup python3 scripts/review_worker.py &")
 
 

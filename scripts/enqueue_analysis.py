@@ -23,10 +23,19 @@ import redis
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
-QUEUE_KEY = "analysis_jobs"
-STATUS_KEY = "analysis_status"
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+
+# Job shapes, queue/status keys, and the canonical enqueue path all come from
+# the shared module so this backfill tool can't drift from the worker triggers.
+from instrument.posthoc import (  # noqa: E402
+    ANALYSIS_QUEUE,
+    ANALYSIS_STATUS,
+    build_analysis_job,
+    enqueue_job,
+)
+
 RESULTS_DIR = ROOT / "experiments" / "results" / "stories"
 ANALYSIS_DIR = ROOT / "experiments" / "results" / "analysis"
 
@@ -43,11 +52,7 @@ def build_jobs(skip_existing: bool = True) -> list[dict]:
             continue
         if skip_existing and (ANALYSIS_DIR / f"analysis_{story_id}.json").exists():
             continue
-        jobs.append({
-            "story_id": story_id,
-            "worktree": data.get("worktree", ""),
-            "result_path": str(f),
-        })
+        jobs.append(build_analysis_job(story_id, data.get("worktree", ""), f))
     return jobs
 
 
@@ -69,15 +74,14 @@ def main() -> None:
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
     if clear:
-        r.delete(QUEUE_KEY, STATUS_KEY)
+        r.delete(ANALYSIS_QUEUE, ANALYSIS_STATUS)
         print("Analysis queue cleared.")
         return
 
     for job in jobs:
-        r.lpush(QUEUE_KEY, json.dumps(job))
-        r.hset(STATUS_KEY, job["story_id"], "queued")
+        enqueue_job(r, ANALYSIS_QUEUE, ANALYSIS_STATUS, job, job["story_id"])
 
-    print(f"Enqueued {len(jobs)} analysis jobs into '{QUEUE_KEY}'")
+    print(f"Enqueued {len(jobs)} analysis jobs into '{ANALYSIS_QUEUE}'")
     print("Start workers with:")
     print("  python scripts/analysis_worker.py &")
 
