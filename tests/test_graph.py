@@ -181,6 +181,7 @@ class TestKnowledgeSchema(_Neo4jTestBase):
         recs = self.client._run("SHOW FULLTEXT INDEXES YIELD name RETURN name")
         names = {r["name"] for r in recs}
         assert "step_text_ft" in names
+        assert "knowledge_text_ft" in names
 
     def test_knowledge_id_uniqueness_enforced(self):
         self.client.create_knowledge_schema()
@@ -402,9 +403,11 @@ class TestSearchHelpers(_Neo4jTestBase):
     def _cleanup(self, _setup_client):
         yield
         self.client._run("MATCH (k:Knowledge {knowledge_id: 'kf_001'}) DETACH DELETE k")
+        self.client._run("MATCH (k:Knowledge {knowledge_id: 'kf_full'}) DETACH DELETE k")
         self.client._run("MATCH (s:Step {step_id: 'ft_1'}) DETACH DELETE s")
         self.client._run(
-            "MATCH (s:Step) WHERE s.step_id IN ['ft_c1', 'ft_c2', 'ft_c3'] DETACH DELETE s"
+            "MATCH (s:Step) WHERE s.step_id IN ['ft_c1', 'ft_c2', 'ft_c3', 'ft_step'] "
+            "DETACH DELETE s"
         )
 
     def test_find_exact_returns_matching_node(self):
@@ -428,6 +431,41 @@ class TestSearchHelpers(_Neo4jTestBase):
         res = self.client.search_fulltext("step_text_ft", "websocket")
         assert len(res) >= 1
         assert any(r["properties"].get("step_id") == "ft_1" for r in res)
+
+    def test_search_knowledge_fulltext_returns_knowledge_nodes(self):
+        self.client.create_knowledge_schema()
+        # A Knowledge finding and a Step share the same text; the Knowledge
+        # full-text leg must surface the Knowledge node and never the Step.
+        self.client._run(
+            "MERGE (k:Knowledge {knowledge_id: 'kf_full'}) "
+            "SET k.entity_id = 'ent_full', k.text = 'task manager api building', "
+            "k.authority = 'MEASURED', k.source_type = 'finding', k.commit_sha = 'abc'"
+        )
+        self.client._run(
+            "MERGE (s:Step {step_id: 'ft_step'}) SET s.text = 'task manager api building'"
+        )
+        res = self.client.search_knowledge_fulltext("task manager api")
+        assert len(res) >= 1
+        assert any(r["properties"].get("knowledge_id") == "kf_full" for r in res)
+        # Scoped to the Knowledge label: no Step node leaks into the KB leg.
+        assert all("Knowledge" in r["labels"] for r in res)
+
+    def test_search_knowledge_fulltext_commit_filter_excludes_stale_commit(self):
+        self.client.create_knowledge_schema()
+        self.client._run(
+            "MERGE (k:Knowledge {knowledge_id: 'kf_full'}) "
+            "SET k.entity_id = 'ent_full', k.text = 'task manager api building', "
+            "k.authority = 'MEASURED', k.commit_sha = 'abc'"
+        )
+        self.client._run(
+            "MERGE (k:Knowledge {knowledge_id: 'kf_001'}) "
+            "SET k.entity_id = 'ent_1', k.text = 'task manager api building', "
+            "k.authority = 'MEASURED', k.commit_sha = 'xyz'"
+        )
+        res = self.client.search_knowledge_fulltext("task manager api", commit="abc")
+        ids = {r["properties"].get("knowledge_id") for r in res}
+        assert "kf_full" in ids          # current commit passes
+        assert "kf_001" not in ids       # stale commit is pre-filtered out
 
     def test_search_fulltext_commit_filter_excludes_stale_commit(self):
         self.client.create_knowledge_schema()

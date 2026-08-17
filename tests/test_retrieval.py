@@ -550,8 +550,12 @@ class _FakeGraph:
         self._lexical_error = lexical_error
         self._expand_error = expand_error
         self.expand_seeds = None
+        self.lexical_queries = []
 
-    def search_fulltext(self, index, query, *, limit=10, commit=None):
+    def search_knowledge_fulltext(self, query, *, limit=10, commit=None):
+        # The lexical leg targets the KB full-text index (Knowledge.text), so the
+        # fake mirrors that method — the Step path (search_fulltext) is never used.
+        self.lexical_queries.append(query)
         if self._lexical_error is not None:
             raise self._lexical_error
         return list(self._lexical_hits)
@@ -585,6 +589,21 @@ def _lexical_hit(cid="doc_lex", text="lexical websocket reload hit"):
     return {
         "id": "elem:lex",
         "properties": {"text": text, "authority": "source", "content_hash": "hash_lex", "doc_id": cid},
+        "score": 0.9,
+    }
+
+
+def _knowledge_lexical_hit(cid="k_kb", text="task manager api building finding", authority="measured"):
+    return {
+        "id": "elem:knowledge",
+        "properties": {
+            "knowledge_id": cid,
+            "entity_id": "ent_kb",
+            "text": text,
+            "authority": authority,
+            "source_type": "finding",
+            "commit_sha": "abc",
+        },
         "score": 0.9,
     }
 
@@ -750,3 +769,41 @@ def test_retrieve_fully_down_yields_no_rag_empty_evidence():
     assert attempt.selected_evidence == []
     assert attempt.token_count == 0
     assert attempt.dedup_path == "none"  # no survivors → embeddings never attempted
+
+
+def test_retrieve_lexical_leg_returns_knowledge_records():
+    # The lexical leg surfaces Knowledge records (authority MEASURED/SOURCE/POLICY),
+    # keyed by knowledge_id — never Step reasoning (ADVISORY).
+    graph = _FakeGraph(lexical_hits=[_knowledge_lexical_hit()])
+    attempt = retrieve("build a task manager api", dense_store=None, graph_client=graph)
+
+    assert attempt.fallback_mode == "lexical_graph_only"
+    kb = next(c for c in attempt.candidates if c.id == "k_kb")
+    assert kb.authority is Authority.MEASURED
+    assert kb.text == "task manager api building finding"
+    assert kb.commit_sha == "abc"
+    # The KB leg is keyed by knowledge_id, not the opaque elementId.
+    assert all(c.id != "elem:knowledge" for c in attempt.candidates)
+
+
+def test_retrieve_lexical_leg_never_calls_step_search():
+    # The lexical leg must target search_knowledge_fulltext, never search_fulltext
+    # (the Step index). A graph client whose Step path raises proves the KB path is
+    # the one taken: if retrieve still hit search_fulltext, the leg would go down
+    # and the Knowledge candidate would never appear.
+    class _KBOnlyGraph:
+        def search_fulltext(self, *args, **kwargs):
+            raise AssertionError("lexical leg must not use search_fulltext")
+
+        def search_knowledge_fulltext(self, query, *, limit=10, commit=None):
+            return [_knowledge_lexical_hit()]
+
+        def expand_candidates(self, seeds, **kwargs):
+            return []
+
+    attempt = retrieve(
+        "build a task manager api", dense_store=None, graph_client=_KBOnlyGraph()
+    )
+    ids = {c.id for c in attempt.candidates}
+    assert "k_kb" in ids
+    assert next(c for c in attempt.candidates if c.id == "k_kb").authority is Authority.MEASURED

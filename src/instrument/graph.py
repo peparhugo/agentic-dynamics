@@ -55,6 +55,7 @@ _KNOWLEDGE_INDEXES = [
 ]
 _KNOWLEDGE_FULLTEXT = [
     "CREATE FULLTEXT INDEX step_text_ft IF NOT EXISTS FOR (s:Step) ON EACH [s.text]",
+    "CREATE FULLTEXT INDEX knowledge_text_ft IF NOT EXISTS FOR (k:Knowledge) ON EACH [k.text]",
 ]
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -143,12 +144,14 @@ class Neo4jClient:
         self._run("MATCH (n) DETACH DELETE n")
 
     def create_knowledge_schema(self) -> None:
-        """Create the knowledge-base constraints, indexes, and full-text index.
+        """Create the knowledge-base constraints, indexes, and full-text indexes.
 
         Idempotent (``IF NOT EXISTS``). Each statement is attempted independently
         so a statement an older server rejects does not abort the rest — mirroring
-        ``create_schema()``. Includes the native full-text index over
-        ``Step.text`` that lexical retrieval (``search_fulltext``) queries.
+        ``create_schema()``. Includes the native full-text index over ``Step.text``
+        (queried by ``search_fulltext``) and the one over ``Knowledge.text``
+        (queried by ``search_knowledge_fulltext``) — the latter is what makes the
+        knowledge base retrievable by the lexical leg.
         """
         for stmt in _KNOWLEDGE_CONSTRAINTS + _KNOWLEDGE_INDEXES + _KNOWLEDGE_FULLTEXT:
             try:
@@ -876,3 +879,19 @@ class Neo4jClient:
         )
         records = self._run(query_str, params)
         return [self._node_dict(rec, with_score=True) for rec in records]
+
+    def search_knowledge_fulltext(
+        self, query: str, *, limit: int = 10, commit: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Full-text search over ``Knowledge.text`` (the ``knowledge_text_ft`` index).
+
+        The lexical retrieval leg must surface *knowledge* records — findings, code,
+        and policy (authority MEASURED / SOURCE / POLICY) — never the reasoning
+        ``Step`` nodes (authority ADVISORY) that ``search_fulltext("step_text_ft",
+        ...)`` returns. Mirrors :meth:`search_fulltext`'s result shape
+        (``{"id", "labels", "properties", "score"}`` dicts, highest score first)
+        and its hard commit pre-filter, but scoped to the ``Knowledge`` label so the
+        ingested KB (``knowledge_id`` / ``entity_id`` / ``text`` / ``authority`` /
+        ``source_type`` / ``commit_sha``) is what the lexical leg actually retrieves.
+        """
+        return self.search_fulltext("knowledge_text_ft", query, limit=limit, commit=commit)

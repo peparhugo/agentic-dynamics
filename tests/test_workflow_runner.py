@@ -377,7 +377,7 @@ def test_default_retrieve_fn_degrades_to_no_rag_when_stores_down(tmp_path, monke
         def __init__(self, **kwargs):
             pass
 
-        def search_fulltext(self, *args, **kwargs):
+        def search_knowledge_fulltext(self, *args, **kwargs):
             raise RuntimeError("neo4j unreachable")
 
     monkeypatch.setattr(embeddings, "ChromaStore", _DownChroma)

@@ -869,10 +869,13 @@ def retrieve(
         return dense_store.search(plan.dense_query, top_k=top_k, where=_dense_filter(filters))
 
     def _lexical_leg():
-        # The lexical leg applies the same hard commit pre-filter as the dense leg:
-        # nodes with a non-matching, non-null commit_sha are dropped in the store.
-        return graph_client.search_fulltext(
-            "step_text_ft", plan.lexical_query, limit=top_k, commit=commit_sha
+        # The lexical leg queries the *knowledge* full-text index (Knowledge.text),
+        # not the Step index: KB records (findings/code/policy) are what we retrieve,
+        # never the reasoning Step nodes. It applies the same hard commit pre-filter
+        # as the dense leg: nodes with a non-matching, non-null commit_sha are
+        # dropped in the store.
+        return graph_client.search_knowledge_fulltext(
+            plan.lexical_query, limit=top_k, commit=commit_sha
         )
 
     with ThreadPoolExecutor(max_workers=2) as pool:
