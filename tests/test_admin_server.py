@@ -511,3 +511,163 @@ def test_queue_reinterleave_requires_idempotency_header(monkeypatch):
     response = server.app.test_client().post("/api/queue/reinterleave", json={})
 
     assert response.status_code == 400
+
+
+# ── canonical-state round 2, plan step 17: /api/registry* ────────
+#
+# Both routes are file-only (never Redis, never Neo4j — see api_registry's/
+# api_registry_lineage's own docstrings) so these tests monkeypatch
+# server.DATA_MANIFEST_PATH to a tmp_path fixture rather than reusing FakeRedis/
+# FakePubSub for the data itself; FakeRedis is still the right double for confirming
+# these routes touch NO Redis state at all (test_api_registry_never_touches_redis).
+
+
+def _registry_row(**overrides):
+    base = {
+        "knowledge_id": "kid_0001",
+        "entity_id": "eid_0001",
+        "source_type": "story",
+        "logical_locator": "story_abc",
+        "source_uri": "story:story_abc",
+        "lifecycle_state": "current",
+        "observed_at": "2026-08-15T00:00:00+00:00",
+        "indexed_at": "2026-08-15T00:00:01+00:00",
+        "supersedes": None,
+        "causes": None,
+    }
+    base.update(overrides)
+    return base
+
+
+def _write_manifest(path, rows):
+    path.write_text(json.dumps({"schema_version": "1.0", "registry": rows}))
+
+
+def test_api_registry_returns_filtered_table(tmp_path, monkeypatch):
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [
+        _registry_row(knowledge_id="kid_story", source_type="story"),
+        _registry_row(knowledge_id="kid_review", entity_id="eid_review", source_type="review"),
+    ])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+
+    response = server.app.test_client().get("/api/registry?record_type=story")
+    body = response.get_json()
+
+    assert response.status_code == 200
+    assert body["count"] == 1
+    assert body["registry"][0]["knowledge_id"] == "kid_story"
+
+
+def test_api_registry_with_no_filters_returns_everything(tmp_path, monkeypatch):
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [
+        _registry_row(knowledge_id="kid_a", entity_id="eid_a"),
+        _registry_row(knowledge_id="kid_b", entity_id="eid_b"),
+    ])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+
+    body = server.app.test_client().get("/api/registry").get_json()
+    assert body["count"] == 2
+
+
+def test_api_registry_filters_by_lifecycle_and_since(tmp_path, monkeypatch):
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [
+        _registry_row(knowledge_id="kid_old", entity_id="eid_old",
+                       lifecycle_state="current", observed_at="2026-01-01T00:00:00+00:00"),
+        _registry_row(knowledge_id="kid_new", entity_id="eid_new",
+                       lifecycle_state="current", observed_at="2026-08-15T00:00:00+00:00"),
+        _registry_row(knowledge_id="kid_dead", entity_id="eid_dead",
+                       lifecycle_state="tombstoned", observed_at="2026-08-15T00:00:00+00:00"),
+    ])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+
+    body = server.app.test_client().get(
+        "/api/registry?lifecycle=current&since=2026-06-01"
+    ).get_json()
+
+    assert body["count"] == 1
+    assert body["registry"][0]["knowledge_id"] == "kid_new"
+
+
+def test_api_registry_missing_manifest_returns_empty_table(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", tmp_path / "does_not_exist.json")
+    response = server.app.test_client().get("/api/registry")
+    body = response.get_json()
+    assert response.status_code == 200
+    assert body == {"registry": [], "count": 0}
+
+
+def test_api_registry_never_touches_redis(tmp_path, monkeypatch):
+    """Both routes are pure file reads — confirms neither ever calls server._redis()."""
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_registry_row()])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+
+    def _explode():
+        raise AssertionError("/api/registry* must never connect to Redis")
+
+    monkeypatch.setattr(server, "_redis", _explode)
+
+    client = server.app.test_client()
+    assert client.get("/api/registry").status_code == 200
+    assert client.get("/api/registry/eid_0001").status_code == 200
+
+
+def test_api_registry_lineage_returns_the_matched_entity(tmp_path, monkeypatch):
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_registry_row(entity_id="eid_target")])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+
+    response = server.app.test_client().get("/api/registry/eid_target")
+    body = response.get_json()
+
+    assert response.status_code == 200
+    assert body["record"]["entity_id"] == "eid_target"
+    assert "causes_record" not in body  # only present for actuation records
+
+
+def test_api_registry_lineage_renders_causes_for_actuation_records(tmp_path, monkeypatch):
+    manifest_path = tmp_path / "data_manifest.json"
+    observation = _registry_row(
+        knowledge_id="kid_observation_1", entity_id="eid_observation_1",
+        source_type="observation", logical_locator="assessment_xyz",
+    )
+    actuation = _registry_row(
+        knowledge_id="kid_actuation_1", entity_id="eid_actuation_1",
+        source_type="actuation", logical_locator="actuation_xyz",
+        causes="kid_observation_1",
+    )
+    _write_manifest(manifest_path, [observation, actuation])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+
+    response = server.app.test_client().get("/api/registry/eid_actuation_1")
+    body = response.get_json()
+
+    assert response.status_code == 200
+    assert body["record"]["source_type"] == "actuation"
+    assert body["causes_record"]["knowledge_id"] == "kid_observation_1"
+
+
+def test_api_registry_lineage_actuation_with_unresolvable_causes(tmp_path, monkeypatch):
+    manifest_path = tmp_path / "data_manifest.json"
+    actuation = _registry_row(
+        knowledge_id="kid_actuation_2", entity_id="eid_actuation_2",
+        source_type="actuation", causes="kid_never_registered",
+    )
+    _write_manifest(manifest_path, [actuation])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+
+    body = server.app.test_client().get("/api/registry/eid_actuation_2").get_json()
+    assert body["causes_record"] is None
+
+
+def test_api_registry_lineage_404_when_entity_not_found(tmp_path, monkeypatch):
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_registry_row(entity_id="eid_a")])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+
+    response = server.app.test_client().get("/api/registry/does-not-exist")
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "not_found"

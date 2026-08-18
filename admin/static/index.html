@@ -368,6 +368,9 @@
       <button id="routing-toggle" class="drawer-toggle" type="button" aria-expanded="false" aria-controls="routing-drawer">
         ROUTING BOARD <span aria-hidden="true">⌃</span>
       </button>
+      <button id="registry-toggle" class="drawer-toggle" type="button" aria-expanded="false" aria-controls="registry-drawer">
+        REGISTRY <span aria-hidden="true">⌃</span>
+      </button>
       <details class="utility-menu">
         <summary>Queue actions</summary>
         <div class="utility-popover">
@@ -389,6 +392,57 @@
       </header>
       <div id="routing-content" class="routing-content">
         <p class="empty-state">Open the drawer to load routing data.</p>
+      </div>
+    </section>
+
+    <!-- canonical-state round 2, plan step 17: filterable table + one-hop lineage
+         view over the canonical-state registry (GET /api/registry, GET
+         /api/registry/<entity_id>), styled after the routing-drawer pattern above.
+         Read-only by construction — this panel never sends a mutating request. -->
+    <section id="registry-drawer" class="routing-drawer" aria-labelledby="registry-title" hidden>
+      <header class="drawer-header">
+        <div>
+          <div class="eyebrow">Canonical state</div>
+          <h2 id="registry-title">REGISTRY</h2>
+        </div>
+        <button id="registry-refresh" type="button">Refresh</button>
+      </header>
+      <form id="registry-filters" class="registry-filters">
+        <label>
+          Record type
+          <select id="registry-filter-type">
+            <option value="">All</option>
+            <option value="story">story</option>
+            <option value="review">review</option>
+            <option value="ledger_job">ledger_job</option>
+            <option value="ledger_attempt">ledger_attempt</option>
+            <option value="observation">observation</option>
+            <option value="flag">flag</option>
+            <option value="meta_session">meta_session</option>
+            <option value="actuation">actuation</option>
+          </select>
+        </label>
+        <label>
+          Lifecycle
+          <select id="registry-filter-lifecycle">
+            <option value="">All</option>
+            <option value="current">current</option>
+            <option value="superseded">superseded</option>
+            <option value="tombstoned">tombstoned</option>
+          </select>
+        </label>
+        <label>
+          Since
+          <input id="registry-filter-since" type="date" />
+        </label>
+        <button type="submit">Apply</button>
+      </form>
+      <div id="registry-content" class="routing-content">
+        <p class="empty-state">Open the drawer to load the registry.</p>
+      </div>
+      <div id="registry-lineage" class="registry-lineage" hidden>
+        <h3>Lineage</h3>
+        <div id="registry-lineage-content"></div>
       </div>
     </section>
   </div>

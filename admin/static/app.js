@@ -71,6 +71,9 @@
     routingLoaded: false,
     routingOpen: false,
     routingReturnFocus: null,
+    registryLoaded: false,
+    registryOpen: false,
+    registryReturnFocus: null,
     queuePending: false,
     designSessions: new Map(),
     approvedWorkdirs: [],
@@ -1463,6 +1466,107 @@
     }
   }
 
+  /**
+   * canonical-state round 2, plan step 17 — fetch the registry table lazily (only
+   * once the drawer is first opened, mirroring loadRouting's own state.routingLoaded
+   * gate), honoring the three filter controls. GET-only: this panel never sends a
+   * mutating request, matching the flag-only rail's existing invariant.
+   */
+  async function loadRegistry() {
+    const content = $("#registry-content")
+    content.replaceChildren(element("p", "empty-state", "Loading registry…"))
+    $("#registry-lineage").hidden = true
+    try {
+      const params = new URLSearchParams()
+      const recordType = $("#registry-filter-type").value
+      const lifecycle = $("#registry-filter-lifecycle").value
+      const since = $("#registry-filter-since").value
+      if (recordType) params.set("record_type", recordType)
+      if (lifecycle) params.set("lifecycle", lifecycle)
+      if (since) params.set("since", since)
+      const response = await fetch(`/api/registry?${params.toString()}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error("registry unavailable")
+      renderRegistryTable(Array.isArray(data.registry) ? data.registry : [])
+      state.registryLoaded = true
+    } catch (_error) {
+      content.replaceChildren(element("p", "error-state", "Registry unavailable. Live workspace remains connected."))
+    }
+  }
+
+  /** Render registry rows as a clickable table — a row click loads that entity's lineage. */
+  function renderRegistryTable(rows) {
+    const content = $("#registry-content")
+    content.replaceChildren()
+    if (rows.length === 0) {
+      content.appendChild(element("p", "empty-state", "No registry entries match this filter."))
+      return
+    }
+    const wrap = element("div", "table-scroll")
+    const table = element("table", "routing-table")
+    table.appendChild(element("caption", "sr-only", "Canonical-state registry entries — activate a row for its lineage"))
+    const head = element("thead")
+    const headRow = element("tr")
+    ;["knowledge_id", "source_type", "lifecycle_state", "observed_at", "logical_locator"].forEach((header) => {
+      const cell = element("th", "", header)
+      cell.scope = "col"
+      headRow.appendChild(cell)
+    })
+    head.appendChild(headRow)
+    table.appendChild(head)
+    const body = element("tbody")
+    rows.forEach((row) => {
+      const tr = element("tr")
+      tr.tabIndex = 0
+      tr.setAttribute("role", "button")
+      tr.setAttribute("aria-label", `View lineage for ${row.logical_locator || row.entity_id || "entry"}`)
+      ;[row.knowledge_id, row.source_type, row.lifecycle_state, row.observed_at, row.logical_locator].forEach((value) => {
+        tr.appendChild(element("td", "", String(value ?? "?").slice(0, 60)))
+      })
+      const openLineage = () => loadRegistryLineage(row.entity_id)
+      tr.addEventListener("click", openLineage)
+      tr.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return
+        event.preventDefault()
+        openLineage()
+      })
+      body.appendChild(tr)
+    })
+    table.appendChild(body)
+    wrap.appendChild(table)
+    content.appendChild(wrap)
+    content.appendChild(element("p", "bottom-provenance", `${rows.length} record(s)`))
+  }
+
+  /**
+   * Fetch and render the one-hop lineage view for one entity_id (design §10 / §5a).
+   * File-only (never Neo4j — see admin/server.py's api_registry_lineage docstring),
+   * so this always resolves quickly; an actuation record's justifying observation
+   * (`causes_record`) renders alongside its own row when present.
+   */
+  async function loadRegistryLineage(entityId) {
+    if (!entityId) return
+    const panel = $("#registry-lineage")
+    const content = $("#registry-lineage-content")
+    panel.hidden = false
+    content.replaceChildren(element("p", "empty-state", "Loading lineage…"))
+    try {
+      const response = await fetch(`/api/registry/${encodeURIComponent(entityId)}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "lineage unavailable")
+      content.replaceChildren()
+      content.appendChild(element("pre", "", JSON.stringify(data.record, null, 2)))
+      if (data.causes_record) {
+        content.appendChild(element("h4", "", "Causes (justifying observation)"))
+        content.appendChild(element("pre", "", JSON.stringify(data.causes_record, null, 2)))
+      } else if (data.record?.source_type === "actuation") {
+        content.appendChild(element("p", "empty-state", "causes citation unresolved"))
+      }
+    } catch (error) {
+      content.replaceChildren(element("p", "empty-state", error.message || "Lineage unavailable"))
+    }
+  }
+
   /** Call only the existing queue endpoint and report the completed action. */
   async function runQueueAction(action) {
     if (state.queuePending) return
@@ -2067,6 +2171,28 @@
       state.routingReturnFocus?.focus()
     })
     $("#routing-refresh").addEventListener("click", loadRouting)
+    $("#registry-toggle").addEventListener("click", () => {
+      state.registryOpen = !state.registryOpen
+      $("#registry-drawer").hidden = !state.registryOpen
+      $("#registry-toggle").setAttribute("aria-expanded", String(state.registryOpen))
+      if (state.registryOpen) {
+        state.registryReturnFocus = $("#registry-toggle")
+        if (!state.registryLoaded) loadRegistry()
+        $("#registry-refresh").focus()
+      }
+    })
+    $("#registry-drawer").addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return
+      state.registryOpen = false
+      $("#registry-drawer").hidden = true
+      $("#registry-toggle").setAttribute("aria-expanded", "false")
+      state.registryReturnFocus?.focus()
+    })
+    $("#registry-refresh").addEventListener("click", loadRegistry)
+    $("#registry-filters").addEventListener("submit", (event) => {
+      event.preventDefault()
+      loadRegistry()
+    })
     $("#enqueue-button").addEventListener("click", () => {
       const warning = "This enqueues the full experiment matrix (~30 cells) on the default model and will incur real cost. Continue?"
       if (window.confirm(warning)) runQueueAction("enqueue")

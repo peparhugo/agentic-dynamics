@@ -104,10 +104,18 @@ def build_handler(group: str, r: redis.Redis):
             # KnowledgeRecord in this codebase (only round 2's ``causes`` has, via
             # canonical_state_r2_plan.md step 1) — this stays forward-compatible with
             # that field arriving later without raising AttributeError today.
+            #
+            # ``logical_locator``/``source_uri`` (plan step 16 addition): scripts/registry.py's
+            # `show <id>` command resolves a story_id/session_id/cell_id query against
+            # `logical_locator` (the SAME field every producer's identity formula folds
+            # into entity_id — see docs/canonical_state_r2_design.md §3's table), so the
+            # index line must carry it, not just the two derived hash identities.
             line = {
                 "knowledge_id": record.knowledge_id,
                 "entity_id": record.entity_id,
                 "source_type": record.source_type,
+                "logical_locator": record.logical_locator,
+                "source_uri": record.source_uri,
                 "lifecycle_state": "current",
                 "observed_at": record.observed_at,
                 "indexed_at": record.indexed_at,

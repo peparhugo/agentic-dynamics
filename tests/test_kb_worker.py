@@ -86,6 +86,8 @@ def test_kb_registry_v1_handler_appends_jsonl_line(tmp_path, monkeypatch):
         "knowledge_id": "kid_1",
         "entity_id": "eid_1",
         "source_type": "story",
+        "logical_locator": record.logical_locator,
+        "source_uri": record.source_uri,
         "lifecycle_state": "current",
         "observed_at": record.observed_at,
         "indexed_at": record.indexed_at,
