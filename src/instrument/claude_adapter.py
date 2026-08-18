@@ -187,6 +187,8 @@ _CLAUDE_MODEL_ALIASES: dict[str, str] = {
     "claude-opus-5": "claude-opus-5",
     "claude-sonnet-5": "claude-sonnet-5",
     "claude-haiku-5": "claude-haiku-5",
+    # Latest model (Claude Code's current default; alias "fable"):
+    "claude-fable-5": "claude-fable-5",
     # Claude 4.5 generation (still available):
     "claude-opus-4-5": "claude-opus-4-5",
     "claude-sonnet-4-5": "claude-sonnet-4-5",
@@ -195,8 +197,7 @@ _CLAUDE_MODEL_ALIASES: dict[str, str] = {
     "sonnet": "sonnet",
     "opus": "opus",
     "haiku": "haiku",
-    # Framework-internal ids (not real Claude Code models):
-    "claude-fable-5": "claude-sonnet-5",
+    "fable": "fable",
 }
 
 

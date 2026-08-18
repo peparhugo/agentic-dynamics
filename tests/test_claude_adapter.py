@@ -117,11 +117,12 @@ def test_model_resolution_passes_real_ids_through():
     assert _resolve_claude_model("anthropic/sonnet") == "sonnet"
     assert _resolve_claude_model("anthropic/opus") == "opus"
     assert _resolve_claude_model("anthropic/haiku") == "haiku"
+    assert _resolve_claude_model("anthropic/fable") == "fable"
 
 
-def test_model_resolution_maps_framework_ids():
+def test_model_resolution_passes_claude5_ids_through():
     assert _resolve_claude_model("anthropic/claude-sonnet-5") == "claude-sonnet-5"
-    assert _resolve_claude_model("anthropic/claude-fable-5") == "claude-sonnet-5"
+    assert _resolve_claude_model("anthropic/claude-fable-5") == "claude-fable-5"
 
 
 def test_model_resolution_unknown_passthrough():
@@ -137,7 +138,7 @@ def test_model_resolution_empty():
 
 def test_claude_model_arg_builds_flag():
     assert _claude_model_arg("anthropic/claude-sonnet-4-5") == ["--model", "claude-sonnet-4-5"]
-    assert _claude_model_arg("anthropic/claude-fable-5") == ["--model", "claude-sonnet-5"]
+    assert _claude_model_arg("anthropic/claude-fable-5") == ["--model", "claude-fable-5"]
 
 
 def test_run_claude_agentic_honors_transcript_path(tmp_path, monkeypatch):
