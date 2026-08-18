@@ -1,0 +1,197 @@
+name: repo_review_fable
+question: >-
+  Conduct a comprehensive, evidence-grounded review of the repository in five areas —
+  (1) restructuring/refactoring recommendations, (2) concrete bugs, (3) how to restructure the
+  website, (4) the Control Room UI + endpoints, (5) a full review of the knowledge base across
+  experiments and real workflows — each with file:line evidence and actionable recommendations.
+  Run once with claude-fable-5 (now passed through to the real Claude Code model).
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: markdown
+    fork: true
+    context:
+      scope: >-
+        Five independent review areas, one deliverable each, all evidence-grounded (file:line, not
+        vibes). This REPLACES nothing and builds on prior work: the DeepSeek architecture review
+        (docs/arch_review/{architecture_map,coupling_assessment,refactor_roadmap,review_verify}.md)
+        already covered the as-is architecture + seed-repo gap — do not redo it; extend it. The
+        canonical-state registry (one-typed-stream, write-time registration) is now merged into
+        main — review it as shipped code, not as a design doc.
+      read_first: >-
+        .opencode/instructions/mental-model.md (module map + signatures),
+        src/instrument/CONTEXT.md (module + KB + ledger reference),
+        scripts/CONTEXT.md, admin/CONTEXT.md (or scripts/CONTEXT.md's admin section),
+        firebase/CONTEXT.md, docs/supervisor_design.md, docs/arch_review/*.md (DeepSeek's prior
+        review — build on, don't repeat).
+      run_shape: >-
+        SINGLE-model: run with --model anthropic/claude-fable-5. One worktree, one branch
+        (feature/repo-review-fable); each phase commits [workflow] <phase>. This is a REVIEW:
+        produce analysis docs under docs/review/, do NOT edit production code.
+    phases:
+      - name: restructure
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Survey the codebase and recommend restructuring + refactoring.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/arch_review/refactor_roadmap.md   (DeepSeek's prior refactor roadmap — build on it)
+          - docs/arch_review/coupling_assessment.md (the PARAMETERIZED vs HARD-CODED audit)
+          - .opencode/instructions/mental-model.md
+          - src/instrument/CONTEXT.md
+
+          REQUIREMENTS:
+          - Recommend concrete restructuring/refactoring with file:line evidence, extending (not
+            repeating) DeepSeek's roadmap: name the module, the seam, the before/after, and the
+            expected effect. Flag anything DeepSeek got wrong or missed.
+          - Cover the merged canonical-state code as shipped: is the one-typed-stream split clean,
+            or did it leak across module boundaries (knowledge/knowledge_stream/ingestion/worker)?
+
+          DELIVER exactly one file: docs/review/restructure.md.
+      - name: bugs
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Hunt for concrete bugs across the codebase.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - .opencode/instructions/mental-model.md
+          - src/instrument/CONTEXT.md, scripts/CONTEXT.md
+          - docs/arch_review/architecture_map.md (the four-layer map to orient the hunt)
+
+          REQUIREMENTS:
+          - Each bug needs: file:line, a one-line description, a reproduction sketch, expected vs
+            actual, and a suggested fix. Severity-tag each (CRITICAL / HIGH / MEDIUM / LOW).
+          - Prioritize: the measurement apparatus (perturb/solution/basin/efficiency/recovery/
+            strategy), the KB ingestion path (record_to_artifact → record_to_event → stream →
+            extract_record), the workflow runner, and the newly-merged consumer/projection layer
+            (kb_worker.py, generate_manifest.py). Do not just list style nits — find things that
+            produce wrong measurements, wrong lineage, or silent data loss.
+
+          DELIVER exactly one file: docs/review/bugs.md.
+      - name: website
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Review the website and recommend how to restructure it.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - firebase/CONTEXT.md
+          - firebase/public/data.js (the generated data layer) + firebase/public/app.js
+          - scripts/build_data.py (how data.js is produced) + scripts/generate_manifest.py
+
+          REQUIREMENTS:
+          - Recommend how to restructure the site: information architecture, the data.js → UI
+            seam, which claims are now stale (the DeepSeek pricing change, the fable-5→sonnet-5
+            labeling, the corpus shrinkage), and how the provenance tags ([M]/[C]/[H]/[P]/[X])
+            should reflect the new peak/off-peak + subscription-vs-metered cost model.
+          - Separate STRUCTURAL recommendations (layout/IA/rendering) from CONTENT corrections
+            (stale numbers/claims), each with a concrete location.
+
+          DELIVER exactly one file: docs/review/website.md.
+      - name: control_room
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Review the Control Room UI and endpoints.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - admin/server.py (all 24 routes) + admin/static/ (the vanilla-JS dashboard)
+          - docs/supervisor_design.md (the flag-only/observe-only rail)
+          - scripts/CONTEXT.md (the admin route table + the read-only pull contract for
+            .opencode/tools/dashboard.ts + control_room.ts)
+
+          REQUIREMENTS:
+          - Review BOTH the UI and the endpoints: what is missing, mislabeled, or fragile. Confirm
+            or refute that the flag-only rail holds (no agent-callable POST steer/interrupt), and
+            that the canonical-state board (if any) stays read-only.
+          - Given the "observation vs actuation" split (the supervisor may control in the future),
+            recommend what the Control Room should expose now vs gate behind a future actuation
+            type, without breaking the observe-only default.
+
+          DELIVER exactly one file: docs/review/control_room.md.
+      - name: knowledge_base
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Full review of the knowledge base across experiments AND real workflows.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - src/instrument/CONTEXT.md (Runtime RAG / Knowledge Base section)
+          - src/instrument/knowledge.py, knowledge_stream.py, knowledge_ingestion.py,
+            code_ingestion.py, quality_ingestion.py, policy_ingestion.py, retrieval.py,
+            prompt_constructor.py
+          - scripts/kb_produce.py, scripts/kb_produce_sources.py, scripts/kb_produce_registry.py,
+            scripts/kb_worker.py
+          - docs/arch_review/coupling_assessment.md (the KB/apparatus write-path finding)
+
+          REQUIREMENTS:
+          - Review the KB as it is now USED two ways: (a) by experiments — the measured-finding/
+            code/quality/policy producers, the batch backfill, the registry/tombstone machinery;
+            (b) by real workflows — the runtime RAG seam (retrieve → construct → render), the
+            prompt-constructor, the self-build emit_self path. Assess both separately.
+          - Identify: authority-contract violations, scope-isolation gaps, write-guard holes, the
+            retrieve-vs-registry surface split, and whether the "one typed stream" holds end to end.
+          - Recommend what to fix first, with file:line.
+
+          DELIVER exactly one file: docs/review/knowledge_base.md.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Verify the review is complete, grounded, and actionable.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Confirm all five areas delivered (restructure, bugs, website, control_room,
+            knowledge_base) and every headline finding carries file:line.
+          - Confirm the bugs doc has severity tags + reproduction sketches; the restructure doc
+            builds on (not repeats) docs/arch_review/.
+          - Write docs/review/review_verify.md with PASS/FAIL per check.
+
+          DELIVER docs/review/review_verify.md.
+factors:
+  - {name: model, levels: [anthropic/claude-fable-5]}
+design: factorial
+rules:
+  - name: areas_covered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [five_areas_delivered]
+  - name: findings_grounded
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_areas_delivered]
+    produces: [file_line_evidence]
+metrics:
+  - {name: five_areas_delivered, agg: ratio, over: cell}
+  - {name: file_line_evidence, agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, restructure, bugs, website, control_room, knowledge_base, verify]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
