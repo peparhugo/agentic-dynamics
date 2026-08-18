@@ -93,11 +93,192 @@ def test_compact_registry_index_skips_malformed_lines(tmp_path):
 
 
 def test_compact_registry_index_preserves_all_row_fields(tmp_path):
+    # A lone, unsuperseded row: every field it carries survives compaction unchanged,
+    # plus the two newly-DERIVED fields this row's own history doesn't affect —
+    # valid_to stays None (still open/current — nothing supersedes it) and versions
+    # is a single-entry history of itself (see the multi-version tests below for a
+    # chain where versions actually has more than one entry).
     path = tmp_path / "registry_index.jsonl"
     row = _row(supersedes="kid_prev", causes="kid_obs")
     _write_jsonl(path, [row])
     compacted = gm._compact_registry_index(path)
-    assert compacted[0] == row
+    assert compacted[0] == {**row, "valid_to": None, "versions": [{
+        "knowledge_id": row["knowledge_id"],
+        "lifecycle_state": "current",
+        "valid_to": None,
+        "observed_at": row["observed_at"],
+        "indexed_at": row["indexed_at"],
+    }]}
+
+
+# ── derived lifecycle_state / valid_to (canonical-state finalize, G2) ────
+#
+# These fixtures exercise multi-version entity histories the way
+# scripts/kb_worker.py's kb-registry-v1 handler (G1) actually writes them: a plain
+# tombstone (one row, lifecycle_state already "tombstoned"), a two-version supersede
+# chain (the successor's own "current" line PLUS its "predecessor superseded" marker
+# line — same entity_id, same indexed_at, distinct knowledge_id), and a three-version
+# chain to prove the derivation generalizes past a single hop.
+
+
+def test_compact_registry_index_delete_marker_renders_entity_tombstoned(tmp_path):
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_bad", entity_id="eid_1", lifecycle_state="tombstoned"),
+    ])
+    compacted = gm._compact_registry_index(path)
+    assert len(compacted) == 1
+    assert compacted[0]["lifecycle_state"] == "tombstoned"
+    # No dedicated valid_to was ever recorded on the row itself, so the derivation
+    # falls back to the tombstone's own indexed_at as the closest proxy this flat
+    # index has to "event time" (design §6).
+    assert compacted[0]["valid_to"] == compacted[0]["indexed_at"]
+
+
+def test_compact_registry_index_tombstone_wins_over_an_older_current_row(tmp_path):
+    # An entity that was "current" and is LATER tombstoned must render tombstoned —
+    # the tombstone is the entity's most recent fact, even though an earlier row for
+    # the same entity_id still says "current".
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_v1", entity_id="eid_1", indexed_at="2026-08-15T00:00:00+00:00",
+             lifecycle_state="current"),
+        _row(knowledge_id="kid_v1_tombstone", entity_id="eid_1", indexed_at="2026-08-16T00:00:00+00:00",
+             lifecycle_state="tombstoned"),
+    ])
+    compacted = gm._compact_registry_index(path)
+    assert len(compacted) == 1
+    assert compacted[0]["knowledge_id"] == "kid_v1_tombstone"
+    assert compacted[0]["lifecycle_state"] == "tombstoned"
+
+
+def test_compact_registry_index_supersede_marks_predecessor_superseded_with_effective_valid_to(tmp_path):
+    # Mirrors exactly what kb-registry-v1's handler appends for one supersede event:
+    # the successor's own full "current" line, plus a thin "predecessor superseded"
+    # marker line for the OLD knowledge_id — same entity_id, same indexed_at.
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_v1", entity_id="eid_1", indexed_at="2026-08-15T00:00:00+00:00",
+             observed_at="2026-08-15T00:00:00+00:00", lifecycle_state="current"),
+        _row(knowledge_id="kid_v2", entity_id="eid_1", indexed_at="2026-08-16T00:00:00+00:00",
+             observed_at="2026-08-16T00:00:00+00:00", lifecycle_state="current",
+             supersedes="kid_v1"),
+        {
+            "knowledge_id": "kid_v1", "entity_id": "eid_1",
+            "lifecycle_state": "superseded", "valid_to": "2026-08-16T00:00:00+00:00",
+            "indexed_at": "2026-08-16T00:00:00+00:00",
+        },
+    ])
+    compacted = gm._compact_registry_index(path)
+    assert len(compacted) == 1  # still one row per entity_id
+
+    entity_row = compacted[0]
+    # The entity's HEAD is the successor — "current", not "superseded".
+    assert entity_row["knowledge_id"] == "kid_v2"
+    assert entity_row["lifecycle_state"] == "current"
+    assert entity_row["valid_to"] is None
+    assert entity_row["supersedes"] == "kid_v1"
+
+    # The predecessor's derived state is exposed via the entity's version history —
+    # this is the fact this compaction pass exists to compute: "a supersede renders
+    # the predecessor superseded with effective valid_to = successor valid_from"
+    # (here, the successor's own observed_at, the flat index's valid_from proxy).
+    versions_by_kid = {v["knowledge_id"]: v for v in entity_row["versions"]}
+    assert versions_by_kid["kid_v1"]["lifecycle_state"] == "superseded"
+    assert versions_by_kid["kid_v1"]["valid_to"] == "2026-08-16T00:00:00+00:00"
+    assert versions_by_kid["kid_v2"]["lifecycle_state"] == "current"
+    assert versions_by_kid["kid_v2"]["valid_to"] is None
+
+
+def test_compact_registry_index_derives_supersession_even_without_a_marker_line(tmp_path):
+    # The derivation must not depend on kb-registry-v1's marker-line mechanism
+    # existing — it is re-derivable from the `supersedes` chain alone (design §6: "the
+    # index layers compute the effective valid_to ... purely as a derived view over
+    # the supersedes chain"). Here only the successor's own line is present (its
+    # `supersedes` pointer is enough); no separate marker line for kid_v1 was ever
+    # appended, e.g. because it predates G1 shipping.
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_v1", entity_id="eid_1", indexed_at="2026-08-15T00:00:00+00:00",
+             observed_at="2026-08-15T00:00:00+00:00", lifecycle_state="current"),
+        _row(knowledge_id="kid_v2", entity_id="eid_1", indexed_at="2026-08-16T00:00:00+00:00",
+             observed_at="2026-08-16T00:00:00+00:00", lifecycle_state="current",
+             supersedes="kid_v1"),
+    ])
+    compacted = gm._compact_registry_index(path)
+    entity_row = compacted[0]
+    assert entity_row["knowledge_id"] == "kid_v2"
+    versions_by_kid = {v["knowledge_id"]: v for v in entity_row["versions"]}
+    assert versions_by_kid["kid_v1"]["lifecycle_state"] == "superseded"
+    assert versions_by_kid["kid_v1"]["valid_to"] == "2026-08-16T00:00:00+00:00"  # kid_v2's observed_at
+
+
+def test_compact_registry_index_three_version_chain(tmp_path):
+    # v1 -> v2 -> v3: each predecessor's effective valid_to is its OWN direct
+    # successor's valid_from, not the chain's final head's.
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_v1", entity_id="eid_1", indexed_at="2026-08-14T00:00:00+00:00",
+             observed_at="2026-08-14T00:00:00+00:00", lifecycle_state="current"),
+        _row(knowledge_id="kid_v2", entity_id="eid_1", indexed_at="2026-08-15T00:00:00+00:00",
+             observed_at="2026-08-15T00:00:00+00:00", lifecycle_state="current",
+             supersedes="kid_v1"),
+        _row(knowledge_id="kid_v3", entity_id="eid_1", indexed_at="2026-08-16T00:00:00+00:00",
+             observed_at="2026-08-16T00:00:00+00:00", lifecycle_state="current",
+             supersedes="kid_v2"),
+    ])
+    compacted = gm._compact_registry_index(path)
+    entity_row = compacted[0]
+    assert entity_row["knowledge_id"] == "kid_v3"
+    assert entity_row["lifecycle_state"] == "current"
+
+    versions_by_kid = {v["knowledge_id"]: v for v in entity_row["versions"]}
+    assert versions_by_kid["kid_v1"]["lifecycle_state"] == "superseded"
+    assert versions_by_kid["kid_v1"]["valid_to"] == "2026-08-15T00:00:00+00:00"  # v2's observed_at
+    assert versions_by_kid["kid_v2"]["lifecycle_state"] == "superseded"
+    assert versions_by_kid["kid_v2"]["valid_to"] == "2026-08-16T00:00:00+00:00"  # v3's observed_at
+    assert versions_by_kid["kid_v3"]["lifecycle_state"] == "current"
+    assert versions_by_kid["kid_v3"]["valid_to"] is None
+
+
+def test_compact_registry_index_supersede_then_tombstone(tmp_path):
+    # A chain where the CURRENT head is itself later tombstoned: the entity renders
+    # tombstoned (not "current"), and the earlier, already-superseded predecessor
+    # keeps its own derived state regardless.
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_v1", entity_id="eid_1", indexed_at="2026-08-14T00:00:00+00:00",
+             observed_at="2026-08-14T00:00:00+00:00", lifecycle_state="current"),
+        _row(knowledge_id="kid_v2", entity_id="eid_1", indexed_at="2026-08-15T00:00:00+00:00",
+             observed_at="2026-08-15T00:00:00+00:00", lifecycle_state="current",
+             supersedes="kid_v1"),
+        _row(knowledge_id="kid_v2_tombstone", entity_id="eid_1", indexed_at="2026-08-16T00:00:00+00:00",
+             lifecycle_state="tombstoned"),
+    ])
+    compacted = gm._compact_registry_index(path)
+    entity_row = compacted[0]
+    assert entity_row["knowledge_id"] == "kid_v2_tombstone"
+    assert entity_row["lifecycle_state"] == "tombstoned"
+
+    versions_by_kid = {v["knowledge_id"]: v for v in entity_row["versions"]}
+    assert versions_by_kid["kid_v1"]["lifecycle_state"] == "superseded"
+
+
+def test_compact_registry_index_independent_entities_do_not_interfere(tmp_path):
+    # A supersede chain under one entity_id must not affect an unrelated entity_id's
+    # own, independent version.
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_v1", entity_id="eid_1", lifecycle_state="current"),
+        _row(knowledge_id="kid_v2", entity_id="eid_1", lifecycle_state="current", supersedes="kid_v1"),
+        _row(knowledge_id="kid_other", entity_id="eid_2", lifecycle_state="current"),
+    ])
+    compacted = gm._compact_registry_index(path)
+    by_entity = {r["entity_id"]: r for r in compacted}
+    assert len(compacted) == 2
+    assert by_entity["eid_2"]["knowledge_id"] == "kid_other"
+    assert by_entity["eid_2"]["lifecycle_state"] == "current"
+    assert len(by_entity["eid_2"]["versions"]) == 1
 
 
 # ── main() integration: registry is additive, files{} stays unchanged ────

@@ -3,6 +3,7 @@
 import hashlib
 import json
 import subprocess
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -45,24 +46,17 @@ def get_git_commit():
     except Exception:
         return "unknown"
 
-def _compact_registry_index(path):
-    """Compact the append-only registry_index.jsonl into one row per entity_id.
-
-    Canonical-state round 2, plan step 15: the same "append-only log + compacted
-    snapshot" relationship flags.jsonl already has to its own bounded Redis mirror.
-    Reads every line, keeps only the row with the newest ``indexed_at`` per
-    ``entity_id`` (a later index pass always describes the more current state of that
-    logical entity — this is what makes each output row genuinely "current", not a
-    stale intermediate version), and returns the result as a list sorted by entity_id
-    for deterministic, diff-friendly manifest output.
+def _iter_registry_rows(path):
+    """Yield each structurally valid row from the append-only registry_index.jsonl.
 
     Missing/corrupt lines are skipped rather than aborting the whole manifest build — a
     single truncated JSONL line (e.g. from a process killed mid-write) must not prevent
-    every OTHER already-durable line from surfacing.
+    every OTHER already-durable line from surfacing. A row with no ``knowledge_id`` or
+    no ``entity_id`` cannot be attributed to a version or a logical entity, so it is
+    skipped too (this also covers scripts/kb_worker.py's kb-registry-v1 "predecessor
+    superseded" marker lines, which — unlike a full record registration line — always
+    carry both of those two fields even though several other fields are absent).
     """
-    if not path.exists():
-        return []
-    latest = {}
     with open(path) as f:
         for line in f:
             line = line.strip()
@@ -72,15 +66,156 @@ def _compact_registry_index(path):
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            entity_id = row.get("entity_id")
-            if not entity_id:
+            if not row.get("knowledge_id") or not row.get("entity_id"):
                 continue
-            existing = latest.get(entity_id)
-            # ">=" (not ">"): among ties, the later line in append order wins — a
-            # deterministic tiebreak since the file is strictly append-only.
-            if existing is None or str(row.get("indexed_at") or "") >= str(existing.get("indexed_at") or ""):
-                latest[entity_id] = row
-    return [latest[key] for key in sorted(latest)]
+            yield row
+
+
+def _derive_lifecycle(row, successor_by_predecessor_kid):
+    """Return ``(lifecycle_state, valid_to)`` DERIVED for one knowledge_id's row.
+
+    Canonical-state finalize, G2 — closes the gap docs/canonical_state_r2_design.md §3/§6
+    describes: ``lifecycle_state``/``valid_to`` are "index-only, computed, never stored in
+    the artifact" — but the pre-G2 compaction above never actually computed them, it just
+    copied whatever a single append-only line happened to say. This function is the
+    computation design §6 always intended, applied at the ONE place (compaction) that has
+    visibility across a whole entity's version history at once:
+
+    - If some OTHER row's ``supersedes`` pointer names this row's ``knowledge_id``, this
+      row is superseded — full stop, regardless of what its OWN ``lifecycle_state`` text
+      says (so this is correct even for a registry_index.jsonl line written before
+      kb_worker.py's kb-registry-v1 handler learned to compute lifecycle_state itself, or
+      for a raw line some future producer writes without going through that handler at
+      all). The effective ``valid_to`` is the successor's own ``valid_from`` — the flat
+      index never persists a dedicated ``valid_from`` column (only ``observed_at``/
+      ``indexed_at``), and base design §"Open Question 2" defines ``valid_from`` as
+      defaulting to ``observed_at`` for exactly this reason, so ``observed_at`` (falling
+      back to ``indexed_at``) is the correct proxy, not a workaround.
+    - Otherwise, a row whose OWN ``lifecycle_state`` says "tombstoned" (kb_worker.py's
+      handler writes this for a ``delete`` operation, self-tombstone — the record IS the
+      retracted version) stays tombstoned; its ``valid_to`` is its own already-recorded
+      value if the producer set one, else its ``indexed_at`` (the closest proxy this flat
+      index has to "event time" per design §6's "delete ... valid_to = event time").
+    - Otherwise it is current, with ``valid_to = None`` (still open).
+    """
+    successor = successor_by_predecessor_kid.get(row["knowledge_id"])
+    if successor is not None:
+        valid_to = successor.get("observed_at") or successor.get("indexed_at")
+        return "superseded", valid_to
+    if row.get("lifecycle_state") == "tombstoned":
+        return "tombstoned", row.get("valid_to") or row.get("indexed_at")
+    return "current", row.get("valid_to")
+
+
+def _compact_registry_index(path):
+    """Compact the append-only registry_index.jsonl into one row per entity_id, with
+    ``lifecycle_state``/``valid_to`` DERIVED rather than copied verbatim from whichever
+    line happens to be temporally last (canonical-state finalize, G2).
+
+    Two passes:
+
+    1. Collapse to (at most) one row per ``knowledge_id``. This is the idempotence step
+       every consumer in this package already applies at its own destination — but it
+       matters MORE here than it used to, because kb_worker.py's kb-registry-v1 handler
+       can now append a "predecessor superseded" marker line for an OLDER version at
+       supersede time (same ``entity_id`` as, and the SAME ``indexed_at`` as, the NEW
+       version's own line). Deduping at the ``entity_id`` grain the way the pre-G2
+       implementation did would let that marker line nondeterministically outrace the
+       real "current" row on the ``>=`` latest-wins tiebreak; deduping at the finer
+       ``knowledge_id`` grain first means the two lines never even compete for the same
+       dict slot — each version keeps its own identity into pass 2.
+    2. Roll each entity_id's known versions up into ONE compacted row. The row reported
+       is either the entity's TOMBSTONED version (if a tombstone is the most recent event
+       recorded against it — a tombstone is terminal, design §6: "used when a record is
+       retracted with no replacement under the same entity", so an older "current" row
+       must never resurface once one exists) or its live (derived-"current") version.
+       Every OTHER known version for that entity — superseded predecessors, most
+       commonly — is still exposed, DERIVED the same way, in the row's nested
+       ``versions`` list, so "a supersede renders the predecessor superseded with
+       effective valid_to = successor valid_from" (the source fact this function exists
+       to compute) remains inspectable even though it can never itself be the entity's
+       one reported head row.
+
+    Missing/corrupt lines are skipped (see :func:`_iter_registry_rows`) rather than
+    aborting the whole manifest build. Returns a list sorted by ``entity_id`` for
+    deterministic, diff-friendly manifest output — unchanged from the pre-G2 contract.
+    """
+    if not path.exists():
+        return []
+
+    by_knowledge_id = {}
+    for row in _iter_registry_rows(path):
+        kid = row["knowledge_id"]
+        existing = by_knowledge_id.get(kid)
+        # ">=" (not ">"): among ties, the later line in append order wins — a
+        # deterministic tiebreak since the file is strictly append-only.
+        if existing is None or str(row.get("indexed_at") or "") >= str(existing.get("indexed_at") or ""):
+            by_knowledge_id[kid] = row
+
+    # A knowledge_id that some OTHER row's `supersedes` pointer names is, by definition,
+    # no longer current. Keyed by the PREDECESSOR's knowledge_id -> the row that
+    # supersedes it, so _derive_lifecycle can look up "am I someone's predecessor, and if
+    # so, what is my successor's own valid_from" in one dict lookup.
+    successor_by_predecessor_kid = {
+        row["supersedes"]: row for row in by_knowledge_id.values() if row.get("supersedes")
+    }
+
+    derived_by_kid = {}
+    for kid, row in by_knowledge_id.items():
+        lifecycle_state, valid_to = _derive_lifecycle(row, successor_by_predecessor_kid)
+        derived_by_kid[kid] = {**row, "lifecycle_state": lifecycle_state, "valid_to": valid_to}
+
+    by_entity = defaultdict(list)
+    for row in derived_by_kid.values():
+        by_entity[row["entity_id"]].append(row)
+
+    compacted = []
+    for entity_id, rows in by_entity.items():
+        rows.sort(key=lambda r: str(r.get("indexed_at") or ""))
+        tombstoned = [r for r in rows if r["lifecycle_state"] == "tombstoned"]
+        live = [r for r in rows if r["lifecycle_state"] == "current"]
+
+        if tombstoned and (not live or tombstoned[-1]["indexed_at"] >= live[-1]["indexed_at"]):
+            head = tombstoned[-1]
+        elif live:
+            head = live[-1]
+        else:
+            # Degenerate: every known version for this entity derived as "superseded"
+            # and none is tombstoned — only reachable from a malformed/partial supersede
+            # chain (e.g. a `supersedes` pointer with no live head at the end of it).
+            # Fall back to the temporally latest row rather than fabricating a "current"
+            # state this entity's own history does not actually support.
+            head = rows[-1]
+
+        compacted.append({
+            "entity_id": entity_id,
+            "knowledge_id": head["knowledge_id"],
+            "source_type": head.get("source_type"),
+            "logical_locator": head.get("logical_locator"),
+            "source_uri": head.get("source_uri"),
+            "observed_at": head.get("observed_at"),
+            "indexed_at": head.get("indexed_at"),
+            "supersedes": head.get("supersedes"),
+            "causes": head.get("causes"),
+            "lifecycle_state": head["lifecycle_state"],
+            "valid_to": head["valid_to"],
+            # Every known version of this entity, oldest -> newest, each with its own
+            # DERIVED lifecycle_state/valid_to — see this function's docstring on why a
+            # superseded predecessor can never be the row above, but must still surface
+            # somewhere in "the manifest's registry array".
+            "versions": [
+                {
+                    "knowledge_id": r["knowledge_id"],
+                    "lifecycle_state": r["lifecycle_state"],
+                    "valid_to": r["valid_to"],
+                    "observed_at": r.get("observed_at"),
+                    "indexed_at": r.get("indexed_at"),
+                }
+                for r in rows
+            ],
+        })
+
+    return sorted(compacted, key=lambda r: r["entity_id"])
 
 def main():
     manifest = {
