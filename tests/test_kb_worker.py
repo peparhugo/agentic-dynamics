@@ -382,3 +382,220 @@ def test_kb_registry_v1_is_in_the_dispatch_table():
     # build_handler must not raise "unknown consumer group" for kb-registry-v1.
     handler = kb_worker.build_handler("kb-registry-v1", _FakeRedis())
     assert callable(handler)
+
+
+# ── Flag auto-clear rule (canonical-state finalize, G3) ───────────
+#
+# docs/canonical_state_base_design.md, "Open Question 6"(c): a flag is tombstoned
+# (delete + reason + a CLEARED_BY edge to the justifying observation) the moment a
+# LATER observation for the same session reads "healthy" — fully automatic, no human
+# "clear this flag" button, and never touching steer/interrupt/OpenCodeClient.
+
+
+class _FakeRegistryRedis:
+    """A minimal store double supporting exactly what ``publish_event()`` calls:
+    ``XADD`` (append an event, returning a fake monotonic entry id) and ``HSET``/
+    ``HGET`` (the source_type index ``publish_event`` maintains for non-actuation
+    events) — never a live Redis connection. Mirrors ``tests/test_retrieval.py``'s
+    store-double convention, extended just far enough to exercise the auto-clear
+    rule's actual write path end-to-end (unlike the schema-only ``_FakeRedis`` above,
+    which the kb-neo4j-v1 tests never call methods on).
+    """
+
+    def __init__(self):
+        self.published: list[dict] = []  # every XADD'd event, as its field dict
+        self.hashes: dict[str, dict[str, str]] = {}
+        self._next_id = 0
+
+    def xadd(self, stream, fields):
+        self._next_id += 1
+        self.published.append(dict(fields))
+        return f"{self._next_id}-0"
+
+    def hset(self, name, key, value):
+        self.hashes.setdefault(name, {})[key] = value
+
+    def hget(self, name, key):
+        return self.hashes.get(name, {}).get(key)
+
+
+def _flag_record(**overrides) -> KnowledgeRecord:
+    """A ``source_type="flag"`` fixture matching
+    ``observation_ingestion.build_flag_record``'s identity shape closely enough for
+    these tests: ``logical_locator`` is the session_id (the field the auto-clear rule
+    keys its in-process index on)."""
+    return _record(
+        knowledge_id="kid_flag_1",
+        entity_id="eid_flag_session_a",
+        source_uri="flag_stream:session_a",
+        source_type="flag",
+        logical_locator="session_a",
+        text="live_session_a [deepseek/deepseek-v4-flash]: stalled — no progress",
+        **overrides,
+    )
+
+
+def _observation_record(*, cell_id="session_a", status="healthy", model="deepseek/deepseek-v4-flash", **overrides) -> KnowledgeRecord:
+    """A ``source_type="observation"`` fixture whose ``text`` matches exactly what
+    ``observation_ingestion.build_observation_record`` renders — the only field the
+    auto-clear rule reads to recover ``(cell_id, status)``."""
+    return _record(
+        knowledge_id=overrides.pop("knowledge_id", "kid_observation_1"),
+        entity_id=overrides.pop("entity_id", "eid_observation_1"),
+        source_uri=f"observation:{cell_id}",
+        source_type="observation",
+        logical_locator="assessment_hash_stub",
+        text=f"{cell_id} [{model}]: {status}",
+        **overrides,
+    )
+
+
+def test_cell_id_and_status_from_observation_text_parses_healthy():
+    cell_id, status = kb_worker._cell_id_and_status_from_observation_text(
+        "session_a [deepseek/deepseek-v4-flash]: healthy"
+    )
+    assert (cell_id, status) == ("session_a", "healthy")
+
+
+def test_cell_id_and_status_from_observation_text_parses_with_why():
+    cell_id, status = kb_worker._cell_id_and_status_from_observation_text(
+        "session_a [deepseek/deepseek-v4-flash]: stalled — no progress in 10 minutes"
+    )
+    assert (cell_id, status) == ("session_a", "stalled")
+
+
+def test_cell_id_and_status_from_observation_text_malformed_returns_none():
+    assert kb_worker._cell_id_and_status_from_observation_text("not the expected shape") == (None, None)
+
+
+def test_clear_flag_record_preserves_entity_id_and_sets_causes():
+    flag = _flag_record()
+    cleared = kb_worker._clear_flag_record(flag, causes="kid_healthy_observation")
+    assert cleared.entity_id == flag.entity_id
+    assert cleared.causes == "kid_healthy_observation"
+    # The new content (causes changed) means a new content_hash/knowledge_id — the
+    # original artifact is never mutated in place.
+    assert cleared.knowledge_id != flag.knowledge_id
+    assert cleared.content_hash != flag.content_hash
+
+
+def test_flag_autoclear_healthy_observation_emits_exactly_one_delete_for_the_flag(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    monkeypatch.setattr(kb_worker, "KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+
+    fake_redis = _FakeRegistryRedis()
+    handler = kb_worker.build_handler("kb-registry-v1", fake_redis)
+
+    handler(_flag_record(), operation="upsert")
+    handler(_observation_record(status="healthy"), operation="upsert")
+
+    assert len(fake_redis.published) == 1
+    event_fields = fake_redis.published[0]
+    assert event_fields["operation"] == "delete"
+    assert event_fields["reason"] == "auto-cleared: subsequent observation was healthy"
+    assert event_fields["causes"] == "kid_observation_1"
+
+    # The tombstone's durable artifact was written before the event was published.
+    cleared_kid = event_fields["knowledge_id"]
+    assert (tmp_path / "kb" / f"{cleared_kid}.json").exists()
+
+    # ...and it never went through the actuation family — only ever "flag".
+    assert fake_redis.hashes[kb_worker.ks.SOURCE_TYPE_INDEX_KEY][cleared_kid] == "flag"
+
+
+def test_flag_autoclear_non_healthy_observation_does_not_clear(tmp_path, monkeypatch):
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    monkeypatch.setattr(kb_worker, "KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+
+    fake_redis = _FakeRegistryRedis()
+    handler = kb_worker.build_handler("kb-registry-v1", fake_redis)
+
+    handler(_flag_record(), operation="upsert")
+    for status in ("stalled", "off_track", "unknown"):
+        handler(_observation_record(status=status, knowledge_id=f"kid_obs_{status}"), operation="upsert")
+
+    assert fake_redis.published == []
+
+
+def test_flag_autoclear_no_actuation_event_is_ever_produced(tmp_path, monkeypatch):
+    # Even on the success path, the ONLY event this rule can ever construct carries
+    # source_type="flag" — never source_type="actuation". Asserted directly against
+    # every published event's recorded source_type, not just the happy-path fields.
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    monkeypatch.setattr(kb_worker, "KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+
+    fake_redis = _FakeRegistryRedis()
+    handler = kb_worker.build_handler("kb-registry-v1", fake_redis)
+
+    handler(_flag_record(), operation="upsert")
+    handler(_observation_record(status="healthy"), operation="upsert")
+
+    assert len(fake_redis.published) == 1
+    recorded_source_types = set(fake_redis.hashes.get(kb_worker.ks.SOURCE_TYPE_INDEX_KEY, {}).values())
+    assert recorded_source_types == {"flag"}
+
+
+def test_flag_autoclear_noop_when_no_known_flag_for_session(tmp_path, monkeypatch):
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    monkeypatch.setattr(kb_worker, "KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+
+    fake_redis = _FakeRegistryRedis()
+    handler = kb_worker.build_handler("kb-registry-v1", fake_redis)
+
+    # No flag was ever processed for "session_a" — nothing to clear.
+    handler(_observation_record(status="healthy"), operation="upsert")
+    assert fake_redis.published == []
+
+
+def test_flag_autoclear_requires_finops_kb_write(tmp_path, monkeypatch):
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    monkeypatch.setattr(kb_worker, "KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
+
+    fake_redis = _FakeRegistryRedis()
+    handler = kb_worker.build_handler("kb-registry-v1", fake_redis)
+
+    handler(_flag_record(), operation="upsert")
+    handler(_observation_record(status="healthy"), operation="upsert")
+
+    assert fake_redis.published == []  # not an authorized writer — observe only
+
+
+def test_flag_autoclear_is_idempotent_across_repeated_healthy_observations(tmp_path, monkeypatch):
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    monkeypatch.setattr(kb_worker, "KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+
+    fake_redis = _FakeRegistryRedis()
+    handler = kb_worker.build_handler("kb-registry-v1", fake_redis)
+
+    handler(_flag_record(), operation="upsert")
+    handler(_observation_record(status="healthy", knowledge_id="kid_obs_1"), operation="upsert")
+    handler(_observation_record(status="healthy", knowledge_id="kid_obs_2"), operation="upsert")
+
+    # The second healthy observation finds no known flag left (popped after the
+    # first clear) — exactly one delete total, not two.
+    assert len(fake_redis.published) == 1
+
+
+def test_flag_autoclear_does_not_reclear_a_flag_already_tombstoned(tmp_path, monkeypatch):
+    # A `delete` event for the flag (from any source, not just this rule) removes it
+    # from the in-process index — a later healthy observation must not re-fire.
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    monkeypatch.setattr(kb_worker, "KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+
+    fake_redis = _FakeRegistryRedis()
+    handler = kb_worker.build_handler("kb-registry-v1", fake_redis)
+
+    handler(_flag_record(), operation="upsert")
+    handler(_flag_record(), operation="delete", reason="manually tombstoned")
+    handler(_observation_record(status="healthy"), operation="upsert")
+
+    assert fake_redis.published == []

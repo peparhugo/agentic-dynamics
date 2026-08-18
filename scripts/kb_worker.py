@@ -16,12 +16,14 @@ missing events hourly (see ``knowledge_stream.reconcile_missing``).
 """
 
 import argparse
+import hashlib
 import json
 import os
 import socket
 import sys
 import time
 import traceback
+from dataclasses import replace as _replace_record
 from datetime import datetime
 from pathlib import Path
 
@@ -32,6 +34,8 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from instrument import knowledge_ingestion as ki  # noqa: E402
 from instrument import knowledge_stream as ks  # noqa: E402
+from instrument import observation_ingestion as oi  # noqa: E402
+from instrument.knowledge import compute_knowledge_id  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -44,6 +48,18 @@ REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 #: down to "one row per entity_id, newest wins" — this consumer does not resolve
 #: superseded/tombstoned lifecycle state itself, it only records what it saw.
 REGISTRY_INDEX_PATH = PROJECT_ROOT / "experiments" / "results" / "registry_index.jsonl"
+
+#: canonical-state finalize (G3) — where the flag auto-clear rule (see
+#: `_clear_flag_record`/`_maybe_autoclear_flag` below) writes the durable, immutable
+#: artifact for the NEW "flag, now tombstoned" record it mints before publishing a
+#: `delete` event for it. Mirrors `instrument.knowledge_ingestion.ARTIFACT_DIR`
+#: ("experiments/results/kb") byte-for-byte, duplicated (not imported as a bare
+#: string) for the exact same reason REGISTRY_INDEX_PATH above is duplicated rather
+#: than imported: it is resolved against THIS module's own PROJECT_ROOT, so a test can
+#: monkeypatch this one constant and have every write in this file honor the override,
+#: without also having to reach into `instrument.knowledge_ingestion`'s separate
+#: PROJECT_ROOT.
+KB_ARTIFACT_DIR = PROJECT_ROOT / ki.ARTIFACT_DIR
 
 REDIS_BASE_DELAY = 2.0
 REDIS_MAX_RETRIES = 10
@@ -92,6 +108,148 @@ def _lifecycle_state_for(operation: str) -> str:
     return _LIFECYCLE_STATE_BY_OPERATION.get(operation, "current")
 
 
+# ── Flag auto-clear rule (canonical-state finalize, G3) ──────────
+#
+# docs/canonical_state_base_design.md, "Open Question 6"(c): "Clearance ('cleared ->
+# tombstoned') is fully automatic, by design — no new mutating route. A flag is
+# tombstoned (delete, reason='auto-cleared: subsequent observation was healthy',
+# CLEARED_BY-edge to the healthy observation that triggered it) the moment a later
+# observation for the same session_id reads healthy... a small rule in the
+# kb-registry-v1 consumer ('if this observation is healthy and the session has an
+# untombstoned flag, emit a delete event for it') is data-plane logic, not a
+# control-plane action, and never touches OpenCodeClient."
+#
+# The three helpers below implement exactly that rule, entirely inside this file (the
+# ONLY file this phase's DO section touches): correlate an incoming `observation`
+# record back to a session id, look up whether THIS process has seen an untombstoned
+# `flag` for that session, and — if so — mint and publish the tombstone.
+
+
+def _cell_id_and_status_from_observation_text(text: str) -> tuple[str | None, str | None]:
+    """Recover ``(cell_id, status)`` from an ``observation`` record's ``text`` field.
+
+    ``instrument.observation_ingestion.build_observation_record`` renders
+    ``text = f"{cell_id} [{model}]: {status}"`` (optionally followed by
+    ``f" — {why}"``). This is the ONLY field a durable ``observation``
+    ``KnowledgeRecord`` carries that names the session/cell it was assessed
+    against — its own ``logical_locator``/``entity_id`` deliberately fold
+    ``cell_id`` into a one-way hash together with the assessment timestamp
+    (``assessment_id = sha256(cell_id|at)[:16]``, design §3: "every verdict against
+    the same cell is an independent fact", so two verdicts must never collide on
+    identity) — so there is no separate, directly-comparable ``cell_id`` field to
+    read instead. Parsing this text is therefore the one durable correlation this
+    consumer has, without re-deriving anything the producer already decided.
+
+    In this codebase ``cell_id`` and a flag's ``session_id`` are the SAME string:
+    ``scripts/supervise.py:supervise_once`` calls ``emit_flag({"id": cell_id, ...},
+    ...)``, so ``flag["session_id"] == cell_id`` always — meaning the ``cell_id``
+    this function recovers is directly comparable to a flag record's own
+    ``logical_locator`` (``session_id``), with no further translation needed.
+
+    Returns ``(None, None)`` when ``text`` doesn't match the expected shape (e.g. a
+    non-observation record, or a future producer changing the format) — the
+    auto-clear rule then conservatively does nothing rather than guessing.
+    """
+    if " [" not in text or "]: " not in text:
+        return None, None
+    cell_id, _, rest = text.partition(" [")
+    _model, _, after_model = rest.partition("]: ")
+    status = after_model.split(" — ", 1)[0].strip()
+    return (cell_id or None), (status or None)
+
+
+def _clear_flag_record(flag_record, *, causes: str):
+    """Return a NEW, immutable ``KnowledgeRecord`` for the SAME flag entity, carrying
+    ``causes`` (the healthy observation's ``knowledge_id``) — ready to be published as
+    a ``delete`` (tombstone) event.
+
+    ``causes`` is NOT one of the five fields ``knowledge_ingestion.record_to_artifact``
+    blanks before hashing, so it is part of the artifact's hashed content: the
+    ORIGINAL flag's already-durable artifact (bytes fixed the moment it was first
+    written) can never simply be edited in place to add a ``causes`` value after the
+    fact — that would break the "artifacts are immutable, write-once" invariant every
+    other producer in this package relies on. Instead, exactly like
+    ``scripts/kb_produce_registry.py``'s contaminated-tombstone migration pass (which
+    registers a FRESH record and applies ``operation="delete"`` to it at emit time,
+    rather than mutating an existing one), this mints a genuinely NEW
+    ``content_hash``/``knowledge_id`` for the SAME ``entity_id`` — a new immutable
+    "version" of the flag fact, published as a tombstone from the moment it exists.
+    ``entity_id`` itself is untouched, so this new version still resolves to the exact
+    same logical flag (``flag_stream:{session_id}``) every other version does.
+    """
+    provisional = _replace_record(flag_record, causes=causes, knowledge_id="", content_hash="")
+    content_hash = hashlib.sha256(ki.record_to_artifact(provisional)).hexdigest()
+    knowledge_id = compute_knowledge_id(
+        provisional.entity_id, oi.REVISION_FALLBACK, content_hash, oi.EXTRACTOR_VERSION,
+    )
+    return _replace_record(provisional, content_hash=content_hash, knowledge_id=knowledge_id)
+
+
+def _maybe_autoclear_flag(observation_record, flag_by_session_id: dict, r) -> None:
+    """Auto-clear rule entry point: called once per ``observation`` record the
+    kb-registry-v1 handler processes.
+
+    No-ops (returns without writing anything) unless ALL of the following hold:
+
+    1. ``observation_record.text`` parses to a known ``cell_id`` and a status of
+       exactly ``"healthy"`` (see :func:`_cell_id_and_status_from_observation_text`
+       — a non-``"healthy"`` status, including ``"unknown"``/``"stalled"``/
+       ``"off_track"``, is never enough on its own to clear anything).
+    2. ``flag_by_session_id`` (the in-process index the kb-registry-v1 handler below
+       maintains — see its own docstring for why this is in-process, not a new
+       store) has a currently-known, untombstoned flag for that session.
+    3. ``FINOPS_KB_WRITE=1`` is set — this consumer is normally a READER of the
+       change stream; writing a new event back onto it is the one exception this
+       rule makes, and it must stay opt-in exactly like every other KB writer in
+       this package (``scripts/story.py``, ``scripts/supervise.py``, etc.).
+
+    When all three hold, this mints the flag's tombstoned version (see
+    :func:`_clear_flag_record`), durably writes its artifact, and publishes a
+    ``delete`` event for it with
+    ``reason="auto-cleared: subsequent observation was healthy"`` — the consumer's
+    ONLY write path back onto the stream. This function never imports
+    ``OpenCodeClient`` and never constructs a ``source_type="actuation"`` event (the
+    flag-only rail, docs/supervisor_design.md §1, stays intact): the ONLY event this
+    can ever publish is a ``source_type="flag"`` tombstone.
+
+    Any failure while clearing is caught and logged, never re-raised — mirroring
+    ``scripts/supervise.py``'s own best-effort treatment of its registry-emit calls
+    (``emit_flag``/``supervise_once``): a failure in this DERIVED side-effect must
+    never propagate back through ``knowledge_stream.process_entry`` and dead-letter
+    the ``observation`` event itself, which is the primary fact being processed here.
+    """
+    cell_id, status = _cell_id_and_status_from_observation_text(observation_record.text)
+    if status != "healthy" or not cell_id:
+        return
+
+    flag_record = flag_by_session_id.get(cell_id)
+    if flag_record is None:
+        return  # no known untombstoned flag for this session — nothing to clear
+
+    if os.environ.get("FINOPS_KB_WRITE") != "1":
+        return  # this process is not an authorized writer right now — observe only
+
+    try:
+        cleared_record = _clear_flag_record(flag_record, causes=observation_record.knowledge_id)
+        artifact = ki.record_to_artifact(cleared_record)
+        artifact_path = KB_ARTIFACT_DIR / f"{cleared_record.knowledge_id}.json"
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        artifact_path.write_bytes(artifact)
+
+        event = ki.record_to_event(
+            cleared_record, operation="delete",
+            reason="auto-cleared: subsequent observation was healthy",
+        )
+        ks.publish_event(r, event, authorized=True, source_type="flag")
+
+        # Idempotence: a SECOND healthy observation for the same session, arriving
+        # before this delete event round-trips back through the stream and is
+        # re-processed by kb-registry-v1 itself, must not clear the same flag twice.
+        flag_by_session_id.pop(cell_id, None)
+    except Exception as exc:  # noqa: BLE001
+        log(f"flag auto-clear error for session {cell_id!r}: {exc!r}")
+
+
 def build_handler(group: str, r: redis.Redis):
     """Resolve the destination handler for a named consumer group.
 
@@ -107,6 +265,23 @@ def build_handler(group: str, r: redis.Redis):
         return handler
 
     if group == "kb-registry-v1":
+        # canonical-state finalize (G3): the flag auto-clear rule needs to know, for a
+        # given session, whether it currently has an untombstoned flag — "Track the
+        # flag index in-process ... so the rule can find the session's current flag
+        # without a new store." A plain dict closed over by `handler` below, keyed by
+        # session_id (a flag record's own `logical_locator` — see
+        # `_cell_id_and_status_from_observation_text`'s docstring for why that is
+        # directly comparable to an observation's parsed `cell_id`), mapping to the
+        # flag's own full `KnowledgeRecord` (needed, not just its registry-line
+        # projection, to correctly rebuild+rehash a tombstoned version of it later —
+        # see `_clear_flag_record`). Scoped to ONE handler instance (one running
+        # kb_worker.py process): a freshly (re)started worker starts with an empty
+        # index and only "learns" a session's flag once it processes (or reprocesses,
+        # via claim/replay) that flag's own event. This is an accepted trade-off for
+        # staying a plain in-process dict instead of standing up a new durable store,
+        # exactly as this phase's own instructions frame the choice.
+        flag_by_session_id: dict = {}
+
         def handler(record, *, operation="upsert", reason=""):
             # Append one compacted line to the flat, append-only registry index —
             # deliberately the same durable/human-greppable pattern as flags.jsonl (see
@@ -164,6 +339,21 @@ def build_handler(group: str, r: redis.Redis):
                 }
                 with open(REGISTRY_INDEX_PATH, "a") as f:
                     f.write(json.dumps(predecessor_line) + "\n")
+
+            # canonical-state finalize (G3): maintain the in-process flag index, then
+            # run the auto-clear rule. Order matters — a flag record updates the index
+            # FIRST (so an observation arriving in the SAME batch right after its own
+            # flag can still see it), and the auto-clear check only ever runs for
+            # `observation` records (never re-triggered by the `delete` event this
+            # same rule itself just published for a flag, since that event's own
+            # source_type is "flag", not "observation" — no feedback loop).
+            if record.source_type == "flag":
+                if operation == "delete":
+                    flag_by_session_id.pop(record.logical_locator, None)
+                else:
+                    flag_by_session_id[record.logical_locator] = record
+            elif record.source_type == "observation":
+                _maybe_autoclear_flag(record, flag_by_session_id, r)
 
         return handler
 
