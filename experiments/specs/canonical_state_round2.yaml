@@ -1,0 +1,174 @@
+name: canonical_state_round2
+question: >-
+  Refine fable5's canonical-state design (round 1, committed as docs/canonical_state_base_design.md)
+  into an implementation-ready design that addresses the operator's three deltas and closes the
+  four gaps fable5's own verify phase flagged, then produce a file-by-file implementation plan.
+  Run once per model (deepseek + fable5) to produce two competing refined designs.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: markdown
+    fork: true
+    context:
+      base_design: docs/canonical_state_base_design.md
+      base_inventory: docs/canonical_state_base_inventory.md
+      base_verify: docs/canonical_state_base_verify.md
+      operator_deltas: >-
+        (1) WRITE-TIME REGISTRATION — in steady state every producer (run_story.py, run.py, the
+        review pipeline, supervise.py) emits its registry record INLINE the moment it writes its
+        artifact, into the existing kb:v1:changes stream — the registry is ACCUMULATED, never
+        reconstructed by a filesystem scan. Batch backfill (derive_*_records over existing files)
+        is permitted ONLY as a one-time migration, clearly separated from the steady-state path.
+        No hourly reconcile-missing glob; no scan-derived index rebuild; no inventory.py-style
+        wholesale rescan as the canonical lookup.
+        (2) ONE TYPED EVENT STREAM — the canonical-state machinery is a SINGLE event stream whose
+        `source_type` + `operation` (upsert/supersede/delete) fields are the only discriminators —
+        no separate ledgers, no separate registry store. The envelope is the existing
+        KnowledgeEvent (plus the supersedes/reason additions). A story result, a review, a
+        supervisor verdict, and a ledger attempt are all the SAME thing: a typed message.
+        (3) OBSERVATION VS ACTUATION — the supervisor MAY be allowed to control in the future.
+        Model two message families: `observation` (verdict/flag/session; authority ADVISORY; always
+        emitted; never actuates) and `actuation` (steer/interrupt/escalate; authority POLICY;
+        NOT authorized to fire today). Actuation must be a typed event with full lineage (a
+        `causes` link back to the observation that justified it) and a validator/policy gate, so
+        enabling control later is a NEW GATED TYPE, not a breach of the flag-only rail. The
+        flag-only rail remains today's default; do NOT hard-code "never control."
+      base_gaps: >-
+        fable5's own verify phase (docs/canonical_state_base_verify.md) flagged four gaps that MUST
+        be closed in the refined design: (a) Finding 4 — ledger_ingestion has no fallback when
+        opencode_session_row is None (claude_cli-backend runs): read tokens/cost from the story
+        JSON's sessions[].agentic block / AgenticResult instead of requiring the DB join. (b)
+        Finding 5 — meta_* / meta_batch_* pollution is never named or traced to a concrete
+        mechanism. (c) Finding 2 — no migration step recovers the ~83 entries lost in the
+        _results_summary 227→144 shrink (register them caveated, not silently dropped). (d) OQ4 —
+        the migration plan never extends kb-neo4j-v1's SET clause to persist
+        supersedes/lifecycle_state/valid_from/observed_at (the inventory proved the handler drops
+        them today).
+      run_shape: >-
+        SINGLE-model (--model selects the arm; no model_pool). Run it TWO times —
+        deepseek/deepseek-v4-pro and anthropic/claude-fable-5 — each in its own worktree/branch, so
+        each branch is an independent refined design + implementation plan the operator can compare.
+    phases:
+      - name: analyze
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Produce a change-set: what must change in the base design and why, grounding every item.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/canonical_state_base_design.md    (the base design)
+          - docs/canonical_state_base_verify.md    (its self-check, with the four gaps)
+          - docs/canonical_state_base_inventory.md (the store map)
+          - experiments/specs/canonical_state_round2.yaml   (operator_deltas + base_gaps)
+          - experiments/specs/canonical_state_design.yaml   (round-1 spec: forensic findings + prior_art)
+
+          REQUIREMENTS:
+          - One entry per operator delta (3) and per base gap (4): what changes, why, and which part
+            of the base design it affects.
+          - For delta (3) specifically, design the ACTUATION envelope + gate concretely: schema,
+            authority, who may emit today vs future, the `causes` lineage link, and the
+            validator/policy gate that keeps it from firing today.
+
+          DELIVER exactly one file: docs/canonical_state_round2_changes.md.
+      - name: refine
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Write the refined, implementation-ready design that incorporates the change-set.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/canonical_state_round2_changes.md  (your change-set from the analyze phase)
+          - docs/canonical_state_base_design.md     (the base design)
+
+          REQUIREMENTS:
+          - Address all 3 operator deltas + all 4 base gaps with concrete schemas (field names,
+            identity formulas, enum values, event envelope, gates), not prose.
+          - Preserve: backward compatibility (no rewrite of existing result JSONs), the flag-only
+            rail as TODAY's default, and the "one typed stream" principle.
+          - Do not implement code; deliver the design only.
+
+          DELIVER exactly one file: docs/canonical_state_round2_design.md.
+      - name: plan
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Produce the file-by-file implementation plan.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/canonical_state_round2_design.md (your refined design)
+
+          REQUIREMENTS:
+          - An ordered list of concrete changes, one per file: the exact module/function/constant
+            to add or edit, the new consumer group (kb-registry-v1), the inline emit call sites
+            (run_story.py / run.py / review / supervise.py), and the test file(s) to extend
+            (mirroring tests/test_retrieval.py's store-double pattern).
+          - Clearly distinguish ONE-TIME MIGRATION (backfill) steps from STEADY-STATE (inline emit)
+            steps.
+          - Include a verification gate: which pytest modules must pass before the change ships.
+
+          DELIVER exactly one file: docs/canonical_state_round2_plan.md.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Verify the refined design + plan before it is pulled.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Trace every operator delta (3) and base gap (4) to a mechanism in the refined design AND
+            a step in the plan.
+          - Confirm backward compatibility, the flag-only rail as today's default, and that actuation
+            is POLICY-gated and not authorized to fire.
+          - Write docs/canonical_state_round2_verify.md with PASS/FAIL per check.
+
+          DELIVER docs/canonical_state_round2_verify.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: delta_coverage
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [deltas_addressed]
+  - name: plan_completeness
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [implementation_plan]
+  - name: traceability
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [deltas_addressed, implementation_plan]
+    produces: [gaps_closed]
+metrics:
+  - {name: deltas_addressed, agg: ratio, over: cell}
+  - {name: gaps_closed, agg: ratio, over: cell}
+  - {name: plan_completeness, agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, changes, design, plan, verify]
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
