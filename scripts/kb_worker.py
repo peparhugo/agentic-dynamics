@@ -16,6 +16,7 @@ missing events hourly (see ``knowledge_stream.reconcile_missing``).
 """
 
 import argparse
+import json
 import os
 import socket
 import sys
@@ -26,13 +27,23 @@ from pathlib import Path
 
 import redis
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from instrument import knowledge_ingestion as ki  # noqa: E402
 from instrument import knowledge_stream as ks  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
+
+#: canonical-state round 2, step 8 — the flat, append-only registry index the
+#: "kb-registry-v1" consumer group writes to. Deliberately the same durable,
+#: human-greppable pattern as ``scripts/supervise.py``'s ``flags.jsonl``: one JSON line
+#: per indexed record, never rewritten in place. ``generate_manifest.py``'s compaction
+#: step (plan step 15, out of scope here) is what later collapses this append-only log
+#: down to "one row per entity_id, newest wins" — this consumer does not resolve
+#: superseded/tombstoned lifecycle state itself, it only records what it saw.
+REGISTRY_INDEX_PATH = PROJECT_ROOT / "experiments" / "results" / "registry_index.jsonl"
 
 REDIS_BASE_DELAY = 2.0
 REDIS_MAX_RETRIES = 10
@@ -77,6 +88,38 @@ def build_handler(group: str, r: redis.Redis):
 
         return handler
 
+    if group == "kb-registry-v1":
+        def handler(record):
+            # Append one compacted line to the flat, append-only registry index —
+            # deliberately the same durable/human-greppable pattern as flags.jsonl (see
+            # REGISTRY_INDEX_PATH's module-level docstring). "lifecycle_state": "current"
+            # is a fixed marker, not a computed value: this consumer sees each record
+            # exactly once, in isolation, so it cannot itself determine whether a LATER
+            # record has since superseded this one — that resolution is
+            # generate_manifest.py's compaction step (plan step 15), which takes the
+            # latest-by-indexed_at row per entity_id from this file.
+            #
+            # ``getattr(record, "supersedes", None)`` rather than ``record.supersedes``:
+            # round 1's own ``supersedes`` field was designed but never landed on
+            # KnowledgeRecord in this codebase (only round 2's ``causes`` has, via
+            # canonical_state_r2_plan.md step 1) — this stays forward-compatible with
+            # that field arriving later without raising AttributeError today.
+            line = {
+                "knowledge_id": record.knowledge_id,
+                "entity_id": record.entity_id,
+                "source_type": record.source_type,
+                "lifecycle_state": "current",
+                "observed_at": record.observed_at,
+                "indexed_at": record.indexed_at,
+                "supersedes": getattr(record, "supersedes", None),
+                "causes": record.causes,
+            }
+            REGISTRY_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(REGISTRY_INDEX_PATH, "a") as f:
+                f.write(json.dumps(line) + "\n")
+
+        return handler
+
     if group == "kb-chroma-v1":
         def handler(record):
             from instrument.embeddings import ChromaStore
@@ -114,13 +157,37 @@ def build_handler(group: str, r: redis.Redis):
                 # the verify step of the sources run depends on it (findings alone are not
                 # enough). logical_locator / language / evidence_class carry the citation
                 # provenance the retrieval leg may want to surface.
+                #
+                # canonical-state round 2, step 8 (gap d): the date-spine fields
+                # (valid_from/observed_at/indexed_at) and the lineage fields
+                # (supersedes/causes) are now persisted too — the base inventory found
+                # this SET clause silently dropped all five. ``valid_to``/
+                # ``lifecycle_state`` stay unwritten on purpose: both are computed at
+                # read time only (round 1's argument, unchanged by this round) — writing
+                # them here would make the graph a second source of truth for a value
+                # that must always be derived from "is there a newer knowledge_id for
+                # this entity_id", never stored and risk going stale.
+                #
+                # ``getattr(record, "supersedes", None)``: see the "kb-registry-v1"
+                # handler's comment above — round 1's ``supersedes`` field was designed
+                # but never landed on KnowledgeRecord in this codebase; this stays
+                # forward-compatible with it arriving later.
+                supersedes = getattr(record, "supersedes", None)
                 client._run(
                     "MERGE (k:Knowledge {knowledge_id: $id}) "
                     "SET k.entity_id = $eid, k.text = $text, k.source_uri = $uri, "
                     "k.authority = $authority, k.commit_sha = $commit, "
                     "k.source_type = $stype, k.logical_locator = $loc, "
                     "k.language = $lang, k.evidence_class = $ev, "
-                    "k.repository_id = $repo, k.acl_scope = $acl",
+                    "k.repository_id = $repo, k.acl_scope = $acl, "
+                    "k.valid_from = $valid_from, k.observed_at = $observed_at, "
+                    "k.indexed_at = $indexed_at, k.supersedes = $supersedes, "
+                    "k.causes = $causes "
+                    "WITH k "
+                    "FOREACH (_ IN CASE WHEN $supersedes IS NOT NULL THEN [1] ELSE [] END | "
+                    "    MERGE (prev:Knowledge {knowledge_id: $supersedes}) "
+                    "    MERGE (k)-[:SUPERSEDES]->(prev) "
+                    ")",
                     {
                         "id": record.knowledge_id,
                         "eid": record.entity_id,
@@ -134,6 +201,11 @@ def build_handler(group: str, r: redis.Redis):
                         "ev": record.evidence_class,
                         "repo": record.repository_id,
                         "acl": record.acl_scope,
+                        "valid_from": record.valid_from,
+                        "observed_at": record.observed_at,
+                        "indexed_at": record.indexed_at,
+                        "supersedes": supersedes,
+                        "causes": record.causes,
                     },
                 )
             finally:
