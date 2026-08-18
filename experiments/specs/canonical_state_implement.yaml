@@ -1,0 +1,244 @@
+name: canonical_state_implement
+question: >-
+  Implement the canonical-state registry exactly as specified in fable5's round-2 file-by-file
+  plan (docs/canonical_state_r2_plan.md) and design (docs/canonical_state_r2_design.md) — the
+  date-spined, one-typed-event-stream registry with write-time registration and a gated
+  observation-vs-actuation boundary. Do not redesign; implement the plan step-for-step, run the
+  specified tests, and leave the flag-only rail intact (zero actuation call sites).
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      plan_doc: docs/canonical_state_r2_plan.md
+      design_doc: docs/canonical_state_r2_design.md
+      base_design: docs/canonical_state_base_design.md
+      hard_rules: >-
+        (1) IMPLEMENT ONLY — follow docs/canonical_state_r2_plan.md step-for-step; do not redesign
+        or second-guess it. Every edit is named by file + function there; make exactly those edits.
+        (2) FLAG-ONLY RAIL — the supervisor stays observe-only: zero call sites construct an
+        actuation record, FINOPS_ACTUATION_ARMED is never set, and the actuation gate lives in the
+        single publish_event(). The two CI-enforced tests (test_no_call_sites_construct_actuation_records,
+        test_finops_actuation_armed_is_unset_by_default) MUST pass. (3) BACKWARD COMPATIBILITY — no
+        existing result JSON is rewritten; the new KnowledgeRecord/KnowledgeEvent fields are
+        trailing-default so the 1,913 existing KB artifacts still parse. (4) TEST-DRIVEN — after
+        each phase, run the tests the plan names for that phase; a phase is not complete until its
+        named tests pass. (5) Idempotence via knowledge_id; inline emit is best-effort (gated on
+        FINOPS_KB_WRITE) so a KB outage never blocks an artifact write.
+      run_shape: >-
+        SINGLE-model: run with --model anthropic/claude-fable-5 (the design's author). One worktree,
+        one branch (feature/canonical-state-implement); each phase commits [workflow] <phase>.
+    phases:
+      - name: foundation
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Implement plan steps 1 and 7 — the schema and the transport gates.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/canonical_state_r2_plan.md   (steps 1 and 7 — the exact edits)
+          - docs/canonical_state_r2_design.md (sections 1, 4, 5 — the schema + message_family + gates)
+          - src/instrument/knowledge.py       (the dataclasses you are extending)
+          - src/instrument/knowledge_stream.py (publish_event + CONSUMER_GROUPS)
+
+          DO:
+          - Step 1: add `causes` to KnowledgeRecord and KnowledgeEvent (trailing-default), plus
+            OBSERVATION_TYPES / ACTUATION_TYPES / message_family().
+          - Step 7: add "kb-registry-v1" to CONSUMER_GROUPS; add the two publish_event guard blocks
+            (actuation not armed; causes must resolve to an observation). Resolve the
+            source_type-on-event plumbing the plan calls out (option (b): pass source_type
+            explicitly, or stash via record_to_event — do not add a source_type field to
+            KnowledgeEvent).
+          - Extend tests/test_knowledge.py and tests/test_knowledge_stream.py as the plan specifies.
+
+          VERIFY: run `pytest tests/test_knowledge.py tests/test_knowledge_stream.py -q` — must pass.
+          DELIVER the code + passing tests (committed by the workflow).
+      - name: producers
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Implement plan steps 2-6 — the five producer modules.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/canonical_state_r2_plan.md   (steps 2-6)
+          - docs/canonical_state_r2_design.md (sections 2, 3, 7 — source_type table + identity + gap closures)
+          - src/instrument/code_ingestion.py  (the build_*_record / derive_*_records shape to mirror)
+
+          DO:
+          - Create src/instrument/{story,review,ledger,observation,actuation}_ingestion.py per the
+            plan, with the exact EXTRACTOR_VERSION constants, identity formulas, and the G1
+            no-session fallback + G2 classify_session() in ledger_ingestion.
+          - Export the new surface in src/instrument/__init__.py.
+          - Write the five new test files (test_story_ingestion.py, test_review_ingestion.py,
+            test_ledger_ingestion.py, test_observation_ingestion.py, test_actuation_ingestion.py),
+            including test_no_call_sites_construct_actuation_records.
+
+          VERIFY: run `pytest tests/test_story_ingestion.py tests/test_review_ingestion.py
+          tests/test_ledger_ingestion.py tests/test_observation_ingestion.py
+          tests/test_actuation_ingestion.py -q` — must pass.
+          DELIVER the code + passing tests.
+      - name: consumer
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Implement plan step 8 — the kb-registry-v1 consumer and the kb-neo4j-v1 SET-clause fix.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/canonical_state_r2_plan.md   (step 8)
+          - docs/canonical_state_r2_design.md (section 6 — the Neo4j SET clause + SUPERSEDES edge)
+          - scripts/kb_worker.py              (build_handler dispatch + the current SET clause)
+
+          DO:
+          - Add the kb-registry-v1 handler (append compacted line to
+            experiments/results/registry_index.jsonl).
+          - Extend the kb-neo4j-v1 SET clause to persist valid_from/observed_at/indexed_at/
+            supersedes/causes and write the SUPERSEDES edge.
+          - Write tests/test_kb_worker.py (new — no existing coverage) with the store-double pattern.
+
+          VERIFY: run `pytest tests/test_kb_worker.py -q` — must pass.
+          DELIVER the code + passing tests.
+      - name: migration
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Implement plan step 9 — the one-time migration driver.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/canonical_state_r2_plan.md   (step 9)
+          - scripts/kb_produce_sources.py     (the CLI shape to mirror)
+
+          DO:
+          - Create scripts/kb_produce_registry.py with the six _SOURCES entries and --dry-run.
+          - Write tests/test_kb_produce_registry.py.
+
+          VERIFY: run `pytest tests/test_kb_produce_registry.py -q` — must pass; also confirm
+          `python scripts/kb_produce_registry.py --dry-run --source story` does not touch Redis/files.
+          DELIVER the code + passing tests.
+      - name: wiring
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Implement plan steps 10-14 — inline write-time registration at the four call sites.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/canonical_state_r2_plan.md   (steps 10-14)
+          - src/instrument/story.py           (save_story_result)
+          - scripts/run.py                    (_save_results)
+          - scripts/finalize_reviews.py       (_finalize_story)
+          - scripts/supervise.py              (supervise_once + emit_flag)
+
+          DO:
+          - Add the FINOPS_KB_WRITE-gated inline emit to save_story_result, _save_results,
+            _finalize_story, and supervise_once (every verdict) + emit_flag.
+          - Do NOT add any actuation emit; add the test_finops_actuation_armed_is_unset_by_default
+            assertion.
+
+          VERIFY: run `pytest tests/test_story.py tests/test_pipeline.py tests/test_finalize_reviews.py
+          tests/test_supervise.py tests/test_knowledge_stream.py -q` — must pass.
+          DELIVER the code + passing tests.
+      - name: surfacing
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Implement plan steps 15-17 — the surfacing layer.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/canonical_state_r2_plan.md   (steps 15-17)
+          - scripts/generate_manifest.py      (main + files_to_hash)
+          - admin/server.py                   (the /api/flags route to mirror)
+
+          DO:
+          - Add the registry array compaction to generate_manifest.py.
+          - Create scripts/registry.py (show / query / lineage).
+          - Add GET /api/registry and /api/registry/<entity_id> to admin/server.py + a Registry panel.
+          - Write tests/test_registry_cli.py and extend tests/test_admin_server.py (reuse the
+            existing FakeRedis/FakePubSub doubles).
+
+          VERIFY: run `pytest tests/test_registry_cli.py tests/test_admin_server.py
+          tests/test_generate_manifest.py -q` — must pass.
+          DELIVER the code + passing tests.
+      - name: test_and_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Run the full verification gate, fix any failures, and trace the plan to the code.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run the full gate in the plan's order (schema → producers → transport → migration →
+            steady-state → surface), then `pytest tests/ -q` (full regression).
+          - Fix any failing test. Do not weaken a test to make it pass; fix the code.
+          - Confirm the 1,913-artifact backward-compat invariant holds (existing KB tests still parse).
+          - Write docs/canonical_state_implement_verify.md: a table tracing every one of the 17 plan
+            steps to the file(s) that implemented it, with PASS/FAIL and the pytest result.
+
+          DELIVER docs/canonical_state_implement_verify.md + a green full suite.
+factors:
+  - {name: model, levels: [anthropic/claude-fable-5]}
+design: factorial
+rules:
+  - name: steps_implemented
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [plan_steps_done]
+  - name: tests_green
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [verification_passed]
+  - name: rail_preserved
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [plan_steps_done]
+    produces: [flag_only_rail]
+metrics:
+  - {name: plan_steps_done, agg: ratio, over: cell}
+  - {name: verification_passed, agg: mean, over: cell}
+  - {name: flag_only_rail, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, steps, tests, verify]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
