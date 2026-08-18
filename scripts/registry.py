@@ -49,17 +49,17 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from instrument.knowledge import SOURCE_TYPES  # noqa: E402
+
 #: Where generate_manifest.py (plan step 15) writes the compacted registry array.
 DATA_MANIFEST_PATH = PROJECT_ROOT / "experiments" / "data_manifest.json"
 
-#: The 8 source_type values this round's registry recognizes (design §2's table) — "code"/
-#: "report"/"policy"/"finding" (round-1 KB source types, pre-dating this registry) are
-#: deliberately excluded from this CLI's --record-type choices; they are not part of the
-#: observation/actuation family this surface was built to inspect.
-RECORD_TYPES = (
-    "story", "review", "ledger_job", "ledger_attempt",
-    "observation", "flag", "meta_session", "actuation",
-)
+#: The ``--record-type`` choices — derived from :data:`instrument.knowledge.SOURCE_TYPES`
+#: (R2), the single source of truth for the ``source_type`` vocabulary, instead of a
+#: hard-coded exclusion list. Every registered ``source_type`` is an acceptable filter, so a
+#: new producer type is a one-line addition to ``SOURCE_TYPES`` and shows up here
+#: automatically (round-1 types ``finding``/``code``/``report``/``policy`` included).
+RECORD_TYPES = tuple(SOURCE_TYPES)
 
 #: index-only, computed states (design §6) — see this module's docstring on `lineage` for
 #: why "superseded"/"tombstoned" resolution is not yet wired end-to-end in this codebase;

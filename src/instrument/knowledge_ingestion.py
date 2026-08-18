@@ -28,12 +28,11 @@ Relationship to the other KB modules (one line each):
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import json
 import math
 import os
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -42,8 +41,14 @@ from .knowledge import (
     Authority,
     KnowledgeEvent,
     KnowledgeRecord,
-    compute_entity_id,
-    compute_knowledge_id,
+)
+from .record_factory import (
+    _now_iso,
+    _sha256_bytes,
+    record_to_artifact,
+)
+from .record_factory import (
+    build_record as build_record_from_parts,
 )
 from .retrieval import build_evidence_cards
 
@@ -117,14 +122,6 @@ PHASE_SOURCE_URI = "file://workflow/phase"
 
 
 # ── Entry-field derivation (pure, testable) ─────────────────────
-
-def _now_iso(now: datetime | None = None) -> str:
-    """Return ``now`` (or the current UTC instant) as an ISO-8601 timestamp.
-
-    Injectable so tests can pin the produced timestamps; production always uses the real
-    clock, mirroring ``retrieval.retrieve``'s ``now`` convention.
-    """
-    return (now or datetime.now(timezone.utc)).isoformat()
 
 
 def _git_sha(entry: dict[str, Any]) -> str:
@@ -214,41 +211,6 @@ def _yields_finding(entry: dict[str, Any]) -> bool:
 
 # ── Record / event construction ─────────────────────────────────
 
-def _sha256_bytes(data: bytes) -> str:
-    """Return the sha256 hex digest of raw bytes (the artifact-hash primitive).
-
-    ``compute_content_hash`` in :mod:`instrument.knowledge` hashes *str*; the durable
-    artifact is bytes, so this is the byte-level counterpart used for ``content_hash``.
-    """
-    return hashlib.sha256(data).hexdigest()
-
-
-def record_to_artifact(record: KnowledgeRecord) -> bytes:
-    """Serialize ``record`` to its durable per-record artifact bytes.
-
-    This is the JSON serialization of ``record.to_dict()`` with stable (sorted) key ordering.
-    Five *non-content* fields are blanked so the artifact is a pure function of the **stable**
-    finding content, and ``content_hash = sha256(artifact)`` is therefore reproducible:
-
-    * ``knowledge_id`` / ``content_hash`` — the two derived identities. Blanking them avoids
-      a self-referential hash (``content_hash`` covers the artifact; ``knowledge_id`` folds
-      ``content_hash``).
-    * ``valid_from`` / ``observed_at`` / ``indexed_at`` — the volatile observation/indexing
-      timestamps (producer wall-clock). Excluding them makes ``content_hash`` — and thus
-      ``knowledge_id`` — **stable across re-derivations**, which is exactly what makes the
-      producer idempotent: the same entry always yields the same id, so a re-run skips it.
-
-    The real values travel in the pointer event (ids) or are reconstructed from it
-    (timestamps) by :func:`extract_record`; every *stable* field survives the round trip.
-    """
-    data = record.to_dict()
-    data["knowledge_id"] = ""
-    data["content_hash"] = ""
-    data["valid_from"] = ""
-    data["observed_at"] = ""
-    data["indexed_at"] = ""
-    return json.dumps(data, sort_keys=True).encode("utf-8")
-
 
 def build_record(
     entry: dict[str, Any],
@@ -286,8 +248,6 @@ def build_record(
     flailed or unmeasured run must not become a trusted finding) — callers that need the
     batch behavior use :func:`derive_records`, which pre-filters with the same gate.
     """
-    ts = _now_iso(now)
-
     # Reuse build_evidence_cards' rendering (its text is the one-line finding). Deriving
     # from a single-entry list also re-applies the documented skip rules; an empty result
     # means this entry is not a valid finding.
@@ -302,57 +262,34 @@ def build_record(
     run_id = _run_id(entry)
     source_revision = _source_revision(entry)
 
-    # Identity: entity_id is the stable logical identity (aggregate origin + locator). The
-    # record is built with placeholder derived ids, then the durable artifact is serialized
-    # and hashed, and only then are content_hash (sha256 of the artifact) and knowledge_id
-    # (which folds content_hash) back-filled. Ordering matters: the derived ids AND the
-    # volatile timestamps must not be part of the bytes content_hash covers — the ids would
-    # make the hash self-referential, and the timestamps would make it re-derivation-dependent
-    # (breaking producer idempotence). record_to_artifact blanks all five, so content_hash is a
-    # pure function of the entry's stable content.
-    entity_id = compute_entity_id(repository_id, SOURCE_URI, run_id)
-
-    record = KnowledgeRecord(
-        knowledge_id="",  # back-filled below (folds content_hash)
-        entity_id=entity_id,
-        source_uri=SOURCE_URI,
+    # Delegate identity + the content-hash back-fill to the shared factory. This module keeps
+    # only its *derivation* (the evidence-card text + the structured ledger signals), while the
+    # ordering-sensitive mechanics (blank ids/timestamps → serialize → hash → back-fill) live in
+    # record_factory.build_record exactly once.
+    return build_record_from_parts(
         source_type=SOURCE_TYPE,
+        source_uri=SOURCE_URI,
         logical_locator=run_id,
         repository_id=repository_id,
-        branch="",  # the summary has no branch dimension; scoping is via repository_id + locator
-        worktree_id=run_id,
-        # commit_sha *is* the source_revision for repository-backed units (knowledge.py's
-        # docstring); here that is the commit id when stamped, else RESULT_VERSION.
-        commit_sha=source_revision,
-        content_hash="",  # back-filled below (sha256 of the artifact)
-        extractor_version=EXTRACTOR_VERSION,
-        embedding_version="",  # no embedding is computed at extraction time
+        revision=source_revision,
         authority=Authority.MEASURED,
-        valid_from=ts,
-        valid_to=None,
-        # observed_at prefers the entry's own run timestamp (when the summary stamps one);
-        # valid_from/indexed_at stay the producer now — they describe *this* pass, not the run.
-        observed_at=_observed_at(entry, now=now),
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=card.text,
-        token_count=max(1, len(card.text.split())),  # whitespace-token estimate, [H]
-        language="",  # a finding is prose, not a source-language unit
-        symbols=[],  # no symbol table on a one-line finding
-        outcome_id=str(entry.get("outcome_id") or ""),
-        test_executed_success=card.test_executed_success,
         evidence_class="[M]",
-        # Structured ledger signals — measured-or-None, in lockstep with the rendered text
-        # (build_evidence_cards already derived them via _finite_float, so absent stays None).
-        confidence=card.confidence,
-        perturbation_strength=card.perturbation_strength,
+        text=card.text,
+        extra_fields={
+            "worktree_id": run_id,  # the summary has no branch dimension; scoping via repo + locator
+            "extractor_version": EXTRACTOR_VERSION,
+            # observed_at prefers the entry's own run timestamp; valid_from/indexed_at stay the
+            # producer now (they describe *this* pass, not the run).
+            "observed_at": _observed_at(entry, now=now),
+            "outcome_id": str(entry.get("outcome_id") or ""),
+            "test_executed_success": card.test_executed_success,
+            # Structured ledger signals — measured-or-None, in lockstep with the rendered text
+            # (build_evidence_cards already derived them via _finite_float, so absent stays None).
+            "confidence": card.confidence,
+            "perturbation_strength": card.perturbation_strength,
+        },
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(
-        entity_id, source_revision, content_hash, EXTRACTOR_VERSION
-    )
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 def record_to_event(
@@ -520,7 +457,6 @@ def derive_phase_record(
     (repository_id / logical_locator / acl_scope) + extractor version, so re-emitting the same
     phase yields the same id.
     """
-    ts = _now_iso(now)
     success = getattr(phase_result, "test_executed_success", None)
     # A bool is an independent measurement (test runner); None is self-report → ADVISORY.
     authority = Authority.MEASURED if isinstance(success, bool) else Authority.ADVISORY
@@ -533,44 +469,26 @@ def derive_phase_record(
         f"test_executed_success {success}, cost ${cost:.4f}, tokens {tokens}"
     )
 
-    # logical_locator = the cell scope (== repository_id on the self-build path).
-    entity_id = compute_entity_id(repository_id, PHASE_SOURCE_URI, repository_id)
-
-    record = KnowledgeRecord(
-        knowledge_id="",  # back-filled below (folds content_hash)
-        entity_id=entity_id,
-        source_uri=PHASE_SOURCE_URI,
+    # Delegate identity + the content-hash back-fill to the shared factory. Every scoping field
+    # is the cell scope (== repository_id on the self-build path), never global.
+    return build_record_from_parts(
         source_type=SOURCE_TYPE,  # "finding"
+        source_uri=PHASE_SOURCE_URI,
         logical_locator=repository_id,
         repository_id=repository_id,
-        branch="",
-        worktree_id=repository_id,
-        commit_sha=revision,
-        content_hash="",  # back-filled below (sha256 of the artifact)
-        extractor_version=PHASE_EXTRACTOR_VERSION,
-        embedding_version="",
+        revision=revision,
         authority=authority,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=ts,
-        indexed_at=ts,
-        acl_scope=repository_id,  # scoped to the cell, never global
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language="",
-        symbols=[],
-        outcome_id=phase,  # the phase name is the outcome unit
-        test_executed_success=success,
         evidence_class="[M]" if authority is Authority.MEASURED else "[H]",
-        confidence=None,
-        perturbation_strength=None,
+        text=text,
+        extra_fields={
+            "worktree_id": repository_id,
+            "extractor_version": PHASE_EXTRACTOR_VERSION,
+            "acl_scope": repository_id,  # scoped to the cell, never global
+            "outcome_id": phase,  # the phase name is the outcome unit
+            "test_executed_success": success,
+        },
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(
-        entity_id, revision, content_hash, PHASE_EXTRACTOR_VERSION
-    )
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 def emit_phase_finding(

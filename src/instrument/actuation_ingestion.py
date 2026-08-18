@@ -39,17 +39,20 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from .knowledge import (
     Authority,
     KnowledgeRecord,
-    compute_entity_id,
-    compute_knowledge_id,
 )
-from .knowledge_ingestion import REPOSITORY_ID, record_to_artifact
+from .knowledge_ingestion import REPOSITORY_ID
+from .record_factory import (
+    _now_iso,
+)
+from .record_factory import (
+    build_record as build_record_from_parts,
+)
 
 # ── Extractor contract constants ────────────────────────────────
 
@@ -67,14 +70,6 @@ ACTUATION_KINDS = frozenset({"steer", "interrupt", "escalate", "retry", "budget"
 
 
 # ── Small deterministic helpers (mirror the other *_ingestion modules) ──────
-
-
-def _now_iso(now: datetime | None = None) -> str:
-    return (now or datetime.now(timezone.utc)).isoformat()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
 
 
 def _actuation_id(target_session_id: str, causes: str, occurred_at: str) -> str:
@@ -129,7 +124,6 @@ def derive_actuation_record(
     ts = _now_iso(now)
     actuation_id = _actuation_id(target_session_id, causes, ts)
     source_uri = f"actuation:{actuation_id}"
-    entity_id = compute_entity_id(repository_id, source_uri, actuation_id)
 
     body = {
         "actuation_kind": actuation_kind,
@@ -140,37 +134,20 @@ def derive_actuation_record(
     }
     text = json.dumps(body, sort_keys=True)
 
-    record = KnowledgeRecord(
-        knowledge_id="",
-        entity_id=entity_id,
-        source_uri=source_uri,
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=SOURCE_TYPE,
+        source_uri=source_uri,
         logical_locator=actuation_id,
         repository_id=repository_id,
-        branch="",
-        worktree_id="",
-        commit_sha="",
-        content_hash="",
-        extractor_version=EXTRACTOR_VERSION,
-        embedding_version="",
+        revision=REVISION_FALLBACK,
         authority=Authority.POLICY,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=ts,
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language="",
-        symbols=[],
-        outcome_id="",
-        test_executed_success=None,
         evidence_class="[P]",
-        confidence=None,
-        perturbation_strength=None,
-        causes=causes,
+        text=text,
+        extra_fields={
+            "commit_sha": "",
+            "extractor_version": EXTRACTOR_VERSION,
+            "causes": causes,
+        },
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(entity_id, REVISION_FALLBACK, content_hash, EXTRACTOR_VERSION)
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)

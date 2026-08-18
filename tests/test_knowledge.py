@@ -13,6 +13,8 @@ from instrument.knowledge import (
     ACTUATION_TYPES,
     OBSERVATION_TYPES,
     SCHEMA_VERSION,
+    SOURCE_TYPES,
+    SourceTypeSpec,
     Authority,
     KnowledgeEvent,
     KnowledgeRecord,
@@ -339,3 +341,47 @@ def test_actuation_types_is_a_single_member_allowlist():
     # Guards the design's "closed by default" invariant directly: ACTUATION_TYPES must
     # never silently grow beyond the one family this round introduces.
     assert ACTUATION_TYPES == frozenset({"actuation"})
+
+
+# ── SOURCE_TYPES registry (R2 — the single vocabulary owner) ───
+
+
+def test_source_types_is_the_single_vocabulary_owner():
+    # All twelve source types — the four round-1 producer types PLUS the round-2 registry
+    # types — are registered here. This is what closes the pre-R2 split where
+    # OBSERVATION_TYPES silently omitted finding/code/report/policy.
+    assert set(SOURCE_TYPES) == {
+        "finding", "code", "report", "policy",
+        "story", "review", "ledger_job", "ledger_attempt",
+        "observation", "flag", "meta_session", "actuation",
+    }
+
+
+def test_observation_and_actuation_types_are_derived_from_source_types():
+    # The two frozensets are pure projections of SOURCE_TYPES' message_family column.
+    assert OBSERVATION_TYPES == frozenset(
+        n for n, s in SOURCE_TYPES.items() if s.message_family == "observation"
+    )
+    assert ACTUATION_TYPES == frozenset(
+        n for n, s in SOURCE_TYPES.items() if s.message_family == "actuation"
+    )
+
+
+def test_source_type_spec_carries_nominal_provenance():
+    assert SOURCE_TYPES["actuation"] == SourceTypeSpec("actuation", Authority.POLICY, "[P]")
+    assert SOURCE_TYPES["code"] == SourceTypeSpec("observation", Authority.SOURCE, "[C]")
+    assert SOURCE_TYPES["policy"] == SourceTypeSpec("observation", Authority.POLICY, "[P]")
+    assert SOURCE_TYPES["story"].authority is Authority.MEASURED
+    assert SOURCE_TYPES["review"].evidence_class == "[H]"
+
+
+def test_message_family_keys_off_source_types_for_registered_types():
+    # Registered round-1 types now classify via the table, not by the "observation" default.
+    for name, spec in SOURCE_TYPES.items():
+        assert message_family(name) == spec.message_family
+
+
+def test_source_type_spec_is_frozen():
+    spec = SOURCE_TYPES["code"]
+    with pytest.raises(FrozenInstanceError):
+        spec.message_family = "actuation"  # type: ignore[misc]

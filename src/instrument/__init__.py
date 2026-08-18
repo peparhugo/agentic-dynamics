@@ -85,13 +85,16 @@ from .game_report import GameReport
 from .graph import ALLOWED_EXPANSION_RELS, Neo4jClient
 
 # v1.0: canonical identity + authority contract for the runtime-RAG knowledge base
-# canonical-state round 2 (step 1): ACTUATION_TYPES/OBSERVATION_TYPES/message_family added
+# canonical-state round 2 (step 1): ACTUATION_TYPES/OBSERVATION_TYPES/message_family added;
+# R2 (restructure): the single SOURCE_TYPES vocabulary + SourceTypeSpec
 from .knowledge import (
     ACTUATION_TYPES,
     EVIDENCE_CLASSES,
     OBSERVATION_TYPES,
     OPERATIONS,
     SCHEMA_VERSION,
+    SOURCE_TYPES,
+    SourceTypeSpec,
     Authority,
     KnowledgeEvent,
     KnowledgeRecord,
@@ -100,6 +103,10 @@ from .knowledge import (
     compute_knowledge_id,
     message_family,
 )
+
+# R1 (restructure): the shared record-builder factory — the single owner of the
+# content-hash back-fill ordering every producer was previously copy-pasting.
+from .record_factory import build_record as build_record_from_parts
 
 # v0.6: Multi-language analysis + mutation compiler + story orchestrator
 from .language import (
@@ -483,6 +490,7 @@ __all__ = [
     "Authority", "KnowledgeRecord", "KnowledgeEvent",
     "compute_entity_id", "compute_knowledge_id", "compute_content_hash",
     "SCHEMA_VERSION", "OPERATIONS", "EVIDENCE_CLASSES",
+    "SOURCE_TYPES", "SourceTypeSpec",
     # v1.0 retrieval + evidence cards
     "QueryPlan", "Candidate", "EvidenceCard", "RetrievalAttempt", "FallbackMode",
     "build_query_plan", "retrieve", "build_evidence_cards",
@@ -541,6 +549,8 @@ __all__ = [
     "ACTUATION_KINDS",
     # canonical-state round 2, step 1: message-family classification
     "OBSERVATION_TYPES", "ACTUATION_TYPES", "message_family",
+    # R1 (restructure): the shared record-builder factory
+    "build_record_from_parts",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",

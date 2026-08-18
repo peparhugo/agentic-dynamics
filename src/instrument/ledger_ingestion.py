@@ -44,19 +44,16 @@ Two record kinds per cell (one call to :func:`derive_ledger_records` returns bot
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
-from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from .knowledge import (
     Authority,
     KnowledgeRecord,
-    compute_entity_id,
-    compute_knowledge_id,
 )
-from .knowledge_ingestion import PROJECT_ROOT, REPOSITORY_ID, record_to_artifact
+from .knowledge_ingestion import PROJECT_ROOT, REPOSITORY_ID
+from .record_factory import build_record as build_record_from_parts
 
 # ── Extractor contract constants ────────────────────────────────
 
@@ -129,14 +126,6 @@ def classify_session(session_title: str) -> str:
 # ── Small deterministic helpers (mirror the other *_ingestion modules) ──────
 
 
-def _now_iso(now: datetime | None = None) -> str:
-    return (now or datetime.now(timezone.utc)).isoformat()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
 def _job_id(story_result: dict[str, Any]) -> str:
     return str(story_result.get("story_id") or "")
 
@@ -190,9 +179,7 @@ def build_job_record(
     if not job_id:
         raise ValueError("story_result has no story_id — cannot derive a stable job identity")
 
-    ts = _now_iso(now)
     source_uri = f"ledger_job:{job_id}"
-    entity_id = compute_entity_id(repository_id, source_uri, job_id)
     extractor_version = EXTRACTOR_VERSION if opencode_session_row is not None else FALLBACK_EXTRACTOR_VERSION
     revision = _source_revision(summary_entry)
 
@@ -212,40 +199,30 @@ def build_job_record(
 
     text = f"job {job_id} [{model}]: cost={cost!r} total_tokens={total_tokens!r}"
 
-    record = KnowledgeRecord(
-        knowledge_id="",
-        entity_id=entity_id,
-        source_uri=source_uri,
+    observed_at = str(story_result.get("completed_at") or story_result.get("started_at") or "")
+    extra_fields = {
+        "worktree_id": str(story_result.get("worktree") or ""),
+        "extractor_version": extractor_version,
+        "language": str(story_result.get("language") or ""),
+        "test_executed_success": story_result.get("test_executed_success"),
+        "perturbation_strength": story_result.get("perturbation_strength"),
+    }
+    if observed_at:
+        extra_fields["observed_at"] = observed_at
+
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=SOURCE_TYPE_JOB,
+        source_uri=source_uri,
         logical_locator=job_id,
         repository_id=repository_id,
-        branch="",
-        worktree_id=str(story_result.get("worktree") or ""),
-        commit_sha=revision,
-        content_hash="",
-        extractor_version=extractor_version,
-        embedding_version="",
+        revision=revision,
         authority=Authority.MEASURED,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=str(story_result.get("completed_at") or story_result.get("started_at") or ts),
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language=str(story_result.get("language") or ""),
-        symbols=[],
-        outcome_id="",
-        test_executed_success=story_result.get("test_executed_success"),
         evidence_class="[M]",
-        confidence=None,  # job-level confidence is not a thing; see attempt records
-        perturbation_strength=story_result.get("perturbation_strength"),
-        causes=None,
+        text=text,
+        extra_fields=extra_fields,
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(entity_id, revision, content_hash, extractor_version)
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 # ── Record construction: ledger_attempt / meta_session (one per session) ────
@@ -281,13 +258,11 @@ def build_attempt_record(
     title = str((opencode_session_row or {}).get("title") or story_result.get("story_name") or "")
     source_type = classify_session(title)
 
-    ts = _now_iso(now)
     agentic = session.get("agentic") or {}
     extractor_version = EXTRACTOR_VERSION if opencode_session_row is not None else FALLBACK_EXTRACTOR_VERSION
     revision = _source_revision(summary_entry)
 
     source_uri = f"{source_type}:{attempt_id}"
-    entity_id = compute_entity_id(repository_id, source_uri, attempt_id)
 
     confidence = agentic.get("confidence")
     total_tokens = agentic.get("total_tokens", session.get("total_tokens"))
@@ -298,40 +273,27 @@ def build_attempt_record(
     authority = Authority.ADVISORY if is_meta else Authority.MEASURED
     evidence_class = "[H]" if is_meta else "[M]"
 
-    record = KnowledgeRecord(
-        knowledge_id="",
-        entity_id=entity_id,
-        source_uri=source_uri,
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=source_type,
+        source_uri=source_uri,
         logical_locator=attempt_id,
         repository_id=repository_id,
-        branch="",
-        worktree_id=str(story_result.get("worktree") or ""),
-        commit_sha=str(session.get("commit_hash") or ""),
-        content_hash="",
-        extractor_version=extractor_version,
-        embedding_version="",
+        revision=revision,
         authority=authority,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=ts,
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language=str(story_result.get("language") or ""),
-        symbols=[],
-        outcome_id="",
-        test_executed_success=story_result.get("test_executed_success"),
         evidence_class=evidence_class,
-        confidence=confidence,
-        perturbation_strength=story_result.get("perturbation_strength"),
-        causes=None,
+        text=text,
+        extra_fields={
+            "worktree_id": str(story_result.get("worktree") or ""),
+            "commit_sha": str(session.get("commit_hash") or ""),
+            "extractor_version": extractor_version,
+            "language": str(story_result.get("language") or ""),
+            "test_executed_success": story_result.get("test_executed_success"),
+            "confidence": confidence,
+            "perturbation_strength": story_result.get("perturbation_strength"),
+        },
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(entity_id, revision, content_hash, extractor_version)
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 # ── The public derivation entry point ───────────────────────────

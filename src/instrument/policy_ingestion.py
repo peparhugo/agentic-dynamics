@@ -31,19 +31,16 @@ leading excerpt — never the whole file). Timestamps are injectable via ``now``
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Iterable
-from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from .knowledge import (
     Authority,
     KnowledgeRecord,
-    compute_entity_id,
-    compute_knowledge_id,
 )
-from .knowledge_ingestion import REPOSITORY_ID, record_to_artifact
+from .knowledge_ingestion import REPOSITORY_ID
+from .record_factory import build_record as build_record_from_parts
 
 # ── Extractor contract constants ────────────────────────────────
 
@@ -64,22 +61,6 @@ ACL_SCOPE = "public"
 #: citation aid (a leading excerpt), not a full-file mirror — the authoritative copy is the
 #: checkout, and retrieval must never substitute a truncated excerpt for it.
 MAX_BLOCK_CHARS = 1000
-
-
-# ── Small deterministic helpers (mirror the other ingestion paths) ──
-
-
-def _now_iso(now: datetime | None = None) -> str:
-    """Return ``now`` (or the current UTC instant) as an ISO-8601 timestamp.
-
-    Injectable so tests can pin timestamps; production always uses the real clock.
-    """
-    return (now or datetime.now(timezone.utc)).isoformat()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    """Return the sha256 hex digest of raw bytes (the artifact-hash primitive)."""
-    return hashlib.sha256(data).hexdigest()
 
 
 # ── First-meaningful-block extraction ───────────────────────────
@@ -198,45 +179,23 @@ def build_policy_record(
     ``evidence_class`` is ``"[P]"`` (policy/prior). ``commit_sha`` stores the injected
     ``revision`` (git HEAD sha), also folded into ``knowledge_id``.
     """
-    ts = _now_iso(now)
     source_uri = f"file://{locator}"
-    entity_id = compute_entity_id(repository_id, source_uri, locator)
 
-    record = KnowledgeRecord(
-        knowledge_id="",  # back-filled below (folds content_hash).
-        entity_id=entity_id,
-        source_uri=source_uri,
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=SOURCE_TYPE,
+        source_uri=source_uri,
         logical_locator=locator,
         repository_id=repository_id,
-        branch="",
-        worktree_id="",
-        commit_sha=revision,
-        content_hash="",  # back-filled below (sha256 of the artifact).
-        extractor_version=EXTRACTOR_VERSION,
-        embedding_version="",
+        revision=revision,
         authority=Authority.POLICY,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=ts,
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language="",  # policy is prose/markup, not a source-language unit.
-        symbols=[],  # no symbol table on a policy excerpt.
-        outcome_id="",
-        test_executed_success=None,
         evidence_class="[P]",
-        confidence=None,
-        perturbation_strength=None,
+        text=text,
+        extra_fields={
+            "extractor_version": EXTRACTOR_VERSION,
+        },
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(
-        entity_id, revision, content_hash, EXTRACTOR_VERSION
-    )
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 # ── The public derivation entry point ───────────────────────────

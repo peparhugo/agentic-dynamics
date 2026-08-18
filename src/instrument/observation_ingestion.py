@@ -32,17 +32,20 @@ verbatim.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from .knowledge import (
     Authority,
     KnowledgeRecord,
-    compute_entity_id,
-    compute_knowledge_id,
 )
-from .knowledge_ingestion import REPOSITORY_ID, record_to_artifact
+from .knowledge_ingestion import REPOSITORY_ID
+from .record_factory import (
+    _now_iso,
+)
+from .record_factory import (
+    build_record as build_record_from_parts,
+)
 
 # ── Extractor contract constants ────────────────────────────────
 
@@ -54,14 +57,6 @@ REVISION_FALLBACK = "observation/unrevisioned"
 
 
 # ── Small deterministic helpers (mirror story_ingestion / knowledge_ingestion) ──
-
-
-def _now_iso(now: datetime | None = None) -> str:
-    return (now or datetime.now(timezone.utc)).isoformat()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
 
 
 def _assessment_id(cell_id: str, at: str) -> str:
@@ -104,43 +99,25 @@ def build_observation_record(
 
     assessment_id = _assessment_id(cell_id, at)
     source_uri = f"observation:{assessment_id}"
-    entity_id = compute_entity_id(repository_id, source_uri, assessment_id)
     text = f"{cell_id} [{model}]: {status}" + (f" — {why}" if why else "")
 
-    record = KnowledgeRecord(
-        knowledge_id="",
-        entity_id=entity_id,
-        source_uri=source_uri,
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=SOURCE_TYPE_OBSERVATION,
+        source_uri=source_uri,
         logical_locator=assessment_id,
         repository_id=repository_id,
-        branch="",
-        worktree_id="",
-        commit_sha="",
-        content_hash="",
-        extractor_version=EXTRACTOR_VERSION,
-        embedding_version="",
+        revision=REVISION_FALLBACK,
         authority=Authority.ADVISORY,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=at,
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language="",
-        symbols=[],
-        outcome_id="",
-        test_executed_success=None,
         evidence_class="[H]",
-        confidence=None,
-        perturbation_strength=None,
-        causes=None,
+        text=text,
+        extra_fields={
+            "commit_sha": "",
+            "extractor_version": EXTRACTOR_VERSION,
+            "observed_at": at,
+        },
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(entity_id, REVISION_FALLBACK, content_hash, EXTRACTOR_VERSION)
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 def derive_observation_record(
@@ -179,51 +156,37 @@ def build_flag_record(
     if not session_id:
         raise ValueError("flag has no session_id — cannot derive a stable identity")
 
-    ts = _now_iso(now)
-    at = str(flag_jsonl_line.get("at") or ts)
+    at = str(flag_jsonl_line.get("at") or "")
     status = str(flag_jsonl_line.get("status") or "unknown")
     why = str(flag_jsonl_line.get("why") or "")
     model = str(flag_jsonl_line.get("model") or "")
     title = str(flag_jsonl_line.get("title") or "")
 
     source_uri = f"flag_stream:{session_id}"
-    entity_id = compute_entity_id(repository_id, source_uri, session_id)
     text = f"{title or session_id} [{model}]: {status}" + (f" — {why}" if why else "")
 
-    record = KnowledgeRecord(
-        knowledge_id="",
-        entity_id=entity_id,
-        source_uri=source_uri,
+    extra_fields = {
+        "commit_sha": "",
+        "extractor_version": EXTRACTOR_VERSION,
+    }
+    # observed_at prefers the flag line's own timestamp; when absent, the factory's
+    # producer-now default is used (mirroring the pre-refactor ``or ts`` fallback).
+    if at:
+        extra_fields["observed_at"] = at
+
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=SOURCE_TYPE_FLAG,
+        source_uri=source_uri,
         logical_locator=session_id,
         repository_id=repository_id,
-        branch="",
-        worktree_id="",
-        commit_sha="",
-        content_hash="",
-        extractor_version=EXTRACTOR_VERSION,
-        embedding_version="",
+        revision=REVISION_FALLBACK,
         authority=Authority.ADVISORY,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=at,
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language="",
-        symbols=[],
-        outcome_id="",
-        test_executed_success=None,
         evidence_class="[H]",
-        confidence=None,
-        perturbation_strength=None,
-        causes=None,
+        text=text,
+        extra_fields=extra_fields,
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(entity_id, REVISION_FALLBACK, content_hash, EXTRACTOR_VERSION)
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 def derive_flag_record(
