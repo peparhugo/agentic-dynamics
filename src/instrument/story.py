@@ -969,15 +969,14 @@ def save_story_result(result: StoryResult, path: Path) -> None:
     path.write_text(json.dumps(result.to_dict(), indent=2))
 
     if os.environ.get("FINOPS_KB_WRITE") == "1":
-        from .knowledge_ingestion import REPOSITORY_ID, record_to_event
-        from .knowledge_stream import connect, publish_event
+        from .knowledge_ingestion import REPOSITORY_ID
+        from .knowledge_stream import register_records
         from .story_ingestion import derive_story_records
 
-        r = connect()
-        for record in derive_story_records(result.to_dict(), repository_id=REPOSITORY_ID):
-            publish_event(
-                r, record_to_event(record), authorized=True, source_type=record.source_type,
-            )
+        register_records(
+            derive_story_records(result.to_dict(), repository_id=REPOSITORY_ID),
+            fail_loud=True,
+        )
 
 
 def load_story_result(path: Path) -> StoryResult:

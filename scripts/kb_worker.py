@@ -36,6 +36,7 @@ from instrument import knowledge_ingestion as ki  # noqa: E402
 from instrument import knowledge_stream as ks  # noqa: E402
 from instrument import observation_ingestion as oi  # noqa: E402
 from instrument.knowledge import compute_knowledge_id  # noqa: E402
+from instrument.paths import KB_ARTIFACT_DIR, REGISTRY_INDEX_PATH  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -46,20 +47,15 @@ REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 #: per indexed record, never rewritten in place. ``generate_manifest.py``'s compaction
 #: step (plan step 15, out of scope here) is what later collapses this append-only log
 #: down to "one row per entity_id, newest wins" — this consumer does not resolve
-#: superseded/tombstoned lifecycle state itself, it only records what it saw.
-REGISTRY_INDEX_PATH = PROJECT_ROOT / "experiments" / "results" / "registry_index.jsonl"
-
-#: canonical-state finalize (G3) — where the flag auto-clear rule (see
-#: `_clear_flag_record`/`_maybe_autoclear_flag` below) writes the durable, immutable
-#: artifact for the NEW "flag, now tombstoned" record it mints before publishing a
-#: `delete` event for it. Mirrors `instrument.knowledge_ingestion.ARTIFACT_DIR`
-#: ("experiments/results/kb") byte-for-byte, duplicated (not imported as a bare
-#: string) for the exact same reason REGISTRY_INDEX_PATH above is duplicated rather
-#: than imported: it is resolved against THIS module's own PROJECT_ROOT, so a test can
-#: monkeypatch this one constant and have every write in this file honor the override,
-#: without also having to reach into `instrument.knowledge_ingestion`'s separate
-#: PROJECT_ROOT.
-KB_ARTIFACT_DIR = PROJECT_ROOT / ki.ARTIFACT_DIR
+#: superseded/tombstoned lifecycle state itself, it only records what it saw. Sourced
+#: from ``instrument.paths`` (canonical-state R6) — the single owner of the path — and
+#: re-bound as a module-level name so a test can monkeypatch this one constant and have
+#: every write in this file honor the override.
+#
+#: canonical-state finalize (G3) — ``KB_ARTIFACT_DIR`` (also from ``instrument.paths``) is
+#: where the flag auto-clear rule (see ``_clear_flag_record``/``_maybe_autoclear_flag``
+#: below) writes the durable, immutable artifact for the NEW "flag, now tombstoned" record
+#: it mints before publishing a ``delete`` event for it.
 
 REDIS_BASE_DELAY = 2.0
 REDIS_MAX_RETRIES = 10

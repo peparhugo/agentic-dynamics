@@ -74,15 +74,14 @@ def _finalize_story(story_id: str) -> bool:
     # try/except) once the flag is set — see story.py:save_story_result's docstring for
     # why this class of call site intentionally lets a downed knowledge stream raise.
     if os.environ.get("FINOPS_KB_WRITE") == "1":
-        from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
-        from instrument.knowledge_stream import connect, publish_event
+        from instrument.knowledge_ingestion import REPOSITORY_ID
+        from instrument.knowledge_stream import register_records
         from instrument.review_ingestion import derive_review_records
 
-        r = connect()
-        for record in derive_review_records(data, repository_id=REPOSITORY_ID):
-            publish_event(
-                r, record_to_event(record), authorized=True, source_type=record.source_type,
-            )
+        register_records(
+            derive_review_records(data, repository_id=REPOSITORY_ID),
+            fail_loud=True,
+        )
 
     return True
 

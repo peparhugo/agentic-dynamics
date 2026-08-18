@@ -262,6 +262,7 @@ from .story_ingestion import (
     ACL_SCOPE as STORY_ACL_SCOPE,
     EXTRACTOR_VERSION as STORY_EXTRACTOR_VERSION,
     SOURCE_TYPE as STORY_SOURCE_TYPE,
+    adapt_to_story_result,
     build_story_record,
     derive_story_records,
     derive_story_records_from_run_output,
@@ -333,6 +334,7 @@ from .knowledge_stream import (
     read_artifact,
     read_events,
     reconcile_missing,
+    register_records,
     verify_content_hash,
 )
 
@@ -503,6 +505,7 @@ __all__ = [
     "read_events", "acknowledge", "pending_count", "delivery_count",
     "claim_pending", "dead_letter", "decode_event", "default_extract",
     "process_entry", "read_artifact", "verify_content_hash", "reconcile_missing",
+    "register_records",
     "CONSUMER_GROUPS", "STREAM_KEY", "DEAD_LETTER_KEY",
     # v1.0 producer-side measured-finding derivation
     "build_record", "record_to_event", "derive_records",
@@ -522,6 +525,7 @@ __all__ = [
     "POLICY_EXTRACTOR_VERSION", "POLICY_SOURCE_TYPE", "POLICY_ACL_SCOPE",
     # canonical-state round 2: story ingestion
     "derive_story_records", "build_story_record", "derive_story_records_from_run_output",
+    "adapt_to_story_result",
     "STORY_EXTRACTOR_VERSION", "STORY_SOURCE_TYPE", "STORY_ACL_SCOPE",
     # canonical-state round 2: review ingestion
     "derive_review_records", "build_review_record",

@@ -55,6 +55,7 @@ from instrument import knowledge_stream as ks  # noqa: E402
 from instrument import ledger_ingestion as li  # noqa: E402
 from instrument import review_ingestion as ri  # noqa: E402
 from instrument import story_ingestion as si  # noqa: E402
+from instrument.paths import KB_ARTIFACT_DIR  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -63,8 +64,8 @@ REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 #: (matches ``kb_produce_sources.REPO_ROOT``'s convention exactly).
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-#: Durable per-record artifact directory (mirrors ``kb_produce_sources.KB_ARTIFACT_DIR``).
-KB_ARTIFACT_DIR = REPO_ROOT / "experiments" / "results" / "kb"
+# Durable per-record artifact directory — sourced from ``instrument.paths``
+# (canonical-state R6), the single owner of the path (``KB_ARTIFACT_DIR`` imported above).
 
 #: The ~156 main-repo story JSONs (pass 1). ``_remediation_contaminated/`` is a
 #: subdirectory of this same directory but is its OWN pass ("contaminated") — the
@@ -225,26 +226,16 @@ def _summary_entry_to_story_result(entry: dict[str, Any]) -> dict[str, Any]:
     """Adapt one recovered ``_results_summary.json`` entry into the minimal
     ``StoryResult``-shaped dict ``story_ingestion.build_story_record`` expects.
 
-    A field-renaming adapter only — not a second identity formula. ``story_id`` below
-    becomes ``entity_id``'s ``logical_locator`` exactly the way a live ``StoryResult``'s
-    own ``story_id`` would; the historical entry has no per-session breakdown to recover
-    (that granularity was never in ``_results_summary.json`` to begin with), so
-    ``sessions`` stays empty — a caveated-but-canonical historical fact (design §7c), not
-    a fabricated reconstruction of session-level detail nobody measured.
+    A field-renaming adapter only — not a second identity formula (canonical-state R8):
+    the reshape lives in ``story_ingestion.adapt_to_story_result`` (``kind="summary"``),
+    which this call site passes through verbatim. ``story_id`` below becomes ``entity_id``'s
+    ``logical_locator`` exactly the way a live ``StoryResult``'s own ``story_id`` would; the
+    historical entry has no per-session breakdown to recover (that granularity was never in
+    ``_results_summary.json`` to begin with), so ``sessions`` stays empty — a caveated-but-
+    canonical historical fact (design §7c), not a fabricated reconstruction of session-level
+    detail nobody measured.
     """
-    story_id = str(entry.get("worktree_name") or entry.get("run_id") or "")
-    return {
-        "story_id": story_id,
-        "story_name": str(entry.get("experiment") or story_id),
-        "language": str(entry.get("language") or ""),
-        "model": str(entry.get("model") or ""),
-        "perturbation_condition": str(entry.get("condition") or ""),
-        "worktree": "",  # recovered from git history — no live worktree to point at
-        "perturbation_strength": entry.get("perturbation_strength", 0.0),
-        "test_executed_success": entry.get("test_executed_success"),
-        "sessions": [],
-        "summary": {},
-    }
+    return si.adapt_to_story_result(entry, kind="summary")
 
 
 def derive_summary_recovery_pass(

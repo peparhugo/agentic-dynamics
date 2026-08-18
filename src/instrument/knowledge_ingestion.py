@@ -45,6 +45,7 @@ from .knowledge import (
     compute_entity_id,
     compute_knowledge_id,
 )
+from .paths import KB_ARTIFACT_DIR_REL
 from .retrieval import build_evidence_cards
 
 # ── Extractor contract constants ────────────────────────────────
@@ -60,12 +61,14 @@ EXTRACTOR_VERSION = "measured-finding/v1"
 #: ``file://`` prefix and resolves relative to the checkout root).
 SOURCE_URI = "file://experiments/results/_results_summary.json"
 
-#: Directory holding the per-record durable artifacts. ``record_to_event`` points at
+#: Directory holding the per-record durable artifacts (repo-root-relative — the ``file://``
+#: URI contract). Sourced from :mod:`instrument.paths` (canonical-state R6) so the producer
+#: and every consumer's ``read_artifact`` stay on one path. ``record_to_event`` points at
 #: ``file://<ARTIFACT_DIR>/<knowledge_id>.json`` — one JSON artifact per derived record — so a
 #: consumer's ``read_artifact`` + ``verify_content_hash`` can verify the *exact* bytes the
 #: event hashes (unlike the aggregate ``_results_summary.json``, whose bytes can never match a
 #: per-finding hash).
-ARTIFACT_DIR = "experiments/results/kb"
+ARTIFACT_DIR = KB_ARTIFACT_DIR_REL
 
 
 def artifact_uri(knowledge_id: str) -> str:

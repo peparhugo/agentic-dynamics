@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from instrument import knowledge_ingestion as ki  # noqa: E402
 from instrument import knowledge_stream as ks  # noqa: E402
+from instrument.paths import KB_ARTIFACT_DIR  # noqa: E402
 from instrument.signal_store import load_results  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
@@ -46,14 +47,12 @@ DEFAULT_RESULTS_PATH = (
     Path(__file__).resolve().parent.parent / "experiments" / "results" / "_results_summary.json"
 )
 
-#: How many sample records ``--dry-run`` prints (a preview, not the whole batch).
+# How many sample records ``--dry-run`` prints (a preview, not the whole batch).
 SAMPLE_COUNT = 5
 
-#: Durable per-record artifact directory, anchored to the repo root so the producer writes to
-#: the same path the consumer's ``read_artifact`` resolves (``file://experiments/results/kb/…``).
-KB_ARTIFACT_DIR = (
-    Path(__file__).resolve().parent.parent / "experiments" / "results" / "kb"
-)
+# Durable per-record artifact directory, anchored to the repo root so the producer writes to
+# the same path the consumer's ``read_artifact`` resolves (``file://experiments/results/kb/…``).
+# Sourced from ``instrument.paths`` (canonical-state R6) — the single owner of the path.
 
 
 def log(msg: str) -> None:
