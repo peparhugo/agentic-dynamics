@@ -48,8 +48,17 @@ from typing import Any
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+# canonical-state round 2, plan step 17: scripts/ is not an importable package (no
+# __init__.py), so — mirroring scripts/supervise.py's own cross-directory import of
+# admin/opencode_client.py via an analogous sys.path insert — the repo root is added
+# here so `from scripts import registry` resolves via Python's implicit
+# namespace-package support rather than duplicating registry.py's filter logic
+# a second time in this file.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from flask import Flask, Response, jsonify, make_response, request
+
+from scripts import registry as registry_cli
 
 from instrument.claude_adapter import _resolve_claude_model
 from instrument.live import (
@@ -126,6 +135,15 @@ ROOT = Path(__file__).resolve().parent.parent
 SUPERVISOR_FLAGS_FILE = ROOT / "experiments" / "results" / "supervisor" / "flags.jsonl"
 SUPERVISOR_FILE_TAIL_BYTES = 512 * 1024
 SUPERVISOR_ACTIVE_WINDOW_SECONDS = int(os.environ.get("SUPERVISOR_ACTIVE_WINDOW", "900"))
+
+#: canonical-state round 2, plan step 17 — where generate_manifest.py (step 15) writes
+#: the compacted registry array this route reads. Same file scripts/registry.py's CLI
+#: reads (registry_cli.DATA_MANIFEST_PATH) — this is this MODULE's own copy of that
+#: constant (not an import of registry_cli.DATA_MANIFEST_PATH) purely so a test can
+#: monkeypatch admin/server.py's manifest path independently of scripts/registry.py's,
+#: matching this file's existing convention of module-local path constants
+#: (SUPERVISOR_FLAGS_FILE above) rather than a shared config module.
+DATA_MANIFEST_PATH = ROOT / "experiments" / "data_manifest.json"
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 _design_manager: DesignSessionManager | None = None
@@ -855,6 +873,68 @@ def api_flags() -> Response:
     limit = min(100, max(1, requested_limit))
     envelope, status = _load_supervisor_flags(limit)
     return jsonify(envelope), status
+
+
+@app.get("/api/registry")
+def api_registry() -> Response:
+    """Filterable table over the manifest's registry array — GET only, read-only by
+    construction (same invariant as ``/api/flags`` and ``/api/matrix`` — no
+    ``send_input``/``interrupt`` anywhere in this file, unchanged by this design).
+
+    Canonical-state round 2, plan step 17. Reads ``experiments/data_manifest.json``'s
+    ``registry`` array (``generate_manifest.py``'s compacted output, plan step 15) —
+    never Redis, never Neo4j: this route is a pure file read, matching
+    ``scripts/registry.py query``'s zero-external-dependency philosophy exactly (in
+    fact it reuses that module's ``load_registry`` directly rather than re-implementing
+    manifest loading a second time). Query params mirror the CLI's ``query`` flags:
+    ``record_type`` / ``lifecycle`` / ``since`` (the CLI's ``--record-type``/etc, with
+    argparse's dash-to-underscore convention already applied since these are query
+    string keys, not flags).
+    """
+    rows = registry_cli.load_registry(DATA_MANIFEST_PATH)
+
+    record_type = request.args.get("record_type")
+    if record_type:
+        rows = [r for r in rows if r.get("source_type") == record_type]
+
+    lifecycle = request.args.get("lifecycle")
+    if lifecycle:
+        rows = [r for r in rows if r.get("lifecycle_state") == lifecycle]
+
+    since = request.args.get("since")
+    if since:
+        rows = [r for r in rows if str(r.get("observed_at") or "") >= since]
+
+    return jsonify({"registry": rows, "count": len(rows)})
+
+
+@app.get("/api/registry/<entity_id>")
+def api_registry_lineage(entity_id) -> Response:
+    """Lineage view for one entity: its own row plus, for an actuation record, the
+    justifying observation resolved through ``causes`` (design §10 / §5a — "why did the
+    system decide to act" stays a one-hop lookup even though nothing constructs an
+    actuation record today, see ``src/instrument/actuation_ingestion.py``).
+
+    Deliberately file-only, like ``/api/registry`` above — this route never queries
+    Neo4j. The compacted registry array keeps only the CURRENT row per ``entity_id``
+    (that is the entire point of ``generate_manifest.py``'s compaction step), so a full
+    ``SUPERSEDES`` version chain is out of scope for an HTTP route by construction; that
+    remains ``scripts/registry.py lineage <entity_id> --live``'s job, not this one's —
+    adding a live Neo4j round-trip to an HTTP request handler would be a materially
+    heavier dependency than this read-only surface needs for the one-hop view it exists
+    to serve.
+    """
+    rows = registry_cli.load_registry(DATA_MANIFEST_PATH)
+    matches = [r for r in rows if r.get("entity_id") == entity_id]
+    if not matches:
+        return jsonify({"error": "not_found", "entity_id": entity_id}), 404
+
+    record = matches[0]
+    response: dict[str, Any] = {"record": record}
+    if record.get("source_type") == "actuation" and record.get("causes"):
+        _stage, causes_matches = registry_cli.resolve_show(rows, record["causes"])
+        response["causes_record"] = causes_matches[0] if causes_matches else None
+    return jsonify(response)
 
 
 @app.get("/api/events/<cell_id>")

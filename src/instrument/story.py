@@ -943,9 +943,41 @@ def _list_tracked_files(worktree: Path) -> set[str]:
 
 
 def save_story_result(result: StoryResult, path: Path) -> None:
-    """Save a StoryResult as JSON."""
+    """Save a StoryResult as JSON, then register it inline (write-time registration).
+
+    canonical-state round 2, plan step 10 (Delta 1): this call site is why
+    finding-1-style stranding cannot recur — a *scan* would only discover a story JSON if
+    it happened to be pointed at the right worktree (which is exactly what stranded the
+    original ~59), but this inline emit always fires the moment the file is durably
+    written, regardless of which worktree that happens to be.
+
+    Gated on ``FINOPS_KB_WRITE`` (opt-in, same convention as every existing KB writer in
+    this package) so a plain ``save_story_result`` call from a test or a read-only tool
+    never accidentally emits. Deliberately UNWRAPPED in a try/except once the flag is
+    set — ``knowledge_stream.connect()``'s own documented contract is "a downed stream
+    must be visible, not silently dropped" (unlike ``live.py``'s best-effort telemetry
+    connect), and every other batch producer in this package (``kb_produce.py``,
+    ``kb_produce_sources.py``, ``kb_produce_registry.py``) already honors that contract by
+    letting a connection failure raise. An operator who has explicitly opted into
+    ``FINOPS_KB_WRITE=1`` gets the same loud-failure guarantee here. Contrast this with
+    ``scripts/supervise.py``'s inline emit (plan step 13): that IS best-effort, because it
+    sits inside a live, always-running assessment loop where crashing on a downed KB
+    stream would take down the flag-only supervisor's actual job — a fundamentally
+    different availability trade-off than a one-shot story run's final persistence step.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result.to_dict(), indent=2))
+
+    if os.environ.get("FINOPS_KB_WRITE") == "1":
+        from .knowledge_ingestion import REPOSITORY_ID, record_to_event
+        from .knowledge_stream import connect, publish_event
+        from .story_ingestion import derive_story_records
+
+        r = connect()
+        for record in derive_story_records(result.to_dict(), repository_id=REPOSITORY_ID):
+            publish_event(
+                r, record_to_event(record), authorized=True, source_type=record.source_type,
+            )
 
 
 def load_story_result(path: Path) -> StoryResult:

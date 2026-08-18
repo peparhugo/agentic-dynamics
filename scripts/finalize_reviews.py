@@ -13,10 +13,15 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import re
+import sys
 from pathlib import Path
 
-REVIEWS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "reviews"
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+
+REVIEWS_DIR = ROOT / "experiments" / "results" / "reviews"
 MODEL = "deepseek/deepseek-v4-flash"
 
 
@@ -62,6 +67,23 @@ def _finalize_story(story_id: str) -> bool:
         "story_review": story_review,
     }
     (REVIEWS_DIR / f"review_{story_id}.json").write_text(json.dumps(data, indent=2))
+
+    # canonical-state round 2, plan step 12: write-time registration (Delta 1) — inline
+    # after the merged review write succeeds. Gated on FINOPS_KB_WRITE (opt-in, same
+    # convention as every other KB writer) and deliberately left unwrapped (no
+    # try/except) once the flag is set — see story.py:save_story_result's docstring for
+    # why this class of call site intentionally lets a downed knowledge stream raise.
+    if os.environ.get("FINOPS_KB_WRITE") == "1":
+        from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
+        from instrument.knowledge_stream import connect, publish_event
+        from instrument.review_ingestion import derive_review_records
+
+        r = connect()
+        for record in derive_review_records(data, repository_id=REPOSITORY_ID):
+            publish_event(
+                r, record_to_event(record), authorized=True, source_type=record.source_type,
+            )
+
     return True
 
 

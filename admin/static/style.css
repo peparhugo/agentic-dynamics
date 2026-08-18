@@ -1384,6 +1384,33 @@ h3 {
   min-height: 70px;
 }
 
+/* canonical-state round 2, plan step 17 — Registry drawer's filter row + lineage
+   panel. Deliberately minimal: reuses .routing-drawer/.drawer-header/.routing-content/
+   .table-scroll/.routing-table wholesale (see registry-drawer's markup in index.html)
+   rather than a parallel style set for what is structurally the same drawer pattern. */
+.registry-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.registry-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.registry-lineage {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+}
+
 .table-scroll {
   max-width: 100%;
   overflow: auto;

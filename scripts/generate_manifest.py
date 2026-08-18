@@ -9,6 +9,17 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 
+#: Where scripts/kb_worker.py's "kb-registry-v1" consumer group appends one compacted
+#: JSON line per indexed knowledge record (canonical-state round 2, plan step 8). This
+#: literal path is duplicated (not imported) from kb_worker.py's own
+#: REGISTRY_INDEX_PATH constant deliberately: kb_worker.py imports `redis` and the full
+#: `instrument` package at module level (a consumer-worker dependency footprint), while
+#: this script is intentionally dependency-light (hashlib/json/subprocess/pathlib only,
+#: confirmed by its existing imports above) so it stays a fast, always-available
+#: pipeline step. Keep this path in sync with kb_worker.REGISTRY_INDEX_PATH by hand if
+#: either ever moves.
+REGISTRY_INDEX_PATH = RESULTS_DIR / "registry_index.jsonl"
+
 def sha256(path):
     """SHA-256 hash of a file."""
     h = hashlib.sha256()
@@ -33,6 +44,43 @@ def get_git_commit():
         return result.stdout.strip()[:8]
     except Exception:
         return "unknown"
+
+def _compact_registry_index(path):
+    """Compact the append-only registry_index.jsonl into one row per entity_id.
+
+    Canonical-state round 2, plan step 15: the same "append-only log + compacted
+    snapshot" relationship flags.jsonl already has to its own bounded Redis mirror.
+    Reads every line, keeps only the row with the newest ``indexed_at`` per
+    ``entity_id`` (a later index pass always describes the more current state of that
+    logical entity — this is what makes each output row genuinely "current", not a
+    stale intermediate version), and returns the result as a list sorted by entity_id
+    for deterministic, diff-friendly manifest output.
+
+    Missing/corrupt lines are skipped rather than aborting the whole manifest build — a
+    single truncated JSONL line (e.g. from a process killed mid-write) must not prevent
+    every OTHER already-durable line from surfacing.
+    """
+    if not path.exists():
+        return []
+    latest = {}
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            entity_id = row.get("entity_id")
+            if not entity_id:
+                continue
+            existing = latest.get(entity_id)
+            # ">=" (not ">"): among ties, the later line in append order wins — a
+            # deterministic tiebreak since the file is strictly append-only.
+            if existing is None or str(row.get("indexed_at") or "") >= str(existing.get("indexed_at") or ""):
+                latest[entity_id] = row
+    return [latest[key] for key in sorted(latest)]
 
 def main():
     manifest = {
@@ -65,6 +113,12 @@ def main():
         else:
             manifest["files"][name] = None
 
+    # canonical-state round 2, plan step 15: the compacted registry array — additive
+    # only. `manifest["files"]` above is otherwise byte-for-byte unchanged (design §11's
+    # backward-compatibility requirement), and this key is new, so no existing consumer
+    # of data_manifest.json is affected by its presence.
+    manifest["registry"] = _compact_registry_index(REGISTRY_INDEX_PATH)
+
     output_path = PROJECT_ROOT / "experiments" / "data_manifest.json"
     with open(output_path, "w") as f:
         json.dump(manifest, f, indent=2)
@@ -76,6 +130,7 @@ def main():
             print(f"  {name}: {info['size_bytes']:,} bytes, sha256={info['sha256'][:12]}...")
         else:
             print(f"  {name}: MISSING")
+    print(f"  registry: {len(manifest['registry'])} entities (compacted from {REGISTRY_INDEX_PATH.name})")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,153 @@
+"""Tests for actuation ingestion (actuation_ingestion).
+
+Covers the POLICY/[P] provenance, the required-``causes`` construction-time check
+(design §5a, ahead of the transport-level lineage gate in ``knowledge_stream.publish_event``),
+identity derivation ("one identity per candidate, not per session" — design §3), the
+reused artifact/event contract, and — the plan's own explicit CI-enforced invariant
+(``docs/canonical_state_r2_plan.md`` step 6) — that this producer has ZERO call sites
+anywhere in the running system today.
+"""
+
+import ast
+import hashlib
+from pathlib import Path
+
+import pytest
+
+from instrument import actuation_ingestion as ai
+from instrument.knowledge import Authority
+from instrument.knowledge_ingestion import record_to_artifact
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _candidate(**overrides) -> dict:
+    base = {
+        "actuation_kind": "steer",
+        "target_session_id": "sess_abc123",
+        "target_cell_id": "wf_task_manager_api_1",
+        "requested_action": {"note": "nudge back toward the spec"},
+        "requested_by": "supervisor",
+        "causes": "obs_knowledge_id_0001",
+    }
+    base.update(overrides)
+    return base
+
+
+# ── Extractor contract constants ────────────────────────────────
+
+
+def test_extractor_constants():
+    assert ai.EXTRACTOR_VERSION == "actuation/v1"
+    assert ai.SOURCE_TYPE == "actuation"
+    assert ai.ACL_SCOPE == "public"
+    assert ai.ACTUATION_KINDS == {
+        "steer", "interrupt", "escalate", "retry", "budget", "deadline",
+    }
+
+
+# ── Provenance ───────────────────────────────────────────────────
+
+
+def test_actuation_authority_is_policy_and_p():
+    record = ai.derive_actuation_record(_candidate())
+    assert record.authority is Authority.POLICY
+    assert record.evidence_class == "[P]"
+
+
+def test_causes_is_set_on_the_record():
+    record = ai.derive_actuation_record(_candidate())
+    assert record.causes == "obs_knowledge_id_0001"
+
+
+# ── Required `causes` — construction-time check (design §5a) ────
+
+
+def test_derive_actuation_record_requires_causes():
+    with pytest.raises(ValueError):
+        ai.derive_actuation_record(_candidate(causes=""))
+
+
+def test_derive_actuation_record_requires_causes_key_present():
+    candidate = _candidate()
+    del candidate["causes"]
+    with pytest.raises(ValueError):
+        ai.derive_actuation_record(candidate)
+
+
+# ── Identity: one per candidate, not per session ─────────────────
+
+
+def test_repeated_candidates_against_the_same_session_are_independent_facts():
+    a = ai.derive_actuation_record(_candidate())
+    b = ai.derive_actuation_record(_candidate())
+    # Distinct occurred_at (the two calls happen at different wall-clock instants) means
+    # distinct actuation_id, hence distinct entity_id — never versions of the same entity.
+    assert a.entity_id != b.entity_id
+
+
+def test_actuation_id_folds_in_target_session_and_causes():
+    a = ai.derive_actuation_record(_candidate(target_session_id="sess_1"))
+    b = ai.derive_actuation_record(_candidate(target_session_id="sess_2"))
+    assert a.entity_id != b.entity_id
+
+
+# ── Body rendering ───────────────────────────────────────────────
+
+
+def test_text_is_the_json_body_with_all_five_fields():
+    import json
+
+    record = ai.derive_actuation_record(_candidate())
+    body = json.loads(record.text)
+    assert body == {
+        "actuation_kind": "steer",
+        "target_session_id": "sess_abc123",
+        "target_cell_id": "wf_task_manager_api_1",
+        "requested_action": {"note": "nudge back toward the spec"},
+        "requested_by": "supervisor",
+    }
+
+
+# ── Reused artifact/event contract ──────────────────────────────
+
+
+def test_content_hash_equals_sha256_of_record_to_artifact():
+    record = ai.derive_actuation_record(_candidate())
+    assert record.content_hash == hashlib.sha256(record_to_artifact(record)).hexdigest()
+
+
+# ── CI-enforced invariant: zero call sites today ─────────────────
+
+
+def _calls_derive_actuation_record(path: Path) -> bool:
+    """Return True if ``path`` contains a syntactic call/reference to
+    ``derive_actuation_record`` (as a bare name, an attribute access, or an import)."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id == "derive_actuation_record":
+            return True
+        if isinstance(node, ast.Attribute) and node.attr == "derive_actuation_record":
+            return True
+        if isinstance(node, (ast.ImportFrom, ast.Import)):
+            for alias in node.names:
+                if alias.name == "derive_actuation_record":
+                    return True
+    return False
+
+
+def test_no_call_sites_construct_actuation_records():
+    # design §5b / §13: "nobody" calls this today. A future call site is legitimate only
+    # once a control rule for actuation exists in a compiled ExperimentSpec — this test
+    # turns that absence into a CI-enforced fact rather than a code-review convention.
+    guarded_files = [
+        REPO_ROOT / "scripts" / "supervise.py",
+        REPO_ROOT / "src" / "instrument" / "workflow_runner.py",
+        REPO_ROOT / "admin" / "server.py",
+    ]
+    offenders = [
+        str(f.relative_to(REPO_ROOT))
+        for f in guarded_files
+        if f.exists() and _calls_derive_actuation_record(f)
+    ]
+    assert offenders == [], f"unexpected actuation call site(s): {offenders}"

@@ -117,6 +117,46 @@ class TestStoryResult:
             assert loaded.story_name == "test"
             assert loaded.total_cost == 3.0
 
+    def test_save_story_result_skips_emission_when_kb_write_unset(self, monkeypatch):
+        # Default test environment: FINOPS_KB_WRITE is unset, so a plain save must never
+        # attempt a knowledge-stream connection — canonical-state round 2, plan step 10.
+        monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
+        from instrument import knowledge_stream as ks
+
+        def _explode(*a, **kw):
+            raise AssertionError("must not connect to the knowledge stream when KB_WRITE is unset")
+
+        monkeypatch.setattr(ks, "connect", _explode)
+
+        result = StoryResult(story_name="test", story_id="abc123")
+        with tempfile.TemporaryDirectory() as d:
+            save_story_result(result, Path(d) / "result.json")
+        # No assertion error raised above == no connection attempt was made.
+
+    def test_save_story_result_emits_registry_event_when_kb_write_enabled(self, monkeypatch):
+        monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+        from instrument import knowledge_stream as ks
+
+        published = []
+        monkeypatch.setattr(ks, "connect", lambda: object())
+        monkeypatch.setattr(
+            ks, "publish_event",
+            lambda r, event, **kw: published.append((event, kw)) or "0-1",
+        )
+
+        result = StoryResult(
+            story_name="test", story_id="abc123",
+            sessions=[SessionResult(1, "greenfield", "Build.", cost_usd=3.0, total_tokens=300)],
+        )
+        with tempfile.TemporaryDirectory() as d:
+            save_story_result(result, Path(d) / "result.json")
+
+        assert len(published) == 1
+        event, kwargs = published[0]
+        assert kwargs["source_type"] == "story"
+        assert kwargs["authorized"] is True
+        assert event.knowledge_id  # a real (non-empty) identity was derived
+
     def test_all_successful(self):
         result = StoryResult(
             story_name="test",

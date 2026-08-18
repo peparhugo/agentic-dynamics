@@ -85,6 +85,45 @@ class Authority(IntEnum):
     POLICY = 5
 
 
+# ── Message family (canonical-state round 2, design §4) ─────────
+#
+# `source_type` + `operation` stay the *only* discriminators a consumer needs — the
+# observation-vs-actuation split below is expressed as a pure classification function, not
+# a schema fork or a third envelope shape. `ACTUATION_TYPES` is deliberately a
+# single-member *allowlist*, not a denylist carved out of `OBSERVATION_TYPES`: a brand-new
+# `source_type` introduced later defaults to "observation" (the safe family) unless someone
+# explicitly opts it into `ACTUATION_TYPES` *and* threads it through the publish_event gate
+# (knowledge_stream.py). This "closed by default" posture mirrors the gate itself.
+
+#: source_type values that represent a fact ABOUT the system (what happened / was
+#: observed) — never an instruction to act on it.
+OBSERVATION_TYPES = frozenset({
+    "story", "review", "ledger_job", "ledger_attempt",
+    "observation", "flag", "meta_session",
+})
+
+#: source_type values that represent a candidate INSTRUCTION to act (steer, interrupt,
+#: escalate, retry, budget, deadline). See docs/canonical_state_r2_design.md §5 — building
+#: and unit-testing this family does not, by itself, authorize anything to fire; that is
+#: gated separately (knowledge_stream.publish_event's `armed` check).
+ACTUATION_TYPES = frozenset({"actuation"})
+
+
+def message_family(source_type: str) -> str:
+    """Classify a record/event's family from ``source_type`` alone.
+
+    Adds no envelope field — the whole point of this function existing is that
+    "source_type + operation are the only discriminators" stays true after the
+    observation-vs-actuation split lands, not just before it. Any ``source_type`` not in
+    :data:`ACTUATION_TYPES` — including one invented in the future and never registered
+    here — classifies as ``"observation"``, the safe default. See
+    ``docs/canonical_state_r2_design.md`` §4 for the full rationale.
+    """
+    if source_type in ACTUATION_TYPES:
+        return "actuation"
+    return "observation"
+
+
 # ── Canonical identity + hashing helpers ────────────────────────
 
 
@@ -156,6 +195,15 @@ class KnowledgeEvent:
     occurred_at: str  # Producer timestamp used to measure end-to-end lag.
     schema_version: str  # Reject unknown contracts instead of guessing.
     event_id: str = ""  # Tracing id; NOT the idempotence key (that is knowledge_id).
+    # Round 2 addition (canonical-state design §1): mirrors KnowledgeRecord.causes onto the
+    # event envelope itself, so a consumer (or the publish_event lineage gate, see
+    # knowledge_stream.py) can reject a malformed actuation event without first materializing
+    # the record. Trailing default, same backward-compatibility argument as event_id above.
+    causes: str = ""
+    # Round 1 addition (canonical-state design §1): the tombstone / supersession reason. Required
+    # non-empty when operation == "delete" (a tombstone must say why) and when "supersede" resolves
+    # a content conflict; also reused as a caveat annotation on a recovered-from-git "upsert".
+    reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict (no body — pointers only)."""
@@ -169,6 +217,8 @@ class KnowledgeEvent:
             "occurred_at": self.occurred_at,
             "schema_version": self.schema_version,
             "event_id": self.event_id,
+            "causes": self.causes,
+            "reason": self.reason,
         }
 
     @classmethod
@@ -184,6 +234,8 @@ class KnowledgeEvent:
             occurred_at=d["occurred_at"],
             schema_version=d["schema_version"],
             event_id=d.get("event_id", ""),
+            causes=d.get("causes", ""),
+            reason=d.get("reason", ""),
         )
 
 
@@ -225,6 +277,17 @@ class KnowledgeRecord:
     evidence_class: str  # [M] [C] [H] [P] [X].
     confidence: float | None = None            # [H] execution-confidence; None = unmeasured.
     perturbation_strength: float | None = None # [M] strength axis (0.0 = baseline); None = unmeasured.
+    # Round 2 addition (canonical-state design §1): the knowledge_id of the OBSERVATION-family
+    # record that justified this record's existence. Cross-entity (unlike a same-entity
+    # supersession chain) — populated only on source_type == "actuation" records; None
+    # everywhere else. Trailing default so every pre-existing serialized artifact still parses
+    # via from_dict()'s .get()-based construction (missing key -> None, never a TypeError).
+    causes: str | None = None
+    # Round 1 addition (canonical-state design §1): predecessor knowledge_id for the SAME
+    # entity_id — the supersession chain link. Set only on a NEW version, never back-written onto
+    # the predecessor (immutability). None for a first version. Index layers derive effective
+    # valid_to from the successor's valid_from; this field is what makes that join possible.
+    supersedes: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict, encoding ``authority`` as its enum name."""
@@ -257,6 +320,8 @@ class KnowledgeRecord:
             "evidence_class": self.evidence_class,
             "confidence": self.confidence,
             "perturbation_strength": self.perturbation_strength,
+            "causes": self.causes,
+            "supersedes": self.supersedes,
         }
 
     @classmethod
@@ -291,4 +356,6 @@ class KnowledgeRecord:
             evidence_class=d["evidence_class"],
             confidence=d.get("confidence"),
             perturbation_strength=d.get("perturbation_strength"),
+            causes=d.get("causes"),
+            supersedes=d.get("supersedes"),
         )

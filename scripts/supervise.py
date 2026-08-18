@@ -251,6 +251,29 @@ def emit_flag(session: dict, status: str, why: str) -> None:
     except Exception:
         # JSONL and stdout remain useful when framework Redis is unavailable.
         pass
+
+    # canonical-state round 2 (Delta 1), plan step 13: register this flag in the
+    # canonical-state registry too — the session-scoped "newest wins" derivative of the
+    # observation supervise_once() already registered for every verdict (this function is
+    # only ever called for the non-healthy/unknown subset). Same FINOPS_KB_WRITE-gated,
+    # best-effort convention as the lpush/ltrim push just above — a downed DB2 knowledge
+    # stream must never cost this function its durable flags.jsonl write or its stdout
+    # line, both of which already succeeded by this point.
+    if os.environ.get("FINOPS_KB_WRITE") == "1":
+        try:
+            from instrument import knowledge_stream as ks
+            from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
+            from instrument.observation_ingestion import derive_flag_record
+
+            record = derive_flag_record(flag, repository_id=REPOSITORY_ID)
+            registry_redis = ks.connect()
+            ks.publish_event(
+                registry_redis, record_to_event(record),
+                authorized=True, source_type=record.source_type,
+            )
+        except Exception as e:  # noqa: BLE001
+            log(f"registry emit error for flag {flag.get('session_id', '?')}: {e!r}")
+
     print(f"[FLAG] {status}: {flag['title']} — {why}", flush=True)
 
 
@@ -340,7 +363,40 @@ def supervise_once(client: OpenCodeClient, monitor_id: str, redis_client) -> Non
             log(f"monitor error for {cell_id}: {e}")
             continue
         status, why = parse_verdict(reply)
-        if status not in ("healthy", "unknown"):
+
+        # canonical-state round 2 (Delta 1 + round-1 OQ6a), plan step 13: register
+        # EVERY verdict — not only the ones that go on to emit a flag below. This is the
+        # literal fix for the audit gap round 1 found: a "healthy" verdict previously
+        # left no durable trace anywhere, because emit_flag() below was (and still is —
+        # the conditional is UNCHANGED) only ever called for a non-healthy/unknown
+        # status. Gated on FINOPS_KB_WRITE, same opt-in convention as every other KB
+        # writer. UNLIKE story.py/run.py/finalize_reviews.py's inline emits, this one IS
+        # wrapped in a try/except: supervise_once() sits inside a live, always-running
+        # relay+assess loop (main()'s `while True`), and this is the one call site in the
+        # whole plan that touches currently-live production traffic — crashing the
+        # entire assessment pass because the separate DB2 knowledge stream happens to be
+        # briefly unreachable would take down the flag-only supervisor's actual job for
+        # every OTHER cell in this same batch too. This mirrors emit_flag()'s own
+        # existing best-effort treatment of ITS Redis push, just below.
+        if os.environ.get("FINOPS_KB_WRITE") == "1":
+            try:
+                from instrument import knowledge_stream as ks
+                from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
+                from instrument.observation_ingestion import derive_observation_record
+
+                record = derive_observation_record(
+                    {"cell_id": cell_id, "status": status, "why": why, "model": model},
+                    repository_id=REPOSITORY_ID,
+                )
+                registry_redis = ks.connect()
+                ks.publish_event(
+                    registry_redis, record_to_event(record),
+                    authorized=True, source_type=record.source_type,
+                )
+            except Exception as e:  # noqa: BLE001
+                log(f"registry emit error for {cell_id}: {e!r}")
+
+        if status not in ("healthy", "unknown"):     # UNCHANGED — still gates flag emission only
             emit_flag({"id": cell_id, "title": cell_id, "model": {"id": model}}, status, why)
 
 

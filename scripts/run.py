@@ -379,6 +379,23 @@ def _save_results(runs, name, model_label, results_dir):
     path.write_text(json.dumps(out, indent=2, default=str))
     print(f"\nResults saved: {path}")
 
+    # canonical-state round 2, plan step 11: write-time registration (Delta 1) — the
+    # single-task-result analog of story.py:save_story_result's inline emit. Gated on
+    # FINOPS_KB_WRITE (opt-in, same convention as every other KB writer) and deliberately
+    # left unwrapped (no try/except) once the flag is set — see save_story_result's
+    # docstring in src/instrument/story.py for why this call site intentionally lets a
+    # downed knowledge stream raise rather than swallowing it.
+    if os.environ.get("FINOPS_KB_WRITE") == "1":
+        from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
+        from instrument.knowledge_stream import connect, publish_event
+        from instrument.story_ingestion import derive_story_records_from_run_output
+
+        r = connect()
+        for record in derive_story_records_from_run_output(out, repository_id=REPOSITORY_ID):
+            publish_event(
+                r, record_to_event(record), authorized=True, source_type=record.source_type,
+            )
+
 
 def _generate_game_reports(runs, name, model_label, constraints, results_dir):
     """Generate individual game reports in markdown with artifacts."""

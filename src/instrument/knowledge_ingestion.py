@@ -356,9 +356,19 @@ def build_record(
 
 
 def record_to_event(
-    record: KnowledgeRecord, *, now: datetime | None = None
+    record: KnowledgeRecord,
+    *,
+    operation: str = "upsert",
+    reason: str = "",
+    now: datetime | None = None,
 ) -> KnowledgeEvent:
-    """Build the POINTER-only event for a record (``operation="upsert"``).
+    """Build the POINTER-only event for a record.
+
+    ``operation`` is one of ``upsert`` | ``supersede`` | ``delete`` (the ``OPERATIONS``
+    frozenset). ``reason`` is required non-empty for ``delete`` (a tombstone must say why) and
+    for a ``supersede`` that resolves a content conflict; it is also reused as a caveat
+    annotation on a recovered-from-git ``upsert``. Both are additive keyword-only defaults so
+    every existing caller (which passes neither) still emits a plain ``upsert``.
 
     Deliberately carries **no** ``text``/``body`` — mirroring ``KnowledgeEvent``'s docstring,
     a consumer must read the source artifact, verify ``content_hash``, and re-run the
@@ -375,13 +385,15 @@ def record_to_event(
     return KnowledgeEvent(
         knowledge_id=record.knowledge_id,
         entity_id=record.entity_id,
-        operation="upsert",
+        operation=operation,
         source_uri=artifact_uri(record.knowledge_id),
         source_revision=record.commit_sha,
         content_hash=_sha256_bytes(record_to_artifact(record)),
         occurred_at=_now_iso(now),
         schema_version=SCHEMA_VERSION,
         event_id=record.knowledge_id,
+        causes=record.causes or "",
+        reason=reason,
     )
 
 
@@ -595,5 +607,5 @@ def emit_phase_finding(
 
     with _authorized_kb_write():
         r = _ks.connect()
-        _ks.publish_event(r, record_to_event(record, now=now))
+        _ks.publish_event(r, record_to_event(record, now=now), source_type=record.source_type)
     return record

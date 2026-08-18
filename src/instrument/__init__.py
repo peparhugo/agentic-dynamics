@@ -85,8 +85,11 @@ from .game_report import GameReport
 from .graph import ALLOWED_EXPANSION_RELS, Neo4jClient
 
 # v1.0: canonical identity + authority contract for the runtime-RAG knowledge base
+# canonical-state round 2 (step 1): ACTUATION_TYPES/OBSERVATION_TYPES/message_family added
 from .knowledge import (
+    ACTUATION_TYPES,
     EVIDENCE_CLASSES,
+    OBSERVATION_TYPES,
     OPERATIONS,
     SCHEMA_VERSION,
     Authority,
@@ -95,6 +98,7 @@ from .knowledge import (
     compute_content_hash,
     compute_entity_id,
     compute_knowledge_id,
+    message_family,
 )
 
 # v0.6: Multi-language analysis + mutation compiler + story orchestrator
@@ -251,6 +255,62 @@ from .policy_ingestion import (
     build_policy_record,
     derive_policy_records,
     discover_policy_paths,
+)
+
+# canonical-state round 2: producer-side story derivation (source_type=story records)
+from .story_ingestion import (
+    ACL_SCOPE as STORY_ACL_SCOPE,
+    EXTRACTOR_VERSION as STORY_EXTRACTOR_VERSION,
+    SOURCE_TYPE as STORY_SOURCE_TYPE,
+    build_story_record,
+    derive_story_records,
+    derive_story_records_from_run_output,
+)
+
+# canonical-state round 2: producer-side review derivation (source_type=review records)
+from .review_ingestion import (
+    ACL_SCOPE as REVIEW_ACL_SCOPE,
+    EXTRACTOR_VERSION as REVIEW_EXTRACTOR_VERSION,
+    SOURCE_TYPE as REVIEW_SOURCE_TYPE,
+    build_review_record,
+    derive_review_records,
+)
+
+# canonical-state round 2: producer-side ledger derivation (ledger_job / ledger_attempt /
+# meta_session records — closes gap (a) no-session fallback and gap (b) meta_* pollution)
+from .ledger_ingestion import (
+    EXTRACTOR_VERSION as LEDGER_EXTRACTOR_VERSION,
+    FALLBACK_EXTRACTOR_VERSION as LEDGER_FALLBACK_EXTRACTOR_VERSION,
+    SOURCE_TYPE_ATTEMPT as LEDGER_SOURCE_TYPE_ATTEMPT,
+    SOURCE_TYPE_JOB as LEDGER_SOURCE_TYPE_JOB,
+    SOURCE_TYPE_META as LEDGER_SOURCE_TYPE_META,
+    build_attempt_record,
+    build_job_record,
+    classify_session,
+    derive_ledger_records,
+)
+
+# canonical-state round 2: producer-side observation/flag derivation (every supervisor
+# verdict is now registrable, not only flagged ones — closes round 1's OQ6a audit gap)
+from .observation_ingestion import (
+    ACL_SCOPE as OBSERVATION_ACL_SCOPE,
+    EXTRACTOR_VERSION as OBSERVATION_EXTRACTOR_VERSION,
+    SOURCE_TYPE_FLAG,
+    SOURCE_TYPE_OBSERVATION,
+    build_flag_record,
+    build_observation_record,
+    derive_flag_record,
+    derive_observation_record,
+)
+
+# canonical-state round 2, Delta 3: producer-side actuation derivation (authority=POLICY,
+# built + unit-tested with ZERO call sites — see actuation_ingestion.py's module docstring)
+from .actuation_ingestion import (
+    ACL_SCOPE as ACTUATION_ACL_SCOPE,
+    ACTUATION_KINDS,
+    EXTRACTOR_VERSION as ACTUATION_EXTRACTOR_VERSION,
+    SOURCE_TYPE as ACTUATION_SOURCE_TYPE,
+    derive_actuation_record,
 )
 
 # v1.0: durable ingestion over Redis Streams (DB 2, pointer-only events)
@@ -460,6 +520,27 @@ __all__ = [
     # v1.0 policy ingestion
     "derive_policy_records", "build_policy_record", "discover_policy_paths",
     "POLICY_EXTRACTOR_VERSION", "POLICY_SOURCE_TYPE", "POLICY_ACL_SCOPE",
+    # canonical-state round 2: story ingestion
+    "derive_story_records", "build_story_record", "derive_story_records_from_run_output",
+    "STORY_EXTRACTOR_VERSION", "STORY_SOURCE_TYPE", "STORY_ACL_SCOPE",
+    # canonical-state round 2: review ingestion
+    "derive_review_records", "build_review_record",
+    "REVIEW_EXTRACTOR_VERSION", "REVIEW_SOURCE_TYPE", "REVIEW_ACL_SCOPE",
+    # canonical-state round 2: ledger ingestion (gaps a, b)
+    "derive_ledger_records", "build_job_record", "build_attempt_record", "classify_session",
+    "LEDGER_EXTRACTOR_VERSION", "LEDGER_FALLBACK_EXTRACTOR_VERSION",
+    "LEDGER_SOURCE_TYPE_JOB", "LEDGER_SOURCE_TYPE_ATTEMPT", "LEDGER_SOURCE_TYPE_META",
+    # canonical-state round 2: observation/flag ingestion (OQ6a closure)
+    "derive_observation_record", "build_observation_record",
+    "derive_flag_record", "build_flag_record",
+    "OBSERVATION_EXTRACTOR_VERSION", "OBSERVATION_ACL_SCOPE",
+    "SOURCE_TYPE_OBSERVATION", "SOURCE_TYPE_FLAG",
+    # canonical-state round 2, Delta 3: actuation ingestion (zero call sites)
+    "derive_actuation_record",
+    "ACTUATION_EXTRACTOR_VERSION", "ACTUATION_SOURCE_TYPE", "ACTUATION_ACL_SCOPE",
+    "ACTUATION_KINDS",
+    # canonical-state round 2, step 1: message-family classification
+    "OBSERVATION_TYPES", "ACTUATION_TYPES", "message_family",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",
