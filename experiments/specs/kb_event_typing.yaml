@@ -1,0 +1,119 @@
+name: kb_event_typing
+question: >-
+  Make the per-cell scope + type invariants hold by construction, not convention (T1 + S1/S2 + A1).
+  Today the event envelope drops the type/scope discriminator, scope_excluded fails OPEN on an
+  empty candidate scope, and default_extract silently de-authors any artifact. Add source_type /
+  repository_id / acl_scope to KnowledgeEvent (trailing-default); make the empty-scope candidate
+  fail CLOSED for scoped queries; make the extractor default safe.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        T1 (HIGH): KnowledgeEvent (knowledge.py:189-206) carries no source_type/repository_id/
+        acl_scope, so a consumer cannot type-dispatch from the event; default_extract would store a
+        raw JSON blob as empty-typed/empty-scoped DERIVED. S1 (HIGH): the scope discriminator is not
+        on the wire — a record that loses repository_id becomes visible in EVERY cell. S2 (MEDIUM):
+        scope_excluded (retrieval.py:397-399) admits an empty candidate scope as "eligible" — the
+        wrong fail-open for a per-cell invariant. A1 (MEDIUM): default_extract
+        (knowledge_stream.py:325-362) assigns DERIVED/""/"" to whatever it decodes; it is the
+        process_entry default (knowledge_stream.py:397) and would de-author a POLICY record.
+      note: >-
+        This SUPERSEDES restructure.md §5.2 item 2 ("do not add source_type to KnowledgeEvent").
+        The knowledge_base review reached the opposite conclusion after tracing default_extract on
+        the merged code; T1 wins. kb_producer_factory (R2) only centralizes the producer-side
+        vocabulary and does not conflict.
+      hard_rules: >-
+        (1) source_type/repository_id/acl_scope are trailing-default on KnowledgeEvent (the same
+        pattern as causes/reason) — existing events still parse and existing hashes are unaffected
+        (event fields are not content-hash inputs). (2) scope_excluded: for a NON-EMPTY requested
+        scope, an empty candidate scope is EXCLUDED (fail-closed); the legacy batch corpus (empty
+        requested scope) keeps today's behavior. (3) default_extract must not silently de-author:
+        either make extract_record the process_entry default, or make default_extract raise on an
+        unrecognized artifact shape. (4) Test-driven; no weakening tests; 1,913 KB artifacts parse.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/kb-event-typing); each phase commits [workflow] <phase>.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement T1 + S1/S2 + A1 per docs/review/knowledge_base.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/review/knowledge_base.md (T1, S1, S2, A1)
+          - src/instrument/knowledge.py (KnowledgeEvent)
+          - src/instrument/knowledge_stream.py (default_extract, process_entry, publish_event)
+          - src/instrument/retrieval.py:392-405 (scope_excluded)
+
+          DO:
+          - Add source_type / repository_id / acl_scope trailing-default fields to KnowledgeEvent;
+            thread them through record_to_event/publish_event; update to_dict/from_dict.
+          - Fix scope_excluded: for a non-empty requested scope, exclude an empty candidate scope;
+            add a test that a scope-stripped record does NOT surface in a cell-scoped query.
+          - Fix default_extract: extract_record as the default, or raise on unrecognized shape; add
+            a test that the default path never de-authors a POLICY/MEASURED record.
+
+          VERIFY: pytest tests/test_knowledge.py tests/test_knowledge_stream.py tests/test_retrieval.py
+          tests/test_kb_worker.py -q — must pass.
+          DELIVER the code + passing tests.
+      - name: test
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the full gate and fix regressions.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q`. Fix failures without weakening tests.
+          - Re-verify the 1,913-artifact backward-compat invariant.
+
+          DELIVER a green full suite.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace T1/S1/S2/A1 to the code.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_kb_event_typing.md tracing each finding to its fix, with PASS/FAIL
+            and the pytest result.
+
+          DELIVER docs/review/impl_kb_event_typing.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: envelope_typed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [event_scope_type, scope_fail_closed, extractor_safe]
+metrics:
+  - {name: event_scope_type, agg: mean, over: cell}
+  - {name: scope_fail_closed, agg: mean, over: cell}
+  - {name: extractor_safe, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

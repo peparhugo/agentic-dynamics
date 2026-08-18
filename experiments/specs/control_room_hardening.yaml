@@ -1,0 +1,125 @@
+name: control_room_hardening
+question: >-
+  Harden the Control Room mutation boundary (F1 + F3), fix the route inventory and registry endpoints
+  (F2 + F4 + F5), and wire the first actuation call site (emit an actuation record whose causes
+  points at the justifying flag when a human steers/interrupts). The flag-only rail and read-only
+  registry board hold; the defect is an INCONSISTENT boundary — the most expensive mutation
+  (/api/experiments) sits outside the trust boundary every other actuation route enforces.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        F1 (HIGH): admin/server.py:1003-1023 POST /api/experiments spawns enqueue.py (real spend)
+        with no loopback/host/origin/idempotency check — unlike /api/queue/reinterleave which IS
+        wrapped in _design_mutation_body. F3 (MEDIUM): design-session /input (admin/server.py:1098-1121)
+        trusts the client's delivery mode (delivery=body.get("delivery","queue") at :1118), so "Send"
+        can silently become "steer". F2 (MEDIUM): route inventory stale (docstring lists 19, CONTEXT.md
+        says 24, actual 28). F4 (LOW): /api/registry re-parses the whole manifest per request
+        (:894, :927). F5 (LOW): lineage route assumes single-match without asserting (:932). The
+        actuation tie-in: actuation_ingestion is built with ZERO call sites; the steer/interrupt
+        handlers should emit an actuation record (authority=POLICY, causes -> flag/observation).
+      hard_rules: >-
+        (1) The flag-only rail is preserved: the actuation records are emitted ONLY from the
+        human-gated POST handlers, with causes -> the justifying observation; never from an
+        agent-callable path. (2) FINOPS_HOST=0.0.0.0 must NOT re-open /api/experiments — it must join
+        the shared mutation boundary. (3) delivery is fixed server-side (the browser never chooses
+        queue vs steer). (4) Test-driven; no weakening tests; the 28-route count is derived from the
+        actual @app.route set, not hand-counted.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/control-room-hardening); each phase commits [workflow] <phase>.
+    phases:
+      - name: harden
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement F1 + F3 + F2 + F4 + F5 per docs/review/control_room.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/review/control_room.md (F1-F5)
+          - admin/server.py (the mutation boundary _design_mutation_body/_claude_agent_mutation_body,
+            the /api/experiments + /api/flags/<sid>/steer + design-session /input handlers)
+          - scripts/CONTEXT.md:117-128 (the stale route table)
+
+          DO:
+          - F1: route /api/experiments through the shared mutation boundary (loopback + host +
+            same-origin + JSON + size cap + Idempotency-Key).
+          - F3: fix delivery server-side on design-session /input (validate against an allowlist).
+          - F2: regenerate the route inventory (module docstring + scripts/CONTEXT.md) from the
+            actual @app.route set (28 routes, five categories incl. registry).
+          - F4: cache the parsed manifest (TTL or file-mtime keyed).
+          - F5: mirror registry.py's ambiguity handling (return all matches / an ambiguous marker).
+          - Extend tests/test_admin_server.py with cases for each.
+
+          VERIFY: pytest tests/test_admin_server.py tests/test_admin_frontend.py -q — must pass.
+          DELIVER the code + passing tests.
+      - name: record_actuation
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Wire the first actuation call site.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/review/control_room.md §5.4
+          - src/instrument/actuation_ingestion.py (the producer, zero call sites)
+          - admin/server.py:333-350 (_authorize_supervisor_action) + the steer/interrupt handlers
+
+          DO:
+          - When POST /api/flags/<sid>/steer and /interrupt succeed, emit an actuation record via
+            actuation_ingestion with causes -> the flag/observation knowledge_id that justified the
+            action (authority=POLICY). Best-effort: a KB outage must not block the steer itself.
+          - Add a test that a steer emits exactly one actuation record with the correct causes, and
+            that a GET-only path emits none.
+
+          VERIFY: pytest tests/test_admin_server.py tests/test_knowledge_stream.py -q — must pass.
+          DELIVER the code + passing tests.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace F1-F5 + the actuation tie-in to the code.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_control_room_hardening.md tracing each finding to its fix, with
+            PASS/FAIL and the pytest result.
+
+          DELIVER docs/review/impl_control_room_hardening.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: boundary_hardened
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [experiments_gated, delivery_fixed, inventory_regen, actuation_recorded]
+metrics:
+  - {name: experiments_gated, agg: mean, over: cell}
+  - {name: delivery_fixed, agg: mean, over: cell}
+  - {name: inventory_regen, agg: mean, over: cell}
+  - {name: actuation_recorded, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, harden, record_actuation, verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

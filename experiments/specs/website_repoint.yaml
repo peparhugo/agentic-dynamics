@@ -1,0 +1,129 @@
+name: website_repoint
+question: >-
+  Repoint the website to the correct data and content (S3 + C1 + C2 + C3/C4): fix the statMap/
+  findModel seam that reports the wrong model, resolve the fable-5/sonnet-5 labeling split, refresh
+  the stale DeepSeek pricing + peak/off-peak, and make the corpus counts canonical. The root cause
+  is two sources of truth — data.js (regenerated) vs hand-authored HTML fallbacks/claims — diverging.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        S3: app.js findModel does substring matching over the story corpus ordered by avg_cost, so
+        findModel('claude') -> Haiku, findModel('deepseek') -> Flash, findModel('gpt-5.6') -> Luna;
+        narration_rate/avg_narration_penalty are None and render as "0%" via (x||0). C1: evidence.html
+        says "Claude Fable 5" (the archive) while the story pages say "Claude Sonnet 5"; MODEL_DISPLAY_ORDER
+        (build_data.py:43) still lists claude-fable-5 and _short_model_label (build_data.py:728) maps
+        it to "Claude Fable 5". C2: story.html:123 claims "$10.00 vs $0.87, 11.5x" (now $1.98 off-peak);
+        peak/off-peak is undocumented anywhere. C3/C4: static pages claim "1,097 / 227 / 249 / 221 / 224"
+        while data.js reports 772 story sessions / 156 stories / 344 reports.
+      note: >-
+        Per website.md's priority table, this spec covers S3 + C1 + C2 + C3/C4 (the low/medium-effort,
+        high-impact items). The larger structural split S1+S2 (evidence.html into two pages, delete
+        inline arrays) is a follow-up, not this spec.
+      hard_rules: >-
+        (1) data.js is the single source of truth — every number/model-label change goes through
+        build_data.py (or generate_manifest.py), never a hand-edited data.js. (2) Never resolve a
+        model by indexOf; key statMap by explicit id. (3) The fable-5/sonnet-5 decision: claude-fable-5
+        is the SAME model under a renamed alias (per the adapter fix) — normalize the perturbation
+        corpus's model id to claude-sonnet-5 in MODEL_DISPLAY_ORDER/_short_model_label, and relabel
+        the archive as historical Sonnet-5 (or clearly stamp "Fable 5 (historical alias)").
+        (4) Cost figures carry the off-peak/peak basis; null renders as an em-dash, never "0%".
+        (5) Run build_data.py + generate_manifest.py to regenerate data.js before verifying.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/website-repoint); each phase commits [workflow] <phase>.
+    phases:
+      - name: repoint_ui
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement S3 per docs/review/website.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/review/website.md (S3)
+          - firebase/public/app.js (findModel, statMap)
+          - scripts/build_data.py (compute_story_models — where flail/narration should be sourced)
+
+          DO:
+          - Key statMap by explicit model id (or provider with a declared default); never indexOf.
+          - Source cost_per/flail/narration from the corpus where actually measured; render null as
+            an em-dash instead of "0%". Update the model cards/tables accordingly.
+
+          VERIFY: regenerate data.js and confirm findModel('claude')->sonnet, findModel('deepseek')->pro
+          (or explicit-id lookups); pytest tests/test_build_data.py -q must pass.
+          DELIVER the code.
+      - name: fix_content
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement C1 + C2 + C3/C4 per docs/review/website.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/review/website.md (C1, C2, C3, C4)
+          - scripts/build_data.py (MODEL_DISPLAY_ORDER, _short_model_label, the summary block)
+          - firebase/public/story.html:123, framework.html:832/882, glossary.html:45, evidence.html,
+            accelerator.html, databricks.html, methodology.html:60
+
+          DO:
+          - C1: normalize claude-fable-5 -> claude-sonnet-5 in MODEL_DISPLAY_ORDER/_short_model_label;
+            relabel the historical archive consistently.
+          - C2: fix the DeepSeek pricing claims (off-peak $1.98, peak 2x); add a peak/off-peak note;
+            regenerate the multiplier claims from PROVIDER_PRICING.
+          - C3/C4: add a canonical corpus-count block to data.js summary and bind the static pages to
+            it via data-stat; prefix remaining historical figures with "historical".
+          - Regenerate data.js + manifest.
+
+          VERIFY: grep confirms no stale "1,097"/"227"/"249"/"221"/"224"/"$0.87"/"11.5x" claims remain
+          where they should be live; pytest tests/test_build_data.py tests/test_generate_manifest.py -q
+          — must pass.
+          DELIVER the code.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace S3/C1/C2/C3/C4 to the code.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_website_repoint.md tracing each finding to its fix, with PASS/FAIL
+            and the pytest result.
+
+          DELIVER docs/review/impl_website_repoint.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: site_repointed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [ui_seam_fixed, labels_resolved, pricing_fixed, counts_canonical]
+metrics:
+  - {name: ui_seam_fixed, agg: mean, over: cell}
+  - {name: labels_resolved, agg: mean, over: cell}
+  - {name: pricing_fixed, agg: mean, over: cell}
+  - {name: counts_canonical, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, repoint_ui, fix_content, verify]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

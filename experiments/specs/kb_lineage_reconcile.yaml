@@ -1,0 +1,110 @@
+name: kb_lineage_reconcile
+question: >-
+  Retire the SOURCE_TYPE_INDEX_KEY stand-in and wire the reconcile_missing repair path (R1 + R2).
+  The lineage gate reads only the now-least-authoritative Redis stand-in (not the canonical
+  registry_index.jsonl), and reconcile_missing has no production caller — dead-lettered events and
+  events lost before a consumer group existed have no repair path.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        R1 (HIGH): knowledge_stream.py:62-69 SOURCE_TYPE_INDEX_KEY is "a stand-in for the eventual
+        canonical registry index", populated by publish_event (:192-193), and the lineage gate
+        _resolves_to_observation reads ONLY it (:114-125) — not registry_index.jsonl, which
+        generate_manifest/registry.py now treat as canonical. Two records can disagree across the
+        three views. R2 (MEDIUM): reconcile_missing (knowledge_stream.py:431-449) has no production
+        caller — kb_worker.main logs "no manifest wired in v1" every hour (kb_worker.py:550-554) and
+        does nothing.
+      hard_rules: >-
+        (1) The lineage gate must be reconciled against registry_index.jsonl (or the SOURCE_TYPE_INDEX_KEY
+        stand-in retired entirely) — a source_type the registry knows must be visible to the gate. (2)
+        reconcile_missing must be wired into kb_worker.main's periodic pass (or the loss mode must be
+        explicitly documented + the "no manifest wired" log removed). (3) Do not weaken the write
+        guard, the actuation gates, or the authority ordinal. (4) Test-driven; 1,913 KB artifacts
+        parse.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/kb-lineage-reconcile); each phase commits [workflow] <phase>.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement R1 + R2 per docs/review/knowledge_base.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/review/knowledge_base.md (R1, R2)
+          - src/instrument/knowledge_stream.py (SOURCE_TYPE_INDEX_KEY, _resolves_to_observation,
+            reconcile_missing)
+          - scripts/kb_worker.py (the consumer groups + the hourly main loop)
+          - scripts/generate_manifest.py (the canonical registry compaction)
+
+          DO:
+          - R1: make _resolves_to_observation read the canonical registry (or retire the stand-in
+            and reconcile against registry_index.jsonl); add a test that a source_type visible in
+            the registry resolves in the lineage gate.
+          - R2: wire reconcile_missing into kb_worker.main's periodic pass (or document the loss mode
+            explicitly and remove the misleading "no manifest wired" log); add a test for the repair
+            path.
+
+          VERIFY: pytest tests/test_knowledge_stream.py tests/test_kb_worker.py
+          tests/test_generate_manifest.py -q — must pass.
+          DELIVER the code + passing tests.
+      - name: test
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the full gate and fix regressions.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q`. Fix failures without weakening tests.
+
+          DELIVER a green full suite.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace R1/R2 to the code.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_kb_lineage_reconcile.md tracing each finding to its fix, with
+            PASS/FAIL and the pytest result.
+
+          DELIVER docs/review/impl_kb_lineage_reconcile.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: lineage_reconciled
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [standin_retired, reconcile_wired]
+metrics:
+  - {name: standin_retired, agg: mean, over: cell}
+  - {name: reconcile_wired, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
