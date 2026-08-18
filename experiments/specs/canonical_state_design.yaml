@@ -1,0 +1,222 @@
+name: canonical_state_design
+question: >-
+  The project's measurement data is fragmented across ad-hoc stores — story result JSONs, review
+  JSONs, a conceptual LEDGER_FIELDS schema (no persisted ledger), _results_summary.json, parquet,
+  and a Neo4j/Chroma/Redis knowledge base — with no date spine and no canonical registry. A recent
+  remediation run exposed the cost: 59 re-run story results stranded in a worktree by a
+  relative-path bug, a single-task summary that shrank 227→144, and a future session had to spelunk
+  git history + DB + /tmp to reconstruct what was canonical. Design a canonical-state architecture
+  — a date-spined, queryable registry of every record the project produces — such that (a) no
+  record can silently strand, (b) the canonical version of any artifact is determinable in ONE
+  query, (c) superseded/contaminated records are tombstoned not deleted, (d) the knowledge base
+  extends to the WHOLE project rather than experiments only, and (e) the supervisor's observe-only
+  assessment flags become durable first-class observations rather than ephemeral Redis state —
+  surfacing through BOTH the CLI/query path and the Control Room portal. Run once per model to
+  produce three independent, pull-able design proposals.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: markdown
+    fork: true
+    context:
+      forensic_findings: >-
+        Facts established 2026-08-18 (do not re-derive; cite them): (1) The story corpus shrank
+        221→156 because the remediation moved 77 contaminated early_degrade cells to
+        experiments/results/stories/_remediation_contaminated/ (they ran as CLEAN due to the P0-7
+        mutation fallback), then the re-run workers were launched from feature worktrees
+        (feature/remediation-integrity, feature/queue-steer-2) and wrote results to a RELATIVE
+        experiments/results/stories/ path — so ~59 re-run results are stranded in those worktrees,
+        not the main repo. (2) _results_summary.json shrank 227→144 because the single-task exp_*
+        worktrees were deleted/unarchived; the 227-entry version is recoverable from git but carries
+        stale manifold/semantic labels and cross-matched baselines. (3) Single-task results from
+        2026-08-17 (task_manager 7 models + process_perturbation_resample for deepseek-v4-pro /
+        claude-fable-5 / gpt-5.6-sol) are complete but NOT folded into _results_summary.json.
+        (4) claude-fable-5 single-task runs went through the claude_cli backend, so they have NO
+        opencode.db session and analyze_worktrees.py silently drops them. (5) 52 meta_* analysis
+        sessions own /tmp/exp_* dirs and can pollute analyze_worktrees.py (meta_batch_* matches the
+        "batch" title filter). (6) There is no date spine: the only signal that distinguishes
+        canonical from stale is file mtime + git history + Redis queue status.
+      open_questions: >-
+        Answer EACH, with a concrete schema/sketch, not prose: (1) One canonical registry with a
+        record_type axis (experiment/attempt/story/review/finding) vs three separate ledgers — which,
+        and what are the exact record fields + the identity key? (2) The date spine: what temporal
+        fields (observed_at / recorded_at / valid_from / valid_to / supersedes) and how does
+        supersession work (tombstone vs delete vs both)? (3) Surfacing: what is the ONE query/CLI a
+        future session runs to see canonical state + lineage, and where does it live (inventory.py /
+        monitor.py --json / KB retrieve / manifest) — and what is the Control Room's corresponding
+        human-facing board/route (it currently shows live matrix/routing/flags, NOT canonical
+        state/lineage/supersession)? (4) Store split: what stays in immutable files, what moves to
+        Neo4j (lineage/supersession edges), what stays in parquet as analytic views, and is the
+        manifest the registry index? (5) KB extension: how do story/review/ledger/manifest become
+        first-class record_types alongside finding/code/quality/policy, with the date spine +
+        supersession on every KnowledgeRecord, through the existing producer-side ingestion
+        (record_to_artifact → record_to_event → stream → extract_record)? (6) Supervisor: how do the
+        observe-only assessor's THREE output layers become first-class records — (a) the assessment
+        VERDICT (STATUS + WHY, authority ADVISORY/[H]), (b) the MONITOR SESSION itself (a flash-model
+        meta-run whose transcript/tokens/cost must be measured by the same instrument, since the
+        supervisor is itself an information-acquisition cost the ledger does not see), and (c) the
+        normalized FLAG (flags.jsonl, already durable with flag_id + at) — each with a date spine
+        (raised_at / reviewed_at / cleared_at) and supersession (cleared → tombstoned), while the
+        supervisor stays observe-only (flag-only rail) and its Redis contracts remain the live surface
+        feeding the Control Room flags board?
+      prior_art: >-
+        The remediation that motivated this is experiments/specs/remediation_data_integrity.yaml
+        (measurement fixes) — do not redo it; build the ARCHITECTURAL layer above it. The knowledge
+        base already provides: dual sha256 ids (entity_id, knowledge_id), ordered Authority
+        (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY), pointer-only records (source_uri →
+        file://experiments/results/kb/<id>.json), four producer source_types
+        (finding/code/quality/policy), and a Redis Streams ingestion plane (kb:v1:changes, DB 2 on
+        6380, WRITE GUARD). src/instrument/experiment_spec.py holds LEDGER_FIELDS (the conceptual
+        schema) and the validate_rules gate. scripts/sync_data.py → build_data.py → generate_manifest.py
+        is the current derived-data spine. data_manifest.json is the current (thin) registry. The
+        Control Room (admin/server.py, port 8000/8001) is the human-facing portal — 24 routes across
+        matrix/status(SSE)/events/routing/supervisor-flags/design-sessions/claude-agents — reading
+        Redis (queue status DB 1, live telemetry, flags) + compute_routing; the control-plane agent
+        pulls state via .opencode/tools/dashboard.ts + control_room.ts (read-only GET). It is the
+        flag-only/observe-only rail (see docs/supervisor_design.md) and currently surfaces live state
+        only — no canonical corpus, no date spine, no supersession view. The supervisor
+        (src/instrument/supervisor.py + scripts/supervise.py) is the observe-only assessor: a flash
+        monitor session (deepseek/deepseek-v4-flash, state in experiments/results/supervisor/
+        monitor_session.json) watches running opencode sessions and emits FLAGS. Its OUTPUT is three
+        layers: (a) the monitor's assessment VERDICT (STATUS + WHY — the flash model's substantive
+        observation), (b) the MONITOR SESSION itself — a meta-LLM run (transcript, tokens, cost) that
+        is currently NOT measured by the instrument, and (c) the normalized FLAG
+        (experiments/results/supervisor/flags.jsonl, append-only, flag_id = sha256 of FLAG_FIELDS =
+        at/session_id/title/model/status/why) plus the bounded Redis hot path (SUPERVISOR_FLAGS_KEY,
+        ltrim to MAX). flags.jsonl is durable but is in NO registry, has NO supersession (a flag has
+        no resolved/cleared lifecycle), and the monitor session's own cost is unaccounted — so the
+        supervisor is an information-acquisition cost the ledger cannot see.
+      design_priorities: >-
+        Optimize for: future-session surfacing (no spelunking) through BOTH the CLI/query path and
+        the Control Room, immutability of raw records, and backward compatibility (do not rewrite the
+        existing result JSONs — register them). Explicitly address how the stranded/contaminated/
+        quarantined records from the forensic_findings become first-class tombstoned records rather
+        than a recurring surprise.
+      run_shape: >-
+        This spec is SINGLE-model: the model is selected by --model (no model_pool, no per-phase pin).
+        Run it THREE times — deepseek/deepseek-v4-pro, anthropic/claude-fable-5, openai/gpt-5.6-sol —
+        each in its own worktree/branch, so each branch is an independent complete design the
+        operator can compare.
+    phases:
+      - name: inventory
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Map every store the project currently uses and the gaps the forensic findings expose.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - experiments/specs/canonical_state_design.yaml  (the forensic_findings + open_questions)
+          - src/instrument/CONTEXT.md                      (module + KB + ledger reference)
+          - src/instrument/experiment_spec.py              (LEDGER_FIELDS — the conceptual schema)
+          - src/instrument/knowledge.py                    (Authority, KnowledgeRecord, dual ids)
+          - scripts/CONTEXT.md                             (sync_data / build_data / inventory / monitor)
+          - admin/server.py + docs/supervisor_design.md    (the Control Room routes + flag-only rail)
+          - src/instrument/supervisor.py + scripts/supervise.py  (the observe-only flag contracts)
+          - experiments/results/data_manifest.json         (the current thin registry)
+
+          REQUIREMENTS:
+          - Produce a STORE MAP: one row per store (story JSONs, review JSONs, _results_summary.json,
+            sessions.parquet/stories.parquet, inventory.json, data_manifest.json, opencode.db,
+            Neo4j graph, Chroma, Redis queue/streams, the KB artifacts, the SUPERVISOR's three output
+            layers — flags.jsonl (append-only), monitor_session.json, the flash monitor session's own
+            transcript/cost, and the Redis flag list + session↔cell↔event mappings — AND the Control
+            Room — its Redis DB-1 queue-status hash, live pub/sub telemetry, supervisor flags, SSE
+            routes, and routing board) with: what records it holds, its identity key, whether it has
+            a date spine, whether it is canonical or derived, and its known gap (stranding, staleness,
+            no-session, pollution, live-only, unmeasured) per the forensic findings.
+          - Mark each store IMMUTABLE-SOURCE vs DERIVED-VIEW vs INDEX vs GRAPH vs TRANSIENT vs
+            SURFACE (the Control Room is a surface, not a source; the supervisor's flags.jsonl is an
+            immutable source but its monitor session + Redis contracts are transient/unmeasured — the
+            monitor session's own cost is an information-acquisition cost no ledger currently sees).
+
+          DELIVER exactly one file: docs/canonical_state_inventory.md (the store map + gap table).
+      - name: design
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Write the canonical-state architecture proposal — YOUR independent design.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/canonical_state_inventory.md (produced by the inventory phase)
+          - experiments/specs/canonical_state_design.yaml (open_questions + prior_art)
+
+          REQUIREMENTS:
+          - Answer ALL SIX open_questions with concrete schemas, not prose: (1) registry + record
+            fields + identity key, (2) the date-spine fields + supersession semantics, (3) the ONE
+            surfacing query/CLI and where it lives, PLUS the Control Room's canonical-state
+            board/route (what it shows, how it stays read-only/flag-only, how lineage + supersession
+            are rendered), (4) the store split (files / Neo4j / parquet / manifest), (5) the KB
+            extension (new record_types + how story/review/ledger/manifest flow through the existing
+            ingestion path), (6) how the supervisor's observe-only flags become durable OBSERVATION
+            records with a date spine + supersession while the flag-only rail is preserved.
+          - Give a migration plan: how the stranded 59 story results, the quarantined contaminated
+            cells, and the un-folded single-task results become first-class tombstoned-or-canonical
+            records, with a concrete ordering of steps.
+          - State explicitly what you would NOT build (scope boundary) and why.
+          - Do not implement; deliver the design only.
+
+          DELIVER exactly one file: docs/canonical_state_design.md.
+      - name: verify
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Verify your design before it is pulled.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Trace every forensic_findings item to a concrete mechanism in your design (which store /
+            spine / surfacing step makes that corruption impossible to repeat).
+          - Confirm all open_questions (six) are answered with a schema/sketch (not prose).
+          - Confirm backward compatibility: no existing result JSON is rewritten; records are
+            registered, not re-factored.
+          - Confirm the supervisor stays observe-only (flag-only rail) in the design — its verdicts,
+            monitor session, and flags become durable records WITHOUT gaining any steering authority,
+            and the monitor session's own cost/tokens are measured by the same instrument (it is a
+            meta-LLM run, not free observation).
+          - Write docs/canonical_state_design_verify.md with PASS/FAIL per check.
+
+          DELIVER docs/canonical_state_design_verify.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: store_inventory
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [store_map]
+  - name: design_coverage
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [questions_answered, migration_plan]
+  - name: traceability
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [store_map, migration_plan]
+    produces: [corruption_prevented]
+metrics:
+  - {name: questions_answered, agg: ratio, over: cell}
+  - {name: stores_covered, agg: ratio, over: cell}
+  - {name: corruption_prevented, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, inventory, design, verify]
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
