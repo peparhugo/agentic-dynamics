@@ -1,0 +1,185 @@
+name: deep_architecture_review
+question: >-
+  Conduct a deep architectural + refactor review of this codebase. It has a dual role: (a) an
+  experimental apparatus that gleans findings and applies intelligent routing, and (b) a RAG /
+  knowledge-base layer plus a host of other functionality (supervisor, Control Room, workflow
+  runner, stories/reviews/lab books, data pipeline). Long-term the framework must work against
+  OTHER eager repositories as seeds — clone an external repo, build its codebase graph, derive
+  code/quality/policy knowledge, run tasks/stories and perturbations against it, measure, route,
+  and retrieve — not just this one repo. Produce an as-is architecture map, a coupling/seed-repo
+  generalization assessment, and a prioritized refactor roadmap.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: markdown
+    fork: true
+    context:
+      frame: >-
+        The repo is an information-acquisition machine for AI economics: instrument → derive
+        (measurement rules → information) → policy (control rules) → grid → campaign. But it is
+        ALSO a working RAG/knowledge-base (knowledge.py, retrieval.py, prompt_constructor.py,
+        knowledge_stream.py + the four producer ingestion modules) and a growing control surface
+        (supervisor, Control Room admin/server.py, workflow_runner, step_routing, signal_store).
+        The spec/compiler layer (experiment_spec.py + compile_experiment.py) is the declared
+        roadmap toward generalizing the linear execution core. The review must treat these roles
+        as equally first-class and locate where they couple, leak, or duplicate.
+      seed_repo_goal: >-
+        Long-term: use OTHER eager repositories as seeds. Today the framework experiments largely
+        on itself — BUILTIN_STORIES (task_manager_api, static_site_gen, notification_service) build
+        toy apps in worktrees, and code/quality/policy knowledge is derived from THIS repo. The
+        target: point the framework at an arbitrary external repo, and have the whole cycle run
+        against it — seed ingestion (clone + build_graph + parse_codebase), knowledge derivation
+        (code_ingestion / quality_ingestion / policy_ingestion over the seed), task/story execution
+        (a feature or perturbation applied to the seed), measurement + routing, and retrieval
+        scoped to the seed. Assess what is ALREADY parameterized (codebase_path, repository_id,
+        worktree, parse_codebase(path), build_graph(codebase_path)) vs what is hard-coded to this
+        repo (BUILTIN_STORIES, the fixed story/task configs, routing task types, REPOSITORY_ID
+        constant, worktree path assumptions, the /tmp/story_* + /tmp/exp_* conventions).
+      prior_work: >-
+        Recent relevant work to factor in (do not redo): the canonical-state design rounds
+        (docs/canonical_state_base_design.md, docs/canonical_state_r2_design.md) propose a
+        one-typed-event-stream registry with write-time registration and a gated
+        observation-vs-actuation boundary; the spec/compiler design
+        (code_reviews/2026-08-14_experiment-spec-and-compiler-design.md) is the declared
+        generalization roadmap; the KB CONTEXT (src/instrument/CONTEXT.md) documents the merged
+        knowledge base. Read the mental model first (.opencode/instructions/mental-model.md) for
+        the authoritative module map and signatures.
+      read_first: >-
+        .opencode/instructions/mental-model.md  (module map, signatures, dependencies)
+        src/instrument/CONTEXT.md               (module + KB + ledger reference)
+        code_reviews/2026-08-14_experiment-spec-and-compiler-design.md
+        scripts/CONTEXT.md, experiments/CONTEXT.md, firebase/CONTEXT.md, docs/supervisor_design.md
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/architecture-review); each phase commits [workflow] <phase>. This is a REVIEW:
+        produce analysis docs, do NOT edit production code.
+    phases:
+      - name: survey
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Map the as-is architecture. READ FIRST the files listed in the spec's `read_first`, then
+          survey src/ (75 modules, ~20k lines) and scripts/ (82 scripts).
+
+          GOAL:
+          {goal}
+
+          DELIVER exactly one file: docs/arch_review/architecture_map.md containing:
+          - LAYER MAP: classify every src/instrument module into the four roles — apparatus
+            (measurement: story/perturb/mutation/solution/basin/efficiency/strategy/recovery/
+            game_report/trajectory), knowledge (knowledge/knowledge_stream/knowledge_ingestion/
+            code_ingestion/quality_ingestion/policy_ingestion/retrieval/prompt_constructor/
+            embeddings/graph/codebase_graph), orchestration (workflow_runner/step_routing/routing/
+            signal_store/experiment_spec/compile_experiment/supervisor), analysis
+            (commit_analysis/review/entropy/lsp_diagnostics/sonar/opencode_analyzer/ollama_analyzer).
+            For each, one line: what it does and its ONE biggest dependency.
+          - CYCLE TRACE: where each stage of instrument→derive→policy→grid→campaign is implemented.
+          - SEAMS: the import graph across the four layers — which layers import which, and any
+            cycle or god-module (flag story.py:1415, retrieval.py:1121, graph.py:897,
+            workflow_runner.py:820, review.py:809, perturb.py:787, opencode.py:738 as candidates;
+            confirm or refute).
+          - A "surprises" list: anything whose placement contradicts its role.
+      - name: assess
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Assess coupling and the seed-repo generalization gap.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/arch_review/architecture_map.md (your survey)
+          - the spec's `seed_repo_goal` + `frame`
+
+          DELIVER exactly one file: docs/arch_review/coupling_assessment.md containing:
+          - DUAL-ROLE ASSESSMENT: where the experimental apparatus and the KB/RAG layer couple,
+            leak, or duplicate. Name the specific modules + seams. Is knowledge.py's dual-id/
+            authority contract being honored by the apparatus, or bypassed?
+          - SEED-REPO GAP: a two-column audit — PARAMETERIZED vs HARD-CODED-TO-THIS-REPO — with
+            file:line evidence. Cover at minimum: BUILTIN_STORIES, story/task configs
+            (experiments/configs/*, experiments/specs/*), routing task types
+            (src/instrument/routing.py + step_routing.py), REPOSITORY_ID / repository scoping,
+            worktree path conventions (/tmp/story_*, /tmp/exp_*), codebase_graph/parse_codebase
+            assumptions, and the review/lab-book pipelines. For each hard-coded item, state the
+            smallest change that generalizes it to an arbitrary seed repo.
+          - DEBT + RISKS: the top blockers to seed-repo work and to maintainability, ranked.
+      - name: refactor_plan
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Produce the prioritized refactor roadmap.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/arch_review/architecture_map.md + docs/arch_review/coupling_assessment.md
+
+          DELIVER exactly one file: docs/arch_review/refactor_roadmap.md containing:
+          - A SEED-REPO WORKSTREAM as a first-class goal: the concrete steps (ordered) to ingest an
+            arbitrary external repo and run the full cycle against it, reusing the existing
+            parameterized seams and generalizing the hard-coded ones. Name the new module(s) or
+            changed signature(s) per step.
+          - A DEBT WORKSTREAM: the top 5-8 highest-leverage refactors for maintainability, each with
+            a before/after sketch (module, seam, expected effect) and an ordering rationale.
+          - A "do NOT do" list: tempting rewrites that would break the measurement apparatus's
+            provenance or the KB's authority contract, and why to avoid them.
+          - An explicit phasing (what is safe to do in parallel, what is strictly ordered).
+          - Do NOT implement; deliver the roadmap only.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Verify the review is grounded and actionable.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Trace every headline finding to file:line evidence (re-read, do not recall).
+          - Confirm every roadmap step names a concrete module/signature/change and a verification.
+          - Confirm the seed-repo workstream reuses parameterized seams and does not re-invent
+            transport (the reuse-map convention).
+          - Write docs/arch_review/review_verify.md with PASS/FAIL per check.
+
+          DELIVER docs/arch_review/review_verify.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: map_complete
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [architecture_mapped]
+  - name: seed_repo_gap
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [generalization_gap]
+  - name: roadmap_actionable
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [architecture_mapped, generalization_gap]
+    produces: [refactor_roadmap]
+metrics:
+  - {name: architecture_mapped, agg: ratio, over: cell}
+  - {name: generalization_gap, agg: ratio, over: cell}
+  - {name: refactor_roadmap, agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, map, assessment, roadmap, verify]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
