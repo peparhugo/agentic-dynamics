@@ -227,3 +227,59 @@ def derive_story_records(
     if not story_result.get("story_id"):
         return []
     return [build_story_record(story_result, repository_id=repository_id, now=now)]
+
+
+def derive_story_records_from_run_output(
+    out: dict[str, Any],
+    *,
+    repository_id: str = REPOSITORY_ID,
+    now: datetime | None = None,
+) -> list[KnowledgeRecord]:
+    """Adapt ``scripts/run.py``'s ``_save_results`` single-task output shape into the
+    ``StoryResult``-shaped dict :func:`derive_story_records` expects, then delegates to
+    it — no second identity formula lives here, per this module's "no new derivation
+    logic outside build_story_record" convention (plan step 11).
+
+    ``out`` is ``{"experiment": name, "model": model_label, "runs": [...]}`` — a
+    DIFFERENT shape from a full ``StoryResult.to_dict()`` (no ``story_id``, no
+    ``sessions`` list of the story.py shape, no ``perturbation_condition``/``summary``
+    block). ``run.py``'s own pipeline has no per-run unique id of its own (unlike
+    ``story.py``'s ``StoryResult``, which mints a random ``story_id`` hash per run) — its
+    persistence layer already treats ``f"{experiment}_{model_slug}"`` as the de-facto
+    cell identity (the EXACT string ``_save_results`` derives its own output filename
+    from: ``results_dir / f"{name}_{model_slug}.json"``), so this adapter reuses that
+    same formula as the synthetic ``story_id`` rather than inventing a second identity
+    scheme for the same underlying concept.
+
+    Raises ``ValueError`` when ``out`` has no ``experiment`` key — mirrors
+    ``build_story_record``'s "no story_id, no stable identity" contract.
+    """
+    name = str(out.get("experiment") or "")
+    if not name:
+        raise ValueError("run output has no 'experiment' — cannot derive a stable identity")
+    model = str(out.get("model") or "")
+    model_slug = model.replace(" ", "_").lower()
+    run_output_id = f"{name}_{model_slug}"
+
+    runs = out.get("runs") or []
+    # A lightweight rollup computed here (run.py's own runs are flat per-run dicts, not
+    # a pre-computed "summary" sub-block the way StoryResult.to_dict() already has one) —
+    # deliberately minimal: this adapter's whole job is identity + a text-rendering input,
+    # not a second analytics layer duplicating what run.py's own reporting already does.
+    total_cost = sum(
+        float(r.get("cost_usd") or 0.0) for r in runs if isinstance(r, dict)
+    )
+
+    adapted_story_result: dict[str, Any] = {
+        "story_id": run_output_id,
+        "story_name": name,
+        "language": "",
+        "model": model,
+        "perturbation_condition": "",
+        "worktree": "",
+        "perturbation_strength": None,
+        "test_executed_success": None,
+        "summary": {"total_cost": total_cost, "session_count": len(runs)},
+        "sessions": [],
+    }
+    return derive_story_records(adapted_story_result, repository_id=repository_id, now=now)

@@ -264,6 +264,7 @@ from .story_ingestion import (
     SOURCE_TYPE as STORY_SOURCE_TYPE,
     build_story_record,
     derive_story_records,
+    derive_story_records_from_run_output,
 )
 
 # canonical-state round 2: producer-side review derivation (source_type=review records)
@@ -520,7 +521,7 @@ __all__ = [
     "derive_policy_records", "build_policy_record", "discover_policy_paths",
     "POLICY_EXTRACTOR_VERSION", "POLICY_SOURCE_TYPE", "POLICY_ACL_SCOPE",
     # canonical-state round 2: story ingestion
-    "derive_story_records", "build_story_record",
+    "derive_story_records", "build_story_record", "derive_story_records_from_run_output",
     "STORY_EXTRACTOR_VERSION", "STORY_SOURCE_TYPE", "STORY_ACL_SCOPE",
     # canonical-state round 2: review ingestion
     "derive_review_records", "build_review_record",

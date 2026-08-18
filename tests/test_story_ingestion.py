@@ -177,3 +177,57 @@ def test_derive_story_records_returns_one_record():
     records = si.derive_story_records(_story_result())
     assert len(records) == 1
     assert records[0].source_type == "story"
+
+
+# ── derive_story_records_from_run_output (plan step 11's run.py adapter) ─
+
+
+def _run_output(**overrides) -> dict:
+    base = {
+        "experiment": "task_manager_api",
+        "model": "DeepSeek v4 Flash",
+        "runs": [
+            {"operator": "baseline", "correctness": 0.9, "cost_usd": 0.5, "total_tokens": 1000},
+            {"operator": "inject_alien_vocab", "correctness": 0.7, "cost_usd": 0.3, "total_tokens": 800},
+        ],
+    }
+    base.update(overrides)
+    return base
+
+
+def test_run_output_adapter_reuses_the_save_results_filename_formula_as_story_id():
+    # scripts/run.py's _save_results writes to results_dir / f"{name}_{model_slug}.json"
+    # — this adapter must derive the SAME string as its synthetic story_id, not a second
+    # identity formula.
+    records = si.derive_story_records_from_run_output(_run_output())
+    assert len(records) == 1
+    assert records[0].logical_locator == "task_manager_api_deepseek_v4_flash"
+    assert records[0].source_uri == "story:task_manager_api_deepseek_v4_flash"
+
+
+def test_run_output_adapter_produces_a_valid_story_record():
+    records = si.derive_story_records_from_run_output(_run_output())
+    assert records[0].source_type == "story"
+    assert records[0].authority is Authority.MEASURED
+    assert records[0].evidence_class == "[M]"
+
+
+def test_run_output_adapter_raises_without_experiment_key():
+    import pytest
+
+    with pytest.raises(ValueError):
+        si.derive_story_records_from_run_output(_run_output(experiment=""))
+
+
+def test_run_output_adapter_is_idempotent():
+    a = si.derive_story_records_from_run_output(_run_output())
+    b = si.derive_story_records_from_run_output(_run_output())
+    assert a[0].knowledge_id == b[0].knowledge_id
+
+
+def test_run_output_adapter_changed_runs_yields_a_different_knowledge_id():
+    a = si.derive_story_records_from_run_output(_run_output())
+    b = si.derive_story_records_from_run_output(_run_output(runs=[]))
+    assert a[0].knowledge_id != b[0].knowledge_id
+    # Same experiment+model -> same logical entity, still.
+    assert a[0].entity_id == b[0].entity_id

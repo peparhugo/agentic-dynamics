@@ -666,3 +666,56 @@ class TestFanOutYaml:
         assert ws.phases[0].id == "spec"
         assert ws.phases[1].depends_on == ["spec"]
         assert ws.phases[2].depends_on == ["impl"]
+
+
+# ── canonical-state round 2, plan step 11: run.py:_save_results write-time
+# registration. run.py is a DIFFERENT script from pipeline.py (this file's main
+# subject) but shares this file's existing `scripts/` sys.path bootstrap above, and no
+# other test file covers `_save_results` at all — extending in place here rather than
+# adding a fourth test file for the same call-site pattern already covered by
+# test_story.py (save_story_result) and test_finalize_reviews.py (_finalize_story).
+class TestSaveResultsRegistryEmission:
+    def _runs(self):
+        return [{"operator": "baseline", "correctness": 0.9, "cost_usd": 0.5, "total_tokens": 1000}]
+
+    def test_skips_emission_when_kb_write_unset(self, tmp_path, monkeypatch):
+        import run
+        from instrument import knowledge_stream as ks
+
+        monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
+
+        def _explode(*a, **kw):
+            raise AssertionError("must not connect to the knowledge stream when KB_WRITE is unset")
+
+        monkeypatch.setattr(ks, "connect", _explode)
+
+        run._save_results(self._runs(), "task_manager_api", "DeepSeek v4 Flash", tmp_path)
+        # No assertion error raised above == no connection attempt was made.
+
+    def test_emits_registry_event_when_kb_write_enabled(self, tmp_path, monkeypatch):
+        import run
+        from instrument import knowledge_stream as ks
+
+        monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+        published = []
+        monkeypatch.setattr(ks, "connect", lambda: object())
+        monkeypatch.setattr(
+            ks, "publish_event",
+            lambda r, event, **kw: published.append((event, kw)) or "0-1",
+        )
+
+        run._save_results(self._runs(), "task_manager_api", "DeepSeek v4 Flash", tmp_path)
+
+        assert len(published) == 1
+        event, kwargs = published[0]
+        assert kwargs["source_type"] == "story"
+        assert kwargs["authorized"] is True
+        assert event.knowledge_id
+
+    def test_result_file_is_still_written_regardless_of_kb_write(self, tmp_path, monkeypatch):
+        import run
+
+        monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
+        run._save_results(self._runs(), "task_manager_api", "DeepSeek v4 Flash", tmp_path)
+        out_path = tmp_path / "task_manager_api_deepseek_v4_flash.json"
+        assert out_path.exists()
