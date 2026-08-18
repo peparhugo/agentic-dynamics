@@ -396,10 +396,18 @@ from .test_runner import run_suite, suite_succeeded
 
 # v1.0: the execute phase — run an agent_task workflow in a worktree
 from .workflow_runner import (
-    AugmentationOutcome,
     PhaseResult,
     WorkflowRunResult,
     run_workflow,
+)
+
+# v1.0: the retrieve->construct->render augmentation seam (R7 — split out of workflow_runner)
+from .augment import (
+    AugmentationOutcome,
+    DEFAULT_INHERITED_TOOLS,
+    augment_prompt,
+    default_construct_fn,
+    default_retrieve_fn,
 )
 
 # v1.0: shared post-hoc job shapes + enqueue primitives (execute -> analyze -> review)
@@ -479,6 +487,8 @@ __all__ = [
     "compile_spec", "experiment_matrix", "compare_arms", "evaluate_rules",
     "first_pass_quality",
     "PhaseResult", "WorkflowRunResult", "run_workflow", "AugmentationOutcome",
+    "augment_prompt", "default_retrieve_fn", "default_construct_fn",
+    "DEFAULT_INHERITED_TOOLS",
     # v1.0 knowledge identity + authority contract
     "Authority", "KnowledgeRecord", "KnowledgeEvent",
     "compute_entity_id", "compute_knowledge_id", "compute_content_hash",

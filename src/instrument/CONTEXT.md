@@ -1,6 +1,6 @@
 # `src/instrument/` — Measurement Apparatus
 
-40 Python modules (+ `__init__.py`) that form the core library. Measures search dynamics (not
+58 Python modules (+ `__init__.py`) that form the core library. Measures search dynamics (not
 outputs): basin escape rates, recovery cost, attractor strength, strategy classification.
 Pip-installable as `agentic-dynamics`.
 
@@ -95,7 +95,8 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 | Module | Lines | Purpose | Key Exports |
 |--------|-------|---------|-------------|
 | `supervisor.py` | 171 | Shared Redis contracts for human-reviewed supervisor flags — observation metadata only; deliberately no OpenCode client dependency, so observation can't become control | `canonical_json()`, `normalize_flag()`, `parse_mapping()`, `register_session_mapping()`, `register_event_mapping()` |
-| `workflow_runner.py` | 812 | Executes an `agent_task` workflow's phases inside a git worktree, committing + ledgering (tokens, cost, `test_executed_success`) after each phase; the `execute` phase of the spec/compiler DAG; hosts the off-by-default RAG augmentation seam and the opt-in self-build emit (`rag_params.emit_self`) | `PhaseResult`, `WorkflowRunResult`, `AugmentationOutcome`, `cell_scope()`, `run_workflow()` |
+| `workflow_runner.py` | 587 | Executes an `agent_task` workflow's phases inside a git worktree, committing + ledgering (tokens, cost, `test_executed_success`) after each phase; the `execute` phase of the spec/compiler DAG; phase execution + the opt-in self-build emit (`rag_params.emit_self`), calling out to `augment.py` for the rag-gated augmentation | `PhaseResult`, `WorkflowRunResult`, `cell_scope()`, `run_workflow()` |
+| `augment.py` | 265 | The `retrieve -> construct -> render` augmentation seam (R7 — split out of `workflow_runner.py`): `augment_prompt()` plus the default dense+graph store wiring (`default_retrieve_fn()`) and the default constructor wiring (`default_construct_fn()`). Pure w.r.t. the worktree; references `publish_event` zero times | `AugmentationOutcome`, `augment_prompt()`, `default_retrieve_fn()`, `default_construct_fn()`, `DEFAULT_INHERITED_TOOLS` |
 | `test_runner.py` | 140 | Independent pytest/jest/go-test/cargo-test runner, keyed off `language.py`; sole source of truth for `test_executed_success` — never taken from the model's self-reported pass/fail | `resolve_node()`, `run_suite()`, `suite_succeeded()` |
 
 ### Backend, Telemetry & Routing
@@ -141,19 +142,53 @@ which path ran in `dedup_path`) → allowlisted graph expansion (real seed score
 
 | Module | Lines | Purpose | Key Exports |
 |--------|-------|---------|-------------|
-| `knowledge.py` | 288 | Canonical identity + authority contract — two sha256 ids (`entity_id`, `knowledge_id`), ordered `Authority` (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY), frozen `KnowledgeRecord`/`KnowledgeEvent` (pointer-only). `KnowledgeRecord` carries the structured measured-or-`None` ledger signals `confidence` [H], `perturbation_strength` [M], and `test_executed_success` [M] (never a fabricated `0.0`) | `Authority`, `KnowledgeRecord`, `KnowledgeEvent`, `compute_entity_id()`, `compute_knowledge_id()`, `compute_content_hash()` |
+| `knowledge.py` | 361 | Canonical identity + authority contract — two sha256 ids (`entity_id`, `knowledge_id`), ordered `Authority` (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY), frozen `KnowledgeRecord`/`KnowledgeEvent` (pointer-only), the `source_type`/`operation` discriminator vocabulary (`OBSERVATION_TYPES`/`ACTUATION_TYPES` + `message_family()` — observation-vs-actuation, closed-by-default), and the lineage/version fields `causes` (observation→actuation) and `supersedes` (same-entity version chain). `KnowledgeRecord` carries the structured measured-or-`None` ledger signals `confidence` [H], `perturbation_strength` [M], and `test_executed_success` [M] (never a fabricated `0.0`) | `Authority`, `KnowledgeRecord`, `KnowledgeEvent`, `OBSERVATION_TYPES`, `ACTUATION_TYPES`, `message_family()`, `compute_entity_id()`, `compute_knowledge_id()`, `compute_content_hash()` |
 | `retrieval.py` | 1121 | Deterministic retrieval — regex query planner, parallel dense (Chroma) + lexical (Neo4j full-text) legs, RRF fusion × authority/freshness/exact-id/conflict (hard commit pre-filter), per-cell `repository_id` scope pre-filter (`scope_excluded()`), content-hash `deduplicate`, cosine `collapse_redundant` (embeddings-optional), allowlisted decayed graph expansion, token-budgeted whole-chunk selection, `RetrievalAttempt` (`dedup_path` records the collapse leg), offline `build_evidence_cards()` | `QueryPlan`, `Candidate`, `RetrievalAttempt`, `build_query_plan()`, `retrieve()`, `rrf_base()`, `compute_fused_score()`, `graph_boost()`, `scope_excluded()`, `deduplicate()`, `collapse_redundant()`, `select_evidence()`, `build_evidence_cards()`, `FallbackMode` |
 | `prompt_constructor.py` | 456 | Typed prompt-constructor — `PromptConstructor` protocol, `prompt-plan/v1` schema, deterministic validator, one-repair + deterministic fallback renderer, no-fork cache keying, default `deepseek/deepseek-v4-flash` | `PromptConstructor`, `ModelPromptConstructor`, `ConstructionRequest`, `AugmentedPrompt`, `PromptPlan`, `validate_plan()`, `render_prompt()`, `construction_cache_key()`, `hash_work_item()` |
+| `knowledge_stream.py` | 449 | The durable transport — pointer-only `KnowledgeEvent` over Redis Streams (DB 2 on 6380); `publish_event()` carries three orthogonal gates (write guard → actuation-armed → lineage `causes`-must-resolve-to-observation), `process_entry()` (read → verify → extract → upsert → XACK), `SOURCE_TYPE_INDEX_KEY` (knowledge_id → source_type, powers the lineage gate); `CONSUMER_GROUPS` = `kb-chroma-v1`/`kb-neo4j-v1`/`kb-ledger-v1`/`kb-registry-v1` | `STREAM_KEY`, `DEAD_LETTER_KEY`, `SOURCE_TYPE_INDEX_KEY`, `CONSUMER_GROUPS`, `connect()`, `publish_event()`, `process_entry()`, `read_artifact()`, `verify_content_hash()`, `reconcile_missing()` |
 | `knowledge_ingestion.py` | 599 | Producer-side measured-finding derivation — turns a `_results_summary.json` entry into a MEASURED-authority `KnowledgeRecord` whose text is the evidence-card one-liner, keyed by the canonical dual-id; the richer extractor that supersedes `knowledge_stream.default_extract`. Also the self-build (progressive) phase-finding producer: `derive_phase_record()` / `emit_phase_finding()` emit a completed phase's one-line finding into its OWN cell scope (`MEASURED` when `test_executed_success` is a bool, else `ADVISORY`) | `EXTRACTOR_VERSION` (`"measured-finding/v1"`), `PHASE_EXTRACTOR_VERSION` (`"phase-finding/v1"`), `derive_records()`, `build_record()`, `record_to_artifact()`, `record_to_event()`, `extract_record()`, `derive_phase_record()`, `emit_phase_finding()` |
 | `code_ingestion.py` | 403 | Producer-side code-structure derivation — one `source_type=code` `KnowledgeRecord` per function/class (signature + docstring head, no body), `SOURCE`/`[C]`, keyed by the canonical dual-id; `ingest_codebase_graph()` wires the orphaned `graph.load_codebase_graph` so `CodeModule` + IMPORTS/IMPORTED_BY/TOUCHED populate | `EXTRACTOR_VERSION` (`"code/v1"`), `derive_code_records()`, `build_code_record()`, `ingest_codebase_graph()` |
 | `quality_ingestion.py` | 308 | Producer-side code-quality derivation — one `source_type=report` `KnowledgeRecord` per available signal (SonarQube/LSP → `MEASURED`/`[M]`, entropy → `DERIVED`/`[C]`), graceful skip-and-note when a tool is absent (never fabricated) | `EXTRACTOR_VERSION` (`"quality/v1"`), `derive_quality_records()`, `build_quality_record()` |
 | `policy_ingestion.py` | 288 | Producer-side policy ingestion — one `source_type=policy` `KnowledgeRecord` per pinned policy artifact (`AGENTS.md`, `conventions/*.yaml`, `experiments/specs/*.yaml`, mental-model files), `POLICY`/`[P]`; discoverability/citation only, never RRF candidates | `EXTRACTOR_VERSION` (`"policy/v1"`), `derive_policy_records()`, `build_policy_record()`, `discover_policy_paths()` |
+| `story_ingestion.py` | 285 | Canonical-state producer: `source_type=story` — one `KnowledgeRecord` per saved story result (idempotent `story_id` key), `MEASURED`/`[M]`; `derive_story_records_from_run_output()` adapts a `scripts/run.py` result into the same shape | `EXTRACTOR_VERSION` (`"story/v1"`), `derive_story_records()`, `build_story_record()`, `derive_story_records_from_run_output()` |
+| `review_ingestion.py` | 160 | Canonical-state producer: `source_type=review` — one `KnowledgeRecord` per merged review, `ADVISORY`/`[H]` | `EXTRACTOR_VERSION` (`"review/v1"`), `derive_review_records()`, `build_review_record()` |
+| `ledger_ingestion.py` | 374 | Canonical-state producer: `source_type=ledger_job`/`ledger_attempt`/`meta_session` — job/attempt/session records (`ledger_job`/`ledger_attempt` `MEASURED`/`[M]`, `meta_session` `ADVISORY`); `classify_session()` closes gap (a) no-session fallback and gap (b) `meta_*` pollution | `EXTRACTOR_VERSION` (`"ledger/v1"`), `derive_ledger_records()`, `build_job_record()`, `build_attempt_record()`, `classify_session()` |
+| `observation_ingestion.py` | 236 | Canonical-state producer: `source_type=observation`/`flag` — every supervisor verdict is registrable (not only flagged ones, closing round-1 OQ6a), both `ADVISORY`/`[H]` | `EXTRACTOR_VERSION` (`"observation/v1"`), `derive_observation_record()`, `build_observation_record()`, `derive_flag_record()`, `build_flag_record()` |
+| `actuation_ingestion.py` | 176 | Canonical-state producer (Delta 3): `source_type=actuation` — a candidate *instruction* to act, `POLICY`/`[P]`, `causes`-linked to a justifying observation; built + unit-tested with ZERO call sites (nothing fires it yet) | `EXTRACTOR_VERSION` (`"actuation/v1"`), `derive_actuation_record()`, `ACTUATION_KINDS` |
 
-The four producer-side `source_type`s, over the authority ordering (`POLICY > SOURCE > MEASURED > DERIVED > ADVISORY`): **finding → MEASURED `[M]`** (`knowledge_ingestion`), **code → SOURCE `[C]`** (`code_ingestion`), **report → MEASURED `[M]`** (Sonar/LSP) or **DERIVED `[C]`** (entropy) (`quality_ingestion`), **policy → POLICY `[P]`** (`policy_ingestion`). All four flow through the same pointer contract (`record_to_artifact` → `record_to_event` → stream → `extract_record`).
+The producer-side `source_type` vocabulary (one typed stream — `source_type` + `operation`
+are the only discriminators; one pointer envelope, one idempotent `knowledge_id` key), over
+the authority ordering (`POLICY > SOURCE > MEASURED > DERIVED > ADVISORY`): **finding → MEASURED
+`[M]`** (`knowledge_ingestion`), **code → SOURCE `[C]`** (`code_ingestion`), **report → MEASURED
+`[M]`** (Sonar/LSP) or **DERIVED `[C]`** (entropy) (`quality_ingestion`), **policy → POLICY `[P]`**
+(`policy_ingestion`), then the five canonical-state producers — **story → MEASURED `[M]`**
+(`story_ingestion`), **review → ADVISORY `[H]`** (`review_ingestion`), **ledger_job/ledger_attempt
+→ MEASURED `[M]`** + **meta_session → ADVISORY** (`ledger_ingestion`), **observation/flag → ADVISORY
+`[H]`** (`observation_ingestion`), **actuation → POLICY `[P]`** (`actuation_ingestion`). All flow
+through the same pointer contract (`record_to_artifact` → `record_to_event` → stream → `extract_record`).
 
-`workflow_runner.py` is the seam: between `route_step()` and `run_agent()` it calls
-`retrieve → construct → render` (gated by `spec.workflow.params.rag_augment`, default OFF) and
-persists augmentation provenance on `PhaseResult` (`raw_prompt_hash`, `pre_phase_commit`,
+`source_type` also carries a second, orthogonal split: `message_family()` (`knowledge.py`)
+classifies each type as **observation** (a fact *about* the system — every type not in
+`ACTUATION_TYPES`) or **actuation** (a candidate instruction to *act* — `ACTUATION_TYPES =
+{"actuation"}`, an allowlist that is closed-by-default). `publish_event()` keys three gates off
+this split: the write guard (`FINOPS_KB_WRITE=1` or `authorized=True`) applies to everything; the
+actuation-armed gate (`FINOPS_ACTUATION_ARMED=1` or `armed=True`) and the lineage gate (`causes`
+must resolve to an observation-family `knowledge_id` via `SOURCE_TYPE_INDEX_KEY`) apply only to
+actuation.
+
+Registry / tombstone / compaction (canonical-state rounds): the `kb-registry-v1` consumer group
+appends one compacted line per record to the flat, append-only `experiments/results/registry_index.jsonl`;
+`operation` discriminates `upsert` / `supersede` / `delete` (a `delete` is a **tombstone**,
+requiring a non-empty `reason`); `KnowledgeRecord.supersedes` links same-entity versions and
+`causes` links an actuation to its justifying observation. `scripts/generate_manifest.py` compacts
+`registry_index.jsonl` into the manifest's `registry` array (latest-per-entity, deriving
+`lifecycle_state` `current|superseded|tombstoned` from the supersede/delete chain), surfaced
+read-only via `scripts/registry.py` (`show`/`query`/`lineage`) and the Control Room `/api/registry*` routes.
+
+`augment.augment_prompt()` is the seam (R7 — split out of `workflow_runner.py`): between
+`route_step()` and `run_agent()` it calls `retrieve → construct → render` (gated by
+`spec.workflow.params.rag_augment`, default OFF) and `run_workflow()` persists the returned
+`AugmentationOutcome` onto `PhaseResult` provenance (`raw_prompt_hash`, `pre_phase_commit`,
 `retrieval_attempt_id`, `constructor_attempt_id`, `selected_evidence_ids`, `augmentation_versions`,
 `augmentation_tokens`, `augmentation_cost_usd`, `augmentation_latency_ms`, `fallback_mode`). Any
 retrieval/constructor failure falls back to the base prompt and records a named fallback mode.

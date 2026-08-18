@@ -4,10 +4,10 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
+from instrument.augment import default_retrieve_fn
 from instrument.experiment_spec import load_spec, validate_spec
 from instrument.workflow_runner import (
     _build_phase_prompt,
-    _default_retrieve_fn,
     cell_scope,
     run_workflow,
 )
@@ -461,7 +461,7 @@ def test_rag_fallback_on_construct_failure(tmp_path):
 def test_default_retrieve_fn_binds_dense_and_graph_stores(monkeypatch):
     """The default retrieval wiring builds both stores and binds them to ``retrieve``.
 
-    ``_default_retrieve_fn`` constructs ``ChromaStore`` with the dedicated
+    ``default_retrieve_fn`` constructs ``ChromaStore`` with the dedicated
     ``knowledge_chunks_v1`` collection and ``Neo4jClient`` with its own defaults,
     then returns a ``functools.partial`` carrying both as keyword args.
     """
@@ -481,7 +481,7 @@ def test_default_retrieve_fn_binds_dense_and_graph_stores(monkeypatch):
     monkeypatch.setattr(embeddings, "ChromaStore", _FakeChroma)
     monkeypatch.setattr(graph, "Neo4jClient", _FakeNeo4j)
 
-    fn = _default_retrieve_fn()
+    fn = default_retrieve_fn()
 
     assert isinstance(fn.keywords["dense_store"], _FakeChroma)
     assert isinstance(fn.keywords["graph_client"], _FakeNeo4j)
@@ -594,6 +594,7 @@ def test_retrieve_construct_render_path_never_writes():
     """
     import inspect
 
+    import instrument.augment as augment
     import instrument.prompt_constructor as pc
     import instrument.retrieval as retrieval_mod
     from instrument import workflow_runner as wr
@@ -603,7 +604,7 @@ def test_retrieve_construct_render_path_never_writes():
         assert "publish_event" not in inspect.getsource(mod)
 
     # The seam's retrieve/construct/render functions never reference publish_event either.
-    for fn in (wr._augment_prompt, wr._default_retrieve_fn, wr._default_construct_fn):
+    for fn in (augment.augment_prompt, augment.default_retrieve_fn, augment.default_construct_fn):
         assert "publish_event" not in inspect.getsource(fn)
 
     # The write is funneled through emit_phase_finding (not publish_event) and lives only in
