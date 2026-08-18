@@ -200,6 +200,10 @@ class KnowledgeEvent:
     # knowledge_stream.py) can reject a malformed actuation event without first materializing
     # the record. Trailing default, same backward-compatibility argument as event_id above.
     causes: str = ""
+    # Round 1 addition (canonical-state design §1): the tombstone / supersession reason. Required
+    # non-empty when operation == "delete" (a tombstone must say why) and when "supersede" resolves
+    # a content conflict; also reused as a caveat annotation on a recovered-from-git "upsert".
+    reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict (no body — pointers only)."""
@@ -214,6 +218,7 @@ class KnowledgeEvent:
             "schema_version": self.schema_version,
             "event_id": self.event_id,
             "causes": self.causes,
+            "reason": self.reason,
         }
 
     @classmethod
@@ -230,6 +235,7 @@ class KnowledgeEvent:
             schema_version=d["schema_version"],
             event_id=d.get("event_id", ""),
             causes=d.get("causes", ""),
+            reason=d.get("reason", ""),
         )
 
 
@@ -277,6 +283,11 @@ class KnowledgeRecord:
     # everywhere else. Trailing default so every pre-existing serialized artifact still parses
     # via from_dict()'s .get()-based construction (missing key -> None, never a TypeError).
     causes: str | None = None
+    # Round 1 addition (canonical-state design §1): predecessor knowledge_id for the SAME
+    # entity_id — the supersession chain link. Set only on a NEW version, never back-written onto
+    # the predecessor (immutability). None for a first version. Index layers derive effective
+    # valid_to from the successor's valid_from; this field is what makes that join possible.
+    supersedes: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict, encoding ``authority`` as its enum name."""
@@ -310,6 +321,7 @@ class KnowledgeRecord:
             "confidence": self.confidence,
             "perturbation_strength": self.perturbation_strength,
             "causes": self.causes,
+            "supersedes": self.supersedes,
         }
 
     @classmethod
@@ -345,4 +357,5 @@ class KnowledgeRecord:
             confidence=d.get("confidence"),
             perturbation_strength=d.get("perturbation_strength"),
             causes=d.get("causes"),
+            supersedes=d.get("supersedes"),
         )

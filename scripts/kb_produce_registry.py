@@ -287,19 +287,21 @@ def derive_summary_recovery_pass(
 
 # ── Pass 6: contaminated tombstones + meta_* retro-tagging ───────
 
+#: Forensic reason attached to every contaminated-cell tombstone (design §7c / §12 step 6).
+CONTAMINATED_REASON = (
+    "contaminated: ran as CLEAN due to the P0-7 mutation fallback "
+    "(mutated_spec = mutated or specification); labeled early_degrade but never degraded"
+)
+
 
 def derive_contaminated_tombstone_pass(repository_id: str, revision: str | None = None) -> list:
     """Pass 6: the 77 contaminated cells under ``stories/_remediation_contaminated/``.
 
-    Registers each as a story record so its outcome is durably indexed and citable. The
-    ``delete``-with-``reason`` TOMBSTONE semantics design §7c/§12 step 6 calls for are a
-    property of the ``KnowledgeEvent.operation`` a caller PUBLISHES this record under —
-    not something ``KnowledgeRecord``/``story_ingestion.build_story_record`` itself
-    carries (mirrors every other producer in this package: the record describes the
-    fact, the event describes the change operation). This function stays a thin wrapper
-    over the step-2 producer per this file's "no new derivation logic" rule; it is the
-    caller's job (a future publish step) to construct the ``delete`` event with a
-    forensic ``reason`` when actually emitting these records to the stream.
+    Derives one story record per contaminated file (its outcome stays durably citable), but the
+    *tombstone* is applied at emit time: ``main()`` publishes these under ``operation="delete"``
+    with :data:`CONTAMINATED_REASON`, so the entity registers as tombstoned rather than current.
+    The record itself carries the fact; the event carries the change operation — same split as
+    every other producer in this package.
     """
     records = []
     for f in _iter_json_files(CONTAMINATED_DIR):
@@ -380,12 +382,17 @@ def load_checkpoint_ids(r) -> set[str]:
     return set(r.hkeys(ks.CHECKPOINT_KEY))
 
 
-def emit_records(r, records: list) -> tuple[int, int]:
+def emit_records(
+    r, records: list, operation: str = "upsert", reason: str = ""
+) -> tuple[int, int]:
     """Write each durable artifact then publish its pointer event; skip already-checkpointed ids.
 
-    Returns ``(emitted, skipped)``. Ordering mirrors ``kb_produce_sources.emit_records``:
-    the artifact lands *before* the event, so a consumer can always read + verify the
-    exact bytes the event's ``content_hash`` covers.
+    ``operation`` (one of ``upsert``/``supersede``/``delete``) and ``reason`` (required
+    non-empty for ``delete``) are forwarded to ``record_to_event`` so the tombstone pass can
+    register a record as ``delete``-with-reason rather than a plain ``upsert``. Returns
+    ``(emitted, skipped)``. Ordering mirrors ``kb_produce_sources.emit_records``: the artifact
+    lands *before* the event, so a consumer can always read + verify the exact bytes the
+    event's ``content_hash`` covers.
     """
     from instrument.knowledge_ingestion import record_to_artifact, record_to_event
 
@@ -398,7 +405,11 @@ def emit_records(r, records: list) -> tuple[int, int]:
         artifact = record_to_artifact(record)
         KB_ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
         (KB_ARTIFACT_DIR / f"{record.knowledge_id}.json").write_bytes(artifact)
-        ks.publish_event(r, record_to_event(record), source_type=record.source_type)
+        ks.publish_event(
+            r,
+            record_to_event(record, operation=operation, reason=reason),
+            source_type=record.source_type,
+        )
         r.hset(ks.CHECKPOINT_KEY, record.knowledge_id, record.indexed_at)
         emitted += 1
     return emitted, skipped
@@ -491,11 +502,24 @@ def main(argv: list[str] | None = None) -> None:
 
     # 2. Emit — fail fast on connection (knowledge_stream.connect raises on a downed
     #    stream). The producer is an authorized writer for the duration of this run only
-    #    (matches kb_produce_sources.py's convention exactly).
+    #    (matches kb_produce_sources.py's convention exactly). The contaminated source is
+    #    published under operation="delete" + CONTAMINATED_REASON (a tombstone); every other
+    #    source is a plain "upsert".
     os.environ["FINOPS_KB_WRITE"] = "1"
     r = ks.connect(host=REDIS_HOST, port=REDIS_PORT)
-    emitted, skipped = emit_records(r, all_records)
-    log(f"emitted={emitted} skipped={skipped} (already checkpointed) total={len(all_records)}")
+    total_emitted = 0
+    total_skipped = 0
+    for key in source_keys:
+        records = derived[key]
+        if args.limit and args.limit > 0:
+            records = records[: args.limit]
+        if key == "contaminated":
+            e, s = emit_records(r, records, operation="delete", reason=CONTAMINATED_REASON)
+        else:
+            e, s = emit_records(r, records)
+        total_emitted += e
+        total_skipped += s
+    log(f"emitted={total_emitted} skipped={total_skipped} (already checkpointed) total={len(all_records)}")
 
 
 if __name__ == "__main__":

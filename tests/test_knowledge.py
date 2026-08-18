@@ -193,7 +193,8 @@ def test_event_has_no_body_field():
 
 def test_event_carries_only_pointers_and_identity():
     field_names = {f.name for f in fields(KnowledgeEvent)}
-    # Identity + pointer/hash/version fields, plus a tracing id and (round 2) `causes`.
+    # Identity + pointer/hash/version fields, plus a tracing id, (round 2) `causes`,
+    # and (round 1) `reason`.
     assert field_names == {
         "knowledge_id",
         "entity_id",
@@ -205,6 +206,7 @@ def test_event_carries_only_pointers_and_identity():
         "schema_version",
         "event_id",
         "causes",
+        "reason",
     }
 
 

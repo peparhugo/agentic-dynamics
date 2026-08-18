@@ -99,11 +99,8 @@ def build_handler(group: str, r: redis.Redis):
             # generate_manifest.py's compaction step (plan step 15), which takes the
             # latest-by-indexed_at row per entity_id from this file.
             #
-            # ``getattr(record, "supersedes", None)`` rather than ``record.supersedes``:
-            # round 1's own ``supersedes`` field was designed but never landed on
-            # KnowledgeRecord in this codebase (only round 2's ``causes`` has, via
-            # canonical_state_r2_plan.md step 1) — this stays forward-compatible with
-            # that field arriving later without raising AttributeError today.
+            # ``record.supersedes`` is the round-1 supersession-chain field (canonical-state
+            # design §1) — present on KnowledgeRecord, None for a first version.
             #
             # ``logical_locator``/``source_uri`` (plan step 16 addition): scripts/registry.py's
             # `show <id>` command resolves a story_id/session_id/cell_id query against
@@ -119,7 +116,7 @@ def build_handler(group: str, r: redis.Redis):
                 "lifecycle_state": "current",
                 "observed_at": record.observed_at,
                 "indexed_at": record.indexed_at,
-                "supersedes": getattr(record, "supersedes", None),
+                "supersedes": record.supersedes,
                 "causes": record.causes,
             }
             REGISTRY_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -176,11 +173,9 @@ def build_handler(group: str, r: redis.Redis):
                 # that must always be derived from "is there a newer knowledge_id for
                 # this entity_id", never stored and risk going stale.
                 #
-                # ``getattr(record, "supersedes", None)``: see the "kb-registry-v1"
-                # handler's comment above — round 1's ``supersedes`` field was designed
-                # but never landed on KnowledgeRecord in this codebase; this stays
-                # forward-compatible with it arriving later.
-                supersedes = getattr(record, "supersedes", None)
+                # ``record.supersedes`` is the round-1 supersession-chain field — present on
+                # KnowledgeRecord (canonical-state design §1), None for a first version.
+                supersedes = record.supersedes
                 client._run(
                     "MERGE (k:Knowledge {knowledge_id: $id}) "
                     "SET k.entity_id = $eid, k.text = $text, k.source_uri = $uri, "
