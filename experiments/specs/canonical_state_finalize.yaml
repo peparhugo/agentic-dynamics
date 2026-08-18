@@ -1,0 +1,179 @@
+name: canonical_state_finalize
+question: >-
+  Finish the canonical-state consumer/projection layer so that the supersession/tombstone
+  machinery — now present in the schema and producers — is actually reflected downstream. The
+  kb-registry-v1 and kb-neo4j-v1 consumers must interpret KnowledgeEvent.operation
+  (upsert/supersede/delete) and derive lifecycle_state/valid_to, the manifest compaction must
+  carry that derived state, the flag auto-clear rule must be wired, and the CLEARED_BY/REPLACED_BY
+  lineage edges must be written. Run once with claude-fable-5 (the design's author + prior
+  implementer).
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      prior_work: >-
+        The canonical-state schema and producers are IN MAIN and green (994 tests). Already
+        present: KnowledgeRecord.supersedes + KnowledgeEvent.reason (trailing-default),
+        message_family()/OBSERVATION_TYPES/ACTUATION_TYPES, the publish_event actuation gate
+        (armed + causes), five producer modules, record_to_event(record, *, operation, reason),
+        emit_records emitting the contaminated pass as delete+reason, inline write-time emit at
+        the four call sites, scripts/registry.py, /api/registry*, and generate_manifest.py's
+        registry compaction. The docs are docs/canonical_state_r2_design.md (design) and
+        docs/canonical_state_r2_plan.md (plan).
+      remaining_gaps: >-
+        Three gaps this spec must close, all in the CONSUMER/PROJECTION layer (the producer side
+        is done): (G1) The kb-registry-v1 handler (scripts/kb_worker.py) hard-codes
+        "lifecycle_state": "current" and receives only the extracted KnowledgeRecord — it never
+        sees the event's `operation`, so a `delete` tombstone or `supersede` chain is emitted
+        correctly into the stream but marked "current" in registry_index.jsonl. (G2)
+        generate_manifest.py's compaction takes the latest-by-indexed_at row per entity_id but
+        does not derive superseded/tombstoned from the supersedes/delete chain. (G3) The flag
+        auto-clear rule is unwired: a `healthy` observation for a session with an untombstoned
+        flag should emit a `delete` for that flag with a reason and a CLEARED_BY edge. The
+        CLEARED_BY/REPLACED_BY lineage edges are also not written anywhere.
+      hard_rules: >-
+        (1) The stream is the only source of truth — registry_index.jsonl, Neo4j, and the manifest
+        registry array are projections of it; never write derived state back into an artifact.
+        (2) The flag-only rail: the auto-clear rule is the consumer's ONLY write path, and it
+        emits a TOMBSTONE (delete + reason), never a steer/interrupt; it must not import
+        OpenCodeClient. (3) Backward compatibility: no existing result JSON is rewritten; the
+        1,913 KB artifacts still parse (new fields are trailing-default). (4) Test-driven: each
+        phase must pass its named pytest modules before committing; the full gate is
+        `pytest tests/ -m "not external"`.
+      run_shape: >-
+        SINGLE-model: run with --model anthropic/claude-fable-5. One worktree, one branch
+        (feature/canonical-state-finalize); each phase commits [workflow] <phase>.
+    phases:
+      - name: thread_operation
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Close G1: thread KnowledgeEvent.operation through the consumer dispatch.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - src/instrument/knowledge_stream.py   (process_entry — the dispatch the handlers plug into)
+          - scripts/kb_worker.py                (build_handler + the kb-registry-v1 / kb-neo4j-v1 handlers)
+          - src/instrument/knowledge.py         (OPERATIONS, KnowledgeEvent, KnowledgeRecord)
+          - docs/canonical_state_r2_design.md §3/§6 (supersession + edge semantics)
+
+          DO:
+          - Change process_entry (knowledge_stream.py) to pass the event's `operation` (and
+            `reason`) into the handler, so a handler can distinguish upsert/supersede/delete.
+            Keep the existing default so OTHER consumer groups (chroma/ledger) are unaffected.
+          - In scripts/kb_worker.py: the kb-registry-v1 handler writes "lifecycle_state" as
+            "current" for upsert, "superseded" for a supersede (and derives the predecessor's
+            effective valid_to), and "tombstoned" for delete — while still appending the compacted
+            JSONL line. The kb-neo4j-v1 handler persists lifecycle_state and writes the SUPERSEDES
+            edge (already present) only for supersede, plus the CLEARED_BY/REPLACED_BY edges.
+          - Extend tests/test_knowledge_stream.py + tests/test_kb_worker.py with store-double
+            cases: delete -> tombstoned, supersede -> predecessor superseded + effective valid_to.
+
+          VERIFY: pytest tests/test_knowledge_stream.py tests/test_kb_worker.py -q — must pass.
+          DELIVER the code + passing tests.
+      - name: projection
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Close G2: make generate_manifest.py's registry compaction derive lifecycle_state.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/generate_manifest.py        (_compact_registry_index and its current logic)
+          - docs/canonical_state_r2_design.md §3 (valid_to/lifecycle_state are computed, never stored)
+
+          DO:
+          - Make the compaction derive, per entity_id: the current row is the latest-by-indexed_at
+            non-deleted row; a row with a tombstone/delete marker renders the entity tombstoned; a
+            supersede renders the predecessor superseded with effective valid_to = successor
+            valid_from. Store the derived state in the manifest's registry array (not in any artifact).
+          - Extend tests/test_generate_manifest.py (or its current coverage file) with multi-version
+            fixtures asserting the derived lifecycle_state + valid_to.
+
+          VERIFY: pytest tests/test_generate_manifest.py -q — must pass.
+          DELIVER the code + passing tests.
+      - name: autoclear
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Close G3: wire the flag auto-clear rule in the kb-registry-v1 consumer.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - scripts/kb_worker.py                (the kb-registry-v1 handler + its in-process state, if any)
+          - scripts/supervise.py + src/instrument/supervisor.py  (flag identity: flag_stream:<session_id>)
+          - src/instrument/observation_ingestion.py  (observation record shape, status values)
+          - docs/canonical_state_r2_design.md §6.1 (auto-clear: healthy observation -> delete flag)
+
+          DO:
+          - When the handler processes a `healthy` observation for a session that has an
+            untombstoned flag, emit a `delete` event for that flag (operation="delete",
+            reason="auto-cleared: subsequent observation was healthy") via publish_event under
+            FINOPS_KB_WRITE, and write a CLEARED_BY edge flag -> observation. This is the
+            consumer's ONLY write path; it must not import OpenCodeClient or touch steer/interrupt.
+          - Track the flag index in-process (or read registry_index.jsonl) so the rule can find the
+            session's current flag without a new store.
+          - Extend tests/test_kb_worker.py: a healthy observation emits exactly one delete for the
+            flag; a non-healthy observation does not; no actuation event is ever produced.
+
+          VERIFY: pytest tests/test_kb_worker.py tests/test_knowledge_stream.py -q — must pass.
+          DELIVER the code + passing tests.
+      - name: verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Run the full gate and trace the three gaps to code.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q` (full regression) — must be green.
+          - Re-verify the 1,913-artifact backward-compat invariant (KnowledgeRecord.from_dict on
+            every experiments/results/kb/*.json, 0 failures).
+          - Write docs/canonical_state_finalize_verify.md: a table tracing G1/G2/G3 to the files
+            that close them, with PASS/FAIL and the pytest result.
+
+          DELIVER docs/canonical_state_finalize_verify.md + a green full suite.
+factors:
+  - {name: model, levels: [anthropic/claude-fable-5]}
+design: factorial
+rules:
+  - name: gaps_closed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [consumer_operation_handled, projection_derived, autoclear_wired]
+  - name: rail_preserved
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [consumer_operation_handled]
+    produces: [flag_only_rail]
+metrics:
+  - {name: consumer_operation_handled, agg: mean, over: cell}
+  - {name: projection_derived, agg: mean, over: cell}
+  - {name: autoclear_wired, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, gaps, verify]
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
