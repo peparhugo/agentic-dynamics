@@ -29,6 +29,17 @@ from instrument.backends import run_agentic
 from instrument.language import detect_language
 
 
+def _model_label(model_id: str) -> str:
+    """Derive the deterministic display slug from a canonical ``provider/model`` id.
+
+    Pure function of ``model_id`` (``model_id.split("/")[-1]``, lowercased and
+    space-normalized), so the same physical model is labeled identically on every
+    invocation path. Used only for display and result filenames — the persisted
+    ``model`` field carries the canonical id (see ``_save_results``).
+    """
+    return model_id.split("/")[-1].replace(" ", "_").lower()
+
+
 def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
                    timeout: int = 200, repetitions: int = 1,
                    thinking_effort: str = "", backend: str = "auto",
@@ -57,10 +68,11 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     perturbation_mode = cfg.get("perturbation_mode", "deterministic")
     perturbation_cache_dir = Path(cfg.get("perturbation_cache_dir", "experiments/results/perturbations"))
     model_id = model_override or cfg.get("model_id", "deepseek/deepseek-v4-pro")
-    if model_override:
-        model_label = model_override.split("/")[-1].replace(" ", "_").lower()
-    else:
-        model_label = cfg.get("model", model_id.split("/")[-1]).replace(" ", "_").lower()
+    # The display slug is a pure function of the canonical model id, so the same
+    # physical model is labeled identically whether it arrived via ``--model`` or
+    # via the config's ``model``/``model_id`` key (BUG-3: the two paths used to
+    # diverge, writing the same model under two different result filenames).
+    model_label = _model_label(model_id)
     ops = build_operators()
 
     # Standardized constraints
@@ -119,7 +131,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     # Aggregation
     perturbed = [r for r in all_runs if r["type"] == "perturbed"]
     _print_summary(all_runs, name, model_label)
-    _save_results(all_runs, name, model_label, results_dir)
+    _save_results(all_runs, name, model_label, results_dir, model_id)
     _generate_game_reports(all_runs, name, model_label, constraints, results_dir)
 
     return all_runs
@@ -369,10 +381,10 @@ def _print_summary(runs, name, model_label):
           f"{len(perturbed)} perturbed + 1 baseline")
 
 
-def _save_results(runs, name, model_label, results_dir):
+def _save_results(runs, name, model_label, results_dir, model_id=None):
     model_slug = model_label.replace(" ", "_").lower()
     out = {
-        "experiment": name, "model": model_label,
+        "experiment": name, "model": model_id or model_label,
         "runs": [{k: v for k, v in r.items() if k != "final_response"} for r in runs],
     }
     path = results_dir / f"{name}_{model_slug}.json"

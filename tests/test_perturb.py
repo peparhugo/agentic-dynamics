@@ -80,6 +80,30 @@ def test_perturbation_class_for_unknown_returns_empty():
     assert perturbation_class_for("nonexistent_operator") == ""
 
 
+def test_insert_contradiction_first_matching_domain_wins():
+    """BUG-5: the first matching domain must win, not the last.
+
+    The prompt matches both "api" (first in iteration order) and "database"
+    (second). The loop must exit on the first match so the injected contradiction
+    is drawn from the "api" pairs, never "database".
+    """
+    ops = build_operators()
+    rng = random.Random(0)
+
+    prompt = "Build an API backed by a PostgreSQL database. Use REST endpoints."
+    result = ops["insert_contradiction"].apply_fn(prompt, 0.5, rng)
+
+    api_signatures = ("stateless", "GraphQL", "versioned via URL prefix", "per-IP", "XML")
+    db_signatures = ("3NF", "denormalized", "MongoDB", "eventual consistency")
+
+    assert any(sig in result for sig in api_signatures), (
+        "contradiction should be drawn from the first-matching 'api' domain"
+    )
+    assert not any(sig in result for sig in db_signatures), (
+        "contradiction must not come from the later 'database' domain"
+    )
+
+
 @pytest.mark.parametrize("cls", PERTURBATION_CLASSES)
 def test_basin_verdict_handles_every_class(cls):
     for escape in (0.9, 0.4, 0.0):

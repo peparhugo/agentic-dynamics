@@ -341,6 +341,10 @@ def _insert_contradiction(prompt: str, strength: float, rng: random.Random) -> s
             if keywords and any(kw.lower() in prompt.lower() for kw in keywords):
                 all_domains = pairs
                 break
+        # First matching domain wins: exit the outer loop too, so a later domain
+        # (e.g. "database") cannot overwrite an earlier one (e.g. "api").
+        if all_domains:
+            break
     if not all_domains:
         all_domains = domain_contradictions["general"]
 
