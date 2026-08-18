@@ -84,7 +84,6 @@ def classify_trajectory_segments(
     """
     markers = recovery_markers or _default_recovery_markers()
     baseline_tools_set = set(baseline.tool_call_sequence())
-    baseline.tool_call_sequence()
     perturbed_tool_seq = perturbed.tool_call_sequence()
 
     # Build index maps: for each step index, what position in the filtered tool sequence?

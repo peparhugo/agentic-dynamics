@@ -6,6 +6,18 @@ def _make_step(i, thought="", action="", tool_name=""):
     return TrajectoryStep(step_index=i, thought=thought, action=action, tool_name=tool_name, tokens_used=10)
 
 
+class _CountingTrajectory(ReasoningTrajectory):
+    """A trajectory that counts how many times its tool sequence is materialized."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tool_call_sequence_calls = 0
+
+    def tool_call_sequence(self):
+        self.tool_call_sequence_calls += 1
+        return super().tool_call_sequence()
+
+
 def test_identical_trajectories_not_recovery():
     steps = [
         _make_step(0, thought="designing", action="code", tool_name="write"),
@@ -55,3 +67,19 @@ def test_explicit_recovery_markers_detected():
     classifications = classify_trajectory_segments(baseline, perturbed)
     has_recovery = any(c.classification == SegmentClass.RECOVERY for c in classifications)
     assert has_recovery, "Explicit recovery markers should be detected"
+
+
+def test_baseline_tool_sequence_materialized_once():
+    """BUG-6: the baseline tool sequence must be materialized exactly once."""
+    baseline_steps = [
+        _make_step(0, thought="designing", action="code", tool_name="write"),
+        _make_step(1, thought="testing", action="tests", tool_name="bash"),
+    ]
+    baseline = _CountingTrajectory(run_id="baseline", steps=baseline_steps)
+    perturbed = ReasoningTrajectory(run_id="perturbed", steps=[
+        _make_step(0, thought="designing", action="code", tool_name="write"),
+        _make_step(1, thought="wrong tool", action="wrong", tool_name="grep"),
+    ])
+
+    classify_trajectory_segments(baseline, perturbed)
+    assert baseline.tool_call_sequence_calls == 1

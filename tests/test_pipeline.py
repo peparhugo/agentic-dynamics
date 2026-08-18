@@ -1,5 +1,6 @@
 """Tests for pipeline.py — YAML-driven phase orchestration."""
 
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -719,3 +720,35 @@ class TestSaveResultsRegistryEmission:
         run._save_results(self._runs(), "task_manager_api", "DeepSeek v4 Flash", tmp_path)
         out_path = tmp_path / "task_manager_api_deepseek_v4_flash.json"
         assert out_path.exists()
+
+
+# ── BUG-3: run.py model-label canonicality. ``out["model"]`` must carry the
+# canonical ``provider/model`` id that actually executed, while the display slug
+# (result filename) is a pure function of that id. Before the fix, the config
+# path persisted the short ``model: deepseek`` label while ``--model`` persisted
+# ``deepseek-v4-pro`` — the same model written under two identities.
+class TestRunModelLabelCanonicality:
+    def _runs(self):
+        return [{"operator": "baseline", "correctness": 0.9, "cost_usd": 0.5, "total_tokens": 1000}]
+
+    def test_model_label_is_pure_function_of_model_id(self):
+        import run
+
+        # Deterministic slug regardless of invocation path.
+        assert run._model_label("deepseek/deepseek-v4-pro") == "deepseek-v4-pro"
+        assert run._model_label("deepseek/deepseek-v4-flash") == "deepseek-v4-flash"
+        assert run._model_label("anthropic/claude-sonnet-5") == "claude-sonnet-5"
+        assert run._model_label("openai/gpt-5.6-luna") == "gpt-5.6-luna"
+
+    def test_save_results_persists_canonical_model_id(self, tmp_path, monkeypatch):
+        import run
+
+        monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
+        run._save_results(
+            self._runs(), "task_manager_api", "deepseek-v4-pro", tmp_path,
+            model_id="deepseek/deepseek-v4-pro",
+        )
+        out_path = tmp_path / "task_manager_api_deepseek-v4-pro.json"
+        data = json.loads(out_path.read_text())
+        # The persisted field is the canonical id, not the display slug.
+        assert data["model"] == "deepseek/deepseek-v4-pro"
