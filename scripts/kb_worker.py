@@ -315,6 +315,7 @@ def build_handler(group: str, r: redis.Redis):
                 "indexed_at": record.indexed_at,
                 "supersedes": record.supersedes,
                 "causes": record.causes,
+                "reason": reason,
             }
             REGISTRY_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
             with open(REGISTRY_INDEX_PATH, "a") as f:

@@ -149,8 +149,18 @@ def _compact_registry_index(path):
         existing = by_knowledge_id.get(kid)
         # ">=" (not ">"): among ties, the later line in append order wins — a
         # deterministic tiebreak since the file is strictly append-only.
-        if existing is None or str(row.get("indexed_at") or "") >= str(existing.get("indexed_at") or ""):
+        if existing is None:
             by_knowledge_id[kid] = row
+        elif str(row.get("indexed_at") or "") >= str(existing.get("indexed_at") or ""):
+            # MERGE, don't replace. kb_worker.py's kb-registry-v1 handler appends a thin
+            # "predecessor superseded" marker line that shares the predecessor's knowledge_id
+            # but carries only a handful of fields (lifecycle_state/valid_to/indexed_at). If a
+            # bare replace won, that marker would clobber the predecessor's full registration
+            # line and silently drop its observed_at/source_type/logical_locator/source_uri/
+            # supersedes/causes. The newer line's non-null fields still win (so the marker's
+            # derived lifecycle_state/valid_to take effect), but the older line's fields that
+            # the newer line lacks are preserved.
+            by_knowledge_id[kid] = {**existing, **{k: v for k, v in row.items() if v is not None}}
 
     # A knowledge_id that some OTHER row's `supersedes` pointer names is, by definition,
     # no longer current. Keyed by the PREDECESSOR's knowledge_id -> the row that
@@ -197,6 +207,7 @@ def _compact_registry_index(path):
             "indexed_at": head.get("indexed_at"),
             "supersedes": head.get("supersedes"),
             "causes": head.get("causes"),
+            "reason": head.get("reason"),
             "lifecycle_state": head["lifecycle_state"],
             "valid_to": head["valid_to"],
             # Every known version of this entity, oldest -> newest, each with its own
@@ -210,6 +221,7 @@ def _compact_registry_index(path):
                     "valid_to": r["valid_to"],
                     "observed_at": r.get("observed_at"),
                     "indexed_at": r.get("indexed_at"),
+                    "reason": r.get("reason"),
                 }
                 for r in rows
             ],

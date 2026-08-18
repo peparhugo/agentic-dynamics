@@ -102,12 +102,13 @@ def test_compact_registry_index_preserves_all_row_fields(tmp_path):
     row = _row(supersedes="kid_prev", causes="kid_obs")
     _write_jsonl(path, [row])
     compacted = gm._compact_registry_index(path)
-    assert compacted[0] == {**row, "valid_to": None, "versions": [{
+    assert compacted[0] == {**row, "reason": None, "valid_to": None, "versions": [{
         "knowledge_id": row["knowledge_id"],
         "lifecycle_state": "current",
         "valid_to": None,
         "observed_at": row["observed_at"],
         "indexed_at": row["indexed_at"],
+        "reason": None,
     }]}
 
 
@@ -328,3 +329,46 @@ def test_main_registry_is_empty_list_when_no_index_file_exists(tmp_path, monkeyp
 
     manifest = json.loads((project_root / "experiments" / "data_manifest.json").read_text())
     assert manifest["registry"] == []
+
+
+def test_compact_registry_index_merges_marker_line_without_losing_observed_at(tmp_path):
+    # A supersede event appends (a) the successor's full "current" line, (b) a thin
+    # "predecessor superseded" marker line that shares the predecessor's knowledge_id. The
+    # marker must NOT clobber the predecessor's full registration line — its observed_at
+    # must survive into the versions projection (merge, not replace).
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_v1", entity_id="eid_1",
+             observed_at="2026-08-14T00:00:00+00:00", indexed_at="2026-08-14T00:00:01+00:00"),
+        _row(knowledge_id="kid_v2", entity_id="eid_1",
+             observed_at="2026-08-15T00:00:00+00:00", indexed_at="2026-08-15T00:00:01+00:00",
+             supersedes="kid_v1"),
+        {
+            "knowledge_id": "kid_v1", "entity_id": "eid_1",
+            "lifecycle_state": "superseded", "valid_to": "2026-08-15T00:00:00+00:00",
+            "indexed_at": "2026-08-15T00:00:01+00:00",
+        },
+    ])
+    compacted = gm._compact_registry_index(path)
+    entity_row = compacted[0]
+    versions_by_kid = {v["knowledge_id"]: v for v in entity_row["versions"]}
+
+    # The marker's derived lifecycle_state/valid_to still win ...
+    assert versions_by_kid["kid_v1"]["lifecycle_state"] == "superseded"
+    assert versions_by_kid["kid_v1"]["valid_to"] == "2026-08-15T00:00:00+00:00"
+    # ... but the predecessor's original observed_at survives the merge.
+    assert versions_by_kid["kid_v1"]["observed_at"] == "2026-08-14T00:00:00+00:00"
+
+
+def test_compact_registry_index_carries_reason_through(tmp_path):
+    # A tombstoned record's `reason` (why it was retracted) must surface in both the head
+    # row and the versions list, not be dropped at the registry_index.jsonl boundary.
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_t", entity_id="eid_1", lifecycle_state="tombstoned",
+             reason="contaminated: ran as clean (P0-7)"),
+    ])
+    compacted = gm._compact_registry_index(path)
+    entity_row = compacted[0]
+    assert entity_row["reason"] == "contaminated: ran as clean (P0-7)"
+    assert entity_row["versions"][0]["reason"] == "contaminated: ran as clean (P0-7)"

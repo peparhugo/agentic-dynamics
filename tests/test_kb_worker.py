@@ -93,6 +93,7 @@ def test_kb_registry_v1_handler_appends_jsonl_line(tmp_path, monkeypatch):
         "indexed_at": record.indexed_at,
         "supersedes": None,
         "causes": None,
+        "reason": "",
     }
 
 
@@ -149,6 +150,7 @@ def test_kb_registry_v1_handler_delete_is_tombstoned(tmp_path, monkeypatch):
     assert len(lines) == 1  # a self-tombstone — no predecessor side-effect
     assert lines[0]["knowledge_id"] == "kid_contaminated"
     assert lines[0]["lifecycle_state"] == "tombstoned"
+    assert lines[0]["reason"] == "contaminated cell"  # the tombstone's "why" is surfaced
 
 
 def test_kb_registry_v1_handler_supersede_marks_predecessor_superseded_with_effective_valid_to(
