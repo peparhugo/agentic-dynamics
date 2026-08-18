@@ -45,7 +45,6 @@ Two record kinds per cell (one call to :func:`derive_ledger_records` returns bot
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any
@@ -56,7 +55,7 @@ from .knowledge import (
     compute_entity_id,
     compute_knowledge_id,
 )
-from .knowledge_ingestion import PROJECT_ROOT, REPOSITORY_ID, record_to_artifact
+from .knowledge_ingestion import REPOSITORY_ID, record_to_artifact
 
 # ── Extractor contract constants ────────────────────────────────
 
@@ -73,56 +72,30 @@ ACL_SCOPE = "public"
 REVISION_FALLBACK = "ledger/unrevisioned"
 
 
-# ── EXPERIMENT_SESSION_PATTERNS — loaded from scripts/_constants.py, not re-declared ──
-
-
-def _load_experiment_session_patterns() -> list[str]:
-    """Load ``EXPERIMENT_SESSION_PATTERNS`` from ``scripts/_constants.py`` by file path.
-
-    ``classify_session`` must use the IDENTICAL list ``analyze_worktrees.py:32`` imports —
-    a re-declared copy would drift from the exact thing gap (b) is meant to match (plan
-    step 4's explicit warning). ``scripts/`` is not an importable package (no
-    ``__init__.py``), and the dependency direction throughout this repo runs
-    ``scripts -> src/instrument``, never the reverse (``scripts/analyze_worktrees.py``
-    imports ``instrument``, not vice versa) — adding ``scripts/`` to ``sys.path`` from a
-    core library module would invert that graph for every future import in the process.
-    Loading the file by its exact path avoids both problems: it reads the same source list
-    without becoming a normal Python package dependency in either direction.
-    """
-    path = PROJECT_ROOT / "scripts" / "_constants.py"
-    spec = importlib.util.spec_from_file_location("_finops_scripts_constants", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return list(module.EXPERIMENT_SESSION_PATTERNS)
-
-
-#: The identical list analyze_worktrees.py:32 imports — loaded once at import time (not
-#: re-derived per call), so classify_session() never drifts from the pattern list it must
-#: match against.
-EXPERIMENT_SESSION_PATTERNS = _load_experiment_session_patterns()
+# ── classify_session — the meta_ prefix discriminator ───────────
 
 
 def classify_session(session_title: str) -> str:
     """Return the ``source_type`` a session's ledger record should be emitted as.
 
     Runs BEFORE emission (not after) so a ``meta_*`` title is routed to
-    ``"meta_session"`` at registration time — it never enters ``"ledger_attempt"`` in the
-    first place. This is what prevents this design from merely *relocating*
+    ``"meta_session"`` at registration time — it never enters ``"ledger_attempt"``
+    in the first place. This is what prevents this design from merely *relocating*
     ``analyze_worktrees.py``'s title-substring pollution into the registry's own cost
     rollups instead of eliminating it (design §7b).
 
-    The ``meta_`` prefix check runs first and short-circuits — a title starting with
-    ``meta_`` (e.g. ``"meta_batch_042"``) is never given the chance to also match an
-    ``EXPERIMENT_SESSION_PATTERNS`` substring (``"batch"`` is itself one of those
-    patterns, which is exactly how gap (b) happened upstream). An unclassified title
-    (matches neither check) still registers as ``"ledger_attempt"`` — round 1's OQ1,
-    unchanged: an ambiguous title is not silently dropped.
+    The ``meta_`` prefix check is the *whole* discriminator: a title starting with
+    ``meta_`` (e.g. ``"meta_batch_042"``) routes to ``"meta_session"``, and every
+    other title routes to ``"ledger_attempt"``. The former
+    ``EXPERIMENT_SESSION_PATTERNS`` substring branch was dead code — both its match
+    and its fallthrough returned ``"ledger_attempt"`` — and its import-time
+    ``scripts/`` exec has been removed (the list now lives in
+    :mod:`instrument.session_types`, which ``scripts/_constants.py`` imports *from*).
+    An ambiguous title is not silently dropped: it still registers as
+    ``"ledger_attempt"`` (round 1's OQ1, unchanged).
     """
     if session_title.startswith("meta_"):
         return SOURCE_TYPE_META
-    if any(p in session_title.lower() for p in EXPERIMENT_SESSION_PATTERNS):
-        return SOURCE_TYPE_ATTEMPT
     return SOURCE_TYPE_ATTEMPT
 
 

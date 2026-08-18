@@ -117,16 +117,23 @@ def test_classify_session_unclassified_title_still_registers():
     assert li.classify_session("totally_unrelated_thing") == "ledger_attempt"
 
 
-def test_classify_session_uses_the_real_analyze_worktrees_pattern_list():
-    # Not a re-declared copy — the identical list analyze_worktrees.py:32 imports.
+def test_experiment_session_patterns_live_in_instrument_not_scripts():
+    # The dependency edge is now scripts -> src, not the reverse: `_constants.py`
+    # imports EXPERIMENT_SESSION_PATTERNS from instrument.session_types (the single
+    # source of truth) instead of being exec'd back into the package at import time.
+    # Loading _constants.py by path must therefore yield the SAME list object the
+    # instrument exports — a re-declared copy in scripts/ would be a regression.
     import importlib.util
     from pathlib import Path
 
-    path = Path(li.PROJECT_ROOT) / "scripts" / "_constants.py"
+    from instrument import session_types as st
+
+    path = Path(st.__file__).resolve().parents[2] / "scripts" / "_constants.py"
     spec = importlib.util.spec_from_file_location("_check_constants", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    assert li.EXPERIMENT_SESSION_PATTERNS == module.EXPERIMENT_SESSION_PATTERNS
+    assert module.EXPERIMENT_SESSION_PATTERNS is st.EXPERIMENT_SESSION_PATTERNS
+    assert module.normalize_task is st.normalize_task
 
 
 # ── Baseline path: DB row present ────────────────────────────────

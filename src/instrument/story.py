@@ -34,6 +34,7 @@ from .mutation import (
     compile_mutation,
 )
 from .opencode import AgenticResult
+from .session_types import DEFAULT_TASK_TYPE
 from .test_runner import run_suite, suite_succeeded
 
 # ── Perturbation Condition ─────────────────────────────────────
@@ -139,7 +140,7 @@ class SessionSpec:
     """Definition of one session in a story."""
 
     session_number: int
-    task_type: str  # greenfield, feature_addition, integration, refactor, cross_cutting
+    task_type: str  # see instrument.session_types.TASK_TYPES (greenfield, feature_addition, ...)
     prompt: str  # the actual task prompt for this session
     description: str = ""  # human-readable description
 
@@ -158,7 +159,7 @@ class SessionSpec:
             raise ValueError(f"SessionSpec missing required fields: {missing}")
         return cls(
             session_number=d["session_number"],
-            task_type=d.get("task_type", "feature_addition"),
+            task_type=d.get("task_type", DEFAULT_TASK_TYPE),
             prompt=d["prompt"],
             description=d.get("description", ""),
         )

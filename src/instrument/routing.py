@@ -8,14 +8,10 @@ routing recommendations plus aggregate strategy simulations.
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from typing import Any
 
-
-def normalize_task(name: str) -> str:
-    """Strip perturbation strength / repetition suffixes from a task name."""
-    return re.sub(r"_(s\d+\.\d+|r\d+)$", "", name)
+from .session_types import normalize_task
 
 
 def recommend_route(
