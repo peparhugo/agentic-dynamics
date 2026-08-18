@@ -901,3 +901,180 @@ def test_api_registry_lineage_flags_ambiguity(tmp_path, monkeypatch):
     assert body["error"] == "ambiguous"
     assert body["count"] == 2
     assert [row["knowledge_id"] for row in body["records"]] == ["kid_dup_a", "kid_dup_b"]
+
+
+# ── actuation call site (review §5.4) ───────────────────────────
+#
+# The steer/interrupt handlers are the first caller of the actuation producer:
+# after a successful intervention, they emit ONE actuation record whose ``causes``
+# is the flag observation's knowledge_id. Best-effort — a KB outage never blocks
+# the steer. Observation (GET) surfaces never emit.
+
+
+def _flagged_session(**overrides):
+    flag = {
+        "at": "2026-08-15T00:00:00+00:00",
+        "session_id": "sess_abc",
+        "title": "task_manager_api",
+        "model": "deepseek/deepseek-v4-flash",
+        "status": "stalled",
+        "why": "no forward progress",
+        "review": {
+            "state": "mapped",
+            "cell_id": "cell_1",
+            "source": "publisher_index",
+            "mapped_at": "2026-08-15T00:00:00Z",
+        },
+    }
+    flag.update(overrides)
+    return flag
+
+
+def test_supervisor_steer_emits_exactly_one_actuation_record(monkeypatch):
+    """A successful steer emits exactly one actuation record citing the flag's knowledge_id."""
+    from instrument import knowledge_stream as ks
+    from instrument.knowledge_ingestion import REPOSITORY_ID
+    from instrument.observation_ingestion import derive_flag_record
+
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    flag = _flagged_session()
+    monkeypatch.setattr(
+        server, "_authorize_supervisor_action",
+        lambda session_id, cell_id: (flag, None),
+    )
+
+    sent = []
+
+    class FakeOpenCode:
+        def send_input(self, session_id, prompt, *, delivery):
+            sent.append((session_id, prompt, delivery))
+
+    monkeypatch.setattr(server, "_opencode_client", lambda: FakeOpenCode())
+
+    published = []
+
+    def fake_connect():
+        return object()
+
+    def fake_publish_event(redis_client, event, **kwargs):
+        published.append((event, kwargs))
+        return "entry-1"
+
+    monkeypatch.setattr(ks, "connect", fake_connect)
+    monkeypatch.setattr(ks, "publish_event", fake_publish_event)
+
+    response = server.app.test_client().post(
+        "/api/flags/sess_abc/steer",
+        json={"cell_id": "cell_1", "prompt": "please continue"},
+        headers={"Idempotency-Key": "steer-1"},
+    )
+
+    assert response.status_code == 200
+    assert sent == [("sess_abc", "please continue", "steer")]
+    assert len(published) == 1
+    event, kwargs = published[0]
+    assert event.causes == derive_flag_record(flag, repository_id=REPOSITORY_ID).knowledge_id
+    assert kwargs["source_type"] == "actuation"
+    assert kwargs["authorized"] is True
+    assert kwargs["armed"] is True
+
+
+def test_supervisor_interrupt_emits_exactly_one_actuation_record(monkeypatch):
+    """A successful interrupt emits exactly one actuation record, kind=interrupt."""
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    flag = _flagged_session()
+    monkeypatch.setattr(
+        server, "_authorize_supervisor_action",
+        lambda session_id, cell_id: (flag, None),
+    )
+
+    interrupted = []
+
+    class FakeOpenCode:
+        def interrupt(self, session_id):
+            interrupted.append(session_id)
+
+    monkeypatch.setattr(server, "_opencode_client", lambda: FakeOpenCode())
+
+    emitted = []
+    monkeypatch.setattr(
+        server, "_emit_actuation_record",
+        lambda f, **kw: emitted.append((f, kw)),
+    )
+
+    response = server.app.test_client().post(
+        "/api/flags/sess_abc/interrupt",
+        json={"cell_id": "cell_1", "confirmation": "INTERRUPT sess_abc"},
+        headers={"Idempotency-Key": "interrupt-1"},
+    )
+
+    assert response.status_code == 200
+    assert interrupted == ["sess_abc"]
+    assert len(emitted) == 1
+    emitted_flag, kwargs = emitted[0]
+    assert emitted_flag is flag
+    assert kwargs["actuation_kind"] == "interrupt"
+    assert kwargs["target_cell_id"] == "cell_1"
+
+
+def test_actuation_emit_is_best_effort_and_never_blocks_the_steer(monkeypatch):
+    """A KB-plane failure swallows the actuation emit and still returns 200."""
+    from instrument import knowledge_stream as ks
+
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    flag = _flagged_session()
+    monkeypatch.setattr(
+        server, "_authorize_supervisor_action",
+        lambda session_id, cell_id: (flag, None),
+    )
+
+    class FakeOpenCode:
+        def send_input(self, session_id, prompt, *, delivery):
+            return None
+
+    monkeypatch.setattr(server, "_opencode_client", lambda: FakeOpenCode())
+
+    def failing_connect():
+        raise RuntimeError("KB DB 2 down")
+
+    monkeypatch.setattr(ks, "connect", failing_connect)
+
+    response = server.app.test_client().post(
+        "/api/flags/sess_abc/steer",
+        json={"cell_id": "cell_1", "prompt": "please continue"},
+        headers={"Idempotency-Key": "steer-1"},
+    )
+
+    # The steer still succeeded despite the KB outage.
+    assert response.status_code == 200
+    assert response.get_json()["admitted"] is True
+
+
+def test_get_only_paths_never_emit_actuation(tmp_path, monkeypatch):
+    """Observation surfaces (flags, registry, matrix) never emit an actuation record."""
+    def _explode(*_args, **_kwargs):
+        raise AssertionError("read-only path must never emit an actuation record")
+
+    monkeypatch.setattr(server, "_emit_actuation_record", _explode)
+
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_registry_row()])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+    server._REGISTRY_CACHE.clear()
+
+    monkeypatch.setattr(server, "_redis", lambda: FakeRedis(statuses={"a": "running"}))
+    monkeypatch.setattr(
+        server, "_load_supervisor_flags",
+        lambda limit: ({"flags": [], "warnings": [], "degraded": False}, 200),
+    )
+
+    client = server.app.test_client()
+    assert client.get("/api/flags").status_code == 200
+    assert client.get("/api/registry").status_code == 200
+    assert client.get("/api/matrix").status_code == 200

@@ -385,6 +385,60 @@ def _authorize_supervisor_action(
     return flag, None
 
 
+def _emit_actuation_record(
+    flag: dict[str, Any],
+    *,
+    actuation_kind: str,
+    target_cell_id: str,
+    requested_action: dict[str, Any] | None = None,
+) -> None:
+    """Best-effort emit one actuation record justifying a human intervention.
+
+    This is the first (and, so far, only) actuation call site — the Control Room's
+    steer/interrupt handlers (review §5.4). It runs AFTER the side effect already
+    succeeded and is deliberately best-effort: a KB-plane outage (the DB-2 change
+    stream) must never block the steer/interrupt that already happened, so every
+    failure is swallowed. ``causes`` is the ``knowledge_id`` of the flag's
+    observation-family record (derived via ``observation_ingestion``), so the
+    registry's one-hop "why did the system act" lookup resolves end-to-end.
+    """
+    try:
+        from instrument import knowledge_stream as ks
+        from instrument.actuation_ingestion import derive_actuation_record
+        from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
+        from instrument.observation_ingestion import derive_flag_record
+
+        # The flag is the justifying observation: derive its canonical knowledge_id
+        # so ``causes`` points at the exact record ``supervise.py`` emitted for it.
+        flag_record = derive_flag_record(flag, repository_id=REPOSITORY_ID)
+        record = derive_actuation_record(
+            {
+                "actuation_kind": actuation_kind,
+                "target_session_id": str(flag.get("session_id") or ""),
+                "target_cell_id": target_cell_id,
+                "requested_action": requested_action or {},
+                "requested_by": "control_room",
+                "causes": flag_record.knowledge_id,
+            },
+            repository_id=REPOSITORY_ID,
+        )
+        redis_client = ks.connect()
+        # ``authorized=True`` (the human POST is the write authorization) and
+        # ``armed=True`` (this is the deliberate human actuation surface) are passed
+        # as explicit keyword args rather than mutating the FINOPS_* env flags —
+        # env mutation would race across Flask's threaded request handlers.
+        ks.publish_event(
+            redis_client,
+            record_to_event(record),
+            authorized=True,
+            armed=True,
+            source_type=record.source_type,
+        )
+    except Exception:
+        # Best-effort: a KB outage must never block the steer/interrupt.
+        pass
+
+
 def _claude_agents() -> ClaudeAgentsClient:
     """Construct the process-local ``claude`` CLI wrapper used for one-shot calls.
 
@@ -1231,6 +1285,12 @@ def api_supervisor_steer(session_id: str) -> Response:
         if denied:
             return denied
         _opencode_client().send_input(session_id, prompt.strip(), delivery="steer")
+        _emit_actuation_record(
+            _flag,
+            actuation_kind="steer",
+            target_cell_id=cell_id,
+            requested_action={"prompt": prompt.strip()},
+        )
         return jsonify({"action": "steer", "admitted": True, "session_id": session_id})
 
     return _idempotent_design_response(f"supervisor-steer:{session_id}", body, steer)
@@ -1256,6 +1316,11 @@ def api_supervisor_interrupt(session_id: str) -> Response:
         if denied:
             return denied
         _opencode_client().interrupt(session_id)
+        _emit_actuation_record(
+            _flag,
+            actuation_kind="interrupt",
+            target_cell_id=cell_id,
+        )
         return jsonify({"action": "interrupt", "accepted": True, "session_id": session_id})
 
     return _idempotent_design_response(f"supervisor-interrupt:{session_id}", body, interrupt)
