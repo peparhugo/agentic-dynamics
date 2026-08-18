@@ -41,7 +41,7 @@ from typing import Any, Callable, Protocol
 
 SCHEMA_VERSION = "prompt-plan/v1"
 
-#: Cheapest constructor model in ``efficiency.PROVIDER_PRICING`` ($0.14 input) — a
+#: Cheapest constructor model in ``efficiency.PROVIDER_PRICING`` ($0.22 input) — a
 #: prior, not a conclusion: constructor model is a tunable parameter.
 DEFAULT_CONSTRUCTOR_MODEL = "deepseek/deepseek-v4-flash"
 

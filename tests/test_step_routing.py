@@ -137,14 +137,14 @@ def test_coverage_objective_scores_when_measured():
 
 
 def test_cache_switch_penalty_uses_deepseek_spread():
-    # input $0.435/1M − cache_read $0.003625/1M = $0.431375/1M.
+    # input $0.66/1M − cache_read $0.022/1M = $0.638/1M.
     penalty = cache_switch_penalty(DS, 1_000_000)
-    assert abs(penalty - 0.431375) < 1e-6
+    assert abs(penalty - 0.638) < 1e-6
 
 
 def test_switch_penalty_keeps_router_on_prior_model():
     # CL is nominally cheaper ($0.0005 vs $0.001), but switching forfeits 10M cache-read
-    # tokens (~$4.31) from the prior DeepSeek session → the router stays on DS.
+    # tokens (~$6.38) from the prior DeepSeek session → the router stays on DS.
     signals = {DS: _sig(DS, cost=0.001), CL: _sig(CL, cost=0.0005)}
     state = _state(prev_model=DS, prev_cache_read_tokens=10_000_000)
     assert route_step({}, state, _prefs(_min("cost")), signals=signals) == DS

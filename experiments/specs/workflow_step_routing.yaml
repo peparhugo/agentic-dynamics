@@ -22,8 +22,8 @@ workflow:
       - anthropic/claude-sonnet-5
     context:
       cache_economics: >-
-        DeepSeek cache reads are ~120x cheaper than input (PROVIDER_PRICING: deepseek input $0.435/1k,
-        cache_read $0.003625/1k; deepseek-flash input $0.14/1k, cache_read $0.0028/1k). Maximizing
+        DeepSeek cache reads are ~30x cheaper than input (PROVIDER_PRICING: deepseek input $0.66/1M,
+        cache_read $0.022/1M; deepseek-flash input $0.22/1M, cache_read $0.007/1M). Maximizing
         cache-read hits is the dominant cost lever for deepseek-heavy workloads.
       observed_usage: >-
         Operator Aug 2026: $60.10 across 37,367 requests / 3.51B tokens. deepseek-v4-pro dominates

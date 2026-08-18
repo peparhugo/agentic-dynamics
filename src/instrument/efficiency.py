@@ -39,14 +39,14 @@ ENERGY_PER_REASONING_TOKEN = 0.47  # Joules per reasoning token (RL models)
 # These rates reflect what was actually charged during the v0.5 experiment corpus.
 PROVIDER_PRICING: dict[str, dict[str, float]] = {
     "deepseek": {
-        "input": 0.435, "output": 0.87, "reasoning": 0.87,
-        "cache_read": 0.003625, "cache_write": 0.435,
-        "source": "api-docs.deepseek.com — DeepSeek V4 Pro pricing (Aug 2026)",
+        "input": 0.66, "output": 1.98, "reasoning": 1.98,
+        "cache_read": 0.022, "cache_write": 0.66,
+        "source": "api-docs.deepseek.com — DeepSeek V4 Pro (0813) off-peak; peak = 2x (01:00-04:00 & 06:00-10:00 UTC)",
     },
     "deepseek-flash": {
-        "input": 0.14, "output": 0.28, "reasoning": 0.28,
-        "cache_read": 0.0028, "cache_write": 0.14,
-        "source": "api-docs.deepseek.com — DeepSeek V4 Flash pricing (Aug 2026)",
+        "input": 0.22, "output": 0.66, "reasoning": 0.66,
+        "cache_read": 0.007, "cache_write": 0.22,
+        "source": "api-docs.deepseek.com — DeepSeek V4 Flash (0731) off-peak; peak = 2x",
     },
     "anthropic": {
         "input": 3.00, "output": 15.00, "reasoning": 15.00,
@@ -105,12 +105,12 @@ CONTEXT_OVER_200K_PRICING: dict[str, dict[str, float]] = {
 # Sources: api-docs.deepseek.com, docs.anthropic.com, platform.openai.com
 CURRENT_REFERENCE_PRICING: dict[str, dict[str, float]] = {
     "deepseek": {
-        "input": 0.435, "output": 0.87, "reasoning": 0.87,
-        "cache_read": 0.003625, "cache_write": 0.435,
+        "input": 0.66, "output": 1.98, "reasoning": 1.98,
+        "cache_read": 0.022, "cache_write": 0.66,
     },
     "deepseek-flash": {
-        "input": 0.14, "output": 0.28, "reasoning": 0.28,
-        "cache_read": 0.0028, "cache_write": 0.14,
+        "input": 0.22, "output": 0.66, "reasoning": 0.66,
+        "cache_read": 0.007, "cache_write": 0.22,
     },
     "anthropic": {
         "input": 10.00, "output": 50.00, "reasoning": 50.00,

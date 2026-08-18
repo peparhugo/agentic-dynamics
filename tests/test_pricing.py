@@ -5,10 +5,10 @@ from instrument.efficiency import compute_cost_estimate, get_pricing
 
 def test_get_pricing_deepseek():
     pricing = get_pricing("deepseek", "deepseek-v4-pro")
-    assert pricing["input"] == 0.435
-    assert pricing["output"] == 0.87
-    assert pricing["cache_read"] == 0.003625
-    assert pricing["cache_write"] == 0.435
+    assert pricing["input"] == 0.66
+    assert pricing["output"] == 1.98
+    assert pricing["cache_read"] == 0.022
+    assert pricing["cache_write"] == 0.66
 
 
 def test_get_pricing_anthropic():
@@ -29,7 +29,7 @@ def test_get_pricing_openai():
 
 def test_get_pricing_detect_by_model_id():
     pricing = get_pricing("unknown", "deepseek-something")
-    assert pricing["input"] == 0.435
+    assert pricing["input"] == 0.66
 
 
 def test_get_pricing_raises_on_unknown():
@@ -60,9 +60,9 @@ def test_get_pricing_openai_via_gpt():
 
 def test_get_pricing_deepseek_flash():
     pricing = get_pricing("deepseek", "deepseek-v4-flash")
-    assert pricing["input"] == 0.14
-    assert pricing["output"] == 0.28
-    assert pricing["cache_read"] == 0.0028
+    assert pricing["input"] == 0.22
+    assert pricing["output"] == 0.66
+    assert pricing["cache_read"] == 0.007
 
 
 def test_get_pricing_haiku():
