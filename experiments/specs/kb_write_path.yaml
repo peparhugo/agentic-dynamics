@@ -1,0 +1,111 @@
+name: kb_write_path
+question: >-
+  Deduplicate the write path (R4 + R6 + R8): (a) the four inline emit blocks in story.py / run.py /
+  finalize_reviews.py / supervise.py are near-identical copies of the same five-line
+  derive->record_to_event->publish_event loop; (b) REGISTRY_INDEX_PATH and KB_ARTIFACT_DIR are
+  hand-synced across five scripts; (c) two separate adapters reshape a non-StoryResult into a
+  StoryResult. Assumes kb_producer_factory has landed (R1).
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        R4: story.py:971-980, run.py:389-396, finalize_reviews.py:70-86, supervise.py:262-275/381-400
+        each hand-roll the emit loop with function-local imports + a divergent availability posture
+        (three raise on a downed stream; supervise swallows). R6: REGISTRY_INDEX_PATH/KB_ARTIFACT_DIR
+        copied at kb_worker.py:50,62, generate_manifest.py:22, kb_produce.py:54, kb_produce_registry.py:67,
+        knowledge_ingestion.ARTIFACT_DIR:68. R8: story_ingestion.derive_story_records_from_run_output
+        (story_ingestion.py:232-285) and kb_produce_registry._summary_entry_to_story_result
+        (kb_produce_registry.py:224-247) both synthesize a StoryResult-shaped dict with independent
+        identity rationale.
+      hard_rules: >-
+        (1) Test-driven. (2) Backward compat: ids byte-identical; 1,913 KB artifacts parse. (3) The
+        shared helper takes RECORDS (post-R1), not dicts. (4) Preserve the four call sites'
+        availability posture difference via a single fail_loud parameter, not by re-forking the
+        helper. (5) One place owns the canonical story_id for a non-story artifact (R8) — do not let
+        the two identity formulas drift.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/kb-write-path); each phase commits [workflow] <phase>.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement R4 + R6 + R8 per docs/review/restructure.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/review/restructure.md (R4, R6, R8)
+          - src/instrument/knowledge_stream.py, knowledge_ingestion.py (the emit + path constants)
+          - src/instrument/story.py:971-980, scripts/run.py:389-396, scripts/finalize_reviews.py:70-86,
+            scripts/supervise.py:262-275/381-400 (the four call sites)
+
+          DO:
+          - R4: add register_records(records, *, fail_loud: bool) to knowledge_stream.py; replace
+            the four inline blocks with calls to it.
+          - R6: add src/instrument/paths.py (REGISTRY_INDEX_PATH, KB_ARTIFACT_DIR); the five
+            scripts import from it (generate_manifest uses a value-only import so it stays redis-free).
+          - R8: add one adapt_to_story_result(source, *, kind) helper; the two call sites pass kind.
+
+          VERIFY: pytest tests/test_knowledge_stream.py tests/test_story.py tests/test_pipeline.py
+          tests/test_finalize_reviews.py tests/test_supervise.py tests/test_kb_produce_registry.py
+          tests/test_generate_manifest.py -q — must pass.
+          DELIVER the code + passing tests.
+      - name: test
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the full gate and fix regressions.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q`. Fix failures without weakening tests.
+
+          DELIVER a green full suite.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace R4/R6/R8 to the code.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_kb_write_path.md tracing each recommendation to its file, with
+            PASS/FAIL and the pytest result.
+
+          DELIVER docs/review/impl_kb_write_path.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: write_path_deduped
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [register_records, paths_module, story_adapter]
+metrics:
+  - {name: register_records, agg: mean, over: cell}
+  - {name: paths_module, agg: mean, over: cell}
+  - {name: story_adapter, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

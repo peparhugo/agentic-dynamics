@@ -1,0 +1,107 @@
+name: measurement_bug_fixes
+question: >-
+  Fix three small measurement-apparatus bugs (BUG-3 + BUG-5 + BUG-6): run.py persists the short
+  config label (model: deepseek) instead of the executed provider/model id; _insert_contradiction
+  selects the last matching domain instead of the first; recovery.py materializes the baseline tool
+  sequence twice.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        BUG-3 (MEDIUM): scripts/run.py:59-63 label derivation vs :90-96/:106-109 (model_id actually
+        executed); :374-376 out["model"] = model_label — result records "deepseek" not
+        "deepseek/deepseek-v4-pro", and the two invocation paths yield different labels
+        ("deepseek-v4-pro" vs "deepseek"), fragmenting the corpus. BUG-5 (LOW): perturb.py:337-345
+        _insert_contradiction's break exits only the inner loop, so the last matching domain
+        overwrites earlier ones. BUG-6 (LOW): recovery.py:86-87 calls tool_call_sequence() twice.
+      hard_rules: >-
+        (1) BUG-3: persist the canonical model_id as out["model"]; make the display slug a pure
+        function of model_id on both paths (deterministic label regardless of invocation). (2) BUG-5:
+        first matching domain must win. (3) BUG-6: single materialization. (4) Test-driven; do not
+        weaken tests. (5) These touch the measurement core — keep changes minimal and behavior-
+        preserving except where the bug fix is the point.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/measurement-bug-fixes); each phase commits [workflow] <phase>.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Implement BUG-3 + BUG-5 + BUG-6 per docs/review/bugs.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/review/bugs.md (BUG-3, BUG-5, BUG-6)
+          - scripts/run.py:59-109, :374-376
+          - src/instrument/perturb.py:337-345
+          - src/instrument/recovery.py:86-87
+
+          DO:
+          - BUG-3: persist model_id; derive the label deterministically on both paths.
+          - BUG-5: break out of both loops so the first matching domain wins.
+          - BUG-6: delete the redundant call.
+          - Add/extend tests: run.py label canonicality, contradiction first-domain-wins,
+            recovery single-materialization.
+
+          VERIFY: pytest tests/test_pipeline.py tests/test_perturb.py tests/test_recovery.py -q
+          — must pass.
+          DELIVER the code + passing tests.
+      - name: test
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the full gate and fix regressions.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q`. Fix failures without weakening tests.
+
+          DELIVER a green full suite.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace BUG-3/BUG-5/BUG-6 to the code.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_measurement_bug_fixes.md tracing each bug to its fix, with
+            PASS/FAIL and the pytest result.
+
+          DELIVER docs/review/impl_measurement_bug_fixes.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: bugs_fixed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [model_label, contradiction_domain, recovery_dedup]
+metrics:
+  - {name: model_label, agg: mean, over: cell}
+  - {name: contradiction_domain, agg: mean, over: cell}
+  - {name: recovery_dedup, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -1,0 +1,111 @@
+name: rag_seam_split
+question: >-
+  Split workflow_runner's RAG seam into a standalone module (R7) and refresh the load-bearing docs
+  (CONTEXT.md + mental-model) for the merged canonical-state surface. workflow_runner.py (820 lines)
+  still mixes phase execution, the retrieve->construct->render augmentation, and self-build emit;
+  and src/instrument/CONTEXT.md + the mental-model are now stale (zero mention of the five new
+  producer modules, says "40 modules" when there are 58, no message_family/registry/tombstone docs).
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        R7: workflow_runner.py mixes phase execution + RAG augmentation + self-build emit; the RAG
+        imports are already lazy (retrieval/prompt_constructor imported inside the rag-gated path),
+        so the remaining problem is responsibility. Meta: docs/review/restructure.md item 4 — the
+        load-bearing CONTEXT.md "Runtime RAG / Knowledge Base" section has 0 mentions of
+        story_ingestion/review_ingestion/ledger_ingestion/observation_ingestion/actuation_ingestion,
+        still says "40 Python modules", and omits message_family/observation-vs-actuation/registry/
+        tombstone/compaction; the mental-model ledger table omits supersedes/causes.
+      hard_rules: >-
+        (1) R7 must preserve behavior: the augmentation path, fallback modes, and provenance fields
+        on PhaseResult stay byte-compatible (existing workflow tests must pass unchanged). (2) The
+        docs update must be accurate, not aspirational — every claim traced to a file:line. (3)
+        Test-driven for the code; the docs update is verified by grep (module names present, module
+        count corrected).
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/rag-seam-split); each phase commits [workflow] <phase>.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement R7 + the docs refresh per docs/review/restructure.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/review/restructure.md (R7 + item 4 of "What DeepSeek got wrong")
+          - src/instrument/workflow_runner.py (the rag-gated seam)
+          - src/instrument/CONTEXT.md + .opencode/instructions/mental-model.md
+
+          DO:
+          - Extract the retrieve->construct->render augmentation into src/instrument/augment.py
+            (augment_prompt(...) -> AugmentationOutcome); workflow_runner keeps phase execution +
+            emit. Preserve the PhaseResult provenance fields.
+          - Update src/instrument/CONTEXT.md: add the five canonical-state producer modules,
+            message_family/observation-vs-actuation, the registry/tombstone/compaction machinery, and
+            correct the module count. Update the mental-model KB section (ledger fields supersedes/
+            causes; the one-typed-stream + write-time registration summary).
+
+          VERIFY: pytest tests/test_workflow_runner.py tests/test_retrieval.py
+          tests/test_prompt_constructor.py -q — must pass (behavior unchanged). Grep confirms the
+          five modules are named in CONTEXT.md and the count is corrected.
+
+          DELIVER the code + passing tests + updated docs.
+      - name: test
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the full gate and fix regressions.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q`. Fix failures without weakening tests.
+
+          DELIVER a green full suite.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace R7 + the docs refresh.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_rag_seam_split.md tracing R7 (augment.py + workflow_runner) and
+            the docs changes, with PASS/FAIL and the pytest result.
+
+          DELIVER docs/review/impl_rag_seam_split.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: seam_split
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [augment_module, docs_refreshed]
+metrics:
+  - {name: augment_module, agg: mean, over: cell}
+  - {name: docs_refreshed, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

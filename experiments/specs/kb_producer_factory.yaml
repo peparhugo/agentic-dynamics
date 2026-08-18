@@ -1,0 +1,125 @@
+name: kb_producer_factory
+question: >-
+  Introduce a single shared RecordBuilder factory and centralize the source_type vocabulary
+  (restructure R1 + R2). The five canonical-state producers plus the four round-1 producers are
+  ~60% identical — each re-defines _now_iso/_sha256_bytes and the placeholder-ids -> hash ->
+  replace() back-fill (~300 lines of correctness-sensitive duplication), and the source_type field
+  is owned by three overlapping lists. Land first; nothing else depends on it.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        See docs/review/restructure.md R1 (RecordBuilder factory) and R2 (source_type registry).
+        The nine-copy record-build dance lives in: knowledge_ingestion.py:315-355, code_ingestion.py,
+        quality_ingestion.py, policy_ingestion.py, story_ingestion.py:175-208, review_ingestion.py:109-142,
+        ledger_ingestion.py:215-248, observation_ingestion.py:110-143, actuation_ingestion.py:143-176;
+        _now_iso/_sha256_bytes are re-defined in all five canonical-state producers. The source_type
+        vocabulary is split across knowledge.py:100-124 (OBSERVATION_TYPES omits finding/code/report/
+        policy), per-module SOURCE_TYPE constants re-aliased in __init__.py:211-314, and
+        scripts/registry.py:59-62 (RECORD_TYPES excludes round-1 types).
+      hard_rules: >-
+        (1) Test-driven: run the named pytest modules after each phase; a phase is not complete
+        until they pass. (2) Backward compat: the 1,913 KB artifacts still parse; no existing
+        result JSON is rewritten; ids stay byte-identical (the factory must preserve the exact
+        hash-input ordering — blank knowledge_id/content_hash/valid_from/observed_at/indexed_at
+        before hashing). (3) Keep the derivation IN CODE per module (authority/evidence_class/
+        why) — the factory factors only the mechanics, never a YAML/table registry. (4) Do not add
+        a source_type field to KnowledgeEvent (source_type stays a publish_event keyword).
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/kb-producer-factory); each phase commits [workflow] <phase>.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement R1 + R2 per docs/review/restructure.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/review/restructure.md (R1 + R2)
+          - src/instrument/knowledge.py, knowledge_ingestion.py, and one canonical-state producer
+            (story_ingestion.py) to see the back-fill pattern to factor.
+
+          DO:
+          - Add src/instrument/record_factory.py with
+            build_record(*, source_type, source_uri, logical_locator, repository_id, revision,
+            authority, evidence_class, text, extra_fields, now=None) -> KnowledgeRecord owning the
+            hash-input ordering once.
+          - Refactor the nine producers to call the factory, keeping each module's derivation
+            (text + structured fields) but deleting the duplicated _now_iso/_sha256_bytes/back-fill.
+          - Add a single SOURCE_TYPES registry in knowledge.py (name -> message_family/authority/
+            evidence_class); message_family() keys off it; scripts/registry.py derives its
+            --record-type choices from it. Update __init__.py exports.
+          - Extend tests/test_knowledge.py + the producer ingestion tests; assert ids are
+            byte-identical to pre-refactor (no re-key).
+
+          VERIFY: pytest tests/test_knowledge.py tests/test_story_ingestion.py
+          tests/test_review_ingestion.py tests/test_ledger_ingestion.py tests/test_observation_ingestion.py
+          tests/test_actuation_ingestion.py tests/test_code_ingestion.py -q — must pass.
+          DELIVER the code + passing tests.
+      - name: test
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the full gate and fix regressions.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q`. Fix any failure. Do not weaken a test; fix
+            the code. Re-verify the 1,913-artifact backward-compat invariant (KnowledgeRecord.from_dict
+            on every experiments/results/kb/*.json, 0 failures).
+
+          DELIVER a green full suite.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace R1 + R2 to the code.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_kb_producer_factory.md: a table tracing R1 (factory + the nine
+            producers) and R2 (SOURCE_TYPES registry + registry.py + __init__.py) to files, with
+            PASS/FAIL and the pytest result.
+
+          DELIVER docs/review/impl_kb_producer_factory.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: factory_landed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [record_factory]
+  - name: types_centralized
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [record_factory]
+    produces: [source_type_registry]
+metrics:
+  - {name: record_factory, agg: mean, over: cell}
+  - {name: source_type_registry, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
