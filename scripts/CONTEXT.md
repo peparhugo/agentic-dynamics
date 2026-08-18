@@ -114,14 +114,16 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 
 | File | Purpose |
 |------|---------|
-| `admin/server.py` | Flask backend — now the **Control Room portal**, 24 API routes across 4 categories (below). Serves `admin/static/`. Port 8000 (`FINOPS_PORT`). |
+| `admin/server.py` | Flask backend — now the **Control Room portal**, 28 routes across 5 API categories plus the static shell (below). Serves `admin/static/`. Port 8000 (`FINOPS_PORT`). |
 | `admin/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board, supervisor flags, design sessions, Claude background sessions. |
 
-`admin/server.py`'s 24 routes, categorized:
-- **Legacy telemetry** (5): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/routing`, `POST /api/experiments`
+`admin/server.py`'s 28 routes, categorized:
+- **Legacy telemetry** (6): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/routing`, `POST /api/experiments`, `POST /api/queue/reinterleave`
 - **Supervisor flags** (3): `/api/flags`, `POST /api/flags/<session_id>/steer`, `POST /api/flags/<session_id>/interrupt`
+- **Registry** (2): `/api/registry`, `/api/registry/<entity_id>`
 - **Design sessions** (7): `/api/design-sessions`, `POST /api/design-sessions`, `/api/design-sessions/<portal_id>/spec`, `POST /api/design-sessions/<portal_id>/input`, `POST /api/design-sessions/<portal_id>/interrupt`, `POST /api/design-sessions/<portal_id>/save`, `POST /api/design-sessions/<portal_id>/run`
 - **Claude background sessions** (9): `/api/claude-agents`, `POST /api/claude-agents`, `/api/claude-agents/<session_id>/logs`, `POST /api/claude-agents/<session_id>/stop`, `POST /api/claude-agents/<session_id>/respawn`, `POST /api/claude-agents/<session_id>/rm`, `POST /api/claude-agents/<session_id>/steer`, `/api/claude-agents/daemon`, `POST /api/claude-agents/daemon/stop`
+- **Static shell** (1): `GET /`
 
 Full endpoint reference: `docs/supervisor_design.md`, `docs/spec.md`.
 
