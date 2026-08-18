@@ -348,7 +348,7 @@ def default_extract(event: KnowledgeEvent, artifact: bytes) -> KnowledgeRecord:
         authority=Authority.DERIVED,
         valid_from=event.occurred_at,
         valid_to=None,
-        observed_at=event.occurred_at,
+        observed_at=event.observed_at or event.occurred_at,
         indexed_at=datetime.now(timezone.utc).isoformat(),
         acl_scope="",
         contains_sensitive_data=False,

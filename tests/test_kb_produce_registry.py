@@ -243,6 +243,23 @@ def test_derive_summary_recovery_pass_recovers_only_the_missing_entries(tmp_path
     assert records[0].source_type == "story"
 
 
+# ── BUG-7: perturbation_strength must stay None when absent ──────
+
+
+def test_summary_entry_absent_perturbation_strength_stays_none():
+    # A recovered historical entry lacking the field must flow through as None (unmeasured),
+    # never a fabricated 0.0 baseline (which downstream would read as "baseline cell").
+    result = kpr._summary_entry_to_story_result({"worktree_name": "wt", "experiment": "e"})
+    assert result["perturbation_strength"] is None
+
+
+def test_summary_entry_present_perturbation_strength_is_preserved():
+    result = kpr._summary_entry_to_story_result(
+        {"worktree_name": "wt", "experiment": "e", "perturbation_strength": 0.5}
+    )
+    assert result["perturbation_strength"] == 0.5
+
+
 # ── --dry-run: touches neither Redis nor the filesystem ─────────
 
 

@@ -137,6 +137,8 @@ def build_observation_record(
         confidence=None,
         perturbation_strength=None,
         causes=None,
+        subject_id=cell_id,
+        subject_status=status,
     )
     content_hash = _sha256_bytes(record_to_artifact(record))
     knowledge_id = compute_knowledge_id(entity_id, REVISION_FALLBACK, content_hash, EXTRACTOR_VERSION)
@@ -220,6 +222,8 @@ def build_flag_record(
         confidence=None,
         perturbation_strength=None,
         causes=None,
+        subject_id=session_id,
+        subject_status=status,
     )
     content_hash = _sha256_bytes(record_to_artifact(record))
     knowledge_id = compute_knowledge_id(entity_id, REVISION_FALLBACK, content_hash, EXTRACTOR_VERSION)

@@ -226,8 +226,8 @@ def test_structured_signals_round_trip_to_dict_from_dict_and_artifact():
     assert restored == record
     # The durable artifact carries the stable content; extract_record reattaches the derived
     # ids (from the event) and reconstructs the timestamps (transport metadata). The content,
-    # identity, and measured signals survive; only the observation/indexing timestamps differ
-    # (indexed_at is stamped at consumer time by design).
+    # identity, and measured signals survive; observed_at round-trips the producer's own value
+    # (via the event's observed_at), while indexed_at is stamped at consumer time by design.
     event = record_to_event(record)
     artifact = record_to_artifact(record)
     extracted = extract_record(event, artifact)
@@ -238,7 +238,8 @@ def test_structured_signals_round_trip_to_dict_from_dict_and_artifact():
     assert extracted.content_hash == record.content_hash
     assert extracted.text == record.text
     assert extracted.valid_from == event.occurred_at
-    assert extracted.observed_at == event.occurred_at
+    assert extracted.observed_at == record.observed_at
+    assert extracted.observed_at == event.observed_at
 
 
 def test_absent_signals_round_trip_stay_none_through_artifact():
@@ -340,6 +341,32 @@ def test_observed_at_prefers_entry_timestamp_else_falls_back_to_now():
     # valid_from / indexed_at describe *this* derivation pass, so they stay the producer now.
     assert record.valid_from == pinned.isoformat()
     assert record.indexed_at == pinned.isoformat()
+
+
+def test_observed_at_round_trips_the_entry_timestamp_not_the_producer_clock():
+    # BUG-1 regression: the cell's OWN run timestamp must survive the pointer round-trip,
+    # not be silently replaced by the producer's wall-clock (occurred_at).
+    from datetime import datetime, timezone
+
+    stamped = "2026-08-01T00:00:00+00:00"
+    producer_now = datetime(2026, 8, 19, 12, 0, 0, tzinfo=timezone.utc)
+
+    record = build_record(_entry(ended_at=stamped), now=producer_now)
+    assert record.observed_at == stamped
+
+    event = record_to_event(record, now=producer_now)
+    # occurred_at is the producer clock (end-to-end lag); observed_at is the real measurement.
+    assert event.occurred_at == producer_now.isoformat()
+    assert event.observed_at == stamped
+
+    extracted = extract_record(event, record_to_artifact(record))
+    # The entry's own timestamp round-trips, not the producer clock.
+    assert extracted.observed_at == stamped
+    assert extracted.observed_at != event.occurred_at
+    # valid_from still reflects the producer derivation pass; the stable content survives.
+    assert extracted.valid_from == event.occurred_at
+    assert extracted.content_hash == record.content_hash
+    assert extracted.knowledge_id == record.knowledge_id
 
 
 # ── Batch derivation filters like build_evidence_cards ──────────

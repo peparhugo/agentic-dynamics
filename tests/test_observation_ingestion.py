@@ -104,6 +104,21 @@ def test_flag_authority_is_advisory_and_h():
     assert record.evidence_class == "[H]"
 
 
+# ── Structured subject fields (record-fidelity / R5) ─────────────
+
+
+def test_observation_record_carries_structured_subject():
+    record = oi.derive_observation_record(_verdict(cell_id="wf_task_manager_api_1", status="healthy"))
+    assert record.subject_id == "wf_task_manager_api_1"
+    assert record.subject_status == "healthy"
+
+
+def test_flag_record_carries_structured_subject():
+    record = oi.derive_flag_record(_flag(session_id="sess_abc123", status="off_track"))
+    assert record.subject_id == "sess_abc123"
+    assert record.subject_status == "off_track"
+
+
 # ── Reused artifact/event contract ──────────────────────────────
 
 
