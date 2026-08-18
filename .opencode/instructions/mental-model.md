@@ -179,6 +179,13 @@ model_cascade(attempts, state) -> RuleResult # control (consumes confidence)
 # knowledge.py — canonical identity + authority contract (two sha256 ids, ordered Authority)
 Authority, KnowledgeRecord, KnowledgeEvent
 compute_entity_id(), compute_knowledge_id(), compute_content_hash()
+  # lineage + version fields on KnowledgeRecord (and KnowledgeEvent):
+  #   supersedes: str|None — predecessor knowledge_id for the SAME entity_id (version chain link)
+  #   causes:     str|None — observation-family knowledge_id that justified an actuation (cross-entity)
+  #   operation:  upsert | supersede | delete  (delete = tombstone; requires a non-empty `reason`)
+  # observation-vs-actuation split (no third envelope; source_type + operation are the only discriminators):
+  #   OBSERVATION_TYPES / ACTUATION_TYPES, message_family(source_type) -> "observation"|"actuation"
+  #   ACTUATION_TYPES = {"actuation"} is a closed-by-default allowlist; unknown types -> "observation"
 
 # retrieval.py — deterministic retrieval (dense Chroma + lexical Neo4j full-text → RRF fusion)
 QueryPlan, Candidate, RetrievalAttempt, FallbackMode
@@ -190,8 +197,11 @@ PromptConstructor, ModelPromptConstructor, PromptPlan, AugmentedPrompt, render_p
 
 # knowledge_stream.py — durable Redis Streams ingestion (DB 2 on 6380)
 connect(), publish_event(), process_entry(), reconcile_missing()
-  CONSUMER_GROUPS: kb-chroma-v1 | kb-neo4j-v1 | kb-ledger-v1
+  CONSUMER_GROUPS: kb-chroma-v1 | kb-neo4j-v1 | kb-ledger-v1 | kb-registry-v1
   # WRITE GUARD: publish_event raises RuntimeError unless FINOPS_KB_WRITE=1 or authorized=True
+  # three orthogonal gates keyed off message_family(source_type): write guard (all) ->
+  #   actuation-armed (actuation: FINOPS_ACTUATION_ARMED=1 or armed=True) ->
+  #   lineage (actuation: event.causes must resolve to an observation via SOURCE_TYPE_INDEX_KEY)
 
 # knowledge_ingestion.py — producer-side measured-finding derivation (richer extractor)
 EXTRACTOR_VERSION = "measured-finding/v1"
@@ -229,7 +239,44 @@ build_policy_record(locator, text, *, repository_id, revision, now=None) -> Know
 discover_policy_paths(repo_root) -> list[Path]
   # authority=POLICY (top tier), evidence_class="[P]"; discoverability/citation only — never RRF candidates
 
-# workflow_runner.py — the rag_augment seam (default OFF)
+# story_ingestion.py — canonical-state producer (source_type=story)
+EXTRACTOR_VERSION = "story/v1"
+derive_story_records(story_result, *, repository_id, revision, now=None) -> list[KnowledgeRecord]
+build_story_record(story_result, *, repository_id, revision, now=None) -> KnowledgeRecord
+derive_story_records_from_run_output(run_output, *, repository_id, now=None) -> list[KnowledgeRecord]
+  # authority=MEASURED "[M]"; write-time registration call site in story.save_story_result / scripts/run.py
+
+# review_ingestion.py — canonical-state producer (source_type=review)
+EXTRACTOR_VERSION = "review/v1"
+derive_review_records(review, *, repository_id, revision, now=None) -> list[KnowledgeRecord]
+build_review_record(review, *, repository_id, revision, now=None) -> KnowledgeRecord
+  # authority=ADVISORY "[H]"; write-time call site in scripts/finalize_reviews.py
+
+# ledger_ingestion.py — canonical-state producer (ledger_job / ledger_attempt / meta_session)
+EXTRACTOR_VERSION = "ledger/v1"
+derive_ledger_records(summary_entry, *, repository_id, revision, now=None) -> list[KnowledgeRecord]
+build_job_record(...) / build_attempt_record(...) / classify_session(title) -> source_type
+  # ledger_job/ledger_attempt -> MEASURED "[M]"; meta_session -> ADVISORY (closes gaps a+b)
+
+# observation_ingestion.py — canonical-state producer (source_type=observation / flag)
+EXTRACTOR_VERSION = "observation/v1"
+derive_observation_record(...) / build_observation_record(...) -> KnowledgeRecord
+derive_flag_record(...) / build_flag_record(...) -> KnowledgeRecord
+  # authority=ADVISORY "[H]"; every supervisor verdict registrable (closes OQ6a)
+
+# actuation_ingestion.py — canonical-state producer, Delta 3 (source_type=actuation)
+EXTRACTOR_VERSION = "actuation/v1"
+derive_actuation_record(..., *, causes, repository_id, now=None) -> KnowledgeRecord
+  # authority=POLICY "[P]"; causes-linked to an observation; ZERO call sites (nothing fires it yet)
+
+# augment.py — the retrieve->construct->render seam (R7; split out of workflow_runner, default OFF)
+augment_prompt(*, base_prompt, goal, phase_def, model, commit_sha, inherited_tools,
+               pinned_policy, rag_params, retrieve_fn, construct_fn) -> AugmentationOutcome
+default_retrieve_fn() -> Callable    # dense ChromaStore + graph Neo4jClient -> functools.partial(retrieve)
+default_construct_fn(rag_params, run_agent) -> Callable  # ModelPromptConstructor on DEFAULT_CONSTRUCTOR_MODEL
+  # pure w.r.t. the worktree; any failure -> base_prompt + named fallback_mode; NEVER blocks the phase
+
+# workflow_runner.py — phase execution + the opt-in self-build emit (default OFF)
 cell_scope(workdir) -> str   # f"self-{workdir.name}"; FINOPS_CELL_ID overrides — the cell's KB scope
 run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=None,
              construct_fn=None, rag_params=None) -> WorkflowRunResult
@@ -239,17 +286,30 @@ run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=N
 # one agent phase (only when rag_augment enabled):
 route_step ──▶ retrieve ──▶ construct ──▶ render ──▶ run_agent
 
-# producer data flow (batch ingestion): any of four sources ──▶ derive_*_records ──▶
+# producer data flow (batch ingestion): any source ──▶ derive_*_records ──▶
 #   record_to_artifact (write kb/<id>.json) ──▶ record_to_event ──▶ publish_event ──▶
 #   stream ──▶ process_entry (read → verify sha256(artifact) → extract_record → upsert)
-# four record types, over the authority ordering (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY):
-#   finding → MEASURED [M] | code → SOURCE [C] | report → MEASURED [M] (Sonar/LSP) or DERIVED [C] (entropy) | policy → POLICY [P]
+# nine source_type values, over the authority ordering (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY):
+#   finding → MEASURED [M] | code → SOURCE [C] | report → MEASURED [M] (Sonar/LSP) or DERIVED [C] (entropy)
+#   | policy → POLICY [P] | story → MEASURED [M] | review → ADVISORY [H]
+#   | ledger_job/ledger_attempt → MEASURED [M] + meta_session → ADVISORY
+#   | observation/flag → ADVISORY [H] | actuation → POLICY [P]
+# ONE typed stream: source_type + operation are the only discriminators, one pointer envelope,
+#   one idempotent knowledge_id key. Write-time registration is now live in four call sites
+#   (story.py, run.py, finalize_reviews.py, supervise.py) + the kb_produce* scripts + the opt-in
+#   emit_self path — NOT only emit_self anymore (see docs/review/restructure.md §1).
+
+# registry / tombstone / compaction (canonical-state):
+#   kb-registry-v1 consumer -> append-only experiments/results/registry_index.jsonl (one line/record)
+#   generate_manifest.py compacts it into the manifest `registry` array (latest-per-entity,
+#     lifecycle_state current|superseded|tombstoned derived from the supersede/delete chain)
+#   scripts/registry.py (show/query/lineage) + Control Room /api/registry* read it back
 
 # two-channel rule (do not conflate the two Redis planes):
 #   knowledge = per-cell repository_id scope (default self-<worktree>); an explicit non-empty
 #               repository_id is the SHARED-scope override (parallel workstreams). Empty never
 #               means "global". retrieve→construct→render references publish_event ZERO times —
-#               the ONLY KB writer is the opt-in emit_self path.
+#               the write is the opt-in emit_self path (and the batch producers above).
 #   control/telemetry = live.LivePublisher (pub/sub, DB 1) — UNscoped, observe-only, never writes KB.
 ```
 
