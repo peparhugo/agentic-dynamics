@@ -127,6 +127,68 @@ def test_kb_registry_v1_handler_carries_causes_for_actuation_records(tmp_path, m
     assert line["source_type"] == "actuation"
 
 
+# ── kb-registry-v1 — operation-derived lifecycle_state (canonical-state finalize, G1) ──
+
+
+def test_kb_registry_v1_handler_upsert_is_current(tmp_path, monkeypatch):
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    handler = kb_worker.build_handler("kb-registry-v1", _FakeRedis())
+
+    handler(_record(), operation="upsert")
+    line = json.loads(kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()[0])
+    assert line["lifecycle_state"] == "current"
+
+
+def test_kb_registry_v1_handler_delete_is_tombstoned(tmp_path, monkeypatch):
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    handler = kb_worker.build_handler("kb-registry-v1", _FakeRedis())
+
+    handler(_record(knowledge_id="kid_contaminated"), operation="delete", reason="contaminated cell")
+
+    lines = [json.loads(l) for l in kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()]
+    assert len(lines) == 1  # a self-tombstone — no predecessor side-effect
+    assert lines[0]["knowledge_id"] == "kid_contaminated"
+    assert lines[0]["lifecycle_state"] == "tombstoned"
+
+
+def test_kb_registry_v1_handler_supersede_marks_predecessor_superseded_with_effective_valid_to(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    handler = kb_worker.build_handler("kb-registry-v1", _FakeRedis())
+
+    successor = _record(
+        knowledge_id="kid_v2", entity_id="eid_1", valid_from="2026-08-18T00:00:00+00:00",
+    )
+    object.__setattr__(successor, "supersedes", "kid_v1")
+
+    handler(successor, operation="supersede")
+
+    lines = [json.loads(l) for l in kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()]
+    assert len(lines) == 2
+
+    successor_line, predecessor_line = lines
+    # The successor's own line is a plain "current" registration, same as an upsert.
+    assert successor_line["knowledge_id"] == "kid_v2"
+    assert successor_line["lifecycle_state"] == "current"
+
+    # The derived side-effect: the predecessor is now superseded, with an effective
+    # valid_to equal to the successor's own valid_from.
+    assert predecessor_line["knowledge_id"] == "kid_v1"
+    assert predecessor_line["lifecycle_state"] == "superseded"
+    assert predecessor_line["valid_to"] == "2026-08-18T00:00:00+00:00"
+
+
+def test_kb_registry_v1_handler_supersede_without_predecessor_writes_one_line(tmp_path, monkeypatch):
+    # record.supersedes is falsy (e.g. a mislabeled first version) — no predecessor to mark.
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    handler = kb_worker.build_handler("kb-registry-v1", _FakeRedis())
+
+    handler(_record(), operation="supersede")
+    lines = kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()
+    assert len(lines) == 1
+
+
 # ── kb-neo4j-v1 (gap d) ────────────────────────────────────────────
 
 
@@ -205,17 +267,16 @@ def test_kb_neo4j_v1_handler_writes_supersedes_edge_when_present(monkeypatch):
     _patch_neo4j_client(monkeypatch)
     handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
 
-    # `supersedes` is not (yet) a real KnowledgeRecord field in this codebase (see
-    # kb_worker.py's comment) — the handler reads it via getattr with a None default, so
-    # a caller can still exercise the "present" branch by monkeypatching it onto the
-    # frozen dataclass instance via object.__setattr__ (bypassing frozen=True, test-only).
     record = _record()
     object.__setattr__(record, "supersedes", "kid_prev")
 
-    handler(record)
+    # The edge only fires for an actual "supersede" operation (G1) — see the next test for
+    # the upsert-with-a-stale-supersedes-value case.
+    handler(record, operation="supersede")
     query, params = _FakeNeo4jClient.instances[0].calls[0]
 
     assert params["supersedes"] == "kid_prev"
+    assert params["operation"] == "supersede"
     assert "SUPERSEDES" in query
     assert "FOREACH" in query
 
@@ -232,6 +293,86 @@ def test_kb_neo4j_v1_handler_supersedes_edge_foreach_is_present_but_conditional(
     query, params = _FakeNeo4jClient.instances[0].calls[0]
     assert "FOREACH" in query
     assert params["supersedes"] is None
+
+
+# ── kb-neo4j-v1 — lifecycle_state + CLEARED_BY/REPLACED_BY (canonical-state finalize, G1) ──
+
+
+def test_kb_neo4j_v1_handler_persists_lifecycle_state_current_for_upsert(monkeypatch):
+    _patch_neo4j_client(monkeypatch)
+    handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
+
+    handler(_record(), operation="upsert")
+    _query, params = _FakeNeo4jClient.instances[0].calls[0]
+    assert params["lifecycle_state"] == "current"
+
+
+def test_kb_neo4j_v1_handler_persists_lifecycle_state_tombstoned_for_delete(monkeypatch):
+    _patch_neo4j_client(monkeypatch)
+    handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
+
+    handler(_record(), operation="delete", reason="contaminated cell")
+    _query, params = _FakeNeo4jClient.instances[0].calls[0]
+    assert params["lifecycle_state"] == "tombstoned"
+
+
+def test_kb_neo4j_v1_handler_does_not_write_supersedes_edge_for_upsert(monkeypatch):
+    # A record carrying a (stale) `supersedes` value under a plain upsert must not
+    # retroactively rewrite graph lineage — the edge is gated on the operation, not merely
+    # on the field's presence.
+    _patch_neo4j_client(monkeypatch)
+    handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
+
+    record = _record()
+    object.__setattr__(record, "supersedes", "kid_prev")
+    handler(record, operation="upsert")
+
+    _query, params = _FakeNeo4jClient.instances[0].calls[0]
+    assert params["operation"] == "upsert"
+    assert params["supersedes"] == "kid_prev"  # still persisted as a property...
+    # ...but the FOREACH CASE guard requires operation = 'supersede', so the edge MERGE
+    # (present in the query text, per Cypher's unconditional-query-text convention) never
+    # actually fires for this call — see the query's CASE clause.
+    assert "$operation = 'supersede'" in _query
+
+
+def test_kb_neo4j_v1_handler_writes_cleared_by_edge_for_flag_tombstone(monkeypatch):
+    _patch_neo4j_client(monkeypatch)
+    handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
+
+    flag = _record(
+        knowledge_id="kid_flag_v2", source_type="flag", causes="kid_healthy_observation",
+    )
+    handler(flag, operation="delete", reason="auto-cleared: subsequent observation was healthy")
+
+    query, params = _FakeNeo4jClient.instances[0].calls[0]
+    assert params["causes"] == "kid_healthy_observation"
+    assert params["stype"] == "flag"
+    assert "CLEARED_BY" in query
+    assert "REPLACED_BY" in query  # present in query text (both FOREACHes always sent)
+
+
+def test_kb_neo4j_v1_handler_writes_replaced_by_edge_for_non_flag_tombstone(monkeypatch):
+    _patch_neo4j_client(monkeypatch)
+    handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
+
+    story = _record(
+        knowledge_id="kid_contaminated", source_type="story", causes="kid_clean_rerun",
+    )
+    handler(story, operation="delete", reason="contaminated: rerun under a new story_id")
+
+    _query, params = _FakeNeo4jClient.instances[0].calls[0]
+    assert params["causes"] == "kid_clean_rerun"
+    assert params["stype"] == "story"
+
+
+def test_kb_neo4j_v1_handler_no_clear_or_replace_edge_without_causes(monkeypatch):
+    _patch_neo4j_client(monkeypatch)
+    handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
+
+    handler(_record(source_type="flag"), operation="delete", reason="contaminated cell")
+    _query, params = _FakeNeo4jClient.instances[0].calls[0]
+    assert params["causes"] is None
 
 
 # ── kb-registry-v1 is a recognized group ─────────────────────────

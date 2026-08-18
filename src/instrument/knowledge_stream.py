@@ -27,6 +27,7 @@ companion ``docs/rag_design.md`` §4.2 / §4.4.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -363,12 +364,32 @@ def default_extract(event: KnowledgeEvent, artifact: bytes) -> KnowledgeRecord:
 
 # ── The ingestion loop ──────────────────────────────────────────
 
+def _handler_wants_operation(handler: Callable[..., None]) -> bool:
+    """Return True when ``handler`` opts into receiving the event's ``operation``/``reason``.
+
+    Most handlers (chroma/ledger upserts, test doubles) take just the extracted record —
+    they predate the canonical-state supersession/tombstone machinery and have no use for
+    ``operation``. A handler opts in by declaring an ``operation`` parameter (or accepting
+    ``**kwargs``); :func:`process_entry` then calls it with the event's ``operation`` and
+    ``reason`` as keyword arguments so it can distinguish upsert/supersede/delete. Handlers
+    that don't opt in keep receiving exactly the pre-existing ``handler(record)`` call.
+    """
+    try:
+        sig = inspect.signature(handler)
+    except (TypeError, ValueError):
+        return False
+    params = sig.parameters.values()
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params):
+        return True
+    return "operation" in sig.parameters
+
+
 def process_entry(
     r: Any,
     group: str,
     entry_id: str,
     event: KnowledgeEvent,
-    handler: Callable[[KnowledgeRecord], None],
+    handler: Callable[..., None],
     *,
     max_retries: int = MAX_RETRIES,
     stream: str = STREAM_KEY,
@@ -381,13 +402,21 @@ def process_entry(
     raise on any store failure. ``XACK`` happens only after the handler returns
     (destination confirmed). On failure the entry stays pending for a later claim; once
     its delivery count reaches ``max_retries`` it is dead-lettered.
+
+    A handler that declares an ``operation`` parameter (see :func:`_handler_wants_operation`)
+    additionally receives the event's ``operation``/``reason`` as keyword arguments, so it can
+    distinguish upsert/supersede/delete (the canonical-state lifecycle) without every existing
+    handler having to change shape.
     """
     try:
         artifact = artifact_reader(event.source_uri)
         if not verify_content_hash(artifact, event.content_hash):
             raise ValueError(f"content_hash mismatch for {event.source_uri!r}")
         record = extractor(event, artifact)
-        handler(record)
+        if _handler_wants_operation(handler):
+            handler(record, operation=event.operation, reason=event.reason)
+        else:
+            handler(record)
     except Exception as exc:
         if delivery_count(r, group, entry_id, stream=stream) >= max_retries:
             dead_letter(r, event, entry_id, reason=repr(exc))

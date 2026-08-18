@@ -74,6 +74,24 @@ def _default_consumer(group: str) -> str:
     return f"{group}-{socket.gethostname()}-{os.getpid()}"
 
 
+#: canonical-state finalize (G1) — the derived lifecycle_state for a record's OWN registry/
+#: graph entry, keyed by the event operation that registered it. ``upsert``/``supersede`` both
+#: mean "this knowledge_id is a fresh, currently-valid version" (the difference between them is
+#: whether it also carries a `supersedes` pointer, not its own state); ``delete`` is a
+#: self-tombstone — the record processed under a delete operation IS the retracted version (see
+#: kb_produce_registry.py's contaminated pass: "the record itself carries the fact; the event
+#: carries the change operation").
+_LIFECYCLE_STATE_BY_OPERATION = {
+    "upsert": "current",
+    "supersede": "current",
+    "delete": "tombstoned",
+}
+
+
+def _lifecycle_state_for(operation: str) -> str:
+    return _LIFECYCLE_STATE_BY_OPERATION.get(operation, "current")
+
+
 def build_handler(group: str, r: redis.Redis):
     """Resolve the destination handler for a named consumer group.
 
@@ -89,15 +107,19 @@ def build_handler(group: str, r: redis.Redis):
         return handler
 
     if group == "kb-registry-v1":
-        def handler(record):
+        def handler(record, *, operation="upsert", reason=""):
             # Append one compacted line to the flat, append-only registry index —
             # deliberately the same durable/human-greppable pattern as flags.jsonl (see
-            # REGISTRY_INDEX_PATH's module-level docstring). "lifecycle_state": "current"
-            # is a fixed marker, not a computed value: this consumer sees each record
-            # exactly once, in isolation, so it cannot itself determine whether a LATER
-            # record has since superseded this one — that resolution is
-            # generate_manifest.py's compaction step (plan step 15), which takes the
-            # latest-by-indexed_at row per entity_id from this file.
+            # REGISTRY_INDEX_PATH's module-level docstring).
+            #
+            # canonical-state finalize (G1): ``lifecycle_state`` is now derived from the
+            # event's ``operation`` (threaded in by knowledge_stream.process_entry) instead of
+            # a fixed "current" marker — upsert/supersede -> "current" (this record IS the
+            # fresh version), delete -> "tombstoned" (a self-tombstone, see
+            # kb_produce_registry.py's contaminated pass). This consumer still sees each
+            # record exactly once, in isolation, so it does NOT retroactively rewrite an
+            # earlier line — generate_manifest.py's compaction step (G2) is what folds the
+            # full history down to one row per entity_id.
             #
             # ``record.supersedes`` is the round-1 supersession-chain field (canonical-state
             # design §1) — present on KnowledgeRecord, None for a first version.
@@ -113,7 +135,7 @@ def build_handler(group: str, r: redis.Redis):
                 "source_type": record.source_type,
                 "logical_locator": record.logical_locator,
                 "source_uri": record.source_uri,
-                "lifecycle_state": "current",
+                "lifecycle_state": _lifecycle_state_for(operation),
                 "observed_at": record.observed_at,
                 "indexed_at": record.indexed_at,
                 "supersedes": record.supersedes,
@@ -122,6 +144,26 @@ def build_handler(group: str, r: redis.Redis):
             REGISTRY_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
             with open(REGISTRY_INDEX_PATH, "a") as f:
                 f.write(json.dumps(line) + "\n")
+
+            # A "supersede" event's record is the NEW version (knowledge.py: "'supersede'
+            # links a new version to its predecessor") — its own line above is already
+            # "current". The derived side-effect this operation carries is that the
+            # PREDECESSOR (record.supersedes) is now superseded, with an effective valid_to
+            # of this version's valid_from (base design §"Open Question 2": "the index
+            # layers compute the effective valid_to for any non-current version as its
+            # successor's valid_from, purely as a derived view over the supersedes chain").
+            # Recorded as a second append-only line — never a rewrite of the predecessor's
+            # original entry.
+            if operation == "supersede" and record.supersedes:
+                predecessor_line = {
+                    "knowledge_id": record.supersedes,
+                    "entity_id": record.entity_id,
+                    "lifecycle_state": "superseded",
+                    "valid_to": record.valid_from,
+                    "indexed_at": record.indexed_at,
+                }
+                with open(REGISTRY_INDEX_PATH, "a") as f:
+                    f.write(json.dumps(predecessor_line) + "\n")
 
         return handler
 
@@ -151,7 +193,7 @@ def build_handler(group: str, r: redis.Redis):
         return handler
 
     if group == "kb-neo4j-v1":
-        def handler(record):
+        def handler(record, *, operation="upsert", reason=""):
             from instrument.graph import Neo4jClient
 
             client = Neo4jClient()
@@ -166,16 +208,33 @@ def build_handler(group: str, r: redis.Redis):
                 # canonical-state round 2, step 8 (gap d): the date-spine fields
                 # (valid_from/observed_at/indexed_at) and the lineage fields
                 # (supersedes/causes) are now persisted too — the base inventory found
-                # this SET clause silently dropped all five. ``valid_to``/
-                # ``lifecycle_state`` stay unwritten on purpose: both are computed at
-                # read time only (round 1's argument, unchanged by this round) — writing
-                # them here would make the graph a second source of truth for a value
-                # that must always be derived from "is there a newer knowledge_id for
-                # this entity_id", never stored and risk going stale.
+                # this SET clause silently dropped all five.
+                #
+                # canonical-state finalize (G1): ``lifecycle_state`` (derived from the
+                # event's ``operation``, threaded in by knowledge_stream.process_entry) is
+                # now persisted too, mirroring the kb-registry-v1 handler's flat-index
+                # projection — a graph query no longer has to re-derive it from "is there a
+                # newer knowledge_id for this entity_id" every time it wants to filter on
+                # lifecycle. ``valid_to`` remains unwritten (still computed at read time —
+                # its "effective" value depends on the successor's valid_from, which is only
+                # available to the flat-index handler above, not re-derived here).
                 #
                 # ``record.supersedes`` is the round-1 supersession-chain field — present on
-                # KnowledgeRecord (canonical-state design §1), None for a first version.
+                # KnowledgeRecord (canonical-state design §1), None for a first version. The
+                # SUPERSEDES edge (and flipping the predecessor's own lifecycle_state to
+                # "superseded") only fires for an actual "supersede" operation — a record
+                # that merely carries a stale `supersedes` value under a different operation
+                # must not retroactively rewrite graph lineage.
+                #
+                # CLEARED_BY / REPLACED_BY (canonical-state design, base §"Open Question 2"):
+                # cross-entity edges for a "delete" (tombstone) whose ``causes`` names the
+                # record that justified the tombstone — a `flag` cleared by a later healthy
+                # `observation` gets CLEARED_BY; any other tombstoned record naming a
+                # replacement gets REPLACED_BY. ``causes`` is reused here exactly as its own
+                # docstring already generalizes it ("the knowledge_id of the ... record that
+                # justified this record's existence") — no new schema field.
                 supersedes = record.supersedes
+                lifecycle_state = _lifecycle_state_for(operation)
                 client._run(
                     "MERGE (k:Knowledge {knowledge_id: $id}) "
                     "SET k.entity_id = $eid, k.text = $text, k.source_uri = $uri, "
@@ -185,11 +244,20 @@ def build_handler(group: str, r: redis.Redis):
                     "k.repository_id = $repo, k.acl_scope = $acl, "
                     "k.valid_from = $valid_from, k.observed_at = $observed_at, "
                     "k.indexed_at = $indexed_at, k.supersedes = $supersedes, "
-                    "k.causes = $causes "
+                    "k.causes = $causes, k.lifecycle_state = $lifecycle_state "
                     "WITH k "
-                    "FOREACH (_ IN CASE WHEN $supersedes IS NOT NULL THEN [1] ELSE [] END | "
+                    "FOREACH (_ IN CASE WHEN $supersedes IS NOT NULL AND $operation = 'supersede' THEN [1] ELSE [] END | "
                     "    MERGE (prev:Knowledge {knowledge_id: $supersedes}) "
+                    "    SET prev.lifecycle_state = 'superseded' "
                     "    MERGE (k)-[:SUPERSEDES]->(prev) "
+                    ") "
+                    "FOREACH (_ IN CASE WHEN $operation = 'delete' AND $causes IS NOT NULL AND $stype = 'flag' THEN [1] ELSE [] END | "
+                    "    MERGE (cleared_by:Knowledge {knowledge_id: $causes}) "
+                    "    MERGE (k)-[:CLEARED_BY]->(cleared_by) "
+                    ") "
+                    "FOREACH (_ IN CASE WHEN $operation = 'delete' AND $causes IS NOT NULL AND $stype <> 'flag' THEN [1] ELSE [] END | "
+                    "    MERGE (replaced_by:Knowledge {knowledge_id: $causes}) "
+                    "    MERGE (k)-[:REPLACED_BY]->(replaced_by) "
                     ")",
                     {
                         "id": record.knowledge_id,
@@ -209,6 +277,8 @@ def build_handler(group: str, r: redis.Redis):
                         "indexed_at": record.indexed_at,
                         "supersedes": supersedes,
                         "causes": record.causes,
+                        "lifecycle_state": lifecycle_state,
+                        "operation": operation,
                     },
                 )
             finally:

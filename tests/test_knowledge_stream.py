@@ -83,7 +83,8 @@ class _FakeStore:
 
 
 def _publish_file_event(
-    r, content, *, knowledge_id="kid_1", tmp_path=None, source_type=""
+    r, content, *, knowledge_id="kid_1", tmp_path=None, source_type="",
+    operation="upsert", reason="",
 ) -> KnowledgeEvent:
     path = tmp_path or "/tmp/opencode"
     os.makedirs(path, exist_ok=True)
@@ -94,13 +95,14 @@ def _publish_file_event(
     event = KnowledgeEvent(
         knowledge_id=knowledge_id,
         entity_id="entity_1",
-        operation="upsert",
+        operation=operation,
         source_uri=f,
         source_revision="rev-1",
         content_hash=content_hash,
         occurred_at="2026-08-15T00:00:00Z",
         schema_version="kb/v1",
         event_id="",
+        reason=reason,
     )
     # source_type lets a caller seed the observation-family index the actuation gate's
     # `causes` lineage check reads (see knowledge_stream.SOURCE_TYPE_INDEX_KEY).
@@ -153,6 +155,57 @@ def test_process_entry_acks_and_prevents_redelivery(redis2):
     assert ks.pending_count(redis2, "kb-test-g3") == 0
     # A re-read finds nothing — the entry was acked, not redelivered.
     assert ks.read_events(redis2, "kb-test-g3", "c1", count=1) == []
+
+
+# ── Operation threading (canonical-state finalize, G1) ───────────
+#
+# process_entry must pass the event's operation/reason into a handler that opts in (by
+# declaring an `operation` parameter), while handlers that don't opt in — like
+# `_FakeStore.upsert` above, and every pre-existing chroma/ledger handler — keep receiving
+# exactly the old `handler(record)` call.
+
+
+class _OperationCapturingStore:
+    """A handler that opts into operation/reason by declaring both as parameters."""
+
+    def __init__(self):
+        self.calls: list[tuple[str, str, str]] = []  # (knowledge_id, operation, reason)
+
+    def upsert(self, record, *, operation="upsert", reason=""):
+        self.calls.append((record.knowledge_id, operation, reason))
+
+
+def test_process_entry_passes_operation_to_an_opted_in_handler(redis2):
+    ks.create_consumer_group(redis2, "kb-test-op1")
+    _publish_file_event(
+        redis2, "tombstoned payload", knowledge_id="kid_op_delete",
+        operation="delete", reason="contaminated cell",
+    )
+    store = _OperationCapturingStore()
+
+    entries = ks.read_events(redis2, "kb-test-op1", "c1", count=1)
+    outcome = ks.process_entry(
+        redis2, "kb-test-op1", entries[0].entry_id, entries[0].event, store.upsert,
+    )
+    assert outcome == "ok"
+    assert store.calls == [("kid_op_delete", "delete", "contaminated cell")]
+
+
+def test_process_entry_does_not_pass_operation_to_a_plain_handler(redis2):
+    # A handler that only accepts `record` (the pre-existing shape) must still work
+    # unchanged — process_entry must not force operation/reason onto it.
+    ks.create_consumer_group(redis2, "kb-test-op2")
+    _publish_file_event(
+        redis2, "supersede payload", knowledge_id="kid_op_plain", operation="supersede",
+    )
+    store = _FakeStore()
+
+    entries = ks.read_events(redis2, "kb-test-op2", "c1", count=1)
+    outcome = ks.process_entry(
+        redis2, "kb-test-op2", entries[0].entry_id, entries[0].event, store.upsert,
+    )
+    assert outcome == "ok"
+    assert store.docs == {"kid_op_plain": "supersede payload"}
 
 
 def test_upsert_is_idempotent_keyed_by_knowledge_id(redis2, tmp_path):
