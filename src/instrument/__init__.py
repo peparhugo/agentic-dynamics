@@ -157,7 +157,13 @@ from .review import (
     review_commit,
     review_story,
 )
-from .routing import compute_routing, normalize_task, recommend_route, simulate_strategies
+from .routing import compute_routing, recommend_route, simulate_strategies
+from .session_types import (
+    DEFAULT_TASK_TYPE,
+    EXPERIMENT_SESSION_PATTERNS,
+    TASK_TYPES,
+    normalize_task,
+)
 
 # v1.0: deterministic retrieval + evidence cards for the runtime-RAG layer
 from .retrieval import (
@@ -445,6 +451,8 @@ __all__ = [
     "get_backend_for_model", "resolve_backend", "run_agentic",
     "LivePublisher", "make_publisher",
     "compute_routing", "normalize_task", "recommend_route", "simulate_strategies",
+    # v1.0 session/task-type vocabulary (single source of truth)
+    "EXPERIMENT_SESSION_PATTERNS", "TASK_TYPES", "DEFAULT_TASK_TYPE",
     # v1.0 per-step routing
     "route_step", "ModelSignals", "RouteState", "RoutingPreferences", "Objective",
     "StepSelector", "MEASURED_SIGNALS", "FORBIDDEN_SIGNALS",

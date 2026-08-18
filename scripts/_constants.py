@@ -1,6 +1,7 @@
 """Shared constants for the FinOps framework pipeline scripts."""
 
-import re as _re
+from instrument.session_types import EXPERIMENT_SESSION_PATTERNS as EXPERIMENT_SESSION_PATTERNS
+from instrument.session_types import normalize_task as normalize_task
 
 MODEL_LABELS = {
     "deepseek/deepseek-v4-pro": "DeepSeek v4 Pro",
@@ -20,17 +21,10 @@ MODEL_LABELS = {
 # Do not re-add provider pricing here — import `get_pricing` from
 # instrument.efficiency instead.
 
-EXPERIMENT_SESSION_PATTERNS = [
-    "flask", "api", "rest", "task", "url", "probe", "std_", "sweep", "batch", "config",
-    "silent", "constraint", "recovery", "baseline", "perturb", "inject", "phantom",
-    "remove_critical", "invert", "shift_framing", "alien", "false_premise", "competing",
-    "force_abandonment", "reverse_causality", "contradiction", "data_table",
-    "collaborat", "url_shortener", "iterative", "cross-domain", "standardized",
-    "silent_mode", "factorial", "architecture_redesign", "search_kv", "web_crawler",
-    "notification", "autocomplete", "twitter", "form_wizard", "social_graph",
-    "mint_financial", "fastapi_maintenance", "flask_maintenance", "comparative",
-    "r1]", "r2]", "r3]", "s0.5", "s0.8", "s1.0", "2rep",
-]
+# EXPERIMENT_SESSION_PATTERNS and normalize_task are imported from
+# instrument.session_types (the single task-type / session-pattern vocabulary) —
+# the dependency direction here is scripts -> src, not the reverse. Keep this
+# re-export for the scripts that already do `from _constants import ...`.
 
 
 def bootstrap_ci(values, n_resamples=1000, ci=95, seed=42):
@@ -48,11 +42,6 @@ def bootstrap_ci(values, n_resamples=1000, ci=95, seed=42):
     lo_idx = int((100 - ci) / 2 / 100 * n_resamples)
     hi_idx = int((100 + ci) / 2 / 100 * n_resamples) - 1
     return [round(means[lo_idx], 4), round(means[hi_idx], 4)]
-
-
-def normalize_task(experiment: str) -> str:
-    """Strip perturbation strength and repetition suffixes from task names."""
-    return _re.sub(r'_(s\d+\.\d+|r\d+)$', '', experiment)
 
 
 import os as _os
