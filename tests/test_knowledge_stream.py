@@ -6,6 +6,7 @@ DB 1 (the framework queue) is only ever *read* to prove key isolation.
 """
 
 import hashlib
+import os
 import socket
 
 import pytest
@@ -55,7 +56,7 @@ def redis1():
 
 def _event(content: str, *, knowledge_id: str = "kid_1", **overrides) -> tuple[KnowledgeEvent, str]:
     content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-    event = KnowledgeEvent(
+    kwargs = dict(
         knowledge_id=knowledge_id,
         entity_id="entity_1",
         operation="upsert",
@@ -66,6 +67,8 @@ def _event(content: str, *, knowledge_id: str = "kid_1", **overrides) -> tuple[K
         schema_version="kb/v1",
         event_id="",
     )
+    kwargs.update(overrides)  # e.g. causes=... for the round-2 actuation-gate tests
+    event = KnowledgeEvent(**kwargs)
     return event, content_hash
 
 
@@ -79,9 +82,9 @@ class _FakeStore:
         self.docs[record.knowledge_id] = record.text  # same key overwrites → idempotent
 
 
-def _publish_file_event(r, content, *, knowledge_id="kid_1", tmp_path=None) -> KnowledgeEvent:
-    import os
-
+def _publish_file_event(
+    r, content, *, knowledge_id="kid_1", tmp_path=None, source_type=""
+) -> KnowledgeEvent:
     path = tmp_path or "/tmp/opencode"
     os.makedirs(path, exist_ok=True)
     f = f"{path}/kb_source_{knowledge_id}.txt"
@@ -99,7 +102,9 @@ def _publish_file_event(r, content, *, knowledge_id="kid_1", tmp_path=None) -> K
         schema_version="kb/v1",
         event_id="",
     )
-    ks.publish_event(r, event)
+    # source_type lets a caller seed the observation-family index the actuation gate's
+    # `causes` lineage check reads (see knowledge_stream.SOURCE_TYPE_INDEX_KEY).
+    ks.publish_event(r, event, source_type=source_type)
     return event
 
 
@@ -109,7 +114,15 @@ def test_contract_constants():
     assert ks.REDIS_DB == 2
     assert ks.STREAM_KEY == "kb:v1:changes"
     assert ks.DEAD_LETTER_KEY == "kb:v1:dead_letter"
-    assert ks.CONSUMER_GROUPS == ("kb-chroma-v1", "kb-neo4j-v1", "kb-ledger-v1")
+    assert ks.CONSUMER_GROUPS == (
+        "kb-chroma-v1", "kb-neo4j-v1", "kb-ledger-v1", "kb-registry-v1",
+    )
+
+
+def test_kb_registry_v1_is_a_valid_consumer_group(redis2):
+    # The registry consumer group can be created idempotently like the other three.
+    assert ks.create_consumer_group(redis2, "kb-registry-v1") is True
+    assert ks.create_consumer_group(redis2, "kb-registry-v1") is False  # BUSYGROUP → False
 
 
 # ── Group creation ──────────────────────────────────────────────
@@ -221,6 +234,84 @@ def test_reconcile_missing_emits_only_absent_ids(redis2):
     emitted = ks.reconcile_missing(redis2, [event], set())
     assert len(emitted) == 1
     assert len(redis2.xrange(STREAM)) == 1
+
+
+# ── Actuation gate (round 2 canonical-state design §5c) ──────────
+#
+# The gate lives inside publish_event() itself (the single function every producer
+# already calls) and fires only when the caller's `source_type` classifies as
+# "actuation" (see instrument.knowledge.message_family). Nothing in the running system
+# passes source_type="actuation" today — these tests exercise the gate directly, the same
+# way its own eventual caller (a future control-rule evaluator, per design §5b) would.
+
+
+def test_publish_event_rejects_actuation_without_armed_flag(redis2, tmp_path, monkeypatch):
+    monkeypatch.delenv("FINOPS_ACTUATION_ARMED", raising=False)
+    obs = _publish_file_event(
+        redis2, "an observation", knowledge_id="kid_obs_unarmed", tmp_path=str(tmp_path),
+        source_type="story",
+    )
+    event, _ = _event("actuation candidate", knowledge_id="kid_act_unarmed", causes=obs.knowledge_id)
+    with pytest.raises(RuntimeError, match="not armed"):
+        ks.publish_event(redis2, event, source_type="actuation")
+
+
+def test_publish_event_accepts_actuation_when_armed_true_and_causes_valid(redis2, tmp_path):
+    obs = _publish_file_event(
+        redis2, "an observation", knowledge_id="kid_obs_armed", tmp_path=str(tmp_path),
+        source_type="observation",
+    )
+    event, _ = _event("actuation candidate", knowledge_id="kid_act_armed", causes=obs.knowledge_id)
+    entry_id = ks.publish_event(redis2, event, source_type="actuation", armed=True)
+    assert entry_id  # accepted — armed explicitly, and `causes` resolves to an observation
+
+
+def test_publish_event_accepts_actuation_when_env_flag_armed(redis2, tmp_path, monkeypatch):
+    monkeypatch.setenv("FINOPS_ACTUATION_ARMED", "1")
+    obs = _publish_file_event(
+        redis2, "an observation", knowledge_id="kid_obs_envarmed", tmp_path=str(tmp_path),
+        source_type="flag",
+    )
+    event, _ = _event("actuation candidate", knowledge_id="kid_act_envarmed", causes=obs.knowledge_id)
+    entry_id = ks.publish_event(redis2, event, source_type="actuation")
+    assert entry_id
+
+
+def test_publish_event_rejects_actuation_with_unresolvable_causes(redis2):
+    # armed=True but `causes` points at a knowledge_id nothing ever registered.
+    event, _ = _event(
+        "actuation candidate", knowledge_id="kid_act_badcauses", causes="no_such_knowledge_id",
+    )
+    with pytest.raises(RuntimeError, match="causes"):
+        ks.publish_event(redis2, event, source_type="actuation", armed=True)
+
+
+def test_publish_event_rejects_actuation_with_empty_causes(redis2):
+    event, _ = _event("actuation candidate", knowledge_id="kid_act_emptycauses")
+    assert event.causes == ""
+    with pytest.raises(RuntimeError, match="causes"):
+        ks.publish_event(redis2, event, source_type="actuation", armed=True)
+
+
+def test_publish_event_rejects_actuation_whose_causes_is_itself_an_actuation(redis2, tmp_path):
+    # `causes` must resolve to an OBSERVATION-family record — an actuation cannot cite
+    # another actuation as its justification.
+    prior_actuation, _ = _event("prior actuation", knowledge_id="kid_prior_actuation")
+    # Published unarmed-check-bypassed via a direct index seed is not possible (the
+    # actuation branch never writes to the index — see publish_event's docstring), so the
+    # index has no entry for kid_prior_actuation at all; resolution must fail regardless.
+    event, _ = _event(
+        "actuation candidate", knowledge_id="kid_act_citesactuation",
+        causes=prior_actuation.knowledge_id,
+    )
+    with pytest.raises(RuntimeError, match="causes"):
+        ks.publish_event(redis2, event, source_type="actuation", armed=True)
+
+
+def test_finops_actuation_armed_is_unset_by_default():
+    # Guards against a future .env/CI config change silently arming actuation without
+    # anyone noticing — nothing else in the suite would catch that.
+    assert os.environ.get("FINOPS_ACTUATION_ARMED") != "1"
 
 
 # ── DB 2 key isolation ──────────────────────────────────────────

@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable
 
-from .knowledge import Authority, KnowledgeEvent, KnowledgeRecord
+from .knowledge import Authority, KnowledgeEvent, KnowledgeRecord, message_family
 
 # ── Connection / key contract ───────────────────────────────────
 
@@ -46,13 +46,26 @@ STREAM_KEY = "kb:v1:changes"
 DEAD_LETTER_KEY = "kb:v1:dead_letter"
 CHECKPOINT_KEY = "kb:v1:checkpoints"  # ledger consumer's per-knowledge_id checkpoint hash
 
-#: The three consumers. Each ack's only after its own destination confirms.
-CONSUMER_GROUPS = ("kb-chroma-v1", "kb-neo4j-v1", "kb-ledger-v1")
+#: The four consumers. Each ack's only after its own destination confirms. "kb-registry-v1"
+#: (round 2, canonical-state design §6) appends one compacted line per record to the
+#: flat, append-only registry index (experiments/results/registry_index.jsonl) — the
+#: kb_worker.py handler is a separate, out-of-scope-for-this-module concern; this tuple only
+#: reserves the group name so create_consumer_group() can be called for it like the others.
+CONSUMER_GROUPS = ("kb-chroma-v1", "kb-neo4j-v1", "kb-ledger-v1", "kb-registry-v1")
 
 LEASE_TIMEOUT_MS = 60_000      # [H] how long a crashed consumer's claim survives
 MAX_RETRIES = 3                # [H] delivery attempts before dead-letter
 CLAIM_BATCH = 100              # [H] max messages reclaimed per pass
 RECONCILE_INTERVAL_S = 3600    # hourly manifest reconciliation
+
+#: Lightweight knowledge_id -> source_type lookup used ONLY by the actuation lineage gate
+#: (publish_event's `causes` check, round 2 design §5c). Populated as a side effect of
+#: publish_event() itself whenever a caller supplies `source_type` (observation-family
+#: events only — see publish_event's docstring). This hash is a stand-in for the eventual
+#: canonical registry index (`scripts/registry.py`, the "kb-registry-v1" consumer,
+#: docs/canonical_state_r2_design.md §6/§10); it exists so the lineage gate is
+#: self-contained and testable ahead of that surfacing infrastructure landing.
+SOURCE_TYPE_INDEX_KEY = "kb:v1:source_type_index"
 
 
 def connect(
@@ -97,27 +110,86 @@ def decode_event(data: dict[str, Any]) -> KnowledgeEvent:
     return KnowledgeEvent.from_dict(data)
 
 
+def _resolves_to_observation(r: Any, knowledge_id: str) -> bool:
+    """Return True when ``knowledge_id`` is indexed as an OBSERVATION-family record.
+
+    Backed by :data:`SOURCE_TYPE_INDEX_KEY` (see its module-level docstring). A missing or
+    falsy lookup resolves to False, never an exception — an actuation citing an unindexed
+    or not-yet-registered knowledge_id must fail closed, the same posture as every other
+    check in this gate.
+    """
+    stype = r.hget(SOURCE_TYPE_INDEX_KEY, knowledge_id)
+    if not stype:
+        return False
+    return message_family(stype) == "observation"
+
+
 def publish_event(
     r: Any,
     event: KnowledgeEvent,
     *,
     stream: str = STREAM_KEY,
     authorized: bool = False,
+    armed: bool = False,
+    source_type: str = "",
 ) -> str:
     """Append a pointer event to the change stream; return its entry id.
 
-    WRITE GUARD: appending mutates the durable ingestion plane, so the caller must be an
-    authorized writer. Authorization is granted when ``authorized=True`` is passed explicitly
-    OR the ``FINOPS_KB_WRITE`` env flag is ``"1"``; otherwise this raises ``RuntimeError`` so a
-    read-mostly process can never accidentally emit. ``scripts/kb_produce.py`` (and
+    WRITE GUARD (unchanged): appending mutates the durable ingestion plane, so the caller
+    must be an authorized writer. Authorization is granted when ``authorized=True`` is
+    passed explicitly OR the ``FINOPS_KB_WRITE`` env flag is ``"1"``; otherwise this raises
+    ``RuntimeError`` so a read-mostly process can never accidentally emit. Applies to every
+    event regardless of family. ``scripts/kb_produce.py`` (and
     ``scripts/kb_produce_sources.py``) set the env flag for their whole run; the self-build
-    emit path (``knowledge_ingestion.emit_phase_finding``) sets it only for the duration of the
-    emit and restores it afterward.
+    emit path (``knowledge_ingestion.emit_phase_finding``) sets it only for the duration of
+    the emit and restores it afterward.
+
+    ``source_type`` (round 2, NEW — keyword-only, defaults to ``""``): the caller's
+    ``KnowledgeRecord.source_type``, passed explicitly rather than stored on
+    ``KnowledgeEvent`` (design's plumbing option (b) — see
+    ``docs/canonical_state_r2_design.md`` §5c / ``docs/canonical_state_r2_plan.md`` step 7:
+    ``KnowledgeEvent`` gains no fourth field to solve this, since ``record_to_event()``'s
+    existing callers already have the source ``KnowledgeRecord`` in scope when they call
+    this function). Selects which gate below applies. Callers that omit it default to the
+    safe "observation" family (see :func:`instrument.knowledge.message_family`) and skip
+    both new checks — unchanged behavior for every pre-round-2 call site.
+
+    ACTUATION GATE (round 2, NEW): when ``message_family(source_type) == "actuation"``,
+    ALSO requires ``armed=True`` or ``FINOPS_ACTUATION_ARMED == "1"`` — checked in addition
+    to, not instead of, the write guard above. Default unset/false. This means
+    ``FINOPS_KB_WRITE=1`` (which every existing producer already sets for its whole run)
+    never accidentally arms actuation — the two flags are orthogonal on purpose.
+
+    LINEAGE GATE (round 2, NEW): also for actuation events, ``event.causes`` must be a
+    non-empty ``knowledge_id`` that resolves to an existing OBSERVATION-family record (see
+    :func:`_resolves_to_observation`). Independent of ``armed`` — it fires even when
+    actuation IS armed, so a future caller can never emit an actuation event with no
+    justifying observation, armed or not.
+
+    Non-actuation events with a non-empty ``source_type`` are recorded into
+    :data:`SOURCE_TYPE_INDEX_KEY` so a later actuation's ``causes`` can resolve against
+    them — see that constant's docstring for why this index exists and what it stands in
+    for. Nothing is written to the index for actuation events themselves (an actuation
+    cannot be `causes`-cited by another actuation — see design §5a: `causes` must resolve
+    to an *observation*).
     """
     if not authorized and os.environ.get("FINOPS_KB_WRITE") != "1":
         raise RuntimeError(
             "knowledge write not authorized: set FINOPS_KB_WRITE=1 or pass authorized=True"
         )
+    if message_family(source_type) == "actuation":
+        if not armed and os.environ.get("FINOPS_ACTUATION_ARMED") != "1":
+            raise RuntimeError(
+                "actuation not armed: set FINOPS_ACTUATION_ARMED=1 or pass armed=True "
+                "(today, nothing in the running system does either — this is a future hook)"
+            )
+        if not event.causes or not _resolves_to_observation(r, event.causes):
+            raise RuntimeError(
+                "actuation event missing or invalid `causes`: every actuation must cite "
+                "the knowledge_id of the observation-family record that justified it"
+            )
+    elif source_type:
+        r.hset(SOURCE_TYPE_INDEX_KEY, event.knowledge_id, source_type)
     return r.xadd(stream, event.to_dict())
 
 

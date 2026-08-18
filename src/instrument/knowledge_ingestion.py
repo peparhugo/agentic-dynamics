@@ -595,5 +595,5 @@ def emit_phase_finding(
 
     with _authorized_kb_write():
         r = _ks.connect()
-        _ks.publish_event(r, record_to_event(record, now=now))
+        _ks.publish_event(r, record_to_event(record, now=now), source_type=record.source_type)
     return record

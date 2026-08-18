@@ -170,7 +170,7 @@ def emit_records(r, records: list) -> tuple[int, int]:
         artifact = record_to_artifact(record)
         KB_ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
         (KB_ARTIFACT_DIR / f"{record.knowledge_id}.json").write_bytes(artifact)
-        ks.publish_event(r, record_to_event(record))
+        ks.publish_event(r, record_to_event(record), source_type=record.source_type)
         r.hset(ks.CHECKPOINT_KEY, record.knowledge_id, record.indexed_at)
         emitted += 1
     return emitted, skipped

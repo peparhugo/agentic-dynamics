@@ -10,6 +10,8 @@ from dataclasses import FrozenInstanceError, fields
 import pytest
 
 from instrument.knowledge import (
+    ACTUATION_TYPES,
+    OBSERVATION_TYPES,
     SCHEMA_VERSION,
     Authority,
     KnowledgeEvent,
@@ -17,6 +19,7 @@ from instrument.knowledge import (
     compute_content_hash,
     compute_entity_id,
     compute_knowledge_id,
+    message_family,
 )
 
 
@@ -190,7 +193,7 @@ def test_event_has_no_body_field():
 
 def test_event_carries_only_pointers_and_identity():
     field_names = {f.name for f in fields(KnowledgeEvent)}
-    # Identity + pointer/hash/version fields, plus a tracing id.
+    # Identity + pointer/hash/version fields, plus a tracing id and (round 2) `causes`.
     assert field_names == {
         "knowledge_id",
         "entity_id",
@@ -201,6 +204,7 @@ def test_event_carries_only_pointers_and_identity():
         "occurred_at",
         "schema_version",
         "event_id",
+        "causes",
     }
 
 
@@ -270,3 +274,66 @@ def test_record_and_event_share_knowledge_id():
     event = _event()
     assert record.knowledge_id == event.knowledge_id
     assert record.entity_id == event.entity_id
+
+
+# ── `causes` (round 2 addition) ─────────────────────────────────
+
+
+def test_record_causes_defaults_to_none():
+    assert _record().causes is None
+
+
+def test_event_causes_defaults_to_empty_string():
+    assert _event().causes == ""
+
+
+def test_record_causes_round_trips_through_to_dict():
+    record = _record(causes="some-observation-knowledge-id")
+    restored = KnowledgeRecord.from_dict(record.to_dict())
+    assert restored == record
+    assert restored.causes == "some-observation-knowledge-id"
+
+
+def test_event_causes_round_trips_through_to_dict():
+    event = _event(causes="some-observation-knowledge-id")
+    restored = KnowledgeEvent.from_dict(event.to_dict())
+    assert restored == event
+    assert restored.causes == "some-observation-knowledge-id"
+
+
+def test_record_from_dict_accepts_fixture_with_no_causes_key():
+    # A pre-existing artifact (any of the 1,913 already on disk) has no `causes` key at
+    # all. from_dict() must resolve the missing key to None, never raise a TypeError.
+    d = _record().to_dict()
+    del d["causes"]
+    restored = KnowledgeRecord.from_dict(d)
+    assert restored.causes is None
+
+
+def test_event_from_dict_accepts_fixture_with_no_causes_key():
+    d = _event().to_dict()
+    del d["causes"]
+    restored = KnowledgeEvent.from_dict(d)
+    assert restored.causes == ""
+
+
+# ── message_family (round 2 addition) ───────────────────────────
+
+
+def test_message_family_classifies_actuation_vs_observation():
+    assert message_family("actuation") == "actuation"
+    for source_type in OBSERVATION_TYPES:
+        assert message_family(source_type) == "observation"
+
+
+def test_message_family_defaults_unknown_source_type_to_observation():
+    # A closed allowlist, not a denylist: a made-up source_type must classify as
+    # "observation" (the safe default), not error and not silently become "actuation".
+    assert message_family("some_future_source_type_nobody_registered") == "observation"
+    assert "some_future_source_type_nobody_registered" not in ACTUATION_TYPES
+
+
+def test_actuation_types_is_a_single_member_allowlist():
+    # Guards the design's "closed by default" invariant directly: ACTUATION_TYPES must
+    # never silently grow beyond the one family this round introduces.
+    assert ACTUATION_TYPES == frozenset({"actuation"})
