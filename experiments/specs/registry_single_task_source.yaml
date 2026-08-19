@@ -1,0 +1,132 @@
+name: registry_single_task_source
+question: >-
+  Fix the canonical-state migration so it registers the CLEAN single-task re-run results and does
+  NOT recover the flawed old ones. The migration's summary-recovery source recovers the ~83
+  flawed entries lost in the 227->144 shrink (caveated) — the wrong posture, since those cells
+  were re-run precisely because the old data was flawed (stale taxonomy, cross-matched baselines).
+  Add a single-task source that registers the clean task_manager_* + process_perturbation_resample_*
+  results as MEASURED findings, and retire the recovery posture.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        scripts/kb_produce_registry.py _SOURCES has six sources (story, story-worktree, review,
+        summary-recovery, contaminated, meta-audit). summary-recovery (derive_summary_recovery_pass,
+        :241-302) recovers _results_summary.json entries present at --since-sha but absent from the
+        current 144-entry summary — i.e. it RE-COVERS the FLAWED old single-task cells (the
+        manifold/semantic taxonomy + P0-8 cross-matched baselines the remediation was run to
+        escape). Meanwhile the CLEAN re-runs — experiments/results/task_manager_*.json (7 models,
+        run.py output shape {"experiment","model","runs":[...]}) and
+        experiments/results/process_perturbation_resample_*.json (deepseek-v4-pro, claude-fable-5,
+        gpt-5.6-sol, plus an INVALID gpt-5.6 file whose model id is "gpt-5.6") — are registered by
+        NO source. The registry (experiments/results/registry_index.jsonl) therefore never gets the
+        measured flail/narration data those re-runs carry.
+      taxonomy: >-
+        Single-task perturbation results are findings, not stories: source_type="finding",
+        authority=MEASURED, evidence_class="[M]" — the same shape knowledge_ingestion.derive_records
+        produces from a _results_summary.json entry. If reuse is simplest, the run.py output shape
+        can be adapted via story_ingestion.derive_story_records_from_run_output and then re-derived,
+        but the EMITTED record_type must be "finding" (not "story"), matching how the summary feeds
+        build_data.compute_model_data.
+      hard_rules: >-
+        (1) The flawed old single-task entries are NOT recovered: remove/retire the summary-recovery
+        posture (either delete the source, or re-purpose it so it never emits the flawed entries as
+        canonical upserts). (2) The INVALID process_perturbation_resample_gpt-5.6.json (model id
+        "gpt-5.6", not a real model) is excluded with a logged skip, never emitted. (3) Idempotent:
+        knowledge_id = f(entity, revision, content_hash, extractor) so a re-run skips; byte-identity
+        with the existing finding producer. (4) Dry-run must report per-source would-emit counts and
+        touch neither Redis nor the filesystem. (5) Test-driven; the 1,913-artifact backward-compat
+        invariant still holds.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/registry-single-task-source); each phase commits [workflow] <phase>.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Add the single-task migration source and retire the summary-recovery posture.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - scripts/kb_produce_registry.py (_SOURCES, derive_summary_recovery_pass, the _summary_entry
+            adapter, emit_records, main)
+          - src/instrument/knowledge_ingestion.py (derive_records / build_record — the finding shape)
+          - src/instrument/story_ingestion.py (derive_story_records_from_run_output + adapt_to_story_result)
+          - docs/canonical_state_r2_design.md §7c (the recovery pass) + §3 (source_type table)
+
+          DO:
+          - Add a `single-task` source to _SOURCES whose derive fn reads experiments/results/
+            task_manager_*.json + process_perturbation_resample_*.json and emits ONE "finding"
+            KnowledgeRecord per result (MEASURED/[M]); skip the invalid gpt-5.6 file with a logged
+            reason. Reuse the finding producer where possible; do NOT emit source_type="story".
+          - Retire the recovery posture: remove `summary-recovery` from _SOURCES (and its derive fn
+            + --since-sha plumbing), so the flawed old entries are never re-emitted as canonical.
+            Keep the contaminated/meta-audit/story/review/worktree sources unchanged.
+          - Add tests (tests/test_kb_produce_registry.py) asserting: single-task emits findings not
+            stories; gpt-5.6 is skipped; summary-recovery no longer exists; dry-run reports counts.
+
+          VERIFY: pytest tests/test_kb_produce_registry.py tests/test_story_ingestion.py
+          tests/test_knowledge_ingestion.py -q — must pass; `python3 scripts/kb_produce_registry.py
+          --source single-task --dry-run` reports the would-emit count + samples.
+          DELIVER the code + passing tests.
+      - name: test
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the full gate and the dry-run.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q`. Fix failures without weakening tests.
+          - Run `python3 scripts/kb_produce_registry.py --dry-run` and confirm: single-task present,
+            summary-recovery absent, contaminated still 77 tombstones, and the full would-emit count
+            is sane (no source doubles up).
+
+          DELIVER a green full suite + the dry-run output.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace the migration-source change.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_registry_single_task_source.md tracing the new single-task source
+            + the removed summary-recovery posture to files, with PASS/FAIL and the dry-run counts.
+
+          DELIVER docs/review/impl_registry_single_task_source.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: source_landed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [single_task_source, recovery_retired]
+metrics:
+  - {name: single_task_source, agg: mean, over: cell}
+  - {name: recovery_retired, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
