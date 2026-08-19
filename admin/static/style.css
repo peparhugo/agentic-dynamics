@@ -810,6 +810,18 @@ pre {
   color: var(--text-muted);
 }
 
+/* Flags owns the whole board region rather than growing to fit: the list scrolls inside a
+   fixed frame so the count, the provenance line, and the "You decide." boundary stay visible
+   no matter how many flags are open (design §4.1). */
+.board-flags { min-height: 100%; }
+.board-flags .supervisor-rail { flex: 1; min-height: 0; }
+
+.board-header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
 .attention-count {
   min-width: 26px;
   padding: 2px var(--sp-2);
@@ -1100,6 +1112,9 @@ pre {
 .detail-surface[data-open="true"] {
   display: flex;
   animation: sheet-rise var(--motion-sheet) var(--ease);
+  /* The drag gesture writes `transform` directly for 1:1 thumb tracking, so there is no
+     transition on it — an eased transform would lag the finger. */
+  will-change: transform;
 }
 
 .detail-header {
@@ -1119,6 +1134,36 @@ pre {
   font-size: var(--fs-base);
   text-transform: none;
   overflow-wrap: anywhere;
+}
+
+/* Glance line: total reported cost and tokens for the selected cell, directly under the
+   status/phase line so the first screenful answers "what has this cost me?" (design §3.2). */
+.detail-glance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-top: var(--sp-1);
+}
+
+.glance-metric {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+
+/* Long prose is clamped to three lines and expands on activation. `cursor: pointer` plus the
+   role/tabindex in the markup make it discoverable as a control rather than dead text. */
+.prose-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.prose-clamp.expanded {
+  display: block;
+  overflow: visible;
 }
 
 .inline-state {
@@ -1336,6 +1381,12 @@ button:disabled {
   background: color-mix(in srgb, var(--attention-off-track) 16%, transparent);
 }
 
+/* On a phone the sheet is a pushed depth, so the control reads "Back"; on desktop it is a
+   docked column, so it reads as a close glyph. Same button, same handler (design §3.3). */
+.detail-close { display: flex; align-items: center; gap: var(--sp-1); }
+.detail-close .detail-close-glyph { display: none; }
+.detail-close .detail-back-label { font-size: var(--fs-small); }
+
 .icon-button {
   min-width: var(--touch-target);
   padding: 0 var(--sp-2);
@@ -1512,13 +1563,33 @@ input[type="checkbox"] {
 
 .scrim[hidden] { display: none; }
 
+/* The drag handle is a real button (keyboard-reachable), drawn as the familiar grabber pill.
+   Its hit area is a full touch target even though the pill itself is 4px tall. */
 .sheet-handle {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheet-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 8px;
   width: 36px;
   height: 4px;
-  margin: var(--sp-2) auto var(--sp-1);
+  transform: translateX(-50%);
   border-radius: 2px;
   background: var(--border-strong);
 }
+
+.sheet-handle:active { cursor: grabbing; }
 
 .system-sheet {
   position: fixed;
@@ -1569,6 +1640,23 @@ input[type="checkbox"] {
   .transcript-feed {
     min-height: 55vh;
   }
+
+  /* Thumb zone (design §3.3, [R §1.4.2]): on a phone the transcript controls move BELOW the
+     stream and stick to the bottom of the sheet, because `follow` is the single most-thumbed
+     control and the top of a sheet is the hardest place to reach one-handed. The DOM order
+     stays reading-order correct (controls describe the stream that follows them); only the
+     visual order changes, via flex `order`. */
+  .transcript-pane > .transcript-feed { order: 1; }
+  .transcript-pane > .jump-live { order: 2; }
+  .transcript-pane > .transcript-controls {
+    order: 3;
+    position: sticky;
+    bottom: 0;
+    padding: var(--sp-2) 0;
+    background: var(--bg-1);
+    border-top: 1px solid var(--border);
+  }
+  .transcript-pane > .pane-note { order: 4; }
 
   /* On a phone the sheet owns the screen; the board behind it must not scroll under a drag. */
   body.sheet-open { overflow: hidden; }
@@ -1673,6 +1761,8 @@ input[type="checkbox"] {
   }
 
   .sheet-handle { display: none; }
+  .detail-close .detail-close-glyph { display: inline; }
+  .detail-close .detail-back-label { display: none; }
   .mobile-anchor { display: none; }
   .transcript-feed { max-height: none; flex: 1; }
 

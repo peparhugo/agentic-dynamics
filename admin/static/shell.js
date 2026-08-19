@@ -147,6 +147,38 @@
     if (region) region.scrollTop = 0
   }
 
+  /* ── Drawer toggle labels ─────────────────────────────────────────────────────────────────
+     Routing and Registry each keep an explicit show/hide control, and the data layer owns what
+     pressing it does (lazy fetch, focus handling, Escape). The shell owns only its LABEL: a
+     button that says "Show routing data" while the data is already showing is a small lie the
+     operator has to test by pressing it. Driven off `aria-expanded`, which app.js already
+     maintains, so there is no second source of truth for the open state. */
+
+  /** Keep one drawer toggle's label in sync with the state it reports. */
+  function syncToggleLabel(toggle, noun) {
+    if (!toggle) return
+    const expanded = toggle.getAttribute("aria-expanded") === "true"
+    const label = `${expanded ? "Hide" : "Show"} ${noun}`
+    if (toggle.textContent.trim() !== label) toggle.textContent = label
+  }
+
+  /** Observe both drawer toggles and relabel them whenever their state changes. */
+  function bindToggleLabels() {
+    const toggles = [
+      [$("#routing-toggle"), "routing data"],
+      [$("#registry-toggle"), "registry"],
+    ]
+    for (const [toggle, noun] of toggles) {
+      if (!toggle) continue
+      syncToggleLabel(toggle, noun)
+      if (typeof MutationObserver !== "function") continue
+      new MutationObserver(() => syncToggleLabel(toggle, noun)).observe(toggle, {
+        attributes: true,
+        attributeFilter: ["aria-expanded"],
+      })
+    }
+  }
+
   /* ── System overflow sheet ────────────────────────────────────────────────────────────────
      Registry + Queue actions: occasional surfaces that are not glance-worthy enough for a tab
      (design §1.2, §7.2). Bottom sheet on mobile, centered panel on desktop — one DOM, styled
@@ -333,6 +365,7 @@
     bindShell()
     bindMirrors()
     bindOnDemandForms()
+    bindToggleLabels()
     setTheme(document.documentElement.dataset.theme)
     setDensity(readStored(DENSITY_KEY) || "comfortable")
     showBoard(readStored(BOARD_KEY) || "fleet")

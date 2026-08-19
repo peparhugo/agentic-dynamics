@@ -125,12 +125,117 @@
     const node = surface()
     if (!node || node.dataset.open !== "true") return
     node.dataset.open = "false"
+    clearDragOffset()
     document.body.classList.remove("detail-modal")
     root.ControlRoomShell?.hideScrimIfIdle()
     // Only restore focus if the trigger is still in the document: the fleet re-renders on
     // every poll, so the original button may already have been replaced.
     if (returnFocus instanceof HTMLElement && returnFocus.isConnected) returnFocus.focus({ preventScroll: true })
     returnFocus = null
+  }
+
+  /* ── Drag-to-dismiss ──────────────────────────────────────────────────────────────────────
+     A modal bottom sheet is expected to follow the thumb and dismiss on a downward flick
+     (Material 3 modal bottom sheet, iOS sheets — [R §2.7]). Implemented with Pointer Events so
+     one code path covers touch, pen, and mouse, and with `setPointerCapture` so the gesture
+     survives the pointer leaving the handle mid-drag.
+
+     Three rules keep the gesture from fighting the content:
+       - it only arms below the breakpoint, where the surface IS a sheet;
+       - it only arms on the handle and the header, never on the scrolling body, so dragging
+         the transcript scrolls it instead of dismissing the sheet;
+       - only downward movement counts, and a dismiss needs either distance (a quarter of the
+         sheet) or speed (a flick), so a small accidental nudge springs back.
+
+     `prefers-reduced-motion` is honoured by skipping the follow transform entirely: the sheet
+     then simply closes on release past the threshold, with no travel animation. */
+
+  /** Distance, in px, past which a slow drag dismisses the sheet. */
+  const DRAG_DISMISS_PX = 120
+
+  /** Speed, in px/ms, past which a short flick dismisses regardless of distance. */
+  const FLICK_VELOCITY = 0.5
+
+  /** Live gesture state; null whenever no drag is in progress. */
+  let drag = null
+
+  /** True when the operator asked for reduced motion. */
+  function reducedMotion() {
+    return typeof root.matchMedia === "function" && root.matchMedia("(prefers-reduced-motion: reduce)").matches
+  }
+
+  /** Offset the sheet by `distance` px without animating (the sheet tracks the thumb 1:1). */
+  function applyDragOffset(distance) {
+    const node = surface()
+    if (!node) return
+    node.style.transform = distance > 0 ? `translateY(${distance}px)` : ""
+  }
+
+  /** Drop any drag transform, returning the sheet to its docked position. */
+  function clearDragOffset() {
+    const node = surface()
+    if (node) node.style.transform = ""
+  }
+
+  /** Begin a drag when the pointer goes down on the handle or the header. */
+  function onPointerDown(event) {
+    const node = surface()
+    if (!node || node.dataset.open !== "true" || !isModal()) return
+    if (event.button !== undefined && event.button !== 0) return
+    const target = event.target instanceof Element ? event.target : null
+    // Buttons inside the header (close) keep their own behavior; dragging starts from the
+    // handle or from empty header space only.
+    if (!target?.closest("#detail-handle, .detail-header")) return
+    if (target.closest("#detail-close")) return
+    drag = { startY: event.clientY, startedAt: event.timeStamp, distance: 0 }
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  /** Follow the pointer while it moves down. */
+  function onPointerMove(event) {
+    if (!drag) return
+    drag.distance = Math.max(0, event.clientY - drag.startY)
+    // Upward movement is ignored rather than inverted: a sheet that can be dragged up would
+    // imply an expanded state this design does not have.
+    if (!reducedMotion()) applyDragOffset(drag.distance)
+  }
+
+  /** Dismiss past the threshold (or on a flick); otherwise spring back. */
+  function onPointerUp(event) {
+    if (!drag) return
+    const elapsed = Math.max(1, event.timeStamp - drag.startedAt)
+    const velocity = drag.distance / elapsed
+    const dismissed = drag.distance > DRAG_DISMISS_PX || (drag.distance > 24 && velocity > FLICK_VELOCITY)
+    drag = null
+    clearDragOffset()
+    if (dismissed) close()
+  }
+
+  /** Abandon a drag the browser cancelled (a system gesture, a lost pointer). */
+  function onPointerCancel() {
+    drag = null
+    clearDragOffset()
+  }
+
+  /** Arm the gesture on the sheet itself, so capture and cleanup have one owner. */
+  function bindDragToDismiss() {
+    const node = surface()
+    if (!node || typeof root.PointerEvent !== "function") return
+    node.addEventListener("pointerdown", onPointerDown)
+    node.addEventListener("pointermove", onPointerMove)
+    node.addEventListener("pointerup", onPointerUp)
+    node.addEventListener("pointercancel", onPointerCancel)
+    // The handle is also a real button: activating it with a keyboard or a screen reader is
+    // the non-gesture equivalent of flicking it down.
+    $("#detail-handle")?.addEventListener("click", () => {
+      if (!drag) close()
+    })
+  }
+
+  /** Expand or re-clamp one long-prose field, keeping `aria-expanded` truthful. */
+  function toggleProse(node) {
+    const expanded = node.classList.toggle("expanded")
+    node.setAttribute("aria-expanded", String(expanded))
   }
 
   /** Bind the surface's own controls and the board-side selection delegation. */
@@ -142,6 +247,22 @@
     })
 
     $("#detail-close")?.addEventListener("click", close)
+    bindDragToDismiss()
+
+    // Clamped long prose (the supervisor's rationale) expands on click or Enter/Space. It is
+    // the last field in the facts panel by design (§3.2), so expanding it never pushes the
+    // glanceable lines out of view.
+    document.addEventListener("click", (event) => {
+      const prose = event.target instanceof Element ? event.target.closest(".prose-clamp") : null
+      if (prose) toggleProse(prose)
+    })
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return
+      const prose = event.target instanceof Element ? event.target.closest(".prose-clamp") : null
+      if (!prose) return
+      event.preventDefault()
+      toggleProse(prose)
+    })
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && $("#system-sheet")?.dataset.open !== "true") close()
@@ -167,6 +288,8 @@
     if (typeof root.matchMedia === "function") {
       const media = root.matchMedia(MODAL_QUERY)
       const onChange = () => {
+        // A drag transform is meaningless once the surface is a docked column.
+        clearDragOffset()
         if (surface()?.dataset.open === "true") open(null)
         else {
           document.body.classList.remove("detail-modal")

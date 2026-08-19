@@ -21,9 +21,9 @@
   3. The read/act boundary is stated in markup, not only in CSS: READ ONLY / INTERACTIVE mode
      line, danger-styled irreversible actions, and the typed-confirmation door (design §3.4).
 
-  No build step: five classic scripts, loaded so that each one's dependencies are already
-  defined when it runs (core -> fleet vocabulary -> shell -> detail sheet -> app), and so the
-  chrome is interactive before the polling data layer starts.
+  No build step: six classic scripts, loaded so that each one's dependencies are already
+  defined when it runs (core -> keyed list -> fleet vocabulary -> shell -> detail sheet -> app),
+  and so the chrome is interactive before the polling data layer starts.
 -->
 <html lang="en">
 <head>
@@ -136,19 +136,37 @@
          a keyboard reaches after the nav.
     -->
     <aside id="detail-surface" class="detail-surface" aria-labelledby="transcript-title" data-open="false">
-      <div class="sheet-handle" aria-hidden="true"></div>
+      <!-- Drag affordance for the mobile sheet: dragging it (or the header) down dismisses the
+           sheet, matching the Material 3 / iOS sheet gesture [R §2.7]. It is a button so the
+           gesture has a keyboard- and screen-reader-reachable equivalent. -->
+      <button id="detail-handle" class="sheet-handle" type="button">
+        <span class="sr-only">Drag down or activate to close the detail sheet</span>
+      </button>
 
+      <!-- Field order is the design's glanceable-first rule (§3.2): identity, then state, then
+           where it is in the pipeline, then what it has cost. Those first three lines answer
+           "what is it, is it healthy, where is it" without scrolling; everything below is
+           secondary, and the long prose is clamped at the bottom of the control panels. -->
       <header class="detail-header">
         <div class="transcript-identity">
           <span id="transcript-mode" class="eyebrow">Cell / Transcript</span>
           <h2 id="transcript-title">NO CELL SELECTED</h2>
           <div class="inline-state">
             <span id="selected-status" class="status-word status-unknown">UNKNOWN</span>
+            <span id="selected-phase" class="phase-badge" hidden></span>
             <span>stream: <strong id="selected-stream-state">DISCONNECTED</strong></span>
           </div>
+          <div id="selected-glance" class="detail-glance" hidden>
+            <span id="selected-cost" class="glance-metric">--</span>
+            <span id="selected-tokens" class="glance-metric">--</span>
+          </div>
         </div>
+        <!-- Back on a phone (the sheet is a pushed depth), close on desktop (it is a docked
+             column). One control, one handler; the label swaps at the breakpoint. -->
         <button id="detail-close" class="icon-button detail-close" type="button">
-          <span aria-hidden="true">✕</span><span class="sr-only">Close detail and return to the board</span>
+          <span class="detail-close-glyph" aria-hidden="true">✕</span>
+          <span class="detail-back-label" aria-hidden="true">Back</span>
+          <span class="sr-only">Close detail and return to the board</span>
         </button>
       </header>
 
@@ -208,7 +226,8 @@
             <dl class="control-facts supervisor-facts">
               <div><dt>Session</dt><dd><span id="supervisor-title">--</span><br><span id="supervisor-session-id">--</span></dd></div>
               <div><dt>Model / assessment</dt><dd><span id="supervisor-model">--</span><br><span id="supervisor-status">ATTENTION</span></dd></div>
-              <div><dt>Reason</dt><dd id="supervisor-reason">--</dd></div>
+              <!-- Long prose comes last and is clamped; tapping expands it (design §3.2). -->
+              <div><dt>Reason</dt><dd id="supervisor-reason" class="prose-clamp" role="button" tabindex="0" aria-expanded="false">--</dd></div>
               <div><dt>Review stream</dt><dd id="supervisor-review">Review unavailable</dd></div>
               <div><dt>Last activity</dt><dd id="supervisor-activity">unavailable</dd></div>
             </dl>
@@ -403,7 +422,10 @@
             <div id="burn-label" class="metric-label">Reported burn · rolling 60s</div>
             <output id="burn-rate" class="metric-value cost-value">WAITING FOR LIVE COST</output>
             <!-- Full-width trace: the rail keeps only the number (design §5.2). -->
-            <svg id="burn-trace" class="burn-trace" viewBox="0 0 120 24" role="img" aria-label="No live cost samples"></svg>
+            <!-- Full-width trace: the design gives the rail a number and this board the whole
+                 series (§5.2), so the viewBox is wide enough to hold the full 60s window at
+                 one point per sample instead of the rail-sized 20-sample slice. -->
+            <svg id="burn-trace" class="burn-trace" viewBox="0 0 240 48" preserveAspectRatio="none" role="img" aria-label="No live cost samples"></svg>
           </section>
 
           <section class="metric-card" aria-label="Token totals">
@@ -434,7 +456,12 @@
             <span class="eyebrow">Supervisor</span>
             <h2 id="flags-title">NEEDS ATTENTION</h2>
           </div>
-          <span id="supervisor-count" class="attention-count">--</span>
+          <div class="board-header-meta">
+            <!-- Which store answered (redis | file | none). A "file" answer means the board is
+                 showing a retained snapshot, which is why it pairs with the delay notice. -->
+            <span id="supervisor-source" class="provenance">source: unknown</span>
+            <span id="supervisor-count" class="attention-count">--</span>
+          </div>
         </header>
 
         <section id="supervisor-rail" class="supervisor-rail">
@@ -662,10 +689,27 @@
       <section class="system-section" aria-labelledby="queue-title">
         <h3 id="queue-title">QUEUE</h3>
         <div class="queue-actions">
+          <!-- Reversible: one explicit press, primary-styled (design §3.4). -->
           <button id="enqueue-button" class="primary-action" type="button">Enqueue experiment</button>
-          <button id="clear-queue-button" class="danger-action" type="button">Clear queued work</button>
+          <!-- Irreversible: danger-styled AND behind the two-step door below, the same pattern
+               as the supervisor Interrupt (design §3.4, §7.2). Color alone never distinguishes
+               "will do something" from "just viewing"; the typed phrase does. -->
+          <button id="clear-queue-button" class="danger-action" type="button" aria-expanded="false" aria-controls="queue-clear-door">Clear queued work</button>
         </div>
         <p class="boundary-copy">Clearing removes queued metadata only; running work is unaffected and is never cancelled from here.</p>
+        <section id="queue-clear-door" class="interrupt-door" aria-labelledby="queue-door-title" hidden>
+          <h4 id="queue-door-title">ONE-WAY DOOR</h4>
+          <p>Every queued job record is removed. Work already leased by a worker keeps running and is not cancelled.</p>
+          <p>Type <code id="queue-confirmation-phrase">CLEAR QUEUE</code> to continue.</p>
+          <label>
+            <span class="sr-only">Clear queue confirmation</span>
+            <input id="queue-clear-confirmation" type="text" autocomplete="off">
+          </label>
+          <div class="form-actions">
+            <button id="cancel-queue-clear" type="button">Cancel</button>
+            <button id="confirm-queue-clear" class="danger-action" type="button" disabled>Clear queued work permanently</button>
+          </div>
+        </section>
         <output id="queue-result" class="inline-result" aria-live="polite"></output>
       </section>
     </div>
@@ -675,6 +719,7 @@
   <div id="alert-status" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
   <script src="/static/control-room-core.js"></script>
+  <script src="/static/keyed-list.js"></script>
   <script src="/static/board-fleet.js"></script>
   <script src="/static/shell.js"></script>
   <script src="/static/detail-sheet.js"></script>
