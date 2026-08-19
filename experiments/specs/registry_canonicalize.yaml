@@ -1,0 +1,134 @@
+name: registry_canonicalize
+question: >-
+  Canonicalize the corpus per docs/data_integrity_findings.md: (1) relabel no-op story conditions
+  (non-instrumented early_degrade/bad_seed -> clean, since the perturbation never happened) while
+  keeping their cost + code-quality measurements; (2) register the clean single-task re-runs
+  (task_manager_* + process_perturbation_resample_*) as MEASURED findings; (3) retire the flawed
+  144-entry single-task summary (remove summary-recovery, never re-emit it); (4) keep the 77
+  contaminated cells tombstoned. The registry becomes a large clean baseline + a small real
+  degraded arm, not a fake three-condition grid.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      canonical: docs/data_integrity_findings.md
+      summary: >-
+        READ docs/data_integrity_findings.md FIRST — it is the authoritative record. In brief: the
+        pre-fix story conditions were no-ops (early_degrade never degraded, bad_seed was not a bad
+        seed; P0-7 silent fallback), and the single-task summary has stale taxonomy + cross-matched
+        baselines + a fabricated pass rate. The ONLY trustable perturbation data is the new
+        instrumented cells (80 early_degrade re-runs + task_manager_* + process_perturbation_resample_*).
+        Old cells are still valid for COST and CODE QUALITY (they really ran), just not for
+        perturbation. So: relabel no-op conditions to "clean", register the new cells, tombstone the
+        77 contaminated, retire the 144 single-task.
+      rules: >-
+        (1) RELABEL rule (in the story producer): a story result whose perturbation_condition is
+        early_degrade or bad_seed AND whose result lacks test_executed_success (non-instrumented,
+        pre-fix) is a NO-OP — emit its record with condition="clean" and a caveat (text or a
+        note field) that the original label was a no-op. Instrumented cells (test_executed_success
+        present) keep their condition. (2) SINGLE-TASK source: derive one "finding" KnowledgeRecord
+        (source_type=finding, authority=MEASURED, evidence_class=[M]) per task_manager_*/process_
+        perturbation_resample_* result; skip the invalid process_perturbation_resample_gpt-5.6.json
+        (model id "gpt-5.6" is not real) with a logged reason. (3) RETIRE summary-recovery: remove
+        the summary-recovery source (and --since-sha plumbing) so the flawed 144 entries are never
+        re-emitted. (4) The 77 contaminated cells stay tombstoned (the contaminated source is
+        unchanged). (5) Idempotent knowledge_id; dry-run reports per-source counts and touches
+        neither Redis nor the filesystem. (6) Test-driven; 1,913-artifact backward-compat holds.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/registry-canonicalize); each phase commits [workflow] <phase>.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement the canonicalization per docs/data_integrity_findings.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/data_integrity_findings.md          (the authoritative record)
+          - src/instrument/story_ingestion.py         (build_story_record / derive_story_records —
+            where the relabel rule goes)
+          - scripts/kb_produce_registry.py            (_SOURCES, derive_summary_recovery_pass, the
+            single-task / contaminated sources, main)
+          - src/instrument/knowledge_ingestion.py     (the finding record shape)
+
+          DO:
+          - RELABEL: in the story producer, apply the no-op rule — non-instrumented early_degrade/
+            bad_seed -> emit condition="clean" + a caveat that the original label was a no-op. Add a
+            test: a non-instrumented early_degrade result emits condition "clean" (caveat present);
+            an instrumented one keeps "early_degrade".
+          - SINGLE-TASK: add a `single-task` source to _SOURCES that derives finding records from
+            experiments/results/task_manager_*.json + process_perturbation_resample_*.json (skip the
+            invalid gpt-5.6). Add a test asserting source_type=finding (never "story") and gpt-5.6 is
+            skipped.
+          - RETIRE: remove `summary-recovery` from _SOURCES + its derive fn + --since-sha plumbing.
+            Add a test asserting summary-recovery no longer exists and the flawed 144 are never
+            emitted.
+          - Keep `contaminated` (77 tombstones) and the story/review/meta-audit sources unchanged.
+
+          VERIFY: pytest tests/test_kb_produce_registry.py tests/test_story_ingestion.py
+          tests/test_knowledge_ingestion.py -q — must pass; then
+          `python3 scripts/kb_produce_registry.py --dry-run` reports the new per-source counts.
+          DELIVER the code + passing tests.
+      - name: test
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the full gate and the dry-run.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q`. Fix failures without weakening tests.
+          - Run `python3 scripts/kb_produce_registry.py --dry-run` and confirm: single-task present,
+            summary-recovery absent, contaminated still 77, and the relabeled story counts reflect
+            the no-op cells as "clean".
+
+          DELIVER a green full suite + the dry-run output.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace the canonicalization to code + the canonical doc.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Write docs/review/impl_registry_canonicalize.md tracing each rule (relabel / single-task /
+            retire / tombstone) to its file, with PASS/FAIL and the dry-run counts.
+          - Confirm docs/data_integrity_findings.md matches the implemented behavior (no drift).
+
+          DELIVER docs/review/impl_registry_canonicalize.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: canonicalized
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [noop_relabeled, single_task_registered, summary_retired]
+metrics:
+  - {name: noop_relabeled, agg: mean, over: cell}
+  - {name: single_task_registered, agg: mean, over: cell}
+  - {name: summary_retired, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
