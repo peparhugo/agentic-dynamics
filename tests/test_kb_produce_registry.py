@@ -130,6 +130,27 @@ def test_derive_story_pass3_tolerates_a_missing_worktree(tmp_path, monkeypatch):
     assert kpr.derive_story_pass3("agentic-dynamics") == []
 
 
+def test_derive_story_pass3_skips_contaminated_cells(tmp_path, monkeypatch):
+    # feature_queue-steer-2 was cut BEFORE the remediation moved the 77 contaminated files
+    # into _remediation_contaminated/, so its top-level stories/ still holds them. Pass 3
+    # must EXCLUDE those story_ids — otherwise it registers a contaminated cell as a plain
+    # upsert (current) before pass 6 can tombstone it, and the tombstone's delete event is
+    # deduped away by knowledge_id.
+    contam_dir = tmp_path / "contaminated"
+    _write_json(contam_dir / "x_early_degrade_contam1.json", _story_result("contam1"))
+    monkeypatch.setattr(kpr, "CONTAMINATED_DIR", contam_dir)
+
+    wt = tmp_path / "wt1"
+    stories = wt / "experiments" / "results" / "stories"
+    _write_json(stories / "x_early_degrade_contam1.json", _story_result("contam1"))
+    _write_json(stories / "x_clean_ok1.json", _story_result("ok1"))
+    monkeypatch.setattr(kpr, "STRANDED_WORKTREES", (wt,))
+
+    records = kpr.derive_story_pass3("agentic-dynamics")
+
+    assert {r.logical_locator for r in records} == {"ok1"}
+
+
 def test_worktree_independent_identity_makes_a_duplicate_a_free_no_op(tmp_path, monkeypatch):
     # The SAME story, byte-identical, present in both the main repo and a stranded
     # worktree, must converge on the same knowledge_id (worktree-independence — see

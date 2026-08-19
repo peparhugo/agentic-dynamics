@@ -186,6 +186,21 @@ def derive_review_pass1(repository_id: str, revision: str | None = None) -> list
 # ── Pass 3: stranded worktrees (finding 1) ──────────────────────
 
 
+def _contaminated_story_ids() -> set[str]:
+    """The story_ids of the quarantined contaminated cells (pass 6 tombstones them).
+
+    ``feature_queue-steer-2`` was created BEFORE the remediation moved the 77 contaminated
+    files into ``_remediation_contaminated/``, so its TOP-LEVEL ``stories/`` still holds
+    them. Pass 3 must skip those files — otherwise it registers a contaminated cell as a
+    plain ``upsert`` (``current``) before pass 6 can tombstone it, and the tombstone's
+    ``delete`` event is deduped away by ``knowledge_id``.
+    """
+    ids: set[str] = set()
+    for f in _iter_json_files(CONTAMINATED_DIR):
+        ids.add(f.stem.rsplit("_", 1)[-1])
+    return ids
+
+
 def derive_story_pass3(repository_id: str, revision: str | None = None) -> list:
     """Pass 3: story JSONs stranded in the two named worktrees (finding 1).
 
@@ -195,7 +210,12 @@ def derive_story_pass3(repository_id: str, revision: str | None = None) -> list:
     SAME ``knowledge_id``, so a downstream checkpoint dedupe (``emit_records`` below)
     silently skips it. Only genuinely stranded stories (absent from ``STORIES_DIR``)
     actually add anything new.
+
+    Contaminated cells that happen to still live in a worktree's top-level ``stories/``
+    are EXCLUDED here (see :func:`_contaminated_story_ids`): they are pass 6's tombstones,
+    not stranded stories.
     """
+    contaminated = _contaminated_story_ids()
     records = []
     for worktree in STRANDED_WORKTREES:
         stories_dir = worktree / "experiments" / "results" / "stories"
@@ -203,6 +223,9 @@ def derive_story_pass3(repository_id: str, revision: str | None = None) -> list:
         if not found:
             log(f"story-worktree: no stories found under {stories_dir} (worktree may be gone)")
         for f in found:
+            if f.stem.rsplit("_", 1)[-1] in contaminated:
+                log(f"story-worktree: skipping contaminated cell {f.name} (pass 6 tombstones it)")
+                continue
             data = _load_json(f)
             if data is None:
                 log(f"story-worktree: skipping unreadable file {f}")
