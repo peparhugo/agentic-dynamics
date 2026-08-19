@@ -87,22 +87,49 @@ workflow:
           scripts/run_workflow.py (the per-cell executor).
 
           REQUIREMENTS:
-          - Add scripts/run_routing_kb.py with `--spec` + `--stage` (smoke|warmup|grid). It:
-            load_spec -> experiment_matrix (16 cells) -> for each cell, map levels to kwargs:
-              routing fixed -> model=deepseek/deepseek-v4-pro; random -> seeded uniform draw from
-              model_pool; recommend_route -> compute_routing(entries) cheapest-qualified (cold-start
-              fallback documented); route_step -> model_pool + preferences (no pin).
+          - Add scripts/run_routing_kb.py with `--spec` + `--stage` (smoke|warmup|grid). It
+            load_spec -> experiment_matrix (16 cells) and, for each cell, maps factor levels to a
+            QUEUE JOB PAYLOAD (it ENQUEUES, it does not run inline — the Control Room reads the
+            queue + status, so cells must flow through Redis, not a local loop):
+              routing fixed -> phase model pinned deepseek/deepseek-v4-pro; random -> seeded uniform
+              draw from model_pool; recommend_route -> compute_routing(entries) cheapest-qualified
+              (cold-start fallback documented); route_step -> model_pool + preferences (no pin).
               kb bare -> rag_augment=False; historical -> rag_augment=True + repository_id
               "more-itertools"; self_built -> rag_augment=True + emit_self=True + repository_id
               "self-<worktree>"; shared -> rag_augment=True + explicit shared repository_id.
-            provision each cell's worktree via seed_repo, inject the held-out test, run run_workflow,
-            then write the result as a _results_summary.json-SHAPED row carrying task=
-            "more_itertools_chunked_negative_n" (the task_label) so signal_store + recommend_route
-            can read it. Cold-start note: recommend_route/route_step need the warmup rows first.
+            Each payload carries {kind: "agent_task", spec, goal, model/phase-selector, rag kwargs,
+            workdir, task_label: "more_itertools_chunked_negative_n", cell_id}, pushed to the
+            story_jobs queue (6380 DB 1) exactly as enqueue.py does. The worker (dispatch phase)
+            runs it and writes the signal-store-readable result row.
+          - Cold-start note: recommend_route/route_step need the warmup rows first — stage=warmup
+            enqueues the fixed-model cells first; stage=grid enqueues the rest.
           - The launcher must NOT reimplement routing/retrieval/testing/pricing — it only maps
-            levels to existing kwargs and shapes results.
-          TESTS: tests/test_launcher.py — factor->kwargs mapping for all 4x4 levels; the result row
-          has the task field; cold-start fallback resolves to a documented model. Run green.
+            levels to a job payload and enqueues.
+          TESTS: tests/test_launcher.py — factor->payload mapping for all 4x4 levels; the payload
+          carries kind/task_label/cell_id; cold-start fallback resolves to a documented model. Run green.
+      - name: dispatch
+        kind: agent
+        prompt: >
+          Extend the queue worker so agent_task cells run through the same Control-Room-visible
+          path as story cells.
+
+          READ FIRST: scripts/worker.py (BRPOP + run_story + status/results writes), scripts/
+          enqueue.py (the job payload shape), admin/server.py (QUEUE_KEY/STATUS_KEY/RESULTS_KEY the
+          matrix reads), scripts/run_workflow.py (the agent_task executor).
+
+          REQUIREMENTS:
+          - Extend scripts/worker.py to dispatch on the job's `kind` field: kind=story -> existing
+            run_story path (unchanged); kind=agent_task -> provision the worktree via seed_repo,
+            inject the held-out test, run run_workflow(spec, goal, model, workdir, **rag kwargs).
+          - After run_workflow returns, write the result as a _results_summary.json-SHAPED row
+            (carrying task=the job's task_label) into story_results, and set story_status
+            queued->running->done|failed, so the Control Room /api/matrix shows the cell's status
+            transition and telemetry exactly like a story cell.
+          - The agent_task path must NOT disturb the story path: same status/results keys, distinct
+            kind discriminator, no change to run_story behavior.
+          TESTS: tests/test_dispatch.py — a kind=agent_task job is dispatched to run_workflow (not
+          run_story); status transitions queued->running->done are written; the result row carries
+          task_label. Run green.
       - name: seeding
         kind: agent
         prompt: >
@@ -126,23 +153,27 @@ workflow:
       - name: smoke
         kind: agent
         prompt: >
-          Run the wiring end-to-end on ONE cell (routing=fixed, kb=bare) and prove every piece fires.
+          Run the wiring end-to-end through the QUEUE on ONE cell (routing=fixed, kb=bare) and prove
+          every piece fires — and that the cell is Control-Room-visible.
 
           REQUIREMENTS:
           - scripts/seed_repo.py more-itertools @ 516f0a80 into a fresh worktree.
-          - scripts/run_routing_kb.py --stage smoke -> the fixed/bare cell runs reproduce -> fix ->
-            [inject held-out] -> test.
+          - scripts/run_routing_kb.py --stage smoke -> enqueues the fixed/bare cell to story_jobs
+            (kind=agent_task). Run a worker (scripts/worker.py) once to drain it; the worker
+            provisions, injects the held-out test, runs reproduce -> fix -> test, and writes the
+            result row + status.
           - Verify: test_executed_success True; the held-out test discriminates (fails pre-fix,
             passes post-fix); the result row carries task=more_itertools_chunked_negative_n; the
-            launcher logged the resolved model (deepseek/deepseek-v4-pro) and rag_augment=False.
+            status hash shows the cell queued->running->done; and admin/server.py /api/matrix
+            reflects the cell (the whole point of the queue path).
           - Report the per-cell cost and the held-out test's pass/fail.
       - name: verify
         kind: agent
         prompt: >
           Scoped verification — do NOT run the full pytest suite. Run
-          tests/test_seed_repo.py tests/test_held_out.py tests/test_launcher.py tests/test_seeding.py
-          tests/test_workflow_runner.py -q, plus an import smoke of scripts/run_routing_kb.py and
-          scripts/seed_repo.py. Leave green.
+          tests/test_seed_repo.py tests/test_held_out.py tests/test_launcher.py tests/test_dispatch.py
+          tests/test_seeding.py tests/test_workflow_runner.py -q, plus an import smoke of scripts/
+          run_routing_kb.py and scripts/seed_repo.py. Leave green.
       - name: docs
         kind: agent
         prompt: >

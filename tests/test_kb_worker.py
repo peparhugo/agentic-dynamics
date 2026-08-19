@@ -433,41 +433,49 @@ def _flag_record(**overrides) -> KnowledgeRecord:
         source_type="flag",
         logical_locator="session_a",
         text="live_session_a [deepseek/deepseek-v4-flash]: stalled — no progress",
+        subject_id="session_a",
+        subject_status="stalled",
         **overrides,
     )
 
 
 def _observation_record(*, cell_id="session_a", status="healthy", model="deepseek/deepseek-v4-flash", **overrides) -> KnowledgeRecord:
-    """A ``source_type="observation"`` fixture whose ``text`` matches exactly what
-    ``observation_ingestion.build_observation_record`` renders — the only field the
-    auto-clear rule reads to recover ``(cell_id, status)``."""
+    """A ``source_type="observation"`` fixture carrying the structured ``subject_id``/
+    ``subject_status`` fields the auto-clear rule reads (replacing the old text split).
+    ``text`` is deliberately overridable so a test can prove the rule no longer depends on it."""
     return _record(
         knowledge_id=overrides.pop("knowledge_id", "kid_observation_1"),
         entity_id=overrides.pop("entity_id", "eid_observation_1"),
         source_uri=f"observation:{cell_id}",
         source_type="observation",
         logical_locator="assessment_hash_stub",
-        text=f"{cell_id} [{model}]: {status}",
+        text=overrides.pop("text", f"{cell_id} [{model}]: {status}"),
+        subject_id=cell_id,
+        subject_status=status,
         **overrides,
     )
 
 
-def test_cell_id_and_status_from_observation_text_parses_healthy():
-    cell_id, status = kb_worker._cell_id_and_status_from_observation_text(
-        "session_a [deepseek/deepseek-v4-flash]: healthy"
+def test_autoclear_reads_structured_subject_not_text(tmp_path, monkeypatch):
+    # R5 / BUG-4 regression: the auto-clear correlation now reads the structured
+    # subject_id/subject_status fields. A text-format change (drop the "[model]" bracket,
+    # reword the status entirely) must NOT break clearing — the old text-split heuristic
+    # would have returned (None, None) here and silently no-op'd.
+    monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
+    monkeypatch.setattr(kb_worker, "KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.setenv("FINOPS_KB_WRITE", "1")
+
+    fake_redis = _FakeRegistryRedis()
+    handler = kb_worker.build_handler("kb-registry-v1", fake_redis)
+
+    handler(_flag_record(), operation="upsert")
+    handler(
+        _observation_record(status="healthy", text="reworded prose: no [bracket] format at all"),
+        operation="upsert",
     )
-    assert (cell_id, status) == ("session_a", "healthy")
 
-
-def test_cell_id_and_status_from_observation_text_parses_with_why():
-    cell_id, status = kb_worker._cell_id_and_status_from_observation_text(
-        "session_a [deepseek/deepseek-v4-flash]: stalled — no progress in 10 minutes"
-    )
-    assert (cell_id, status) == ("session_a", "stalled")
-
-
-def test_cell_id_and_status_from_observation_text_malformed_returns_none():
-    assert kb_worker._cell_id_and_status_from_observation_text("not the expected shape") == (None, None)
+    assert len(fake_redis.published) == 1
+    assert fake_redis.published[0]["operation"] == "delete"
 
 
 def test_clear_flag_record_preserves_entity_id_and_sets_causes():

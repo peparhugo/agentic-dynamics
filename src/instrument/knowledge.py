@@ -253,6 +253,13 @@ class KnowledgeEvent:
     # non-empty when operation == "delete" (a tombstone must say why) and when "supersede" resolves
     # a content conflict; also reused as a caveat annotation on a recovered-from-git "upsert".
     reason: str = ""
+    # Record-fidelity addition (BUG-1): the record's OWN observation timestamp — the cell's run
+    # timestamp when the producer's entry stamped one, else the producer's now. Carried on the
+    # pointer (not the artifact, which blanks it to keep ``content_hash`` stable across
+    # re-derivations) so ``extract_record`` can reattach the real measurement time instead of the
+    # producer wall-clock (``occurred_at``, which stays the end-to-end-lag clock). Trailing
+    # default (empty = absent) so a pre-existing serialized event without the key still parses.
+    observed_at: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict (no body — pointers only)."""
@@ -268,6 +275,7 @@ class KnowledgeEvent:
             "event_id": self.event_id,
             "causes": self.causes,
             "reason": self.reason,
+            "observed_at": self.observed_at,
         }
 
     @classmethod
@@ -285,6 +293,7 @@ class KnowledgeEvent:
             event_id=d.get("event_id", ""),
             causes=d.get("causes", ""),
             reason=d.get("reason", ""),
+            observed_at=d.get("observed_at", ""),
         )
 
 
@@ -337,6 +346,14 @@ class KnowledgeRecord:
     # the predecessor (immutability). None for a first version. Index layers derive effective
     # valid_to from the successor's valid_from; this field is what makes that join possible.
     supersedes: str | None = None
+    # Record-fidelity addition (BUG-4 / restructure R5): the structured subject this record
+    # describes — for an observation record, the cell it assessed; for a flag, the session it
+    # flagged. Replaces the consumer's text-split heuristic so producer prose can change freely
+    # without silently breaking the flag auto-clear rule. Trailing defaults (empty = not a
+    # subject-carrying record) so every pre-existing serialized artifact still parses via
+    # ``from_dict()``'s ``.get()``-based construction (missing key -> empty, never a TypeError).
+    subject_id: str = ""
+    subject_status: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict, encoding ``authority`` as its enum name."""
@@ -371,6 +388,8 @@ class KnowledgeRecord:
             "perturbation_strength": self.perturbation_strength,
             "causes": self.causes,
             "supersedes": self.supersedes,
+            "subject_id": self.subject_id,
+            "subject_status": self.subject_status,
         }
 
     @classmethod
@@ -407,4 +426,6 @@ class KnowledgeRecord:
             perturbation_strength=d.get("perturbation_strength"),
             causes=d.get("causes"),
             supersedes=d.get("supersedes"),
+            subject_id=d.get("subject_id", ""),
+            subject_status=d.get("subject_status", ""),
         )

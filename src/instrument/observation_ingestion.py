@@ -115,6 +115,8 @@ def build_observation_record(
             "commit_sha": "",
             "extractor_version": EXTRACTOR_VERSION,
             "observed_at": at,
+            "subject_id": cell_id,
+            "subject_status": status,
         },
         now=now,
     )
@@ -168,6 +170,8 @@ def build_flag_record(
     extra_fields = {
         "commit_sha": "",
         "extractor_version": EXTRACTOR_VERSION,
+        "subject_id": session_id,
+        "subject_status": status,
     }
     # observed_at prefers the flag line's own timestamp; when absent, the factory's
     # producer-now default is used (mirroring the pre-refactor ``or ts`` fallback).

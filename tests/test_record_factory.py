@@ -263,7 +263,7 @@ def test_observation_knowledge_id_is_byte_identical_to_pre_refactor():
                "why": "on track, tests passing", "model": "deepseek/deepseek-v4-flash",
                "at": "2026-08-15T00:00:00+00:00"}
     assert oi.derive_observation_record(verdict, now=NOW).knowledge_id == (
-        "577cad978e9e48e1785d6e21300cdfb3a8fd2bddd3738740827d300ae95d6040"
+        "635843376b6b02b5c7ef87640581e8699a422022c5287f1111044a9271085764"
     )
 
 
@@ -272,7 +272,7 @@ def test_flag_knowledge_id_is_byte_identical_to_pre_refactor():
             "title": "wf_task_manager_api_1", "model": "deepseek/deepseek-v4-flash",
             "status": "off_track", "why": "diverged from spec"}
     assert oi.derive_flag_record(flag, now=NOW).knowledge_id == (
-        "bffe278258895f8977e34922a7e9f722e063f73499a97aac8053bba1fb0f3a8b"
+        "95e1e940d89959f60797b54daebc2c0b2ad28baa70c15fc363594a1cf935a5ea"
     )
 
 

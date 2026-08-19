@@ -196,7 +196,7 @@ def test_event_has_no_body_field():
 def test_event_carries_only_pointers_and_identity():
     field_names = {f.name for f in fields(KnowledgeEvent)}
     # Identity + pointer/hash/version fields, plus a tracing id, (round 2) `causes`,
-    # and (round 1) `reason`.
+    # (round 1) `reason`, and (record-fidelity) `observed_at`.
     assert field_names == {
         "knowledge_id",
         "entity_id",
@@ -209,6 +209,7 @@ def test_event_carries_only_pointers_and_identity():
         "event_id",
         "causes",
         "reason",
+        "observed_at",
     }
 
 
@@ -385,3 +386,51 @@ def test_source_type_spec_is_frozen():
     spec = SOURCE_TYPES["code"]
     with pytest.raises(FrozenInstanceError):
         spec.message_family = "actuation"  # type: ignore[misc]
+
+# ── `subject_id` / `subject_status` (record-fidelity addition) ──
+
+
+def test_record_subject_fields_default_to_empty():
+    record = _record()
+    assert record.subject_id == ""
+    assert record.subject_status == ""
+
+
+def test_record_subject_fields_round_trip_through_to_dict():
+    record = _record(subject_id="session_a", subject_status="healthy")
+    restored = KnowledgeRecord.from_dict(record.to_dict())
+    assert restored == record
+    assert restored.subject_id == "session_a"
+    assert restored.subject_status == "healthy"
+
+
+def test_record_from_dict_accepts_fixture_with_no_subject_keys():
+    # A pre-existing artifact has no `subject_id`/`subject_status` keys. from_dict() must
+    # resolve the missing keys to "" (the trailing-default pattern), never a TypeError.
+    d = _record().to_dict()
+    del d["subject_id"]
+    del d["subject_status"]
+    restored = KnowledgeRecord.from_dict(d)
+    assert restored.subject_id == ""
+    assert restored.subject_status == ""
+
+
+# ── `observed_at` on the event (record-fidelity addition) ───────
+
+
+def test_event_observed_at_defaults_to_empty():
+    assert _event().observed_at == ""
+
+
+def test_event_observed_at_round_trips_through_to_dict():
+    event = _event(observed_at="2026-08-14T09:30:00+00:00")
+    restored = KnowledgeEvent.from_dict(event.to_dict())
+    assert restored == event
+    assert restored.observed_at == "2026-08-14T09:30:00+00:00"
+
+
+def test_event_from_dict_accepts_fixture_with_no_observed_at_key():
+    d = _event().to_dict()
+    del d["observed_at"]
+    restored = KnowledgeEvent.from_dict(d)
+    assert restored.observed_at == ""

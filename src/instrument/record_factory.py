@@ -88,6 +88,13 @@ def record_to_artifact(record: KnowledgeRecord) -> bytes:
     data["valid_from"] = ""
     data["observed_at"] = ""
     data["indexed_at"] = ""
+    # Optional stable fields: OMIT when at their trailing default, so an additive field
+    # does not re-key records that do not carry it. observation/flag populate subject_id/
+    # subject_status (and therefore hash them); every other producer leaves them "" and
+    # keeps byte-identical ids across the schema addition.
+    for optional in ("subject_id", "subject_status"):
+        if not data.get(optional):
+            data.pop(optional, None)
     return json.dumps(data, sort_keys=True).encode("utf-8")
 
 

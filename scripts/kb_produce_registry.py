@@ -240,7 +240,7 @@ def _summary_entry_to_story_result(entry: dict[str, Any]) -> dict[str, Any]:
         "model": str(entry.get("model") or ""),
         "perturbation_condition": str(entry.get("condition") or ""),
         "worktree": "",  # recovered from git history — no live worktree to point at
-        "perturbation_strength": entry.get("perturbation_strength", 0.0),
+        "perturbation_strength": entry.get("perturbation_strength"),
         "test_executed_success": entry.get("test_executed_success"),
         "sessions": [],
         "summary": {},

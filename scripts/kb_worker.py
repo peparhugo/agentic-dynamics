@@ -125,39 +125,6 @@ def _lifecycle_state_for(operation: str) -> str:
 # `flag` for that session, and — if so — mint and publish the tombstone.
 
 
-def _cell_id_and_status_from_observation_text(text: str) -> tuple[str | None, str | None]:
-    """Recover ``(cell_id, status)`` from an ``observation`` record's ``text`` field.
-
-    ``instrument.observation_ingestion.build_observation_record`` renders
-    ``text = f"{cell_id} [{model}]: {status}"`` (optionally followed by
-    ``f" — {why}"``). This is the ONLY field a durable ``observation``
-    ``KnowledgeRecord`` carries that names the session/cell it was assessed
-    against — its own ``logical_locator``/``entity_id`` deliberately fold
-    ``cell_id`` into a one-way hash together with the assessment timestamp
-    (``assessment_id = sha256(cell_id|at)[:16]``, design §3: "every verdict against
-    the same cell is an independent fact", so two verdicts must never collide on
-    identity) — so there is no separate, directly-comparable ``cell_id`` field to
-    read instead. Parsing this text is therefore the one durable correlation this
-    consumer has, without re-deriving anything the producer already decided.
-
-    In this codebase ``cell_id`` and a flag's ``session_id`` are the SAME string:
-    ``scripts/supervise.py:supervise_once`` calls ``emit_flag({"id": cell_id, ...},
-    ...)``, so ``flag["session_id"] == cell_id`` always — meaning the ``cell_id``
-    this function recovers is directly comparable to a flag record's own
-    ``logical_locator`` (``session_id``), with no further translation needed.
-
-    Returns ``(None, None)`` when ``text`` doesn't match the expected shape (e.g. a
-    non-observation record, or a future producer changing the format) — the
-    auto-clear rule then conservatively does nothing rather than guessing.
-    """
-    if " [" not in text or "]: " not in text:
-        return None, None
-    cell_id, _, rest = text.partition(" [")
-    _model, _, after_model = rest.partition("]: ")
-    status = after_model.split(" — ", 1)[0].strip()
-    return (cell_id or None), (status or None)
-
-
 def _clear_flag_record(flag_record, *, causes: str):
     """Return a NEW, immutable ``KnowledgeRecord`` for the SAME flag entity, carrying
     ``causes`` (the healthy observation's ``knowledge_id``) — ready to be published as
@@ -191,10 +158,12 @@ def _maybe_autoclear_flag(observation_record, flag_by_session_id: dict, r) -> No
 
     No-ops (returns without writing anything) unless ALL of the following hold:
 
-    1. ``observation_record.text`` parses to a known ``cell_id`` and a status of
-       exactly ``"healthy"`` (see :func:`_cell_id_and_status_from_observation_text`
-       — a non-``"healthy"`` status, including ``"unknown"``/``"stalled"``/
-       ``"off_track"``, is never enough on its own to clear anything).
+    1. ``observation_record`` carries a structured ``subject_id`` and a
+       ``subject_status`` of exactly ``"healthy"`` (read from the trailing-default
+       ``KnowledgeRecord.subject_id``/``subject_status`` fields the observation
+       producer populates structurally — a non-``"healthy"`` status, including
+       ``"unknown"``/``"stalled"``/``"off_track"``, is never enough on its own to
+       clear anything).
     2. ``flag_by_session_id`` (the in-process index the kb-registry-v1 handler below
        maintains — see its own docstring for why this is in-process, not a new
        store) has a currently-known, untombstoned flag for that session.
@@ -218,7 +187,8 @@ def _maybe_autoclear_flag(observation_record, flag_by_session_id: dict, r) -> No
     never propagate back through ``knowledge_stream.process_entry`` and dead-letter
     the ``observation`` event itself, which is the primary fact being processed here.
     """
-    cell_id, status = _cell_id_and_status_from_observation_text(observation_record.text)
+    cell_id = observation_record.subject_id
+    status = observation_record.subject_status
     if status != "healthy" or not cell_id:
         return
 
@@ -269,9 +239,9 @@ def build_handler(group: str, r: redis.Redis):
         # given session, whether it currently has an untombstoned flag — "Track the
         # flag index in-process ... so the rule can find the session's current flag
         # without a new store." A plain dict closed over by `handler` below, keyed by
-        # session_id (a flag record's own `logical_locator` — see
-        # `_cell_id_and_status_from_observation_text`'s docstring for why that is
-        # directly comparable to an observation's parsed `cell_id`), mapping to the
+        # the flag's structured `subject_id` (the session it flagged — the SAME field an
+        # observation record carries as `subject_id`, so the auto-clear correlation reads
+        # both sides structurally rather than re-parsing prose), mapping to the
         # flag's own full `KnowledgeRecord` (needed, not just its registry-line
         # projection, to correctly rebuild+rehash a tombstoned version of it later —
         # see `_clear_flag_record`). Scoped to ONE handler instance (one running
@@ -349,10 +319,16 @@ def build_handler(group: str, r: redis.Redis):
             # same rule itself just published for a flag, since that event's own
             # source_type is "flag", not "observation" — no feedback loop).
             if record.source_type == "flag":
+                # Key the in-process index on the flag's structured subject id (the
+                # session it flagged) — the SAME field the observation record carries as
+                # subject_id, so the auto-clear correlation reads both sides structurally.
+                # Fall back to logical_locator for a pre-fidelity flag whose subject_id is
+                # empty (it still stores the session id there).
+                flag_key = record.subject_id or record.logical_locator
                 if operation == "delete":
-                    flag_by_session_id.pop(record.logical_locator, None)
+                    flag_by_session_id.pop(flag_key, None)
                 else:
-                    flag_by_session_id[record.logical_locator] = record
+                    flag_by_session_id[flag_key] = record
             elif record.source_type == "observation":
                 _maybe_autoclear_flag(record, flag_by_session_id, r)
 

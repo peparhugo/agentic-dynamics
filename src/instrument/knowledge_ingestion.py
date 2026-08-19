@@ -315,9 +315,12 @@ def record_to_event(
     ``sha256(record_to_artifact(record))``. The ``source_revision`` is recovered from
     ``record.commit_sha`` (which stores the revision folded into ``knowledge_id``), so a replay
     reproduces the exact id. ``occurred_at`` is the producer timestamp used to measure
-    end-to-end lag. ``event_id`` is set to ``record.knowledge_id`` as a deterministic tracing
-    id — it is **not** the idempotence key (``knowledge_id`` is; ``event_id`` is only a
-    correlation handle, so a re-emitted event traces back to the same logical record).
+    end-to-end lag. ``observed_at`` carries the record's OWN observation timestamp (the cell's
+    run time when stamped, else the producer now) so a consumer can round-trip the real
+    measurement time rather than mistaking the producer clock for it. ``event_id`` is set to
+    ``record.knowledge_id`` as a deterministic tracing id — it is **not** the idempotence key
+    (``knowledge_id`` is; ``event_id`` is only a correlation handle, so a re-emitted event
+    traces back to the same logical record).
     """
     return KnowledgeEvent(
         knowledge_id=record.knowledge_id,
@@ -331,6 +334,7 @@ def record_to_event(
         event_id=record.knowledge_id,
         causes=record.causes or "",
         reason=reason,
+        observed_at=record.observed_at,
     )
 
 
@@ -343,9 +347,12 @@ def extract_record(event: KnowledgeEvent, artifact_bytes: bytes) -> KnowledgeRec
     JSON from :func:`record_to_artifact`, which blanked the two derived identities
     (``knowledge_id`` and ``content_hash``) and the three volatile timestamps (``valid_from``,
     ``observed_at``, ``indexed_at``). The ids are reattached from the pointer event; the
-    timestamps are reconstructed from the event's ``occurred_at`` (producer wall-clock) and the
-    consumer clock (``indexed_at``) — mirroring ``default_extract``'s convention. Every stable
-    field — including ``authority=MEASURED`` and the structured ledger signals
+    timestamps are reconstructed from the event — ``valid_from`` from ``occurred_at`` (the
+    producer derivation clock), ``observed_at`` from the event's ``observed_at`` (the cell's
+    real measurement time the producer carried) falling back to ``occurred_at`` only for
+    pre-fidelity events that predate that field, and ``indexed_at`` from the consumer clock —
+    mirroring ``default_extract``'s convention. Every stable field — including
+    ``authority=MEASURED`` and the structured ledger signals
     ``confidence``/``perturbation_strength``/``test_executed_success`` — is restored via
     ``KnowledgeRecord.from_dict`` (those three are measured-or-``None``, never a fabricated 0.0).
     """
@@ -356,7 +363,7 @@ def extract_record(event: KnowledgeEvent, artifact_bytes: bytes) -> KnowledgeRec
         knowledge_id=event.knowledge_id,
         content_hash=event.content_hash,
         valid_from=event.occurred_at,
-        observed_at=event.occurred_at,
+        observed_at=event.observed_at or event.occurred_at,
         indexed_at=_now_iso(),
     )
 
