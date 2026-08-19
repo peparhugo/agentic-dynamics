@@ -42,10 +42,13 @@ From `admin/server.py`'s docstring. Five API categories + the static shell:
 | **Claude background sessions** (9) | `/api/claude-agents` (GET/POST), `/…/<id>/logs`, `/stop`, `/respawn`, `/rm`, `/steer`, `/daemon` (GET), `/daemon/stop` (POST) | roster, logs, daemon | start, stop, respawn, rm, steer, daemon/stop |
 | **Static shell** (1) | `GET /` | index.html | — |
 
-**Actuation is the minority.** Of 28 routes, only ~13 are POST, and every POST sits behind a
-loopback + same-origin + JSON + size-cap + `Idempotency-Key` trust boundary. Reads dominate.
-The design must make *read surfaces* the default visual treatment and make *actuation surfaces*
-deliberately gated and visually distinct — this is exactly the flag-only rail's contract.
+**Reads (GET) number 13; actuation (POST) numbers 15.** Every one of the 15 POST routes sits
+behind a loopback + same-origin + JSON + size-cap + `Idempotency-Key` trust boundary. Reads
+dominate the *visual surface and frequency* (a single GET `/api/matrix` renders the whole
+fleet), while actuation is rare, deliberate, and gated. The design must make *read surfaces*
+the default visual treatment and make *actuation surfaces* deliberately gated and visually
+distinct — this is exactly the flag-only rail's contract. (Corrected during verify: the
+earlier draft miscounted this as "~13 POST".)
 
 ### 0.2 Data shapes the UI already renders
 
