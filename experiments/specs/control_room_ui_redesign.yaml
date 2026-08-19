@@ -1,0 +1,145 @@
+name: control_room_ui_redesign
+question: >-
+  Research modern, sleek UI/UX design — with a heavy focus on FLEET MANAGEMENT and mission-control
+  dashboards and mobile-first responsive patterns — and produce a concrete redesign proposal for
+  the Control Room (admin/server.py + admin/static/), which is currently clunky and hard to navigate
+  on mobile. The model is weak at UI/UX intuition, so the research phase MUST ground every design
+  decision in real, cited examples rather than taste. Deliver research + a design spec a human (or a
+  stronger UI model) can implement; do NOT implement.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: markdown
+    fork: true
+    context:
+      problem: >-
+        The Control Room (admin/server.py routes + admin/static/ vanilla-JS dashboard) is the
+        live mission-control for the experiment fleet: a matrix of cells, per-cell status, routing
+        recommendations, supervisor flags, design sessions, and Claude background sessions. It is
+        clunky and hard to navigate, especially on mobile. It is the SURFACE an operator stares at
+        during a campaign, so it must be glanceable, navigable one-handed, and calm under load.
+      frame: >-
+        Treat the Control Room as FLEET MANAGEMENT for AI agents: the "fleet" is the set of running
+        workflows/experiments/cells; the "node" is one cell; the "alerts" are the supervisor flags;
+        the "controls" are routing/steer/interrupt. Research how modern fleet-management and
+        mission-control UIs solve exactly these: dense-but-glanceable fleet overviews, drill-down
+        node detail, prioritized alert rails, sparse-but-clear controls, and mobile compaction.
+      research_targets: >-
+        Look up and collect CONCRETE examples with sources across: (1) fleet/agent-management
+        consoles (Kubernetes dashboards, CI/CD systems, agent-platform consoles like LangSmith /
+        OpenAI ops / self-hosted LLM UIs); (2) mission-control / live-ops / incident dashboards
+        (PagerDuty, Datadog, Grafana); (3) modern dev-tool surfaces (Linear, Vercel, Railway,
+        Resend — calm, dense, keyboard-friendly); (4) mobile-first responsive patterns for dense
+        data (cards -> list -> table compaction, sticky nav, bottom-sheet drill-down, tap targets).
+        For each example capture: what it solves, the layout/navigation pattern, the visual system
+        (color/spacing/typography), and a screenshot-or-text description the designer can follow.
+      hard_rules: >-
+        (1) Every design recommendation cites a research source/example — no uncited "looks nice".
+        (2) Mobile is FIRST-CLASS, not an afterthought: specify the one-handed layout explicitly.
+        (3) The flag-only / observe-only rail stays intact — the design must distinguish read
+        surfaces from the (few) gated actuation surfaces and never bury the difference. (4) This is
+        RESEARCH + DESIGN only: do NOT edit admin/ or deploy. (5) The current Control Room's actual
+        routes/data (admin/server.py, admin/static/app.js) are the constraint — the redesign must
+        map to real endpoints and data, not invent new ones.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/control-room-ui); each phase commits [workflow] <phase>.
+    phases:
+      - name: research
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Research modern, sleek UI/UX for fleet-management and mission-control dashboards.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - admin/server.py (the actual 28 routes) + admin/static/app.js (the current dashboard)
+          - docs/supervisor_design.md (the flag-only rail)
+          - the spec's `problem` + `frame` + `research_targets` (what to collect and why)
+
+          DO:
+          - Collect a RICH reference: for each research target family, concrete named examples with
+            sources, the pattern they solve, the layout/navigation, the visual system, and the mobile
+            treatment. Prefer real, recognizable products/consoles over abstract advice.
+          - Extract 8-12 REUSABLE PATTERNS (fleet overview matrix, drill-down, alert rail, sticky
+            controls, mobile bottom-sheet, dense card -> list -> table compaction, status color
+            language, calm under load) with the example that embodies each.
+
+          DELIVER exactly one file: docs/control_room_ui/research.md.
+      - name: design
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Produce the concrete Control Room redesign, grounded in the research.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/control_room_ui/research.md (your research)
+          - admin/server.py + admin/static/app.js (the constraint)
+
+          DO:
+          - Information architecture: reorganize the 28 routes / boards into a glanceable hierarchy
+            (e.g. Fleet / Status / Flags / Routing / Sessions) — map every current board to its new
+            home, name the nav, and specify the mobile treatment (sticky tab bar vs drawer).
+          - Fleet overview: the matrix as a compact, scannable fleet view (status color language,
+            density controls, one-tap drill-down to a cell).
+          - Detail: the per-cell / per-session view (what to show, in what order, glanceable first).
+          - Alert rail: how the supervisor flags surface without shouting; how read vs actuation
+            surfaces are visually distinguished (flag-only rail).
+          - Visual system: color, spacing, typography, and a light/dark stance, with a concrete
+            palette (not "a nice blue").
+          - Cite the research example behind EACH decision (footnote or inline).
+          - Deliver a before/after sketch per board (text or ASCII wireframe).
+
+          DELIVER exactly one file: docs/control_room_ui/design.md.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Verify the design is grounded and implementable.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Trace every design decision to a research source; flag any uncited aesthetic choice.
+          - Confirm mobile is specified explicitly (one-handed layout) and the flag-only rail is
+            visibly preserved.
+          - Confirm the design maps to the ACTUAL 28 routes + data shapes (no invented endpoints).
+          - Write docs/control_room_ui/verify.md with PASS/FAIL per check.
+
+          DELIVER docs/control_room_ui/verify.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: research_rich
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [research_reference]
+  - name: design_grounded
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [research_reference]
+    produces: [redesign_proposal]
+metrics:
+  - {name: research_reference, agg: ratio, over: cell}
+  - {name: redesign_proposal, agg: ratio, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, research, design, verify]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
