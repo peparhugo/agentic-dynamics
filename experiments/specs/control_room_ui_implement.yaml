@@ -1,0 +1,162 @@
+name: control_room_ui_implement
+question: >-
+  Implement the Control Room UI redesign exactly per docs/control_room_ui/design.md (and its
+  cited research.md) against admin/static/. This is a RE-SKIN + RE-LAYOUT of the existing DOM/JS,
+  not a rewrite: the five-destination nav shell + System overflow + transversal Detail, the
+  mobile bottom tab bar + modal bottom sheet, the two-axis status color language, and the
+  dark+light token palette. No new endpoints; the flag-only rail, single-context EventSource, and
+  textContent-only invariants are preserved.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      design: docs/control_room_ui/design.md
+      research: docs/control_room_ui/research.md
+      authority: >-
+        docs/control_room_ui/design.md is the AUTHORITY — implement §1-§8 verbatim. Every board
+        maps to the real DOM per §1.3 (the migration map) and consumes only the real 28 routes in
+        §1.2. docs/control_room_ui/research.md backs the cited patterns ([R §x.y]); you are not to
+        improvise new design decisions — if a gap is genuinely unspecified, follow the nearest
+        cited pattern and note it for verify.
+      hard_rules: >-
+        (1) NO new endpoints — every board consumes the existing 28 routes; §9 confirms the JS
+        change set (nav/tab switcher, detail sheet open/close wrapping replaceEventSource, density
+        toggle, System sheet). (2) FLAG-ONLY RAIL preserved: Flags board is read-only; Steer/Interrupt
+        remain the only actuation behind the existing gated doors; "Supervisor flags. You decide."
+        stays visible on the board and above actions; the READ ONLY / INTERACTIVE mode line and the
+        type-to-confirm Interrupt door are kept. (3) SINGLE-CONTEXT: exactly one selected-detail
+        EventSource; replaceEventSource's close-then-open is preserved. (4) textContent-only for
+        IDs/titles/reasons/why (never innerHTML for untrusted text). (5) MOBILE-FIRST: the sticky
+        bottom tab bar + modal bottom sheet + one-handed reach per §1.4/§2.7/§3 — no anchor-jump
+        stack. (6) The render functions (renderFleet/renderRail/renderBurn/stageCard/flag render)
+        and control-room-core.js helpers (normalizeStatus/sortCellIds/replaceEventSource/
+        reconcileTelemetry/burnRate) keep their contract. (7) Test-driven: test_admin_server.py +
+        test_admin_frontend.py must pass; do not weaken tests.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/control-room-ui-implement); each phase commits [workflow] <phase>.
+    phases:
+      - name: shell_and_nav
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement the nav shell + information architecture (§1) per the design.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/control_room_ui/design.md §1 (IA, the five destinations + System + Detail, the
+            §1.3 board->home migration map, §1.4 nav)
+          - admin/static/app.js + index.html (the current DOM)
+
+          DO:
+          - Build the five-destination nav (Fleet/Status/Flags/Sessions/Routing) + System overflow
+            + transversal Detail per §1.2/§1.3; move each current DOM surface to its new home via
+            the migration map.
+          - Implement the desktop left nav rail + the mobile sticky bottom tab bar (§1.4).
+          - Keep the JS change set minimal (a nav/tab switcher; no route changes).
+
+          VERIFY: pytest tests/test_admin_frontend.py tests/test_admin_server.py -q — must pass;
+          also confirm no new endpoint was added (the 28 routes are unchanged).
+          DELIVER the code.
+      - name: boards
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement the boards (§2, §4, §5, §6, §7) per the design.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/control_room_ui/design.md §2 (Fleet + the two-axis status §2.2 + density §2.3),
+            §4 (Flags board), §5 (Status), §6 (Sessions), §7 (Routing + System)
+
+          DO:
+          - Fleet board: status color language (lifecycle vs attention axes, glyph+word+color),
+            density toggle (comfortable/compact), one-tap drill-down, counts footer (§2).
+          - Flags board: full-height alert rail, in-place flag_id updates, the three states
+            (empty/flags/degraded), read-only (§4).
+          - Status board (expanded telemetry), Sessions board (design + claude-agent), Routing +
+            System overflow (registry table + gated queue actions) (§5-§7).
+
+          VERIFY: pytest tests/test_admin_frontend.py tests/test_admin_server.py -q — must pass.
+          DELIVER the code.
+      - name: mobile_and_visual
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement the mobile treatment + visual system (§1.4, §2.7, §3, §8) per the design.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/control_room_ui/design.md §3 (Detail bottom sheet), §8 (palette/spacing/typography/motion)
+
+          DO:
+          - Modal bottom sheet for the Detail surface on mobile (drag handle, swipe-to-dismiss,
+            safe-area aware, back affordance) wrapping the existing selection handoff (§2.7, §3).
+          - The dark+light token palette (§8.2) as CSS custom properties, the 4px spacing scale,
+            Inter + mono typography with tabular-nums, and motion reserved for transitions
+            (honor prefers-reduced-motion) (§8).
+          - The READ ONLY / INTERACTIVE mode line and the danger/gated actuation styling (§3.4).
+
+          VERIFY: pytest tests/test_admin_frontend.py tests/test_admin_server.py -q — must pass;
+          grep confirms the §8.2 tokens + tabular-nums are present and the light theme exists.
+          DELIVER the code.
+      - name: test_and_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Run the full gate and trace the implementation to the design.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q` (full regression) — must be green.
+          - Confirm the invariants: no new endpoint (28 routes unchanged), flag-only rail (read-only
+            Flags board + gated Interrupt + "Supervisor flags. You decide."), single-context
+            replaceEventSource, textContent-only rendering.
+          - Write docs/control_room_ui/implement_verify.md tracing each design section (§1-§8) to the
+            file(s) that implement it, with PASS/FAIL and the pytest result.
+
+          DELIVER docs/control_room_ui/implement_verify.md + a green full suite.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: design_implemented
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [shell_nav_done, boards_done, mobile_visual_done]
+  - name: invariants_held
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [shell_nav_done]
+    produces: [no_new_endpoints, flag_only_rail, single_context]
+metrics:
+  - {name: shell_nav_done, agg: mean, over: cell}
+  - {name: boards_done, agg: mean, over: cell}
+  - {name: mobile_visual_done, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, shell_nav, boards, mobile_visual, test_verify]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
