@@ -1,0 +1,233 @@
+name: spec_lifecycle
+question: >-
+  Wire spec lifecycle into the plumbing that already exists: status fields on ExperimentSpec,
+  a generated per-spec status index (experiments/specs/index.json + STATUS.md), a `spec`
+  knowledge source_type with supersedes lineage flowing into the registry/manifest, and
+  hooks at compile and run time — so an agent authoring a new spec can see what exists,
+  what is done, when it was completed, and what supersedes what. Nothing is invented here:
+  every piece of transport (load_spec, the run ledger, the knowledge stream, the registry
+  compaction) already exists and is simply not wired to specs.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      why: >-
+        An agent authoring a new spec gets confused about what is done and when. Today:
+        (1) all committed specs share the same top-level keys and carry NO status field —
+        ExperimentSpec (src/instrument/experiment_spec.py:289-362) has no lifecycle fields and
+        from_dict silently drops unknown keys; (2) run outputs
+        experiments/results/workflows/<spec>/<ts>.json (scripts/run_workflow.py:104-108) are
+        write-only — no reader, aggregator, or index; (3) `spec_id` is declared in
+        LEDGER_FIELDS (experiment_spec.py:48) but never written; (4) the knowledge base has the
+        full lifecycle machinery (supersedes chains, lifecycle_state/tombstones in
+        scripts/generate_manifest.py:75-108 and scripts/kb_worker.py:256-303) but zero spec
+        records — SOURCE_TYPES (src/instrument/knowledge.py:125-142) has no `spec` type and
+        registry_index.jsonl contains only story/review/finding/meta_session; (5)
+        policy_ingestion.py:127-143 already globs experiments/specs/*.yaml but emits no
+        registry rows. Connect these — do not invent new transport.
+      hard_rules: >-
+        (1) No new transport machinery: reuse load_spec, the run_workflow end-of-run hook, the
+        knowledge stream contract (record_to_artifact -> publish_event), and the existing
+        registry/manifest compaction. (2) The index is DERIVED, never hand-maintained: spec
+        YAML fields (when present) are the seed; run JSONs are the measured evidence. (3)
+        Best-effort hooks never block or fail a run (follow the emit_self pattern,
+        workflow_runner.py:254-267). (4) Do not rewrite existing spec YAMLs or their version
+        numbers. (5) Conventions: snake_case functions, PascalCase classes, type hints on
+        public signatures, dataclasses over dicts; update src/instrument/__init__.py for new
+        exports. (6) Tests: name the exact test files, never bare pytest. (7) Scope: only
+        src/instrument, scripts/, tests/, experiments/CONTEXT.md,
+        .opencode/instructions/conventions.md, AGENTS.md (key-files pointer), and the new
+        index artifacts. Do not touch admin/, firebase/, or the story/perturbation pipeline.
+      run_shape: >-
+        TWO parallel arms of this one spec: --model anthropic/claude-opus-5 and
+        --model deepseek/deepseek-v4-pro, one worktree each, branch feature/spec-lifecycle-*,
+        each phase commits [workflow] <phase>. The operator diffs and merges the winner.
+    phases:
+      - name: core_status
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement the spec status layer: lifecycle fields on ExperimentSpec + the derived status index.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - src/instrument/experiment_spec.py — ExperimentSpec (:289-362, to_dict/from_dict/load_spec),
+            LEDGER_FIELDS (:48), validate_spec (:412-452). from_dict silently drops unknown keys today.
+          - scripts/run_workflow.py — end-of-run ledger write (:104-108), --resume (:64-65).
+          - src/instrument/workflow_runner.py — WorkflowRunResult started/ended (:374-376, :583-586),
+            workflow ledger job/attempt writes (:141, :160), best-effort emit pattern (:254-267).
+          - experiments/specs/ (63 committed YAMLs), experiments/results/workflows/<name>/<ts>.json
+            (run outputs; the dir is untracked so the index must tolerate missing data).
+
+          REQUIRED SEMANTICS (fixed):
+          A. ExperimentSpec gains lifecycle fields: status (draft|active|superseded|tombstoned),
+             supersedes (spec name or list of names), superseded_by (name or null),
+             completed_at (ISO or null), last_run_at (ISO or null), results_pointer
+             (repo-relative path or null). to_dict/from_dict round-trip them; load_spec
+             preserves them; validate_spec restricts status to the four values; unknown
+             top-level keys in a spec YAML produce a WARNING (visible, not silent drop).
+          B. src/instrument/spec_status.py (core logic, unit-testable) + scripts/spec_status.py
+             (thin CLI): scan experiments/specs/*.yaml via load_spec +
+             experiments/results/workflows/<name>/*.json; derive per spec: name, version,
+             status (YAML value if set; else superseded when superseded_by is set; else
+             active), supersedes, superseded_by, last_run_at (max run timestamp), latest_ok,
+             latest_model, latest_cost_usd, latest_git_sha, results_pointer (path to that run
+             json), n_runs. Emit BOTH experiments/specs/index.json (machine schema, one entry
+             per spec, plus generated_at) and experiments/specs/STATUS.md (agent-facing table:
+             one row per spec sorted by status then name; columns
+             name|status|version|supersedes|last_run|ok|model|cost|n_runs; a legend explaining
+             status values and derivation; a generated-at timestamp line). Missing runs render
+             as an em-dash, never as a failure.
+          C. run_workflow.py end-of-run hook: after writing the run json (:104-108), refresh
+             that spec's index entries (index.json + STATUS.md) — best-effort, wrapped so any
+             failure prints a warning and never fails or blocks the run. Also write
+             spec_id = "<name>@<version>" into the workflow ledger job/attempt records
+             (workflow_runner.py writes them today without it).
+          D. --resume still consults the git-log path first; the index (last_run_at /
+             results_pointer) is the fallback when no [workflow] commits exist. Do not regress
+             the existing path.
+
+          VERIFY:
+          - python -m pytest tests/test_experiment_spec.py tests/test_spec_status.py -q —
+            green. NEVER bare pytest.
+          - python scripts/spec_status.py runs against the real repo: index.json + STATUS.md
+            generated, all 63 committed specs present, no exceptions.
+
+          DELIVER the dataclass + loader/validator changes, src/instrument/spec_status.py,
+          scripts/spec_status.py, the run_workflow hook + ledger spec_id, and the tests
+          (extend tests/test_experiment_spec.py for lifecycle round-trip + unknown-key
+          warning; new tests/test_spec_status.py with fixture specs + fixture run jsons
+          covering status derivation, supersede handling, index.json schema, STATUS.md
+          rendering).
+      - name: kb_registry
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Wire spec lifecycle into the knowledge base and the registry/manifest.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - src/instrument/knowledge.py — SOURCE_TYPES (:125-142), message_family (:160-173),
+            Authority ordering, KnowledgeRecord lineage fields (supersedes/causes), the
+            observation vs actuation split (closed-by-default: ACTUATION_TYPES = {"actuation"}).
+          - src/instrument/knowledge_ingestion.py — the producer pattern: extractor-versioned
+            derive_*/build_record + record_to_artifact + record_to_event.
+          - scripts/kb_produce.py + scripts/kb_produce_sources.py — batch producers (artifact ->
+            publish_event -> kb:v1:changes on Redis DB 2 port 6380; FINOPS_KB_WRITE=1 write
+            guard).
+          - scripts/kb_worker.py (:256-303 kb-registry-v1 handler) + scripts/generate_manifest.py
+            (:75-108 lifecycle derivation) — supersede chains -> lifecycle_state
+            current|superseded|tombstoned.
+          - src/instrument/policy_ingestion.py (:127-143) — already globs spec YAMLs (content
+            citations); spec lifecycle is a DIFFERENT record type; do not conflate them.
+
+          REQUIRED SEMANTICS (fixed):
+          A. Add "spec" to SOURCE_TYPES (knowledge.py) and classify it in the observation
+             family (never an actuation). Authority POLICY, evidence_class "[P]" for the spec
+             document; the lifecycle fields (status/last_run_at/completed_at/latest_ok/
+             results_pointer) travel as structured fields on the record.
+          B. New src/instrument/spec_ingestion.py (EXTRACTOR_VERSION "spec-lifecycle/v1"):
+             build_spec_record(entry, *, repository_id, revision, now=None) +
+             derive_spec_records(entries, *, repository_id) -> list[KnowledgeRecord] — one
+             record per spec from index.json entries. entity_id = f"spec:{name}";
+             knowledge_id deterministic from (entity_id, extractor); locator = spec name;
+             source_uri = the spec YAML repo-relative path; operation = "supersede" when a
+             record for the SAME entity_id already exists in the registry (same-entity
+             version chain — that is what makes generate_manifest.py derive lifecycle_state
+             current vs superseded); supersedes set to the predecessor knowledge_id in that
+             case.
+          C. Batch producer: extend scripts/kb_produce_sources.py with a --source spec option
+             (or add a thin scripts/kb_produce_specs.py following scripts/kb_produce.py) that
+             reads index.json, derives spec records, and emits them through
+             record_to_artifact -> record_to_event -> publish_event (authorized write).
+             --dry-run preview support like the siblings.
+          D. run_workflow end-of-run: after the index refresh, best-effort emit the spec
+             record event for that spec (follow the emit_self pattern,
+             workflow_runner.py:254-267 — never blocks, never fails the run). Update
+             src/instrument/__init__.py exports.
+          E. Pointers so authoring agents read the index first: experiments/CONTEXT.md (specs
+             section), .opencode/instructions/conventions.md (the "Specs live in
+             experiments/specs/*.yaml" sentence), and AGENTS.md (Key files list) must all say:
+             read experiments/specs/STATUS.md first — the generated spec lifecycle index
+             (what exists, what is done, when, supersedes chains).
+
+          VERIFY:
+          - python -m pytest tests/test_spec_ingestion.py tests/test_knowledge.py
+            tests/test_knowledge_ingestion.py tests/test_knowledge_stream.py -q — green.
+            NEVER bare pytest.
+          - python scripts/kb_produce_sources.py --source spec --dry-run (or the new script's
+            dry-run) lists every spec from index.json with zero errors.
+
+          DELIVER the source_type addition, spec_ingestion.py, the producer wiring, the run
+          hook, the doc pointer edits, and the tests (new tests/test_spec_ingestion.py:
+          record shape, authority/evidence class, supersede chain emits two records with
+          correct supersedes link + operation; registry append + lifecycle_state derivation
+          over fixture records).
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Full gate: run the whole targeted suite, generate the real index, and confirm the registry wiring.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run the targeted suites with exact file names (NEVER bare pytest):
+            python -m pytest tests/test_experiment_spec.py tests/test_spec_status.py
+            tests/test_spec_ingestion.py tests/test_knowledge.py tests/test_knowledge_ingestion.py
+            tests/test_knowledge_stream.py tests/test_compile_experiment.py
+            tests/test_workflow_runner.py -q — all green.
+          - python scripts/spec_status.py — regenerates experiments/specs/index.json +
+            STATUS.md over every committed spec; spot-check 5 rows: supersede chains correct,
+            missing runs render as em-dash, legend explains every column, generated_at present.
+          - Registry: emit the spec records via the producer (dry-run first, then the
+            authorized run if the kb stream is reachable) and confirm the records would
+            append to experiments/results/registry_index.jsonl with source_type "spec" and
+            correct supersedes links (verify via producer output, or a unit test if Redis is
+            down).
+          - Confirm no regression: compile/validate still gates requires/produces
+            (python -c "from instrument.experiment_spec import validate_spec"); run_workflow
+            still writes the run json and the new hook refreshes the index without failing
+            the run.
+          - Write docs/spec_lifecycle/verify.md: PASS/FAIL per check, the exact commands +
+            results, and a short "what changed" summary.
+
+          DELIVER docs/spec_lifecycle/verify.md + a green targeted suite.
+factors:
+  - {name: model, levels: [anthropic/claude-opus-5, deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: spec_index
+    plane: measurement
+    evidence_class: "[C]"
+    requires: []
+    produces: [spec_index]
+  - name: spec_lifecycle
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [spec_index]
+    produces: [spec_lifecycle_state]
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: cache_hit_rate, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, core_status, kb_registry, verify]
+stop: {budget_usd: 25.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
