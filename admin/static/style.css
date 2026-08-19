@@ -1,1634 +1,1753 @@
+/* ============================================================================================
+   Control Room — design system + application styles.
+
+   Authored mobile-first, per docs/control_room_ui/design.md §8 and research §1.4:
+   the base rules describe the phone (single column, sticky bottom tab bar, modal bottom
+   sheet); `min-width` queries add the desktop rail/columns. Only two `max-width` blocks
+   exist, and both are for things that must NOT survive to desktop (the mobile sheet metrics
+   and the 420px hard-compaction pass).
+
+   Section map
+     1  Tokens — dark + light, spacing, type, radii, motion, z-index      [design §8.2–§8.5]
+     2  Reset + base elements
+     3  Typography + utility primitives
+     4  Shell layout (command rail, boards region, safe areas)            [design §1.4]
+     5  Destinations nav (bottom tab bar -> left rail)                    [design §1.4]
+     6  Boards (generic chrome)                                          [design §1.2]
+     7  Fleet board (stages, filters, grid, cards, density)              [design §2]
+     8  Status board                                                     [design §5]
+     9  Flags board                                                      [design §4]
+    10  Sessions board                                                   [design §6]
+    11  Routing board + System sheet                                     [design §7]
+    12  Detail surface (transcript + control panels)                     [design §3]
+    13  Components (buttons, forms, badges, doors, tables)               [design §3.4]
+    14  Sheets, scrim, drag handle                                       [design §1.5, R §2.7]
+    15  Responsive escalation (>=760px, >=1200px) + mobile-only passes
+    16  Motion, focus, reduced motion                                    [design §8.5]
+
+   Color discipline (the rule that keeps the two axes readable, design §2.2):
+     - `--accent` (indigo) means INTERACTIVITY ONLY: focus ring, active destination, primary CTA.
+     - `--status-*` means LIFECYCLE, and always ships with a glyph + an uppercase word.
+     - `--attention-*` means a SUPERVISOR HEURISTIC and appears only on the Flags board and the
+       supervisor control panel — never on a fleet card.
+   ============================================================================================ */
+
+/* ── 1. Tokens ───────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --ink-0: #07090c;
-  --ink-1: #0d1117;
-  --ink-2: #151b23;
-  --line: #2a3441;
-  --line-strong: #46566a;
-  --text: #e8edf2;
-  --muted: #9ba8b8;
-  --cost: #ffbf47;
-  --queued: #8793a1;
-  --running: #43b9ff;
-  --done: #57d38c;
-  --failed: #ff6470;
-  --timeout: #c995ff;
-  --unknown: #aab3be;
-  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  /* dark (default) — design §8.2 */
+  /* surfaces: bg-0 page, bg-1 board, bg-2 card, bg-3 raised/hover */
+  --bg-0: #0a0d12;
+  --bg-1: #10151d;
+  --bg-2: #171e28;
+  --bg-3: #1e2733;
+  --border: #1f2a37;
+  --border-strong: #334154;
+  /* text */
+  --text: #e6edf3;
+  --text-muted: #8b98a9;
+  --text-faint: #5b6b7e;
+  /* brand — interactivity ONLY (focus, active tab, primary CTA, links) */
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-strong: #4f46e5;
+  --accent-ink: #eef2ff;
+  /* lifecycle status (glyph+word+color, never alone) */
+  --status-queued: #94a3b8;
+  --status-running: #38bdf8;
+  --status-done: #34d399;
+  --status-failed: #f87171;
+  --status-timeout: #fbbf24;
+  --status-retry: #2dd4bf;
+  --status-unknown: #64748b;
+  /* attention (supervisor only) */
+  --attention-off-track: #fb7185;
+  --attention-stalled: #fbbf24;
+  --attention-unknown: #e2e8f0;
+
+  /* spacing — 4px base scale, design §8.3 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  /* typography — design §8.4 */
+  --font-ui: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+  --fs-eyebrow: 11px;
+  --fs-small: 12px;
+  --fs-title: 13px;
+  --fs-base: 14px;
+  --fs-metric: 16px;
+  --fs-hero: 24px;
+
+  /* shape */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  /* motion — reserved for transitions, not churn (design §8.5) */
+  --motion-fast: 120ms;
+  --motion-sheet: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* layout constants */
+  --rail-height: 48px;          /* slim sticky command rail */
+  --tabbar-height: 56px;        /* Material 3 NavigationBar height [R §1.4.1] */
+  --nav-rail-width: 92px;       /* desktop left rail */
+  --detail-width: 420px;        /* desktop detail column */
+  --touch-target: 44px;         /* iOS HIG minimum [R §1.4.2] */
+
+  /* stacking: one variable per layer so nothing is ordered by accident */
+  --z-rail: 20;
+  --z-nav: 30;
+  --z-scrim: 40;
+  --z-sheet: 50;
 }
 
-* {
-  box-sizing: border-box;
+[data-theme="light"] {
+  --bg-0: #f1f5f9;
+  --bg-1: #ffffff;
+  --bg-2: #f8fafc;
+  --bg-3: #eef2f7;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-faint: #94a3b8;
+  --accent: #4f46e5;
+  --accent-hover: #6366f1;
+  --accent-strong: #4338ca;
+  --accent-ink: #ffffff;
+  --status-queued: #64748b;
+  --status-running: #0284c7;
+  --status-done: #059669;
+  --status-failed: #dc2626;
+  --status-timeout: #d97706;
+  --status-retry: #0d9488;
+  --status-unknown: #94a3b8;
+  --attention-off-track: #e11d48;
+  --attention-stalled: #d97706;
+  --attention-unknown: #334155;
 }
 
-html {
-  background: var(--ink-0);
-  color-scheme: dark;
-  scroll-behavior: smooth;
+/* Tell the UA which form controls/scrollbars to render for the resolved theme. */
+:root { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
+/* ── 2. Reset + base ─────────────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
 }
 
 body {
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: 1.45;
+  /* Tabular numerals everywhere: a 5s poll must never change a counter's width (design §8.4). */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+h1, h2, h3, h4 {
   margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  background: var(--ink-0);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+h1 { font-size: var(--fs-title); text-transform: uppercase; }
+h2 { font-size: var(--fs-title); text-transform: uppercase; }
+h3 { font-size: var(--fs-small); text-transform: uppercase; color: var(--text-muted); }
+h4 { font-size: var(--fs-small); text-transform: uppercase; color: var(--text-muted); }
+
+p { margin: 0 0 var(--sp-2); }
+
+a { color: var(--accent-hover); }
+
+code, pre, output, time { font-family: var(--font-mono); }
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── 3. Typography + utility primitives ──────────────────────────────────────────────────── */
+
+.eyebrow {
+  display: block;
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.metric-label {
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.metric-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-metric);
   color: var(--text);
-  font-family: var(--sans);
-  font-size: 14px;
 }
 
-button,
-input,
-select,
-textarea,
-summary {
-  font: inherit;
+.cost-value { font-variant-numeric: tabular-nums; }
+
+.provenance,
+.last-update,
+.pane-note,
+.boundary-copy,
+.control-guidance {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
 }
 
-button,
-summary {
-  min-height: 36px;
+.boundary-copy { color: var(--text-faint); }
+
+.empty-state,
+.terminal-empty {
+  font-size: var(--fs-small);
+  color: var(--text-faint);
+  padding: var(--sp-3);
 }
 
-button {
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  background: var(--ink-2);
-  color: var(--text);
-  cursor: pointer;
+.error-state {
+  font-size: var(--fs-small);
+  color: var(--status-failed);
+  padding: var(--sp-3);
 }
 
-button:hover:not(:disabled),
-summary:hover {
-  border-color: var(--text);
-  background: #1b2430;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.52;
-}
-
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-summary:focus-visible,
-a:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--running);
-  outline-offset: 2px;
-}
-
-[hidden] {
-  display: none !important;
-}
-
+/* Visible to assistive technology only — used for live regions and icon-button labels. */
 .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
-  padding: 0;
   margin: -1px;
+  padding: 0;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
 
+/* Status vocabulary. Color is never the only signal: each word gets its glyph via ::before
+   and the word itself is always rendered by the data layer (design §2.2). */
+.status-word {
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--status-unknown);
+}
+
+.status-word::before { margin-right: var(--sp-1); }
+
+.status-queued { color: var(--status-queued); }
+.status-queued::before { content: "\25CB"; }        /* ○ waiting */
+.status-running { color: var(--status-running); }
+.status-running::before { content: "\25D4"; }       /* ◔ active */
+.status-done { color: var(--status-done); }
+.status-done::before { content: "\2713"; }          /* ✓ succeeded */
+.status-failed { color: var(--status-failed); }
+.status-failed::before { content: "\00D7"; }        /* × hard failure */
+.status-timeout { color: var(--status-timeout); }
+.status-timeout::before { content: "\25F7"; }       /* ◷ ran out of time */
+.status-retry { color: var(--status-retry); }
+.status-retry::before { content: "\21BB"; }         /* ↻ re-enqueued */
+.status-unknown { color: var(--status-unknown); }
+.status-unknown::before { content: "?"; }
+
+/* ── 4. Shell layout ─────────────────────────────────────────────────────────────────────── */
+
+/* 100dvh flex shell: rails stay put, only the board region scrolls ([R §2.6], §1.4.4). */
 .app-shell {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
   height: 100dvh;
-  min-width: 0;
 }
 
 .command-rail {
-  z-index: 10;
-  display: grid;
-  grid-template-columns: minmax(190px, 1.1fr) minmax(250px, 1.8fr) minmax(220px, 1.4fr) minmax(260px, 1.4fr);
-  min-height: 86px;
-  border-bottom: 1px solid var(--line-strong);
-  background: var(--ink-1);
-}
-
-.command-rail > * {
-  min-width: 0;
-  padding: 12px 16px;
-  border-right: 1px solid var(--line);
-}
-
-.command-rail > *:last-child {
-  border-right: 0;
-}
-
-.eyebrow,
-.metric-label,
-dt {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
-h1,
-h2,
-h3,
-p {
-  margin-top: 0;
-}
-
-h1 {
-  margin: 2px 0 8px;
-  font-family: var(--mono);
-  font-size: 18px;
-  letter-spacing: 0.08em;
-}
-
-h2 {
-  margin: 2px 0 0;
-  font-family: var(--mono);
-  font-size: 13px;
-  letter-spacing: 0.04em;
-}
-
-h3 {
-  margin: 20px 0 8px;
-  color: var(--running);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.rail-status-line,
-.inline-state {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-rail);
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 11px;
+  gap: var(--sp-3);
+  min-height: var(--rail-height);
+  padding: var(--sp-2) var(--sp-3);
+  padding-top: max(var(--sp-2), env(safe-area-inset-top));
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
 }
 
-.state-badge,
-.readonly-badge,
-.provenance,
-.selected-label {
-  display: inline-flex;
+.rail-identity { min-width: 0; }
+.rail-identity h1 { white-space: nowrap; }
+
+.rail-status-line {
+  display: flex;
   align-items: center;
-  min-height: 20px;
-  padding: 2px 6px;
-  border: 1px solid currentColor;
-  border-radius: 2px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  gap: var(--sp-2);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-muted);
 }
 
-.state-live {
-  color: var(--done);
+/* Mirrors of the canonical Status-board outputs. They are aria-hidden because the canonical
+   nodes already expose the same values to assistive technology (design §1.3). */
+.rail-mirrors {
+  display: none;
+  gap: var(--sp-4);
+  margin-left: auto;
 }
 
-.state-connecting,
-.state-reconnecting {
-  color: var(--running);
+.rail-mirror {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
 }
 
-.state-offline {
-  color: var(--failed);
-}
-
-.rail-metric {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-content: center;
-  gap: 3px 10px;
-}
-
-.rail-metric .metric-label {
-  grid-column: 1 / -1;
-}
-
-.metric-value {
-  align-self: center;
-  overflow-wrap: anywhere;
-  font-family: var(--mono);
-  font-size: clamp(14px, 1.45vw, 24px);
-  font-weight: 750;
-  line-height: 1.08;
-  text-align: left;
-}
-
-.cost-value {
-  color: var(--cost);
-  font-variant-numeric: tabular-nums;
-}
-
-.provenance {
-  align-self: center;
-  color: var(--cost);
-  white-space: nowrap;
-}
-
-.burn-trace {
-  grid-column: 1 / -1;
-  width: 100%;
-  height: 22px;
-  overflow: visible;
-}
-
-.cost-line {
-  fill: none;
-  stroke: var(--cost);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-}
-
-.rail-counters {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: center;
-  gap: 10px 16px;
-}
-
-.rail-counters div {
-  display: grid;
-  gap: 2px;
-}
-
-.rail-counters strong {
-  overflow: hidden;
+.mirror-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
   color: var(--text);
-  font-family: var(--mono);
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
 }
 
-.workspace {
-  display: grid;
-  grid-template-columns: minmax(260px, 5fr) minmax(300px, 5fr) minmax(190px, 2.5fr);
+.rail-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+
+.rail-mirrors + .rail-actions { margin-left: var(--sp-3); }
+
+/* The scrolling region. `min-height: 0` is required or the flex child refuses to shrink and
+   the sticky rails scroll away with it. */
+.boards {
+  flex: 1;
   min-height: 0;
-  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg-0);
+  /* Clear the sticky tab bar (and the home indicator) so the last card is reachable. */
+  padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--sp-3));
 }
 
-.pane {
-  min-width: 0;
-  min-height: 0;
-  border-right: 1px solid var(--line-strong);
-  background: var(--ink-1);
+/* ── 5. Destinations nav ─────────────────────────────────────────────────────────────────── */
+
+/* Mobile: sticky bottom tab bar — five destinations, one-handed, no hamburger (design §1.4). */
+.destinations {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-nav);
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: var(--bg-1);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.pane:last-child {
-  border-right: 0;
+.destination {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--tabbar-height);
+  min-width: var(--touch-target);
+  padding: var(--sp-1);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.destination-glyph { font-size: var(--fs-metric); line-height: 1; }
+
+.destination[aria-current="page"] {
+  color: var(--accent-hover);
+}
+
+/* The active indicator is a shape change, not only a hue change. */
+.destination[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: var(--accent);
+}
+
+/* Attention badge on the Flags destination — suggests, never navigates for you (design §4.2). */
+.destination-badge {
+  position: absolute;
+  top: 6px;
+  right: 50%;
+  transform: translateX(22px);
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--attention-stalled);
+  color: #1a1205;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* System is the overflow: on mobile it is reached from the shell gear, not the tab bar. */
+.destination-system { display: none; }
+
+/* ── 6. Boards ───────────────────────────────────────────────────────────────────────────── */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+}
+
+.board[hidden] { display: none; }
+
+.board-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.board-header-actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
 }
 
 .pane-header {
-  z-index: 2;
-  min-width: 0;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-  background: var(--ink-1);
-}
-
-.fleet-pane {
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-}
-
-.fleet-header,
-.control-header,
-.drawer-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-2);
 }
 
-.last-update {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-  white-space: nowrap;
+/* Mount points for regions shell.js re-parents between boards (see adoptRegions). Empty by
+   design; they collapse when they hold nothing. */
+.region-mount:empty { display: none; }
+
+/* ── 7. Fleet board ──────────────────────────────────────────────────────────────────────── */
+
+/* Stage strip: health-by-stage sits directly above health-by-cell (design §2.1, [R §2.1]). */
+.pipeline-stages {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
 }
+
+.pipeline-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--status-unknown);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+}
+
+.pipeline-stage.stage-idle { border-left-color: var(--status-queued); }
+.pipeline-stage.stage-running { border-left-color: var(--status-running); }
+.pipeline-stage.stage-done { border-left-color: var(--status-done); }
+.pipeline-stage.stage-failed { border-left-color: var(--status-failed); }
+
+.stage-name {
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.stage-counts {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text);
+}
+
+.stage-total {
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-faint);
+}
+
+/* Expanded variant: the same strip, adopted by the Status board (design §5.2). */
+.board-status .pipeline-stages { grid-template-columns: minmax(0, 1fr); }
+.board-status .pipeline-stage { padding: var(--sp-3); }
 
 .fleet-controls {
   display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--line);
 }
 
 .filter-group {
   display: flex;
-  gap: 4px;
+  gap: var(--sp-1);
 }
 
 .filter-chip {
-  min-height: 32px;
-  padding: 4px 9px;
-  color: var(--muted);
-  font-size: 11px;
+  min-height: var(--touch-target);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-1);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--fs-small);
+  cursor: pointer;
 }
 
 .filter-chip.active {
-  border-color: var(--running);
-  color: var(--text);
-  box-shadow: inset 0 -2px var(--running);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-1));
+  color: var(--accent-ink);
 }
 
-.search-label {
-  flex: 1 1 130px;
-  min-width: 0;
-}
+.search-label { flex: 1 1 160px; min-width: 0; }
 
 #cell-search {
   width: 100%;
-  height: 32px;
-  min-width: 0;
-  padding: 4px 8px;
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  background: var(--ink-0);
+  min-height: var(--touch-target);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
   color: var(--text);
-  font-family: var(--mono);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
 }
 
-.pipeline-stages {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--line);
+.density-toggle {
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
-.pipeline-stage {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--stage-color, var(--unknown));
-  border-radius: 4px;
-  background: var(--ink-1);
+.density-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent-hover);
 }
 
-.pipeline-stage.stage-running { --stage-color: var(--running); }
-.pipeline-stage.stage-failed  { --stage-color: var(--failed); }
-.pipeline-stage.stage-done    { --stage-color: var(--done); }
-.pipeline-stage.stage-idle    { --stage-color: var(--line-strong); }
-
-.stage-name {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-}
-
-.stage-total {
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.stage-counts {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.stage-counts .count {
-  white-space: nowrap;
-}
-
-.stage-counts .count .n {
-  color: var(--text);
-  font-weight: 700;
-}
-
+/* card -> list -> table compaction ([R §1.4.3]): one card per row on a phone, an auto-fill
+   grid as soon as there is width for it. */
 .fleet-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
-  align-content: start;
-  gap: 8px;
-  min-height: 0;
-  padding: 10px;
-  overflow: auto;
-  scrollbar-color: var(--line-strong) var(--ink-0);
-}
-
-.skeleton-card {
-  min-height: 145px;
-  border: 1px solid var(--line);
-  background: var(--ink-2);
-  animation: skeleton-pulse 1.5s ease-in-out infinite alternate;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
 }
 
 .cell-card {
   position: relative;
-  align-self: start;
-  min-width: 0;
-  border: 1px solid var(--line-strong);
-  border-left: 3px solid var(--status-color, var(--unknown));
-  border-radius: 4px;
-  background: var(--ink-1);
-  transition: border-color 160ms ease;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--status-unknown);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+  overflow: hidden;
 }
+
+.cell-card.status-queued { border-left-color: var(--status-queued); }
+.cell-card.status-running { border-left-color: var(--status-running); }
+.cell-card.status-done { border-left-color: var(--status-done); }
+.cell-card.status-failed { border-left-color: var(--status-failed); }
+.cell-card.status-timeout { border-left-color: var(--status-timeout); }
+.cell-card.status-retry { border-left-color: var(--status-retry); }
 
 .cell-card.selected {
-  background: var(--ink-2);
-  box-shadow: inset 0 0 0 2px var(--text);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-.cell-card.status-running {
-  animation: running-pulse 2s ease-in-out infinite;
-}
-
-.status-queued { --status-color: var(--queued); color: var(--queued); }
-.status-running { --status-color: var(--running); color: var(--running); }
-.status-done { --status-color: var(--done); color: var(--done); }
-.status-failed { --status-color: var(--failed); color: var(--failed); }
-.status-timeout { --status-color: var(--timeout); color: var(--timeout); }
-.status-unknown { --status-color: var(--unknown); color: var(--unknown); }
-
+/* The whole card is the drill-down target — one tap, no interstitial (design §2.4). */
 .cell-select {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
   width: 100%;
-  min-height: 132px;
-  padding: 10px;
+  min-height: 84px;
+  padding: var(--sp-3);
   border: 0;
   background: transparent;
-  color: var(--text);
+  color: inherit;
+  font-family: inherit;
   text-align: left;
+  cursor: pointer;
 }
 
-.cell-select:hover:not(:disabled) {
-  background: #121923;
-}
+.cell-select:hover { background: var(--bg-2); }
 
 .cell-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-}
-
-.status-word {
-  color: var(--status-color, var(--unknown));
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.selected-label {
-  color: var(--text);
+  gap: var(--sp-2);
 }
 
 .cell-id {
-  display: block;
-  margin: 8px 0 4px;
-  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
   color: var(--text);
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.35;
+  word-break: break-all;
 }
 
-.latest-cost {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--cost);
-  font-family: var(--mono);
-  font-size: 10px;
-}
-
+/* Live workflow phase, e.g. "4/7 rerun_contaminated" (display-only). */
 .phase-badge {
-  display: inline-block;
-  margin: 2px 0 4px;
-  padding: 1px 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  color: var(--text);
-  font-family: var(--mono);
+  align-self: flex-start;
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
 }
 
-.sparkline-wrap {
-  display: grid;
-  align-items: center;
-  min-height: 38px;
-  border-top: 1px solid var(--line);
+.latest-cost,
+.cost-line {
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-muted);
 }
+
+.sparkline-wrap { line-height: 0; }
 
 .sparkline {
-  display: block;
   width: 100%;
-  height: 36px;
-}
-
-.token-bar {
-  fill: #536174;
+  height: 22px;
+  color: var(--status-running);
 }
 
 .sparkline-empty {
-  color: var(--muted);
-  font-family: var(--mono);
   font-size: 10px;
+  color: var(--text-faint);
 }
 
-.card-jump {
-  display: none;
+.token-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bg-3);
+}
+
+/* Compact density: the same DOM, less of it visible (design §2.3). */
+.fleet-grid.density-compact .cell-select { min-height: 56px; padding: var(--sp-2); }
+.fleet-grid.density-compact .phase-badge,
+.fleet-grid.density-compact .sparkline-wrap { display: none; }
+
+.skeleton-card {
+  height: 96px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--bg-1), var(--bg-2), var(--bg-1));
 }
 
 .fleet-counts {
-  padding: 8px 12px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.5;
-  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--border);
 }
 
-.claude-agents-pane {
+/* Anchor fallbacks that app.js injects for narrow screens; the Detail sheet supersedes them
+   at >=760px, where they are hidden (design §3.1 removed the anchor-jump chain). */
+.mobile-anchor {
+  display: inline-block;
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-small);
+  color: var(--accent-hover);
+}
+
+.card-jump { padding-left: var(--sp-3); }
+
+/* ── 8. Status board ─────────────────────────────────────────────────────────────────────── */
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+}
+
+.metric-card {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  border-top: 1px solid var(--line-strong);
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
 }
 
-.claude-agents-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.metric-hero .metric-value { font-size: var(--fs-hero); }
+
+.burn-trace {
+  width: 100%;
+  height: 48px;
+  color: var(--status-running);
 }
 
-.daemon-panel {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-.daemon-panel h3 {
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-}
-
-.daemon-stop-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.claude-agent-grid {
-  min-height: 120px;
-}
-
-.ownership-chip {
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  padding: 1px 6px;
-  font-size: 9px;
-  letter-spacing: 0.06em;
-}
-
-.ownership-chip.owned {
-  color: var(--running);
-  border-color: var(--running);
-}
-
-.ownership-chip.external {
-  color: var(--muted);
-}
-
-.claude-agent-task,
-.claude-agent-meta {
-  display: block;
-  overflow-wrap: anywhere;
-  font-size: 11px;
-}
-
-.claude-agent-meta {
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.claude-agent-control-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.claude-agent-external-log {
-  max-height: 220px;
+.metric-pairs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
   margin: 0;
-  padding: 8px;
-  overflow: auto;
-  border: 1px solid var(--line);
-  background: var(--ink-0);
-  font-family: var(--mono);
-  font-size: 10px;
-  white-space: pre-wrap;
 }
 
-.transcript-pane {
-  position: relative;
+.metric-pairs dt {
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.metric-pairs dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-metric);
+}
+
+.bottom-provenance {
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+.state-badge {
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--border-strong);
+}
+
+.state-live { color: var(--status-done); border-color: var(--status-done); }
+.state-connecting { color: var(--status-queued); }
+.state-reconnecting { color: var(--status-timeout); border-color: var(--status-timeout); }
+.state-offline { color: var(--status-failed); border-color: var(--status-failed); }
+
+/* ── 9. Flags board ──────────────────────────────────────────────────────────────────────── */
+
+/* Named areas keep the delayed-source notice, the attention list, and the flag-only boundary
+   in a fixed reading order regardless of which of them is present (design §4.2). */
+.supervisor-rail {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  background: var(--ink-0);
-}
-
-.transcript-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 12px;
-}
-
-.transcript-identity {
-  min-width: 0;
-}
-
-#transcript-title {
-  overflow-wrap: anywhere;
-}
-
-.transcript-controls {
-  display: flex;
-  flex-wrap: wrap;
-  grid-column: 1 / -1;
-  gap: 5px;
-}
-
-.transcript-controls button {
-  min-height: 30px;
-  padding: 4px 8px;
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.transcript-feed {
+  grid-template-areas:
+    "delay"
+    "attention"
+    "boundary";
+  gap: var(--sp-2);
   min-height: 0;
-  padding: 8px 12px 24px;
-  overflow: auto;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.5;
-  scrollbar-color: var(--line-strong) var(--ink-0);
-}
-
-.terminal-empty,
-.empty-state,
-.error-state {
-  padding: 18px;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
-.error-state {
-  color: var(--failed);
-}
-
-.transcript-row {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
-  gap: 6px 12px;
-  padding: 7px 2px;
-  border-bottom: 1px solid #151b23;
-}
-
-.row-meta {
-  display: grid;
-  align-content: start;
-  gap: 2px;
-}
-
-.row-time {
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.row-label {
-  color: var(--running);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-}
-
-.row-think .row-label,
-.row-think .row-text {
-  color: #a6b2bf;
-}
-
-.row-agent .row-label {
-  color: var(--done);
-}
-
-.row-tool .row-label {
-  color: var(--timeout);
-}
-
-.row-step .row-label {
-  color: var(--cost);
-}
-
-.row-raw .row-label,
-.row-event .row-label {
-  color: var(--queued);
-}
-
-.row-step-start {
-  border-top: 1px solid var(--line-strong);
-}
-
-.row-text {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.row-details {
-  grid-column: 2;
-  min-width: 0;
-  color: var(--muted);
-}
-
-.row-details summary {
-  min-height: 24px;
-  cursor: pointer;
-  font-size: 10px;
-}
-
-.row-payload {
-  max-width: 100%;
-  margin: 6px 0;
-  padding: 8px;
-  overflow: auto;
-  border: 1px solid var(--line);
-  background: var(--ink-1);
-  color: var(--text);
-  white-space: pre;
-}
-
-.pane-note {
-  margin: 0;
-  padding: 7px 12px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.jump-live {
-  position: absolute;
-  right: 14px;
-  bottom: 42px;
-  z-index: 3;
-  min-height: 34px;
-  padding: 5px 10px;
-  border-color: var(--running);
-}
-
-.mobile-anchor {
-  align-self: start;
-  color: var(--running);
-  font-size: 10px;
-}
-
-.transcript-header > .mobile-anchor {
-  display: none;
-}
-
-.control-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.control-content {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-  padding-bottom: 16px;
-  overflow: auto;
-}
-
-.supervisor-rail {
-  flex: 0 1 40%;
-  min-height: 118px;
-  max-height: 40%;
-  border-bottom: 1px solid var(--cost);
-  background: #12100b;
-}
-
-.supervisor-rail > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.supervisor-rail > summary::-webkit-details-marker {
-  display: none;
-}
-
-.supervisor-rail > summary > span:first-child {
-  display: grid;
-  gap: 2px;
-  font-family: var(--mono);
-  font-size: 11px;
-}
-
-.attention-count {
-  min-width: 24px;
-  padding: 3px 6px;
-  border: 1px solid var(--cost);
-  border-radius: 999px;
-  color: var(--cost);
-  font-family: var(--mono);
-  font-size: 10px;
-  text-align: center;
 }
 
 .supervisor-delay {
-  margin: 0;
-  padding: 6px 14px;
-  border-block: 1px solid var(--line);
-  color: var(--cost);
-  font-family: var(--mono);
-  font-size: 9px;
+  grid-area: delay;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--attention-stalled);
+  border-radius: var(--radius-md);
+  color: var(--attention-stalled);
+  font-size: var(--fs-small);
 }
 
 .supervisor-flag-list {
-  display: grid;
-  max-height: min(260px, 27vh);
-  overflow: auto;
+  grid-area: attention;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 0;
+  overflow-y: auto;
 }
 
+.supervisor-boundary {
+  grid-area: boundary;
+  margin: 0;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+
+.attention-count {
+  min-width: 26px;
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  background: var(--bg-3);
+  color: var(--attention-stalled);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* Rows are buttons: selecting one opens the Detail surface in supervisor mode. The board
+   itself never sends a request (design §4.3). */
 .supervisor-flag {
-  display: grid;
-  gap: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
   width: 100%;
-  min-width: 0;
-  padding: 9px 12px;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-left: 3px solid var(--cost);
-  border-radius: 0;
-  background: transparent;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--attention-unknown);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+  color: inherit;
+  font-family: inherit;
   text-align: left;
+  cursor: pointer;
 }
 
-.supervisor-flag.flag-off-track {
-  border-left-color: var(--failed);
-}
-
-.supervisor-flag.selected {
-  background: var(--ink-2);
-  box-shadow: inset 0 0 0 1px var(--text);
-}
+.supervisor-flag.flag-off-track { border-left-color: var(--attention-off-track); }
+.supervisor-flag.flag-stalled { border-left-color: var(--attention-stalled); }
+.supervisor-flag.selected { border-color: var(--accent); }
 
 .supervisor-flag-heading {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
-}
-
-.flag-status {
-  font-family: var(--mono);
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.flag-status-off-track { color: var(--failed); }
-.flag-status-stalled,
-.flag-status-attention { color: var(--cost); }
-
-.supervisor-flag-title,
-.supervisor-flag-meta {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
 }
 
 .supervisor-flag-title {
-  color: var(--text);
-  font-size: 11px;
+  font-size: var(--fs-base);
+  overflow-wrap: anywhere;
 }
 
+/* Two-line clamp: enough to judge, not enough to push the next flag off screen (design §4.2). */
 .supervisor-flag-reason {
   display: -webkit-box;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: var(--fs-small);
+  color: var(--text-muted);
 }
 
 .supervisor-flag-meta,
 .review-unavailable {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-faint);
 }
 
-.review-unavailable {
-  color: var(--cost);
-  text-transform: uppercase;
-}
-
-.supervisor-rail > footer {
-  padding: 7px 14px;
-  color: var(--text);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.supervisor-boundary {
-  margin: 0;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--cost);
-  color: var(--cost);
-  font-weight: 700;
-}
-
-.supervisor-control-panel > .mobile-anchor {
-  display: none;
-  margin: 8px 14px 0;
-}
-
-.supervisor-stream-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.supervisor-stream-actions button {
-  min-height: 44px;
-}
-
-.interrupt-door {
-  margin: 12px 14px;
-  padding: 12px;
-  border: 1px solid var(--failed);
-  background: #1a0d10;
-}
-
-.interrupt-door h3 {
-  margin: 0 0 8px;
-  color: var(--failed);
-}
-
-.interrupt-door p,
-.interrupt-door label {
-  color: var(--text);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.interrupt-door input {
-  width: 100%;
-  margin-bottom: 9px;
-  padding: 8px;
-  border: 1px solid var(--failed);
-  background: var(--ink-0);
-  color: var(--text);
-  font-family: var(--mono);
-}
-
-.supervisor-result {
-  display: block;
-  padding: 0 14px 12px;
-}
-
-.readonly-badge {
-  flex: 0 0 auto;
-  color: var(--cost);
-}
-
-.interactive-badge {
-  flex: 0 0 auto;
-  color: var(--running);
-}
-
-.design-launchers,
-.recent-designs {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.design-launchers h3,
-.recent-designs h3,
-.control-form h3,
-.validation-panel h3 {
-  margin: 0 0 9px;
-  color: var(--muted);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-}
-
-.design-launcher-grid,
-.form-actions,
-.design-stream-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-}
-
-.design-launcher-grid button,
-.form-actions button,
-.design-stream-actions button {
-  min-height: 44px;
-}
-
-.control-form {
-  display: grid;
-  gap: 9px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.control-form label {
-  display: grid;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.control-form input,
-.control-form select,
-.control-form textarea {
-  width: 100%;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  background: var(--ink-0);
-  color: var(--text);
-}
-
-.control-form textarea {
-  resize: vertical;
-  font-family: var(--mono);
-  line-height: 1.45;
-}
-
-.control-form .primary-action {
-  margin: 0;
-}
-
-.compact-form {
-  padding-top: 10px;
-}
-
-.check-label {
-  display: flex !important;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-}
-
-.check-label input {
-  width: auto;
-}
-
-.inline-result {
-  min-height: 1.4em;
-  overflow-wrap: anywhere;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-.design-control-panel > .mobile-anchor {
-  display: none;
-  margin: 8px 14px 0;
-}
-
-.validation-panel {
-  padding: 12px 14px;
-  border-block: 1px solid var(--line);
-}
-
-.validation-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.validation-badge {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 9px;
-}
-
-.validation-valid {
-  color: var(--done);
-}
-
-.validation-invalid,
-#validation-errors {
-  color: var(--failed);
-}
-
-.validation-panel p,
-.validation-panel li {
-  overflow-wrap: anywhere;
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-#validation-errors {
-  padding-left: 18px;
-}
-
-#matrix-preview pre,
-.row-yaml {
-  max-width: 100%;
-  margin: 8px 0 0;
-  overflow: auto;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.5;
-  white-space: pre;
-}
-
-.row-spec {
-  border-left-color: var(--running);
-}
-
-.row-validate-pass {
-  border-left-color: var(--done);
-  color: var(--done);
-}
-
-.row-validate-error {
-  border-left-color: var(--failed);
-}
-
-.row-operator {
-  border-left-color: var(--timeout);
-}
-
-.design-stream-actions {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.recent-designs {
-  margin-top: auto;
-}
-
-#recent-design-list {
-  display: grid;
-  gap: 5px;
-}
-
-.recent-design {
-  display: grid;
-  gap: 3px;
-  width: 100%;
-  min-width: 0;
-  padding: 8px;
-  text-align: left;
-}
-
-.recent-design.selected {
-  border-color: var(--running);
-}
-
-.recent-design-title,
-.recent-design-meta {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.recent-design-meta {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 9px;
-}
-
-.control-facts {
-  display: grid;
-  gap: 0;
-  margin: 0;
-  padding: 4px 14px 14px;
-}
-
-.control-facts div {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.control-facts dt {
-  margin-bottom: 5px;
-}
-
-.control-facts dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.primary-action,
-.secondary-action {
-  margin: 0 14px 8px;
-  padding: 8px 10px;
-}
-
-.primary-action {
-  border-color: var(--running);
-  color: var(--running);
-  font-weight: 700;
-}
-
-.control-guidance,
-.boundary-copy {
-  margin: 4px 14px 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.boundary-copy {
-  margin-top: auto;
-  padding-top: 18px;
-  color: var(--text);
-}
-
-.bottom-rail {
-  z-index: 12;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 39px;
-  padding: 4px 10px;
-  border-top: 1px solid var(--line-strong);
-  background: var(--ink-1);
-}
-
-.drawer-toggle {
-  min-height: 30px;
-  border: 0;
-  background: transparent;
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 800;
+.flag-status {
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
   letter-spacing: 0.08em;
 }
 
-.utility-menu {
-  position: relative;
-  margin-left: auto;
-}
+.flag-status-off-track { color: var(--attention-off-track); }
+.flag-status-off-track::before { content: "\25B2 "; }   /* ▲ needs a human */
+.flag-status-stalled { color: var(--attention-stalled); }
+.flag-status-stalled::before { content: "\25A0 "; }     /* ■ idle */
+.flag-status-attention { color: var(--attention-unknown); }
 
-.utility-menu summary {
+/* ── 10. Sessions board ──────────────────────────────────────────────────────────────────── */
+
+.design-launchers,
+.recent-designs,
+.claude-agents-pane {
   display: flex;
-  align-items: center;
-  padding: 0 9px;
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 10px;
-  list-style: none;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
 }
 
-.utility-menu summary::-webkit-details-marker {
-  display: none;
-}
-
-.utility-popover {
-  position: absolute;
-  right: 0;
-  bottom: 38px;
-  z-index: 20;
+.design-launcher-grid {
   display: grid;
-  gap: 7px;
-  width: min(280px, calc(100vw - 20px));
-  padding: 10px;
-  border: 1px solid var(--line-strong);
-  background: var(--ink-1);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--sp-2);
 }
 
-.utility-popover output {
+.recent-design {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.recent-design.selected { border-color: var(--accent); }
+.recent-design-title { font-size: var(--fs-small); }
+.recent-design-meta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-faint);
+}
+
+.claude-agents-header { align-items: center; }
+
+.daemon-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+}
+
+.daemon-stop-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.claude-agent-grid { margin-top: var(--sp-1); }
+
+.claude-agent-task {
+  font-size: var(--fs-small);
+  color: var(--text);
   overflow-wrap: anywhere;
-  color: var(--muted);
-  font-size: 10px;
 }
 
-.danger-action {
-  border-color: var(--failed);
-  color: var(--failed);
+.claude-agent-meta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-faint);
 }
 
-.bottom-provenance {
-  color: var(--cost);
-  font-family: var(--mono);
+/* Ownership is a read/act distinction, mirroring the server-side gate (design §6.2). */
+.ownership-chip {
+  align-self: flex-start;
+  padding: 1px var(--sp-2);
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono);
   font-size: 10px;
-  white-space: nowrap;
+  letter-spacing: 0.06em;
 }
+
+.ownership-chip.owned { color: var(--accent-hover); border-color: var(--accent); }
+.ownership-chip.external { color: var(--text-faint); }
+
+.claude-agent-external-log {
+  max-height: 200px;
+  overflow: auto;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-0);
+  font-size: var(--fs-eyebrow);
+}
+
+/* ── 11. Routing board + System sheet ────────────────────────────────────────────────────── */
 
 .routing-drawer {
-  max-height: 38vh;
-  padding: 0 14px 14px;
-  overflow: auto;
-  border-top: 1px solid var(--running);
-  background: var(--ink-1);
-  transition: max-height 180ms ease;
-}
-
-.drawer-header {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
-  background: var(--ink-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 0;
 }
 
 .routing-content {
-  min-height: 70px;
-}
-
-/* canonical-state round 2, plan step 17 — Registry drawer's filter row + lineage
-   panel. Deliberately minimal: reuses .routing-drawer/.drawer-header/.routing-content/
-   .table-scroll/.routing-table wholesale (see registry-drawer's markup in index.html)
-   rather than a parallel style set for what is structurally the same drawer pattern. */
-.registry-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 11px;
-}
-
-.registry-filters label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.registry-lineage {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-  font-size: 11px;
-}
-
-.table-scroll {
-  max-width: 100%;
+  min-height: 0;
   overflow: auto;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.drawer-toggle {
+  min-height: var(--touch-target);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+/* Dense tables use the same compaction ladder as the fleet: they scroll horizontally on a
+   phone rather than reflowing into unreadable columns ([R §1.4.3]). */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .routing-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
 }
 
 .routing-table th,
 .routing-table td {
-  padding: 7px 9px;
-  border-bottom: 1px solid var(--line);
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--border);
   text-align: left;
   white-space: nowrap;
 }
 
 .routing-table th {
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 700;
+  position: sticky;
+  top: 0;
+  background: var(--bg-1);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.registry-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  font-size: var(--fs-small);
+}
+
+.registry-lineage {
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+}
+
+.system-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+}
+
+.queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* ── 12. Detail surface ──────────────────────────────────────────────────────────────────── */
+
+/* Mobile default: a modal bottom sheet over the board, dismissed by the handle, the close
+   button, Escape, or the scrim (design §1.5, [R §2.7]). It is `display: none` when closed so
+   its controls never enter the tab order behind the board. */
+.detail-surface {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sheet);
+  display: none;
+  flex-direction: column;
+  max-height: 92dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg-1);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.detail-surface[data-open="true"] {
+  display: flex;
+  animation: sheet-rise var(--motion-sheet) var(--ease);
+}
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.transcript-identity { min-width: 0; }
+
+/* Glanceable first: identity, then state, then everything else (design §3.2). */
+#transcript-title {
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.inline-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-muted);
+}
+
+.detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-3);
+}
+
+.transcript-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 0;
+}
+
+.transcript-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.transcript-feed {
+  min-height: 240px;
+  max-height: 60dvh;
+  overflow-y: auto;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-0);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+}
+
+.transcript-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.row-time { color: var(--text-faint); font-size: var(--fs-eyebrow); }
+.row-label {
+  grid-column: 1;
+  color: var(--text-muted);
+  font-size: var(--fs-eyebrow);
   letter-spacing: 0.06em;
+}
+.row-text { grid-column: 2; overflow-wrap: anywhere; white-space: pre-wrap; }
+.row-meta { grid-column: 2; color: var(--text-faint); font-size: var(--fs-eyebrow); }
+.row-details { grid-column: 2; }
+.row-payload {
+  max-height: 220px;
+  overflow: auto;
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  font-size: var(--fs-eyebrow);
+}
+
+/* Transcript row kinds — a left accent only; the label text is always present. */
+.row-think { color: var(--text-muted); }
+.row-agent { color: var(--text); }
+.row-tool .row-label { color: var(--status-retry); }
+.row-operator .row-label { color: var(--accent-hover); }
+.row-step .row-label,
+.row-step-start .row-label { color: var(--status-running); }
+.row-event .row-label { color: var(--text-faint); }
+.row-raw .row-label { color: var(--status-failed); }
+.row-spec .row-label { color: var(--status-done); }
+
+/* Design-session artifacts rendered into the transcript stream. */
+.row-yaml {
+  grid-column: 2;
+  max-height: 260px;
+  overflow: auto;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-0);
+  font-size: var(--fs-eyebrow);
+  white-space: pre;
+}
+
+.row-validate-pass { color: var(--status-done); }
+.row-validate-error { color: var(--status-failed); }
+
+/* The single most-thumbed control sits in the thumb zone, bottom-right (design §3.3). */
+.jump-live {
+  position: sticky;
+  bottom: var(--sp-2);
+  align-self: flex-end;
+  min-height: var(--touch-target);
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.detail-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+.control-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  margin: 0;
+}
+
+.control-facts > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: baseline;
+}
+
+.control-facts dt {
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--text-faint);
 }
 
-@keyframes running-pulse {
-  0%, 100% { border-color: var(--line-strong); border-left-color: var(--running); }
-  50% { border-color: var(--running); }
+.control-facts dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
 }
 
-@keyframes skeleton-pulse {
-  from { opacity: 0.45; }
-  to { opacity: 0.8; }
+.supervisor-control-panel,
+.design-control-panel,
+.claude-agent-control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
 }
 
-@media (max-width: 980px) and (min-width: 760px) {
-  .command-rail {
-    grid-template-columns: 1fr 1.4fr 1.2fr;
-  }
-
-  .rail-counters {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(4, 1fr);
-    min-height: 44px;
-    padding-block: 7px;
-  }
-
-  .workspace {
-    grid-template-columns: minmax(230px, 5fr) minmax(280px, 5fr) minmax(180px, 2.5fr);
-  }
+/* The anchor inside a control panel is a mobile-only fallback; the sheet already scrolls to
+   the transcript, so it is hidden once the Detail column exists (>=760px, section 15). */
+.design-control-panel > .mobile-anchor,
+.supervisor-control-panel > .mobile-anchor,
+.claude-agent-control-panel > .mobile-anchor {
+  align-self: flex-start;
 }
 
+.supervisor-stream-actions,
+.design-stream-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+/* ── 13. Components ──────────────────────────────────────────────────────────────────────── */
+
+button {
+  min-height: var(--touch-target);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { background: var(--bg-3); }
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Reversible actuation: one explicit press, indigo (design §3.4). */
+.primary-action {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.primary-action:hover:not(:disabled) { background: var(--accent-hover); }
+
+.secondary-action { background: transparent; }
+
+/* Irreversible actuation: rose, and always paired with a confirmation step — never color
+   alone (design §3.4, [R §2.8]). */
+.danger-action {
+  border-color: var(--attention-off-track);
+  background: transparent;
+  color: var(--attention-off-track);
+}
+
+.danger-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--attention-off-track) 16%, transparent);
+}
+
+.icon-button {
+  min-width: var(--touch-target);
+  padding: 0 var(--sp-2);
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--fs-metric);
+}
+
+.control-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+}
+
+.compact-form { padding: var(--sp-2); }
+
+.control-form label,
+.registry-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+
+.check-label {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+input[type="text"],
+input[type="search"],
+input[type="date"],
+input[type="number"],
+select,
+textarea {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-1);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+}
+
+textarea { resize: vertical; }
+
+input[type="checkbox"] {
+  width: auto;
+  min-height: auto;
+  accent-color: var(--accent);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.inline-result {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.supervisor-result { color: var(--attention-off-track); }
+
+/* Mode line: the attachment's read/act state, in a word plus a chip (design §3.4). */
+.readonly-badge,
+.interactive-badge {
+  align-self: flex-start;
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.readonly-badge {
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+.interactive-badge {
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent-ink);
+}
+
+/* The one-way door: typed confirmation, visually separated from the dismiss path. */
+.interrupt-door {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--attention-off-track);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--attention-off-track) 8%, var(--bg-2));
+  font-size: var(--fs-small);
+}
+
+.validation-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+  font-size: var(--fs-small);
+}
+
+.validation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.validation-badge {
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.validation-valid { color: var(--status-done); border-color: var(--status-done); }
+.validation-invalid { color: var(--status-failed); border-color: var(--status-failed); }
+
+#validation-errors {
+  margin: 0;
+  padding-left: var(--sp-4);
+  color: var(--status-failed);
+}
+
+#matrix-preview summary { cursor: pointer; }
+#matrix-cells {
+  max-height: 200px;
+  overflow: auto;
+  font-size: var(--fs-eyebrow);
+}
+
+.selected-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--accent-hover);
+}
+
+.count {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* ── 14. Sheets, scrim, drag handle ──────────────────────────────────────────────────────── */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-scrim);
+  background: rgba(2, 4, 8, 0.6);
+}
+
+.scrim[hidden] { display: none; }
+
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  margin: var(--sp-2) auto var(--sp-1);
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+
+.system-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  flex-direction: column;
+  max-height: 88dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg-1);
+  animation: sheet-rise var(--motion-sheet) var(--ease);
+}
+
+.system-sheet[hidden] { display: none; }
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-3);
+}
+
+@keyframes sheet-rise {
+  from { transform: translateY(12%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── 15. Responsive escalation ───────────────────────────────────────────────────────────── */
+
+/* Mobile-only rules: everything here must NOT survive to the desktop layout. The transcript
+   is the sheet's body on a phone, so it gets a real minimum height there and only there. */
 @media (max-width: 759px) {
-  body {
-    overflow: auto;
-  }
-
-  .app-shell {
-    display: block;
-    height: auto;
-    min-height: 100dvh;
-  }
-
-  .command-rail {
-    position: static;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .command-rail > * {
-    min-height: 82px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .metric-value {
-    font-size: 16px;
-  }
-
-  .workspace {
-    display: grid;
-    grid-template-areas:
-      "attention"
-      "fleet"
-      "transcript"
-      "controls";
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .fleet-pane { grid-area: fleet; }
-  .transcript-pane { grid-area: transcript; }
-
-  .control-pane {
-    display: contents;
-  }
-
-  .supervisor-rail {
-    grid-area: attention;
-    min-height: 0;
-    max-height: none;
-  }
-
-  .control-content {
-    grid-area: controls;
-    min-height: 360px;
-    overflow: visible;
-  }
-
-  .pane {
-    border-right: 0;
-    border-bottom: 1px solid var(--line-strong);
-  }
-
-  .fleet-grid {
-    max-height: none;
-    overflow: visible;
-  }
-
-  .transcript-pane {
-    min-height: 55vh;
-    grid-template-rows: auto minmax(55vh, 1fr) auto;
-  }
-
   .transcript-feed {
     min-height: 55vh;
-    max-height: 70vh;
   }
 
-  .transcript-header > .mobile-anchor,
-  .card-jump {
-    display: inline-block;
+  /* On a phone the sheet owns the screen; the board behind it must not scroll under a drag. */
+  body.sheet-open { overflow: hidden; }
+}
+
+/* Desktop: left nav rail + board column + detail column (design §1.4 diagram). */
+@media (min-width: 760px) {
+  .app-shell {
+    display: grid;
+    grid-template-columns: var(--nav-rail-width) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "rail rail"
+      "nav  boards";
   }
 
-  .control-pane {
-    overflow: visible;
+  .command-rail { grid-area: rail; }
+  .destinations { grid-area: nav; }
+  .boards { grid-area: boards; }
+
+  .rail-mirrors { display: flex; }
+
+  /* The nav becomes a sticky left rail; the same buttons, stacked. */
+  .destinations {
+    /* Drop the phone's bottom-docked offsets before switching to a sticky column: a sticky
+       box honors every offset it is given, and a leftover `bottom: 0` fights the top offset. */
+    position: sticky;
+    top: var(--rail-height);
+    left: auto;
+    right: auto;
+    bottom: auto;
+    align-self: start;
+    height: calc(100dvh - var(--rail-height));
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--sp-1);
+    padding: var(--sp-2) var(--sp-1);
+    border-top: 0;
+    border-right: 1px solid var(--border);
   }
 
-  .design-control-panel > .mobile-anchor {
-    display: inline-block;
+  .destination {
+    flex: 0 0 auto;
+    min-height: 56px;
+    border-radius: var(--radius-md);
   }
 
-  .supervisor-control-panel > .mobile-anchor {
-    display: inline-block;
+  .destination[aria-current="page"] {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
   }
 
-  .bottom-rail {
+  .destination[aria-current="page"]::after {
+    top: 50%;
+    left: 0;
+    width: 3px;
+    height: 24px;
+    transform: translateY(-50%);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+
+  .destination-badge { transform: translateX(20px); }
+
+  /* System sits at the bottom of the rail on desktop (design §1.4); the shell gear is the
+     mobile-only equivalent. */
+  .destination-system { display: flex; margin-top: auto; }
+  .system-gear { display: none; }
+
+  .boards { padding-bottom: var(--sp-4); }
+  .board { padding: var(--sp-4); }
+
+  .fleet-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .fleet-grid.density-compact { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .cell-select { min-height: 132px; }
+  .fleet-grid.density-compact .cell-select { min-height: 84px; }
+
+  .metric-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .metric-hero { grid-column: span 2; }
+  .registry-filters { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); align-items: end; }
+  .board-status .pipeline-stages { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  /* Detail becomes a docked right column instead of a modal sheet (design §1.5). */
+  .detail-surface {
     position: static;
-    flex-wrap: wrap;
-  }
-
-  .utility-menu {
-    margin-left: 0;
-  }
-
-  .bottom-provenance {
-    margin-left: auto;
-  }
-
-  .routing-drawer {
+    grid-area: detail;
     max-height: none;
+    min-height: 0;
+    border-top: 0;
+    border-left: 1px solid var(--border);
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+  }
+
+  .detail-surface[data-open="true"] { animation: none; }
+
+  /* When a node is selected, the shell grows a third column for it. */
+  .app-shell:has(.detail-surface[data-open="true"]) {
+    grid-template-columns: var(--nav-rail-width) minmax(0, 1fr) var(--detail-width);
+    grid-template-areas:
+      "rail rail   rail"
+      "nav  boards detail";
+  }
+
+  .sheet-handle { display: none; }
+  .mobile-anchor { display: none; }
+  .transcript-feed { max-height: none; flex: 1; }
+
+  /* System stays a sheet in structure but reads as a centered panel on a large screen. */
+  .system-sheet {
+    left: 50%;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    width: min(720px, 92vw);
+    max-height: 80dvh;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
   }
 }
 
+/* Wide desktop: more fleet columns, wider detail column. */
+@media (min-width: 1200px) {
+  :root { --detail-width: 460px; }
+  .fleet-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+}
+
+/* Hard compaction for the smallest phones: single-column everything, actions stack full
+   width so nothing overflows the viewport. */
 @media (max-width: 420px) {
-  .command-rail > * {
-    min-width: 0;
-  }
+  .board { padding: var(--sp-2); }
 
-  .rail-spend,
-  .rail-burn {
-    grid-template-columns: 1fr;
-  }
+  .rail-identity h1 { font-size: var(--fs-small); }
 
-  .provenance {
-    justify-self: start;
-  }
-
-  .fleet-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
+  .design-launcher-grid,
+  .metric-pairs,
   .pipeline-stages {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .transcript-row {
-    grid-template-columns: 1fr;
-  }
-
-  .row-meta {
-    display: flex;
-    gap: 8px;
-  }
-
-  .row-details {
-    grid-column: 1;
-  }
-
-  .design-launcher-grid,
-  .form-actions,
   .design-stream-actions,
-  .supervisor-stream-actions {
+  .supervisor-stream-actions,
+  .queue-actions,
+  .form-actions {
+    display: grid;
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-2);
   }
+
+  .control-facts > div { grid-template-columns: minmax(0, 1fr); }
+
+  .row-yaml,
+  .row-payload { max-height: 180px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+/* ── 16. Motion, focus, reduced motion ───────────────────────────────────────────────────── */
 
+/* One accent, one focus treatment, everywhere — interactivity is never confused with a
+   status hue (design §8.2). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Motion marks a state transition, not continuous churn: only a running cell pulses, and it
+   pulses on its border, so text never moves (design §8.5, [R §2.9]). */
+@keyframes running-pulse {
+  0%, 100% { border-left-color: var(--status-running); }
+  50% { border-left-color: color-mix(in srgb, var(--status-running) 45%, transparent); }
+}
+
+.cell-card.status-running { animation: running-pulse 2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
+    animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
   }
 }
