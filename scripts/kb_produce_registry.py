@@ -6,9 +6,9 @@ Mirrors ``scripts/kb_produce_sources.py``'s exact shape (a ``_SOURCES`` dict of
 ``{key: (source_type_label, derive_fn)}``, an ``argparse`` CLI selecting one-or-all keys, a
 ``--dry-run`` flag) rather than inventing a new CLI pattern. Every ``derive_*_pass``
 function below is a THIN WRAPPER that reads existing files and calls the step-2/3/4
-producer functions (``story_ingestion``, ``review_ingestion``, ``ledger_ingestion``) — no
-new derivation/identity logic lives in this file, matching the plan's explicit "purely an
-orchestration/CLI layer" framing.
+producer functions (``story_ingestion``, ``review_ingestion``, ``ledger_ingestion``,
+``knowledge_ingestion``) — no new derivation/identity logic lives in this file, matching
+the plan's explicit "purely an orchestration/CLI layer" framing.
 
 Run order (the "ONE-TIME MIGRATION" sequence — executed once, by an operator, never by a
 cron or a steady-state code path; the design's §12 step numbers are noted per source)::
@@ -16,16 +16,15 @@ cron or a steady-state code path; the design's §12 step numbers are noted per s
     python scripts/kb_produce_registry.py --source story             # pass 1
     python scripts/kb_produce_registry.py --source review            # pass 1
     python scripts/kb_produce_registry.py --source story-worktree    # pass 3 (finding 1)
-    python scripts/kb_produce_registry.py --source summary-recovery --since-sha <sha>
-                                                                       # pass 3 (gap c)
+    python scripts/kb_produce_registry.py --source single-task       # clean single-task arm
     python scripts/kb_produce_registry.py --source contaminated      # pass 6 (77 cells)
     python scripts/kb_produce_registry.py --source meta-audit        # pass 6 (gap b)
 
 Each invocation (when not ``--dry-run``) sets ``FINOPS_KB_WRITE=1`` for its own process
 only, matching ``kb_produce_sources.py``'s existing convention. **None of these six
 sources ever emits an ``actuation`` record** — this file imports only
-``story_ingestion``/``review_ingestion``/``ledger_ingestion`` (never
-``actuation_ingestion``), so ``knowledge_stream.publish_event``'s actuation gate
+``story_ingestion``/``review_ingestion``/``ledger_ingestion``/``knowledge_ingestion``
+(never ``actuation_ingestion``), so ``knowledge_stream.publish_event``'s actuation gate
 (``FINOPS_ACTUATION_ARMED``) is never exercised by migration at all; that is a structural
 fact of this file's imports, not a runtime check this script needs to perform.
 
@@ -41,7 +40,6 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -51,6 +49,7 @@ from typing import Any
 # (matches the bootstrap in worker.py / kb_worker.py / kb_produce.py / kb_produce_sources.py).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from instrument import knowledge_ingestion as ki  # noqa: E402
 from instrument import knowledge_stream as ks  # noqa: E402
 from instrument import ledger_ingestion as li  # noqa: E402
 from instrument import review_ingestion as ri  # noqa: E402
@@ -77,9 +76,19 @@ CONTAMINATED_DIR = STORIES_DIR / "_remediation_contaminated"
 #: The merged (not per-session-shard) review JSONs finalize_reviews.py writes (pass 1).
 REVIEWS_DIR = REPO_ROOT / "experiments" / "results" / "reviews"
 
-#: The current, post-shrink summary — used only to determine which of the historical
-#: entries at ``--since-sha`` are genuinely missing (gap c's diff step).
-RESULTS_SUMMARY_PATH = REPO_ROOT / "experiments" / "results" / "_results_summary.json"
+#: The results directory holding the clean single-task re-run files
+#: (``task_manager_*.json`` + ``process_perturbation_resample_*.json``) that form the
+#: canonical clean single-task perturbation arm (docs/data_integrity_findings.md).
+SINGLE_TASK_DIR = REPO_ROOT / "experiments" / "results"
+
+#: Filename prefixes that identify a single-task run file (vs. the story/review/lab
+#: artifacts that also live in the same results directory).
+SINGLE_TASK_PREFIXES = ("task_manager_", "process_perturbation_resample_")
+
+#: The invalid gpt-5.6 model id — the plain ``gpt-5.6`` (NOT the -luna/-sol/-terra
+#: variants), whose single-task file is a server error (every run all-zero), skipped
+#: wholesale (docs/data_integrity_findings.md).
+INVALID_GPT56_MODEL = "gpt-5.6"
 
 #: The corpus of raw session titles (incl. non-experiment ones) — used by the
 #: "meta-audit" pass to find any ``meta_*`` title that a naive substring match would
@@ -174,7 +183,7 @@ def derive_review_pass1(repository_id: str, revision: str | None = None) -> list
     return records
 
 
-# ── Pass 3: stranded worktrees (finding 1) + lost-83 recovery (gap c) ────────
+# ── Pass 3: stranded worktrees (finding 1) ──────────────────────
 
 
 def derive_story_pass3(repository_id: str, revision: str | None = None) -> list:
@@ -202,77 +211,93 @@ def derive_story_pass3(repository_id: str, revision: str | None = None) -> list:
     return records
 
 
-def _historical_results_summary(since_sha: str) -> dict[str, Any]:
-    """Return the parsed ``_results_summary.json`` as it existed at ``since_sha``.
+# ── Single-task: the clean single-task perturbation arm ──────────
 
-    Uses ``git show`` rather than checking out the commit — read-only, does not disturb
-    the working tree. Raises ``RuntimeError`` when the sha or the path at that revision
-    is invalid (a migration pass must not silently treat "no such commit" as "no entries").
+
+def _iter_single_task_files():
+    """Yield every single-task run file directly under the results dir, sorted.
+
+    ``task_manager_*.json`` and ``process_perturbation_resample_*.json`` are the clean
+    single-task re-runs (docs/data_integrity_findings.md) — the story/review/lab/lab-*
+    artifacts that share the same directory are excluded by the prefix filter.
     """
-    proc = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "show", f"{since_sha}:experiments/results/_results_summary.json"],
-        capture_output=True,
-        text=True,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"git show {since_sha}:experiments/results/_results_summary.json failed: "
-            f"{proc.stderr.strip()}"
-        )
-    return json.loads(proc.stdout)
+    if not SINGLE_TASK_DIR.is_dir():
+        return
+    for f in sorted(SINGLE_TASK_DIR.glob("*.json")):
+        if f.name.startswith(SINGLE_TASK_PREFIXES):
+            yield f
 
 
-def _summary_entry_to_story_result(entry: dict[str, Any]) -> dict[str, Any]:
-    """Adapt one recovered ``_results_summary.json`` entry into the minimal
-    ``StoryResult``-shaped dict ``story_ingestion.build_story_record`` expects.
+def _is_invalid_gpt56(data: dict[str, Any]) -> bool:
+    """Return True for the invalid plain-``gpt-5.6`` single-task file.
 
-    A field-renaming adapter only — not a second identity formula (canonical-state R8):
-    the reshape lives in ``story_ingestion.adapt_to_story_result`` (``kind="summary"``),
-    which this call site passes through verbatim. ``story_id`` below becomes ``entity_id``'s
-    ``logical_locator`` exactly the way a live ``StoryResult``'s own ``story_id`` would; the
-    historical entry has no per-session breakdown to recover (that granularity was never in
-    ``_results_summary.json`` to begin with), so ``sessions`` stays empty — a caveated-but-
-    canonical historical fact (design §7c), not a fabricated reconstruction of session-level
-    detail nobody measured.
+    docs/data_integrity_findings.md: the plain ``gpt-5.6`` model (NOT the -luna/-sol/
+    -terra variants) errored — every run carries correctness 0.0 / zero tokens / a
+    server-error transcript — and must be skipped wholesale, never registered as a
+    canonical perturbation finding. The -luna/-sol/-terra variants are valid and kept.
     """
-    return si.adapt_to_story_result(entry, kind="summary")
+    return str(data.get("model") or "").strip() == INVALID_GPT56_MODEL
 
 
-def derive_summary_recovery_pass(
-    repository_id: str, revision: str | None = None, *, since_sha: str | None = None
-) -> list:
-    """Pass 3, gap (c): recover entries present in ``_results_summary.json`` at
-    ``since_sha`` but absent from the CURRENT file (design §7c's ~83-entry remediation).
+def _run_to_entry(run: dict[str, Any], file_model: Any) -> dict[str, Any]:
+    """Adapt one single-task run dict into the ``_results_summary.json``-shaped entry
+    ``knowledge_ingestion.derive_records`` expects.
 
-    ``since_sha`` (the pre-shrink commit) is a genuine one-time operator decision, not
-    something this script can safely default or guess — design §7c's own procedure
-    begins "``git show <pre-shrink-commit>:...``", naming a specific historical commit
-    the operator identifies by inspecting ``git log`` themselves. Raising here (rather
-    than silently no-op-ing) keeps that requirement visible instead of letting
-    ``--source summary-recovery`` silently emit nothing.
+    Field renames only (canonical-state R8 posture — no second identity formula):
+    ``cost_usd`` → ``cost``, ``escape_score`` → ``escape`` (the basin-escape signal
+    ``build_evidence_cards``' ``_derive_flail`` falls back to), and the run's ``workdir``
+    basename becomes the durable ``worktree_name``/``run_id`` locator. ``model`` prefers
+    the run's own full provider/model id, falling back to the file-level short id.
     """
-    if not since_sha:
-        raise ValueError(
-            "summary-recovery requires --since-sha <commit> (the pre-shrink commit "
-            "documented in docs/canonical_state_r2_design.md §7c) — this is a one-time "
-            "operator decision, never a default this script can safely guess"
-        )
-    historical = _historical_results_summary(since_sha)
-    historical_entries = historical.get("entries") or []
-
-    current = _load_json(RESULTS_SUMMARY_PATH) or {}
-    current_keys = {
-        str(e.get("experiment") or e.get("worktree_name") or e.get("run_id") or "")
-        for e in (current.get("entries") or [])
+    worktree_name = Path(str(run.get("workdir") or "")).name
+    return {
+        "worktree_name": worktree_name,
+        "run_id": worktree_name,
+        "model": str(run.get("model") or file_model or ""),
+        "operator": str(run.get("operator") or ""),
+        "perturbation_class": str(run.get("perturbation_class") or ""),
+        "strategy": str(run.get("strategy") or ""),
+        "correctness": run.get("correctness"),
+        "cost": run.get("cost_usd"),
+        "escape": run.get("escape_score"),
+        "test_executed_success": run.get("test_executed_success"),
+        "confidence": run.get("confidence"),
+        "perturbation_strength": run.get("perturbation_strength"),
     }
 
+
+def derive_single_task_pass(repository_id: str, revision: str | None = None) -> list:
+    """The clean single-task perturbation arm — ``task_manager_*.json`` +
+    ``process_perturbation_resample_*.json`` (docs/data_integrity_findings.md).
+
+    Each run in each file becomes ONE measured-finding record (``source_type=finding``,
+    never ``story``) via ``knowledge_ingestion.derive_records`` — the same finding shape
+    the summary corpus uses — keyed by the run's worktree basename. The invalid plain
+    ``gpt-5.6`` file is skipped wholesale. Each file's ``file://`` locator is its own
+    ``source_uri``, so these findings never share the retired aggregate summary's
+    namespace.
+    """
     records = []
-    for entry in historical_entries:
-        key = str(entry.get("experiment") or entry.get("worktree_name") or entry.get("run_id") or "")
-        if not key or key in current_keys:
-            continue  # not missing — already present in the post-shrink file
-        story_result = _summary_entry_to_story_result(entry)
-        records.extend(si.derive_story_records(story_result, repository_id=repository_id))
+    for f in _iter_single_task_files():
+        data = _load_json(f)
+        if data is None:
+            log(f"single-task: skipping unreadable file {f}")
+            continue
+        if _is_invalid_gpt56(data):
+            log(f"single-task: skipping invalid gpt-5.6 file {f}")
+            continue
+        source_uri = f"file://experiments/results/{f.name}"
+        entries = []
+        for run in data.get("runs") or []:
+            if not isinstance(run, dict):
+                continue
+            entry = _run_to_entry(run, data.get("model"))
+            if not entry["worktree_name"]:
+                continue
+            entries.append(entry)
+        records.extend(
+            ki.derive_records(entries, repository_id=repository_id, source_uri=source_uri)
+        )
     return records
 
 
@@ -409,14 +434,12 @@ def emit_records(
 # ── Source table ────────────────────────────────────────────────
 
 #: Each source: a key -> (source_type label, derive callable). The derive callables all
-#: share the signature ``(repository_id, revision=None, **kwargs) -> list[KnowledgeRecord]``
-#: — ``summary_recovery`` additionally accepts ``since_sha`` via a small wrapper below
-#: (``main()`` passes it as a keyword only when that source is selected).
+#: share the signature ``(repository_id, revision=None) -> list[KnowledgeRecord]``.
 _SOURCES = {
     "story": ("story", derive_story_pass1),
     "story-worktree": ("story", derive_story_pass3),
     "review": ("review", derive_review_pass1),
-    "summary-recovery": ("story", derive_summary_recovery_pass),
+    "single-task": ("finding", derive_single_task_pass),
     "contaminated": ("story", derive_contaminated_tombstone_pass),
     "meta-audit": ("meta_session", derive_meta_audit_pass),
 }
@@ -426,7 +449,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
             "ONE-TIME migration driver — backfill the pre-Delta-1 corpus "
-            "(stories/reviews/stranded worktrees/lost-83/contaminated/meta_*) into the "
+            "(stories/reviews/stranded worktrees/single-task/contaminated/meta_*) into the "
             "canonical-state registry. Never invoked by a cron or steady-state code path."
         )
     )
@@ -452,11 +475,6 @@ def main(argv: list[str] | None = None) -> None:
         default=DEFAULT_REPOSITORY_ID,
         help="repository identity folded into entity_id",
     )
-    parser.add_argument(
-        "--since-sha",
-        default=None,
-        help="pre-shrink commit for --source summary-recovery (design §7c) — required only by that source",
-    )
     args = parser.parse_args(argv)
 
     source_keys = list(_SOURCES.keys()) if args.source == "all" else [args.source]
@@ -467,10 +485,7 @@ def main(argv: list[str] | None = None) -> None:
     derived: dict[str, list] = {}
     for key in source_keys:
         label, derive_fn = _SOURCES[key]
-        if key == "summary-recovery":
-            records = derive_fn(args.repository_id, since_sha=args.since_sha)
-        else:
-            records = derive_fn(args.repository_id)
+        records = derive_fn(args.repository_id)
         derived[key] = records
         log(f"{key} ({label}): derived {len(records)} record(s)")
 

@@ -119,6 +119,45 @@ def test_text_mentions_model_and_condition():
     assert "clean" in record.text
 
 
+# ── No-op relabel (docs/data_integrity_findings.md treatment rule 1) ──
+
+
+def test_noop_early_degrade_relabeled_to_clean_with_caveat():
+    # A non-instrumented (test_executed_success=None) early_degrade cell is a no-op:
+    # relabeled to "clean" with a caveat that the original label was a no-op.
+    record = si.build_story_record(
+        _story_result(perturbation_condition="early_degrade", test_executed_success=None)
+    )
+    assert "[deepseek/deepseek-v4-flash, clean]" in record.text
+    assert "no-op" in record.text  # the caveat is present
+
+
+def test_instrumented_early_degrade_keeps_its_label():
+    # An instrumented early_degrade cell (test_executed_success is a real bool) genuinely
+    # perturbed — it keeps "early_degrade" and carries no caveat.
+    record = si.build_story_record(
+        _story_result(perturbation_condition="early_degrade", test_executed_success=True)
+    )
+    assert "[deepseek/deepseek-v4-flash, early_degrade]" in record.text
+    assert "no-op" not in record.text
+
+
+def test_noop_bad_seed_relabeled_to_clean():
+    record = si.build_story_record(
+        _story_result(perturbation_condition="bad_seed", test_executed_success=None)
+    )
+    assert "[deepseek/deepseek-v4-flash, clean]" in record.text
+    assert "no-op" in record.text
+
+
+def test_genuinely_clean_cell_is_untouched():
+    record = si.build_story_record(
+        _story_result(perturbation_condition="clean", test_executed_success=None)
+    )
+    assert "[deepseek/deepseek-v4-flash, clean]" in record.text
+    assert "no-op" not in record.text
+
+
 # ── Reused artifact/event contract ──────────────────────────────
 
 

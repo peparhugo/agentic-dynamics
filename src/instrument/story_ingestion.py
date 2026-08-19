@@ -67,6 +67,16 @@ ACL_SCOPE = "public"
 #: mirroring ``knowledge_ingestion.RESULT_VERSION``'s fallback-not-fabrication convention.
 REVISION_FALLBACK = "story-result/no-commit"
 
+#: The perturbation-condition labels that were *no-ops* in the pre-fix corpus
+#: (``docs/data_integrity_findings.md`` treatment rule 1). A story carrying one of these
+#: AND lacking an instrumented verdict (``test_executed_success`` is not a bool — the
+#: pre-fix cells never ran the independent test runner) is relabeled to ``clean`` below.
+NOOP_CONDITIONS = frozenset({"early_degrade", "bad_seed"})
+
+#: The relabeled condition for a no-op cell. Its cost + code-quality measurements stay
+#: valid (the cell really ran); only the perturbation *label* is corrected.
+CLEAN_CONDITION = "clean"
+
 
 # ── Small deterministic helpers (mirror knowledge_ingestion / code_ingestion) ───
 
@@ -87,6 +97,39 @@ def _last_commit_sha(story_result: dict[str, Any]) -> str:
     return REVISION_FALLBACK
 
 
+def _is_noop_condition(story_result: dict[str, Any]) -> bool:
+    """Return True when the story's condition is a non-instrumented no-op.
+
+    ``docs/data_integrity_findings.md`` treatment rule 1: ``perturbation_condition`` in
+    {``early_degrade``, ``bad_seed``} AND ``test_executed_success`` is not a bool (the
+    pre-fix cells never ran the independent test runner, so the label claims a
+    perturbation that never happened). An instrumented cell — ``test_executed_success``
+    a real bool — genuinely perturbed and keeps its label.
+    """
+    condition = str(story_result.get("perturbation_condition") or "")
+    if condition not in NOOP_CONDITIONS:
+        return False
+    return not isinstance(story_result.get("test_executed_success"), bool)
+
+
+def _effective_condition(story_result: dict[str, Any]) -> tuple[str, str | None]:
+    """Return ``(condition, caveat)`` after applying the no-op relabel rule.
+
+    A non-instrumented ``early_degrade``/``bad_seed`` cell is relabeled ``clean`` with a
+    caveat recording that the original label was a no-op; an instrumented cell (or a
+    genuinely-clean one) keeps its condition with no caveat. The caveat travels in the
+    rendered text — the record carries no dedicated condition/caveat field, and the text
+    is the retrieval-facing evidence line.
+    """
+    original = str(story_result.get("perturbation_condition") or "")
+    if _is_noop_condition(story_result):
+        return CLEAN_CONDITION, (
+            f"original condition {original!r} was a no-op "
+            f"(non-instrumented, pre-fix); relabeled {CLEAN_CONDITION}"
+        )
+    return original, None
+
+
 def _render_text(story_result: dict[str, Any]) -> str:
     """Render a one-line human-readable summary of the story's outcome.
 
@@ -94,10 +137,14 @@ def _render_text(story_result: dict[str, Any]) -> str:
     ``perturbation_strength``) — those are carried on dedicated typed fields, per
     ``AGENTS.md``'s measure-before-policy convention that a signal must be structurally
     present, not only prose-rendered. This text is the retrieval-facing evidence line.
+
+    The condition is the *effective* one (:func:`_effective_condition`): a no-op cell's
+    label is relabeled to ``clean`` and its caveat appended, so a cost/code-quality reader
+    never mistakes the record for a genuine perturbation.
     """
     story_name = str(story_result.get("story_name") or "")
     model = str(story_result.get("model") or "")
-    condition = str(story_result.get("perturbation_condition") or "")
+    condition, caveat = _effective_condition(story_result)
     summary = story_result.get("summary") or {}
     sessions = story_result.get("sessions") or []
     session_count = summary.get("session_count", len(sessions))
@@ -112,10 +159,13 @@ def _render_text(story_result: dict[str, Any]) -> str:
         status = "success unmeasured"
 
     cost_part = f"${total_cost:.2f}" if isinstance(total_cost, (int, float)) else "cost unmeasured"
-    return (
+    text = (
         f"{story_name} [{model}, {condition}]: {session_count} sessions, "
         f"{status}, {cost_part}"
     )
+    if caveat:
+        text += f" — {caveat}"
+    return text
 
 
 # ── Record construction ─────────────────────────────────────────
