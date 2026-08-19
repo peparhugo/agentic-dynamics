@@ -62,10 +62,10 @@ def _write_json(path: Path, data: dict) -> None:
 # ── _SOURCES table shape ─────────────────────────────────────────
 
 
-def test_sources_table_has_the_six_plan_step_9_keys():
+def test_sources_table_has_the_six_canonical_sources():
     assert set(kpr._SOURCES.keys()) == {
         "story", "story-worktree", "review",
-        "summary-recovery", "contaminated", "meta-audit",
+        "single-task", "contaminated", "meta-audit",
     }
 
 
@@ -75,7 +75,7 @@ def test_sources_table_labels_match_the_plan():
         "story": "story",
         "story-worktree": "story",
         "review": "review",
-        "summary-recovery": "story",
+        "single-task": "finding",
         "contaminated": "story",
         "meta-audit": "meta_session",
     }
@@ -86,7 +86,7 @@ def test_sources_table_wires_the_documented_derive_functions():
     assert fns["story"] is kpr.derive_story_pass1
     assert fns["story-worktree"] is kpr.derive_story_pass3
     assert fns["review"] is kpr.derive_review_pass1
-    assert fns["summary-recovery"] is kpr.derive_summary_recovery_pass
+    assert fns["single-task"] is kpr.derive_single_task_pass
     assert fns["contaminated"] is kpr.derive_contaminated_tombstone_pass
     assert fns["meta-audit"] is kpr.derive_meta_audit_pass
 
@@ -213,51 +213,134 @@ def test_derive_meta_audit_pass_missing_inventory_returns_empty(tmp_path, monkey
     assert kpr.derive_meta_audit_pass("agentic-dynamics") == []
 
 
-# ── summary-recovery (pass 3, gap c) ──────────────────────────────
+# ── single-task (clean single-task perturbation arm) ─────────────
 
 
-def test_derive_summary_recovery_pass_requires_since_sha():
-    with pytest.raises(ValueError):
-        kpr.derive_summary_recovery_pass("agentic-dynamics", since_sha=None)
+def _single_task_run(**overrides) -> dict:
+    base = {
+        "type": "baseline",
+        "model": "deepseek/deepseek-v4-pro",
+        "operator": "baseline",
+        "perturbation_class": "baseline",
+        "strength": 0.0,
+        "perturbation_strength": 0.0,
+        "test_executed_success": True,
+        "correctness": 1.0,
+        "cost_usd": 0.01,
+        "confidence": 1.0,
+        "escape_score": 0.2,
+        "workdir": "/tmp/exp_abc123",
+    }
+    base.update(overrides)
+    return base
 
 
-def test_derive_summary_recovery_pass_recovers_only_the_missing_entries(tmp_path, monkeypatch):
-    current = tmp_path / "_results_summary.json"
-    _write_json(current, {"entries": [{"experiment": "still_here"}]})
-    monkeypatch.setattr(kpr, "RESULTS_SUMMARY_PATH", current)
+def _run_file_data(experiment: str, model: str, runs: list) -> dict:
+    return {"experiment": experiment, "model": model, "runs": runs}
 
-    def _fake_historical(since_sha):
-        assert since_sha == "deadbeef"
-        return {"entries": [
-            {"experiment": "still_here", "model": "x"},
-            {"experiment": "long_lost", "model": "deepseek/deepseek-v4-flash",
-             "worktree_name": "long_lost", "test_executed_success": True},
-        ]}
 
-    monkeypatch.setattr(kpr, "_historical_results_summary", _fake_historical)
+def test_derive_single_task_pass_emits_finding_records(tmp_path, monkeypatch):
+    results_dir = tmp_path / "results"
+    _write_json(results_dir / "task_manager_deepseek-v4-pro.json", _run_file_data(
+        "task_manager", "deepseek-v4-pro",
+        [
+            _single_task_run(),
+            _single_task_run(
+                operator="inject_alien_vocab",
+                perturbation_class="process_perturbation",
+                perturbation_strength=0.5,
+                workdir="/tmp/exp_def456",
+            ),
+        ],
+    ))
+    _write_json(results_dir / "process_perturbation_resample_deepseek-v4-pro.json", _run_file_data(
+        "process_perturbation_resample", "deepseek-v4-pro",
+        [_single_task_run(operator="shift_framing", workdir="/tmp/exp_ghi789")],
+    ))
+    monkeypatch.setattr(kpr, "SINGLE_TASK_DIR", results_dir)
 
-    records = kpr.derive_summary_recovery_pass("agentic-dynamics", since_sha="deadbeef")
+    records = kpr.derive_single_task_pass("agentic-dynamics")
+
+    assert len(records) == 3
+    # source_type is "finding" — never "story" (these are measured single-task re-runs).
+    assert all(r.source_type == "finding" for r in records)
+    assert all(r.source_type != "story" for r in records)
+    assert {r.logical_locator for r in records} == {"exp_abc123", "exp_def456", "exp_ghi789"}
+    # Each file's own locator is the source_uri, not the retired aggregate summary.
+    assert any("task_manager_deepseek-v4-pro.json" in r.source_uri for r in records)
+    assert any("process_perturbation_resample_deepseek-v4-pro.json" in r.source_uri for r in records)
+
+
+def test_derive_single_task_pass_skips_invalid_gpt56(tmp_path, monkeypatch):
+    results_dir = tmp_path / "results"
+    # The invalid plain gpt-5.6 (server error, all-zero runs) — must be skipped.
+    _write_json(results_dir / "process_perturbation_resample_gpt-5.6.json", _run_file_data(
+        "process_perturbation_resample", "gpt-5.6",
+        [_single_task_run(
+            model="openai/gpt-5.6", correctness=0.0, cost_usd=0.0,
+            test_executed_success=False, workdir="/tmp/exp_invalid",
+        )],
+    ))
+    # The valid gpt-5.6-sol variant — must be kept.
+    _write_json(results_dir / "process_perturbation_resample_gpt-5.6-sol.json", _run_file_data(
+        "process_perturbation_resample", "gpt-5.6-sol",
+        [_single_task_run(model="openai/gpt-5.6-sol", workdir="/tmp/exp_sol")],
+    ))
+    monkeypatch.setattr(kpr, "SINGLE_TASK_DIR", results_dir)
+
+    records = kpr.derive_single_task_pass("agentic-dynamics")
 
     assert len(records) == 1
-    assert records[0].logical_locator == "long_lost"
-    assert records[0].source_type == "story"
+    assert records[0].text.startswith("openai/gpt-5.6-sol under")
+    assert all("openai/gpt-5.6 under" not in r.text for r in records)
 
 
-# ── BUG-7: perturbation_strength must stay None when absent ──────
-
-
-def test_summary_entry_absent_perturbation_strength_stays_none():
-    # A recovered historical entry lacking the field must flow through as None (unmeasured),
-    # never a fabricated 0.0 baseline (which downstream would read as "baseline cell").
-    result = kpr._summary_entry_to_story_result({"worktree_name": "wt", "experiment": "e"})
-    assert result["perturbation_strength"] is None
-
-
-def test_summary_entry_present_perturbation_strength_is_preserved():
-    result = kpr._summary_entry_to_story_result(
-        {"worktree_name": "wt", "experiment": "e", "perturbation_strength": 0.5}
+def test_run_to_entry_renames_cost_and_escape_and_worktree():
+    entry = kpr._run_to_entry(
+        {
+            "model": "deepseek/deepseek-v4-pro",
+            "operator": "baseline",
+            "perturbation_class": "baseline",
+            "correctness": 1.0,
+            "cost_usd": 0.01,
+            "escape_score": 0.2,
+            "test_executed_success": True,
+            "workdir": "/tmp/exp_abc123",
+        },
+        "deepseek-v4-pro",
     )
-    assert result["perturbation_strength"] == 0.5
+    assert entry["worktree_name"] == "exp_abc123"
+    assert entry["run_id"] == "exp_abc123"
+    assert entry["cost"] == 0.01
+    assert entry["escape"] == 0.2
+    assert entry["test_executed_success"] is True
+
+
+def test_run_to_entry_falls_back_to_file_model():
+    entry = kpr._run_to_entry({"workdir": "/tmp/exp_xyz"}, "deepseek-v4-pro")
+    assert entry["model"] == "deepseek-v4-pro"
+
+
+# ── RETIRE: summary-recovery + the flawed 144 are gone ──────────
+
+
+def test_summary_recovery_is_retired():
+    # The summary-recovery source (the flawed 144-entry _results_summary.json fold) is
+    # removed wholesale: no source key, no derive fn, no --since-sha helpers, no path constant.
+    assert "summary-recovery" not in kpr._SOURCES
+    assert not hasattr(kpr, "derive_summary_recovery_pass")
+    assert not hasattr(kpr, "_historical_results_summary")
+    assert not hasattr(kpr, "_summary_entry_to_story_result")
+    assert not hasattr(kpr, "RESULTS_SUMMARY_PATH")
+
+
+def test_cli_rejects_the_retired_summary_recovery_source(tmp_path):
+    # --source summary-recovery is no longer a valid choice (argparse exits non-zero),
+    # and --since-sha no longer exists as a flag.
+    with pytest.raises(SystemExit):
+        kpr.main(["--source", "summary-recovery", "--dry-run"])
+    with pytest.raises(SystemExit):
+        kpr.main(["--source", "story", "--dry-run", "--since-sha", "deadbeef"])
 
 
 # ── --dry-run: touches neither Redis nor the filesystem ─────────

@@ -428,6 +428,19 @@ def test_derive_records_repository_id_threads_through():
     assert records[0].repository_id == "other-repo"
 
 
+def test_build_record_source_uri_override_changes_identity():
+    alt = "file://experiments/results/task_manager_deepseek-v4-pro.json"
+    record = build_record(_entry(), source_uri=alt)
+    assert record.source_uri == alt
+    assert record.entity_id == compute_entity_id(REPOSITORY_ID, alt, "exp_05ngi4l9")
+
+
+def test_derive_records_source_uri_threads_through():
+    alt = "file://experiments/results/task_manager_deepseek-v4-pro.json"
+    records = derive_records([_entry()], source_uri=alt)
+    assert records[0].source_uri == alt
+
+
 # ── Batch producer pure logic (scripts/kb_produce.py) ───────────
 
 

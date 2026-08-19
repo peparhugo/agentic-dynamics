@@ -219,9 +219,15 @@ def build_record(
     entry: dict[str, Any],
     *,
     repository_id: str = REPOSITORY_ID,
+    source_uri: str = SOURCE_URI,
     now: datetime | None = None,
 ) -> KnowledgeRecord:
     """Derive ONE measured-finding :class:`KnowledgeRecord` from a results entry.
+
+    ``source_uri`` defaults to the aggregate :data:`SOURCE_URI` (the summary corpus); a
+    producer deriving findings from a *different* source artifact (e.g. the single-task
+    ``task_manager_*.json`` run files) passes its own ``file://`` locator so the record's
+    provenance and ``entity_id`` namespace reflect the real source, not the summary.
 
     The record's ``text`` is the evidence-card one-liner produced by
     ``build_evidence_cards([entry])`` — a pure function of the measured vector
@@ -271,7 +277,7 @@ def build_record(
     # record_factory.build_record exactly once.
     return build_record_from_parts(
         source_type=SOURCE_TYPE,
-        source_uri=SOURCE_URI,
+        source_uri=source_uri,
         logical_locator=run_id,
         repository_id=repository_id,
         revision=source_revision,
@@ -375,6 +381,7 @@ def derive_records(
     entries: list[dict[str, Any]],
     *,
     repository_id: str = REPOSITORY_ID,
+    source_uri: str = SOURCE_URI,
 ) -> list[KnowledgeRecord]:
     """Derive one measured-finding record per valid entry, in input order.
 
@@ -382,14 +389,15 @@ def derive_records(
     skip rules); this function pre-filters with :func:`_yields_finding` so ``narration_failure``
     and unmeasured/negative-``correctness`` rows are skipped without an exception path. The
     result is a list with one record per surviving row, preserving input order. ``repository_id``
-    (default :data:`REPOSITORY_ID`) is threaded to each ``build_record`` so a producer can
-    scope the whole batch to a different repository.
+    (default :data:`REPOSITORY_ID`) and ``source_uri`` (default :data:`SOURCE_URI`) are threaded
+    to each ``build_record`` so a producer can scope the whole batch to a different repository
+    and/or source artifact.
     """
     records: list[KnowledgeRecord] = []
     for entry in entries:
         if not _yields_finding(entry):
             continue
-        records.append(build_record(entry, repository_id=repository_id))
+        records.append(build_record(entry, repository_id=repository_id, source_uri=source_uri))
     return records
 
 
