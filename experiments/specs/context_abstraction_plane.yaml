@@ -1,0 +1,287 @@
+name: context_abstraction_plane
+question: >-
+  Design the Context Abstraction Plane — the canonical, scope-aware state layer between the
+  project's evidence/ledger machinery and any control agent. The operator's directive: for
+  automated workloads, a control agent must NOT receive all available context; it receives a
+  canonical abstraction of system state appropriate to the scope and horizon of the decision.
+  Layers of context abstraction are the missing control-plane primitive: today knowledge.py +
+  retrieval.py give evidence discovery (relevance ranking, which is NOT truth resolution),
+  prompt_constructor.py builds executor prompts (stateless, one work item), step_routing.py
+  routes from model economics only (no budget/deadline/dependency state), and workflow_runner.py
+  builds per-phase execution context (not canonical workflow state). Design the plane — six
+  abstraction levels (L0 evidence → L5 intent/policy), a typed CanonicalFact plane with
+  deterministic versioned reducers, a Context Compiler emitting decision-specific snapshots,
+  a typed ControlDecision + validator, fact contracts that generalize the load-bearing rule,
+  and a scope hierarchy — grounded in the existing event/ledger architecture, with concrete
+  schemas and an implementation order that honors measure-before-policy. REVIEW first, then
+  DESIGN. Run once with anthropic/claude-opus-5.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: markdown
+    fork: true
+    context:
+      design_input: >-
+        The operator's proposal (authoritative seed — challenge it against the code, do not
+        paraphrase it into vagueness): (1) SIX LEVELS: L0 Evidence (immutable observations and
+        artifacts: test results, logs, commits, tool output, token events), L1 Canonical facts
+        (typed, current, scope-bound statements established from evidence: current_commit,
+        budget_remaining, worker status, dependency failed), L2 Job/phase state (goal,
+        acceptance criteria, attempts, blockers, risk), L3 Workflow state (completed phases,
+        critical path, dependencies, accumulated cost, deadline slack), L4 Workload/program
+        state (priorities, aggregate capacity, portfolio budget, shared dependencies, business
+        value), L5 Intent and policy (allowed models, maximum spend, permissions, compliance,
+        outcome priorities). A control decision receives a PROJECTION across layers, not one
+        complete layer. (2) THE DISTINCTION: evidence is not canonical state. Every controller
+        value must have a scope, source, validity window, authority, abstraction level,
+        derivation path, and supporting evidence. Relevance ranking is not truth resolution;
+        exactly one current canonical representation per fact, or explicitly unknown/conflicted.
+        (3) CANONICALFACT: dataclass with subject/predicate/value, scope_type
+        (organization|workload|workflow|job|attempt|resource), scope_id, abstraction_level
+        (fact|job|workflow|workload|policy), authority (reuse the existing ordered Authority),
+        epistemic_status (observed|verified|derived|declared|advisory), evidence_ids (link to
+        knowledge_ids / ledger events), source_revision, observed_at, valid_from, valid_to,
+        expires_at, reducer_version, supersedes. (4) DETERMINISTIC REDUCERS: layers are built
+        upward through versioned reducers (events → atomic facts → attempt → job → workflow →
+        workload state); a deterministic versioned reducer (workflow_health/v1(failed_critical_jobs,
+        deadline_slack, budget_remaining) -> "at_risk") may produce canonical derived facts; an
+        LLM statement ("seems at risk") stays ADVISORY and can never silently become canonical
+        state. Authority and abstraction level are SEPARATE axes (a high-level derived fact, a
+        low-level measured fact, a high-level declared policy fact, a high-level advisory
+        judgment). (5) CONTEXT COMPILER: input = decision type, decision scope, current canonical
+        facts, required context contract, policy; output = ControlContext snapshot
+        (snapshot_id, decision_type, scope_path, invariants, objectives, workload/workflow/job/
+        resource state tuples, unknowns, conflicts, stale_facts, evidence_ids). Loop: snapshot →
+        controller proposes typed ControlDecision (action route|retry|split|parallelize|pause|
+        escalate|rollback|stop|continue, target_id, parameters, facts_used, expected_effect,
+        preconditions, snapshot_id) → deterministic validator checks action → executor applies →
+        observations enter ledger → facts update → layers recompute. (6) GENERALIZED
+        LOAD-BEARING RULE: from "to make policies we need information" to: NO control action may
+        consume a value that is not canonical, current, scope-valid, and produced by a declared
+        source or reducer. RuleSpec.requires/produces becomes fact contracts: each requirement
+        names fact + scope + max_age_seconds + on_missing (halt|escalate|classify|investigate)
+        + on_conflict; the compiler refuses the controller when a required fact is absent,
+        stale, conflicting, out-of-scope, or lacks a valid derivation chain. (7) COMPONENT
+        PLACEMENT: knowledge.py + retrieval.py remain evidence/discovery; prompt_constructor.py
+        constructs executor prompts; NEW context_compiler.py constructs canonical controller
+        state; NEW control_agent.py selects typed actions; NEW control_validator.py enforces
+        policy/permissions/preconditions/fact contracts; workflow_runner.py executes;
+        step_routing.py remains ONE deterministic control policy. The controller sits AROUND
+        workflow_runner, not inside a phase prompt. (8) HIERARCHY: organization → program →
+        workload → workflow → job → attempt; downward flow policy→objectives→constraints→actions,
+        upward flow observations→attempt→job→workflow→workload facts; controlled context
+        inheritance (a job controller inherits applicable workload/policy facts but sees no
+        sibling-job details) — analogous to, but broader than, the existing per-cell
+        repository_id scope. (9) AGENTIC DYNAMICS LOOP: observe → canonicalize → abstract →
+        decide → execute → measure → update; the existing system covers execute→measure→
+        information, the plane provides canonicalize→abstract→decide.
+      grounding_facts: >-
+        Established 2026-08-20 (do not re-derive; cite them): (1) knowledge.py provides
+        immutable identities (entity_id/knowledge_id), provenance, validity, and an ordered
+        Authority hierarchy (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY) — but it is an
+        evidence/discovery system, not a state model. (2) retrieval.py returns ranked textual
+        candidates (RRF fusion, per-cell scope pre-filter) — relevance ranking, not truth
+        resolution. (3) prompt_constructor.py is typed and guarded but stateless — one work item
+        plus evidence, no world model. (4) step_routing.py's RouteState holds model pool,
+        previous model, session, cache footprint, context tokens — NO budget_remaining,
+        critical path, dependency state, priority, failure history, capacity, or risk. (5)
+        workflow_runner.py constructs phases from goal + prior-phase strings + optional RAG
+        evidence — execution context, not canonical workflow state. (6) The ledger schema
+        (experiment_spec.py LEDGER_FIELDS, JobRecord/AttemptRecord) already carries
+        timestamps, tokens, cost, cache_hit, completed, first_pass, accepted, confidence,
+        perturbation_strength, test_executed_success — L0/L1-grade raw material for the plane.
+        (7) The registry/manifest machinery (scripts/generate_manifest.py lifecycle derivation,
+        scripts/kb_worker.py kb-registry-v1 handler, supersede chains → lifecycle_state
+        current|superseded|tombstoned) is the ready-made validity spine for canonical facts.
+        (8) The supervisor is the observe-only (flag-only) rail — it observes and flags, never
+        steers; any control actuation design must preserve that boundary (docs/supervisor_design.md).
+        (9) The spec_lifecycle work is RUNNING NOW (two arms implementing spec status fields +
+        index + a spec source_type in the registry) — it is the first concrete L1 fact
+        instantiation (spec status facts derived from run events); reference it as prior art and
+        as the plane's first consumer example.
+      open_questions: >-
+        Answer EACH with concrete schemas/sketches (dataclass or YAML), not prose: (1)
+        CanonicalFact: exact fields + the identity key + how evidence_ids resolve to
+        knowledge_ids / ledger event ids, and how epistemic_status composes with the existing
+        Authority ordering (incl. the rule that ADVISORY never becomes canonical). (2) Reducer
+        model: where versioned reducers live, how a reducer version is pinned in a fact, how a
+        derived fact's derivation chain (evidence_ids → reducer → fact) is stored and validated,
+        and what happens to downstream derived facts when upstream evidence is superseded
+        (staleness cascade vs explicit re-derivation). (3) Level mapping: for each of L0-L5,
+        what exists today (with file refs) and what is missing — specifically which L1 facts are
+        ALREADY derivable from ledger events today and which require new instrumentation; where
+        job/workflow/workload state would live; how the scope hierarchy composes with the
+        existing per-cell repository_id scope and the two Redis planes (knowledge vs control/
+        telemetry). (4) Context Compiler: the decision-type contract schema (show the
+        route_next_job example from the design_input as a concrete YAML contract), how snapshots
+        are built and addressed (snapshot_id semantics), and how unknowns/conflicts/stale_facts
+        are surfaced to the controller (halt vs degrade). (5) Fact contracts in RuleSpec: the
+        exact extension of requires/produces to fact contracts (fact + scope + max_age_seconds +
+        on_missing + on_conflict), how validate_rules/compile_spec enforce them, and what the
+        compiler refuses. (6) ControlDecision + validator: the minimal first-action set for a
+        route/retry/stop controller, the preconditions schema, how facts_used + snapshot_id give
+        the provenance chain canonical→snapshot→decision→execution→measured outcome, and how the
+        observe-only supervisor boundary constrains actuation (who may actuate what, where
+        policy gates live). (7) Implementation order: the exact ordering that honors
+        measure-before-policy — which reducers must ship and which facts must be measured
+        before ANY control rule may consume them — and where spec_lifecycle's spec-status facts
+        slot in as the first reducer-produced canonical facts.
+      hard_rules: >-
+        (1) DESIGN ONLY — this run produces documents; it must not modify src/, scripts/,
+        tests/, admin/, or any existing file except adding docs/context_abstraction/*.md.
+        (2) No new transport: reuse the ledger, the knowledge stream, the registry/manifest
+        supersede machinery, and the Redis plane split (knowledge DB 2 vs control/telemetry
+        DB 1). (3) Deterministic reducers only for canonical derived facts; LLM judgment is
+        ADVISORY, always. (4) Exactly one canonical representation per fact, or explicitly
+        unknown/conflicted — never relevance as truth. (5) Preserve the observe-only supervisor
+        rail and the existing authority hierarchy. (6) The generalized load-bearing rule is the
+        gate: no control rule may consume a fact that no declared source or reducer produces.
+        (7) Do not redesign knowledge.py/retrieval.py/prompt_constructor.py — the plane sits
+        ABOVE them.
+      run_shape: >-
+        SINGLE-model: run once with --model anthropic/claude-opus-5 (claude_cli backend). One
+        worktree, one branch (feature/context-abstraction-plane); each phase commits
+        [workflow] <phase>.
+    phases:
+      - name: review
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Audit the existing architecture against the Context Abstraction Plane proposal.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - experiments/specs/context_abstraction_plane.yaml (the design_input + grounding_facts)
+          - src/instrument/CONTEXT.md (module + KB + ledger reference)
+          - src/instrument/knowledge.py (Authority, KnowledgeRecord, source types, lineage)
+          - src/instrument/retrieval.py (RRF fusion, scope pre-filter)
+          - src/instrument/prompt_constructor.py (typed executor-prompt construction)
+          - src/instrument/workflow_runner.py (phase execution, ledger writes, emit_self)
+          - src/instrument/step_routing.py (RouteState, the routing policy)
+          - src/instrument/experiment_spec.py (LEDGER_FIELDS, RuleSpec, validate_rules)
+          - src/instrument/compile_experiment.py (validate_rules gate, the DAG)
+          - src/instrument/ledger_ingestion.py (ledger_job/ledger_attempt records)
+          - scripts/kb_worker.py + scripts/generate_manifest.py (registry + lifecycle_state)
+          - src/instrument/supervisor.py + docs/supervisor_design.md (the flag-only rail)
+
+          REQUIREMENTS:
+          - Produce a COMPONENT AUDIT TABLE: one row per proposal element — the six levels
+            (L0-L5), CanonicalFact plane, deterministic reducers, Context Compiler,
+            ControlDecision, ControlValidator, scope hierarchy — each marked EXISTS / PARTIAL /
+            MISSING with exact file:line citations of what exists today and a one-line gap
+            statement for what does not.
+          - Ground the four critical distinctions in code, with citations: (a) retrieval is
+            relevance ranking, not truth resolution (retrieval.py); (b) RouteState knows model
+            economics but not workload state (step_routing.py — list the fields it LACKS);
+            (c) workflow_runner constructs execution context, not canonical workflow state;
+            (d) the ledger's JobRecord/AttemptRecord fields are L0/L1-grade material — list
+            which L1 facts are ALREADY derivable from them with zero new instrumentation and
+            which facts would need new measurement.
+          - State explicitly which proposal claims do NOT hold against the code (if any) and
+            why — the proposal is a seed, not gospel.
+
+          DELIVER exactly one file: docs/context_abstraction/review.md.
+      - name: design
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Write the Context Abstraction Plane design.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/context_abstraction/review.md (produced by the review phase)
+          - experiments/specs/context_abstraction_plane.yaml (design_input + open_questions +
+            hard_rules)
+          - src/instrument/experiment_spec.py + src/instrument/compile_experiment.py (the
+            requires/produces gate the fact contracts must generalize)
+          - src/instrument/knowledge.py (Authority + lineage fields the CanonicalFact reuses)
+
+          REQUIREMENTS:
+          - Answer ALL SEVEN open_questions with concrete schemas (dataclass or YAML sketches,
+            not prose): CanonicalFact + identity; the reducer model + derivation chains +
+            staleness cascade; the L0-L5 mapping to existing components; the Context Compiler
+            contracts + snapshot semantics; the RuleSpec fact-contract extension (show a full
+            YAML contract, e.g. route_next_job with fact/predicate/scope/max_age_seconds/
+            on_missing/on_conflict and what the compiler refuses); ControlDecision +
+            ControlValidator + the supervisor boundary; the measure-before-policy
+            implementation order with spec_lifecycle's spec-status facts as the first
+            reducer-produced canonical facts.
+          - Show the full loop the design completes: observe → canonicalize → abstract →
+            decide → execute → measure → update — and where each existing component sits in it.
+          - Give the scope hierarchy with explicit inheritance rules (downward policy flow,
+            upward fact aggregation) and how it composes with per-cell repository_id scope and
+            the two Redis planes (knowledge DB 2 vs control/telemetry DB 1 — the plane reads
+            canonical state from the knowledge plane, never from live telemetry).
+          - State explicitly what you would NOT build (scope boundary) and why.
+          - Do not implement; deliver the design only. All canonical derived facts must flow
+            from deterministic versioned reducers; LLM judgments are ADVISORY everywhere.
+
+          DELIVER exactly one file: docs/context_abstraction/design.md.
+      - name: verify
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Verify the design before it is pulled.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Trace every design_input item (six levels, the evidence-vs-canonical distinction,
+            CanonicalFact, reducers, Context Compiler, ControlDecision, the generalized
+            load-bearing rule, component placement, hierarchy, the Agentic Dynamics loop) to a
+            concrete mechanism in docs/context_abstraction/design.md.
+          - Confirm all seven open_questions are answered with a schema/sketch (not prose).
+          - Confirm the generalized load-bearing rule is enforceable in the design: every fact a
+            control rule consumes has a declared producing source or reducer, and the compiler
+            refusal conditions (absent/stale/conflict/out-of-scope/no derivation chain) are
+            specified.
+          - Confirm the review's component audit citations are preserved (no claim contradicts
+            the audited code state).
+          - Confirm the design-only boundary: git status shows ONLY docs/context_abstraction/*
+            added/modified in this worktree — no src/, scripts/, tests/ changes.
+          - Confirm the observe-only supervisor boundary and the existing authority hierarchy
+            are preserved.
+          - Write docs/context_abstraction/verify.md with PASS/FAIL per check.
+
+          DELIVER docs/context_abstraction/verify.md.
+factors:
+  - {name: model, levels: [anthropic/claude-opus-5]}
+design: factorial
+rules:
+  - name: component_audit
+    plane: measurement
+    evidence_class: "[C]"
+    requires: []
+    produces: [component_gap_map]
+  - name: design_coverage
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [context_plane_design]
+  - name: traceability
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [component_gap_map, context_plane_design]
+    produces: [design_input_covered]
+metrics:
+  - {name: questions_answered, agg: ratio, over: cell}
+  - {name: levels_covered, agg: ratio, over: cell}
+  - {name: design_input_covered, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, review, design, verify]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
