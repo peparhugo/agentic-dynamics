@@ -143,6 +143,7 @@
 *::before,
 *::after { box-sizing: border-box; }
 
+
 html,
 body {
   margin: 0;
@@ -259,22 +260,24 @@ pre {
   color: var(--status-unknown);
 }
 
-.status-word::before { margin-right: var(--sp-1); }
+/* The glyph is a real, aria-hidden element emitted by the renderer from the vocabulary in
+   board-fleet.js — not a `::before`. One source for "what a status looks like" means the glyph
+   cannot drift from the word beside it, and a `content:` string that a screen reader may or
+   may not announce never enters the accessibility tree. */
+.status-glyph {
+  display: inline-block;
+  min-width: 1em;
+  margin-right: var(--sp-1);
+  text-align: center;
+}
 
-.status-queued { color: var(--status-queued); }
-.status-queued::before { content: "\25CB"; }        /* ○ waiting */
-.status-running { color: var(--status-running); }
-.status-running::before { content: "\25D4"; }       /* ◔ active */
-.status-done { color: var(--status-done); }
-.status-done::before { content: "\2713"; }          /* ✓ succeeded */
-.status-failed { color: var(--status-failed); }
-.status-failed::before { content: "\00D7"; }        /* × hard failure */
-.status-timeout { color: var(--status-timeout); }
-.status-timeout::before { content: "\25F7"; }       /* ◷ ran out of time */
-.status-retry { color: var(--status-retry); }
-.status-retry::before { content: "\21BB"; }         /* ↻ re-enqueued */
-.status-unknown { color: var(--status-unknown); }
-.status-unknown::before { content: "?"; }
+.status-queued { color: var(--status-queued); }      /* glyph: circle,  waiting */
+.status-running { color: var(--status-running); }    /* glyph: quarter, active */
+.status-done { color: var(--status-done); }          /* glyph: check,   succeeded */
+.status-failed { color: var(--status-failed); }      /* glyph: cross,   hard failure */
+.status-timeout { color: var(--status-timeout); }    /* glyph: clock,   ran out of time */
+.status-retry { color: var(--status-retry); }        /* glyph: cycle,   re-enqueued */
+.status-unknown { color: var(--status-unknown); }    /* glyph: query,   unrecognized */
 
 /* ── 4. Shell layout ─────────────────────────────────────────────────────────────────────── */
 
@@ -874,11 +877,10 @@ pre {
   letter-spacing: 0.08em;
 }
 
-.flag-status-off-track { color: var(--attention-off-track); }
-.flag-status-off-track::before { content: "\25B2 "; }   /* ▲ needs a human */
-.flag-status-stalled { color: var(--attention-stalled); }
-.flag-status-stalled::before { content: "\25A0 "; }     /* ■ idle */
-.flag-status-attention { color: var(--attention-unknown); }
+/* Attention axis: same glyph-from-the-renderer rule as the lifecycle axis above. */
+.flag-status-off-track { color: var(--attention-off-track); }   /* glyph: triangle, needs a human */
+.flag-status-stalled { color: var(--attention-stalled); }       /* glyph: square,   idle */
+.flag-status-attention { color: var(--attention-unknown); }     /* glyph: diamond,  unclassified */
 
 /* ── 10. Sessions board ──────────────────────────────────────────────────────────────────── */
 
@@ -1751,3 +1753,15 @@ input[type="checkbox"] {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── 17. Hidden-state guarantee ──────────────────────────────────────────────────────────── */
+
+/* The UA's `[hidden] { display: none }` lives in the user-agent origin, so ANY author rule that
+   gives an element a `display` value silently defeats it — and most components the data layer
+   hides by toggling `.hidden` (the control panels, the drawers, the on-demand forms, the
+   per-card badges) are flex or grid containers here. Restoring the attribute once, globally,
+   beats remembering `:not([hidden])` at a dozen call sites.
+
+   Deliberately the LAST rule in the file: it then wins on source order as well as on
+   importance, so it holds even in a CSS engine with an incomplete `!important` cascade. */
+[hidden] { display: none !important; }

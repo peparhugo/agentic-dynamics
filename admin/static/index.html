@@ -21,8 +21,9 @@
   3. The read/act boundary is stated in markup, not only in CSS: READ ONLY / INTERACTIVE mode
      line, danger-styled irreversible actions, and the typed-confirmation door (design §3.4).
 
-  No build step: three classic scripts, loaded chrome-first so the shell is interactive before
-  the polling data layer starts (core -> shell -> detail sheet -> app).
+  No build step: five classic scripts, loaded so that each one's dependencies are already
+  defined when it runs (core -> fleet vocabulary -> shell -> detail sheet -> app), and so the
+  chrome is interactive before the polling data layer starts.
 -->
 <html lang="en">
 <head>
@@ -674,6 +675,7 @@
   <div id="alert-status" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
   <script src="/static/control-room-core.js"></script>
+  <script src="/static/board-fleet.js"></script>
   <script src="/static/shell.js"></script>
   <script src="/static/detail-sheet.js"></script>
   <script src="/static/app.js"></script>

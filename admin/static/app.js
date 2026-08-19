@@ -7,7 +7,7 @@
  * only overlays not-yet-polled live samples, which prevents polling, replay,
  * and automatic EventSource reconnection from multiplying reported spend.
  */
-(function startControlRoom(core) {
+(function startControlRoom(core, root) {
   const SVG_NS = "http://www.w3.org/2000/svg"
   const MAX_TRANSCRIPT_ROWS = 500
   const MAX_LIVE_SAMPLES_PER_CELL = 500
@@ -21,15 +21,10 @@
   const CLAUDE_AGENTS_POLL_MS = 10000
   const CLAUDE_AGENTS_DAEMON_POLL_MS = 15000
   const CLAUDE_AGENT_CELL_PREFIX = "claude_bg_"
-  const STATUS_SYMBOLS = {
-    queued: "○",
-    running: "◔",
-    done: "✓",
-    failed: "×",
-    timeout: "◷",
-    retry: "↻",
-    unknown: "?",
-  }
+
+  // The status vocabulary (glyph + word + class, on two axes) lives in board-fleet.js so the
+  // fleet cards, the detail header, the Claude roster, and the flag rows cannot drift apart.
+  const fleet = root.ControlRoomFleet
 
   const state = {
     cells: {},
@@ -150,18 +145,39 @@
     return `${Math.floor(seconds / 86400)}d ago`
   }
 
-  /** Keep heuristic supervisor statuses separate from fleet lifecycle states. */
+  /**
+   * Keep heuristic supervisor statuses separate from fleet lifecycle states.
+   *
+   * The two axes must never be confusable (design §2.2), so this resolves the ATTENTION
+   * vocabulary and nothing else: asking it for "running" yields the neutral ATTENTION entry,
+   * not a lifecycle state. The returned shape is kept (`label`/`className`) because the
+   * supervisor rail composes `flag-<className>` and `flag-status-<className>` class names;
+   * `vocabulary` carries the glyph for callers that paint the word.
+   */
   function supervisorStatus(value) {
-    if (value === "off_track") return { label: "OFF TRACK", className: "off-track" }
-    if (value === "stalled") return { label: "STALLED", className: "stalled" }
-    return { label: "ATTENTION", className: "attention" }
+    const vocabulary = fleet.attention(value)
+    return { label: vocabulary.word, className: vocabulary.key, vocabulary }
   }
 
   /** Return normalized status counts for both cards and the command rail. */
   function statusCounts() {
-    const counts = { queued: 0, running: 0, done: 0, failed: 0, timeout: 0, retry: 0, unknown: 0 }
-    for (const value of Object.values(state.cells)) counts[core.normalizeStatus(value)] += 1
-    return counts
+    return fleet.statusCounts(state.cells)
+  }
+
+  /**
+   * Paint one status vocabulary entry into a node as an aria-hidden glyph plus the word.
+   *
+   * Color is never the only signal (design §2.2): the glyph survives a monochrome display and
+   * the word survives a screen reader, which announces only the text because the glyph is
+   * marked decorative. Every status surface in the app goes through here, so there is exactly
+   * one place where "how a status looks" is decided.
+   */
+  function applyStatusWord(node, vocabulary, baseClass = "status-word") {
+    node.className = `${baseClass} ${vocabulary.className}`
+    const glyph = element("span", "status-glyph", vocabulary.glyph)
+    glyph.setAttribute("aria-hidden", "true")
+    node.replaceChildren(glyph, document.createTextNode(vocabulary.word))
+    return node
   }
 
   /** Describe the healthiest meaningful aggregate connection state. */
@@ -294,87 +310,236 @@
     return wrapper
   }
 
+  /* ── Fleet board ─────────────────────────────────────────────────────────────────────────
+     The matrix is the operator's home surface (design §2.1), and it re-renders every 5s
+     whether or not anything moved. The renderer below is therefore KEYED rather than
+     wholesale: each cell owns one `<article>` that is created once, updated in place, and
+     moved only when its position in the urgency order actually changes (design §2.5).
+
+     What that buys, concretely — every item is something the previous rebuild-the-world
+     renderer lost on each poll:
+       - keyboard focus stays on the card the operator was on, without a re-focus hack;
+       - a half-finished text selection of a cell id survives;
+       - hover/active state and the running pulse animation do not restart;
+       - the scroll position does not jump, because no node the browser is anchored to is
+         destroyed;
+       - a no-op poll performs ZERO DOM writes, so a screen reader announces nothing.
+
+     Ordering, filtering, counts, and change detection are all decided by board-fleet.js, which
+     is pure and browser-free; this section only translates those decisions into DOM. */
+
+  /** Live card handles, keyed by cell id: `{ card, button, statusWord, ... }`. */
+  const fleetCards = new Map()
+
+  /** The cell ids currently laid out in the grid, in DOM order (the reorder baseline). */
+  let fleetOrder = []
+
+  /** The mounted empty/no-match placeholder, when the grid has no cards to show. */
+  let fleetPlaceholder = null
+
+  /**
+   * Build the DOM for one cell card.
+   *
+   * Called exactly once per cell id. Every mutable part is kept as a permanent child that is
+   * later hidden or retitled rather than created and destroyed, because a node that survives
+   * is a node the browser (and the operator's focus) can stay anchored to.
+   *
+   * The whole card is a single `<button>`: tapping anywhere on it IS the drill-down, with no
+   * interstitial, because drill-down is read-only and safe to be one-tap (design §2.4).
+   */
+  function createFleetCard(cellId) {
+    const card = element("article", "cell-card")
+    const button = element("button", "cell-select")
+    button.type = "button"
+    button.dataset.cellId = cellId
+
+    const heading = element("div", "cell-heading")
+    const statusWord = element("span", "status-word")
+    const selectedLabel = element("span", "selected-label", "SELECTED")
+    selectedLabel.hidden = true
+    heading.appendChild(statusWord)
+    heading.appendChild(selectedLabel)
+    button.appendChild(heading)
+
+    // The id is rendered with textContent (never interpolated into markup): cell ids come from
+    // the queue and are not trusted input.
+    const identity = element("span", "cell-id", cellId)
+    button.appendChild(identity)
+
+    // Live workflow phase badge (display-only): "4/7 rerun_contaminated".
+    const phaseBadge = element("span", "phase-badge")
+    phaseBadge.hidden = true
+    button.appendChild(phaseBadge)
+
+    const cost = element("span", "latest-cost", "no cost yet")
+    button.appendChild(cost)
+
+    // The sparkline is the one part that is genuinely rebuilt, and only when a new sample
+    // arrives; `sparkline` holds the node so the replacement can swap in place.
+    const sparkline = createSparkline([])
+    button.appendChild(sparkline)
+    card.appendChild(button)
+
+    // Pre-sheet fallback for narrow screens; the Detail surface supersedes it, and it stays
+    // hidden unless this card is the selected one.
+    const jump = element("a", "mobile-anchor card-jump", "Jump to transcript")
+    jump.href = "#transcript-panel"
+    jump.hidden = true
+    card.appendChild(jump)
+
+    const entry = { card, button, statusWord, selectedLabel, phaseBadge, cost, sparkline, jump, signature: null, sampleSignature: null }
+    fleetCards.set(cellId, entry)
+    return entry
+  }
+
+  /**
+   * Update one card, writing only the parts whose value actually changed.
+   *
+   * `facts.signature` is the whole card's fingerprint: when it matches the previous render the
+   * function returns immediately and the card is not touched at all.
+   */
+  function updateFleetCard(entry, cellId, facts) {
+    if (entry.signature === facts.signature) return
+    entry.signature = facts.signature
+
+    const vocabulary = facts.vocabulary
+    entry.card.className = `cell-card ${vocabulary.className}${facts.selected ? " selected" : ""}`
+    applyStatusWord(entry.statusWord, vocabulary)
+    entry.button.setAttribute(
+      "aria-label",
+      vocabulary.key === "running" ? `Watch running cell ${cellId}` : `Inspect cell ${cellId}`,
+    )
+    entry.button.setAttribute("aria-pressed", String(facts.selected))
+    entry.selectedLabel.hidden = !facts.selected
+    entry.jump.hidden = !facts.selected
+
+    entry.phaseBadge.hidden = !facts.phase
+    if (facts.phase) entry.phaseBadge.textContent = facts.phase
+
+    entry.cost.textContent = facts.cost
+
+    // Redraw the sparkline only when the sample series grew: it is the most expensive node on
+    // the card, and a status-only change must not cost an SVG rebuild.
+    if (entry.sampleSignature !== facts.samples) {
+      entry.sampleSignature = facts.samples
+      const replacement = createSparkline(facts.sampleList)
+      entry.sparkline.replaceWith(replacement)
+      entry.sparkline = replacement
+    }
+  }
+
+  /** Format the live workflow phase badge label, or "" when the cell reports no phase. */
+  function phaseLabel(cellId) {
+    const phase = state.phases[cellId]
+    if (!phase || typeof phase !== "object" || typeof phase.name !== "string" || !phase.name) return ""
+    const index = Number.isInteger(phase.index) ? phase.index : null
+    const total = Number.isInteger(phase.total) ? phase.total : null
+    return `${index !== null ? `${index}/${total ?? "?"}` : ""} ${phase.name}`.trim()
+  }
+
+  /** Mount, retitle, or remove the "nothing to show" placeholder for the grid. */
+  function renderFleetPlaceholder(grid, text) {
+    if (!text) {
+      fleetPlaceholder?.remove()
+      fleetPlaceholder = null
+      return
+    }
+    if (!fleetPlaceholder) {
+      // Both empty states are plain copy; the wording distinguishes "the fleet is empty" from
+      // "your filter hid everything", which are very different operator problems.
+      fleetPlaceholder = element("p", "empty-state", "No cells are queued or retained")
+      grid.appendChild(fleetPlaceholder)
+    }
+    if (fleetPlaceholder.textContent !== text) fleetPlaceholder.textContent = text
+  }
+
   /** Render urgency-sorted fleet cards without interpolating untrusted IDs. */
   function renderFleet() {
     const grid = $("#fleet-grid")
-    grid.setAttribute("aria-busy", state.matrixState === "connecting" ? "true" : "false")
+    // Re-setting an attribute to the value it already holds still queues a mutation record,
+    // which is enough to make a screen reader re-announce a busy region every 5 seconds. Write
+    // only on a real change — the same rule the card updates below follow.
+    const busy = state.matrixState === "connecting" ? "true" : "false"
+    if (grid.getAttribute("aria-busy") !== busy) grid.setAttribute("aria-busy", busy)
     // Preserve the immediate skeleton until the first matrix request settles.
     if (!state.firstMatrixLoaded && state.matrixState === "connecting" && Object.keys(state.cells).length === 0) {
       renderRail()
       return
     }
-    const focusedCellId = document.activeElement?.classList.contains("cell-select")
-      ? document.activeElement.dataset.cellId
-      : null
-    grid.replaceChildren()
-    const search = state.search.toLowerCase()
-    const ids = core.sortCellIds(state.cells).filter((cellId) => {
-      const status = core.normalizeStatus(state.cells[cellId])
-      const matchesFilter = state.filter === "all"
-        || (state.filter === "running" && status === "running")
-        || (state.filter === "risk" && ["failed", "timeout", "unknown"].includes(status))
-      return matchesFilter && cellId.toLowerCase().includes(search)
-    })
+    // The skeleton cards are static markup from index.html; they are dropped once, on the
+    // first real render, and never re-created.
+    for (const skeleton of Array.from(grid.querySelectorAll(".skeleton-card"))) skeleton.remove()
 
-    if (Object.keys(state.cells).length === 0 && state.matrixState !== "connecting") {
-      grid.appendChild(element("p", "empty-state", "No cells are queued or retained"))
-    } else if (ids.length === 0) {
-      grid.appendChild(element("p", "empty-state", "No cells match the current fleet filter"))
+    const ids = fleet.visibleCellIds(state.cells, { filter: state.filter, search: state.search }, core.sortCellIds)
+    const retained = Object.keys(state.cells).length
+
+    renderFleetPlaceholder(
+      grid,
+      retained === 0 && state.matrixState !== "connecting"
+        ? "No cells are queued or retained"
+        : ids.length === 0 && retained > 0
+          ? "No cells match the current fleet filter"
+          : "",
+    )
+
+    // Drop cards for cells that left the snapshot or the current facet.
+    const visible = new Set(ids)
+    for (const [cellId, entry] of fleetCards) {
+      if (visible.has(cellId)) continue
+      entry.card.remove()
+      fleetCards.delete(cellId)
     }
 
+    // Create or update each visible card. New cards are appended here and positioned by the
+    // reorder pass below.
     for (const cellId of ids) {
-      const status = core.normalizeStatus(state.cells[cellId])
-      const selected = state.selectedId === cellId
-      const card = element("article", `cell-card status-${status}${selected ? " selected" : ""}`)
-      const button = element("button", "cell-select")
-      button.type = "button"
-      button.dataset.cellId = cellId
-      button.setAttribute("aria-label", status === "running" ? `Watch running cell ${cellId}` : `Inspect cell ${cellId}`)
-      button.setAttribute("aria-pressed", String(selected))
-      button.addEventListener("click", () => selectCell(cellId, true))
-
-      const heading = element("div", "cell-heading")
-      const statusLabel = element("span", `status-word status-${status}`, `${STATUS_SYMBOLS[status]} ${status.toUpperCase()}`)
-      heading.appendChild(statusLabel)
-      if (selected) heading.appendChild(element("span", "selected-label", "SELECTED"))
-      button.appendChild(heading)
-      button.appendChild(element("span", "cell-id", cellId))
-
-      // Live workflow phase badge (display-only): "4/7 rerun_contaminated".
-      const phase = state.phases[cellId]
-      if (phase && typeof phase === "object" && typeof phase.name === "string" && phase.name) {
-        const index = Number.isInteger(phase.index) ? phase.index : null
-        const total = Number.isInteger(phase.total) ? phase.total : null
-        const label = `${index !== null ? `${index}/${total ?? "?"}` : ""} ${phase.name}`.trim()
-        button.appendChild(element("span", "phase-badge", label))
+      let entry = fleetCards.get(cellId)
+      if (!entry) {
+        entry = createFleetCard(cellId)
+        grid.appendChild(entry.card)
       }
-
-      const samples = samplesForCell(cellId)
-      const costs = samples.map((sample) => core.safeNumber(sample.cost)).filter((value) => value !== null)
-      button.appendChild(element("span", "latest-cost", costs.length ? `${formatCost(costs.at(-1))} latest reported step` : "no cost yet"))
-      button.appendChild(createSparkline(samples))
-      card.appendChild(button)
-      if (selected) {
-        const jump = element("a", "mobile-anchor card-jump", "Jump to transcript")
-        jump.href = "#transcript-panel"
-        card.appendChild(jump)
+      const vocabulary = fleet.lifecycle(state.cells[cellId])
+      const selected = state.selectedType === "cell" && state.selectedId === cellId
+      const sampleList = samplesForCell(cellId)
+      const costs = sampleList.map((sample) => core.safeNumber(sample.cost)).filter((value) => value !== null)
+      const facts = {
+        vocabulary,
+        selected,
+        sampleList,
+        phase: phaseLabel(cellId),
+        cost: costs.length ? `${formatCost(costs.at(-1))} latest reported step` : "no cost yet",
+        samples: fleet.sampleSignature(sampleList),
       }
-      grid.appendChild(card)
+      facts.signature = fleet.cellSignature({
+        status: vocabulary.key,
+        selected,
+        phase: facts.phase,
+        cost: facts.cost,
+        samples: facts.samples,
+      })
+      updateFleetCard(entry, cellId, facts)
     }
 
-    // A status or telemetry update must not eject a keyboard operator from the fleet.
-    if (focusedCellId) {
-      const focusedReplacement = Array.from(grid.querySelectorAll(".cell-select"))
-        .find((button) => button.dataset.cellId === focusedCellId)
-      focusedReplacement?.focus({ preventScroll: true })
+    // Reorder only when the urgency order genuinely changed, and then with the minimum number
+    // of moves: walk the target order and move a card only if it is not already in place.
+    if (fleet.orderChanged(fleetOrder, ids)) {
+      let cursor = grid.firstElementChild
+      for (const cellId of ids) {
+        const card = fleetCards.get(cellId).card
+        if (card === cursor) cursor = cursor.nextElementSibling
+        else grid.insertBefore(card, cursor)
+      }
+      fleetOrder = ids.slice()
     }
 
-    const counts = statusCounts()
-    $("#fleet-total").textContent = String(Object.keys(state.cells).length)
-    const countText = ["queued", "running", "done", "failed", "timeout"]
-      .map((status) => `${status} ${counts[status]}`)
-      .join("  ·  ")
-    $("#fleet-counts").textContent = countText
+    // Footer: totals and the counts line, written only when the text actually differs so a
+    // no-op poll cannot re-announce them to assistive technology (design §2.5).
+    const total = String(retained)
+    const totalNode = $("#fleet-total")
+    if (totalNode.textContent !== total) totalNode.textContent = total
+    const countText = fleet.countsSummary(statusCounts())
+    const countsNode = $("#fleet-counts")
+    if (countsNode.textContent !== countText) countsNode.textContent = countText
     renderRail()
   }
 
@@ -464,7 +629,7 @@
         `${status.label}: ${flag.title || flag.session_id}. ${flag.why}. ${flag.review?.state === "unavailable" ? "Review unavailable." : "Review available."}`,
       )
       const heading = element("span", "supervisor-flag-heading")
-      heading.appendChild(element("span", `flag-status flag-status-${status.className}`, status.label))
+      heading.appendChild(applyStatusWord(element("span"), status.vocabulary, "flag-status"))
       heading.appendChild(element("strong", "supervisor-flag-title", flag.title || flag.session_id.slice(0, 18)))
       button.appendChild(heading)
       button.appendChild(element("span", "supervisor-flag-reason", flag.why))
@@ -636,7 +801,7 @@
       button.addEventListener("click", () => selectClaudeAgent(entry.id, true))
 
       const heading = element("div", "cell-heading")
-      heading.appendChild(element("span", `status-word status-${statusWord}`, statusWord.toUpperCase()))
+      heading.appendChild(applyStatusWord(element("span"), fleet.lifecycle(statusWord)))
       heading.appendChild(element("span", `ownership-chip ${entry.owned ? "owned" : "external"}`, entry.owned ? "OWNED" : "EXTERNAL"))
       button.appendChild(heading)
       button.appendChild(element("span", "cell-id", entry.id))
@@ -692,8 +857,7 @@
     $("#ownership-badge").className = (design || supervisor || claudeAgent?.owned) ? "interactive-badge" : "readonly-badge"
     if (design) {
       $("#transcript-title").textContent = design.title
-      $("#selected-status").textContent = design.lifecycle_state.toUpperCase()
-      $("#selected-status").className = "status-word status-running"
+      applyStatusWord($("#selected-status"), { ...fleet.lifecycle("running"), word: design.lifecycle_state.toUpperCase() })
       $("#selected-stream-state").textContent = state.streamState.toUpperCase()
       renderDesignControls(design)
       renderRecentDesigns()
@@ -705,8 +869,7 @@
         $("#transcript-mode").textContent = "Supervisor / Observed activity"
         $("#transcript-title").textContent = supervisor.title || supervisor.session_id
         const assessment = supervisorStatus(supervisor.status)
-        $("#selected-status").textContent = assessment.label
-        $("#selected-status").className = `status-word flag-status-${assessment.className}`
+        applyStatusWord($("#selected-status"), assessment.vocabulary)
         $("#selected-stream-state").textContent = state.streamState.toUpperCase()
       }
       renderSupervisorControls(supervisor)
@@ -717,8 +880,7 @@
     if (claudeAgent) {
       const status = String(claudeAgent.status || "unknown").toLowerCase()
       $("#transcript-title").textContent = claudeAgent.id
-      $("#selected-status").textContent = status.toUpperCase()
-      $("#selected-status").className = `status-word status-${status}`
+      applyStatusWord($("#selected-status"), fleet.lifecycle(status))
       $("#selected-stream-state").textContent = state.streamState.toUpperCase()
       renderClaudeAgentControls(claudeAgent)
       renderRecentDesigns()
@@ -726,8 +888,7 @@
     }
     const status = cellId ? core.normalizeStatus(state.cells[cellId]) : "unknown"
     $("#transcript-title").textContent = cellId || "NO CELL SELECTED"
-    $("#selected-status").textContent = status.toUpperCase()
-    $("#selected-status").className = `status-word status-${status}`
+    applyStatusWord($("#selected-status"), fleet.lifecycle(status))
     $("#selected-stream-state").textContent = state.streamState.toUpperCase()
     $("#control-cell").textContent = cellId || "No cell selected"
     $("#control-status").textContent = status.toUpperCase()
@@ -2079,6 +2240,15 @@
     $("#detach-design").addEventListener("click", detachSelectedStream)
     $("#save-spec-form").addEventListener("submit", saveSpec)
     $("#run-workflow-form").addEventListener("submit", runWorkflow)
+    // One delegated listener for the entire matrix, instead of one per card. Cards now
+    // outlive a poll, so per-card binding would work too — but delegation means a newly
+    // created card is interactive the instant it is appended, with no binding step to forget,
+    // and it keeps the listener count flat as the fleet grows (design §2.4).
+    $("#fleet-grid").addEventListener("click", (event) => {
+      const button = event.target instanceof Element ? event.target.closest(".cell-select") : null
+      const cellId = button?.dataset.cellId
+      if (cellId) selectCell(cellId, true)
+    })
     document.querySelectorAll(".filter-chip").forEach((button) => {
       button.addEventListener("click", () => {
         state.filter = button.dataset.filter
@@ -2408,4 +2578,4 @@
   window.setInterval(loadClaudeAgents, CLAUDE_AGENTS_POLL_MS)
   window.setInterval(loadClaudeAgentDaemon, CLAUDE_AGENTS_DAEMON_POLL_MS)
   window.setInterval(tick, 1000)
-})(window.ControlRoomCore)
+})(window.ControlRoomCore, window)
