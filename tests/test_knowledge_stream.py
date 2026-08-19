@@ -12,12 +12,24 @@ import socket
 import pytest
 
 # Use a dedicated TEST DB, never the production knowledge stream (DB 2), so a
-# per-test flushdb() cannot wipe the live corpus. Set before the import so the
-# module's REDIS_DB constant resolves to 15.
+# per-test flushdb() cannot wipe the live corpus.
 os.environ.setdefault("FINOPS_KB_DB", "15")
 
 from instrument import knowledge_stream as ks
 from instrument.knowledge import KnowledgeEvent
+
+#: The DB every fixture in this module connects to, resolved HERE rather than relied upon
+#: through ``ks.REDIS_DB``.
+#:
+#: ``ks.REDIS_DB`` — and therefore ``connect()``'s ``db`` default, which is bound at function
+#: definition time — resolves when ``instrument.knowledge_stream`` is FIRST imported. Running
+#: this file alone, that is the line above, so the default was 15. But any sibling test module
+#: that imports anything from ``instrument`` pulls ``knowledge_stream`` in through the package
+#: ``__init__`` first, and in a combined pytest invocation the default was therefore already
+#: bound to the production value (2) before ``os.environ.setdefault`` ever ran — so the
+#: fixtures below would ``flushdb()`` the LIVE knowledge stream. Passing this constant
+#: explicitly makes the isolation independent of import order.
+TEST_DB = int(os.environ["FINOPS_KB_DB"])
 
 try:
     _probe = socket.create_connection(("127.0.0.1", 6380), timeout=2)
@@ -48,7 +60,8 @@ DEAD_LETTER = ks.DEAD_LETTER_KEY
 
 @pytest.fixture()
 def redis2():
-    r = ks.connect()
+    # db=TEST_DB explicitly — never connect()'s import-order-dependent default (see TEST_DB).
+    r = ks.connect(db=TEST_DB)
     r.flushdb()
     yield r
     r.flushdb()
@@ -121,9 +134,11 @@ def _publish_file_event(
 # ── Contract constants ──────────────────────────────────────────
 
 def test_contract_constants():
-    # REDIS_DB is env-driven (FINOPS_KB_DB) so tests never flush production DB 2; this
-    # module sets it to 15 at the top, so the constant resolves to the test DB here.
-    assert ks.REDIS_DB == 15
+    # REDIS_DB is env-driven (FINOPS_KB_DB) so tests never flush production DB 2. Assert the
+    # invariant that actually protects the live corpus — the DB this module's fixtures connect
+    # to — rather than ``ks.REDIS_DB``, whose value depends on which test module imported
+    # ``knowledge_stream`` first (see TEST_DB's comment).
+    assert TEST_DB == 15
     assert ks.STREAM_KEY == "kb:v1:changes"
     assert ks.DEAD_LETTER_KEY == "kb:v1:dead_letter"
     assert ks.CONSUMER_GROUPS == (

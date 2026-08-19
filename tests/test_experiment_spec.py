@@ -1,7 +1,13 @@
 """Tests for ExperimentSpec dataclasses, YAML loading, and the requires/produces validator."""
 
+from pathlib import Path
+
+import pytest
+
 from instrument.experiment_spec import (
     LEDGER_FIELDS,
+    SPEC_KEYS,
+    SPEC_STATUSES,
     ComparisonSpec,
     ExperimentSpec,
     Factor,
@@ -271,3 +277,180 @@ def test_stop_and_writeup_defaults():
     assert spec.stop.budget_usd is None
     assert spec.adapt.strategy == "manual"
     assert spec.writeup is None
+
+
+# ── Spec lifecycle (the status layer) ───────────────────────────
+
+LIFECYCLE_YAML = """\
+name: canonical_state_round2
+question: Does the canonical registry survive a supersede chain?
+version: "0.3"
+workflow:
+  kind: agent_task
+  params: {language: python}
+factors:
+  - {name: model, levels: [anthropic/claude-opus-5]}
+design: factorial
+status: superseded
+supersedes: [canonical_state_design, canonical_state_implement]
+superseded_by: canonical_state_finalize
+completed_at: "2026-08-15T10:00:00+00:00"
+last_run_at: "2026-08-15T09:30:00+00:00"
+results_pointer: experiments/results/workflows/canonical_state_round2/20260815T093000Z.json
+"""
+
+
+def _minimal_spec(**overrides) -> ExperimentSpec:
+    """An ExperimentSpec with only the required fields, plus any lifecycle overrides."""
+    base = dict(
+        name="x",
+        question="q",
+        version="1",
+        workflow=Workflow("agent_task"),
+        factors=[Factor("model", ["a"])],
+        design="factorial",
+    )
+    base.update(overrides)
+    return ExperimentSpec(**base)
+
+
+def test_lifecycle_defaults_are_unset():
+    # The 63 committed specs carry no lifecycle keys, so every default must be the
+    # "nothing asserted" value — the index derives status from these, not the YAML.
+    spec = _minimal_spec()
+    assert spec.status == ""
+    assert spec.supersedes == []
+    assert spec.superseded_by is None
+    assert spec.completed_at is None
+    assert spec.last_run_at is None
+    assert spec.results_pointer is None
+
+
+def test_load_spec_preserves_lifecycle_fields(tmp_path):
+    path = tmp_path / "canonical_state_round2.yaml"
+    path.write_text(LIFECYCLE_YAML)
+    spec = load_spec(path)
+    assert spec.status == "superseded"
+    assert spec.supersedes == ["canonical_state_design", "canonical_state_implement"]
+    assert spec.superseded_by == "canonical_state_finalize"
+    assert spec.completed_at == "2026-08-15T10:00:00+00:00"
+    assert spec.last_run_at == "2026-08-15T09:30:00+00:00"
+    assert spec.results_pointer.endswith("20260815T093000Z.json")
+
+
+def test_lifecycle_round_trips_through_to_dict(tmp_path):
+    path = tmp_path / "canonical_state_round2.yaml"
+    path.write_text(LIFECYCLE_YAML)
+    spec = load_spec(path)
+    assert ExperimentSpec.from_dict(spec.to_dict()) == spec
+    # ... and every key to_dict emits is a recognized top-level key, so a round trip
+    # through the serialized form can never trip the unknown-key warning.
+    assert set(spec.to_dict()) <= SPEC_KEYS
+
+
+def test_supersedes_accepts_a_bare_string():
+    # `supersedes: old_spec` is as natural to author as `supersedes: [old_spec]`;
+    # both normalize to a list so consumers never branch on the type.
+    spec = ExperimentSpec.from_dict(
+        {
+            "name": "x", "question": "q", "version": "1",
+            "workflow": {"kind": "agent_task"},
+            "factors": [{"name": "model", "levels": ["a"]}],
+            "design": "factorial",
+            "supersedes": "old_spec",
+        }
+    )
+    assert spec.supersedes == ["old_spec"]
+
+
+def test_empty_lifecycle_strings_normalize_to_none():
+    spec = ExperimentSpec.from_dict(
+        {
+            "name": "x", "question": "q", "version": "1",
+            "workflow": {"kind": "agent_task"},
+            "factors": [{"name": "model", "levels": ["a"]}],
+            "design": "factorial",
+            "superseded_by": "", "completed_at": "  ", "supersedes": "",
+        }
+    )
+    assert spec.superseded_by is None
+    assert spec.completed_at is None
+    assert spec.supersedes == []
+
+
+def test_unknown_top_level_key_warns_and_is_not_silently_dropped():
+    # A typo'd lifecycle key used to vanish without a trace, so the spec looked like it
+    # had been honoured. It must now be visible — and still non-fatal.
+    payload = {
+        "name": "typo_spec", "question": "q", "version": "1",
+        "workflow": {"kind": "agent_task"},
+        "factors": [{"name": "model", "levels": ["a"]}],
+        "design": "factorial",
+        "supercedes": "old_spec",  # note the misspelling
+    }
+    with pytest.warns(UserWarning, match="supercedes"):
+        spec = ExperimentSpec.from_dict(payload)
+    assert spec.supersedes == []          # the typo really was not applied ...
+    assert spec.name == "typo_spec"       # ... and the load still succeeded
+
+
+def test_known_keys_do_not_warn(recwarn):
+    load_spec_payload = ExperimentSpec.from_dict(
+        {
+            "name": "x", "question": "q", "version": "1",
+            "workflow": {"kind": "agent_task"},
+            "factors": [{"name": "model", "levels": ["a"]}],
+            "design": "factorial",
+            "status": "draft", "supersedes": [], "superseded_by": None,
+            "completed_at": None, "last_run_at": None, "results_pointer": None,
+        }
+    )
+    assert load_spec_payload.status == "draft"
+    assert [w for w in recwarn.list if issubclass(w.category, UserWarning)] == []
+
+
+def test_spec_id_is_name_at_version():
+    # `spec_id` is a declared LEDGER_FIELD; this property is its one canonical builder,
+    # so job and attempt records cannot drift into two formats.
+    assert _minimal_spec(name="spec_lifecycle", version="0.1").spec_id == "spec_lifecycle@0.1"
+    assert "spec_id" in LEDGER_FIELDS
+
+
+@pytest.mark.parametrize("status", sorted(SPEC_STATUSES))
+def test_validator_admits_every_defined_status(status):
+    assert validate_spec(_minimal_spec(status=status)) == []
+
+
+def test_validator_admits_unset_status():
+    # "" means "not asserted" — the index derives it. Every committed spec is in this state.
+    assert validate_spec(_minimal_spec(status="")) == []
+
+
+def test_validator_flags_unknown_status():
+    errors = validate_spec(_minimal_spec(status="retired"))
+    assert any("retired" in e for e in errors)
+
+
+def test_validator_flags_self_referential_lineage():
+    errors = validate_spec(_minimal_spec(name="loop", superseded_by="loop"))
+    assert any("superseded_by" in e for e in errors)
+    errors = validate_spec(_minimal_spec(name="loop", supersedes=["loop"]))
+    assert any("supersedes" in e for e in errors)
+
+
+def test_committed_specs_all_load_without_unknown_key_warnings(recwarn):
+    """Every committed spec must load clean — no unknown keys, no validation errors.
+
+    This is the regression guard for the corpus itself: adding a lifecycle key to a spec
+    YAML that this dataclass does not know about would light up here rather than in a run.
+    """
+    specs_dir = Path(__file__).resolve().parent.parent / "experiments" / "specs"
+    paths = sorted(specs_dir.glob("*.yaml"))
+    assert len(paths) >= 63, f"expected the committed spec corpus, found {len(paths)}"
+    for path in paths:
+        spec = load_spec(path)
+        assert spec.spec_id == f"{spec.name}@{spec.version}"
+    unknown_key_warnings = [
+        w for w in recwarn.list if "unknown top-level key" in str(w.message)
+    ]
+    assert unknown_key_warnings == []

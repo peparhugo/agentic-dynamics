@@ -31,6 +31,7 @@ never again mean "global".
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -41,11 +42,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .augment import DEFAULT_INHERITED_TOOLS, augment_prompt, default_construct_fn, default_retrieve_fn
+from .augment import (
+    DEFAULT_INHERITED_TOOLS,
+    augment_prompt,
+    default_construct_fn,
+    default_retrieve_fn,
+)
 from .backends import run_agentic
 from .experiment_spec import ExperimentSpec, validate_spec
 from .language import detect_language
 from .live import LivePublisher
+from .paths import PROJECT_ROOT
 from .step_routing import (
     ModelSignals,
     RouteState,
@@ -68,6 +75,10 @@ class PhaseResult:
     phase: str
     kind: str  # agent | test
     status: str  # ok | failed
+    # ``spec_id`` ("<name>@<version>") has been declared in LEDGER_FIELDS since the schema
+    # was written but was never emitted, so an attempt record could not be traced back to
+    # the exact spec *version* that produced it. Built once via ExperimentSpec.spec_id.
+    spec_id: str = ""
     model: str = ""
     duration_s: float = 0.0
     commit_hash: str = ""
@@ -104,6 +115,7 @@ class PhaseResult:
             "phase": self.phase,
             "kind": self.kind,
             "status": self.status,
+            "spec_id": self.spec_id,
             "model": self.model,
             "duration_s": self.duration_s,
             "commit_hash": self.commit_hash,
@@ -143,6 +155,9 @@ class WorkflowRunResult:
     workdir: str
     goal: str
     phases: list[PhaseResult] = field(default_factory=list)
+    #: ``"<name>@<version>"`` — the job-level ``spec_id`` of LEDGER_FIELDS. ``spec_name``
+    #: alone cannot distinguish two runs of the same spec across a version bump; this can.
+    spec_id: str = ""
     git_sha: str = ""
     started_at: str = ""
     ended_at: str = ""
@@ -158,6 +173,7 @@ class WorkflowRunResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "spec_name": self.spec_name,
+            "spec_id": self.spec_id,
             "model": self.model,
             "workdir": self.workdir,
             "goal": self.goal,
@@ -267,6 +283,47 @@ def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
         pass  # progressive path — never block or fail the phase on emission
 
 
+def _completed_phases_from_index(
+    spec: ExperimentSpec, phase_names: list[str], goal: str
+) -> set[str]:
+    """Resume fallback: read completed phases out of the spec's latest run ledger.
+
+    Consulted **only** when :func:`_completed_phases` found no ``[workflow]`` commit, so
+    the existing git-log path can never be regressed by this. The derived index
+    (``experiments/specs/index.json``) points at the latest run ledger via
+    ``results_pointer``; that ledger lists each phase and its status.
+
+    Two guards keep this honest:
+
+    * only phases whose recorded ``status`` is ``"ok"`` count as completed — a failed phase
+      must be re-entered;
+    * the ledger's ``goal`` must share this run's 40-char prefix, mirroring the same
+      discipline :func:`_completed_phases` applies to commit subjects. Phase names collide
+      across workflows (scope/verify), so without the goal check a resume could skip work
+      that belongs to a different run of the same spec.
+
+    Best-effort throughout: any failure returns an empty set, which simply means "resume
+    from the top" — the pre-existing behaviour when no commits exist.
+    """
+    try:
+        from .spec_status import index_entry
+
+        entry = index_entry(spec.name)
+        if entry is None or not entry.results_pointer:
+            return set()
+        ledger_path = PROJECT_ROOT / entry.results_pointer
+        payload = json.loads(ledger_path.read_text())
+        if str(payload.get("goal", ""))[:40] != goal[:40]:
+            return set()
+        return {
+            str(ph.get("phase"))
+            for ph in payload.get("phases", []) or []
+            if str(ph.get("phase")) in phase_names and ph.get("status") == "ok"
+        }
+    except Exception:
+        return set()  # never block a resume on an index/ledger problem
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -372,7 +429,8 @@ def run_workflow(
     inherited_tools = list(rag_params.get("inherited_tools") or DEFAULT_INHERITED_TOOLS)
 
     result = WorkflowRunResult(
-        spec_name=spec.name, model=model, workdir=str(wd), goal=goal, started_at=_now()
+        spec_name=spec.name, spec_id=spec.spec_id, model=model, workdir=str(wd),
+        goal=goal, started_at=_now(),
     )
 
     # Prefer the launch envelope's cell id (set by the Control Room via
@@ -391,7 +449,13 @@ def run_workflow(
     start_idx = 0
     if resume:
         phase_names = [str(p.get("name", "?")) for p in phases]
+        # The git-log path stays primary and unchanged: a ``[workflow] <phase>`` commit in
+        # this worktree is the strongest possible evidence a phase already ran here. Only
+        # when it finds nothing — a worktree whose commits were squashed away, or a
+        # --no-commit run — do we fall back to the derived index's latest run ledger.
         completed = _completed_phases(wd, phase_names, goal)
+        if not completed:
+            completed = _completed_phases_from_index(spec, phase_names, goal)
         for i, phase_def in enumerate(phases):
             name = str(phase_def.get("name", "?"))
             if name in completed:
@@ -423,7 +487,7 @@ def run_workflow(
         name = str(phase_def.get("name", "?"))
         kind = str(phase_def.get("kind", "agent"))
         phase_timeout = int(phase_def.get("timeout", timeout))
-        pr = PhaseResult(phase=name, kind=kind, status="ok")
+        pr = PhaseResult(phase=name, kind=kind, status="ok", spec_id=spec.spec_id)
         # Publish the live phase as each phase *starts* (1-based index over the full
         # list, so resume keeps the original position). Display-only badge data.
         if publisher is not None and publisher.enabled:

@@ -109,13 +109,15 @@ def build_record(
     evidence_class: str,
     text: str,
     extra_fields: dict[str, Any] | None = None,
+    entity_id: str | None = None,
     now: datetime | None = None,
 ) -> KnowledgeRecord:
     """Build ONE :class:`~instrument.knowledge.KnowledgeRecord`, owning the hash-input ordering.
 
     This is the single place the canonical identity contract is applied end-to-end:
 
-    * ``entity_id``    — ``sha256(repository_id | source_uri | logical_locator)``.
+    * ``entity_id``    — ``sha256(repository_id | source_uri | logical_locator)``, unless an
+      explicit ``entity_id`` is supplied (see below).
     * ``content_hash`` — ``sha256(record_to_artifact(record))`` (the durable per-record JSON
       artifact, with the derived ids + volatile timestamps blanked).
     * ``knowledge_id`` — ``sha256(entity_id | revision | content_hash | extractor_version)``,
@@ -135,6 +137,15 @@ def build_record(
     ``causes``, ``acl_scope``, ...). Unknown keys raise ``ValueError`` rather than being silently
     dropped — a mistyped field name must not change the hashed content invisibly.
 
+    ``entity_id`` overrides the computed hash with a caller-chosen logical key. It exists for
+    producers whose entity is a *named* thing rather than a file location — the spec-lifecycle
+    path uses ``"spec:<name>"`` so the version chain is greppable in
+    ``registry_index.jsonl`` and directly addressable by ``scripts/registry.py show``. It is a
+    parameter of this function (rather than an ``extra_fields`` key) on purpose: the override
+    must reach BOTH the record field and the ``compute_knowledge_id`` input, and an
+    ``extra_fields`` entry would only reach the first — silently desynchronizing the two
+    identities. Omit it and the canonical hash is used, exactly as before.
+
     Because every producer funnels through this one function, byte-identity is preserved by
     construction: the same ``(source_type, source_uri, logical_locator, repository_id, revision,
     authority, evidence_class, text, extra_fields, now)`` yields the exact same
@@ -148,7 +159,10 @@ def build_record(
         raise ValueError(f"unknown KnowledgeRecord field(s) in extra_fields: {sorted(unknown)}")
 
     ts = _now_iso(now)
-    entity_id = compute_entity_id(repository_id, source_uri, logical_locator)
+    # The canonical hash unless the caller named the entity explicitly. Assigned to the local
+    # `entity_id` so the record field and the knowledge_id input below can never diverge.
+    if entity_id is None:
+        entity_id = compute_entity_id(repository_id, source_uri, logical_locator)
 
     # The common surface every producer shares. `commit_sha` defaults to `revision`; the fields a
     # producer genuinely varies are supplied via `extra_fields` (applied after these defaults).

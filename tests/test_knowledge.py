@@ -14,10 +14,10 @@ from instrument.knowledge import (
     OBSERVATION_TYPES,
     SCHEMA_VERSION,
     SOURCE_TYPES,
-    SourceTypeSpec,
     Authority,
     KnowledgeEvent,
     KnowledgeRecord,
+    SourceTypeSpec,
     compute_content_hash,
     compute_entity_id,
     compute_knowledge_id,
@@ -174,7 +174,7 @@ def test_authority_sorted_ascending():
 def test_policy_is_highest_authority():
     # Pinned policy outranks every other class, including current source.
     for authority in (Authority.SOURCE, Authority.MEASURED, Authority.DERIVED, Authority.ADVISORY):
-        assert Authority.POLICY > authority
+        assert authority < Authority.POLICY
     assert Authority.ADVISORY < Authority.SOURCE
 
 
@@ -341,31 +341,43 @@ def test_message_family_defaults_unknown_source_type_to_observation():
 def test_actuation_types_is_a_single_member_allowlist():
     # Guards the design's "closed by default" invariant directly: ACTUATION_TYPES must
     # never silently grow beyond the one family this round introduces.
-    assert ACTUATION_TYPES == frozenset({"actuation"})
+    assert frozenset({"actuation"}) == ACTUATION_TYPES
 
 
 # ── SOURCE_TYPES registry (R2 — the single vocabulary owner) ───
 
 
 def test_source_types_is_the_single_vocabulary_owner():
-    # All twelve source types — the four round-1 producer types PLUS the round-2 registry
-    # types — are registered here. This is what closes the pre-R2 split where
-    # OBSERVATION_TYPES silently omitted finding/code/report/policy.
+    # All thirteen source types — the four round-1 producer types, the round-2 registry
+    # types, and the spec-lifecycle type — are registered here. This is what closes the
+    # pre-R2 split where OBSERVATION_TYPES silently omitted finding/code/report/policy.
     assert set(SOURCE_TYPES) == {
         "finding", "code", "report", "policy",
         "story", "review", "ledger_job", "ledger_attempt",
         "observation", "flag", "meta_session", "actuation",
+        "spec",
     }
+
+
+def test_spec_source_type_is_a_policy_authority_observation():
+    # A spec record states what a spec IS and where its lifecycle stands — pinned,
+    # authored repository policy, and never an instruction to act. Both halves matter:
+    # POLICY/[P] mirrors the `policy` type's trust tier, and the observation family keeps
+    # it structurally outside the actuation gate.
+    assert SOURCE_TYPES["spec"] == SourceTypeSpec("observation", Authority.POLICY, "[P]")
+    assert message_family("spec") == "observation"
+    assert "spec" in OBSERVATION_TYPES
+    assert "spec" not in ACTUATION_TYPES
 
 
 def test_observation_and_actuation_types_are_derived_from_source_types():
     # The two frozensets are pure projections of SOURCE_TYPES' message_family column.
-    assert OBSERVATION_TYPES == frozenset(
+    assert frozenset(
         n for n, s in SOURCE_TYPES.items() if s.message_family == "observation"
-    )
-    assert ACTUATION_TYPES == frozenset(
+    ) == OBSERVATION_TYPES
+    assert frozenset(
         n for n, s in SOURCE_TYPES.items() if s.message_family == "actuation"
-    )
+    ) == ACTUATION_TYPES
 
 
 def test_source_type_spec_carries_nominal_provenance():

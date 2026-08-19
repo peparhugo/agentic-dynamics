@@ -26,7 +26,11 @@ Ported from `.opencode/instructions/conventions.md` (loaded unconditionally ther
   deadline}` goes in the grid as a `Factor` level, not a side-channel.
 - **Specs live in `experiments/specs/*.yaml`** (see the directory for the current set, e.g. `workflow_step_routing.yaml`). `Workflow.kind` is
   `story | task | experiment | agent_task`; `experiment` makes a campaign an experiment of
-  experiments (same interpreter at every level).
+  experiments (same interpreter at every level). **Read `experiments/specs/STATUS.md` FIRST**
+  before authoring a new one — it is the generated spec lifecycle index (what exists, what is
+  done, when it was completed, and the supersedes chains); `experiments/specs/index.json` is its
+  machine-readable twin. Both are derived, never hand-edited — regenerate with
+  `python scripts/spec_status.py`.
 
 ## Anti-Patterns
 

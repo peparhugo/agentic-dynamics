@@ -1,18 +1,30 @@
-"""Batch producer for the code / quality / policy sources of the runtime-RAG KB.
+"""Batch producer for the code / quality / policy / spec sources of the runtime-RAG KB.
 
 This is the *sources* producer — the sibling of ``scripts/kb_produce.py`` (which emits
 measured *findings*). Where ``kb_produce.py`` derives ``MEASURED`` findings from a
-``_results_summary.json``, this script derives three other source types through the SAME
+``_results_summary.json``, this script derives four other source types through the SAME
 pointer contract:
 
 * ``code``    — ``derive_code_records`` over ``src/`` and ``scripts/`` (``SOURCE`` / ``[C]``),
 * ``quality`` — ``derive_quality_records`` over the repo root (SonarQube/LSP → ``MEASURED``/``[M]``,
   entropy → ``DERIVED``/``[C]``, absent tools skipped-with-note),
-* ``policy``  — ``derive_policy_records`` over the pinned policy surface (``POLICY`` / ``[P]``).
+* ``policy``  — ``derive_policy_records`` over the pinned policy surface (``POLICY`` / ``[P]``),
+* ``spec``    — ``derive_spec_records`` over ``experiments/specs/index.json``
+  (``POLICY`` / ``[P]``), one lifecycle record per experiment spec.
 
     python scripts/kb_produce_sources.py --source code --dry-run
     python scripts/kb_produce_sources.py --source code --limit 20     # smoke
+    python scripts/kb_produce_sources.py --source spec --dry-run      # spec lifecycle preview
     python scripts/kb_produce_sources.py --source all                # full emit
+
+The ``spec`` source is the one that can emit a ``supersede`` (rather than ``upsert``) event:
+when ``registry_index.jsonl`` already holds a record for the same ``spec:<name>`` entity, the
+new record links its predecessor, which is what lets ``scripts/generate_manifest.py`` derive
+``lifecycle_state`` ``current`` vs ``superseded``. Both the operation and the ``reason``
+annotation are derived from the record itself (``spec_ingestion.spec_event``), never passed
+alongside it, so the two can never disagree. Note the difference from ``policy``: that source
+also globs the spec YAMLs, but emits their leading *text* for citation — a different record
+type for a different question. Both may coexist for one YAML.
 
 Idempotence contract (identical to ``kb_produce.py``): ``knowledge_id`` is the idempotence key.
 Before emitting, the producer checks the checkpoint hash (``CHECKPOINT_KEY`` on DB 2) with
@@ -42,6 +54,7 @@ from instrument import code_ingestion as ci  # noqa: E402
 from instrument import knowledge_stream as ks  # noqa: E402
 from instrument import policy_ingestion as pi  # noqa: E402
 from instrument import quality_ingestion as qi  # noqa: E402
+from instrument import spec_ingestion as si  # noqa: E402
 from instrument.paths import KB_ARTIFACT_DIR  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
@@ -124,6 +137,25 @@ def derive_policy(repository_id: str, revision: str) -> list:
     )
 
 
+def derive_spec(repository_id: str, revision: str) -> list:
+    """Derive one ``source_type=spec`` lifecycle record per entry in ``index.json``.
+
+    Reads the *generated* index rather than the YAMLs directly: the index is the single place
+    the spec corpus and the run ledgers have already been joined, and re-deriving that join
+    here would give the KB a second, drift-prone opinion about what "done" means. Regenerate it
+    first with ``python scripts/spec_status.py``; a missing index simply yields zero records.
+
+    Only specs whose lifecycle actually changed since their last registration come back —
+    ``derive_spec_records`` consults ``registry_index.jsonl`` and skips the rest, so a re-run
+    over an unchanged corpus is a genuine no-op instead of another link on every chain.
+    """
+    return si.derive_spec_records(
+        si.load_index_entries(root=REPO_ROOT),
+        repository_id=repository_id,
+        revision=revision,
+    )
+
+
 # ── Emission (identical logic to kb_produce.py) ────────────────
 
 
@@ -151,6 +183,23 @@ def load_checkpoint_ids(r) -> set[str]:
     return set(r.hkeys(ks.CHECKPOINT_KEY))
 
 
+def build_event(record):
+    """Build the pointer event for one record, honouring the spec path's supersede semantics.
+
+    Every source but ``spec`` emits a plain ``upsert`` with no ``reason`` — exactly what this
+    script did before. A ``spec`` record additionally carries (a) ``operation="supersede"``
+    when it links a predecessor and (b) the lifecycle-fingerprint ``reason`` that the NEXT
+    producer run reads back off the registry line to decide whether anything changed. Both are
+    derived from the record inside ``spec_ingestion.spec_event``, so this function only has to
+    route to it rather than re-implement the rules.
+    """
+    from instrument.knowledge_ingestion import record_to_event
+
+    if record.source_type == si.SOURCE_TYPE:
+        return si.spec_event(record)
+    return record_to_event(record)
+
+
 def emit_records(r, records: list) -> tuple[int, int]:
     """Write each durable artifact then publish its pointer event; skip already-checkpointed ids.
 
@@ -166,12 +215,12 @@ def emit_records(r, records: list) -> tuple[int, int]:
             continue
         # The fixed producer contract (knowledge_ingestion): serialize to the per-record JSON
         # artifact, then emit a pointer-only event whose content_hash covers those exact bytes.
-        from instrument.knowledge_ingestion import record_to_artifact, record_to_event
+        from instrument.knowledge_ingestion import record_to_artifact
 
         artifact = record_to_artifact(record)
         KB_ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
         (KB_ARTIFACT_DIR / f"{record.knowledge_id}.json").write_bytes(artifact)
-        ks.publish_event(r, record_to_event(record), source_type=record.source_type)
+        ks.publish_event(r, build_event(record), source_type=record.source_type)
         r.hset(ks.CHECKPOINT_KEY, record.knowledge_id, record.indexed_at)
         emitted += 1
     return emitted, skipped
@@ -184,6 +233,7 @@ _SOURCES = {
     "code": ("code", derive_code),
     "quality": ("report", derive_quality),
     "policy": ("policy", derive_policy),
+    "spec": ("spec", derive_spec),
 }
 
 
@@ -194,7 +244,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--source",
         default="all",
-        choices=["code", "quality", "policy", "all"],
+        choices=["code", "quality", "policy", "spec", "all"],
         help="which source to emit (default: all)",
     )
     parser.add_argument(
@@ -223,7 +273,9 @@ def main(argv: list[str] | None = None) -> None:
     revision = args.revision or git_head_sha()
 
     # Resolve the requested source keys (order is fixed and deterministic).
-    source_keys = ["code", "quality", "policy"] if args.source == "all" else [args.source]
+    source_keys = (
+        ["code", "quality", "policy", "spec"] if args.source == "all" else [args.source]
+    )
 
     # 1. Derive every requested source, capturing records + quality skip notes.
     derived: dict[str, tuple[list, list[str]]] = {}
@@ -267,7 +319,9 @@ def main(argv: list[str] | None = None) -> None:
             f"limit={args.limit or 'none'}) — by source_type: {per_source}"
         )
         for rec in plan[:SAMPLE_COUNT]:
-            log(f"  {rec.knowledge_id[:12]}  [{rec.source_type}]  {rec.text[:80]}")
+            op = si.spec_operation(rec) if rec.source_type == si.SOURCE_TYPE else "upsert"
+            summary = rec.text.splitlines()[0] if rec.text else ""
+            log(f"  {rec.knowledge_id[:12]}  [{rec.source_type}/{op}]  {summary[:80]}")
         return
 
     # 3. Emit — fail fast on connection (knowledge_stream.connect raises on a downed stream).

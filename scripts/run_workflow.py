@@ -21,6 +21,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from instrument.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from instrument.signal_store import build_signal_store, load_results  # noqa: E402
+from instrument.spec_ingestion import emit_spec_record  # noqa: E402
+from instrument.spec_status import refresh_spec_status  # noqa: E402
 from instrument.step_routing import ModelSignals  # noqa: E402
 from instrument.workflow_runner import run_workflow  # noqa: E402
 
@@ -62,7 +64,9 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=1800, help="per-phase timeout (s)")
     ap.add_argument("--no-commit", action="store_true", help="do not commit after phases")
     ap.add_argument("--resume", action="store_true",
-                    help="skip phases that already have a [workflow] <phase> commit")
+                    help="skip phases that already have a [workflow] <phase> commit; when the "
+                         "worktree has no such commits, fall back to the phases the derived "
+                         "spec index (experiments/specs/index.json) shows as ok for this goal")
     ap.add_argument("--signals", default=None,
                     help="path to a JSON file mapping model id -> measured signals "
                          "(overrides the auto-built signal store)")
@@ -108,6 +112,55 @@ def main() -> None:
     out_path.write_text(json.dumps(result.to_dict(), indent=2))
     print(f"\nledger: {out_path}", file=sys.stderr)
     print(f"cost: ${result.total_cost_usd:.4f}  ok: {result.ok}", file=sys.stderr)
+
+    _refresh_index(spec.name)
+    _emit_spec_record(spec.name, revision=result.git_sha)
+
+
+def _refresh_index(spec_name: str) -> None:
+    """Refresh the derived spec index now that this run's ledger is on disk.
+
+    Best-effort by construction (the ``emit_self`` pattern of
+    ``workflow_runner.py:254-267``): the run has already completed and its ledger is
+    already written, so an index problem — an unreadable spec YAML, a read-only
+    ``experiments/specs/``, anything — must degrade to a printed warning. It may never
+    fail the run or change its exit status.
+    """
+    try:
+        report = refresh_spec_status(spec_name, root=ROOT)
+        print(f"spec index: {report.index_path} ({report.n_specs} specs)", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 — a post-run bookkeeping step, never a gate
+        print(
+            f"warning: spec index refresh failed ({exc}) — run itself unaffected",
+            file=sys.stderr,
+        )
+
+
+def _emit_spec_record(spec_name: str, *, revision: str) -> None:
+    """Publish this spec's lifecycle record to the knowledge base. Best-effort.
+
+    Runs AFTER ``_refresh_index`` on purpose: the record is derived from
+    ``experiments/specs/index.json``, so the index must already reflect the run that just
+    finished. ``emit_spec_record`` swallows every failure internally (Redis down, the
+    ``FINOPS_KB_WRITE`` guard, a missing index) and returns ``None`` — the ``emit_self``
+    pattern from ``workflow_runner.py:254-267``. The extra ``try`` here is belt-and-braces
+    for the import/logging path itself: nothing after a completed run may change its outcome.
+
+    A ``None`` return is also the ordinary "lifecycle unchanged, nothing to say" case, so it
+    is reported as a no-op rather than as a warning.
+    """
+    try:
+        record = emit_spec_record(spec_name, root=ROOT, revision=revision or "workflow-run")
+        if record is None:
+            print("spec record: nothing to emit (unchanged or KB unreachable)", file=sys.stderr)
+        else:
+            print(
+                f"spec record: {record.entity_id} {record.knowledge_id[:12]} "
+                f"({'supersede' if record.supersedes else 'upsert'})",
+                file=sys.stderr,
+            )
+    except Exception as exc:  # noqa: BLE001 — progressive path, never a gate
+        print(f"warning: spec record emit failed ({exc}) — run itself unaffected", file=sys.stderr)
 
 
 if __name__ == "__main__":

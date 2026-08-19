@@ -1,13 +1,17 @@
 """Tests for the execute runner — run_workflow drives agent_task phases in a worktree."""
 
+import json
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
+from instrument import spec_status, workflow_runner
 from instrument.augment import default_retrieve_fn
 from instrument.experiment_spec import load_spec, validate_spec
+from instrument.spec_status import SpecStatusEntry
 from instrument.workflow_runner import (
     _build_phase_prompt,
+    _completed_phases_from_index,
     cell_scope,
     run_workflow,
 )
@@ -612,3 +616,120 @@ def test_retrieve_construct_render_path_never_writes():
     assert "emit_phase_finding" in inspect.getsource(wr._emit_self_finding)
     assert "publish_event" not in inspect.getsource(wr._emit_self_finding)
 
+
+# ── spec_id on the ledger records ───────────────────────────────
+
+
+def test_ledger_records_carry_spec_id(tmp_path):
+    """``spec_id`` is a declared LEDGER_FIELD; job *and* attempt records must emit it.
+
+    Without it a run ledger identifies only the spec *name*, so two runs across a version
+    bump are indistinguishable in the ledger.
+    """
+    spec = load_spec(SPEC)
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                          commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
+
+    expected = f"{spec.name}@{spec.version}"
+    assert result.spec_id == expected                                  # job record
+    assert all(p.spec_id == expected for p in result.phases)           # attempt records
+
+    serialized = result.to_dict()
+    assert serialized["spec_id"] == expected
+    assert all(ph["spec_id"] == expected for ph in serialized["phases"])
+
+
+# ── --resume: git log first, the derived index as the fallback ──
+
+
+def _index_ledger(tmp_path: Path, goal: str, phases: list[dict]) -> SpecStatusEntry:
+    """Write a fixture run ledger under ``tmp_path`` and return an entry pointing at it."""
+    rel = "experiments/results/workflows/control_room_portal/20260819T000000Z.json"
+    path = tmp_path / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"spec_name": "control_room_portal", "goal": goal, "phases": phases})
+    )
+    return SpecStatusEntry(
+        name="control_room_portal", version="0.2", status="active",
+        spec_path="experiments/specs/control_room_portal.yaml",
+        last_run_at="2026-08-19T00:00:00+00:00", results_pointer=rel, n_runs=1,
+    )
+
+
+def test_resume_falls_back_to_the_index_without_workflow_commits(tmp_path, monkeypatch):
+    # tmp_path is not a git repo, so the git-log path finds nothing — exactly the case
+    # the index fallback exists for.
+    entry = _index_ledger(tmp_path, "g", [
+        {"phase": "scope", "status": "ok"},
+        {"phase": "ux_design", "status": "ok"},
+        {"phase": "implement", "status": "failed"},
+    ])
+    monkeypatch.setattr(workflow_runner, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: entry)
+
+    spec = load_spec(SPEC)
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, resume=True,
+                          commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
+    # scope/ux_design were ok in the ledger and are skipped; the failed implement re-runs.
+    assert [p.phase for p in result.phases] == ["implement", "verify"]
+
+
+def test_index_fallback_is_not_consulted_when_commits_exist(tmp_path, monkeypatch):
+    """The git-log path stays primary — the pre-existing behaviour must not regress."""
+    consulted = []
+    monkeypatch.setattr(
+        spec_status, "index_entry", lambda name, **kw: consulted.append(name)
+    )
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    calls = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        calls.append(prompt)
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "x.md").write_text(str(len(calls)))
+        return _fake_agent(ok=len(calls) < 2, error="boom")
+
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, resume=True,
+                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    assert [p.phase for p in result.phases][0] == "ux_design"  # scope skipped via git log
+    assert consulted == []                                     # ... and the index untouched
+
+
+def test_index_fallback_requires_a_matching_goal(tmp_path, monkeypatch):
+    # Phase names collide across workflows (scope/verify), so a ledger written for a
+    # different goal must not let a resume skip work that was never done for this one.
+    entry = _index_ledger(tmp_path, "a completely different goal",
+                          [{"phase": "scope", "status": "ok"}])
+    monkeypatch.setattr(workflow_runner, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: entry)
+
+    spec = load_spec(SPEC)
+    phase_names = [p["name"] for p in spec.workflow.params["phases"]]
+    assert _completed_phases_from_index(spec, phase_names, "g") == set()
+
+
+def test_index_fallback_degrades_to_empty_on_any_failure(tmp_path, monkeypatch):
+    """No index, a dangling results_pointer, or a raising lookup all mean "start over"."""
+    spec = load_spec(SPEC)
+    phase_names = [p["name"] for p in spec.workflow.params["phases"]]
+    monkeypatch.setattr(workflow_runner, "PROJECT_ROOT", tmp_path)
+
+    monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: None)
+    assert _completed_phases_from_index(spec, phase_names, "g") == set()
+
+    dangling = SpecStatusEntry(name="control_room_portal", version="0.2", status="active",
+                               spec_path="x.yaml", results_pointer="does/not/exist.json")
+    monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: dangling)
+    assert _completed_phases_from_index(spec, phase_names, "g") == set()
+
+    def boom(name, **kw):
+        raise RuntimeError("index exploded")
+
+    monkeypatch.setattr(spec_status, "index_entry", boom)
+    assert _completed_phases_from_index(spec, phase_names, "g") == set()
