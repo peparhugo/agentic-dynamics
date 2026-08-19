@@ -8,17 +8,18 @@ producer in this package, which only ever describes what already happened.
 
 READ THIS BEFORE ADDING A CALL SITE — THAT IS THE WHOLE POINT OF THIS MODULE EXISTING:
 :func:`derive_actuation_record` is built and unit-tested so its schema is exercised before
-anything in the running system ever calls it. As of this round, it has **zero call sites**
-in ``scripts/supervise.py``, ``src/instrument/workflow_runner.py``, or anywhere else —
-that absence is itself part of the design (design §5b / §13's Scope Boundary), not an
-oversight, and :func:`instrument.knowledge_stream.publish_event`'s actuation gate
+anything in the running system ever calls it. The **one legitimate call site** is the
+Control Room's human-gated steer/interrupt handlers (``admin/server.py``'s
+``_emit_actuation_record``, review §5.4 — a POST to ``/api/flags/<sid>/steer`` or
+``/interrupt`` after the human operator explicitly decided to act), and
+:func:`instrument.knowledge_stream.publish_event`'s actuation gate
 (``FINOPS_ACTUATION_ARMED``, the ``causes``-must-resolve-to-an-observation lineage check —
 see ``knowledge_stream.py``, plan step 7, already landed) independently blocks anything
-this function produces from ever reaching the durable stream unarmed. A future call site
-is legitimate only once a control rule for actuation exists in a compiled
-``ExperimentSpec`` — the same ``requires``/``produces`` gate ``compile_experiment.py``
-already enforces for every other policy arm (``AGENTS.md``'s load-bearing rule, applied to
-actuation with no bespoke exception).
+this function produces from ever reaching the durable stream unarmed. Any OTHER call site
+— an automated/agent-driven caller — is legitimate only once a control rule for actuation
+exists in a compiled ``ExperimentSpec`` — the same ``requires``/``produces`` gate
+``compile_experiment.py`` already enforces for every other policy arm (``AGENTS.md``'s
+load-bearing rule, applied to actuation with no bespoke exception).
 
 Schema (design §5a): ``source_type="actuation"``, ``authority=POLICY``,
 ``evidence_class="[P]"``. ``causes`` (the :class:`~instrument.knowledge.KnowledgeRecord`

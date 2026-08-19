@@ -671,3 +671,410 @@ def test_api_registry_lineage_404_when_entity_not_found(tmp_path, monkeypatch):
     response = server.app.test_client().get("/api/registry/does-not-exist")
     assert response.status_code == 404
     assert response.get_json()["error"] == "not_found"
+
+
+# ── control-room hardening review: F1-F5 ────────────────────────
+#
+# F1: /api/experiments joins the shared mutation boundary.
+# F3: design-session /input validates delivery against a server-side allowlist.
+# F2: the 28-route inventory matches the registered url_map.
+# F4: /api/registry caches the parsed manifest.
+# F5: lineage surfaces ambiguity instead of silently picking the first match.
+
+
+def test_experiments_requires_idempotency_key():
+    """F1: a JSON enqueue body without an Idempotency-Key is rejected at the gate."""
+    response = server.app.test_client().post(
+        "/api/experiments",
+        json={"action": "enqueue"},
+    )
+
+    assert response.status_code == 400
+    assert "Idempotency-Key" in response.get_json()["error"]
+
+
+def test_experiments_rejects_non_loopback_remote():
+    """F1: the enqueue route is loopback-gated like every other mutation."""
+    response = server.app.test_client().post(
+        "/api/experiments",
+        json={"action": "enqueue"},
+        headers={"Idempotency-Key": "exp-remote"},
+        environ_overrides={"REMOTE_ADDR": "203.0.113.7"},
+    )
+
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "loopback access required"
+
+
+def test_experiments_rejects_unknown_action(monkeypatch):
+    """F1: the action allowlist survives the boundary; unknown actions are 400."""
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    response = server.app.test_client().post(
+        "/api/experiments",
+        json={"action": "launch_the_missiles"},
+        headers={"Idempotency-Key": "exp-bad-action"},
+    )
+
+    assert response.status_code == 400
+    assert "unknown action" in response.get_json()["error"]
+
+
+def test_experiments_enqueue_spawns_subprocess(monkeypatch):
+    """F1: a gated enqueue still reaches scripts/enqueue.py via subprocess."""
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+    calls = []
+
+    class FakeProc:
+        returncode = 0
+        stdout = "enqueued 30 cells\n"
+        stderr = ""
+
+    def fake_run(cmd, capture_output, text, timeout, cwd):
+        calls.append((cmd, capture_output, text, timeout, cwd))
+        return FakeProc()
+
+    monkeypatch.setattr(server.subprocess, "run", fake_run)
+
+    response = server.app.test_client().post(
+        "/api/experiments",
+        json={"action": "enqueue"},
+        headers={"Idempotency-Key": "exp-enqueue"},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["ok"] is True
+    assert body["output"] == "enqueued 30 cells"
+    assert len(calls) == 1
+    assert calls[0][0][-1] == "scripts/enqueue.py"
+    assert calls[0][0][0:2] == [server.sys.executable, "scripts/enqueue.py"]
+    assert calls[0][3] == 30
+
+
+def test_experiments_clear_appends_flag(monkeypatch):
+    """F1: the clear action passes --clear through to the subprocess."""
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+    calls = []
+
+    class FakeProc:
+        returncode = 0
+        stdout = "cleared\n"
+        stderr = ""
+
+    def fake_run(cmd, capture_output, text, timeout, cwd):
+        calls.append(cmd)
+        return FakeProc()
+
+    monkeypatch.setattr(server.subprocess, "run", fake_run)
+
+    response = server.app.test_client().post(
+        "/api/experiments",
+        json={"action": "clear"},
+        headers={"Idempotency-Key": "exp-clear"},
+    )
+
+    assert response.status_code == 200
+    assert calls[0] == [server.sys.executable, "scripts/enqueue.py", "--clear"]
+
+
+def test_design_session_input_rejects_unknown_delivery():
+    """F3: a client cannot smuggle an unknown delivery mode through /input."""
+    response = server.app.test_client().post(
+        "/api/design-sessions/ds_abc/input",
+        json={"prompt": "make it so", "delivery": "teleport"},
+        headers={"Idempotency-Key": "input-bad-delivery"},
+    )
+
+    assert response.status_code == 400
+    assert "delivery" in response.get_json()["error"]
+
+
+def test_design_session_input_forwards_allowlisted_delivery(monkeypatch):
+    """F3: an allowlisted delivery mode is forwarded untouched to the manager."""
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+    admitted = []
+
+    class FakeManager:
+        def send_input(self, portal_id, *, prompt, delivery):
+            admitted.append((portal_id, prompt, delivery))
+            return {"ok": True, "admitted": True, "delivery": delivery, "response": {}}
+
+    monkeypatch.setattr(server, "_design_sessions", lambda: FakeManager())
+
+    response = server.app.test_client().post(
+        "/api/design-sessions/ds_abc/input",
+        json={"prompt": "make it so", "delivery": "steer"},
+        headers={"Idempotency-Key": "input-steer"},
+    )
+
+    assert response.status_code == 200
+    assert admitted == [("ds_abc", "make it so", "steer")]
+
+
+def test_route_inventory_covers_all_registered_routes():
+    """F2: the inventory's 28 routes match the actual url_map exactly."""
+    rules = [rule for rule in server.app.url_map.iter_rules() if not rule.rule.startswith("/static")]
+
+    # GET and POST on the same path register two Rule objects; count them
+    # (28), then dedupe for path-membership assertions below.
+    assert len(rules) == 28
+    routes = {rule.rule for rule in rules}
+
+    # The surfaces the stale inventory omitted are all registered.
+    for required in (
+        "/",
+        "/api/registry",
+        "/api/registry/<entity_id>",
+        "/api/queue/reinterleave",
+        "/api/experiments",
+        "/api/flags",
+        "/api/flags/<session_id>/steer",
+        "/api/flags/<session_id>/interrupt",
+        "/api/design-sessions/<portal_id>/spec",
+        "/api/design-sessions/<portal_id>/save",
+        "/api/design-sessions/<portal_id>/run",
+    ):
+        assert required in routes, f"missing route in inventory: {required}"
+
+
+def test_api_registry_caches_parsed_manifest(tmp_path, monkeypatch):
+    """F4: a second registry request reuses the parsed manifest, not a re-parse."""
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_registry_row(knowledge_id="kid_cached")])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+    server._REGISTRY_CACHE.clear()
+
+    loads = []
+    real_load = server.registry_cli.load_registry
+
+    def counting_load(path):
+        loads.append(path)
+        return real_load(path)
+
+    monkeypatch.setattr(server.registry_cli, "load_registry", counting_load)
+
+    client = server.app.test_client()
+    first = client.get("/api/registry")
+    second = client.get("/api/registry")
+
+    assert first.status_code == 200
+    assert second.get_json()["count"] == 1
+    assert len(loads) == 1
+
+
+def test_api_registry_cache_invalidates_on_rewrite(tmp_path, monkeypatch):
+    """F4: rewriting the manifest (a size change) busts the parsed-manifest cache."""
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_registry_row(knowledge_id="kid_v1")])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+    server._REGISTRY_CACHE.clear()
+
+    client = server.app.test_client()
+    assert client.get("/api/registry").get_json()["count"] == 1
+
+    _write_manifest(manifest_path, [
+        _registry_row(knowledge_id="kid_v1"),
+        _registry_row(knowledge_id="kid_v2", entity_id="eid_v2"),
+    ])
+    assert client.get("/api/registry").get_json()["count"] == 2
+
+
+def test_api_registry_lineage_flags_ambiguity(tmp_path, monkeypatch):
+    """F5: duplicate entity rows surface an ambiguity, never a silent first pick."""
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [
+        _registry_row(knowledge_id="kid_dup_a", entity_id="eid_dup"),
+        _registry_row(knowledge_id="kid_dup_b", entity_id="eid_dup"),
+    ])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+    server._REGISTRY_CACHE.clear()
+
+    response = server.app.test_client().get("/api/registry/eid_dup")
+    body = response.get_json()
+
+    assert response.status_code == 409
+    assert body["error"] == "ambiguous"
+    assert body["count"] == 2
+    assert [row["knowledge_id"] for row in body["records"]] == ["kid_dup_a", "kid_dup_b"]
+
+
+# ── actuation call site (review §5.4) ───────────────────────────
+#
+# The steer/interrupt handlers are the first caller of the actuation producer:
+# after a successful intervention, they emit ONE actuation record whose ``causes``
+# is the flag observation's knowledge_id. Best-effort — a KB outage never blocks
+# the steer. Observation (GET) surfaces never emit.
+
+
+def _flagged_session(**overrides):
+    flag = {
+        "at": "2026-08-15T00:00:00+00:00",
+        "session_id": "sess_abc",
+        "title": "task_manager_api",
+        "model": "deepseek/deepseek-v4-flash",
+        "status": "stalled",
+        "why": "no forward progress",
+        "review": {
+            "state": "mapped",
+            "cell_id": "cell_1",
+            "source": "publisher_index",
+            "mapped_at": "2026-08-15T00:00:00Z",
+        },
+    }
+    flag.update(overrides)
+    return flag
+
+
+def test_supervisor_steer_emits_exactly_one_actuation_record(monkeypatch):
+    """A successful steer emits exactly one actuation record citing the flag's knowledge_id."""
+    from instrument import knowledge_stream as ks
+    from instrument.knowledge_ingestion import REPOSITORY_ID
+    from instrument.observation_ingestion import derive_flag_record
+
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    flag = _flagged_session()
+    monkeypatch.setattr(
+        server, "_authorize_supervisor_action",
+        lambda session_id, cell_id: (flag, None),
+    )
+
+    sent = []
+
+    class FakeOpenCode:
+        def send_input(self, session_id, prompt, *, delivery):
+            sent.append((session_id, prompt, delivery))
+
+    monkeypatch.setattr(server, "_opencode_client", lambda: FakeOpenCode())
+
+    published = []
+
+    def fake_connect():
+        return object()
+
+    def fake_publish_event(redis_client, event, **kwargs):
+        published.append((event, kwargs))
+        return "entry-1"
+
+    monkeypatch.setattr(ks, "connect", fake_connect)
+    monkeypatch.setattr(ks, "publish_event", fake_publish_event)
+
+    response = server.app.test_client().post(
+        "/api/flags/sess_abc/steer",
+        json={"cell_id": "cell_1", "prompt": "please continue"},
+        headers={"Idempotency-Key": "steer-1"},
+    )
+
+    assert response.status_code == 200
+    assert sent == [("sess_abc", "please continue", "steer")]
+    assert len(published) == 1
+    event, kwargs = published[0]
+    assert event.causes == derive_flag_record(flag, repository_id=REPOSITORY_ID).knowledge_id
+    assert kwargs["source_type"] == "actuation"
+    assert kwargs["authorized"] is True
+    assert kwargs["armed"] is True
+
+
+def test_supervisor_interrupt_emits_exactly_one_actuation_record(monkeypatch):
+    """A successful interrupt emits exactly one actuation record, kind=interrupt."""
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    flag = _flagged_session()
+    monkeypatch.setattr(
+        server, "_authorize_supervisor_action",
+        lambda session_id, cell_id: (flag, None),
+    )
+
+    interrupted = []
+
+    class FakeOpenCode:
+        def interrupt(self, session_id):
+            interrupted.append(session_id)
+
+    monkeypatch.setattr(server, "_opencode_client", lambda: FakeOpenCode())
+
+    emitted = []
+    monkeypatch.setattr(
+        server, "_emit_actuation_record",
+        lambda f, **kw: emitted.append((f, kw)),
+    )
+
+    response = server.app.test_client().post(
+        "/api/flags/sess_abc/interrupt",
+        json={"cell_id": "cell_1", "confirmation": "INTERRUPT sess_abc"},
+        headers={"Idempotency-Key": "interrupt-1"},
+    )
+
+    assert response.status_code == 200
+    assert interrupted == ["sess_abc"]
+    assert len(emitted) == 1
+    emitted_flag, kwargs = emitted[0]
+    assert emitted_flag is flag
+    assert kwargs["actuation_kind"] == "interrupt"
+    assert kwargs["target_cell_id"] == "cell_1"
+
+
+def test_actuation_emit_is_best_effort_and_never_blocks_the_steer(monkeypatch):
+    """A KB-plane failure swallows the actuation emit and still returns 200."""
+    from instrument import knowledge_stream as ks
+
+    redis = QueueRedis(queue=[])
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    flag = _flagged_session()
+    monkeypatch.setattr(
+        server, "_authorize_supervisor_action",
+        lambda session_id, cell_id: (flag, None),
+    )
+
+    class FakeOpenCode:
+        def send_input(self, session_id, prompt, *, delivery):
+            return None
+
+    monkeypatch.setattr(server, "_opencode_client", lambda: FakeOpenCode())
+
+    def failing_connect():
+        raise RuntimeError("KB DB 2 down")
+
+    monkeypatch.setattr(ks, "connect", failing_connect)
+
+    response = server.app.test_client().post(
+        "/api/flags/sess_abc/steer",
+        json={"cell_id": "cell_1", "prompt": "please continue"},
+        headers={"Idempotency-Key": "steer-1"},
+    )
+
+    # The steer still succeeded despite the KB outage.
+    assert response.status_code == 200
+    assert response.get_json()["admitted"] is True
+
+
+def test_get_only_paths_never_emit_actuation(tmp_path, monkeypatch):
+    """Observation surfaces (flags, registry, matrix) never emit an actuation record."""
+    def _explode(*_args, **_kwargs):
+        raise AssertionError("read-only path must never emit an actuation record")
+
+    monkeypatch.setattr(server, "_emit_actuation_record", _explode)
+
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_registry_row()])
+    monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
+    server._REGISTRY_CACHE.clear()
+
+    monkeypatch.setattr(server, "_redis", lambda: FakeRedis(statuses={"a": "running"}))
+    monkeypatch.setattr(
+        server, "_load_supervisor_flags",
+        lambda limit: ({"flags": [], "warnings": [], "degraded": False}, 200),
+    )
+
+    client = server.app.test_client()
+    assert client.get("/api/flags").status_code == 200
+    assert client.get("/api/registry").status_code == 200
+    assert client.get("/api/matrix").status_code == 200

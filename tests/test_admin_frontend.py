@@ -111,6 +111,15 @@ def test_design_client_reuses_one_stream_and_server_capability_gates():
     assert 'headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() }' in app
 
 
+def test_enqueue_client_sends_idempotency_key():
+    """F1: the enqueue mutation carries the shared Idempotency-Key convention."""
+    app = (STATIC / "app.js").read_text()
+
+    enqueue_block = app[app.index('fetch("/api/experiments"'):app.index("function mutationKey()")]
+    assert 'headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() }' in enqueue_block
+    assert 'body: JSON.stringify({ action })' in enqueue_block
+
+
 def test_design_styles_keep_artifacts_bounded_on_narrow_screens():
     """YAML and action groups remain usable without page-level overflow."""
     css = (STATIC / "style.css").read_text()

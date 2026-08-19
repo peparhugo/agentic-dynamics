@@ -2,21 +2,43 @@
 
 Serves the admin dashboard and exposes live experiment telemetry over SSE.
 
-Endpoints:
-    GET  /api/matrix           — queue/status matrix (Redis hash + queue)
-    GET  /api/status           — SSE stream of status transitions
-    GET  /api/events/<cell_id> — SSE stream of a cell's events (replay + live)
-    GET  /api/routing          — routing board (Phase 7; stub for now)
-    POST /api/experiments      — enqueue/clear the experiment queue
-    POST /api/queue/reinterleave — re-interleave story_jobs round-robin by provider
-    GET  /api/claude-agents           — Claude background-session roster (Redis read only)
-    GET  /api/claude-agents/<id>/logs — one-shot log tail for an external session
-    GET  /api/claude-agents/daemon    — read-only `claude daemon status`
-    POST /api/claude-agents           — start a `claude --bg` session
-    POST /api/claude-agents/<id>/stop|respawn|rm — owned-session lifecycle control
-    POST /api/claude-agents/<id>/steer        — interrupt + resume with an adjusted prompt
-    POST /api/claude-agents/daemon/stop          — stop the local claude daemon
-    GET  /                    — static dashboard (admin/static)
+Endpoints (28 routes across 5 API categories, plus the static shell):
+
+    Legacy telemetry (6):
+        GET  /api/matrix              — queue/status matrix (Redis hash + queue)
+        GET  /api/status              — SSE stream of status transitions
+        GET  /api/events/<cell_id>    — SSE stream of a cell's events (replay + live)
+        GET  /api/routing             — routing board (Phase 7; stub for now)
+        POST /api/experiments         — enqueue/clear the experiment queue (mutation)
+        POST /api/queue/reinterleave  — re-interleave story_jobs round-robin by provider (mutation)
+    Supervisor flags (3):
+        GET  /api/flags                        — newest retained supervisor assessments
+        POST /api/flags/<session_id>/steer     — admit a human prompt to a flagged session
+        POST /api/flags/<session_id>/interrupt — interrupt a flagged session
+    Registry (2):
+        GET /api/registry              — filterable table over the manifest registry
+        GET /api/registry/<entity_id>  — lineage view for one entity
+    Design sessions (7):
+        GET  /api/design-sessions                    — list portal-owned sessions
+        POST /api/design-sessions                    — create a design conversation
+        GET  /api/design-sessions/<portal_id>/spec   — draft/validation/matrix state
+        POST /api/design-sessions/<portal_id>/input  — admit a queued or steering prompt
+        POST /api/design-sessions/<portal_id>/interrupt — interrupt native work
+        POST /api/design-sessions/<portal_id>/save   — atomically save the draft spec
+        POST /api/design-sessions/<portal_id>/run    — launch a saved workflow
+    Claude background sessions (9):
+        GET  /api/claude-agents                    — roster (Redis read only)
+        POST /api/claude-agents                    — start a `claude --bg` session
+        GET  /api/claude-agents/<session_id>/logs  — one-shot log tail for an external session
+        POST /api/claude-agents/<session_id>/stop  — owned-session lifecycle control
+        POST /api/claude-agents/<session_id>/respawn
+        POST /api/claude-agents/<session_id>/rm
+        POST /api/claude-agents/<session_id>/steer — interrupt + resume with an adjusted prompt
+        GET  /api/claude-agents/daemon             — read-only `claude daemon status`
+        POST /api/claude-agents/daemon/stop        — stop the local claude daemon
+
+    Static shell (1):
+        GET  /                    — static dashboard (admin/static)
 
 Run:
     python3 admin/server.py      # default port 8000 (FINOPS_PORT override)
@@ -145,9 +167,22 @@ SUPERVISOR_ACTIVE_WINDOW_SECONDS = int(os.environ.get("SUPERVISOR_ACTIVE_WINDOW"
 #: (SUPERVISOR_FLAGS_FILE above) rather than a shared config module.
 DATA_MANIFEST_PATH = ROOT / "experiments" / "data_manifest.json"
 
+#: The only delivery modes a design-session prompt may be admitted under. The
+#: server (not the browser) fixes the allowed set: an unknown value is rejected
+#: before any OpenCode side effect, mirroring the flag route's server-fixed
+#: ``delivery="steer"`` (docs/supervisor_design.md §3).
+DESIGN_DELIVERY_MODES = ("queue", "steer")
+
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 _design_manager: DesignSessionManager | None = None
 _claude_agents_client: ClaudeAgentsClient | None = None
+
+#: Parsed-manifest cache for ``/api/registry*``. Keyed on ``(path, mtime_ns,
+#: size)`` — the manifest is only rewritten by ``generate_manifest.py``, so
+#: mtime+size is a stronger invalidation signal than a wall-clock TTL: there is
+#: no stale window between a rewrite and a periodic flush, and no per-request
+#: full-file parse (review F4).
+_REGISTRY_CACHE: dict[tuple[str, int | None, int | None], list[dict[str, Any]]] = {}
 
 
 def _redis() -> redis.Redis:
@@ -348,6 +383,60 @@ def _authorize_supervisor_action(
     if cell_id != mapped_cell:
         return None, (jsonify({"error": "supervisor session mapping changed"}), 409)
     return flag, None
+
+
+def _emit_actuation_record(
+    flag: dict[str, Any],
+    *,
+    actuation_kind: str,
+    target_cell_id: str,
+    requested_action: dict[str, Any] | None = None,
+) -> None:
+    """Best-effort emit one actuation record justifying a human intervention.
+
+    This is the first (and, so far, only) actuation call site — the Control Room's
+    steer/interrupt handlers (review §5.4). It runs AFTER the side effect already
+    succeeded and is deliberately best-effort: a KB-plane outage (the DB-2 change
+    stream) must never block the steer/interrupt that already happened, so every
+    failure is swallowed. ``causes`` is the ``knowledge_id`` of the flag's
+    observation-family record (derived via ``observation_ingestion``), so the
+    registry's one-hop "why did the system act" lookup resolves end-to-end.
+    """
+    try:
+        from instrument import knowledge_stream as ks
+        from instrument.actuation_ingestion import derive_actuation_record
+        from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
+        from instrument.observation_ingestion import derive_flag_record
+
+        # The flag is the justifying observation: derive its canonical knowledge_id
+        # so ``causes`` points at the exact record ``supervise.py`` emitted for it.
+        flag_record = derive_flag_record(flag, repository_id=REPOSITORY_ID)
+        record = derive_actuation_record(
+            {
+                "actuation_kind": actuation_kind,
+                "target_session_id": str(flag.get("session_id") or ""),
+                "target_cell_id": target_cell_id,
+                "requested_action": requested_action or {},
+                "requested_by": "control_room",
+                "causes": flag_record.knowledge_id,
+            },
+            repository_id=REPOSITORY_ID,
+        )
+        redis_client = ks.connect()
+        # ``authorized=True`` (the human POST is the write authorization) and
+        # ``armed=True`` (this is the deliberate human actuation surface) are passed
+        # as explicit keyword args rather than mutating the FINOPS_* env flags —
+        # env mutation would race across Flask's threaded request handlers.
+        ks.publish_event(
+            redis_client,
+            record_to_event(record),
+            authorized=True,
+            armed=True,
+            source_type=record.source_type,
+        )
+    except Exception:
+        # Best-effort: a KB outage must never block the steer/interrupt.
+        pass
 
 
 def _claude_agents() -> ClaudeAgentsClient:
@@ -794,6 +883,28 @@ def _parse_phases(payloads) -> dict[str, dict[str, Any]]:
     return phases
 
 
+def _load_registry_cached(manifest_path: Path) -> list[dict[str, Any]]:
+    """Return the parsed manifest registry, cached on the file's identity.
+
+    Replaces a per-request ``registry_cli.load_registry`` (review F4). The file
+    only changes when ``generate_manifest.py`` rewrites it, so caching on
+    ``(path, mtime_ns, size)`` avoids a full-file ``json.loads`` for every
+    registry/lineage request while still noticing a rewrite immediately. A
+    missing file caches the empty-list result under a ``(path, None, None)`` key;
+    when the file later appears its key changes and the cache misses.
+    """
+    try:
+        stat = manifest_path.stat()
+        key = (str(manifest_path), stat.st_mtime_ns, stat.st_size)
+    except FileNotFoundError:
+        key = (str(manifest_path), None, None)
+    cached = _REGISTRY_CACHE.get(key)
+    if cached is None:
+        cached = registry_cli.load_registry(manifest_path)
+        _REGISTRY_CACHE[key] = cached
+    return cached
+
+
 @app.get("/api/matrix")
 def api_matrix() -> Response:
     """Return the legacy fleet matrix plus the three-stage pipeline view."""
@@ -891,7 +1002,7 @@ def api_registry() -> Response:
     argparse's dash-to-underscore convention already applied since these are query
     string keys, not flags).
     """
-    rows = registry_cli.load_registry(DATA_MANIFEST_PATH)
+    rows = _load_registry_cached(DATA_MANIFEST_PATH)
 
     record_type = request.args.get("record_type")
     if record_type:
@@ -924,10 +1035,21 @@ def api_registry_lineage(entity_id) -> Response:
     heavier dependency than this read-only surface needs for the one-hop view it exists
     to serve.
     """
-    rows = registry_cli.load_registry(DATA_MANIFEST_PATH)
+    rows = _load_registry_cached(DATA_MANIFEST_PATH)
     matches = [r for r in rows if r.get("entity_id") == entity_id]
     if not matches:
         return jsonify({"error": "not_found", "entity_id": entity_id}), 404
+    if len(matches) > 1:
+        # Compaction guarantees one row per entity_id, so this is only reachable
+        # with a malformed/duplicate manifest. Mirror registry.py's ``cmd_show``
+        # and surface the ambiguity instead of silently returning the first row
+        # (review F5).
+        return jsonify({
+            "error": "ambiguous",
+            "entity_id": entity_id,
+            "count": len(matches),
+            "records": matches,
+        }), 409
 
     record = matches[0]
     response: dict[str, Any] = {"record": record}
@@ -1002,25 +1124,36 @@ def api_routing() -> Response:
 
 @app.post("/api/experiments")
 def api_experiments() -> Response:
-    # Never default to a costly action: require an explicit JSON body + action.
-    body = request.get_json(silent=True)
-    if not isinstance(body, dict) or "action" not in body:
-        return jsonify({"error": "missing action"}), 400
-    action = body["action"]
+    """Enqueue or clear the experiment queue — the most expensive mutation.
+
+    This route spawns ``scripts/enqueue.py`` (real inference cost), so it joins
+    every other actuation route under ``_design_mutation_body``'s loopback +
+    same-origin + JSON + size-cap + Idempotency-Key boundary (review F1) instead
+    of the former bare ``request.get_json`` + action check, which was the only
+    mutation surface without the trust gate.
+    """
+    body, failure = _design_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    action = body.get("action")
     if action not in ("enqueue", "clear"):
         return jsonify({"error": f"unknown action {action!r}"}), 400
 
-    cmd = [sys.executable, "scripts/enqueue.py"]
-    if action == "clear":
-        cmd.append("--clear")
+    def enqueue():
+        cmd = [sys.executable, "scripts/enqueue.py"]
+        if action == "clear":
+            cmd.append("--clear")
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=Path(__file__).resolve().parent.parent,
+        )
+        return jsonify({"ok": proc.returncode == 0, "output": (proc.stdout or proc.stderr).strip()})
 
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30,
-                              cwd=Path(__file__).resolve().parent.parent)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-    return jsonify({"ok": proc.returncode == 0, "output": (proc.stdout or proc.stderr).strip()})
+    return _idempotent_design_response("experiments", body, enqueue)
 
 
 @app.post("/api/queue/reinterleave")
@@ -1108,6 +1241,15 @@ def api_design_session_input(portal_id) -> Response:
             jsonify({"error": f"prompt must be at most {MAX_DESIGN_PROMPT_CHARS} characters"}),
             400,
         )
+    delivery = body.get("delivery", "queue")
+    if not isinstance(delivery, str) or delivery not in DESIGN_DELIVERY_MODES:
+        # The server, not the browser, fixes the delivery-mode set (review F3):
+        # an arbitrary body value can no longer silently upgrade a "Send" into
+        # a "steer" — only the two server-known modes are ever forwarded.
+        return (
+            jsonify({"error": f"delivery must be one of {list(DESIGN_DELIVERY_MODES)}"}),
+            400,
+        )
     return _idempotent_design_response(
         f"input:{portal_id}",
         body,
@@ -1115,7 +1257,7 @@ def api_design_session_input(portal_id) -> Response:
             _design_sessions().send_input(
                 portal_id,
                 prompt=prompt,
-                delivery=body.get("delivery", "queue"),
+                delivery=delivery,
             )
         ),
     )
@@ -1143,6 +1285,12 @@ def api_supervisor_steer(session_id: str) -> Response:
         if denied:
             return denied
         _opencode_client().send_input(session_id, prompt.strip(), delivery="steer")
+        _emit_actuation_record(
+            _flag,
+            actuation_kind="steer",
+            target_cell_id=cell_id,
+            requested_action={"prompt": prompt.strip()},
+        )
         return jsonify({"action": "steer", "admitted": True, "session_id": session_id})
 
     return _idempotent_design_response(f"supervisor-steer:{session_id}", body, steer)
@@ -1168,6 +1316,11 @@ def api_supervisor_interrupt(session_id: str) -> Response:
         if denied:
             return denied
         _opencode_client().interrupt(session_id)
+        _emit_actuation_record(
+            _flag,
+            actuation_kind="interrupt",
+            target_cell_id=cell_id,
+        )
         return jsonify({"action": "interrupt", "accepted": True, "session_id": session_id})
 
     return _idempotent_design_response(f"supervisor-interrupt:{session_id}", body, interrupt)

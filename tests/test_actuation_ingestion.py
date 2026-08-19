@@ -4,8 +4,9 @@ Covers the POLICY/[P] provenance, the required-``causes`` construction-time chec
 (design §5a, ahead of the transport-level lineage gate in ``knowledge_stream.publish_event``),
 identity derivation ("one identity per candidate, not per session" — design §3), the
 reused artifact/event contract, and — the plan's own explicit CI-enforced invariant
-(``docs/canonical_state_r2_plan.md`` step 6) — that this producer has ZERO call sites
-anywhere in the running system today.
+(``docs/canonical_state_r2_plan.md`` step 6) — that this producer's ONLY call site is the
+Control Room's steer/interrupt handlers (``admin/server.py``); ``scripts/supervise.py`` and
+``src/instrument/workflow_runner.py`` stay call-site-free.
 """
 
 import ast
@@ -137,13 +138,15 @@ def _calls_derive_actuation_record(path: Path) -> bool:
 
 
 def test_no_call_sites_construct_actuation_records():
-    # design §5b / §13: "nobody" calls this today. A future call site is legitimate only
-    # once a control rule for actuation exists in a compiled ExperimentSpec — this test
-    # turns that absence into a CI-enforced fact rather than a code-review convention.
+    # design §5b / §13: the ONLY legitimate actuation call site today is the Control
+    # Room's steer/interrupt handlers (admin/server.py: _emit_actuation_record, wired
+    # per review §5.4 — the human-gated "why did the system act" audit trail). The
+    # supervisor and workflow runner must stay call-site-free: a control rule for
+    # actuation in a compiled ExperimentSpec is still the prerequisite for any OTHER
+    # caller, so this test keeps guarding every non-Control-Room module.
     guarded_files = [
         REPO_ROOT / "scripts" / "supervise.py",
         REPO_ROOT / "src" / "instrument" / "workflow_runner.py",
-        REPO_ROOT / "admin" / "server.py",
     ]
     offenders = [
         str(f.relative_to(REPO_ROOT))

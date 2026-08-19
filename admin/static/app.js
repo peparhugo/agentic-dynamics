@@ -1578,7 +1578,7 @@
     try {
       const response = await fetch("/api/experiments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() },
         body: JSON.stringify({ action }),
       })
       const data = await response.json()
