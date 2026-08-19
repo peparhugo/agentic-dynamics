@@ -3,6 +3,7 @@
 import hashlib
 import json
 import subprocess
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,15 +12,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 
 #: Where scripts/kb_worker.py's "kb-registry-v1" consumer group appends one compacted
-#: JSON line per indexed knowledge record (canonical-state round 2, plan step 8). This
-#: literal path is duplicated (not imported) from kb_worker.py's own
-#: REGISTRY_INDEX_PATH constant deliberately: kb_worker.py imports `redis` and the full
-#: `instrument` package at module level (a consumer-worker dependency footprint), while
-#: this script is intentionally dependency-light (hashlib/json/subprocess/pathlib only,
-#: confirmed by its existing imports above) so it stays a fast, always-available
-#: pipeline step. Keep this path in sync with kb_worker.REGISTRY_INDEX_PATH by hand if
-#: either ever moves.
-REGISTRY_INDEX_PATH = RESULTS_DIR / "registry_index.jsonl"
+#: JSON line per indexed knowledge record (canonical-state round 2, plan step 8). This is
+#: a *value-only leaf import* from ``instrument.paths`` (canonical-state R6), the single
+#: owner of the path: ``sys.path`` is pointed straight at ``src/instrument`` and the
+#: pure-pathlib ``paths`` module is imported as a top-level module — deliberately NOT
+#: ``instrument.paths`` — so this script never triggers the heavy ``instrument/__init__.py``
+#: (redis/neo4j/chroma) and stays a fast, always-available pipeline step
+#: (hashlib/json/subprocess/pathlib only, plus this one pathlib-only leaf import).
+sys.path.insert(0, str(PROJECT_ROOT / "src" / "instrument"))
+from paths import REGISTRY_INDEX_PATH  # noqa: E402  # isort: skip
 
 def sha256(path):
     """SHA-256 hash of a file."""

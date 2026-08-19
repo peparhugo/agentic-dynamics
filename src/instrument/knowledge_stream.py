@@ -194,6 +194,63 @@ def publish_event(
     return r.xadd(stream, event.to_dict())
 
 
+def register_records(
+    records: Iterable[KnowledgeRecord],
+    *,
+    fail_loud: bool,
+) -> list[str]:
+    """Publish one pointer event per already-derived record, authorized (the one write path).
+
+    canonical-state R4: the four write-time registration call sites
+    (``story.save_story_result``, ``scripts/run.py:_save_results``,
+    ``scripts/finalize_reviews.py:_finalize_story``, and ``scripts/supervise.py``'s
+    ``emit_flag``/``supervise_once``) each hand-rolled the same
+    ``connect() → record_to_event() → publish_event(authorized=True)`` loop, differing only
+    in whether a downed stream raised or was swallowed. This function is the single factored
+    write path: the call sites keep only their *derivation* (which producer function, which
+    input) and pass the resulting :class:`~instrument.knowledge.KnowledgeRecord` objects here.
+
+    Each record is published with ``authorized=True`` (this function *is* the opt-in writer —
+    the surrounding call sites still gate on ``FINOPS_KB_WRITE`` so a read-only process never
+    even reaches here) and ``source_type=record.source_type``, so :func:`publish_event`'s
+    actuation/lineage gates see the caller's real family rather than defaulting to the safe
+    "observation" fallback.
+
+    ``fail_loud`` is the single "availability posture" knob the four call sites used to encode
+    separately: ``True`` lets a downed stream raise (the one-shot story/run/review persistence
+    sites — see ``story.save_story_result``'s docstring), ``False`` swallows it (the live
+    supervisor loop, whose actual job must survive a briefly unreachable DB2 knowledge stream).
+
+    Returns the entry ids :func:`publish_event` returned, one per record, in input order. On a
+    swallowed connection failure the list is empty; on a swallowed per-record failure the
+    surviving records' ids are still returned.
+    """
+    from .knowledge_ingestion import record_to_event
+
+    try:
+        r = connect()
+    except Exception:
+        if fail_loud:
+            raise
+        return []
+
+    entry_ids: list[str] = []
+    for record in records:
+        try:
+            entry_ids.append(
+                publish_event(
+                    r,
+                    record_to_event(record),
+                    authorized=True,
+                    source_type=record.source_type,
+                )
+            )
+        except Exception:
+            if fail_loud:
+                raise
+    return entry_ids
+
+
 def dead_letter(
     r: Any,
     event: KnowledgeEvent,

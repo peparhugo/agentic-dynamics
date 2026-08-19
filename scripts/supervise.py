@@ -262,15 +262,11 @@ def emit_flag(session: dict, status: str, why: str) -> None:
     if os.environ.get("FINOPS_KB_WRITE") == "1":
         try:
             from instrument import knowledge_stream as ks
-            from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
+            from instrument.knowledge_ingestion import REPOSITORY_ID
             from instrument.observation_ingestion import derive_flag_record
 
             record = derive_flag_record(flag, repository_id=REPOSITORY_ID)
-            registry_redis = ks.connect()
-            ks.publish_event(
-                registry_redis, record_to_event(record),
-                authorized=True, source_type=record.source_type,
-            )
+            ks.register_records([record], fail_loud=False)
         except Exception as e:  # noqa: BLE001
             log(f"registry emit error for flag {flag.get('session_id', '?')}: {e!r}")
 
@@ -381,18 +377,14 @@ def supervise_once(client: OpenCodeClient, monitor_id: str, redis_client) -> Non
         if os.environ.get("FINOPS_KB_WRITE") == "1":
             try:
                 from instrument import knowledge_stream as ks
-                from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
+                from instrument.knowledge_ingestion import REPOSITORY_ID
                 from instrument.observation_ingestion import derive_observation_record
 
                 record = derive_observation_record(
                     {"cell_id": cell_id, "status": status, "why": why, "model": model},
                     repository_id=REPOSITORY_ID,
                 )
-                registry_redis = ks.connect()
-                ks.publish_event(
-                    registry_redis, record_to_event(record),
-                    authorized=True, source_type=record.source_type,
-                )
+                ks.register_records([record], fail_loud=False)
             except Exception as e:  # noqa: BLE001
                 log(f"registry emit error for {cell_id}: {e!r}")
 

@@ -42,6 +42,7 @@ from instrument import code_ingestion as ci  # noqa: E402
 from instrument import knowledge_stream as ks  # noqa: E402
 from instrument import policy_ingestion as pi  # noqa: E402
 from instrument import quality_ingestion as qi  # noqa: E402
+from instrument.paths import KB_ARTIFACT_DIR  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -49,8 +50,8 @@ REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 #: Repo root, anchored to the script location so flags may be omitted regardless of cwd.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-#: Durable per-record artifact directory (mirrors ``kb_produce.KB_ARTIFACT_DIR``).
-KB_ARTIFACT_DIR = REPO_ROOT / "experiments" / "results" / "kb"
+# Durable per-record artifact directory — sourced from ``instrument.paths``
+# (canonical-state R6), the single owner of the path (``KB_ARTIFACT_DIR`` imported above).
 
 #: Subdirectories the ``code`` source derives over (the spec scopes code records to these).
 CODE_ROOTS = ("src", "scripts")
