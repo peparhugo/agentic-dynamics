@@ -1,0 +1,171 @@
+name: website_registry_repoint
+question: >-
+  Re-point build_data.py (and therefore the site) at the canonical-state registry instead of the
+  flawed 144-entry _results_summary.json. The registry (experiments/data_manifest.json `registry`
+  array + experiments/results/registry_index.jsonl — 635 rows, 558 current + 77 tombstoned, source
+  types story/finding/review/meta_session) is now the single source of truth for corpus membership,
+  model/condition labels, and lifecycle; the measurement payloads live in the result files its
+  source_uri points at (experiments/results/stories/*.json, task_manager_*.json,
+  process_perturbation_resample_*.json). build_data.py still reads the legacy summary for its
+  per-model/per-operator aggregates, the routing input, and the sonar sections — so the site still
+  serves the stale manifold/semantic taxonomy, the cross-matched baselines, and the fabricated
+  100% pass rate. This spec retires the summary as a build_data input and rebuilds those sections
+  from canonical records only. NOTE: this is distinct from website_repoint.yaml (S3/C1/C2/C3/C4
+  content fixes); that spec does not touch build_data.py's data sources.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      canonical: docs/data_integrity_findings.md
+      summary: >-
+        READ docs/data_integrity_findings.md FIRST — it is the authoritative record. In brief: the
+        pre-fix story conditions were no-ops (relabeled clean in the registry), the single-task
+        summary has stale taxonomy + cross-matched baselines + a fabricated pass rate, and the
+        canonical corpus is a large clean baseline + a small real degraded arm. The registry is
+        the membership gate; the payloads it points at are the measurements. registry_canonicalize
+        already relabeled no-op conditions to clean and retired the summary-recovery producer, so
+        the registry itself is clean — but the SITE still reads _results_summary.json via
+        build_data.py (SUMMARY_PATH at scripts/build_data.py:23, load_summary, and the `entries`
+        consumers at ~lines 968/1021/1112-1114: per-model reports, sonar, compute_routing).
+      note: >-
+        Registry index rows are metadata only (entity_id, knowledge_id, source_type,
+        logical_locator, source_uri, lifecycle_state, supersedes, reason). Measurement fields live
+        in the payload file named by source_uri: stories/*.json (sessions, costs, test metrics,
+        per-session worktrees) and task_manager_*.json / process_perturbation_resample_*.json
+        (per-run correctness, cost_usd, tokens, confidence, test_executed_success,
+        perturbation_strength — including the gpt-5.6-sol run). Load the index via
+        scripts/registry.py load_registry() (reads experiments/data_manifest.json; returns [] when
+        the manifest is absent — never raise, degrade with a WARNING like load_summary does).
+        GOTCHA: experiments/results/kb/*.json contains ~804 ORPHAN round-1 finding artifacts whose
+        source_uri points at _results_summary.json (stale manifold/semantic text). They are NOT in
+        the registry — never ingest kb/*.json artifacts directly; go through the manifest index
+        + the payload file named by source_uri. The 64 registered findings all point at
+        task_manager_* / process_perturbation_resample_* payloads.
+      hard_rules: >-
+        (1) The registry is the corpus-membership gate: only lifecycle_state=current AND
+        source_type in {story, finding} count as experiment cells; the 77 tombstones and every
+        review/meta_session row are excluded from experiment aggregates. (2) _results_summary.json
+        must not be read by build_data.py after this change — load_summary/SUMMARY_PATH go away
+        (the file stays on disk for the lab scripts; repointing those is out of scope). (3) All
+        measurement values come from the payload files the registry's source_uri names, joined on
+        logical_locator/entity_id; model ids and conditions come from the payload + registry
+        relabeling — never re-derived, never indexOf-guessed, never fabricated (null renders as an
+        em-dash, and no 100% pass rate may be claimed). (4) compute_routing(entries) must keep
+        receiving canonical entries with task_type/model/correctness/cost fields (they exist in the
+        task_manager payloads); if a section has no canonical replacement, mark it "historical" in
+        data.js with a [P] note rather than silently keeping summary-derived numbers. (5) Corpus
+        counts on the site must equal the registry counts (story 302 + finding 64 = 366 current
+        experiment records; review/meta_session are not experiment cells) — verified against
+        scripts/registry.py query, not hand-set. (6) data.js remains regenerated-only:
+        build_data.py --dry-run works from the registry alone; run build_data.py +
+        generate_manifest.py before verifying. (7) Test-driven; tests/test_build_data.py must
+        cover: a tombstoned record is excluded, a no-op-relabeled story keeps condition clean, and
+        a missing manifest degrades with a warning (not a crash, not an empty site).
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/website-registry-repoint); each phase commits [workflow] <phase>.
+    phases:
+      - name: audit
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Produce the summary->canonical mapping that phase 2 will implement.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/data_integrity_findings.md      (the authoritative record)
+          - scripts/build_data.py                (SUMMARY_PATH, load_summary, every `entries`
+            consumer — per-model reports, _compute_sonar, compute_routing(entries), the summary
+            block)
+          - scripts/registry.py                  (load_registry — the index read)
+          - experiments/data_manifest.json       (the registry array shape)
+          - experiments/results/task_manager_deepseek-v4-pro.json (payload shape: runs[] with
+            correctness/cost_usd/tokens/confidence/test_executed_success/perturbation_strength)
+
+          DO:
+          - Enumerate every data.js section build_data.py derives from summary entries, and for
+            each: canonical source (story payload via registry, finding payload, inventory, or
+            none), the join key (logical_locator/source_uri), and any sections with NO canonical
+            replacement (to be marked "historical").
+          - List the exact counts the site must show post-repoint (story 302 current + finding 64
+            current; 77 tombstoned excluded).
+
+          DELIVER docs/review/impl_website_registry_repoint_audit.md with the mapping table.
+      - name: implement
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement the repoint per the audit mapping and the hard rules in the spec context.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/review/impl_website_registry_repoint_audit.md  (the mapping from the prior phase)
+          - scripts/build_data.py + scripts/registry.py + experiments/data_manifest.json
+          - docs/data_integrity_findings.md
+
+          DO:
+          - Replace load_summary/SUMMARY_PATH with a registry-backed corpus loader: load the
+            manifest index (load_registry), keep only lifecycle_state=current + source_type in
+            {story, finding}, join measurement payloads from the files source_uri names.
+          - Rewire the per-model/per-operator aggregates, _compute_sonar, compute_routing(entries),
+            and the summary block to the canonical entries; mark sections without a canonical
+            replacement "historical" with a [P] note. Never fabricate a pass rate; null renders
+            as an em-dash.
+          - Add tests: tombstoned excluded, no-op-relabeled story keeps condition clean, missing
+            manifest degrades with a warning.
+
+          VERIFY: pytest tests/test_build_data.py -q must pass; python scripts/build_data.py
+          --dry-run works with the registry alone; grep confirms SUMMARY_PATH/_results_summary
+          are gone from build_data.py.
+          DELIVER the code + passing tests.
+      - name: verify
+        kind: agent
+        timeout: 3600
+        prompt: |
+          Trace the repoint to the code and prove the site counts match the registry.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run python scripts/build_data.py && python scripts/generate_manifest.py.
+          - Confirm data.js corpus counts equal `python scripts/registry.py query` (366 current
+            experiment records; tombstones excluded; no stale 144-entry summary numbers leak into
+            any live section).
+          - Run pytest tests/ -m "not external" -q; fix failures without weakening tests.
+          - Write docs/review/impl_website_registry_repoint.md tracing each hard rule to its file,
+            with PASS/FAIL and the pytest result.
+
+          DELIVER docs/review/impl_website_registry_repoint.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: site_registry_repointed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [corpus_gated, summary_retired, counts_canonical]
+metrics:
+  - {name: corpus_gated, agg: mean, over: cell}
+  - {name: summary_retired, agg: mean, over: cell}
+  - {name: counts_canonical, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, audit, implement, verify]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
