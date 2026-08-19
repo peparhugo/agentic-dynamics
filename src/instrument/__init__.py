@@ -10,11 +10,51 @@ v0.6: Multi-language analysis via tree-sitter. Flash V4 mutation compiler.
 """
 
 # Deprecated: Perturbation, PerturbationOperator — only build_operators/perturb_prompt used by current scripts
+# canonical-state round 2, Delta 3: producer-side actuation derivation (authority=POLICY,
+# built + unit-tested with ZERO call sites — see actuation_ingestion.py's module docstring)
+from .actuation_ingestion import (
+    ACL_SCOPE as ACTUATION_ACL_SCOPE,
+)
+from .actuation_ingestion import (
+    ACTUATION_KINDS,
+    derive_actuation_record,
+)
+from .actuation_ingestion import (
+    EXTRACTOR_VERSION as ACTUATION_EXTRACTOR_VERSION,
+)
+from .actuation_ingestion import (
+    SOURCE_TYPE as ACTUATION_SOURCE_TYPE,
+)
+
+# v1.0: the retrieve->construct->render augmentation seam (R7 — split out of workflow_runner)
+from .augment import (
+    DEFAULT_INHERITED_TOOLS,
+    AugmentationOutcome,
+    augment_prompt,
+    default_construct_fn,
+    default_retrieve_fn,
+)
 from .backends import get_backend_for_model, resolve_backend, run_agentic
 
 # Deprecated: ReasoningTrajectory, TrajectoryStep, compute_trajectory_distance — not used by current scripts
 from .basin import BasinMetrics, measure_basin_escape
 from .claude_adapter import ClaudeStreamAdapter, adapt_usage, run_claude_agentic
+
+# v1.0: producer-side code-structure derivation (source_type=code records + graph wiring)
+from .code_ingestion import (
+    ACL_SCOPE as CODE_ACL_SCOPE,
+)
+from .code_ingestion import (
+    EXTRACTOR_VERSION as CODE_EXTRACTOR_VERSION,
+)
+from .code_ingestion import (
+    SOURCE_TYPE as CODE_SOURCE_TYPE,
+)
+from .code_ingestion import (
+    build_code_record,
+    derive_code_records,
+    ingest_codebase_graph,
+)
 from .codebase_graph import (
     CodebaseGraph,
     GraphDelta,
@@ -96,19 +136,62 @@ from .knowledge import (
     OPERATIONS,
     SCHEMA_VERSION,
     SOURCE_TYPES,
-    SourceTypeSpec,
     Authority,
     KnowledgeEvent,
     KnowledgeRecord,
+    SourceTypeSpec,
     compute_content_hash,
     compute_entity_id,
     compute_knowledge_id,
     message_family,
 )
 
-# R1 (restructure): the shared record-builder factory — the single owner of the
-# content-hash back-fill ordering every producer was previously copy-pasting.
-from .record_factory import build_record as build_record_from_parts
+# v1.0: producer-side measured-finding derivation (richer extractor over the summary)
+from .knowledge_ingestion import (
+    ACL_SCOPE,
+    ARTIFACT_DIR,
+    EXTRACTOR_VERSION,
+    PHASE_EXTRACTOR_VERSION,
+    PHASE_SOURCE_URI,
+    REPOSITORY_ID,
+    RESULT_VERSION,
+    SOURCE_TYPE,
+    SOURCE_URI,
+    artifact_uri,
+    build_record,
+    derive_phase_record,
+    derive_records,
+    emit_phase_finding,
+    extract_record,
+    record_to_artifact,
+    record_to_event,
+)
+
+# v1.0: durable ingestion over Redis Streams (DB 2, pointer-only events)
+from .knowledge_stream import (
+    CONSUMER_GROUPS,
+    DEAD_LETTER_KEY,
+    STREAM_KEY,
+    StreamEntry,
+    acknowledge,
+    claim_pending,
+    create_consumer_group,
+    dead_letter,
+    decode_event,
+    default_extract,
+    delivery_count,
+    pending_count,
+    process_entry,
+    publish_event,
+    read_artifact,
+    read_events,
+    reconcile_missing,
+    register_records,
+    verify_content_hash,
+)
+from .knowledge_stream import (
+    connect as kb_stream_connect,
+)
 
 # v0.6: Multi-language analysis + mutation compiler + story orchestrator
 from .language import (
@@ -119,6 +202,30 @@ from .language import (
     detect_language,
     get_parser,
     parse_codebase,
+)
+
+# canonical-state round 2: producer-side ledger derivation (ledger_job / ledger_attempt /
+# meta_session records — closes gap (a) no-session fallback and gap (b) meta_* pollution)
+from .ledger_ingestion import (
+    EXTRACTOR_VERSION as LEDGER_EXTRACTOR_VERSION,
+)
+from .ledger_ingestion import (
+    FALLBACK_EXTRACTOR_VERSION as LEDGER_FALLBACK_EXTRACTOR_VERSION,
+)
+from .ledger_ingestion import (
+    SOURCE_TYPE_ATTEMPT as LEDGER_SOURCE_TYPE_ATTEMPT,
+)
+from .ledger_ingestion import (
+    SOURCE_TYPE_JOB as LEDGER_SOURCE_TYPE_JOB,
+)
+from .ledger_ingestion import (
+    SOURCE_TYPE_META as LEDGER_SOURCE_TYPE_META,
+)
+from .ledger_ingestion import (
+    build_attempt_record,
+    build_job_record,
+    classify_session,
+    derive_ledger_records,
 )
 from .live import LivePublisher, make_publisher
 from .lsp_diagnostics import (
@@ -136,16 +243,112 @@ from .mutation import (
     apply_mutation,
     compile_mutation,
 )
+
+# canonical-state round 2: producer-side observation/flag derivation (every supervisor
+# verdict is now registrable, not only flagged ones — closes round 1's OQ6a audit gap)
+from .observation_ingestion import (
+    ACL_SCOPE as OBSERVATION_ACL_SCOPE,
+)
+from .observation_ingestion import (
+    EXTRACTOR_VERSION as OBSERVATION_EXTRACTOR_VERSION,
+)
+from .observation_ingestion import (
+    SOURCE_TYPE_FLAG,
+    SOURCE_TYPE_OBSERVATION,
+    build_flag_record,
+    build_observation_record,
+    derive_flag_record,
+    derive_observation_record,
+)
 from .ollama_analyzer import OllamaAnalyzer, load_summary_data
 from .opencode import AgenticResult, normalize_opencode_event, run_opencode_agentic
 from .opencode_analyzer import REPORTS_DIR, OpencodeAnalyzer
-from .perturb import PERTURBATION_CLASSES, build_operators, derive_seed, perturb_prompt, perturbation_class_for
+from .perturb import (
+    PERTURBATION_CLASSES,
+    build_operators,
+    derive_seed,
+    perturb_prompt,
+    perturbation_class_for,
+)
 from .pipeline_status import STAGE_KEYS, stage_summary
+
+# v1.0: producer-side policy ingestion (authority=POLICY records)
+from .policy_ingestion import (
+    ACL_SCOPE as POLICY_ACL_SCOPE,
+)
+from .policy_ingestion import (
+    EXTRACTOR_VERSION as POLICY_EXTRACTOR_VERSION,
+)
+from .policy_ingestion import (
+    SOURCE_TYPE as POLICY_SOURCE_TYPE,
+)
+from .policy_ingestion import (
+    build_policy_record,
+    derive_policy_records,
+    discover_policy_paths,
+)
+
+# v1.0: shared post-hoc job shapes + enqueue primitives (execute -> analyze -> review)
+from .posthoc import (
+    ANALYSIS_QUEUE,
+    ANALYSIS_STATUS,
+    DEFAULT_REVIEW_MODEL,
+    REVIEW_QUEUE,
+    REVIEW_STATUS,
+    analysis_job_from_result,
+    build_analysis_job,
+    build_commit_review_job,
+    build_review_jobs,
+    build_story_review_job,
+    enqueue_job,
+    trigger_analysis,
+    trigger_reviews,
+    worktree_commits,
+)
+
+# v1.0: the prompt-constructor agent (typed plan, validator, deterministic renderer)
+from .prompt_constructor import (
+    DEFAULT_CONSTRUCTOR_MODEL,
+    AcceptanceCheck,
+    AugmentedPrompt,
+    ConstructionRequest,
+    EvidenceClaim,
+    EvidenceUnit,
+    HardConstraint,
+    ModelPromptConstructor,
+    PromptConstructor,
+    PromptPlan,
+    RelevantTarget,
+    build_constructor_prompt,
+    build_deterministic_plan,
+    construction_cache_key,
+    hash_work_item,
+    render_prompt,
+    validate_plan,
+)
+from .prompt_constructor import (
+    SCHEMA_VERSION as PROMPT_PLAN_SCHEMA_VERSION,
+)
 from .prompt_perturbation import (
     FLASH_MODEL,
     PromptPerturbation,
     compile_prompt_perturbation,
     resolve_perturbed_prompt,
+)
+
+# v1.0: producer-side code-quality derivation (source_type=report records)
+from .quality_ingestion import (
+    ACL_SCOPE as QUALITY_ACL_SCOPE,
+)
+from .quality_ingestion import (
+    EXTRACTOR_VERSION as QUALITY_EXTRACTOR_VERSION,
+)
+from .quality_ingestion import (
+    SOURCE_TYPE as QUALITY_SOURCE_TYPE,
+)
+from .quality_ingestion import (
+    build_quality_record,
+    derive_quality_records,
 )
 from .queue_reinterleave import (
     connect,
@@ -156,23 +359,12 @@ from .queue_reinterleave import (
     write_queue,
 )
 
+# R1 (restructure): the shared record-builder factory — the single owner of the
+# content-hash back-fill ordering every producer was previously copy-pasting.
+from .record_factory import build_record as build_record_from_parts
+
 # Deprecated: RecoveryCost, recovery_summary_table — not used by current scripts
 from .recovery_cost import compute_recovery_cost
-from .review import (
-    CommitReview,
-    StoryReview,
-    compare_implementations,
-    generate_tests,
-    review_commit,
-    review_story,
-)
-from .routing import compute_routing, recommend_route, simulate_strategies
-from .session_types import (
-    DEFAULT_TASK_TYPE,
-    EXPERIMENT_SESSION_PATTERNS,
-    TASK_TYPES,
-    normalize_task,
-)
 
 # v1.0: deterministic retrieval + evidence cards for the runtime-RAG layer
 from .retrieval import (
@@ -199,162 +391,53 @@ from .retrieval import (
     rrf_base,
     select_evidence,
 )
-
-# v1.0: the prompt-constructor agent (typed plan, validator, deterministic renderer)
-from .prompt_constructor import (
-    DEFAULT_CONSTRUCTOR_MODEL,
-    SCHEMA_VERSION as PROMPT_PLAN_SCHEMA_VERSION,
-    AcceptanceCheck,
-    AugmentedPrompt,
-    ConstructionRequest,
-    EvidenceClaim,
-    EvidenceUnit,
-    HardConstraint,
-    ModelPromptConstructor,
-    PromptConstructor,
-    PromptPlan,
-    RelevantTarget,
-    build_constructor_prompt,
-    build_deterministic_plan,
-    construction_cache_key,
-    hash_work_item,
-    render_prompt,
-    validate_plan,
-)
-
-# v1.0: producer-side measured-finding derivation (richer extractor over the summary)
-from .knowledge_ingestion import (
-    ACL_SCOPE,
-    ARTIFACT_DIR,
-    EXTRACTOR_VERSION,
-    PHASE_EXTRACTOR_VERSION,
-    PHASE_SOURCE_URI,
-    REPOSITORY_ID,
-    RESULT_VERSION,
-    SOURCE_TYPE,
-    SOURCE_URI,
-    artifact_uri,
-    build_record,
-    derive_phase_record,
-    derive_records,
-    emit_phase_finding,
-    extract_record,
-    record_to_artifact,
-    record_to_event,
-)
-
-# v1.0: producer-side code-structure derivation (source_type=code records + graph wiring)
-from .code_ingestion import (
-    ACL_SCOPE as CODE_ACL_SCOPE,
-    EXTRACTOR_VERSION as CODE_EXTRACTOR_VERSION,
-    SOURCE_TYPE as CODE_SOURCE_TYPE,
-    build_code_record,
-    derive_code_records,
-    ingest_codebase_graph,
-)
-
-# v1.0: producer-side code-quality derivation (source_type=report records)
-from .quality_ingestion import (
-    ACL_SCOPE as QUALITY_ACL_SCOPE,
-    EXTRACTOR_VERSION as QUALITY_EXTRACTOR_VERSION,
-    SOURCE_TYPE as QUALITY_SOURCE_TYPE,
-    build_quality_record,
-    derive_quality_records,
-)
-
-# v1.0: producer-side policy ingestion (authority=POLICY records)
-from .policy_ingestion import (
-    ACL_SCOPE as POLICY_ACL_SCOPE,
-    EXTRACTOR_VERSION as POLICY_EXTRACTOR_VERSION,
-    SOURCE_TYPE as POLICY_SOURCE_TYPE,
-    build_policy_record,
-    derive_policy_records,
-    discover_policy_paths,
-)
-
-# canonical-state round 2: producer-side story derivation (source_type=story records)
-from .story_ingestion import (
-    ACL_SCOPE as STORY_ACL_SCOPE,
-    EXTRACTOR_VERSION as STORY_EXTRACTOR_VERSION,
-    SOURCE_TYPE as STORY_SOURCE_TYPE,
-    adapt_to_story_result,
-    build_story_record,
-    derive_story_records,
-    derive_story_records_from_run_output,
+from .review import (
+    CommitReview,
+    StoryReview,
+    compare_implementations,
+    generate_tests,
+    review_commit,
+    review_story,
 )
 
 # canonical-state round 2: producer-side review derivation (source_type=review records)
 from .review_ingestion import (
     ACL_SCOPE as REVIEW_ACL_SCOPE,
+)
+from .review_ingestion import (
     EXTRACTOR_VERSION as REVIEW_EXTRACTOR_VERSION,
+)
+from .review_ingestion import (
     SOURCE_TYPE as REVIEW_SOURCE_TYPE,
+)
+from .review_ingestion import (
     build_review_record,
     derive_review_records,
 )
-
-# canonical-state round 2: producer-side ledger derivation (ledger_job / ledger_attempt /
-# meta_session records — closes gap (a) no-session fallback and gap (b) meta_* pollution)
-from .ledger_ingestion import (
-    EXTRACTOR_VERSION as LEDGER_EXTRACTOR_VERSION,
-    FALLBACK_EXTRACTOR_VERSION as LEDGER_FALLBACK_EXTRACTOR_VERSION,
-    SOURCE_TYPE_ATTEMPT as LEDGER_SOURCE_TYPE_ATTEMPT,
-    SOURCE_TYPE_JOB as LEDGER_SOURCE_TYPE_JOB,
-    SOURCE_TYPE_META as LEDGER_SOURCE_TYPE_META,
-    build_attempt_record,
-    build_job_record,
-    classify_session,
-    derive_ledger_records,
-)
-
-# canonical-state round 2: producer-side observation/flag derivation (every supervisor
-# verdict is now registrable, not only flagged ones — closes round 1's OQ6a audit gap)
-from .observation_ingestion import (
-    ACL_SCOPE as OBSERVATION_ACL_SCOPE,
-    EXTRACTOR_VERSION as OBSERVATION_EXTRACTOR_VERSION,
-    SOURCE_TYPE_FLAG,
-    SOURCE_TYPE_OBSERVATION,
-    build_flag_record,
-    build_observation_record,
-    derive_flag_record,
-    derive_observation_record,
-)
-
-# canonical-state round 2, Delta 3: producer-side actuation derivation (authority=POLICY,
-# built + unit-tested with ZERO call sites — see actuation_ingestion.py's module docstring)
-from .actuation_ingestion import (
-    ACL_SCOPE as ACTUATION_ACL_SCOPE,
-    ACTUATION_KINDS,
-    EXTRACTOR_VERSION as ACTUATION_EXTRACTOR_VERSION,
-    SOURCE_TYPE as ACTUATION_SOURCE_TYPE,
-    derive_actuation_record,
-)
-
-# v1.0: durable ingestion over Redis Streams (DB 2, pointer-only events)
-from .knowledge_stream import (
-    CONSUMER_GROUPS,
-    DEAD_LETTER_KEY,
-    STREAM_KEY,
-    StreamEntry,
-    acknowledge,
-    claim_pending,
-    connect,
-    create_consumer_group,
-    dead_letter,
-    decode_event,
-    default_extract,
-    delivery_count,
-    pending_count,
-    process_entry,
-    publish_event,
-    read_artifact,
-    read_events,
-    reconcile_missing,
-    register_records,
-    verify_content_hash,
-)
+from .routing import compute_routing, recommend_route, simulate_strategies
 
 # Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
 from .semantic_validation import analyze_ast, analyze_markers
+from .session_types import (
+    DEFAULT_TASK_TYPE,
+    EXPERIMENT_SESSION_PATTERNS,
+    TASK_TYPES,
+    normalize_task,
+)
+
+# v1.0: the signal store — measured per-model signals derived from _results_summary.json
+from .signal_store import (
+    MODEL_ALIASES,
+    build_signal_store,
+    derive_cache_hit_rate,
+    derive_constraint_score,
+    load_results,
+    normalize_model_id,
+)
+
+# Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
+from .solution import SolutionMetrics, evaluate_solution
+from .sonar import SonarMetrics, compute_sonar_diff, run_sonar_analysis, sonar_quality_score
 
 # v1.0: spec lifecycle -> knowledge base (source_type "spec", supersedes lineage)
 from .spec_ingestion import (
@@ -400,20 +483,6 @@ from .spec_status import (
     sort_entries,
 )
 
-# v1.0: the signal store — measured per-model signals derived from _results_summary.json
-from .signal_store import (
-    MODEL_ALIASES,
-    build_signal_store,
-    derive_cache_hit_rate,
-    derive_constraint_score,
-    load_results,
-    normalize_model_id,
-)
-
-# Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
-from .solution import SolutionMetrics, evaluate_solution
-from .sonar import SonarMetrics, compute_sonar_diff, run_sonar_analysis, sonar_quality_score
-
 # v1.0: per-step routing — preference-scored, cache-aware model selection per workflow step
 from .step_routing import (
     FORBIDDEN_SIGNALS,
@@ -444,6 +513,23 @@ from .story import (
     save_story_result,
 )
 
+# canonical-state round 2: producer-side story derivation (source_type=story records)
+from .story_ingestion import (
+    ACL_SCOPE as STORY_ACL_SCOPE,
+)
+from .story_ingestion import (
+    EXTRACTOR_VERSION as STORY_EXTRACTOR_VERSION,
+)
+from .story_ingestion import (
+    SOURCE_TYPE as STORY_SOURCE_TYPE,
+)
+from .story_ingestion import (
+    adapt_to_story_result,
+    build_story_record,
+    derive_story_records,
+    derive_story_records_from_run_output,
+)
+
 # Deprecated: StrategyType — not used by current scripts
 from .strategy import StrategyReport, classify_strategy
 from .streaming import StreamResult, stream_subprocess
@@ -460,33 +546,6 @@ from .workflow_runner import (
     PhaseResult,
     WorkflowRunResult,
     run_workflow,
-)
-
-# v1.0: the retrieve->construct->render augmentation seam (R7 — split out of workflow_runner)
-from .augment import (
-    AugmentationOutcome,
-    DEFAULT_INHERITED_TOOLS,
-    augment_prompt,
-    default_construct_fn,
-    default_retrieve_fn,
-)
-
-# v1.0: shared post-hoc job shapes + enqueue primitives (execute -> analyze -> review)
-from .posthoc import (
-    ANALYSIS_QUEUE,
-    ANALYSIS_STATUS,
-    REVIEW_QUEUE,
-    REVIEW_STATUS,
-    DEFAULT_REVIEW_MODEL,
-    analysis_job_from_result,
-    build_analysis_job,
-    build_commit_review_job,
-    build_review_jobs,
-    build_story_review_job,
-    enqueue_job,
-    trigger_analysis,
-    trigger_reviews,
-    worktree_commits,
 )
 
 __all__ = [
@@ -586,7 +645,7 @@ __all__ = [
     "render_prompt", "construction_cache_key", "hash_work_item",
     "DEFAULT_CONSTRUCTOR_MODEL", "PROMPT_PLAN_SCHEMA_VERSION",
     # v1.0 durable ingestion (Redis Streams, DB 2)
-    "StreamEntry", "connect", "publish_event", "create_consumer_group",
+    "StreamEntry", "kb_stream_connect", "publish_event", "create_consumer_group",
     "read_events", "acknowledge", "pending_count", "delivery_count",
     "claim_pending", "dead_letter", "decode_event", "default_extract",
     "process_entry", "read_artifact", "verify_content_hash", "reconcile_missing",

@@ -42,7 +42,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .augment import DEFAULT_INHERITED_TOOLS, augment_prompt, default_construct_fn, default_retrieve_fn
+from .augment import (
+    DEFAULT_INHERITED_TOOLS,
+    augment_prompt,
+    default_construct_fn,
+    default_retrieve_fn,
+)
 from .backends import run_agentic
 from .experiment_spec import ExperimentSpec, validate_spec
 from .language import detect_language

@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .experiment_spec import SPEC_STATUSES, ExperimentSpec, load_spec
+from .experiment_spec import ExperimentSpec, load_spec
 from .paths import PROJECT_ROOT
 
 # ── Constants ───────────────────────────────────────────────────
@@ -187,10 +187,10 @@ def load_runs(spec_name: str, *, results_dir: Path, root: Path) -> list[RunSumma
         try:
             payload = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError) as exc:
-            warnings.warn(f"spec_status: skipping unreadable run ledger {path}: {exc}", UserWarning)
+            warnings.warn(f"spec_status: skipping unreadable run ledger {path}: {exc}", UserWarning, stacklevel=2)
             continue
         if not isinstance(payload, dict):
-            warnings.warn(f"spec_status: skipping non-object run ledger {path}", UserWarning)
+            warnings.warn(f"spec_status: skipping non-object run ledger {path}", UserWarning, stacklevel=2)
             continue
         runs.append(summarize_run(path, payload, root=root))
 
@@ -342,7 +342,7 @@ def collect_entries(*, root: Path | str = PROJECT_ROOT) -> list[SpecStatusEntry]
             spec = load_spec(spec_path)
         except Exception as exc:  # noqa: BLE001 — any load failure is a skip, never a crash
             warnings.warn(
-                f"spec_status: skipping unloadable spec {spec_path}: {exc}", UserWarning
+                f"spec_status: skipping unloadable spec {spec_path}: {exc}", UserWarning, stacklevel=2
             )
             continue
         runs = load_runs(spec.name, results_dir=results_dir, root=root_path)
@@ -521,6 +521,7 @@ def refresh_spec_status(
             f"spec_status: refreshed index does not contain spec {spec_name!r} "
             f"(not found in {SPECS_DIR_REL}/)",
             UserWarning,
+            stacklevel=2,
         )
     return report
 

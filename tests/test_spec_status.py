@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from instrument.experiment_spec import ExperimentSpec, Factor, Workflow
 from instrument.spec_status import (
     INDEX_SCHEMA_VERSION,
     MISSING,
@@ -30,7 +31,6 @@ from instrument.spec_status import (
     render_status_md,
     sort_entries,
 )
-from instrument.experiment_spec import ExperimentSpec, Factor, Workflow
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 

@@ -14,10 +14,10 @@ from instrument.knowledge import (
     OBSERVATION_TYPES,
     SCHEMA_VERSION,
     SOURCE_TYPES,
-    SourceTypeSpec,
     Authority,
     KnowledgeEvent,
     KnowledgeRecord,
+    SourceTypeSpec,
     compute_content_hash,
     compute_entity_id,
     compute_knowledge_id,
@@ -174,7 +174,7 @@ def test_authority_sorted_ascending():
 def test_policy_is_highest_authority():
     # Pinned policy outranks every other class, including current source.
     for authority in (Authority.SOURCE, Authority.MEASURED, Authority.DERIVED, Authority.ADVISORY):
-        assert Authority.POLICY > authority
+        assert authority < Authority.POLICY
     assert Authority.ADVISORY < Authority.SOURCE
 
 
@@ -341,7 +341,7 @@ def test_message_family_defaults_unknown_source_type_to_observation():
 def test_actuation_types_is_a_single_member_allowlist():
     # Guards the design's "closed by default" invariant directly: ACTUATION_TYPES must
     # never silently grow beyond the one family this round introduces.
-    assert ACTUATION_TYPES == frozenset({"actuation"})
+    assert frozenset({"actuation"}) == ACTUATION_TYPES
 
 
 # ── SOURCE_TYPES registry (R2 — the single vocabulary owner) ───
@@ -372,12 +372,12 @@ def test_spec_source_type_is_a_policy_authority_observation():
 
 def test_observation_and_actuation_types_are_derived_from_source_types():
     # The two frozensets are pure projections of SOURCE_TYPES' message_family column.
-    assert OBSERVATION_TYPES == frozenset(
+    assert frozenset(
         n for n, s in SOURCE_TYPES.items() if s.message_family == "observation"
-    )
-    assert ACTUATION_TYPES == frozenset(
+    ) == OBSERVATION_TYPES
+    assert frozenset(
         n for n, s in SOURCE_TYPES.items() if s.message_family == "actuation"
-    )
+    ) == ACTUATION_TYPES
 
 
 def test_source_type_spec_carries_nominal_provenance():
