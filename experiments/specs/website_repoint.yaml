@@ -13,25 +13,36 @@ workflow:
     context:
       finding: >-
         S3: app.js findModel does substring matching over the story corpus ordered by avg_cost, so
-        findModel('claude') -> Haiku, findModel('deepseek') -> Flash, findModel('gpt-5.6') -> Luna;
-        narration_rate/avg_narration_penalty are None and render as "0%" via (x||0). C1: evidence.html
-        says "Claude Fable 5" (the archive) while the story pages say "Claude Sonnet 5"; MODEL_DISPLAY_ORDER
-        (build_data.py:43) still lists claude-fable-5 and _short_model_label (build_data.py:728) maps
-        it to "Claude Fable 5". C2: story.html:123 claims "$10.00 vs $0.87, 11.5x" (now $1.98 off-peak);
-        peak/off-peak is undocumented anywhere. C3/C4: static pages claim "1,097 / 227 / 249 / 221 / 224"
-        while data.js reports 772 story sessions / 156 stories / 344 reports.
+        findModel('claude') -> Haiku, findModel('deepseek') -> Flash, findModel('gpt-5.6') -> Luna.
+        (The null->em-dash rendering half of S3 is ALREADY DONE on main by the registry repoint
+        follow-up — narration/AST/cost fields render as em-dash, never "0%". Remaining: the
+        explicit-id rewire.) C1: evidence.html says "Claude Fable 5" (the archive) while the story
+        pages say "Claude Sonnet 5"; post-repoint, MODEL_DISPLAY_ORDER no longer exists in
+        build_data.py, but _short_model_label (build_data.py:933) still maps claude-fable-5 ->
+        "Claude Fable 5" and the perturbation corpus payload
+        experiments/results/process_perturbation_resample_claude-fable-5.json feeds that model id
+        into data.js perturbation_models. C2: story.html:123 claims "$10.00 vs $0.87, 11.5x" (now
+        $1.98 off-peak); peak/off-peak is undocumented anywhere. C3/C4: static pages claim
+        "1,097 / 227 / 249 / 221 / 224"; the repoint added the canonical counts
+        summary.canonical_stories (225) / canonical_findings (64) / tombstoned_excluded (77) to
+        data.js — the static pages must bind to those instead of hand-written numbers.
       note: >-
         Per website.md's priority table, this spec covers S3 + C1 + C2 + C3/C4 (the low/medium-effort,
         high-impact items). The larger structural split S1+S2 (evidence.html into two pages, delete
-        inline arrays) is a follow-up, not this spec.
+        inline arrays) is a follow-up, not this spec. POST-REPOINT STATE (merged on main): the
+        registry repoint landed — build_data.py reads the canonical-state registry, data.js carries
+        canonical_stories/canonical_findings/tombstoned_excluded, and the null-rendering fix
+        (em-dash) is in app.js/evidence.html. Do not redo that work; extend it.
       hard_rules: >-
         (1) data.js is the single source of truth — every number/model-label change goes through
         build_data.py (or generate_manifest.py), never a hand-edited data.js. (2) Never resolve a
-        model by indexOf; key statMap by explicit id. (3) The fable-5/sonnet-5 decision: claude-fable-5
-        is the SAME model under a renamed alias (per the adapter fix) — normalize the perturbation
-        corpus's model id to claude-sonnet-5 in MODEL_DISPLAY_ORDER/_short_model_label, and relabel
-        the archive as historical Sonnet-5 (or clearly stamp "Fable 5 (historical alias)").
-        (4) Cost figures carry the off-peak/peak basis; null renders as an em-dash, never "0%".
+        model by indexOf; key statMap by explicit id. (3) The fable-5/sonnet-5 decision (per
+        docs/HANDOFF_2026-08-19.md): the adapter silently mapped claude-fable-5 -> claude-sonnet-5
+        until the fix, so EVERY historical "claude-fable-5" result actually ran sonnet-5. Normalize
+        the corpus's model id to claude-sonnet-5 (_short_model_label + the
+        process_perturbation_resample_claude-fable-5 payload id) and relabel the archive as
+        historical Sonnet-5 (or clearly stamp "Fable 5 (historical alias)"). (4) Cost figures carry
+        the off-peak/peak basis; null renders as an em-dash (already implemented — keep it).
         (5) Run build_data.py + generate_manifest.py to regenerate data.js before verifying.
       run_shape: >-
         SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
@@ -48,16 +59,19 @@ workflow:
 
           READ FIRST:
           - docs/review/website.md (S3)
-          - firebase/public/app.js (findModel, statMap)
-          - scripts/build_data.py (compute_story_models — where flail/narration should be sourced)
+          - firebase/public/app.js (findModel, statMap — note pctOrDash/penaltyOrDash are already
+            there from the repoint follow-up)
+          - scripts/build_data.py (compute_story_models — where the story corpus model ids live)
 
           DO:
-          - Key statMap by explicit model id (or provider with a declared default); never indexOf.
-          - Source cost_per/flail/narration from the corpus where actually measured; render null as
-            an em-dash instead of "0%". Update the model cards/tables accordingly.
+          - Key statMap entries by explicit model id (or provider with a declared default); never
+            indexOf. So findModel('claude') -> anthropic/claude-sonnet-5, findModel('deepseek') ->
+            deepseek/deepseek-v4-pro, findModel('gpt-5.6') -> a declared default — not the first
+            substring hit in the avg_cost-ordered story list.
+          - The em-dash null-rendering is DONE — do not redo it; only rewire the model resolution.
 
-          VERIFY: regenerate data.js and confirm findModel('claude')->sonnet, findModel('deepseek')->pro
-          (or explicit-id lookups); pytest tests/test_build_data.py -q must pass.
+          VERIFY: regenerate data.js and confirm the statMap lookups resolve to the declared models;
+          pytest tests/test_build_data.py -q must pass.
           DELIVER the code.
       - name: fix_content
         kind: agent
@@ -73,17 +87,21 @@ workflow:
 
           READ FIRST:
           - docs/review/website.md (C1, C2, C3, C4)
-          - scripts/build_data.py (MODEL_DISPLAY_ORDER, _short_model_label, the summary block)
+          - docs/HANDOFF_2026-08-19.md (the fable-5/sonnet-5 fact)
+          - scripts/build_data.py (_short_model_label at ~933, compute_story_models, the summary
+            block with canonical_stories/canonical_findings/tombstoned_excluded)
           - firebase/public/story.html:123, framework.html:832/882, glossary.html:45, evidence.html,
             accelerator.html, databricks.html, methodology.html:60
 
           DO:
-          - C1: normalize claude-fable-5 -> claude-sonnet-5 in MODEL_DISPLAY_ORDER/_short_model_label;
-            relabel the historical archive consistently.
+          - C1: normalize claude-fable-5 -> claude-sonnet-5 in _short_model_label and the
+            process_perturbation_resample_claude-fable-5 payload's model id (every historical
+            "fable-5" result actually ran sonnet-5); relabel the historical archive consistently.
           - C2: fix the DeepSeek pricing claims (off-peak $1.98, peak 2x); add a peak/off-peak note;
             regenerate the multiplier claims from PROVIDER_PRICING.
-          - C3/C4: add a canonical corpus-count block to data.js summary and bind the static pages to
-            it via data-stat; prefix remaining historical figures with "historical".
+          - C3/C4: bind the static pages' corpus counts to summary.canonical_stories (225) /
+            canonical_findings (64) / tombstoned_excluded (77) via data-stat; prefix remaining
+            historical figures with "historical".
           - Regenerate data.js + manifest.
 
           VERIFY: grep confirms no stale "1,097"/"227"/"249"/"221"/"224"/"$0.87"/"11.5x" claims remain
