@@ -7,7 +7,7 @@
  * only overlays not-yet-polled live samples, which prevents polling, replay,
  * and automatic EventSource reconnection from multiplying reported spend.
  */
-(function startControlRoom(core) {
+(function startControlRoom(core, root) {
   const SVG_NS = "http://www.w3.org/2000/svg"
   const MAX_TRANSCRIPT_ROWS = 500
   const MAX_LIVE_SAMPLES_PER_CELL = 500
@@ -18,18 +18,18 @@
   const DESIGN_LIST_POLL_MS = 10000
   const DRAFT_POLL_MS = 3000
   const BURN_WINDOW_MS = 60000
+  // Presentation bound for the Status board's full-width burn trace (design §5.2).
+  const BURN_TRACE_SAMPLES = 60
   const CLAUDE_AGENTS_POLL_MS = 10000
   const CLAUDE_AGENTS_DAEMON_POLL_MS = 15000
   const CLAUDE_AGENT_CELL_PREFIX = "claude_bg_"
-  const STATUS_SYMBOLS = {
-    queued: "○",
-    running: "◔",
-    done: "✓",
-    failed: "×",
-    timeout: "◷",
-    retry: "↻",
-    unknown: "?",
-  }
+
+  // The status vocabulary (glyph + word + class, on two axes) lives in board-fleet.js so the
+  // fleet cards, the detail header, the Claude roster, and the flag rows cannot drift apart.
+  const fleet = root.ControlRoomFleet
+  // Keyed reconciliation + write-on-change helpers, shared by every polled list in this file.
+  const list = root.ControlRoomKeyedList
+  const { setText, setHidden, setAttribute: setAttr, setClassName } = list
 
   const state = {
     cells: {},
@@ -86,6 +86,7 @@
     draftFresh: false,
     supervisorFlags: new Map(),
     supervisorState: "loading",
+    supervisorSource: "unknown",
     supervisorWarnings: [],
     supervisorRequestInFlight: false,
     supervisorSelection: null,
@@ -150,18 +151,39 @@
     return `${Math.floor(seconds / 86400)}d ago`
   }
 
-  /** Keep heuristic supervisor statuses separate from fleet lifecycle states. */
+  /**
+   * Keep heuristic supervisor statuses separate from fleet lifecycle states.
+   *
+   * The two axes must never be confusable (design §2.2), so this resolves the ATTENTION
+   * vocabulary and nothing else: asking it for "running" yields the neutral ATTENTION entry,
+   * not a lifecycle state. The returned shape is kept (`label`/`className`) because the
+   * supervisor rail composes `flag-<className>` and `flag-status-<className>` class names;
+   * `vocabulary` carries the glyph for callers that paint the word.
+   */
   function supervisorStatus(value) {
-    if (value === "off_track") return { label: "OFF TRACK", className: "off-track" }
-    if (value === "stalled") return { label: "STALLED", className: "stalled" }
-    return { label: "ATTENTION", className: "attention" }
+    const vocabulary = fleet.attention(value)
+    return { label: vocabulary.word, className: vocabulary.key, vocabulary }
   }
 
   /** Return normalized status counts for both cards and the command rail. */
   function statusCounts() {
-    const counts = { queued: 0, running: 0, done: 0, failed: 0, timeout: 0, retry: 0, unknown: 0 }
-    for (const value of Object.values(state.cells)) counts[core.normalizeStatus(value)] += 1
-    return counts
+    return fleet.statusCounts(state.cells)
+  }
+
+  /**
+   * Paint one status vocabulary entry into a node as an aria-hidden glyph plus the word.
+   *
+   * Color is never the only signal (design §2.2): the glyph survives a monochrome display and
+   * the word survives a screen reader, which announces only the text because the glyph is
+   * marked decorative. Every status surface in the app goes through here, so there is exactly
+   * one place where "how a status looks" is decided.
+   */
+  function applyStatusWord(node, vocabulary, baseClass = "status-word") {
+    node.className = `${baseClass} ${vocabulary.className}`
+    const glyph = element("span", "status-glyph", vocabulary.glyph)
+    glyph.setAttribute("aria-hidden", "true")
+    node.replaceChildren(glyph, document.createTextNode(vocabulary.word))
+    return node
   }
 
   /** Describe the healthiest meaningful aggregate connection state. */
@@ -217,15 +239,20 @@
 
     const svg = $("#burn-trace")
     svg.replaceChildren()
-    const samples = state.burnSamples.slice(-20)
+    // The Status board shows the whole retained window rather than a rail-sized tail: every
+    // sample inside the rolling 60s is already in `burnSamples`, so the cap here is the
+    // presentation bound, not a data bound (design §5.2).
+    const samples = state.burnSamples.slice(-BURN_TRACE_SAMPLES)
     if (samples.length === 0) {
       svg.setAttribute("aria-label", "No live cost samples in the rolling 60-second window")
       return
     }
     const maximum = Math.max(...samples.map((sample) => sample.cost), 0.000001)
     const points = samples.map((sample, index) => {
-      const x = samples.length === 1 ? 60 : (index / (samples.length - 1)) * 116 + 2
-      const y = 21 - (sample.cost / maximum) * 18
+      // Geometry follows the 240x48 viewBox: 2px padding on each edge, so a flat series still
+      // draws a visible line rather than sitting on the border.
+      const x = samples.length === 1 ? 120 : (index / (samples.length - 1)) * 236 + 2
+      const y = 45 - (sample.cost / maximum) * 42
       return `${x.toFixed(2)},${y.toFixed(2)}`
     })
     const line = document.createElementNS(SVG_NS, "polyline")
@@ -294,87 +321,225 @@
     return wrapper
   }
 
+  /**
+   * Adopt the shell's static placeholder rather than appending a second one beside it.
+   *
+   * index.html ships a first-paint placeholder in each polled list ("Loading supervisor
+   * flags…", "Loading Claude background sessions…", "No portal-owned design sessions yet.") so
+   * the page says something useful before any fetch resolves. A renderer that creates its OWN
+   * placeholder node leaves that static one stranded above the rows forever — visible, stale,
+   * and pointing at a state the list has long left. Taking ownership of the existing node on
+   * the first render keeps one placeholder per list, whoever created it.
+   */
+  function adoptPlaceholder(container, current) {
+    return current || container.querySelector(".empty-state, .error-state")
+  }
+
+  /* ── Fleet board ─────────────────────────────────────────────────────────────────────────
+     The matrix is the operator's home surface (design §2.1), and it re-renders every 5s
+     whether or not anything moved. The renderer below is therefore KEYED rather than
+     wholesale: each cell owns one `<article>` that is created once, updated in place, and
+     moved only when its position in the urgency order actually changes (design §2.5).
+
+     What that buys, concretely — every item is something the previous rebuild-the-world
+     renderer lost on each poll:
+       - keyboard focus stays on the card the operator was on, without a re-focus hack;
+       - a half-finished text selection of a cell id survives;
+       - hover/active state and the running pulse animation do not restart;
+       - the scroll position does not jump, because no node the browser is anchored to is
+         destroyed;
+       - a no-op poll performs ZERO DOM writes, so a screen reader announces nothing.
+
+     Ordering, filtering, counts, and change detection are all decided by board-fleet.js, which
+     is pure and browser-free; this section only translates those decisions into DOM. */
+
+  /** Live card handles, keyed by cell id: `{ node, button, statusWord, ... }`. */
+  const fleetCards = new Map()
+
+  /** The mounted empty/no-match placeholder, when the grid has no cards to show. */
+  let fleetPlaceholder = null
+
+  /**
+   * Build the DOM for one cell card.
+   *
+   * Called exactly once per cell id. Every mutable part is kept as a permanent child that is
+   * later hidden or retitled rather than created and destroyed, because a node that survives
+   * is a node the browser (and the operator's focus) can stay anchored to.
+   *
+   * The whole card is a single `<button>`: tapping anywhere on it IS the drill-down, with no
+   * interstitial, because drill-down is read-only and safe to be one-tap (design §2.4).
+   */
+  function createFleetCard(cellId) {
+    const card = element("article", "cell-card")
+    const button = element("button", "cell-select")
+    button.type = "button"
+    button.dataset.cellId = cellId
+
+    const heading = element("div", "cell-heading")
+    const statusWord = element("span", "status-word")
+    const selectedLabel = element("span", "selected-label", "SELECTED")
+    selectedLabel.hidden = true
+    heading.appendChild(statusWord)
+    heading.appendChild(selectedLabel)
+    button.appendChild(heading)
+
+    // The id is rendered with textContent (never interpolated into markup): cell ids come from
+    // the queue and are not trusted input.
+    const identity = element("span", "cell-id", cellId)
+    button.appendChild(identity)
+
+    // Live workflow phase badge (display-only): "4/7 rerun_contaminated".
+    const phaseBadge = element("span", "phase-badge")
+    phaseBadge.hidden = true
+    button.appendChild(phaseBadge)
+
+    const cost = element("span", "latest-cost", "no cost yet")
+    button.appendChild(cost)
+
+    // The sparkline is the one part that is genuinely rebuilt, and only when a new sample
+    // arrives; `sparkline` holds the node so the replacement can swap in place.
+    const sparkline = createSparkline([])
+    button.appendChild(sparkline)
+    card.appendChild(button)
+
+    // Pre-sheet fallback for narrow screens; the Detail surface supersedes it, and it stays
+    // hidden unless this card is the selected one.
+    const jump = element("a", "mobile-anchor card-jump", "Jump to transcript")
+    jump.href = "#transcript-panel"
+    jump.hidden = true
+    card.appendChild(jump)
+
+    // `node` is the handle the shared reconciler moves and removes; the rest are the parts
+    // `updateFleetCard` writes.
+    return { node: card, card, button, statusWord, selectedLabel, phaseBadge, cost, sparkline, jump, signature: null, sampleSignature: null }
+  }
+
+  /**
+   * Update one card, writing only the parts whose value actually changed.
+   *
+   * `facts.signature` is the whole card's fingerprint: when it matches the previous render the
+   * function returns immediately and the card is not touched at all.
+   */
+  function updateFleetCard(entry, cellId, facts) {
+    if (entry.signature === facts.signature) return
+    entry.signature = facts.signature
+
+    const vocabulary = facts.vocabulary
+    setClassName(entry.card, `cell-card ${vocabulary.className}${facts.selected ? " selected" : ""}`)
+    applyStatusWord(entry.statusWord, vocabulary)
+    setAttr(
+      entry.button,
+      "aria-label",
+      vocabulary.key === "running" ? `Watch running cell ${cellId}` : `Inspect cell ${cellId}`,
+    )
+    setAttr(entry.button, "aria-pressed", String(facts.selected))
+    setHidden(entry.selectedLabel, !facts.selected)
+    setHidden(entry.jump, !facts.selected)
+
+    setHidden(entry.phaseBadge, !facts.phase)
+    if (facts.phase) setText(entry.phaseBadge, facts.phase)
+
+    setText(entry.cost, facts.cost)
+
+    // Redraw the sparkline only when the sample series grew: it is the most expensive node on
+    // the card, and a status-only change must not cost an SVG rebuild.
+    if (entry.sampleSignature !== facts.samples) {
+      entry.sampleSignature = facts.samples
+      const replacement = createSparkline(facts.sampleList)
+      entry.sparkline.replaceWith(replacement)
+      entry.sparkline = replacement
+    }
+  }
+
+  /** Format the live workflow phase badge label, or "" when the cell reports no phase. */
+  function phaseLabel(cellId) {
+    const phase = state.phases[cellId]
+    if (!phase || typeof phase !== "object" || typeof phase.name !== "string" || !phase.name) return ""
+    const index = Number.isInteger(phase.index) ? phase.index : null
+    const total = Number.isInteger(phase.total) ? phase.total : null
+    return `${index !== null ? `${index}/${total ?? "?"}` : ""} ${phase.name}`.trim()
+  }
+
+  /** Mount, retitle, or remove the "nothing to show" placeholder for the grid. */
+  function renderFleetPlaceholder(grid, text) {
+    if (!text) {
+      fleetPlaceholder?.remove()
+      fleetPlaceholder = null
+      return
+    }
+    if (!fleetPlaceholder) {
+      // Both empty states are plain copy; the wording distinguishes "the fleet is empty" from
+      // "your filter hid everything", which are very different operator problems. The node is
+      // appended AFTER the cards so the reconciler's reorder pass never has to step over it.
+      fleetPlaceholder = element("p", "empty-state", "No cells are queued or retained")
+      grid.appendChild(fleetPlaceholder)
+    }
+    setText(fleetPlaceholder, text)
+  }
+
   /** Render urgency-sorted fleet cards without interpolating untrusted IDs. */
   function renderFleet() {
     const grid = $("#fleet-grid")
-    grid.setAttribute("aria-busy", state.matrixState === "connecting" ? "true" : "false")
+    // Re-setting an attribute to the value it already holds still queues a mutation record,
+    // which is enough to make a screen reader re-announce a busy region every 5 seconds. Write
+    // only on a real change — the same rule the card updates below follow.
+    setAttr(grid, "aria-busy", state.matrixState === "connecting" ? "true" : "false")
     // Preserve the immediate skeleton until the first matrix request settles.
     if (!state.firstMatrixLoaded && state.matrixState === "connecting" && Object.keys(state.cells).length === 0) {
       renderRail()
       return
     }
-    const focusedCellId = document.activeElement?.classList.contains("cell-select")
-      ? document.activeElement.dataset.cellId
-      : null
-    grid.replaceChildren()
-    const search = state.search.toLowerCase()
-    const ids = core.sortCellIds(state.cells).filter((cellId) => {
-      const status = core.normalizeStatus(state.cells[cellId])
-      const matchesFilter = state.filter === "all"
-        || (state.filter === "running" && status === "running")
-        || (state.filter === "risk" && ["failed", "timeout", "unknown"].includes(status))
-      return matchesFilter && cellId.toLowerCase().includes(search)
+    // The skeleton cards are static markup from index.html; they are dropped once, on the
+    // first real render, and never re-created.
+    for (const skeleton of Array.from(grid.querySelectorAll(".skeleton-card"))) skeleton.remove()
+
+    const ids = fleet.visibleCellIds(state.cells, { filter: state.filter, search: state.search }, core.sortCellIds)
+    const retained = Object.keys(state.cells).length
+
+    renderFleetPlaceholder(
+      grid,
+      retained === 0 && state.matrixState !== "connecting"
+        ? "No cells are queued or retained"
+        : ids.length === 0 && retained > 0
+          ? "No cells match the current fleet filter"
+          : "",
+    )
+
+    // Create, update, remove, and reorder in one pass. Cards survive polls; only genuinely
+    // changed cells cost a DOM write, and the order is touched only where it differs.
+    list.reconcile({
+      container: grid,
+      keys: ids,
+      entries: fleetCards,
+      create: createFleetCard,
+      update: (entry, cellId) => {
+        const vocabulary = fleet.lifecycle(state.cells[cellId])
+        const selected = state.selectedType === "cell" && state.selectedId === cellId
+        const sampleList = samplesForCell(cellId)
+        const costs = sampleList.map((sample) => core.safeNumber(sample.cost)).filter((value) => value !== null)
+        const facts = {
+          vocabulary,
+          selected,
+          sampleList,
+          phase: phaseLabel(cellId),
+          cost: costs.length ? `${formatCost(costs.at(-1))} latest reported step` : "no cost yet",
+          samples: fleet.sampleSignature(sampleList),
+        }
+        facts.signature = fleet.cellSignature({
+          status: vocabulary.key,
+          selected,
+          phase: facts.phase,
+          cost: facts.cost,
+          samples: facts.samples,
+        })
+        updateFleetCard(entry, cellId, facts)
+      },
     })
 
-    if (Object.keys(state.cells).length === 0 && state.matrixState !== "connecting") {
-      grid.appendChild(element("p", "empty-state", "No cells are queued or retained"))
-    } else if (ids.length === 0) {
-      grid.appendChild(element("p", "empty-state", "No cells match the current fleet filter"))
-    }
-
-    for (const cellId of ids) {
-      const status = core.normalizeStatus(state.cells[cellId])
-      const selected = state.selectedId === cellId
-      const card = element("article", `cell-card status-${status}${selected ? " selected" : ""}`)
-      const button = element("button", "cell-select")
-      button.type = "button"
-      button.dataset.cellId = cellId
-      button.setAttribute("aria-label", status === "running" ? `Watch running cell ${cellId}` : `Inspect cell ${cellId}`)
-      button.setAttribute("aria-pressed", String(selected))
-      button.addEventListener("click", () => selectCell(cellId, true))
-
-      const heading = element("div", "cell-heading")
-      const statusLabel = element("span", `status-word status-${status}`, `${STATUS_SYMBOLS[status]} ${status.toUpperCase()}`)
-      heading.appendChild(statusLabel)
-      if (selected) heading.appendChild(element("span", "selected-label", "SELECTED"))
-      button.appendChild(heading)
-      button.appendChild(element("span", "cell-id", cellId))
-
-      // Live workflow phase badge (display-only): "4/7 rerun_contaminated".
-      const phase = state.phases[cellId]
-      if (phase && typeof phase === "object" && typeof phase.name === "string" && phase.name) {
-        const index = Number.isInteger(phase.index) ? phase.index : null
-        const total = Number.isInteger(phase.total) ? phase.total : null
-        const label = `${index !== null ? `${index}/${total ?? "?"}` : ""} ${phase.name}`.trim()
-        button.appendChild(element("span", "phase-badge", label))
-      }
-
-      const samples = samplesForCell(cellId)
-      const costs = samples.map((sample) => core.safeNumber(sample.cost)).filter((value) => value !== null)
-      button.appendChild(element("span", "latest-cost", costs.length ? `${formatCost(costs.at(-1))} latest reported step` : "no cost yet"))
-      button.appendChild(createSparkline(samples))
-      card.appendChild(button)
-      if (selected) {
-        const jump = element("a", "mobile-anchor card-jump", "Jump to transcript")
-        jump.href = "#transcript-panel"
-        card.appendChild(jump)
-      }
-      grid.appendChild(card)
-    }
-
-    // A status or telemetry update must not eject a keyboard operator from the fleet.
-    if (focusedCellId) {
-      const focusedReplacement = Array.from(grid.querySelectorAll(".cell-select"))
-        .find((button) => button.dataset.cellId === focusedCellId)
-      focusedReplacement?.focus({ preventScroll: true })
-    }
-
-    const counts = statusCounts()
-    $("#fleet-total").textContent = String(Object.keys(state.cells).length)
-    const countText = ["queued", "running", "done", "failed", "timeout"]
-      .map((status) => `${status} ${counts[status]}`)
-      .join("  ·  ")
-    $("#fleet-counts").textContent = countText
+    // Footer: totals and the counts line, written only when the text actually differs so a
+    // no-op poll cannot re-announce them to assistive technology (design §2.5).
+    setText($("#fleet-total"), retained)
+    setText($("#fleet-counts"), fleet.countsSummary(statusCounts()))
     renderRail()
   }
 
@@ -425,62 +590,150 @@
     }
   }
 
+  /* ── Flags board ─────────────────────────────────────────────────────────────────────────
+     The supervisor rail is the operator's ALERT QUEUE, promoted from a buried third-column
+     `details` block to a full-height board (design §4.1). Three properties matter here and
+     each is implemented deliberately:
+
+       1. Read-only. No button in this list ever sends a request; selecting a row only opens
+          the Detail surface, where the deliberate Steer composer and the gated Interrupt door
+          live (design §4.3, docs/supervisor_design.md).
+       2. In-place updates. Rows are keyed by SESSION ID — the stable identity of the thing
+          being flagged — and `flag_id` (a server-side digest of the flag's fields) is used as
+          the row's revision. Keying by `flag_id` itself, which the design's wording suggests,
+          would destroy and rebuild the row on every assessment change, which is precisely the
+          reorder-and-steal-focus behavior the requirement exists to prevent.
+       3. Three states, verbatim. Empty, flagged, and degraded/unavailable each have their own
+          copy from docs/supervisor_design.md §1, and a degraded source still shows the last
+          useful rows rather than blanking the board. */
+
+  /** Live flag row handles, keyed by session id. */
+  const supervisorRows = new Map()
+
+  /** The mounted empty/degraded placeholder, when there are no rows to show. */
+  let supervisorPlaceholder = null
+
+  /** Build one flag row. Every mutable part is a permanent child, updated in place. */
+  function createSupervisorRow(sessionId) {
+    const button = element("button", "supervisor-flag")
+    button.type = "button"
+    button.dataset.sessionId = sessionId
+
+    const heading = element("span", "supervisor-flag-heading")
+    const statusWord = element("span", "flag-status")
+    const title = element("strong", "supervisor-flag-title")
+    heading.appendChild(statusWord)
+    heading.appendChild(title)
+    button.appendChild(heading)
+
+    // `why` is the supervisor's one-sentence rationale; the CSS clamps it to two lines so a
+    // long explanation cannot push the next flag off the screen (design §4.2).
+    const reason = element("span", "supervisor-flag-reason")
+    button.appendChild(reason)
+
+    const meta = element("span", "supervisor-flag-meta")
+    button.appendChild(meta)
+
+    const review = element("span", "review-unavailable", "Review unavailable")
+    review.hidden = true
+    button.appendChild(review)
+
+    return { node: button, button, statusWord, title, reason, meta, review, signature: null }
+  }
+
+  /** Refresh one flag row, writing only the fields whose text actually changed. */
+  function updateSupervisorRow(entry, sessionId) {
+    const flag = state.supervisorFlags.get(sessionId)
+    if (!flag) return
+    const status = supervisorStatus(flag.status)
+    const selected = state.supervisorSelection?.session_id === sessionId
+    const label = flag.title || sessionId
+    const activity = flag.last_activity_at ? `last activity ${formatAge(flag.last_activity_at)}` : "last activity unavailable"
+    const meta = `${flag.model} · flagged ${formatAge(flag.at)} · ${activity}`
+    const reviewUnavailable = flag.review?.state === "unavailable"
+
+    // `flag_id` is the server's digest of the flag's fields, so it changes exactly when the
+    // assessment changes; the age string and the selection are the only other painted values.
+    const signature = `${flag.flag_id || ""}|${meta}|${selected ? 1 : 0}|${reviewUnavailable ? 1 : 0}`
+    if (entry.signature === signature) return
+    entry.signature = signature
+
+    setClassName(entry.button, `supervisor-flag flag-${status.className}${selected ? " selected" : ""}`)
+    setAttr(entry.button, "aria-pressed", String(selected))
+    setAttr(
+      entry.button,
+      "aria-label",
+      `${status.label}: ${label}. ${flag.why}. ${reviewUnavailable ? "Review unavailable." : "Review available."}`,
+    )
+    applyStatusWord(entry.statusWord, status.vocabulary, "flag-status")
+    setText(entry.title, flag.title || sessionId.slice(0, 18))
+    setText(entry.reason, flag.why)
+    setText(entry.meta, meta)
+    setHidden(entry.review, !reviewUnavailable)
+  }
+
+  /**
+   * Mount, retitle, or remove the board's placeholder.
+   *
+   * The three states are distinct on purpose: "nothing needs attention" is good news, while
+   * "the supervisor's data is stale" is a caveat about the board itself and must never be
+   * mistaken for the first.
+   */
+  function renderSupervisorPlaceholder(container, text, degraded) {
+    supervisorPlaceholder = adoptPlaceholder(container, supervisorPlaceholder)
+    if (!text) {
+      supervisorPlaceholder?.remove()
+      supervisorPlaceholder = null
+      return
+    }
+    if (!supervisorPlaceholder) {
+      supervisorPlaceholder = element("p", "empty-state")
+      container.appendChild(supervisorPlaceholder)
+    }
+    setClassName(supervisorPlaceholder, degraded ? "error-state" : "empty-state")
+    setText(supervisorPlaceholder, text)
+  }
+
   /** Render the bounded flag rail while preserving keyboard focus by session ID. */
   function renderSupervisorFlags() {
-    const list = $("#supervisor-flag-list")
-    const focusedSessionId = document.activeElement?.classList.contains("supervisor-flag")
-      ? document.activeElement.dataset.sessionId
-      : null
-    list.setAttribute("aria-busy", String(state.supervisorState === "loading"))
-    list.replaceChildren()
+    const container = $("#supervisor-flag-list")
+    setAttr(container, "aria-busy", String(state.supervisorState === "loading"))
+
     const flags = Array.from(state.supervisorFlags.values())
-    $("#supervisor-count").textContent = String(flags.length)
+    setText($("#supervisor-count"), flags.length)
+
+    // Provenance line: which store answered, and whether the answer is stale (design §4.2).
+    setText($("#supervisor-source"), `source: ${state.supervisorSource || "unknown"}`)
+
     const delayed = state.supervisorState === "degraded" || state.supervisorState === "unavailable"
     const delay = $("#supervisor-delay")
-    delay.hidden = !delayed
-    delay.textContent = state.supervisorState === "unavailable"
-      ? "Supervisor data unavailable; showing last useful rows"
-      : `Supervisor data delayed${state.supervisorWarnings.length ? ` · ${state.supervisorWarnings[0]}` : ""}`
+    setHidden(delay, !delayed)
+    setText(
+      delay,
+      state.supervisorState === "unavailable"
+        ? "Supervisor data unavailable; showing last useful rows"
+        : `Supervisor data delayed${state.supervisorWarnings.length ? ` · ${state.supervisorWarnings[0]}` : ""}`,
+    )
 
-    if (flags.length === 0) {
-      const text = delayed
-        ? "Supervisor state unavailable; no retained rows to show"
-        : state.supervisorState === "loading"
-          ? "Loading supervisor flags…"
-          : "Supervisor / no sessions need attention"
-      list.appendChild(element("p", delayed ? "error-state" : "empty-state", text))
-    }
-    for (const flag of flags) {
-      const status = supervisorStatus(flag.status)
-      const button = element(
-        "button",
-        `supervisor-flag flag-${status.className}${state.supervisorSelection?.session_id === flag.session_id ? " selected" : ""}`,
-      )
-      button.type = "button"
-      button.dataset.sessionId = flag.session_id
-      button.setAttribute("aria-pressed", String(state.supervisorSelection?.session_id === flag.session_id))
-      button.setAttribute(
-        "aria-label",
-        `${status.label}: ${flag.title || flag.session_id}. ${flag.why}. ${flag.review?.state === "unavailable" ? "Review unavailable." : "Review available."}`,
-      )
-      const heading = element("span", "supervisor-flag-heading")
-      heading.appendChild(element("span", `flag-status flag-status-${status.className}`, status.label))
-      heading.appendChild(element("strong", "supervisor-flag-title", flag.title || flag.session_id.slice(0, 18)))
-      button.appendChild(heading)
-      button.appendChild(element("span", "supervisor-flag-reason", flag.why))
-      const activity = flag.last_activity_at ? `last activity ${formatAge(flag.last_activity_at)}` : "last activity unavailable"
-      button.appendChild(element("span", "supervisor-flag-meta", `${flag.model} · flagged ${formatAge(flag.at)} · ${activity}`))
-      if (flag.review?.state === "unavailable") {
-        button.appendChild(element("span", "review-unavailable", "Review unavailable"))
-      }
-      button.addEventListener("click", () => selectSupervisorFlag(flag.session_id))
-      list.appendChild(button)
-    }
-    if (focusedSessionId) {
-      Array.from(list.querySelectorAll(".supervisor-flag"))
-        .find((button) => button.dataset.sessionId === focusedSessionId)
-        ?.focus({ preventScroll: true })
-    }
+    renderSupervisorPlaceholder(
+      container,
+      flags.length > 0
+        ? ""
+        : delayed
+          ? "Supervisor state unavailable; no retained rows to show"
+          : state.supervisorState === "loading"
+            ? "Loading supervisor flags…"
+            : "Supervisor / no sessions need attention",
+      delayed,
+    )
+
+    list.reconcile({
+      container,
+      keys: flags.map((flag) => flag.session_id),
+      entries: supervisorRows,
+      create: createSupervisorRow,
+      update: updateSupervisorRow,
+    })
   }
 
   /** Return the selected portal-owned design session, if design mode is active. */
@@ -531,23 +784,105 @@
       : null
   }
 
-  /** Render recent portal-owned sessions without mixing them into fleet cells. */
+  /* ── Sessions board ──────────────────────────────────────────────────────────────────────
+     Two session fleets share one management board (design §6): portal-owned DESIGN sessions
+     and CLAUDE background sessions. Both are polled lists, so both go through the same keyed
+     reconciler as the fleet and the flag rail — a 10s poll must not rebuild a roster the
+     operator is reading, and selecting a row must survive the next poll.
+
+     Ownership is mirrored, never invented: `owned` comes from the backend, which enforces the
+     same gate server-side (`_require_owned_claude_agent`). The chip is a read/act signal for
+     the operator, not the authorization itself. */
+
+  /** Live recent-design row handles, keyed by portal id. */
+  const designRows = new Map()
+
+  /** The "no sessions yet" placeholder for the recent list. */
+  let designPlaceholder = null
+
+  /** Build one recent-design row. */
+  function createDesignRow(portalId) {
+    const button = element("button", "recent-design")
+    button.type = "button"
+    button.dataset.portalId = portalId
+    const title = element("span", "recent-design-title")
+    const meta = element("span", "recent-design-meta")
+    button.appendChild(title)
+    button.appendChild(meta)
+    return { node: button, button, title, meta, signature: null }
+  }
+
+  /** Refresh one recent-design row in place. */
+  function updateDesignRow(entry, portalId) {
+    const session = state.designSessions.get(portalId)
+    if (!session) return
+    const selected = state.selectedType === "design" && state.selectedId === portalId
+    const meta = `${session.kind} · ${session.draft_state.replaceAll("_", " ")} · r${session.revision}`
+    const signature = `${session.title}|${meta}|${selected ? 1 : 0}`
+    if (entry.signature === signature) return
+    entry.signature = signature
+    setClassName(entry.button, `recent-design${selected ? " selected" : ""}`)
+    setAttr(entry.button, "aria-pressed", String(selected))
+    setText(entry.title, session.title)
+    setText(entry.meta, meta)
+  }
+
+  /** Render the portal-owned design sessions as a keyed, in-place list. */
   function renderRecentDesigns() {
-    const list = $("#recent-design-list")
-    list.replaceChildren()
+    const container = $("#recent-design-list")
     const sessions = Array.from(state.designSessions.values())
-    if (sessions.length === 0) {
-      list.appendChild(element("p", "empty-state", "No portal-owned design sessions yet."))
+
+    designPlaceholder = adoptPlaceholder(container, designPlaceholder)
+    if (sessions.length === 0 && !designPlaceholder) {
+      designPlaceholder = element("p", "empty-state", "No portal-owned design sessions yet.")
+      container.appendChild(designPlaceholder)
+    } else if (sessions.length > 0 && designPlaceholder) {
+      designPlaceholder.remove()
+      designPlaceholder = null
+    }
+
+    list.reconcile({
+      container,
+      keys: sessions.map((session) => session.portal_id),
+      entries: designRows,
+      create: createDesignRow,
+      update: updateDesignRow,
+    })
+  }
+
+  /**
+   * Fill the Detail surface's glance line: phase, then cost and tokens (design §3.2 steps 3-4).
+   *
+   * These are the two facts an operator wants immediately after "is it healthy": how far
+   * through the workflow the cell is, and what it has spent so far. Both come from the same
+   * retained snapshot the fleet card uses, so the sheet can never disagree with the card that
+   * opened it. Surfaces without per-cell telemetry (design sessions, supervisor flags, Claude
+   * background sessions) pass `null` and the line is hidden rather than shown as blank.
+   */
+  function renderDetailGlance(cellId) {
+    const phase = $("#selected-phase")
+    const glance = $("#selected-glance")
+    if (!cellId) {
+      setHidden(phase, true)
+      setHidden(glance, true)
       return
     }
-    for (const session of sessions) {
-      const button = element("button", `recent-design${state.selectedType === "design" && state.selectedId === session.portal_id ? " selected" : ""}`)
-      button.type = "button"
-      button.appendChild(element("span", "recent-design-title", session.title))
-      button.appendChild(element("span", "recent-design-meta", `${session.kind} · ${session.draft_state.replaceAll("_", " ")} · r${session.revision}`))
-      button.addEventListener("click", () => selectDesignSession(session.portal_id, true))
-      list.appendChild(button)
-    }
+
+    const label = phaseLabel(cellId)
+    setHidden(phase, !label)
+    if (label) setText(phase, label)
+
+    const samples = samplesForCell(cellId)
+    const costs = samples.map((sample) => core.safeNumber(sample.cost)).filter((value) => value !== null)
+    const totalCost = costs.reduce((sum, value) => sum + value, 0)
+    const inputTokens = samples.map((sample) => core.safeNumber(sample.input_tokens))
+      .filter((value) => value !== null).reduce((sum, value) => sum + value, 0)
+    const outputTokens = samples.map((sample) => core.safeNumber(sample.output_tokens))
+      .filter((value) => value !== null).reduce((sum, value) => sum + value, 0)
+
+    setHidden(glance, samples.length === 0)
+    setText($("#selected-cost"), costs.length ? `${formatCost(totalCost)} reported` : "no cost reported")
+    setText($("#selected-tokens"), `${compactTokens(inputTokens)} in · ${compactTokens(outputTokens)} out`)
   }
 
   /** Mirror authoritative draft capabilities into the design control pane. */
@@ -611,41 +946,98 @@
       : "External session — showing a one-shot, best-effort log tail only, not a live stream."
   }
 
+  /** Live Claude roster card handles, keyed by session id. */
+  const claudeAgentCards = new Map()
+
+  /** The roster's empty/unavailable placeholder. */
+  let claudeAgentPlaceholder = null
+
+  /** Build one Claude background-session card (same card shape as a fleet cell). */
+  function createClaudeAgentCard(agentId) {
+    const card = element("article", "cell-card claude-agent-card")
+    const button = element("button", "cell-select")
+    button.type = "button"
+    button.title = agentId
+    button.dataset.claudeAgentId = agentId
+
+    const heading = element("div", "cell-heading")
+    const statusWord = element("span", "status-word")
+    const ownership = element("span", "ownership-chip")
+    heading.appendChild(statusWord)
+    heading.appendChild(ownership)
+    button.appendChild(heading)
+    button.appendChild(element("span", "cell-id", agentId))
+
+    const task = element("span", "claude-agent-task")
+    const meta = element("span", "claude-agent-meta")
+    button.appendChild(task)
+    button.appendChild(meta)
+    card.appendChild(button)
+    return { node: card, card, button, statusWord, ownership, task, meta, signature: null }
+  }
+
+  /**
+   * Refresh one roster card in place.
+   *
+   * `row` is the reconciler's DOM handle; `entry` is the roster record from the API, keeping
+   * the same name the rest of the Claude-agent code uses for a roster entry.
+   */
+  function updateClaudeAgentCard(row, agentId) {
+    const entry = state.claudeAgents.get(agentId)
+    if (!entry) return
+    // The roster reports its own status strings; anything outside the known lifecycle set is
+    // shown as UNKNOWN rather than silently colored as something it is not.
+    const knownStatuses = new Set(["queued", "running", "done", "failed", "timeout"])
+    const raw = String(entry.status || "unknown").toLowerCase()
+    const vocabulary = fleet.lifecycle(knownStatuses.has(raw) ? raw : "unknown")
+    const selected = state.selectedType === "claude_agent" && state.selectedClaudeAgentId === agentId
+    const task = entry.task || entry.title || "No task recorded"
+    const meta = `${entry.model || "unknown model"} · ${entry.cwd || "unknown cwd"}`
+    const signature = `${vocabulary.key}|${entry.owned ? 1 : 0}|${task}|${meta}|${selected ? 1 : 0}`
+    if (row.signature === signature) return
+    row.signature = signature
+
+    setClassName(row.card, `cell-card claude-agent-card ${vocabulary.className}${selected ? " selected" : ""}`)
+    setAttr(row.button, "aria-pressed", String(selected))
+    setAttr(row.button, "aria-label", `${entry.owned ? "Owned" : "External"} Claude background session ${agentId}`)
+    applyStatusWord(row.statusWord, vocabulary)
+    setClassName(row.ownership, `ownership-chip ${entry.owned ? "owned" : "external"}`)
+    setText(row.ownership, entry.owned ? "OWNED" : "EXTERNAL")
+    setText(row.task, task)
+    setText(row.meta, meta)
+  }
+
   /** Render urgency-agnostic Claude background-session cards, owned first. */
   function renderClaudeAgentGrid() {
-    const grid = $("#claude-agent-grid")
-    grid.setAttribute("aria-busy", "false")
-    grid.replaceChildren()
+    const container = $("#claude-agent-grid")
+    setAttr(container, "aria-busy", "false")
     const entries = Array.from(state.claudeAgents.values())
-    if (state.claudeAgentsUnavailable) {
-      grid.appendChild(element("p", "empty-state", "Supervisor not running — start scripts/claude_agents_supervisor.py to see the roster."))
-    } else if (entries.length === 0) {
-      grid.appendChild(element("p", "empty-state", "No Claude background sessions observed."))
-    }
-    const knownStatuses = new Set(["queued", "running", "done", "failed", "timeout"])
-    for (const entry of entries) {
-      const selected = state.selectedType === "claude_agent" && state.selectedClaudeAgentId === entry.id
-      const status = String(entry.status || "unknown").toLowerCase()
-      const statusWord = knownStatuses.has(status) ? status : "unknown"
-      const card = element("article", `cell-card claude-agent-card status-${statusWord}${selected ? " selected" : ""}`)
-      const button = element("button", "cell-select")
-      button.type = "button"
-      button.title = entry.id
-      button.setAttribute("aria-pressed", String(selected))
-      button.setAttribute("aria-label", `${entry.owned ? "Owned" : "External"} Claude background session ${entry.id}`)
-      button.addEventListener("click", () => selectClaudeAgent(entry.id, true))
 
-      const heading = element("div", "cell-heading")
-      heading.appendChild(element("span", `status-word status-${statusWord}`, statusWord.toUpperCase()))
-      heading.appendChild(element("span", `ownership-chip ${entry.owned ? "owned" : "external"}`, entry.owned ? "OWNED" : "EXTERNAL"))
-      button.appendChild(heading)
-      button.appendChild(element("span", "cell-id", entry.id))
-      button.appendChild(element("span", "claude-agent-task", entry.task || entry.title || "No task recorded"))
-      button.appendChild(element("span", "claude-agent-meta", `${entry.model || "unknown model"} · ${entry.cwd || "unknown cwd"}`))
-      card.appendChild(button)
-      grid.appendChild(card)
+    claudeAgentPlaceholder = adoptPlaceholder(container, claudeAgentPlaceholder)
+    const placeholderText = state.claudeAgentsUnavailable
+      ? "Supervisor not running — start scripts/claude_agents_supervisor.py to see the roster."
+      : entries.length === 0
+        ? "No Claude background sessions observed."
+        : ""
+    if (placeholderText) {
+      if (!claudeAgentPlaceholder) {
+        claudeAgentPlaceholder = element("p", "empty-state")
+        container.appendChild(claudeAgentPlaceholder)
+      }
+      setText(claudeAgentPlaceholder, placeholderText)
+    } else if (claudeAgentPlaceholder) {
+      claudeAgentPlaceholder.remove()
+      claudeAgentPlaceholder = null
     }
-    $("#claude-agent-total").textContent = String(entries.length)
+
+    list.reconcile({
+      container,
+      keys: entries.map((agent) => agent.id),
+      entries: claudeAgentCards,
+      create: createClaudeAgentCard,
+      update: updateClaudeAgentCard,
+    })
+    setText($("#claude-agent-total"), entries.length)
   }
 
   /** Fill the start-session workdir control from backend-owned approved labels. */
@@ -692,9 +1084,9 @@
     $("#ownership-badge").className = (design || supervisor || claudeAgent?.owned) ? "interactive-badge" : "readonly-badge"
     if (design) {
       $("#transcript-title").textContent = design.title
-      $("#selected-status").textContent = design.lifecycle_state.toUpperCase()
-      $("#selected-status").className = "status-word status-running"
+      applyStatusWord($("#selected-status"), { ...fleet.lifecycle("running"), word: design.lifecycle_state.toUpperCase() })
       $("#selected-stream-state").textContent = state.streamState.toUpperCase()
+      renderDetailGlance(null)
       renderDesignControls(design)
       renderRecentDesigns()
       return
@@ -705,10 +1097,10 @@
         $("#transcript-mode").textContent = "Supervisor / Observed activity"
         $("#transcript-title").textContent = supervisor.title || supervisor.session_id
         const assessment = supervisorStatus(supervisor.status)
-        $("#selected-status").textContent = assessment.label
-        $("#selected-status").className = `status-word flag-status-${assessment.className}`
+        applyStatusWord($("#selected-status"), assessment.vocabulary)
         $("#selected-stream-state").textContent = state.streamState.toUpperCase()
       }
+      renderDetailGlance(null)
       renderSupervisorControls(supervisor)
       renderSupervisorFlags()
       renderRecentDesigns()
@@ -717,17 +1109,17 @@
     if (claudeAgent) {
       const status = String(claudeAgent.status || "unknown").toLowerCase()
       $("#transcript-title").textContent = claudeAgent.id
-      $("#selected-status").textContent = status.toUpperCase()
-      $("#selected-status").className = `status-word status-${status}`
+      applyStatusWord($("#selected-status"), fleet.lifecycle(status))
       $("#selected-stream-state").textContent = state.streamState.toUpperCase()
+      renderDetailGlance(null)
       renderClaudeAgentControls(claudeAgent)
       renderRecentDesigns()
       return
     }
     const status = cellId ? core.normalizeStatus(state.cells[cellId]) : "unknown"
     $("#transcript-title").textContent = cellId || "NO CELL SELECTED"
-    $("#selected-status").textContent = status.toUpperCase()
-    $("#selected-status").className = `status-word status-${status}`
+    applyStatusWord($("#selected-status"), fleet.lifecycle(status))
+    renderDetailGlance(cellId)
     $("#selected-stream-state").textContent = state.streamState.toUpperCase()
     $("#control-cell").textContent = cellId || "No cell selected"
     $("#control-status").textContent = status.toUpperCase()
@@ -1331,6 +1723,9 @@
       }
       state.supervisorFlags = incoming
       state.supervisorWarnings = Array.isArray(data.warnings) ? data.warnings : []
+      // `source` is the envelope's own account of where the flags came from: "redis" (live),
+      // "file" (a retained snapshot, therefore degraded), or "none".
+      state.supervisorSource = typeof data.source === "string" ? data.source : "unknown"
       state.supervisorState = data.degraded ? "degraded" : "live"
       if (state.supervisorSelection && incoming.has(state.supervisorSelection.session_id)) {
         const refreshed = incoming.get(state.supervisorSelection.session_id)
@@ -1355,6 +1750,7 @@
       renderSelection()
     } catch (error) {
       state.supervisorState = "unavailable"
+      state.supervisorSource = "none"
       state.supervisorWarnings = [error.message || "Supervisor data unavailable"]
       renderSupervisorFlags()
       announce("Supervisor data unavailable; showing last useful rows", true)
@@ -2079,6 +2475,34 @@
     $("#detach-design").addEventListener("click", detachSelectedStream)
     $("#save-spec-form").addEventListener("submit", saveSpec)
     $("#run-workflow-form").addEventListener("submit", runWorkflow)
+    // One delegated listener for the entire matrix, instead of one per card. Cards now
+    // outlive a poll, so per-card binding would work too — but delegation means a newly
+    // created card is interactive the instant it is appended, with no binding step to forget,
+    // and it keeps the listener count flat as the fleet grows (design §2.4).
+    // Sessions board: both rosters are keyed lists whose rows outlive a poll, so selection is
+    // delegated once per container rather than re-bound per row on every render.
+    $("#recent-design-list").addEventListener("click", (event) => {
+      const row = event.target instanceof Element ? event.target.closest(".recent-design") : null
+      const portalId = row?.dataset.portalId
+      if (portalId) selectDesignSession(portalId, true)
+    })
+    $("#claude-agent-grid").addEventListener("click", (event) => {
+      const button = event.target instanceof Element ? event.target.closest(".cell-select") : null
+      const agentId = button?.dataset.claudeAgentId
+      if (agentId) selectClaudeAgent(agentId, true)
+    })
+    // The flag rail is read-only: this listener only opens the Detail surface for a row, it
+    // never sends a request (design §4.3).
+    $("#supervisor-flag-list").addEventListener("click", (event) => {
+      const row = event.target instanceof Element ? event.target.closest(".supervisor-flag") : null
+      const sessionId = row?.dataset.sessionId
+      if (sessionId) selectSupervisorFlag(sessionId)
+    })
+    $("#fleet-grid").addEventListener("click", (event) => {
+      const button = event.target instanceof Element ? event.target.closest(".cell-select") : null
+      const cellId = button?.dataset.cellId
+      if (cellId) selectCell(cellId, true)
+    })
     document.querySelectorAll(".filter-chip").forEach((button) => {
       button.addEventListener("click", () => {
         state.filter = button.dataset.filter
@@ -2197,9 +2621,36 @@
       const warning = "This enqueues the full experiment matrix (~30 cells) on the default model and will incur real cost. Continue?"
       if (window.confirm(warning)) runQueueAction("enqueue")
     })
+    /* Clearing the queue is the System sheet's only irreversible action, so it goes through
+       the same two-step, type-to-confirm door as the supervisor Interrupt rather than a
+       browser `confirm()` dialog: the phrase has to be typed, which cannot be dismissed by
+       reflex, and the door states the blast radius in place (design §3.4, §7.2). */
+    const QUEUE_CLEAR_PHRASE = "CLEAR QUEUE"
+
+    /** Open or close the clear-queue door, resetting its typed confirmation each time. */
+    function setQueueClearDoor(open) {
+      const door = $("#queue-clear-door")
+      door.hidden = !open
+      $("#clear-queue-button").setAttribute("aria-expanded", String(open))
+      $("#queue-clear-confirmation").value = ""
+      $("#confirm-queue-clear").disabled = true
+      if (open) $("#queue-clear-confirmation").focus()
+      else $("#clear-queue-button").focus()
+    }
+
     $("#clear-queue-button").addEventListener("click", () => {
-      const warning = "This clears queued metadata; it does not cancel running work."
-      if (window.confirm(warning)) runQueueAction("clear")
+      setQueueClearDoor($("#queue-clear-door").hidden)
+    })
+    $("#cancel-queue-clear").addEventListener("click", () => setQueueClearDoor(false))
+    $("#queue-clear-confirmation").addEventListener("input", (event) => {
+      // Exact match only, including case: an approximate match would defeat the point of
+      // making the operator retype the phrase.
+      $("#confirm-queue-clear").disabled = event.target.value !== QUEUE_CLEAR_PHRASE
+    })
+    $("#confirm-queue-clear").addEventListener("click", () => {
+      if ($("#queue-clear-confirmation").value !== QUEUE_CLEAR_PHRASE) return
+      setQueueClearDoor(false)
+      runQueueAction("clear")
     })
     bindClaudeAgentControls()
   }
@@ -2408,4 +2859,4 @@
   window.setInterval(loadClaudeAgents, CLAUDE_AGENTS_POLL_MS)
   window.setInterval(loadClaudeAgentDaemon, CLAUDE_AGENTS_DAEMON_POLL_MS)
   window.setInterval(tick, 1000)
-})(window.ControlRoomCore)
+})(window.ControlRoomCore, window)
