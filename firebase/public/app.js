@@ -72,6 +72,11 @@
       'story_sessions': function() { return D.summary.story_sessions || D.summary.sessions_total; },
       'stories_total': function() { return D.summary.stories_total || 0; },
       'story_total_cost': function() { return fmtUSD(D.summary.story_total_cost || D.summary.total_cost); },
+      // Canonical-registry counts — the repointed source of truth for corpus size
+      // (current stories / clean single-task findings / contaminated tombstoned cells).
+      'canonical_stories': function() { return D.summary.canonical_stories; },
+      'canonical_findings': function() { return D.summary.canonical_findings; },
+      'tombstoned_excluded': function() { return D.summary.tombstoned_excluded; },
       'costgap': function() { return D.derived.cost_gap; },
       'passrate': function() { return D.derived.overall_pass_rate; },
       'deepseek_cost': function() { return fmtUSD(D.derived.total_cost_deepseek); },

@@ -100,8 +100,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.63,
       "correctness": 1.0,
@@ -128,8 +128,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -142,8 +142,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -156,8 +156,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -254,8 +254,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -268,8 +268,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -408,8 +408,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.37,
       "correctness": 1.0,
@@ -422,8 +422,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -436,8 +436,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.63,
       "correctness": 0.8,
@@ -562,8 +562,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.65,
       "correctness": 0.8,
@@ -576,8 +576,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -758,8 +758,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 0.7,
@@ -814,8 +814,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -842,8 +842,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -870,8 +870,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 0.7,
@@ -1262,8 +1262,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -1290,8 +1290,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -1388,8 +1388,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.62,
       "correctness": 1.0,
@@ -1444,8 +1444,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.67,
       "correctness": 1.0,
@@ -1514,8 +1514,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -1542,8 +1542,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.65,
       "correctness": 1.0,
@@ -1626,8 +1626,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -1696,8 +1696,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -1724,8 +1724,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.66,
       "correctness": 1.0,
@@ -1920,8 +1920,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.44,
       "correctness": 1.0,
@@ -1948,8 +1948,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.64,
       "correctness": 1.0,
@@ -2004,8 +2004,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.61,
       "correctness": 1.0,
@@ -2018,8 +2018,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.43,
       "correctness": 0.7,
@@ -2032,8 +2032,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.67,
       "correctness": 1.0,
@@ -2046,8 +2046,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -2102,8 +2102,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 0.8,
@@ -2326,8 +2326,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -2340,8 +2340,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -2382,8 +2382,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.59,
       "correctness": 0.8,
@@ -2480,8 +2480,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -2536,8 +2536,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 0.88,
@@ -2648,8 +2648,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": NaN,
       "correctness": 1.0,
@@ -2704,8 +2704,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.6,
       "correctness": 0.7,
@@ -2718,8 +2718,8 @@
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.38,
       "correctness": 1.0,

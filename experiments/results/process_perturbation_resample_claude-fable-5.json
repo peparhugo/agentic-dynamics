@@ -1,10 +1,10 @@
 {
   "experiment": "process_perturbation_resample",
-  "model": "claude-fable-5",
+  "model": "claude-sonnet-5",
   "runs": [
     {
       "type": "baseline",
-      "model": "anthropic/claude-fable-5",
+      "model": "anthropic/claude-sonnet-5",
       "operator": "baseline",
       "perturbation_class": "baseline",
       "strength": 0.0,
@@ -39,7 +39,7 @@
     },
     {
       "type": "perturbed",
-      "model": "anthropic/claude-fable-5",
+      "model": "anthropic/claude-sonnet-5",
       "operator": "inject_alien_vocab",
       "perturbation_class": "process_perturbation",
       "strength": 0.5,
@@ -88,7 +88,7 @@
     },
     {
       "type": "perturbed",
-      "model": "anthropic/claude-fable-5",
+      "model": "anthropic/claude-sonnet-5",
       "operator": "shift_framing",
       "perturbation_class": "process_perturbation",
       "strength": 0.5,
@@ -137,7 +137,7 @@
     },
     {
       "type": "perturbed",
-      "model": "anthropic/claude-fable-5",
+      "model": "anthropic/claude-sonnet-5",
       "operator": "reverse_causality",
       "perturbation_class": "process_perturbation",
       "strength": 0.5,
@@ -186,7 +186,7 @@
     },
     {
       "type": "perturbed",
-      "model": "anthropic/claude-fable-5",
+      "model": "anthropic/claude-sonnet-5",
       "operator": "force_abandonment",
       "perturbation_class": "process_perturbation",
       "strength": 0.5,

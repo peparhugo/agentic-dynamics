@@ -1,8 +1,8 @@
-/* Generated 2026-08-19 22:52:12 UTC by build_data.py */
+/* Generated 2026-08-19 23:04:57 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-19T22:52:12.591381+00:00",
+    "generated_at": "2026-08-19T23:04:57.210415+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -287,105 +287,6 @@ window.DYNAMICS_DATA = {
     }
   ],
   "perturbation_models": [
-    {
-      "id": "anthropic/claude-sonnet-5",
-      "label": "Claude Sonnet 5",
-      "provider": "anthropic",
-      "reports": 7,
-      "reports_valid": 7,
-      "reports_narrated": 0,
-      "n_reports": 7,
-      "n_valid": 7,
-      "n_narrated": 0,
-      "avg_cost": 0.1851,
-      "total_cost": 1.296,
-      "cost_ci95": [
-        0.0,
-        0.5322
-      ],
-      "pass_rate": null,
-      "strategy_cons": 1,
-      "strategy_expl": 2,
-      "strategy_waste": 0,
-      "strategy_efficient": 3,
-      "avg_loc": 902,
-      "avg_thinking_ratio": 0.0,
-      "avg_escape": 0.49,
-      "avg_arch_divergence": 0.429,
-      "avg_composite_score": 0.759,
-      "avg_energy_j": 766.5,
-      "avg_energy_j_per_loc": 0.85,
-      "correctness_per_dollar": 714285715.1058,
-      "avg_quality_per_joule": 55.8661,
-      "avg_constraints_met": 7.9,
-      "avg_constraints_total": 9.0,
-      "tokens_total": 23401,
-      "tokens_input": 110,
-      "tokens_output": 23291,
-      "tokens_reasoning": 0,
-      "avg_narration_penalty": null,
-      "avg_struct_divergence": null,
-      "avg_code_quality": null,
-      "avg_comment_ratio": null,
-      "narration_rate": null,
-      "ast_files": null,
-      "ast_functions": null,
-      "ast_classes": null,
-      "ast_type_hint_pct": null,
-      "ast_docstring_pct": null,
-      "cost_input": null,
-      "cost_output": null,
-      "cost_reasoning": null,
-      "cost_cache": null,
-      "tokens_cache_read": null,
-      "tokens_cache_write": null,
-      "_historical_fields": [
-        "avg_narration_penalty",
-        "avg_struct_divergence",
-        "avg_code_quality",
-        "avg_comment_ratio",
-        "narration_rate",
-        "ast_files",
-        "ast_functions",
-        "ast_classes",
-        "ast_type_hint_pct",
-        "ast_docstring_pct",
-        "cost_input",
-        "cost_output",
-        "cost_reasoning",
-        "cost_cache",
-        "tokens_cache_read",
-        "tokens_cache_write"
-      ],
-      "_provenance": {
-        "reports": "M",
-        "reports_valid": "M",
-        "reports_narrated": "M",
-        "total_cost": "M",
-        "tokens_input": "M",
-        "tokens_output": "M",
-        "tokens_reasoning": "M",
-        "tokens_total": "M",
-        "avg_cost": "C",
-        "cost_ci95": "C",
-        "avg_loc": "C",
-        "avg_thinking_ratio": "C",
-        "avg_escape": "C",
-        "avg_arch_divergence": "C",
-        "avg_composite_score": "C",
-        "avg_energy_j": "C",
-        "avg_energy_j_per_loc": "C",
-        "avg_quality_per_joule": "C",
-        "correctness_per_dollar": "C",
-        "avg_constraints_met": "C",
-        "avg_constraints_total": "C",
-        "strategy_cons": "C",
-        "strategy_expl": "C",
-        "strategy_waste": "C",
-        "strategy_efficient": "C",
-        "pass_rate": null
-      }
-    },
     {
       "id": "anthropic/claude-haiku-4-5",
       "label": "anthropic/claude-haiku-4-5",
@@ -783,6 +684,105 @@ window.DYNAMICS_DATA = {
       }
     },
     {
+      "id": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "provider": "anthropic",
+      "reports": 12,
+      "reports_valid": 12,
+      "reports_narrated": 0,
+      "n_reports": 12,
+      "n_valid": 12,
+      "n_narrated": 0,
+      "avg_cost": 0.3065,
+      "total_cost": 3.6785,
+      "cost_ci95": [
+        0.1126,
+        0.5311
+      ],
+      "pass_rate": null,
+      "strategy_cons": 2,
+      "strategy_expl": 2,
+      "strategy_waste": 0,
+      "strategy_efficient": 6,
+      "avg_loc": 691,
+      "avg_thinking_ratio": 0.0,
+      "avg_escape": 0.46,
+      "avg_arch_divergence": 0.389,
+      "avg_composite_score": 0.757,
+      "avg_energy_j": 1622.8,
+      "avg_energy_j_per_loc": 2.35,
+      "correctness_per_dollar": 416666668.1888,
+      "avg_quality_per_joule": 32.5887,
+      "avg_constraints_met": 6.7,
+      "avg_constraints_total": 7.8,
+      "tokens_total": 84843,
+      "tokens_input": 266,
+      "tokens_output": 84577,
+      "tokens_reasoning": 0,
+      "avg_narration_penalty": null,
+      "avg_struct_divergence": null,
+      "avg_code_quality": null,
+      "avg_comment_ratio": null,
+      "narration_rate": null,
+      "ast_files": null,
+      "ast_functions": null,
+      "ast_classes": null,
+      "ast_type_hint_pct": null,
+      "ast_docstring_pct": null,
+      "cost_input": null,
+      "cost_output": null,
+      "cost_reasoning": null,
+      "cost_cache": null,
+      "tokens_cache_read": null,
+      "tokens_cache_write": null,
+      "_historical_fields": [
+        "avg_narration_penalty",
+        "avg_struct_divergence",
+        "avg_code_quality",
+        "avg_comment_ratio",
+        "narration_rate",
+        "ast_files",
+        "ast_functions",
+        "ast_classes",
+        "ast_type_hint_pct",
+        "ast_docstring_pct",
+        "cost_input",
+        "cost_output",
+        "cost_reasoning",
+        "cost_cache",
+        "tokens_cache_read",
+        "tokens_cache_write"
+      ],
+      "_provenance": {
+        "reports": "M",
+        "reports_valid": "M",
+        "reports_narrated": "M",
+        "total_cost": "M",
+        "tokens_input": "M",
+        "tokens_output": "M",
+        "tokens_reasoning": "M",
+        "tokens_total": "M",
+        "avg_cost": "C",
+        "cost_ci95": "C",
+        "avg_loc": "C",
+        "avg_thinking_ratio": "C",
+        "avg_escape": "C",
+        "avg_arch_divergence": "C",
+        "avg_composite_score": "C",
+        "avg_energy_j": "C",
+        "avg_energy_j_per_loc": "C",
+        "avg_quality_per_joule": "C",
+        "correctness_per_dollar": "C",
+        "avg_constraints_met": "C",
+        "avg_constraints_total": "C",
+        "strategy_cons": "C",
+        "strategy_expl": "C",
+        "strategy_waste": "C",
+        "strategy_efficient": "C",
+        "pass_rate": null
+      }
+    },
+    {
       "id": "openai/gpt-5.6",
       "label": "GPT-5.6",
       "provider": "openai",
@@ -879,105 +879,6 @@ window.DYNAMICS_DATA = {
         "strategy_waste": "C",
         "strategy_efficient": "C",
         "pass_rate": "M"
-      }
-    },
-    {
-      "id": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
-      "provider": "anthropic",
-      "reports": 5,
-      "reports_valid": 5,
-      "reports_narrated": 0,
-      "n_reports": 5,
-      "n_valid": 5,
-      "n_narrated": 0,
-      "avg_cost": 0.4765,
-      "total_cost": 2.3825,
-      "cost_ci95": [
-        0.2924,
-        0.6004
-      ],
-      "pass_rate": null,
-      "strategy_cons": 1,
-      "strategy_expl": 0,
-      "strategy_waste": 0,
-      "strategy_efficient": 3,
-      "avg_loc": 396,
-      "avg_thinking_ratio": 0.0,
-      "avg_escape": 0.41,
-      "avg_arch_divergence": 0.333,
-      "avg_composite_score": 0.752,
-      "avg_energy_j": 2821.7,
-      "avg_energy_j_per_loc": 7.13,
-      "correctness_per_dollar": 2.5051,
-      "avg_quality_per_joule": 0.0003,
-      "avg_constraints_met": 5.0,
-      "avg_constraints_total": 6.0,
-      "tokens_total": 61442,
-      "tokens_input": 156,
-      "tokens_output": 61286,
-      "tokens_reasoning": 0,
-      "avg_narration_penalty": null,
-      "avg_struct_divergence": null,
-      "avg_code_quality": null,
-      "avg_comment_ratio": null,
-      "narration_rate": null,
-      "ast_files": null,
-      "ast_functions": null,
-      "ast_classes": null,
-      "ast_type_hint_pct": null,
-      "ast_docstring_pct": null,
-      "cost_input": null,
-      "cost_output": null,
-      "cost_reasoning": null,
-      "cost_cache": null,
-      "tokens_cache_read": null,
-      "tokens_cache_write": null,
-      "_historical_fields": [
-        "avg_narration_penalty",
-        "avg_struct_divergence",
-        "avg_code_quality",
-        "avg_comment_ratio",
-        "narration_rate",
-        "ast_files",
-        "ast_functions",
-        "ast_classes",
-        "ast_type_hint_pct",
-        "ast_docstring_pct",
-        "cost_input",
-        "cost_output",
-        "cost_reasoning",
-        "cost_cache",
-        "tokens_cache_read",
-        "tokens_cache_write"
-      ],
-      "_provenance": {
-        "reports": "M",
-        "reports_valid": "M",
-        "reports_narrated": "M",
-        "total_cost": "M",
-        "tokens_input": "M",
-        "tokens_output": "M",
-        "tokens_reasoning": "M",
-        "tokens_total": "M",
-        "avg_cost": "C",
-        "cost_ci95": "C",
-        "avg_loc": "C",
-        "avg_thinking_ratio": "C",
-        "avg_escape": "C",
-        "avg_arch_divergence": "C",
-        "avg_composite_score": "C",
-        "avg_energy_j": "C",
-        "avg_energy_j_per_loc": "C",
-        "avg_quality_per_joule": "C",
-        "correctness_per_dollar": "C",
-        "avg_constraints_met": "C",
-        "avg_constraints_total": "C",
-        "strategy_cons": "C",
-        "strategy_expl": "C",
-        "strategy_waste": "C",
-        "strategy_efficient": "C",
-        "pass_rate": null
       }
     }
   ],
@@ -1209,18 +1110,6 @@ window.DYNAMICS_DATA = {
           "avg_energy_j": 4659.6,
           "low_n": true
         },
-        "Claude Fable 5": {
-          "n": 4,
-          "avg_cost": 0.4391,
-          "cost_ci95": null,
-          "avg_escape": 0.52,
-          "escape_ci95": null,
-          "avg_correctness": 0.9,
-          "correctness_ci95": null,
-          "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 2715.0,
-          "low_n": true
-        },
         "GPT-5.6 Luna": {
           "n": 2,
           "avg_cost": 0.0156,
@@ -1239,15 +1128,15 @@ window.DYNAMICS_DATA = {
       "perturbation_class": "baseline",
       "models": {
         "Claude Sonnet 5": {
-          "n": 1,
-          "avg_cost": 0.0,
+          "n": 2,
+          "avg_cost": 0.3131,
           "cost_ci95": null,
           "avg_escape": 0.0,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 0.0,
+          "avg_energy_j": 1624.1,
           "low_n": true
         },
         "DeepSeek v4 Pro": {
@@ -1296,18 +1185,6 @@ window.DYNAMICS_DATA = {
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.0,
           "avg_energy_j": 0.0,
-          "low_n": true
-        },
-        "Claude Fable 5": {
-          "n": 1,
-          "avg_cost": 0.6261,
-          "cost_ci95": null,
-          "avg_escape": 0.0,
-          "escape_ci95": null,
-          "avg_correctness": 1.0,
-          "correctness_ci95": null,
-          "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 3248.2,
           "low_n": true
         },
         "DeepSeek v4 Flash": {
@@ -1428,31 +1305,26 @@ window.DYNAMICS_DATA = {
         "avg_narration_penalty": null
       },
       "Claude Sonnet 5": {
-        "n": 2,
-        "low_n": true,
-        "avg_cost": 0.0407,
-        "cost_ci95": null,
-        "avg_escape": 0.86,
-        "escape_ci95": null,
-        "avg_correctness": 0.7,
-        "correctness_ci95": null,
+        "n": 6,
+        "low_n": false,
+        "avg_cost": 0.3063,
+        "cost_ci95": [
+          0.1161,
+          0.4907
+        ],
+        "avg_escape": 0.63,
+        "escape_ci95": [
+          0.4418,
+          0.8373
+        ],
+        "avg_correctness": 0.83,
+        "correctness_ci95": [
+          0.6333,
+          1.0
+        ],
         "avg_thinking_ratio": 0.0,
-        "avg_loc": 634,
-        "avg_tokens": 1206,
-        "avg_narration_penalty": null
-      },
-      "Claude Fable 5": {
-        "n": 4,
-        "low_n": true,
-        "avg_cost": 0.4391,
-        "cost_ci95": null,
-        "avg_escape": 0.52,
-        "escape_ci95": null,
-        "avg_correctness": 0.9,
-        "correctness_ci95": null,
-        "avg_thinking_ratio": 0.0,
-        "avg_loc": 373,
-        "avg_tokens": 11822,
+        "avg_loc": 460,
+        "avg_tokens": 8283,
         "avg_narration_penalty": null
       },
       "GPT-5.6 Luna": {
@@ -1672,17 +1544,17 @@ window.DYNAMICS_DATA = {
     },
     "baseline": {
       "Claude Sonnet 5": {
-        "n": 1,
+        "n": 2,
         "low_n": true,
-        "avg_cost": 0.0,
+        "avg_cost": 0.3131,
         "cost_ci95": null,
         "avg_escape": 0.0,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
         "avg_thinking_ratio": 0.0,
-        "avg_loc": 1019,
-        "avg_tokens": 0,
+        "avg_loc": 753,
+        "avg_tokens": 7078,
         "avg_narration_penalty": null
       },
       "DeepSeek v4 Pro": {
@@ -1739,20 +1611,6 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.0,
         "avg_loc": 902,
         "avg_tokens": 0,
-        "avg_narration_penalty": null
-      },
-      "Claude Fable 5": {
-        "n": 1,
-        "low_n": true,
-        "avg_cost": 0.6261,
-        "cost_ci95": null,
-        "avg_escape": 0.0,
-        "escape_ci95": null,
-        "avg_correctness": 1.0,
-        "correctness_ci95": null,
-        "avg_thinking_ratio": 0.0,
-        "avg_loc": 487,
-        "avg_tokens": 14155,
         "avg_narration_penalty": null
       },
       "DeepSeek v4 Flash": {
@@ -1871,7 +1729,7 @@ window.DYNAMICS_DATA = {
             "avg_cost": 0.40127,
             "efficiency": 2.49
           },
-          "anthropic/claude-fable-5": {
+          "anthropic/claude-sonnet-5": {
             "n": 5,
             "avg_correctness": 0.92,
             "avg_cost": 0.476491,
@@ -1941,12 +1799,6 @@ window.DYNAMICS_DATA = {
       }
     ],
     "strategies": {
-      "anthropic/claude-fable-5_only": {
-        "n": 5,
-        "total_cost": 2.382453,
-        "avg_cost": 0.476491,
-        "avg_correctness": 0.92
-      },
       "anthropic/claude-haiku-4-5_only": {
         "n": 7,
         "total_cost": 0.309695,
@@ -1954,10 +1806,10 @@ window.DYNAMICS_DATA = {
         "avg_correctness": 1.0
       },
       "anthropic/claude-sonnet-5_only": {
-        "n": 7,
-        "total_cost": 1.296024,
-        "avg_cost": 0.185146,
-        "avg_correctness": 0.9143
+        "n": 12,
+        "total_cost": 3.678477,
+        "avg_cost": 0.30654,
+        "avg_correctness": 0.9167
       },
       "deepseek/deepseek-v4-flash_only": {
         "n": 7,
@@ -2091,8 +1943,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.63,
       "correctness": 1.0,
@@ -2119,8 +1971,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -2133,8 +1985,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -2147,8 +1999,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -2245,8 +2097,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -2259,8 +2111,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -2399,8 +2251,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.37,
       "correctness": 1.0,
@@ -2413,8 +2265,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -2427,8 +2279,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.63,
       "correctness": 0.8,
@@ -2553,8 +2405,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.65,
       "correctness": 0.8,
@@ -2567,8 +2419,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -2749,8 +2601,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 0.7,
@@ -2805,8 +2657,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -2833,8 +2685,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -2861,8 +2713,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 0.7,
@@ -3253,8 +3105,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -3281,8 +3133,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -3379,8 +3231,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.62,
       "correctness": 1.0,
@@ -3435,8 +3287,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.67,
       "correctness": 1.0,
@@ -3505,8 +3357,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -3533,8 +3385,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.65,
       "correctness": 1.0,
@@ -3617,8 +3469,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -3687,8 +3539,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -3715,8 +3567,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.66,
       "correctness": 1.0,
@@ -3911,8 +3763,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.44,
       "correctness": 1.0,
@@ -3939,8 +3791,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.64,
       "correctness": 1.0,
@@ -3995,8 +3847,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.61,
       "correctness": 1.0,
@@ -4009,8 +3861,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.43,
       "correctness": 0.7,
@@ -4023,8 +3875,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.67,
       "correctness": 1.0,
@@ -4037,8 +3889,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -4093,8 +3945,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 0.8,
@@ -4317,8 +4169,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -4331,8 +4183,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -4373,8 +4225,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.59,
       "correctness": 0.8,
@@ -4471,8 +4323,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -4527,8 +4379,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 0.88,
@@ -4639,8 +4491,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": null,
       "correctness": 1.0,
@@ -4695,8 +4547,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.6,
       "correctness": 0.7,
@@ -4709,8 +4561,8 @@ window.DYNAMICS_DATA = {
       "quadrant": "wasteful"
     },
     {
-      "model": "anthropic/claude-fable-5",
-      "label": "Claude Fable 5",
+      "model": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
       "color": "rgba(6,182,212,0.75)",
       "escape": 0.38,
       "correctness": 1.0,
@@ -5065,7 +4917,7 @@ window.DYNAMICS_DATA = {
       "successful": 758,
       "failed": 14
     },
-    "generated_at": "2026-08-19T22:52:12.622271+00:00"
+    "generated_at": "2026-08-19T23:04:57.245062+00:00"
   },
   "reviews": {
     "models": [

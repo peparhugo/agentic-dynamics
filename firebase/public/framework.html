@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Operational Framework — Agentic Dynamics</title>
-<meta name="description" content="Operational principles derived from Agentic Dynamics: 10 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 1,097 story sessions and 227 perturbation experiments.">
+<meta name="description" content="Operational principles derived from Agentic Dynamics: 10 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 772 story sessions and 227 historical perturbation experiments.">
 <meta property="og:title" content="Operational Framework — Agentic Dynamics">
 <meta property="og:description" content="Agentic Dynamics operational framework: observed patterns, derived metrics, modeled extensions">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/framework.html">
@@ -654,7 +654,7 @@
 <section class="fsec" id="levers"><div class="inr wide">
 <div class="section-kicker">ECONOMIC INPUTS / MEASURED AND MODELED</div>
 <h2>Separate what is measured,<br>controlled, and modeled.</h2>
-<p class="lead">Observed cost, outcome, and narration fields come from 227 experiment worktrees. Retry rate is a workload input until the attempt ledger measures it directly. Modeling parameters (&beta;, EPM) are calibrated to your codebase and energy market. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
+<p class="lead">Observed cost, outcome, and narration fields come from 227 historical experiment worktrees. Retry rate is a workload input until the attempt ledger measures it directly. Modeling parameters (&beta;, EPM) are calibrated to your codebase and energy market. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
 <div class="lever-console">
   <article class="lever-lane">
     <div class="lane-head"><h3>Augmented Workforce (Rules 1&ndash;5)</h3><span>human + AI / per session</span></div>
@@ -700,7 +700,7 @@
 <section class="fsec" id="cost-model"><div class="inr wide">
 <div class="section-kicker">ECONOMICS / COST MODEL</div>
 <h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
-<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
+<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 227 historical experiment worktrees. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
 <div class="cost-station">
   <div class="formula-rail">
     <article class="formula-plate"><strong>Augmented Workforce <span style="color:var(--t3);font-size:0.7em">(Rules 1–5)</span></strong>c(t) = C&#8320;&times;EPM(t)&times;(1+&beta;&middot;v&middot;t)<br>C(N,v) = C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<br>CostPerOutcome = C(K/P, v)/K<br>C<sub>mo</sub> = E&times;C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<span class="formula-controls">Controls: C&#8320; / P / &beta; / v / EPM</span></article>
@@ -781,7 +781,7 @@
 <section class="fsec" id="rules"><div class="inr wide">
   <div class="section-kicker kicker-what">POLICY / PROPOSED CONTROL RULES</div>
   <h2>Turn observed patterns into<br>policy arms to test.</h2>
-  <p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 single-session perturbation experiments + 1,097 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
+  <p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 historical single-session perturbation experiments + 772 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
   <div class="rule-groups">
     <section class="rule-group" aria-labelledby="selection-rules">
       <div class="rule-group-head"><h3 id="selection-rules">Selection and verification</h3><p>Choose for resilience, explanation overhead, and working outcomes.</p></div>
@@ -827,11 +827,11 @@
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Per-Token Pricing (per 1M tokens)</h3>
 <div class="tbl" style="max-width:700px"><table><thead><tr><th>Provider</th><th>Input (cache miss)</th><th>Input (cache hit)</th><th>Output</th></tr></thead><tbody>
-<tr><td>DeepSeek v4 Pro</td><td>$0.435</td><td>$0.0036</td><td>$0.87</td></tr>
+<tr><td>DeepSeek v4 Pro</td><td>$0.66</td><td>$0.022</td><td>$1.98</td></tr>
 <tr><td>GPT-5.6 Luna</td><td>$0.20</td><td>$0.02</td><td>$1.20</td></tr>
 <tr><td>Claude Sonnet 5</td><td>$2.00</td><td>$0.20</td><td>$10.00</td></tr>
 </tbody></table></div>
-<p style="font-size:0.72rem;color:var(--t3);text-align:center;margin-top:0.5rem">Per 1M tokens. Sources: api-docs.deepseek.com (Aug 2026), Anthropic/OpenAI list pricing. Verified against the experiment billing database — every measured session cost reconciles to these rates.</p>
+<p style="font-size:0.72rem;color:var(--t3);text-align:center;margin-top:0.5rem">Per 1M tokens. Sources: api-docs.deepseek.com (Aug 2026), Anthropic/OpenAI list pricing. Verified against the experiment billing database — every measured session cost reconciles to these rates. DeepSeek rates are <strong>off-peak</strong>; peak is 2&times; (01:00&ndash;04:00 &amp; 06:00&ndash;10:00 UTC).</p>
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Cache Strategy</h3>
 <p class="lead">Three-layer caching turns the provider economics in your favor. Each layer compounds on the one below.</p>
@@ -865,7 +865,7 @@
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Per-Provider Reference Cards</h3>
 <div class="provider-grid">
-<article class="provider-card"><h4>DeepSeek</h4><p>Input: <strong>$0.435</strong> (miss) &middot; <strong>$0.0036</strong> (hit) &middot; Output: <strong>$0.87</strong><br>Cache: 78% hit rate measured — re-reads codebase each session (35K tokens/session)<br><strong>Best:</strong> High test thoroughness (34 tests/cell) at low cost. Strong for verifiable codegen.</p></article>
+<article class="provider-card"><h4>DeepSeek</h4><p>Input: <strong>$0.66</strong> (miss) &middot; <strong>$0.022</strong> (hit) &middot; Output: <strong>$1.98</strong> (off-peak; 2&times; at peak)<br>Cache: 78% hit rate measured — re-reads codebase each session (35K tokens/session)<br><strong>Best:</strong> High test thoroughness (34 tests/cell) at low cost. Strong for verifiable codegen.</p></article>
 <article class="provider-card"><h4>OpenAI (Luna)</h4><p>Input: <strong>$0.20</strong> &middot; Output: <strong>$1.20</strong> &middot; Cache hit: <strong>$0.02</strong><br>Cache: 97.5% hit rate measured — 6.3K tokens/session<br><strong>Best:</strong> Cheapest per cell ($0.09) but minimal test coverage (7 tests/cell). Route to low-risk tasks.</p></article>
 <article class="provider-card"><h4>Anthropic (Sonnet 5)</h4><p>Input: <strong>$2.00</strong> &middot; Output: <strong>$10.00</strong> &middot; Cache hit: <strong>$0.20</strong><br>Cache: 73% hit rate measured<br><strong>Best:</strong> 122 tests/cell — the deepest verification in the corpus. Reserve for safety-critical work.<br><strong style="color:var(--ac)">Subscription route:</strong> the same model runs through the Claude CLI adapter (<code style="color:var(--ac)">--backend claude_cli</code>) — subscription-safe, no per-token API spend.</p></article>
 </div>
@@ -875,19 +875,19 @@
 <div class="escalation-receipt">
 <div class="escalation-grid">
 <div>
-<h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Key metrics from 221 stories</h4>
+<h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Key metrics from 156 stories</h4>
 <div class="tbl"><table><tbody>
 <tr><td>Escalation multiplier (E&#8340;)</td><td style="color:var(--ac)">50&times; (Luna &rarr; Sonnet 5)</td></tr>
 <tr><td>Test coverage gap</td><td style="color:var(--am)">17&times; (7 vs 122 tests/cell)</td></tr>
-<tr><td>Sonnet vs DeepSeek gap</td><td style="color:var(--am)">33&times; ($4.58 vs $0.14)</td></tr>
+<tr><td>Sonnet vs DeepSeek gap</td><td style="color:var(--am)">30&times; ($4.78 vs $0.16 per session)</td></tr>
 </tbody></table></div>
 </div>
 <div>
 <h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Cost per escalation tier</h4>
 <div class="tbl"><table><tbody>
 <tr><td>Tier 1 (Luna)</td><td style="font-family:'JetBrains Mono',monospace">~$0.09</td></tr>
-<tr><td>Tier 2 (DeepSeek)</td><td style="font-family:'JetBrains Mono',monospace">~$0.14</td></tr>
-<tr><td>Tier 3 (Sonnet 5)</td><td style="font-family:'JetBrains Mono',monospace">~$4.58</td></tr>
+<tr><td>Tier 2 (DeepSeek)</td><td style="font-family:'JetBrains Mono',monospace">~$0.16</td></tr>
+<tr><td>Tier 3 (Sonnet 5)</td><td style="font-family:'JetBrains Mono',monospace">~$4.78</td></tr>
 <tr><td>Verification depth</td><td style="font-family:'JetBrains Mono',monospace;color:var(--ac)">7 &rarr; 122 tests/story</td></tr>
 </tbody></table></div>
 </div>
@@ -909,14 +909,14 @@
 
 <footer>
 <strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-  <span data-stat="story_sessions">1,097</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">221</span> stories · $<span data-stat="story_total_cost">288.69</span> measured<br>
+  <span data-stat="story_sessions">772</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">156</span> stories · $<span data-stat="story_total_cost">219.51</span> measured<br>
   <a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> · <a href="framework.html">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> · <a href="#playbook">Playbook</a>
 </footer>
 
 <script>
 let calcMode='augmented';
 const epmScenarios=[1.00,1.25,1.50],epmLabels=['Baseline (1.00&times;)','High (1.25&times;)','Extreme (1.50&times;)'];
-var models=(window.DYNAMICS_DATA&&window.DYNAMICS_DATA.calculator&&window.DYNAMICS_DATA.calculator.model_costs)||[{n:'DeepSeek v4 Pro',c:0.0158,p:0.84},{n:'GPT-5-nano',c:0.0057,p:0.89},{n:'GPT-5-mini',c:0.0258,p:0.94},{n:'GPT-5',c:0.159,p:0.7},{n:'GPT-5.5',c:0.282,p:1.0},{n:'GPT-5.6',c:0.4474,p:1.0},{n:'GPT-5.6-fast',c:0.6625,p:1.0},{n:'Claude Fable 5',c:1.0847,p:0.99}];
+var models=(window.DYNAMICS_DATA&&window.DYNAMICS_DATA.calculator&&window.DYNAMICS_DATA.calculator.model_costs)||[{n:'DeepSeek v4 Pro',c:0.0158,p:0.84},{n:'GPT-5-nano',c:0.0057,p:0.89},{n:'GPT-5-mini',c:0.0258,p:0.94},{n:'GPT-5',c:0.159,p:0.7},{n:'GPT-5.5',c:0.282,p:1.0},{n:'GPT-5.6',c:0.4474,p:1.0},{n:'GPT-5.6-fast',c:0.6625,p:1.0},{n:'Claude Sonnet 5',c:1.0847,p:0.99}];
 
 function setCalcMode(m){
   calcMode=m;
@@ -962,7 +962,7 @@ function updateChartToggle(active,other){['vwCost','vwThroughput'].forEach(funct
 
 function toggleHow(){var el=document.getElementById('howComputed'),btn=document.getElementById('howComputedToggle'),expanded=el.style.display==='none'||!el.style.display;el.style.display=expanded?'block':'none';if(btn){btn.textContent=expanded?'Hide how this is computed':'Show how this is computed';btn.setAttribute('aria-expanded',expanded)}}
 
-var chart,chartYears=3,chartMode='baseline',chartView='cost';function rebuildChart(yr){buildChart(yr,chartMode,chartView)}function buildChart(yr,mode,view){chartYears=yr||3;if(mode)chartMode=mode;if(view)chartView=view;var ctx=document.getElementById('costChart');if(!ctx)return;var E=10,S=20,D=20,V=500,B=0.001,Ny=S*D*12;var years=Array.from({length:chartYears+1},function(_,i){return 2024+i});var cYr=function(c,rate){var cum=0;return years.map(function(y){var EPM=1.00+(rate||0.016)*(y-2024);cum+=E*c*EPM*(Ny+B*V*Ny*(Ny-1)/2);return cum})};chart&&chart.destroy();if(chartView==='throughput'){var labels=[0.01,0.05,0.1,0.15,0.2,0.25,0.3];var jobCosts=function(r){return labels.map(function(fr){return 10000/(0.015*(1-fr*0.5)*(1+r*28.2))})};var datasets=[{label:'r=5% (DeepSeek)',data:jobCosts(0.05),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'r=11.5% (measured)',data:jobCosts(0.115),borderColor:'#22D3EE',backgroundColor:'rgba(34,211,238,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'r=11.4% (Claude)',data:jobCosts(0.114),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0}];chart=new Chart(ctx,{type:'line',data:{labels:labels.map(function(l){return (l*100).toFixed(0)+'%'}),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{text:'Retry Rate',display:true,color:'#a1a1aa'}},y:{title:{text:'Max Jobs/Day ($10K)',display:true,color:'#a1a1aa'},ticks:{callback:function(v){return (v/1000).toFixed(0)+'K'}}}},plugins:{legend:{labels:{color:'#a1a1aa',font:{size:10}}}}}});return}var datasets;if(mode==='sensitivity'){datasets=[{label:'DS - Aggressive EPM (2.5%/yr)',data:cYr(0.015,0.025),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.06)',borderDash:[6,3],fill:false,tension:0.3,borderWidth:2,pointRadius:0},{label:'DS - Baseline EPM (1.6%/yr)',data:cYr(0.015,0.016),borderColor:'#22D3EE',backgroundColor:'rgba(34,211,238,0.08)',fill:false,tension:0.3,borderWidth:2.5,pointRadius:0},{label:'DS - Optimistic EPM (0.8%/yr)',data:cYr(0.015,0.008),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',borderDash:[4,2],fill:false,tension:0.3,borderWidth:2,pointRadius:0}]}else{datasets=[{label:'DeepSeek v4 Pro ($0.015/sess)',data:cYr(0.015,0.016),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'GPT-5.6 ($0.43/sess)',data:cYr(0.43,0.016),borderColor:'#22D3EE',backgroundColor:'rgba(34,211,238,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'Claude Fable 5 ($1.01/sess)',data:cYr(1.01,0.016),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0}]}chart=new Chart(ctx,{type:'line',data:{labels:years,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{text:'Year',display:true,color:'#a1a1aa'}},y:{title:{text:'Cumulative Cost (USD)',display:true,color:'#a1a1aa'},ticks:{callback:function(v){return '$'+(v/1000).toFixed(0)+'K'}}}},plugins:{legend:{labels:{color:'#a1a1aa',font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return '$'+ctx.raw.toFixed(0)}}}}}})}
+var chart,chartYears=3,chartMode='baseline',chartView='cost';function rebuildChart(yr){buildChart(yr,chartMode,chartView)}function buildChart(yr,mode,view){chartYears=yr||3;if(mode)chartMode=mode;if(view)chartView=view;var ctx=document.getElementById('costChart');if(!ctx)return;var E=10,S=20,D=20,V=500,B=0.001,Ny=S*D*12;var years=Array.from({length:chartYears+1},function(_,i){return 2024+i});var cYr=function(c,rate){var cum=0;return years.map(function(y){var EPM=1.00+(rate||0.016)*(y-2024);cum+=E*c*EPM*(Ny+B*V*Ny*(Ny-1)/2);return cum})};chart&&chart.destroy();if(chartView==='throughput'){var labels=[0.01,0.05,0.1,0.15,0.2,0.25,0.3];var jobCosts=function(r){return labels.map(function(fr){return 10000/(0.015*(1-fr*0.5)*(1+r*28.2))})};var datasets=[{label:'r=5% (DeepSeek)',data:jobCosts(0.05),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'r=11.5% (measured)',data:jobCosts(0.115),borderColor:'#22D3EE',backgroundColor:'rgba(34,211,238,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'r=11.4% (Claude)',data:jobCosts(0.114),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0}];chart=new Chart(ctx,{type:'line',data:{labels:labels.map(function(l){return (l*100).toFixed(0)+'%'}),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{text:'Retry Rate',display:true,color:'#a1a1aa'}},y:{title:{text:'Max Jobs/Day ($10K)',display:true,color:'#a1a1aa'},ticks:{callback:function(v){return (v/1000).toFixed(0)+'K'}}}},plugins:{legend:{labels:{color:'#a1a1aa',font:{size:10}}}}}});return}var datasets;if(mode==='sensitivity'){datasets=[{label:'DS - Aggressive EPM (2.5%/yr)',data:cYr(0.015,0.025),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.06)',borderDash:[6,3],fill:false,tension:0.3,borderWidth:2,pointRadius:0},{label:'DS - Baseline EPM (1.6%/yr)',data:cYr(0.015,0.016),borderColor:'#22D3EE',backgroundColor:'rgba(34,211,238,0.08)',fill:false,tension:0.3,borderWidth:2.5,pointRadius:0},{label:'DS - Optimistic EPM (0.8%/yr)',data:cYr(0.015,0.008),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',borderDash:[4,2],fill:false,tension:0.3,borderWidth:2,pointRadius:0}]}else{datasets=[{label:'DeepSeek v4 Pro ($0.015/sess)',data:cYr(0.015,0.016),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'GPT-5.6 ($0.43/sess)',data:cYr(0.43,0.016),borderColor:'#22D3EE',backgroundColor:'rgba(34,211,238,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'Claude Sonnet 5 ($1.01/sess)',data:cYr(1.01,0.016),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0}]}chart=new Chart(ctx,{type:'line',data:{labels:years,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{text:'Year',display:true,color:'#a1a1aa'}},y:{title:{text:'Cumulative Cost (USD)',display:true,color:'#a1a1aa'},ticks:{callback:function(v){return '$'+(v/1000).toFixed(0)+'K'}}}},plugins:{legend:{labels:{color:'#a1a1aa',font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return '$'+ctx.raw.toFixed(0)}}}}}})}
 document.addEventListener('DOMContentLoaded',function(){
   updateROI();buildChart(3);
   // Anchor controls retain their href contract, so this listener supplies button-like group state without replacing them.

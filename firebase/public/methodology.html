@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>The Instrument — Agentic Dynamics</title>
-<meta name="description" content="How the Agentic Dynamics measurement instrument works. 249 sessions, 8 models, 10 perturbation operators, 7 recovery signals.">
+<meta name="description" content="How the Agentic Dynamics measurement instrument works. 249 historical sessions, 8 models, 10 perturbation operators, 7 recovery signals.">
 <meta property="og:title" content="The Instrument — Agentic Dynamics">
 <meta property="og:description" content="How the Agentic Dynamics measurement instrument works — 10 perturbation operators, pipeline, methodology">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/methodology.html">
@@ -43,13 +43,13 @@
 <div class="pulse"><span class="dot"></span> How — Research Methodology</div>
 <h1>The N x M Measurement Instrument</h1>
 <p class="lead" style="font-size:1.05rem;color:var(--t)">How the measurement instrument was built. A calibrated measurement apparatus that measures how specification degradation changes agent decisions, behavior, and the economics of the results — cost, correctness, and what those outcomes are worth.</p>
-<p style="max-width:800px;margin:0.5rem auto 0;font-size:0.8rem;color:var(--t2)">This page describes the 249-session perturbation corpus; the <a href="evidence.html" style="color:var(--ac)">Evidence page</a> leads with the newer 1,097-session linked-story corpus.</p>
+<p style="max-width:800px;margin:0.5rem auto 0;font-size:0.8rem;color:var(--t2)">This page describes the 249 historical perturbation sessions; the <a href="evidence.html" style="color:var(--ac)">Evidence page</a> leads with the newer 772-session linked-story corpus.</p>
 <div class="stats">
 <div class="stat"><div class="v">10</div><div class="l">Perturbation Operators</div></div>
 <div class="stat"><div class="v">7</div><div class="l">Recovery Signals</div></div>
 <div class="stat"><div class="v">4</div><div class="l">Strategy Archetypes</div></div>
 <div class="stat"><div class="v">34</div><div class="l">Experiment Configs</div></div>
-<div class="stat"><div class="v">249</div><div class="l">Sessions</div></div>
+<div class="stat"><div class="v">249</div><div class="l">Historical Sessions</div></div>
 <div class="stat"><div class="v">8</div><div class="l">Models Tested</div></div>
 </div>
 </section>
@@ -57,7 +57,7 @@
 <details style="max-width:800px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
 <summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the methodology actually means</summary>
 <div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
-<p>We built a measurement instrument that applies <strong style="color:var(--t)">10 types of "stress tests"</strong> (perturbation operators) to AI models across <strong style="color:var(--t)">249 sessions</strong>. It measures how models respond — do they explore new solutions, or recover to familiar patterns? — and classifies that behavior into <strong style="color:var(--t)">4 strategy archetypes</strong> (Conservative, Exploratory, Wasteful, Efficient). Cost drivers (C₀, P, ε, r) are measured from the 227-worktree corpus. Modeling parameters (β, EPM) are externally calibrated. Analysis outputs (escape scores, strategy) are heuristically computed — every metric is tagged with provenance [M]/[C]/[H]/[X] in the game reports.</p>
+<p>We built a measurement instrument that applies <strong style="color:var(--t)">10 types of "stress tests"</strong> (perturbation operators) to AI models across <strong style="color:var(--t)">249 historical sessions</strong>. It measures how models respond — do they explore new solutions, or recover to familiar patterns? — and classifies that behavior into <strong style="color:var(--t)">4 strategy archetypes</strong> (Conservative, Exploratory, Wasteful, Efficient). Cost drivers (C₀, P, ε, r) are measured from the 227 historical worktrees. Modeling parameters (β, EPM) are externally calibrated. Analysis outputs (escape scores, strategy) are heuristically computed — every metric is tagged with provenance [M]/[C]/[H]/[X] in the game reports.</p>
 <p>Below is the full methodology — the operators, detection signals, pipeline, and reproducible experiment configs.</p>
 </div>
 </details>
@@ -86,7 +86,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <h2>The CLI Tools</h2>
 <p class="lead">The instrument runs in two regimes over the same backend, orchestrated by a YAML pipeline and observed through a live control plane.</p>
 <div class="cards">
-<div class="card"><div class="ctag">Single-session</div><div class="ctitle">Perturbation experiments</div><div class="cdesc"><code style="color:var(--ac)">scripts/run.py &lt;task&gt;.yaml</code>. One task, one (perturbed) prompt, one isolated worktree. Produces a Game Report and feeds <code>_results_summary.json</code> — the original 227-worktree corpus.</div></div>
+<div class="card"><div class="ctag">Single-session</div><div class="ctitle">Perturbation experiments</div><div class="cdesc"><code style="color:var(--ac)">scripts/run.py &lt;task&gt;.yaml</code>. One task, one (perturbed) prompt, one isolated worktree. Produces a Game Report and feeds <code>_results_summary.json</code> — the original 227 historical worktrees.</div></div>
 <div class="card"><div class="ctag amber">Multi-session</div><div class="ctitle">Story pipeline</div><div class="cdesc"><code style="color:var(--ac)">scripts/enqueue.py</code> fills a Redis queue (story &times; tier &times; quality &times; condition); <code style="color:var(--ac)">scripts/worker.py</code> drains it, running each cell as a five-session story with git commits between sessions &mdash; greenfield &rarr; feature &rarr; integration &rarr; refactor &rarr; cross-cutting.</div></div>
 <div class="card"><div class="ctag">Orchestration</div><div class="ctitle">YAML pipeline</div><div class="cdesc"><code style="color:var(--ac)">scripts/pipeline.py --plan &lt;ci|deploy|full_matrix|feature|ship_features&gt;</code>. Phase DAGs (lint &rarr; test &rarr; build; matrix &rarr; analyze &rarr; review &rarr; deploy) with Redis state and parallel workers.</div></div>
 <div class="card"><div class="ctag">Control plane</div><div class="ctitle">Live telemetry</div><div class="cdesc"><code style="color:var(--ac)">admin/server.py</code> serves a dashboard: a live experiment matrix, per-cell event streams (SSE), and a routing board &mdash; reading the same Redis state the workers write.</div></div>
@@ -158,7 +158,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <h2>Strategy Taxonomy</h2>
 <p class="lead">Every model exhibits a measurable <strong style="color:var(--ac)">strategic archetype</strong> under perturbation. These aren't labels — they're computed from the ratio of exploration tokens to recovery tokens, weighted by escape score and solution quality.</p>
 <div class="cards">
-<div class="card"><div class="ctag">Conservative</div><div class="ctitle">CONSERVATIVE</div><div class="cdesc">Low exploration, high recovery. The model retreats to familiar patterns when perturbed. Claude Fable 5 and GPT-5.6 consistently exhibit this archetype — high pass rates but higher flail rates under perturbation.</div></div>
+<div class="card"><div class="ctag">Conservative</div><div class="ctitle">CONSERVATIVE</div><div class="cdesc">Low exploration, high recovery. The model retreats to familiar patterns when perturbed. Claude Sonnet 5 and GPT-5.6 consistently exhibit this archetype — high pass rates but higher flail rates under perturbation.</div></div>
 <div class="card"><div class="ctag">Exploratory</div><div class="ctitle">EXPLORATORY</div><div class="cdesc">High escape, low recovery. The model genuinely explores novel solution space under perturbation. DeepSeek's GRPO architecture produces this behavior — lower baseline pass rate but dramatically lower cost.</div></div>
 <div class="card"><div class="ctag amber">Wasteful</div><div class="ctitle">WASTEFUL</div><div class="cdesc">High exploration but low quality. The model wanders without producing useful output. Small models with high reasoning overhead (GPT-5-nano, GPT-5-mini) tend toward this archetype under high-strength perturbation.</div></div>
 <div class="card"><div class="ctag amber">Efficient</div><div class="ctitle">EFFICIENT</div><div class="cdesc">High exploration, high quality, low recovery cost. The ideal. DeepSeek in forced-silent mode approaches this archetype — producing structurally sound solutions without paying the narration cost.</div></div>
@@ -271,7 +271,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <section class="sec alt wide">
 <h2>Limitations</h2>
 <p class="lead" style="font-size:0.82rem;color:var(--t2);line-height:1.7;max-width:900px;margin:0 auto">
-227 experiments is statistically meaningful but not exhaustive — confidence intervals widen for per-model-per-task breakdowns. Validated on Python/Flask REST APIs and TypeScript/Node.js (21 cross-model runs). Not yet validated on Go, Rust, Java, or non-code tasks. Provider pricing and model behavior change — this is a Q3 2026 snapshot. The instrument is open source; independent replication welcome. EPM projections use IEA baseline (1.6%/yr); real energy markets may diverge.<br><br>
+The 227 historical experiments are statistically meaningful but not exhaustive — confidence intervals widen for per-model-per-task breakdowns. Validated on Python/Flask REST APIs and TypeScript/Node.js (21 cross-model runs). Not yet validated on Go, Rust, Java, or non-code tasks. Provider pricing and model behavior change — this is a Q3 2026 snapshot. The instrument is open source; independent replication welcome. EPM projections use IEA baseline (1.6%/yr); real energy markets may diverge.<br><br>
 Known methodological constraints: <strong>insert_contradiction</strong> domain matching relies on keyword overlap with task descriptions and is sensitive to stopword filtering — mismatches default to the general contradiction pool. <strong>inject_alien_vocab</strong> provenance fields track which tech terms were replaced but do not record domain-level attribution for fallback injections. <strong>invert_constraint</strong> and <strong>remove_critical_constraint</strong> may produce passive runs (no-op) when the prompt contains no constraint-form sentences matching their regex patterns — these are recorded as such in the Perturbation metadata but may go unnoticed in aggregate summaries.
 </p>
 </section>
