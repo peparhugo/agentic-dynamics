@@ -356,6 +356,29 @@ from .knowledge_stream import (
 # Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
 from .semantic_validation import analyze_ast, analyze_markers
 
+# v1.0: spec lifecycle -> knowledge base (source_type "spec", supersedes lineage)
+from .spec_ingestion import (
+    EXTRACTOR_VERSION as SPEC_EXTRACTOR_VERSION,
+)
+from .spec_ingestion import (
+    REASON_PREFIX as SPEC_REASON_PREFIX,
+)
+from .spec_ingestion import (
+    RegistryHead,
+    build_spec_record,
+    derive_spec_records,
+    emit_spec_record,
+    lifecycle_fingerprint,
+    load_index_entries,
+    parse_spec_text,
+    registry_head,
+    spec_entity_id,
+    spec_event,
+    spec_operation,
+    spec_reason,
+    spec_text,
+)
+
 # v1.0: the derived spec lifecycle index — experiments/specs/{index.json,STATUS.md}
 from .spec_status import (
     INDEX_FILENAME,
@@ -530,6 +553,12 @@ __all__ = [
     "build_index", "render_status_md", "refresh_spec_status",
     "load_index", "index_entry", "load_runs",
     "INDEX_FILENAME", "STATUS_FILENAME", "INDEX_SCHEMA_VERSION", "STATUS_ORDER",
+    # v1.0 spec lifecycle -> knowledge base (source_type "spec")
+    "build_spec_record", "derive_spec_records", "emit_spec_record",
+    "spec_entity_id", "spec_text", "parse_spec_text", "lifecycle_fingerprint",
+    "spec_operation", "spec_reason", "spec_event",
+    "registry_head", "RegistryHead", "load_index_entries",
+    "SPEC_EXTRACTOR_VERSION", "SPEC_REASON_PREFIX",
     "DAG", "Phase", "SpecError", "RuleResult", "MEASUREMENT_RULES",
     "compile_spec", "experiment_matrix", "compare_arms", "evaluate_rules",
     "first_pass_quality",

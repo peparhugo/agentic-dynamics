@@ -348,14 +348,26 @@ def test_actuation_types_is_a_single_member_allowlist():
 
 
 def test_source_types_is_the_single_vocabulary_owner():
-    # All twelve source types — the four round-1 producer types PLUS the round-2 registry
-    # types — are registered here. This is what closes the pre-R2 split where
-    # OBSERVATION_TYPES silently omitted finding/code/report/policy.
+    # All thirteen source types — the four round-1 producer types, the round-2 registry
+    # types, and the spec-lifecycle type — are registered here. This is what closes the
+    # pre-R2 split where OBSERVATION_TYPES silently omitted finding/code/report/policy.
     assert set(SOURCE_TYPES) == {
         "finding", "code", "report", "policy",
         "story", "review", "ledger_job", "ledger_attempt",
         "observation", "flag", "meta_session", "actuation",
+        "spec",
     }
+
+
+def test_spec_source_type_is_a_policy_authority_observation():
+    # A spec record states what a spec IS and where its lifecycle stands — pinned,
+    # authored repository policy, and never an instruction to act. Both halves matter:
+    # POLICY/[P] mirrors the `policy` type's trust tier, and the observation family keeps
+    # it structurally outside the actuation gate.
+    assert SOURCE_TYPES["spec"] == SourceTypeSpec("observation", Authority.POLICY, "[P]")
+    assert message_family("spec") == "observation"
+    assert "spec" in OBSERVATION_TYPES
+    assert "spec" not in ACTUATION_TYPES
 
 
 def test_observation_and_actuation_types_are_derived_from_source_types():

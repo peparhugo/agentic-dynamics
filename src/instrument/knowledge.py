@@ -137,6 +137,14 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     "observation": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     "flag": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     "meta_session": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    # Spec-lifecycle addition: the experiment spec *document* and its derived lifecycle
+    # (status / supersedes chain / last run). POLICY authority + "[P]" for the same reason
+    # `policy` carries them — a spec is authored, pinned repository policy, read from the
+    # checkout, not a measurement. It is emphatically an OBSERVATION: a spec record states
+    # what a spec IS and where its lifecycle stands; it never instructs anything to act.
+    # Distinct from the `policy` source_type, which carries the spec YAML's leading *text*
+    # excerpt for citation — this one carries the lifecycle, keyed one record per spec.
+    "spec": SourceTypeSpec("observation", Authority.POLICY, "[P]"),
     # Delta 3: the single actuation-family member.
     "actuation": SourceTypeSpec("actuation", Authority.POLICY, "[P]"),
 }

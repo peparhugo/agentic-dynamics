@@ -41,6 +41,7 @@ firebase deploy --only hosting --project agentic-dynamics  # mirror site — dep
 ## Key files (read on demand, not preemptively)
 
 - `.opencode/instructions/mental-model.md` — architecture, signatures, module map, dependencies
+- `experiments/specs/STATUS.md` — **read this first before authoring a new spec** — the generated spec lifecycle index: what exists, what is done, when it was completed, and the supersedes chains (`index.json` is the machine-readable twin). Derived, never hand-edited — `python scripts/spec_status.py`.
 - `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md` — ExperimentSpec + compiler design (the roadmap)
 - `src/instrument/CONTEXT.md` — instrument module reference (incl. operator/metric authoring)
 - `src/instrument/CONTEXT.md` (Runtime RAG / Knowledge Base section) — the merged KB (`knowledge.py` / `retrieval.py` / `prompt_constructor.py` / `knowledge_stream.py`); wired into `run_workflow()` as `rag_augment`, default OFF.

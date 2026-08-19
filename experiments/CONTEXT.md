@@ -4,6 +4,17 @@
 
 ## `experiments/specs/` — ExperimentSpec YAML (written — see the directory for the current set)
 
+**Read `experiments/specs/STATUS.md` FIRST** before authoring a new spec — it is the generated
+spec lifecycle index (what exists, what is done, when it was completed, and the supersedes
+chains), with `experiments/specs/index.json` as its machine-readable twin. Both are derived,
+never hand-edited: regenerate with `python scripts/spec_status.py` (`run_workflow.py` also
+refreshes them at the end of every run).
+Every spec also carries optional lifecycle keys (`status`, `supersedes`, `superseded_by`,
+`completed_at`, `last_run_at`, `results_pointer`); when absent, the index derives the status
+(`superseded` when a `superseded_by` is named, else `active`). The lifecycle additionally flows
+into the knowledge base as `source_type: spec` records with supersedes lineage
+(`src/instrument/spec_ingestion.py`, `python scripts/kb_produce_sources.py --source spec`).
+
 The spec/compiler introduces an `ExperimentSpec` layer above the configs. A spec declares
 `workflow`, `factors` (model, condition, **policy** as a first-class factor), `design`
 (factorial), `rules` (measurement vs control), `metrics`, `comparison`, `writeup`, `stop`, and
