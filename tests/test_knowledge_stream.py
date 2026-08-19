@@ -11,6 +11,11 @@ import socket
 
 import pytest
 
+# Use a dedicated TEST DB, never the production knowledge stream (DB 2), so a
+# per-test flushdb() cannot wipe the live corpus. Set before the import so the
+# module's REDIS_DB constant resolves to 15.
+os.environ.setdefault("FINOPS_KB_DB", "15")
+
 from instrument import knowledge_stream as ks
 from instrument.knowledge import KnowledgeEvent
 
@@ -21,7 +26,10 @@ try:
 except Exception:
     _REDIS_OK = False
 
-pytestmark = pytest.mark.skipif(not _REDIS_OK, reason="Redis not available on 6380")
+pytestmark = [
+    pytest.mark.skipif(not _REDIS_OK, reason="Redis not available on 6380"),
+    pytest.mark.external,  # flushes its own test DB (FINOPS_KB_DB=15) but needs live Redis on 6380
+]
 
 
 @pytest.fixture(autouse=True)
@@ -113,7 +121,9 @@ def _publish_file_event(
 # ── Contract constants ──────────────────────────────────────────
 
 def test_contract_constants():
-    assert ks.REDIS_DB == 2
+    # REDIS_DB is env-driven (FINOPS_KB_DB) so tests never flush production DB 2; this
+    # module sets it to 15 at the top, so the constant resolves to the test DB here.
+    assert ks.REDIS_DB == 15
     assert ks.STREAM_KEY == "kb:v1:changes"
     assert ks.DEAD_LETTER_KEY == "kb:v1:dead_letter"
     assert ks.CONSUMER_GROUPS == (

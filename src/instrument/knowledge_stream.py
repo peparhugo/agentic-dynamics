@@ -40,8 +40,9 @@ from .knowledge import Authority, KnowledgeEvent, KnowledgeRecord, message_famil
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 #: Knowledge stream lives on DB 2 of the framework instance. Never DB 0/1 (queue),
-#: and never the 6379 story sandbox.
-REDIS_DB = 2
+#: and never the 6379 story sandbox. Overridable via FINOPS_KB_DB so tests can use a
+#: dedicated test DB instead of flushing the production stream.
+REDIS_DB = int(os.environ.get("FINOPS_KB_DB", "2"))
 
 STREAM_KEY = "kb:v1:changes"
 DEAD_LETTER_KEY = "kb:v1:dead_letter"
