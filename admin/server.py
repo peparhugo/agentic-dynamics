@@ -150,6 +150,12 @@ MAX_DESIGN_PROMPT_CHARS = 12_000
 MAX_CLAUDE_AGENT_REQUEST_BYTES = 64 * 1024
 MAX_CLAUDE_AGENT_TASK_CHARS = 12_000
 MAX_CLAUDE_AGENT_LOG_BYTES = 64 * 1024
+#: How many most-recent cost samples the /api/matrix fleet snapshot ships per cell. The full
+#: retained window (EVENT_LOG_MAX, 500) would make every 5s poll a ~4 MB download; the fleet
+#: sparkline + burn trace only ever render the rolling 60s window (design §5.2), and the full
+#: per-cell history is available on demand via /api/events/<cell_id>. Aggregates (reported_cost,
+#: tokens) are still computed over the FULL retained window — only the sample LIST is trimmed.
+RETAINED_SAMPLES_MAX = 60
 CLAUDE_AGENT_ADVISORS = {"fable", "opus", "sonnet"}
 CLAUDE_AGENT_ADVISOR_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{2,80}$")
 IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
@@ -840,8 +846,8 @@ def _retained_telemetry(redis_client, cell_ids) -> dict[str, Any]:
             "reported_cost": sum(cell_costs) if cell_costs else None,
             "input_tokens": sum(cell_inputs) if cell_inputs else None,
             "output_tokens": sum(cell_outputs) if cell_outputs else None,
-            "latest_cost": cell_costs[-1] if cell_costs else None,
-            "samples": samples,
+            "latest_cost": cell_costs[0] if cell_costs else None,
+            "samples": samples[:RETAINED_SAMPLES_MAX],
             "history_size": len(history),
             "history_capped": len(history) >= EVENT_LOG_MAX,
             "partial": True,
