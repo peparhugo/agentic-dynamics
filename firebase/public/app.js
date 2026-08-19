@@ -35,6 +35,9 @@
       return {};
     }
 
+    var pctOrDash = function(v) { return v == null ? '\u2014' : v + '%'; };
+    var penaltyOrDash = function(v) { return v == null ? '\u2014' : (v * 100).toFixed(1) + '%'; };
+
     var statMap = {
       'sessions': function() { return D.summary.sessions_total; },
       'worktrees': function() { return D.summary.worktrees_total; },
@@ -55,11 +58,11 @@
       'deepseek_cost_per': function() { return fmtUSD(findModel(D, 'deepseek').avg_cost); },
       'claude_cost_per': function() { return fmtUSD(findModel(D, 'claude').avg_cost); },
       'gpt56_cost_per': function() { return fmtUSD(findModel(D, 'gpt-5.6').avg_cost); },
-      'deepseek_narration': function() { var m = findModel(D, 'deepseek'); return (m.narration_rate || 0) + '%'; },
-      'claude_narration': function() { var m = findModel(D, 'claude'); return (m.narration_rate || 0) + '%'; },
-      'nano_narration': function() { var m = findModel(D, 'nano'); return (m.narration_rate || 0) + '%'; },
-      'deepseek_penalty': function() { return ((findModel(D, 'deepseek').avg_narration_penalty || 0) * 100).toFixed(1) + '%'; },
-      'claude_penalty': function() { return ((findModel(D, 'claude').avg_narration_penalty || 0) * 100).toFixed(1) + '%'; },
+      'deepseek_narration': function() { return pctOrDash(findModel(D, 'deepseek').narration_rate); },
+      'claude_narration': function() { return pctOrDash(findModel(D, 'claude').narration_rate); },
+      'nano_narration': function() { return pctOrDash(findModel(D, 'nano').narration_rate); },
+      'deepseek_penalty': function() { return penaltyOrDash(findModel(D, 'deepseek').avg_narration_penalty); },
+      'claude_penalty': function() { return penaltyOrDash(findModel(D, 'claude').avg_narration_penalty); },
     };
 
     var els = document.querySelectorAll('[data-stat]');

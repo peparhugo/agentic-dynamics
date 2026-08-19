@@ -198,3 +198,23 @@ $ python scripts/generate_manifest.py
 
 The 64 perturbation entries are the 64 `finding` re-runs; the 225 story cells and 77
 tombstones match `registry.py query` exactly.
+
+---
+
+## 5. Engineer follow-up: null-rendering fix (S3 partial, folded in)
+
+The repoint retired narration/AST/cost-split fields to `None`. The public JS still rendered
+those via `(x || 0)` patterns — a visible fabrication ("0%" flail everywhere) and two hard
+breakages: `D.sonar._historical`/`_note` keys made the sonar table `toFixed()` on `undefined`
+(halting the whole DOMContentLoaded block, killing every downstream table), and the AST
+insight called `ast_files.toFixed(1)` on `null` (same halt). Fixed, em-dash for null:
+
+- `firebase/public/app.js` — statMap narration/penalty entries now use `pctOrDash` /
+  `penaltyOrDash` (`null` → em-dash, never "0%").
+- `firebase/public/evidence.html` — `fmtUSD` null-safe; sonar table renders the `[P]`
+  historical note; AST table fmt functions null-safe (no 0-coercion); AST insight guards
+  `null`; narration table renders em-dash; narration chart replaced by a "not measured in
+  the canonical corpus" note when every value is null.
+
+The remaining S3 item (key statMap by explicit model id instead of `findModel` substring
+matching) stays with `website_repoint.yaml`.
