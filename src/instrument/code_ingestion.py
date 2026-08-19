@@ -33,9 +33,8 @@ the finding path). Timestamps are injectable via ``now`` for tests.
 
 from __future__ import annotations
 
-import hashlib
-from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -43,12 +42,9 @@ from .codebase_graph import build_graph
 from .knowledge import (
     Authority,
     KnowledgeRecord,
-    compute_entity_id,
-    compute_knowledge_id,
 )
 from .knowledge_ingestion import (
     REPOSITORY_ID,
-    record_to_artifact,
 )
 from .language import (
     _PROFILES,
@@ -58,6 +54,7 @@ from .language import (
     detect_language,
     get_parser,
 )
+from .record_factory import build_record as build_record_from_parts
 
 if TYPE_CHECKING:
     from .graph import Neo4jClient
@@ -82,26 +79,6 @@ ACL_SCOPE = "public"
 #: ``child_by_field_name("name")`` returns ``None`` (e.g. Go ``type_declaration`` nests the
 #: identifier under a ``type_spec`` rather than exposing a ``name`` field).
 _NAME_NODE_TYPES = ("identifier", "type_identifier", "field_identifier")
-
-
-# ── Small deterministic helpers (mirror knowledge_ingestion) ────
-
-
-def _now_iso(now: datetime | None = None) -> str:
-    """Return ``now`` (or the current UTC instant) as an ISO-8601 timestamp.
-
-    Injectable so tests can pin timestamps; production always uses the real clock.
-    """
-    return (now or datetime.now(timezone.utc)).isoformat()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    """Return the sha256 hex digest of raw bytes (the artifact-hash primitive).
-
-    ``compute_content_hash`` in :mod:`instrument.knowledge` hashes *str*; the durable artifact
-    is bytes, so this byte-level hash is what ``content_hash`` must equal.
-    """
-    return hashlib.sha256(data).hexdigest()
 
 
 # ── Profile resolution ──────────────────────────────────────────
@@ -274,50 +251,26 @@ def build_code_record(
     record is derived from the AST, not an independent measurement). ``commit_sha`` stores the
     injected ``revision`` (the git HEAD sha), which is also folded into ``knowledge_id``.
     """
-    ts = _now_iso(now)
     source_uri = f"file://{file_path}#{symbol.name}"
-    entity_id = compute_entity_id(repository_id, source_uri, file_path)
     text = _render_text(symbol)
 
-    # Build with placeholder derived ids, then serialize + hash, then back-fill — exactly the
-    # finding path's ordering. The ids and volatile timestamps must not be part of the bytes
-    # ``content_hash`` covers (record_to_artifact blanks all five), so the id is a pure
-    # function of the symbol's stable content and the producer is idempotent.
-    record = KnowledgeRecord(
-        knowledge_id="",  # back-filled below (folds content_hash).
-        entity_id=entity_id,
-        source_uri=source_uri,
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=SOURCE_TYPE,
+        source_uri=source_uri,
         logical_locator=file_path,
         repository_id=repository_id,
-        branch="",
-        worktree_id="",
-        commit_sha=revision,
-        content_hash="",  # back-filled below (sha256 of the artifact).
-        extractor_version=EXTRACTOR_VERSION,
-        embedding_version="",
+        revision=revision,
         authority=Authority.SOURCE,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=ts,
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language=language,
-        symbols=[symbol.name],
-        outcome_id="",
-        test_executed_success=None,
         evidence_class="[C]",
-        confidence=None,
-        perturbation_strength=None,
+        text=text,
+        extra_fields={
+            "extractor_version": EXTRACTOR_VERSION,
+            "language": language,
+            "symbols": [symbol.name],
+        },
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(
-        entity_id, revision, content_hash, EXTRACTOR_VERSION
-    )
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 # ── The public derivation entry point ───────────────────────────

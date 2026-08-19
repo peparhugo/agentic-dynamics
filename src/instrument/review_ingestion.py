@@ -28,18 +28,15 @@ the steady-state call site (``finalize_reviews.py``, plan step 12) as
 
 from __future__ import annotations
 
-import hashlib
-from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from .knowledge import (
     Authority,
     KnowledgeRecord,
-    compute_entity_id,
-    compute_knowledge_id,
 )
-from .knowledge_ingestion import REPOSITORY_ID, record_to_artifact
+from .knowledge_ingestion import REPOSITORY_ID
+from .record_factory import build_record as build_record_from_parts
 
 # ── Extractor contract constants ────────────────────────────────
 
@@ -53,14 +50,6 @@ REVISION_FALLBACK = "review/unrevisioned"
 
 
 # ── Small deterministic helpers (mirror story_ingestion / knowledge_ingestion) ──
-
-
-def _now_iso(now: datetime | None = None) -> str:
-    return (now or datetime.now(timezone.utc)).isoformat()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
 
 
 def _render_text(review: dict[str, Any]) -> str:
@@ -101,45 +90,27 @@ def build_review_record(
     if not story_id:
         raise ValueError("review has no story_id — cannot derive a stable identity")
 
-    ts = _now_iso(now)
     source_uri = f"review:{story_id}"
-    entity_id = compute_entity_id(repository_id, source_uri, story_id)
     text = _render_text(review)
 
-    record = KnowledgeRecord(
-        knowledge_id="",
-        entity_id=entity_id,
-        source_uri=source_uri,
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=SOURCE_TYPE,
+        source_uri=source_uri,
         logical_locator=story_id,
         repository_id=repository_id,
-        branch="",
-        worktree_id="",
-        commit_sha="",
-        content_hash="",
-        extractor_version=EXTRACTOR_VERSION,
-        embedding_version="",
+        revision=REVISION_FALLBACK,
         authority=Authority.ADVISORY,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=ts,
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language="",
-        symbols=[],
-        outcome_id="",
-        test_executed_success=None,  # a review is a judgment, not an independent test run
         evidence_class="[H]",
-        confidence=None,
-        perturbation_strength=None,
-        causes=None,
+        text=text,
+        extra_fields={
+            # Reviews carry no commit dimension of their own; the revision folded into
+            # knowledge_id is the REVISION_FALLBACK marker above, not a commit sha.
+            "commit_sha": "",
+            "extractor_version": EXTRACTOR_VERSION,
+        },
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(entity_id, REVISION_FALLBACK, content_hash, EXTRACTOR_VERSION)
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 def derive_review_records(

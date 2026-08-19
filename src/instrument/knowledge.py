@@ -85,28 +85,76 @@ class Authority(IntEnum):
     POLICY = 5
 
 
-# ── Message family (canonical-state round 2, design §4) ─────────
+# ── Message family + the single source_type vocabulary (canonical-state round 2, design §4) ──
 #
 # `source_type` + `operation` stay the *only* discriminators a consumer needs — the
-# observation-vs-actuation split below is expressed as a pure classification function, not
-# a schema fork or a third envelope shape. `ACTUATION_TYPES` is deliberately a
-# single-member *allowlist*, not a denylist carved out of `OBSERVATION_TYPES`: a brand-new
-# `source_type` introduced later defaults to "observation" (the safe family) unless someone
-# explicitly opts it into `ACTUATION_TYPES` *and* threads it through the publish_event gate
+# observation-vs-actuation split is expressed as a pure classification function, not a schema
+# fork or a third envelope shape. `SOURCE_TYPES` is the single source of truth for the type
+# field: one table owns every producer's `source_type` together with its nominal authority /
+# evidence class and its message family, so `message_family()` no longer has to paper over a
+# silently-unregistered type (the pre-R2 `OBSERVATION_TYPES` list omitted the round-1 producer
+# types `finding`/`code`/`report`/`policy` and classified them "observation" only by accident
+# of the default). `ACTUATION_TYPES` remains a *derived* single-member allowlist, not a denylist
+# carved out of `OBSERVATION_TYPES`: a brand-new `source_type` introduced later defaults to
+# "observation" (the safe family) unless someone explicitly registers it with
+# `message_family="actuation"` *and* threads it through the publish_event gate
 # (knowledge_stream.py). This "closed by default" posture mirrors the gate itself.
 
+
+@dataclass(frozen=True)
+class SourceTypeSpec:
+    """One entry in the :data:`SOURCE_TYPES` vocabulary.
+
+    Carries the *nominal* provenance for a ``source_type`` — the message family
+    (``"observation"`` vs ``"actuation"``) plus the authority / evidence class its primary
+    producer path emits. The authority/evidence-class columns are documentation + a sanity
+    anchor, not a validator: a couple of types are context-dependent (``report`` can also be
+    ``DERIVED``/``[C]`` from the entropy arm, and ``ledger_attempt``/``meta_session`` split on
+    the session title), which each producer's own derivation decides at construction time.
+    """
+
+    message_family: str  # "observation" | "actuation"
+    authority: Authority
+    evidence_class: str  # [M] [C] [H] [P] [X]
+
+
+#: The single source-type vocabulary. Every producer's ``source_type`` is registered here with
+#: its message family and nominal authority/evidence class; ``message_family()``,
+#: :data:`OBSERVATION_TYPES`/:data:`ACTUATION_TYPES`, and ``scripts/registry.py``'s
+#: ``--record-type`` choices all derive from this one table (R2 — one owner, not three).
+SOURCE_TYPES: dict[str, SourceTypeSpec] = {
+    # round-1 producer types (finding/code/report/policy — previously omitted from
+    # OBSERVATION_TYPES and classified "observation" only by the default).
+    "finding": SourceTypeSpec("observation", Authority.MEASURED, "[M]"),
+    "code": SourceTypeSpec("observation", Authority.SOURCE, "[C]"),
+    "report": SourceTypeSpec("observation", Authority.MEASURED, "[M]"),  # entropy arm: DERIVED/[C]
+    "policy": SourceTypeSpec("observation", Authority.POLICY, "[P]"),
+    # canonical-state round 2 types (design §2's table).
+    "story": SourceTypeSpec("observation", Authority.MEASURED, "[M]"),
+    "review": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    "ledger_job": SourceTypeSpec("observation", Authority.MEASURED, "[M]"),
+    "ledger_attempt": SourceTypeSpec("observation", Authority.MEASURED, "[M]"),
+    "observation": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    "flag": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    "meta_session": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    # Delta 3: the single actuation-family member.
+    "actuation": SourceTypeSpec("actuation", Authority.POLICY, "[P]"),
+}
+
 #: source_type values that represent a fact ABOUT the system (what happened / was
-#: observed) — never an instruction to act on it.
-OBSERVATION_TYPES = frozenset({
-    "story", "review", "ledger_job", "ledger_attempt",
-    "observation", "flag", "meta_session",
-})
+#: observed) — never an instruction to act on it. Derived from :data:`SOURCE_TYPES`.
+OBSERVATION_TYPES = frozenset(
+    name for name, spec in SOURCE_TYPES.items() if spec.message_family == "observation"
+)
 
 #: source_type values that represent a candidate INSTRUCTION to act (steer, interrupt,
 #: escalate, retry, budget, deadline). See docs/canonical_state_r2_design.md §5 — building
 #: and unit-testing this family does not, by itself, authorize anything to fire; that is
-#: gated separately (knowledge_stream.publish_event's `armed` check).
-ACTUATION_TYPES = frozenset({"actuation"})
+#: gated separately (knowledge_stream.publish_event's `armed` check). Derived from
+#: :data:`SOURCE_TYPES`.
+ACTUATION_TYPES = frozenset(
+    name for name, spec in SOURCE_TYPES.items() if spec.message_family == "actuation"
+)
 
 
 def message_family(source_type: str) -> str:
@@ -114,13 +162,14 @@ def message_family(source_type: str) -> str:
 
     Adds no envelope field — the whole point of this function existing is that
     "source_type + operation are the only discriminators" stays true after the
-    observation-vs-actuation split lands, not just before it. Any ``source_type`` not in
-    :data:`ACTUATION_TYPES` — including one invented in the future and never registered
-    here — classifies as ``"observation"``, the safe default. See
-    ``docs/canonical_state_r2_design.md`` §4 for the full rationale.
+    observation-vs-actuation split lands, not just before it. A registered ``source_type``
+    returns its :data:`SOURCE_TYPES` family; any ``source_type`` not registered here —
+    including one invented in the future — classifies as ``"observation"``, the safe default.
+    See ``docs/canonical_state_r2_design.md`` §4 for the full rationale.
     """
-    if source_type in ACTUATION_TYPES:
-        return "actuation"
+    spec = SOURCE_TYPES.get(source_type)
+    if spec is not None:
+        return spec.message_family
     return "observation"
 
 

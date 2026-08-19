@@ -41,21 +41,18 @@ injectable via ``now`` for tests.
 
 from __future__ import annotations
 
-import hashlib
-from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from .entropy import EntropyProfile, compute_entropy
 from .knowledge import (
     Authority,
     KnowledgeRecord,
-    compute_entity_id,
-    compute_knowledge_id,
 )
-from .knowledge_ingestion import REPOSITORY_ID, record_to_artifact
+from .knowledge_ingestion import REPOSITORY_ID
 from .language import LanguageProfile, detect_language
 from .lsp_diagnostics import LSPReport, run_diagnostics
+from .record_factory import build_record as build_record_from_parts
 from .sonar import SonarMetrics, run_sonar_analysis
 
 # ── Extractor contract constants ────────────────────────────────
@@ -81,19 +78,6 @@ SIGNAL_ENTROPY = "entropy"
 
 
 # ── Small deterministic helpers (mirror code_ingestion) ─────────
-
-
-def _now_iso(now: datetime | None = None) -> str:
-    """Return ``now`` (or the current UTC instant) as an ISO-8601 timestamp.
-
-    Injectable so tests can pin timestamps; production always uses the real clock.
-    """
-    return (now or datetime.now(timezone.utc)).isoformat()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    """Return the sha256 hex digest of raw bytes (the artifact-hash primitive)."""
-    return hashlib.sha256(data).hexdigest()
 
 
 def _resolve_profile(
@@ -171,45 +155,24 @@ def build_quality_record(
     for instrument measurements (SonarQube, LSP) and ``DERIVED``/``[C]`` for the computed
     entropy index. ``commit_sha`` stores the injected ``revision``.
     """
-    ts = _now_iso(now)
     source_uri = f"file://{logical_locator}#{signal}"
-    entity_id = compute_entity_id(repository_id, source_uri, logical_locator)
 
-    record = KnowledgeRecord(
-        knowledge_id="",  # back-filled below (folds content_hash).
-        entity_id=entity_id,
-        source_uri=source_uri,
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=SOURCE_TYPE,
+        source_uri=source_uri,
         logical_locator=logical_locator,
         repository_id=repository_id,
-        branch="",
-        worktree_id="",
-        commit_sha=revision,
-        content_hash="",  # back-filled below (sha256 of the artifact).
-        extractor_version=EXTRACTOR_VERSION,
-        embedding_version="",
+        revision=revision,
         authority=authority,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=ts,
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language=language,
-        symbols=[],  # a quality finding has no symbol table.
-        outcome_id="",
-        test_executed_success=None,
         evidence_class=evidence_class,
-        confidence=None,
-        perturbation_strength=None,
+        text=text,
+        extra_fields={
+            "extractor_version": EXTRACTOR_VERSION,
+            "language": language,
+        },
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(
-        entity_id, revision, content_hash, EXTRACTOR_VERSION
-    )
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 # ── The public derivation entry point ───────────────────────────

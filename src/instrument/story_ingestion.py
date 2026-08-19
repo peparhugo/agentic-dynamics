@@ -38,18 +38,15 @@ out of scope here.
 
 from __future__ import annotations
 
-import hashlib
-from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from .knowledge import (
     Authority,
     KnowledgeRecord,
-    compute_entity_id,
-    compute_knowledge_id,
 )
-from .knowledge_ingestion import REPOSITORY_ID, record_to_artifact
+from .knowledge_ingestion import REPOSITORY_ID
+from .record_factory import build_record as build_record_from_parts
 
 # ── Extractor contract constants ────────────────────────────────
 
@@ -72,16 +69,6 @@ REVISION_FALLBACK = "story-result/no-commit"
 
 
 # ── Small deterministic helpers (mirror knowledge_ingestion / code_ingestion) ───
-
-
-def _now_iso(now: datetime | None = None) -> str:
-    """Return ``now`` (or the current UTC instant) as an ISO-8601 timestamp."""
-    return (now or datetime.now(timezone.utc)).isoformat()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    """Return the sha256 hex digest of raw bytes (the artifact-hash primitive)."""
-    return hashlib.sha256(data).hexdigest()
 
 
 def _last_commit_sha(story_result: dict[str, Any]) -> str:
@@ -161,51 +148,36 @@ def build_story_record(
     if not story_id:
         raise ValueError("story_result has no story_id — cannot derive a stable identity")
 
-    ts = _now_iso(now)
     source_uri = f"story:{story_id}"
-    entity_id = compute_entity_id(repository_id, source_uri, story_id)
     text = _render_text(story_result)
     revision = _last_commit_sha(story_result)
 
-    # Build with placeholder derived ids, then serialize + hash, then back-fill — the same
-    # ordering every other producer in this package uses (knowledge_ingestion.build_record,
-    # code_ingestion.build_code_record): the ids and volatile timestamps must not be part of
-    # the bytes content_hash covers, or the hash would be self-referential / re-derivation
-    # dependent (breaking producer idempotence).
-    record = KnowledgeRecord(
-        knowledge_id="",  # back-filled below (folds content_hash)
-        entity_id=entity_id,
-        source_uri=source_uri,
+    # observed_at prefers the story's own completion/start timestamp; when the result carries
+    # neither, the factory's producer-now default is used (leaving the key out of extra_fields).
+    observed_at = str(story_result.get("completed_at") or story_result.get("started_at") or "")
+    extra_fields = {
+        "worktree_id": str(story_result.get("worktree") or ""),
+        "extractor_version": EXTRACTOR_VERSION,
+        "language": str(story_result.get("language") or ""),
+        "test_executed_success": story_result.get("test_executed_success"),
+        "perturbation_strength": story_result.get("perturbation_strength"),
+    }
+    if observed_at:
+        extra_fields["observed_at"] = observed_at
+
+    # Identity + the content-hash back-fill are the shared factory's job (record_factory).
+    return build_record_from_parts(
         source_type=SOURCE_TYPE,
+        source_uri=source_uri,
         logical_locator=story_id,
         repository_id=repository_id,
-        branch="",  # stories have no branch dimension distinct from worktree_id
-        worktree_id=str(story_result.get("worktree") or ""),
-        commit_sha=revision,
-        content_hash="",  # back-filled below (sha256 of the artifact)
-        extractor_version=EXTRACTOR_VERSION,
-        embedding_version="",
+        revision=revision,
         authority=Authority.MEASURED,
-        valid_from=ts,
-        valid_to=None,
-        observed_at=str(story_result.get("completed_at") or story_result.get("started_at") or ts),
-        indexed_at=ts,
-        acl_scope=ACL_SCOPE,
-        contains_sensitive_data=False,
-        text=text,
-        token_count=max(1, len(text.split())),
-        language=str(story_result.get("language") or ""),
-        symbols=[],  # a story is an outcome, not a source-language unit
-        outcome_id="",
-        test_executed_success=story_result.get("test_executed_success"),
         evidence_class="[M]",
-        confidence=None,  # story-level confidence is not a thing; see ledger_ingestion
-        perturbation_strength=story_result.get("perturbation_strength"),
-        causes=None,  # only ever set on source_type == "actuation" records (design §1)
+        text=text,
+        extra_fields=extra_fields,
+        now=now,
     )
-    content_hash = _sha256_bytes(record_to_artifact(record))
-    knowledge_id = compute_knowledge_id(entity_id, revision, content_hash, EXTRACTOR_VERSION)
-    return replace(record, content_hash=content_hash, knowledge_id=knowledge_id)
 
 
 def derive_story_records(
