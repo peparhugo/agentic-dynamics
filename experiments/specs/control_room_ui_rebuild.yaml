@@ -1,0 +1,167 @@
+name: control_room_ui_rebuild
+question: >-
+  REBUILD the Control Room UI from scratch as a clean, mobile-first, properly-structured static
+  app, per docs/control_room_ui/design.md (+ research.md). The prior attempt RE-SKINNED the
+  existing vanilla-JS dashboard and failed — "a layer on top of the clunk" — because the old DOM
+  (a tightly-coupled, three-column index.html with render functions wired to a clunky layout) is
+  itself the problem. This run builds a fresh foundation instead of patching it. The design docs
+  are the authority; the 28 routes and the hard invariants are the boundary.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      design: docs/control_room_ui/design.md
+      research: docs/control_room_ui/research.md
+      why_rebuild: >-
+        The prior implementation re-skinned the existing DOM/JS and the operator rejected it as
+        "a layer of shit on top of the dashboard" — not responsive, not a real redesign. Root
+        cause: the old dashboard (842-line index.html, tightly-coupled render functions, a
+        three-column desktop layout with a broken mobile stack) is the thing that must go. Do NOT
+        preserve its DOM structure or its layout. Build fresh.
+      authority: >-
+        docs/control_room_ui/design.md is the AUTHORITY: implement its information architecture
+        (§1 — five destinations + System overflow + transversal Detail), the two-axis status
+        language (§2.2), the density control (§2.3), the fleet overview (§2), the Flags board
+        (§4), Status (§5), Sessions (§6), Routing + System (§7), and the visual system (§8). Cite
+        the research patterns ([R §x.y]) where the design does. You may restructure the DOM, CSS,
+        and JS freely — a clean modular JS structure and a real mobile-first responsive system are
+        the whole point — but you may NOT add endpoints or server dependencies.
+      hard_rules: >-
+        (1) NO new endpoints: consume only the existing 28 routes (design §1.2); admin/server.py is
+        untouched. (2) FLAG-ONLY RAIL: the Flags board is read-only; Steer/Interrupt are the only
+        actuation, behind the existing gated doors (type-to-confirm INTERRUPT <id>); "Supervisor
+        flags. You decide." stays visible on the board and above actions; the READ ONLY / INTERACTIVE
+        mode line is preserved. (3) SINGLE-CONTEXT: exactly one selected-detail EventSource; use
+        control-room-core.js helpers (replaceEventSource / normalizeStatus / sortCellIds /
+        reconcileTelemetry / burnRate) rather than reimplementing them. (4) textContent-only for
+        IDs/titles/reasons/why — never innerHTML for untrusted text. (5) MOBILE-FIRST: the bottom
+        tab bar + modal bottom sheet + one-handed reach must actually WORK (design the mobile
+        layout first, not as a breakpoint patch). (6) Static-only: vanilla HTML/CSS/JS served by
+        the existing Flask static handler; no build step that the server can't serve, no new
+        backend dependency. (7) Test-driven: test_admin_frontend.py + test_admin_server.py pass;
+        do not weaken tests.
+      run_shape: >-
+        SINGLE-model: run with --model anthropic/claude-opus-5 (claude_cli backend). One worktree,
+        one branch (feature/control-room-ui-rebuild); each phase commits [workflow] <phase>.
+    phases:
+      - name: foundation
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Build the clean foundation: HTML shell + CSS design system + JS module skeleton.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/control_room_ui/design.md §1 (IA) + §8 (visual system)
+          - docs/control_room_ui/research.md §2.6/§2.7/§1.4 (mobile)
+          - admin/static/ (the OLD dashboard — to be replaced, not extended)
+
+          DO:
+          - A fresh index.html with the five-board + System + transversal Detail structure (§1),
+            NOT the old three-column layout.
+          - A mobile-first CSS foundation: the §8.2 token set (dark+light), the 4px spacing scale,
+            Inter + mono, the responsive grid (card -> list -> table compaction), the sticky bottom
+            tab bar + modal bottom sheet.
+          - A clean JS module skeleton (separate files or clear sections), reusing the existing
+            control-room-core.js helpers.
+
+          VERIFY: pytest tests/test_admin_frontend.py tests/test_admin_server.py -q — must pass;
+          grep confirms the §8.2 tokens + the five data-board values exist.
+          DELIVER the foundation.
+      - name: fleet
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement the Fleet board + the status language.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/control_room_ui/design.md §2 (Fleet + §2.2 status + §2.3 density + §2.4 drill-down)
+
+          DO:
+          - The fleet matrix as a compact, scannable, urgency-sorted card grid; the two-axis status
+            (lifecycle vs attention) with glyph+word+color; the density toggle; one-tap drill-down;
+            the filter/search facet + counts footer. Stable row identity (no reflow on no-op poll).
+
+          VERIFY: pytest tests/test_admin_frontend.py -q — must pass.
+          DELIVER the Fleet board.
+      - name: boards_and_detail
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Implement the remaining boards + the transversal Detail surface.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - docs/control_room_ui/design.md §3 (Detail bottom sheet), §4 (Flags), §5 (Status),
+            §6 (Sessions), §7 (Routing + System)
+
+          DO:
+          - The Flags board (full-height read-only alert rail, in-place flag_id updates, three
+            states, "Supervisor flags. You decide."), Status (expanded telemetry), Sessions
+            (design + claude-agent), Routing (read-only analysis), System overflow (registry +
+            gated queue actions).
+          - The Detail bottom sheet (drag handle, swipe-to-dismiss, safe-area aware, back) with the
+            glanceable-first facts panel + the gated actuation (READ ONLY / INTERACTIVE, danger +
+            type-to-confirm).
+
+          VERIFY: pytest tests/test_admin_frontend.py tests/test_admin_server.py -q — must pass.
+          DELIVER the boards + detail.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Run the full gate and trace the rebuild to the design.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run `pytest tests/ -m "not external" -q` (full regression) — must be green.
+          - Confirm the invariants: no new endpoint (28 routes), flag-only rail, single-context,
+            textContent-only, mobile-first actually works.
+          - Write docs/control_room_ui/rebuild_verify.md tracing §1-§8 to files, with PASS/FAIL.
+
+          DELIVER docs/control_room_ui/rebuild_verify.md + a green full suite.
+factors:
+  - {name: model, levels: [anthropic/claude-opus-5]}
+design: factorial
+rules:
+  - name: rebuilt
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [foundation, fleet, boards_detail]
+  - name: invariants_held
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [foundation]
+    produces: [no_new_endpoints, flag_only_rail, mobile_first]
+metrics:
+  - {name: foundation, agg: mean, over: cell}
+  - {name: fleet, agg: mean, over: cell}
+  - {name: boards_detail, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, foundation, fleet, boards_and_detail, verify]
+stop: {budget_usd: 25.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
