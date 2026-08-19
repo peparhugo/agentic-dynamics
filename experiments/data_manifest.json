@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-19T22:23:00.414379+00:00",
+  "generated_at": "2026-08-19T23:14:26.213702+00:00",
   "opencode_version": "unknown",
-  "git_commit": "6b814b4a",
+  "git_commit": "9ab59a45",
   "files": {
     "inventory.json": {
       "sha256": "a2aa4974de23c094533ddb4c5d6d593c96a5208bb3bf80495782f4115058746c",
@@ -17,8 +17,8 @@
       "size_bytes": 1748
     },
     "data.js": {
-      "sha256": "587d508a6f3f740f7980cfcc678fa563ccd02cb57659773a9c759cc82eb8d910",
-      "size_bytes": 183295
+      "sha256": "0e8298b3ac7a96432cf3e513368759b2fc0a09712924f92cbe57563536248b85",
+      "size_bytes": 178520
     }
   },
   "pipeline_steps": [
@@ -15271,6 +15271,2102 @@
           "observed_at": "2026-08-19T19:19:37.537704+00:00",
           "indexed_at": "2026-08-19T19:19:39.432850+00:00",
           "reason": ""
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:agentic_dynamics_rebrand",
+      "knowledge_id": "e0a93e7e5732765badd2d05ec4d66fc86f2ca3021e096078e67408e77965d3ac",
+      "source_type": "spec",
+      "logical_locator": "agentic_dynamics_rebrand",
+      "source_uri": "file://experiments/specs/agentic_dynamics_rebrand.yaml",
+      "observed_at": "2026-08-14T22:02:47.096413+00:00",
+      "indexed_at": "2026-08-19T23:13:36.469108+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=903be843875594129634c18b74648d3e6de2e0ecfcf4f1a3963e67264f024585",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "09eccf5177a12b5fae9fc96eadccac80f37d9a6f7e3f45f8f00eee70d4e25987",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.715814+00:00",
+          "indexed_at": "2026-08-19T23:13:36.432025+00:00",
+          "reason": "spec-lifecycle-content=824bc9e0f3e6de602236adf83fa3aa7a00cdfa07e000fb4ad863b48d6dfad66b"
+        },
+        {
+          "knowledge_id": "e0a93e7e5732765badd2d05ec4d66fc86f2ca3021e096078e67408e77965d3ac",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T22:02:47.096413+00:00",
+          "indexed_at": "2026-08-19T23:13:36.469108+00:00",
+          "reason": "spec-lifecycle-content=903be843875594129634c18b74648d3e6de2e0ecfcf4f1a3963e67264f024585"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:auto_posthoc_wiring",
+      "knowledge_id": "1ef9fd9c306456fdd568d7b45220b60e7ccb7e7710f870aef944de18fcb6a48c",
+      "source_type": "spec",
+      "logical_locator": "auto_posthoc_wiring",
+      "source_uri": "file://experiments/specs/auto_posthoc_wiring.yaml",
+      "observed_at": "2026-08-17T16:17:29.991251+00:00",
+      "indexed_at": "2026-08-19T23:13:36.469613+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=ea9ff626e9109e3dfe6e8a8ffcd877d62e6d3e17c233fca70d820cf29a7dc7db",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "908527473b2f9bd92f542c9a72b07bb28fbffa56c98808551e366628034a7a83",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.721425+00:00",
+          "indexed_at": "2026-08-19T23:13:36.433366+00:00",
+          "reason": "spec-lifecycle-content=0d36eaf6a403a7995edd87ce1627256cd4257d8457dccffbdb4cbce63d68c712"
+        },
+        {
+          "knowledge_id": "1ef9fd9c306456fdd568d7b45220b60e7ccb7e7710f870aef944de18fcb6a48c",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T16:17:29.991251+00:00",
+          "indexed_at": "2026-08-19T23:13:36.469613+00:00",
+          "reason": "spec-lifecycle-content=ea9ff626e9109e3dfe6e8a8ffcd877d62e6d3e17c233fca70d820cf29a7dc7db"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:canonical_state_design",
+      "knowledge_id": "23692866ecea371257add2f95c8d84f9f07da0525d8be91457d092a8cc269bd4",
+      "source_type": "spec",
+      "logical_locator": "canonical_state_design",
+      "source_uri": "file://experiments/specs/canonical_state_design.yaml",
+      "observed_at": "2026-08-18T15:48:39.677651+00:00",
+      "indexed_at": "2026-08-19T23:13:36.470068+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=7a7ed4d33175389f207ce7833b868900bccdf9a2ce9283a8f8f3b835cf2db0f9",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "9ec1e4c70c86a8c1f54e325581528f0dc09ae776b6ed43eb89e0473c14d4852e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.725189+00:00",
+          "indexed_at": "2026-08-19T23:13:36.433775+00:00",
+          "reason": "spec-lifecycle-content=e6e36af411bbf4275933023d17a095e4c9e4c22029d5f302b3c910fbf0398a9b"
+        },
+        {
+          "knowledge_id": "23692866ecea371257add2f95c8d84f9f07da0525d8be91457d092a8cc269bd4",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T15:48:39.677651+00:00",
+          "indexed_at": "2026-08-19T23:13:36.470068+00:00",
+          "reason": "spec-lifecycle-content=7a7ed4d33175389f207ce7833b868900bccdf9a2ce9283a8f8f3b835cf2db0f9"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:canonical_state_finalize",
+      "knowledge_id": "63d6783aeffb4bf3e748067c009c745676162b7c88a3fa9ee3274bfabcbf22bb",
+      "source_type": "spec",
+      "logical_locator": "canonical_state_finalize",
+      "source_uri": "file://experiments/specs/canonical_state_finalize.yaml",
+      "observed_at": "2026-08-18T20:38:40.811735+00:00",
+      "indexed_at": "2026-08-19T23:13:36.470525+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=c0bf406f01caff67696f91786d349d4d39bf0bb88775b7dae6dfa1234b9f5ed6",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "18b42d2ec30228b39e58409d4bc1381c46b3a9cf29e801717a1f43b4d5fd86a5",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.728789+00:00",
+          "indexed_at": "2026-08-19T23:13:36.434171+00:00",
+          "reason": "spec-lifecycle-content=8cf984baa91200e2bada1c46f8eb625ca5579fab90cd2ee03c73cc0eb05d207b"
+        },
+        {
+          "knowledge_id": "63d6783aeffb4bf3e748067c009c745676162b7c88a3fa9ee3274bfabcbf22bb",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T20:38:40.811735+00:00",
+          "indexed_at": "2026-08-19T23:13:36.470525+00:00",
+          "reason": "spec-lifecycle-content=c0bf406f01caff67696f91786d349d4d39bf0bb88775b7dae6dfa1234b9f5ed6"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:canonical_state_implement",
+      "knowledge_id": "c4d7cff5c6c07e127196f48eace2ac84585ff4be7837f512a92ef3aebd73d3be",
+      "source_type": "spec",
+      "logical_locator": "canonical_state_implement",
+      "source_uri": "file://experiments/specs/canonical_state_implement.yaml",
+      "observed_at": "2026-08-18T19:51:13.363570+00:00",
+      "indexed_at": "2026-08-19T23:13:36.474228+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=c3f344646752ab9a5ae5e066cef0f505ca0c4299d619d608ac631e610853c302",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "a108e46f6587a8e7b765c37a1efd175e49a2f0d990da90dbffbcf09515939f30",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.732911+00:00",
+          "indexed_at": "2026-08-19T23:13:36.434559+00:00",
+          "reason": "spec-lifecycle-content=126e3736453517ec002e166405808ae541e95453921b820ebeb1f96fd7e007ba"
+        },
+        {
+          "knowledge_id": "c4d7cff5c6c07e127196f48eace2ac84585ff4be7837f512a92ef3aebd73d3be",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T19:51:13.363570+00:00",
+          "indexed_at": "2026-08-19T23:13:36.474228+00:00",
+          "reason": "spec-lifecycle-content=c3f344646752ab9a5ae5e066cef0f505ca0c4299d619d608ac631e610853c302"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:canonical_state_round2",
+      "knowledge_id": "d1a99266d9410f179c1fb486a7a6a4fb489da4ecb3f93ac1298bc7b47f432d56",
+      "source_type": "spec",
+      "logical_locator": "canonical_state_round2",
+      "source_uri": "file://experiments/specs/canonical_state_round2.yaml",
+      "observed_at": "2026-08-18T17:55:55.227116+00:00",
+      "indexed_at": "2026-08-19T23:13:36.474668+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=9b30155d3c2df24406781194cc47863fb6d5aa85348c82d9eb7347d54808a158",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "339fbaba2372e3a48ec96f52b6f6eecaeb5000b047a59b0eed7cdd37350ea5fc",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.738107+00:00",
+          "indexed_at": "2026-08-19T23:13:36.435028+00:00",
+          "reason": "spec-lifecycle-content=15beb1655bb904ce3a0e468cd4876c9630d8bc967cc7c8a3d3daab43d13eae2d"
+        },
+        {
+          "knowledge_id": "d1a99266d9410f179c1fb486a7a6a4fb489da4ecb3f93ac1298bc7b47f432d56",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T17:55:55.227116+00:00",
+          "indexed_at": "2026-08-19T23:13:36.474668+00:00",
+          "reason": "spec-lifecycle-content=9b30155d3c2df24406781194cc47863fb6d5aa85348c82d9eb7347d54808a158"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:claude_background_sessions",
+      "knowledge_id": "2f738b1e53d2defa23e6de22e3fd78fb86cd21c2d6129d1f894cbb3174072c13",
+      "source_type": "spec",
+      "logical_locator": "claude_background_sessions",
+      "source_uri": "file://experiments/specs/claude_background_sessions.yaml",
+      "observed_at": "2026-08-14T17:38:06.423934+00:00",
+      "indexed_at": "2026-08-19T23:13:36.475146+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=5c7d1f205aefc326f5441d338d87cdf927322db2001faa5d5c00e546cfa03270",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1cbcfbb75b2b5926beb5b1a6234043d5bdeafa60671a9cfa57642c6d67bd5617",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.743359+00:00",
+          "indexed_at": "2026-08-19T23:13:36.435544+00:00",
+          "reason": "spec-lifecycle-content=0e397c27d9c0493ff26e09b8c16a7430c588e18c213a31696e6901dc8e82ce7e"
+        },
+        {
+          "knowledge_id": "2f738b1e53d2defa23e6de22e3fd78fb86cd21c2d6129d1f894cbb3174072c13",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T17:38:06.423934+00:00",
+          "indexed_at": "2026-08-19T23:13:36.475146+00:00",
+          "reason": "spec-lifecycle-content=5c7d1f205aefc326f5441d338d87cdf927322db2001faa5d5c00e546cfa03270"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:claude_tools_to_skills",
+      "knowledge_id": "140ac65125d9272adcc89a7b70aaa1faffb9ccd537934af3cc06c9edfd21ed84",
+      "source_type": "spec",
+      "logical_locator": "claude_tools_to_skills",
+      "source_uri": "file://experiments/specs/claude_tools_to_skills.yaml",
+      "observed_at": "2026-08-14T22:29:31.048963+00:00",
+      "indexed_at": "2026-08-19T23:13:36.475640+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=8082bb51c3126e767bbbd1683946f14eb3ad7403db6fa15c4f213a3ec2e2f16a",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "97104f6891028ca3c275228170fb61f2e83214e75a034cc2cc959c6a742f14e3",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.749046+00:00",
+          "indexed_at": "2026-08-19T23:13:36.435942+00:00",
+          "reason": "spec-lifecycle-content=0542752595b97600927f2eff8c4357298c689dd02cb3152423e03190ec915a72"
+        },
+        {
+          "knowledge_id": "140ac65125d9272adcc89a7b70aaa1faffb9ccd537934af3cc06c9edfd21ed84",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T22:29:31.048963+00:00",
+          "indexed_at": "2026-08-19T23:13:36.475640+00:00",
+          "reason": "spec-lifecycle-content=8082bb51c3126e767bbbd1683946f14eb3ad7403db6fa15c4f213a3ec2e2f16a"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:code_review",
+      "knowledge_id": "1cf8e02f9ee28954e201ee89e5cf5a083f1cb9c876a8a77089126550b4a83b1f",
+      "source_type": "spec",
+      "logical_locator": "code_review",
+      "source_uri": "file://experiments/specs/code_review.yaml",
+      "observed_at": "2026-08-14T05:38:58.948688+00:00",
+      "indexed_at": "2026-08-19T23:13:36.476048+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=16dc2b2985ecf3fd65d3bf7f9e12129c26d88046d33dc474ab02e99ab0a93806",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "edfb7a505a71a08bf9a4851e3f855d4528c061e004dc7516850635166973c1c5",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.754483+00:00",
+          "indexed_at": "2026-08-19T23:13:36.440226+00:00",
+          "reason": "spec-lifecycle-content=05348d3f779c0310896e03575140181cdd263414fdef719c7c5eab94be5bb7d5"
+        },
+        {
+          "knowledge_id": "1cf8e02f9ee28954e201ee89e5cf5a083f1cb9c876a8a77089126550b4a83b1f",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T05:38:58.948688+00:00",
+          "indexed_at": "2026-08-19T23:13:36.476048+00:00",
+          "reason": "spec-lifecycle-content=16dc2b2985ecf3fd65d3bf7f9e12129c26d88046d33dc474ab02e99ab0a93806"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:context_abstraction_plane",
+      "knowledge_id": "1ec578d6a9cfb372b22444e71a5af69c63fea6b34fe821487bd9c3a2eee25c7b",
+      "source_type": "spec",
+      "logical_locator": "context_abstraction_plane",
+      "source_uri": "file://experiments/specs/context_abstraction_plane.yaml",
+      "observed_at": "2026-08-19T23:03:35.785593+00:00",
+      "indexed_at": "2026-08-19T23:13:36.476431+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=dde1b54c8ea8b8f83f63ea489691b0ea531929d24e92c4e63c1d7f5e8be5a874",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1ec578d6a9cfb372b22444e71a5af69c63fea6b34fe821487bd9c3a2eee25c7b",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T23:03:35.785593+00:00",
+          "indexed_at": "2026-08-19T23:13:36.476431+00:00",
+          "reason": "spec-lifecycle-content=dde1b54c8ea8b8f83f63ea489691b0ea531929d24e92c4e63c1d7f5e8be5a874"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:control_room_hardening",
+      "knowledge_id": "bf47bf451c95d87d3ced5f7fc4d0b740c30ef2521508333082b51ac247babcd3",
+      "source_type": "spec",
+      "logical_locator": "control_room_hardening",
+      "source_uri": "file://experiments/specs/control_room_hardening.yaml",
+      "observed_at": "2026-08-18T23:56:09.127237+00:00",
+      "indexed_at": "2026-08-19T23:13:36.476803+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=adfdc040545e3b960eb7b5b86186a2d140468a223c1c69c175ac6391aba08c96",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "0fefb7be882c8e0312cd19573ad8900c92b384550051ef3ba89074f0cf97b866",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.760001+00:00",
+          "indexed_at": "2026-08-19T23:13:36.440720+00:00",
+          "reason": "spec-lifecycle-content=92e6a9ba1a076b828f0f2ea2988b01a0374738151f08f335afe5364fc8226369"
+        },
+        {
+          "knowledge_id": "bf47bf451c95d87d3ced5f7fc4d0b740c30ef2521508333082b51ac247babcd3",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T23:56:09.127237+00:00",
+          "indexed_at": "2026-08-19T23:13:36.476803+00:00",
+          "reason": "spec-lifecycle-content=adfdc040545e3b960eb7b5b86186a2d140468a223c1c69c175ac6391aba08c96"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:control_room_portal",
+      "knowledge_id": "0c40681c0df15f4fe8124957b9516d8cf2189822d653e24b0c0029533404e868",
+      "source_type": "spec",
+      "logical_locator": "control_room_portal",
+      "source_uri": "file://experiments/specs/control_room_portal.yaml",
+      "observed_at": "2026-08-14T03:36:30.787805+00:00",
+      "indexed_at": "2026-08-19T23:13:36.477188+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=cfd6f6829f1968a0d4477c72560e5b16c7d3b2a55126d082ca76214fc5bff9fb",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "75dc3b1ec3102bb7548a991621e03b6f89e14d145c29539f3e2db5fce1675e31",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.766342+00:00",
+          "indexed_at": "2026-08-19T23:13:36.441163+00:00",
+          "reason": "spec-lifecycle-content=71a22c73ce3d79ceb925c28e9a416379781179e1d47bcf8c25fdb85336b7e9c0"
+        },
+        {
+          "knowledge_id": "0c40681c0df15f4fe8124957b9516d8cf2189822d653e24b0c0029533404e868",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T03:36:30.787805+00:00",
+          "indexed_at": "2026-08-19T23:13:36.477188+00:00",
+          "reason": "spec-lifecycle-content=cfd6f6829f1968a0d4477c72560e5b16c7d3b2a55126d082ca76214fc5bff9fb"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:control_room_posthoc_visibility",
+      "knowledge_id": "24a21117cf64f19442d7a05f0fc0d3e718ae35e9f8a142b1128a55b9d9306c52",
+      "source_type": "spec",
+      "logical_locator": "control_room_posthoc_visibility",
+      "source_uri": "file://experiments/specs/control_room_posthoc_visibility.yaml",
+      "observed_at": "2026-08-17T15:37:22.275777+00:00",
+      "indexed_at": "2026-08-19T23:13:36.477580+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=3ab5e31e516f686e2045c7b880d6a4466d4da66951e1b38087be5a31e8c75bee",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "ab6f7b2ac93bf36168c9a21693192f7d1f0675de20b77501fcf1c34687770ea1",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.771881+00:00",
+          "indexed_at": "2026-08-19T23:13:36.441593+00:00",
+          "reason": "spec-lifecycle-content=bf5e874b1fd4da37645d5f40eeaf78b613e46c5b426182d8bb0883234cff7e69"
+        },
+        {
+          "knowledge_id": "24a21117cf64f19442d7a05f0fc0d3e718ae35e9f8a142b1128a55b9d9306c52",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T15:37:22.275777+00:00",
+          "indexed_at": "2026-08-19T23:13:36.477580+00:00",
+          "reason": "spec-lifecycle-content=3ab5e31e516f686e2045c7b880d6a4466d4da66951e1b38087be5a31e8c75bee"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:control_room_ui_implement",
+      "knowledge_id": "4a72ee97884355e712bee84c100ea39e595173814a16c713977992e210401100",
+      "source_type": "spec",
+      "logical_locator": "control_room_ui_implement",
+      "source_uri": "file://experiments/specs/control_room_ui_implement.yaml",
+      "observed_at": "2026-08-19T14:48:09.813058+00:00",
+      "indexed_at": "2026-08-19T23:13:36.477953+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=d426a83b06bf6aab1c0223bfdbe4471c614993d497129b00035cba319078779d",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "f98e799f10a76e15f87b168186dbabccbcb5faac656d21a602f88438270c5304",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.778041+00:00",
+          "indexed_at": "2026-08-19T23:13:36.442037+00:00",
+          "reason": "spec-lifecycle-content=9d27f4e91fbfcba866523c3421c5f6dac15d5375586fae9570c2a0f7e3bedabb"
+        },
+        {
+          "knowledge_id": "4a72ee97884355e712bee84c100ea39e595173814a16c713977992e210401100",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T14:48:09.813058+00:00",
+          "indexed_at": "2026-08-19T23:13:36.477953+00:00",
+          "reason": "spec-lifecycle-content=d426a83b06bf6aab1c0223bfdbe4471c614993d497129b00035cba319078779d"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:control_room_ui_rebuild",
+      "knowledge_id": "260116895c8b12dd957370ea00b4a33ce77098bcaaccbc22112449ba14e706cc",
+      "source_type": "spec",
+      "logical_locator": "control_room_ui_rebuild",
+      "source_uri": "file://experiments/specs/control_room_ui_rebuild.yaml",
+      "observed_at": "2026-08-19T16:03:19.723289+00:00",
+      "indexed_at": "2026-08-19T23:13:36.478363+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=f2327d343691573fb9682bf9fc509eafb15445fc193a06170caf006c671f5fdc",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "16d810dd4324c3eac9803c39c7e4186cec48c38dc6b0deb80ead354e75e8095e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.783190+00:00",
+          "indexed_at": "2026-08-19T23:13:36.442482+00:00",
+          "reason": "spec-lifecycle-content=1bdb5a75662665ff50f5ef0a541015b59a88d0bab70ec05d0e6b2bc61c0fe280"
+        },
+        {
+          "knowledge_id": "260116895c8b12dd957370ea00b4a33ce77098bcaaccbc22112449ba14e706cc",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T16:03:19.723289+00:00",
+          "indexed_at": "2026-08-19T23:13:36.478363+00:00",
+          "reason": "spec-lifecycle-content=f2327d343691573fb9682bf9fc509eafb15445fc193a06170caf006c671f5fdc"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:control_room_ui_redesign",
+      "knowledge_id": "266a5cffeb78b51f9b39ea86e5ba48d77b1fa9f7daa0e2064a051eaba473c5f1",
+      "source_type": "spec",
+      "logical_locator": "control_room_ui_redesign",
+      "source_uri": "file://experiments/specs/control_room_ui_redesign.yaml",
+      "observed_at": "2026-08-19T13:53:35.776279+00:00",
+      "indexed_at": "2026-08-19T23:13:36.478733+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=699c216083b1f624f7623b88394a1fb5ef6ae6f38178af17bf2ed383bcef7a3e",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "6c1c6e051fef0da4c67530f45bc06c74d6156c7aba7e188cffa4a4ef1971ad01",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.788322+00:00",
+          "indexed_at": "2026-08-19T23:13:36.442937+00:00",
+          "reason": "spec-lifecycle-content=393d817e2e7afee10d5545a0f22095b422812efbc69b4d2952e75d2fb3336bbd"
+        },
+        {
+          "knowledge_id": "266a5cffeb78b51f9b39ea86e5ba48d77b1fa9f7daa0e2064a051eaba473c5f1",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T13:53:35.776279+00:00",
+          "indexed_at": "2026-08-19T23:13:36.478733+00:00",
+          "reason": "spec-lifecycle-content=699c216083b1f624f7623b88394a1fb5ef6ae6f38178af17bf2ed383bcef7a3e"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:control_room_workflow_phase",
+      "knowledge_id": "c6bcc8b896ed5c68b0dde338491e961de5615890ff6354f499d0e3bfb57fc260",
+      "source_type": "spec",
+      "logical_locator": "control_room_workflow_phase",
+      "source_uri": "file://experiments/specs/control_room_workflow_phase.yaml",
+      "observed_at": "2026-08-17T15:44:28.170362+00:00",
+      "indexed_at": "2026-08-19T23:13:36.479158+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=494c9d59756f56a50008641b918ed6e0a59aaca9943c6c5de8f2e31f47fda73c",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1b5d3a5c1643cf8621e9b22cdaa338e24621fa9f11ce7de6b6e2837006ec53b0",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.793492+00:00",
+          "indexed_at": "2026-08-19T23:13:36.443399+00:00",
+          "reason": "spec-lifecycle-content=246f2f912ecffdb72f4b22c68c433176027dbda9071665edd8ece6ae46cb9371"
+        },
+        {
+          "knowledge_id": "c6bcc8b896ed5c68b0dde338491e961de5615890ff6354f499d0e3bfb57fc260",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T15:44:28.170362+00:00",
+          "indexed_at": "2026-08-19T23:13:36.479158+00:00",
+          "reason": "spec-lifecycle-content=494c9d59756f56a50008641b918ed6e0a59aaca9943c6c5de8f2e31f47fda73c"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:deep_architecture_review",
+      "knowledge_id": "c4af38464483c9fd7b2353640d53b37dcd44e9e51fff8c613fa26681438ae3e5",
+      "source_type": "spec",
+      "logical_locator": "deep_architecture_review",
+      "source_uri": "file://experiments/specs/deep_architecture_review.yaml",
+      "observed_at": "2026-08-18T19:10:20.158971+00:00",
+      "indexed_at": "2026-08-19T23:13:36.479540+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=752163114b535c6b6760441d67f2cb73331282c67c15a40c8011b78de20c3b17",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "d5c089552d580b2f34d6fdd3bac5a95a82ed32e707c839ed3717d6c198eb0444",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.798637+00:00",
+          "indexed_at": "2026-08-19T23:13:36.443823+00:00",
+          "reason": "spec-lifecycle-content=bf430c595e7f7d0bdd53c82de6f966baca00784900a7bedd216d2c3884e29455"
+        },
+        {
+          "knowledge_id": "c4af38464483c9fd7b2353640d53b37dcd44e9e51fff8c613fa26681438ae3e5",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T19:10:20.158971+00:00",
+          "indexed_at": "2026-08-19T23:13:36.479540+00:00",
+          "reason": "spec-lifecycle-content=752163114b535c6b6760441d67f2cb73331282c67c15a40c8011b78de20c3b17"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:design_sessions",
+      "knowledge_id": "56ebd5b16ac9c0a0bea8f3cd5e389ee7bb5ec1207d676eddd8e63e5c8159f36e",
+      "source_type": "spec",
+      "logical_locator": "design_sessions",
+      "source_uri": "file://experiments/specs/design_sessions.yaml",
+      "observed_at": "2026-08-14T06:58:12.423952+00:00",
+      "indexed_at": "2026-08-19T23:13:36.479916+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=e3b7e0b24c67816a3b46a45708b5786788aa3a0b3c5c12228d8924a0828ef4b6",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "fa669a2fd836dbfe739f345812e6a471eade4e016d78354791d67daf6369eb57",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.803462+00:00",
+          "indexed_at": "2026-08-19T23:13:36.444232+00:00",
+          "reason": "spec-lifecycle-content=0ac825b76278dede3624de1bac039993dced235c360d5b59f21ddbe24c901180"
+        },
+        {
+          "knowledge_id": "56ebd5b16ac9c0a0bea8f3cd5e389ee7bb5ec1207d676eddd8e63e5c8159f36e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T06:58:12.423952+00:00",
+          "indexed_at": "2026-08-19T23:13:36.479916+00:00",
+          "reason": "spec-lifecycle-content=e3b7e0b24c67816a3b46a45708b5786788aa3a0b3c5c12228d8924a0828ef4b6"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:evidence_narrative",
+      "knowledge_id": "0aa586e905eade5c1801c81904236e087c29f75d6d6293309dc491414d1eb24a",
+      "source_type": "spec",
+      "logical_locator": "evidence_narrative",
+      "source_uri": "file://experiments/specs/evidence_narrative.yaml",
+      "observed_at": "2026-08-14T15:04:46.051512+00:00",
+      "indexed_at": "2026-08-19T23:13:36.480302+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=97ef117bddd07b03477a3ec8a4351f836db49b10bfa81a02f7c92c61a1c76a09",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "7d0b80069afde6d62cf59c0b7920cff97fe56dd8333e18271dd0e1fa111e25fd",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.807997+00:00",
+          "indexed_at": "2026-08-19T23:13:36.444605+00:00",
+          "reason": "spec-lifecycle-content=434694fe99783124cb032cd0a72b6c1e4023af5ed511a51df278817f6ba0a227"
+        },
+        {
+          "knowledge_id": "0aa586e905eade5c1801c81904236e087c29f75d6d6293309dc491414d1eb24a",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T15:04:46.051512+00:00",
+          "indexed_at": "2026-08-19T23:13:36.480302+00:00",
+          "reason": "spec-lifecycle-content=97ef117bddd07b03477a3ec8a4351f836db49b10bfa81a02f7c92c61a1c76a09"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:evidence_redesign",
+      "knowledge_id": "e74929e0fb7819810756425e49491eb08c95ae7fec2e764f58e740e373daa960",
+      "source_type": "spec",
+      "logical_locator": "evidence_redesign",
+      "source_uri": "file://experiments/specs/evidence_redesign.yaml",
+      "observed_at": "2026-08-14T19:18:14.398129+00:00",
+      "indexed_at": "2026-08-19T23:13:36.480672+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=ebb2d4c3b7f535a81282b92b79e6e99d58f82a3ff0af74794e7d0f68d160d1ec",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "3c2817ef2e640b2f3ff033ebc52f27c4edccc0922d5906541a21000719913cd7",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.812673+00:00",
+          "indexed_at": "2026-08-19T23:13:36.444976+00:00",
+          "reason": "spec-lifecycle-content=a72593486d3d9e562e553389f0560932b6d3e46cf69824ad2895eb6b61d72108"
+        },
+        {
+          "knowledge_id": "e74929e0fb7819810756425e49491eb08c95ae7fec2e764f58e740e373daa960",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T19:18:14.398129+00:00",
+          "indexed_at": "2026-08-19T23:13:36.480672+00:00",
+          "reason": "spec-lifecycle-content=ebb2d4c3b7f535a81282b92b79e6e99d58f82a3ff0af74794e7d0f68d160d1ec"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:explanation_tax",
+      "knowledge_id": "c64c7afc4b9239a1975666a4264670e2d1c959c2325766fb16b0a4b390c8ec92",
+      "source_type": "spec",
+      "logical_locator": "explanation_tax",
+      "source_uri": "file://experiments/specs/explanation_tax.yaml",
+      "observed_at": "2026-08-19T23:13:32.809386+00:00",
+      "indexed_at": "2026-08-19T23:13:36.481053+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=691a83b2a7f20a8b3c39c38bfb0fd04c839f581657a19fb88e1fd54beef8be0c",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "e96bd8fbcf4cfb24dca0ab7f1552c48723b18f7f500f863f2cc04b083e58c203",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.817696+00:00",
+          "indexed_at": "2026-08-19T23:13:36.445402+00:00",
+          "reason": "spec-lifecycle-content=691a83b2a7f20a8b3c39c38bfb0fd04c839f581657a19fb88e1fd54beef8be0c"
+        },
+        {
+          "knowledge_id": "c64c7afc4b9239a1975666a4264670e2d1c959c2325766fb16b0a4b390c8ec92",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T23:13:32.809386+00:00",
+          "indexed_at": "2026-08-19T23:13:36.481053+00:00",
+          "reason": "spec-lifecycle-content=691a83b2a7f20a8b3c39c38bfb0fd04c839f581657a19fb88e1fd54beef8be0c"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:fix_review_findings",
+      "knowledge_id": "792aa110dcf2751bf475ba39b05f1930980457e3b421afca74667cae9eb1c7d3",
+      "source_type": "spec",
+      "logical_locator": "fix_review_findings",
+      "source_uri": "file://experiments/specs/fix_review_findings.yaml",
+      "observed_at": "2026-08-14T13:48:37.494047+00:00",
+      "indexed_at": "2026-08-19T23:13:36.481423+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=6b167e2f83bf1b36224cd0d5051a4c8cdc12b9861de22edae7f2deaa7721c2fb",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "d31e15bb8011fd0f1aa691d0ef451793f33680c0a116371ff5662fd9498ab576",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.822707+00:00",
+          "indexed_at": "2026-08-19T23:13:36.445789+00:00",
+          "reason": "spec-lifecycle-content=4dfb5cc1be821081d35271f6c956cac98d280ee81e0c7c08cedcbd076824ec9c"
+        },
+        {
+          "knowledge_id": "792aa110dcf2751bf475ba39b05f1930980457e3b421afca74667cae9eb1c7d3",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T13:48:37.494047+00:00",
+          "indexed_at": "2026-08-19T23:13:36.481423+00:00",
+          "reason": "spec-lifecycle-content=6b167e2f83bf1b36224cd0d5051a4c8cdc12b9861de22edae7f2deaa7721c2fb"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:framework_facelift",
+      "knowledge_id": "c1ca921419741095e7a1cba97b9545443cf09b06326224b79ffd9ee6ea1c6c13",
+      "source_type": "spec",
+      "logical_locator": "framework_facelift",
+      "source_uri": "file://experiments/specs/framework_facelift.yaml",
+      "observed_at": "2026-08-14T15:18:11.996900+00:00",
+      "indexed_at": "2026-08-19T23:13:36.481793+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=55be719add4bcf19c36d78660c571bdf93b78f3170c0784989736b7b4edf136b",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1aab5b77d18250c8fc90c2f0e6ff2d53755e6990beb7b6f79fd152db2f7cc8c2",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.827820+00:00",
+          "indexed_at": "2026-08-19T23:13:36.446212+00:00",
+          "reason": "spec-lifecycle-content=804c08cd3343bd79d18e8ef79e08e6cfa56ef4a4c6d547a07fa2f1ac9321e473"
+        },
+        {
+          "knowledge_id": "c1ca921419741095e7a1cba97b9545443cf09b06326224b79ffd9ee6ea1c6c13",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T15:18:11.996900+00:00",
+          "indexed_at": "2026-08-19T23:13:36.481793+00:00",
+          "reason": "spec-lifecycle-content=55be719add4bcf19c36d78660c571bdf93b78f3170c0784989736b7b4edf136b"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:kb_event_typing",
+      "knowledge_id": "6d11232e4f13148fcccf37f2b7379476e89c42c9d41636d9bcd2b08589d1c8b7",
+      "source_type": "spec",
+      "logical_locator": "kb_event_typing",
+      "source_uri": "file://experiments/specs/kb_event_typing.yaml",
+      "observed_at": "2026-08-19T00:38:28.851991+00:00",
+      "indexed_at": "2026-08-19T23:13:36.482172+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=e875e99d0f78cff51ff97098a2b13cd1426fea15e5ca3749020a30d7d467ccbd",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "d9380590c33bb6d9afb4c12d295c14476b7d1725c5b7804ff09d6e16cd6b0e96",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.832734+00:00",
+          "indexed_at": "2026-08-19T23:13:36.446626+00:00",
+          "reason": "spec-lifecycle-content=dd6babba8f513f69d99ba4f95a67ab5640887fa0cd6df6ba4f8f8322a85c1d56"
+        },
+        {
+          "knowledge_id": "6d11232e4f13148fcccf37f2b7379476e89c42c9d41636d9bcd2b08589d1c8b7",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T00:38:28.851991+00:00",
+          "indexed_at": "2026-08-19T23:13:36.482172+00:00",
+          "reason": "spec-lifecycle-content=e875e99d0f78cff51ff97098a2b13cd1426fea15e5ca3749020a30d7d467ccbd"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:kb_lineage_reconcile",
+      "knowledge_id": "fa591343b3662739d610ab981507d95cf59a9b745362cb00116c982e43e5a261",
+      "source_type": "spec",
+      "logical_locator": "kb_lineage_reconcile",
+      "source_uri": "file://experiments/specs/kb_lineage_reconcile.yaml",
+      "observed_at": "2026-08-19T00:31:25.208424+00:00",
+      "indexed_at": "2026-08-19T23:13:36.482568+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=6f4155044b96ed7dda8dc61331b1f28f82c78ea0d642f82ffbf01f0c412f1f6e",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "13435d5c80e3fb923dd96fed445e3c8389cae7897e1bd11b8c67a3399344b96f",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.837709+00:00",
+          "indexed_at": "2026-08-19T23:13:36.447117+00:00",
+          "reason": "spec-lifecycle-content=f8bab0e47a4db175b21344dd0eab7519cd5d0298a3297ea5a4e001674576d507"
+        },
+        {
+          "knowledge_id": "fa591343b3662739d610ab981507d95cf59a9b745362cb00116c982e43e5a261",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T00:31:25.208424+00:00",
+          "indexed_at": "2026-08-19T23:13:36.482568+00:00",
+          "reason": "spec-lifecycle-content=6f4155044b96ed7dda8dc61331b1f28f82c78ea0d642f82ffbf01f0c412f1f6e"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:kb_producer_factory",
+      "knowledge_id": "b2d8b5ae35d278ca3ca427108ba64e8f3be2b207be5e1b48b92114420debc12e",
+      "source_type": "spec",
+      "logical_locator": "kb_producer_factory",
+      "source_uri": "file://experiments/specs/kb_producer_factory.yaml",
+      "observed_at": "2026-08-18T23:58:21.570615+00:00",
+      "indexed_at": "2026-08-19T23:13:36.483049+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=ce3e289154094d69cf0e84135b35d40176e730527821d849f642ea1f944f33e7",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "e982f6893306d65c0f28698421e707771b3bfbbd37f2654101f58fe603c25241",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.842664+00:00",
+          "indexed_at": "2026-08-19T23:13:36.447533+00:00",
+          "reason": "spec-lifecycle-content=afe7a94dd1c637dfe036297ecc99b1481832e1187025903faab804048a6083fe"
+        },
+        {
+          "knowledge_id": "b2d8b5ae35d278ca3ca427108ba64e8f3be2b207be5e1b48b92114420debc12e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T23:58:21.570615+00:00",
+          "indexed_at": "2026-08-19T23:13:36.483049+00:00",
+          "reason": "spec-lifecycle-content=ce3e289154094d69cf0e84135b35d40176e730527821d849f642ea1f944f33e7"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:kb_record_fidelity",
+      "knowledge_id": "076ed7cfa6224b063b6f153103043a12afeff117959672c2d1145b86ef45207b",
+      "source_type": "spec",
+      "logical_locator": "kb_record_fidelity",
+      "source_uri": "file://experiments/specs/kb_record_fidelity.yaml",
+      "observed_at": "2026-08-18T23:50:06.715214+00:00",
+      "indexed_at": "2026-08-19T23:13:36.483445+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=7989751fcd715091e274bbea1cea95bf8d2b1145b9ed2f2c25a241ae8f2e8955",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1d7a1a20594368f403df9d3d86f46e1c1c96cb21d810df435bb911bfb8980e2e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.849114+00:00",
+          "indexed_at": "2026-08-19T23:13:36.447930+00:00",
+          "reason": "spec-lifecycle-content=aae0070f8883e0041a89491aabd57e2eab1be74c437ec0a943ac85a25deae928"
+        },
+        {
+          "knowledge_id": "076ed7cfa6224b063b6f153103043a12afeff117959672c2d1145b86ef45207b",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T23:50:06.715214+00:00",
+          "indexed_at": "2026-08-19T23:13:36.483445+00:00",
+          "reason": "spec-lifecycle-content=7989751fcd715091e274bbea1cea95bf8d2b1145b9ed2f2c25a241ae8f2e8955"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:kb_write_path",
+      "knowledge_id": "b44a1c8bab8f9d2f48e50b3f608c9ca196ebb55ff26f548a13e8369d8e3f5750",
+      "source_type": "spec",
+      "logical_locator": "kb_write_path",
+      "source_uri": "file://experiments/specs/kb_write_path.yaml",
+      "observed_at": "2026-08-18T23:48:22.847032+00:00",
+      "indexed_at": "2026-08-19T23:13:36.483825+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=17735cbc6f444c882f5595316fea48c3e3511138e11d3bd181c084f661cd2b07",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "34f0214ad5e3f464de3209f68c23773f8e110e3e326a0fceae7da2f839e5a02b",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.853421+00:00",
+          "indexed_at": "2026-08-19T23:13:36.448346+00:00",
+          "reason": "spec-lifecycle-content=dc3af2c898dbc21e0690b1c192fb7427b50a21e1d5ee691b7598ec6fb57ec443"
+        },
+        {
+          "knowledge_id": "b44a1c8bab8f9d2f48e50b3f608c9ca196ebb55ff26f548a13e8369d8e3f5750",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T23:48:22.847032+00:00",
+          "indexed_at": "2026-08-19T23:13:36.483825+00:00",
+          "reason": "spec-lifecycle-content=17735cbc6f444c882f5595316fea48c3e3511138e11d3bd181c084f661cd2b07"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:labbook_refresh",
+      "knowledge_id": "124bdbc2769358da31ee14922bc15600e0bd1e0565aa74ecc883bdd6f998565d",
+      "source_type": "spec",
+      "logical_locator": "labbook_refresh",
+      "source_uri": "file://experiments/specs/labbook_refresh.yaml",
+      "observed_at": "2026-08-17T18:14:52.158184+00:00",
+      "indexed_at": "2026-08-19T23:13:36.484210+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=2ce779177b5d7dd7a082c123fa7535971fda316d297cc25eb8bc6271261ac2db",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "7467a297ea6702b924a90fad52e46acca36cca224cfa2d153b16a3a85042ea2b",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.857416+00:00",
+          "indexed_at": "2026-08-19T23:13:36.448737+00:00",
+          "reason": "spec-lifecycle-content=6cdfdec1438442215520bec577e7ac7a50661a85f7c909f3eebc28f1fb7b3f21"
+        },
+        {
+          "knowledge_id": "124bdbc2769358da31ee14922bc15600e0bd1e0565aa74ecc883bdd6f998565d",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T18:14:52.158184+00:00",
+          "indexed_at": "2026-08-19T23:13:36.484210+00:00",
+          "reason": "spec-lifecycle-content=2ce779177b5d7dd7a082c123fa7535971fda316d297cc25eb8bc6271261ac2db"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:measurement_bug_fixes",
+      "knowledge_id": "d89cd36143ebadf811c3909fc83392c165407ddae1b96e800f5307c29483ab0d",
+      "source_type": "spec",
+      "logical_locator": "measurement_bug_fixes",
+      "source_uri": "file://experiments/specs/measurement_bug_fixes.yaml",
+      "observed_at": "2026-08-18T23:39:37.971749+00:00",
+      "indexed_at": "2026-08-19T23:13:36.484587+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=e6038ce79ca7ff6d5248d443b63bad44227f9281e8e046da769497b6315dc033",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "f2e99ec14852d2207a3142150270574bf6abd65da4ca422c5d6c6c51d32ab11a",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.861860+00:00",
+          "indexed_at": "2026-08-19T23:13:36.449157+00:00",
+          "reason": "spec-lifecycle-content=b737054271191d29dd3c65de22dab1cddd8509c93476a3b923a083c0fe41c6a2"
+        },
+        {
+          "knowledge_id": "d89cd36143ebadf811c3909fc83392c165407ddae1b96e800f5307c29483ab0d",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T23:39:37.971749+00:00",
+          "indexed_at": "2026-08-19T23:13:36.484587+00:00",
+          "reason": "spec-lifecycle-content=e6038ce79ca7ff6d5248d443b63bad44227f9281e8e046da769497b6315dc033"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:opencode_docs_refresh",
+      "knowledge_id": "10422fe608e4c4df0adfd755b30727e246015235adc737426d482fb9cb1cb55e",
+      "source_type": "spec",
+      "logical_locator": "opencode_docs_refresh",
+      "source_uri": "file://experiments/specs/opencode_docs_refresh.yaml",
+      "observed_at": "2026-08-14T21:33:37.195697+00:00",
+      "indexed_at": "2026-08-19T23:13:36.484972+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=890fd411b4f81e0f4ed0768e04153068fe15966fdcab242eeb23ddffdcdd52cf",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "4f8ea207721335d5bd907c85014f0886780d2b2a2b64c1201a09f609091e3c14",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.866718+00:00",
+          "indexed_at": "2026-08-19T23:13:36.449603+00:00",
+          "reason": "spec-lifecycle-content=3a02afbd46410800acff0211a1401fd9a2200924a995cde050307da161aa6fdc"
+        },
+        {
+          "knowledge_id": "10422fe608e4c4df0adfd755b30727e246015235adc737426d482fb9cb1cb55e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T21:33:37.195697+00:00",
+          "indexed_at": "2026-08-19T23:13:36.484972+00:00",
+          "reason": "spec-lifecycle-content=890fd411b4f81e0f4ed0768e04153068fe15966fdcab242eeb23ddffdcdd52cf"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:perturbation_operators_fix",
+      "knowledge_id": "69ed0fbb81831e0c9b62184a36f8e440ce6bf712459fd0fa7f293ba2c48f5c7f",
+      "source_type": "spec",
+      "logical_locator": "perturbation_operators_fix",
+      "source_uri": "file://experiments/specs/perturbation_operators_fix.yaml",
+      "observed_at": "2026-08-15T16:32:12.076040+00:00",
+      "indexed_at": "2026-08-19T23:13:36.485870+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=aacd4f2952ba38a93bf6c63a468ce578cd9da9f50a25b4e25d28355ee8f519af",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "43607b64317962883109ed2c94ba70f14ad79f1582a696e19ce41dae44a7a9c6",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.871636+00:00",
+          "indexed_at": "2026-08-19T23:13:36.449975+00:00",
+          "reason": "spec-lifecycle-content=7af503ff94e63e93065d392d16b61d036b6c8ca7396acfede8faaa492f3903bb"
+        },
+        {
+          "knowledge_id": "69ed0fbb81831e0c9b62184a36f8e440ce6bf712459fd0fa7f293ba2c48f5c7f",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-15T16:32:12.076040+00:00",
+          "indexed_at": "2026-08-19T23:13:36.485870+00:00",
+          "reason": "spec-lifecycle-content=aacd4f2952ba38a93bf6c63a468ce578cd9da9f50a25b4e25d28355ee8f519af"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:posthoc_pipeline",
+      "knowledge_id": "30eeb8880c503dfd2e228d824d765d52c7d4499d75b95271b5375e6b7ed86b7f",
+      "source_type": "spec",
+      "logical_locator": "posthoc_pipeline",
+      "source_uri": "file://experiments/specs/posthoc_pipeline.yaml",
+      "observed_at": "2026-08-19T23:13:32.846308+00:00",
+      "indexed_at": "2026-08-19T23:13:36.486302+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=73f7d44192c7eef31550d76c1d9ed3c1ec83217b3ffd21215d9a017580648817",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "a138f1269ef38818d50035596c86f5df24de787a77c3b5da852640e1da1cc0ce",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.876433+00:00",
+          "indexed_at": "2026-08-19T23:13:36.450358+00:00",
+          "reason": "spec-lifecycle-content=73f7d44192c7eef31550d76c1d9ed3c1ec83217b3ffd21215d9a017580648817"
+        },
+        {
+          "knowledge_id": "30eeb8880c503dfd2e228d824d765d52c7d4499d75b95271b5375e6b7ed86b7f",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T23:13:32.846308+00:00",
+          "indexed_at": "2026-08-19T23:13:36.486302+00:00",
+          "reason": "spec-lifecycle-content=73f7d44192c7eef31550d76c1d9ed3c1ec83217b3ffd21215d9a017580648817"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:process_perturbation_resample",
+      "knowledge_id": "2f3b90a81e27a9dea299b54d2104b983f3344f3e3dd2d1918f9dedf3b41188ba",
+      "source_type": "spec",
+      "logical_locator": "process_perturbation_resample",
+      "source_uri": "file://experiments/specs/process_perturbation_resample.yaml",
+      "observed_at": "2026-08-19T23:13:32.849345+00:00",
+      "indexed_at": "2026-08-19T23:13:36.486711+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=2e06d13564b669bf7b9adcea80489ad91b9bf306f6c8049770c6276f93e15ee8",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "6dbec17035bfaa598103becb70b644fc980eb34576dc86b1aa2e60eb5d8ab650",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.881335+00:00",
+          "indexed_at": "2026-08-19T23:13:36.450723+00:00",
+          "reason": "spec-lifecycle-content=2e06d13564b669bf7b9adcea80489ad91b9bf306f6c8049770c6276f93e15ee8"
+        },
+        {
+          "knowledge_id": "2f3b90a81e27a9dea299b54d2104b983f3344f3e3dd2d1918f9dedf3b41188ba",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T23:13:32.849345+00:00",
+          "indexed_at": "2026-08-19T23:13:36.486711+00:00",
+          "reason": "spec-lifecycle-content=2e06d13564b669bf7b9adcea80489ad91b9bf306f6c8049770c6276f93e15ee8"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:queue_steer",
+      "knowledge_id": "1700e0150bc3bac9a515c3197bf171bfcbf3e45a08b54ea1525c9fb9507c91da",
+      "source_type": "spec",
+      "logical_locator": "queue_steer",
+      "source_uri": "file://experiments/specs/queue_steer.yaml",
+      "observed_at": "2026-08-15T19:32:36.956854+00:00",
+      "indexed_at": "2026-08-19T23:13:36.487446+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=efbfc73b8bafcc1d59288b84421a798a63b4b3120f7b921af8706a0059aeddb8",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1c48e299776e9c64de168d19337b462bb1ab6f5ee2d3e79f74a813d02cf2617c",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.886173+00:00",
+          "indexed_at": "2026-08-19T23:13:36.451195+00:00",
+          "reason": "spec-lifecycle-content=5ca00824a6649f06a81a73500a09f9c4e4a1716fc58b5b41b7024f4d11f8acbd"
+        },
+        {
+          "knowledge_id": "1700e0150bc3bac9a515c3197bf171bfcbf3e45a08b54ea1525c9fb9507c91da",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-15T19:32:36.956854+00:00",
+          "indexed_at": "2026-08-19T23:13:36.487446+00:00",
+          "reason": "spec-lifecycle-content=efbfc73b8bafcc1d59288b84421a798a63b4b3120f7b921af8706a0059aeddb8"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_bare_vs_augmented",
+      "knowledge_id": "29d0b530401cff8bb6a5423deb096968192f0d9e35b3a6d73f9b857e4fd162f1",
+      "source_type": "spec",
+      "logical_locator": "rag_bare_vs_augmented",
+      "source_uri": "file://experiments/specs/rag_bare_vs_augmented.yaml",
+      "observed_at": "2026-08-19T23:13:32.855485+00:00",
+      "indexed_at": "2026-08-19T23:13:36.488109+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=3a4cbe53fcbca850eae3f39f331e47556f7480df829af339f6aebea292bdaed9",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "65d63307a247ecd5effaf6df464f871224f3d4227bdd55aa78413f41a7795444",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.891024+00:00",
+          "indexed_at": "2026-08-19T23:13:36.451609+00:00",
+          "reason": "spec-lifecycle-content=3a4cbe53fcbca850eae3f39f331e47556f7480df829af339f6aebea292bdaed9"
+        },
+        {
+          "knowledge_id": "29d0b530401cff8bb6a5423deb096968192f0d9e35b3a6d73f9b857e4fd162f1",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T23:13:32.855485+00:00",
+          "indexed_at": "2026-08-19T23:13:36.488109+00:00",
+          "reason": "spec-lifecycle-content=3a4cbe53fcbca850eae3f39f331e47556f7480df829af339f6aebea292bdaed9"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_knowledge_base",
+      "knowledge_id": "a758a6aa330fe0ef7f5dc54b58a70778d503912328bb40732943b58d48379fae",
+      "source_type": "spec",
+      "logical_locator": "rag_knowledge_base",
+      "source_uri": "file://experiments/specs/rag_knowledge_base.yaml",
+      "observed_at": "2026-08-14T23:37:48.234450+00:00",
+      "indexed_at": "2026-08-19T23:13:36.488575+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=12b263747de05fdbaf26723407e04143422e7e4f9d1dfd846fc4ede3a3db0c4f",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "764258c4613a0475e89cbdc66dd7eb895e04b9ebecf3df1d8b8278a029c667e9",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.896092+00:00",
+          "indexed_at": "2026-08-19T23:13:36.452064+00:00",
+          "reason": "spec-lifecycle-content=cad8f59e00e3186323a4df282ef743990ed4eb22ec8b2bca749a1c4e50f0de62"
+        },
+        {
+          "knowledge_id": "a758a6aa330fe0ef7f5dc54b58a70778d503912328bb40732943b58d48379fae",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T23:37:48.234450+00:00",
+          "indexed_at": "2026-08-19T23:13:36.488575+00:00",
+          "reason": "spec-lifecycle-content=12b263747de05fdbaf26723407e04143422e7e4f9d1dfd846fc4ede3a3db0c4f"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_knowledge_base_build",
+      "knowledge_id": "ce3a82daa36e0ad53347b0995b2e9868a1955293b67efa11286bc84b985ba6f2",
+      "source_type": "spec",
+      "logical_locator": "rag_knowledge_base_build",
+      "source_uri": "file://experiments/specs/rag_knowledge_base_build.yaml",
+      "observed_at": "2026-08-15T00:58:52.236548+00:00",
+      "indexed_at": "2026-08-19T23:13:36.489034+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=520d51eac85f2ed30da6d19e47f075cf2275da87420d317ea4de7ad408df971f",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "7e411acd4fcef827f64025674f31714183a0d14b4f334613097a3d9593ad4929",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.900769+00:00",
+          "indexed_at": "2026-08-19T23:13:36.452542+00:00",
+          "reason": "spec-lifecycle-content=265662c39f5881b7f7418aa5cce253413583c38eba94e760ef3f68322f0c3668"
+        },
+        {
+          "knowledge_id": "ce3a82daa36e0ad53347b0995b2e9868a1955293b67efa11286bc84b985ba6f2",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-15T00:58:52.236548+00:00",
+          "indexed_at": "2026-08-19T23:13:36.489034+00:00",
+          "reason": "spec-lifecycle-content=520d51eac85f2ed30da6d19e47f075cf2275da87420d317ea4de7ad408df971f"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_knowledge_base_reconcile",
+      "knowledge_id": "67d3715376db9591aaef0a45bba49ed824524245f73a714045df12a513e1538a",
+      "source_type": "spec",
+      "logical_locator": "rag_knowledge_base_reconcile",
+      "source_uri": "file://experiments/specs/rag_knowledge_base_reconcile.yaml",
+      "observed_at": "2026-08-15T19:31:45.356235+00:00",
+      "indexed_at": "2026-08-19T23:13:36.489486+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=990448b99cac2b0d971f2ad3237d2fee33831e010784cda2f50151e4df09b691",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "f3fa9b7d25c50202478f939916692d635172f85de8841892d195281672d62cd1",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.905939+00:00",
+          "indexed_at": "2026-08-19T23:13:36.452957+00:00",
+          "reason": "spec-lifecycle-content=2dfbf544ce7011134911ec7715313399c050836dc82fc3dea2affeaf7a166455"
+        },
+        {
+          "knowledge_id": "67d3715376db9591aaef0a45bba49ed824524245f73a714045df12a513e1538a",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-15T19:31:45.356235+00:00",
+          "indexed_at": "2026-08-19T23:13:36.489486+00:00",
+          "reason": "spec-lifecycle-content=990448b99cac2b0d971f2ad3237d2fee33831e010784cda2f50151e4df09b691"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_knowledge_base_wire",
+      "knowledge_id": "42753a81b8d57c2d174f643f980099fba7b892be45ab091fbb4d131ee8507d72",
+      "source_type": "spec",
+      "logical_locator": "rag_knowledge_base_wire",
+      "source_uri": "file://experiments/specs/rag_knowledge_base_wire.yaml",
+      "observed_at": "2026-08-15T16:17:08.924062+00:00",
+      "indexed_at": "2026-08-19T23:13:36.489939+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=54e6a5c3845d4a107ffbb4695fe78017848e8f8434f390f3c13153003d88b81e",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "513c9b054af88d00f10e7394e437ef1d359799a91606fca787a48e74f20a58c3",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.930921+00:00",
+          "indexed_at": "2026-08-19T23:13:36.453381+00:00",
+          "reason": "spec-lifecycle-content=f5ba9e7cc01cb0a9bed1eb02e3afc754dd1167e51962bdb72392cf4a3ed3e25c"
+        },
+        {
+          "knowledge_id": "42753a81b8d57c2d174f643f980099fba7b892be45ab091fbb4d131ee8507d72",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-15T16:17:08.924062+00:00",
+          "indexed_at": "2026-08-19T23:13:36.489939+00:00",
+          "reason": "spec-lifecycle-content=54e6a5c3845d4a107ffbb4695fe78017848e8f8434f390f3c13153003d88b81e"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_knowledge_produce",
+      "knowledge_id": "61da5e6a817266a5abefddb29afe5bd67504825b613b7130943717f0da751122",
+      "source_type": "spec",
+      "logical_locator": "rag_knowledge_produce",
+      "source_uri": "file://experiments/specs/rag_knowledge_produce.yaml",
+      "observed_at": "2026-08-15T20:16:34.573795+00:00",
+      "indexed_at": "2026-08-19T23:13:36.490384+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=29900414c00e07889aee1340e25fe5fcb215de91f0a4b4ccdef656327173de0d",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "ee3749a307e6a9174501868b119b4aacfed44f4874abd4e461a36e01be9f7487",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.936096+00:00",
+          "indexed_at": "2026-08-19T23:13:36.453898+00:00",
+          "reason": "spec-lifecycle-content=b94651f614eed41a1af408899fbae0c30b73b0a0cc7241247834d17143379dbf"
+        },
+        {
+          "knowledge_id": "61da5e6a817266a5abefddb29afe5bd67504825b613b7130943717f0da751122",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-15T20:16:34.573795+00:00",
+          "indexed_at": "2026-08-19T23:13:36.490384+00:00",
+          "reason": "spec-lifecycle-content=29900414c00e07889aee1340e25fe5fcb215de91f0a4b4ccdef656327173de0d"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_knowledge_produce_fix",
+      "knowledge_id": "e53f0a2ab257c512c0efb00a7865d66491c2d38009321d0a59793181391bf025",
+      "source_type": "spec",
+      "logical_locator": "rag_knowledge_produce_fix",
+      "source_uri": "file://experiments/specs/rag_knowledge_produce_fix.yaml",
+      "observed_at": "2026-08-15T21:11:49.124334+00:00",
+      "indexed_at": "2026-08-19T23:13:36.490833+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=1b0aa4e3036086c842f514b9157bf707dda766b2fee977fe369f6c6eabc6621e",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "0323fa2abc25fa0426c45945c7ee0c7f72d94ddad13f7a9cbb893953543ff5e4",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.941321+00:00",
+          "indexed_at": "2026-08-19T23:13:36.454363+00:00",
+          "reason": "spec-lifecycle-content=b097c2b3a5c34dd0a11ddeecd3b2b7b523c53ee32826990e7d7896566a366408"
+        },
+        {
+          "knowledge_id": "e53f0a2ab257c512c0efb00a7865d66491c2d38009321d0a59793181391bf025",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-15T21:11:49.124334+00:00",
+          "indexed_at": "2026-08-19T23:13:36.490833+00:00",
+          "reason": "spec-lifecycle-content=1b0aa4e3036086c842f514b9157bf707dda766b2fee977fe369f6c6eabc6621e"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_knowledge_sources",
+      "knowledge_id": "656aaff5a57b8673395e91fe221019a28735633be898ec3ee74500b64ebd47fd",
+      "source_type": "spec",
+      "logical_locator": "rag_knowledge_sources",
+      "source_uri": "file://experiments/specs/rag_knowledge_sources.yaml",
+      "observed_at": "2026-08-16T01:39:11.245084+00:00",
+      "indexed_at": "2026-08-19T23:13:36.491311+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=19297744ce1b60b02eb0523d4b5924125338085a3c68ee9b6aef5e99d44ad172",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "2b363d2c00067a0f5a0608baf58f95c9848b42b338b98c6777714c89a2fd5092",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.946410+00:00",
+          "indexed_at": "2026-08-19T23:13:36.454783+00:00",
+          "reason": "spec-lifecycle-content=454d445ec898b8cab81954d6f80b467ad847ab919ebe1a38a80cfb7a266c35ce"
+        },
+        {
+          "knowledge_id": "656aaff5a57b8673395e91fe221019a28735633be898ec3ee74500b64ebd47fd",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-16T01:39:11.245084+00:00",
+          "indexed_at": "2026-08-19T23:13:36.491311+00:00",
+          "reason": "spec-lifecycle-content=19297744ce1b60b02eb0523d4b5924125338085a3c68ee9b6aef5e99d44ad172"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_scope_emit",
+      "knowledge_id": "dac39695f73e1f667f9a57fee032ad71289f8316088949606faebf85afe0ba2a",
+      "source_type": "spec",
+      "logical_locator": "rag_scope_emit",
+      "source_uri": "file://experiments/specs/rag_scope_emit.yaml",
+      "observed_at": "2026-08-17T15:28:45.305401+00:00",
+      "indexed_at": "2026-08-19T23:13:36.491757+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=79451f12db9123eb6fdd396fbae8c754652ff2a6cfce3b59f0ee9725cb5035ef",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1d4f9476116195498d91e52bd1df5a1a0f329697d8ceab153bc0d680b4af162a",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.951187+00:00",
+          "indexed_at": "2026-08-19T23:13:36.458524+00:00",
+          "reason": "spec-lifecycle-content=bef13ab723dd83845036b68428f687bd88ce33a98e64dc2a11151d9d74de0422"
+        },
+        {
+          "knowledge_id": "dac39695f73e1f667f9a57fee032ad71289f8316088949606faebf85afe0ba2a",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T15:28:45.305401+00:00",
+          "indexed_at": "2026-08-19T23:13:36.491757+00:00",
+          "reason": "spec-lifecycle-content=79451f12db9123eb6fdd396fbae8c754652ff2a6cfce3b59f0ee9725cb5035ef"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:rag_seam_split",
+      "knowledge_id": "6b3327d539907058c7c4a2462ee49f3d241debe848739d55c4c4dbb454b1804b",
+      "source_type": "spec",
+      "logical_locator": "rag_seam_split",
+      "source_uri": "file://experiments/specs/rag_seam_split.yaml",
+      "observed_at": "2026-08-18T23:44:35.314199+00:00",
+      "indexed_at": "2026-08-19T23:13:36.492201+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=807c41a0501842dd6b05c81cd96a1944d85387d3d3c9977511bd7395011de55d",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "f63cdba54697b32da4396d9ef12c8770e4b34b7536ad85855d1f8f42a24ba514",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.956069+00:00",
+          "indexed_at": "2026-08-19T23:13:36.459056+00:00",
+          "reason": "spec-lifecycle-content=ef18c051ca5d8901e540fc7a3000a755abb1ec06d92b4983b4a5f8bb53095a13"
+        },
+        {
+          "knowledge_id": "6b3327d539907058c7c4a2462ee49f3d241debe848739d55c4c4dbb454b1804b",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T23:44:35.314199+00:00",
+          "indexed_at": "2026-08-19T23:13:36.492201+00:00",
+          "reason": "spec-lifecycle-content=807c41a0501842dd6b05c81cd96a1944d85387d3d3c9977511bd7395011de55d"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:registry_canonicalize",
+      "knowledge_id": "23f58aec59e699b3819e8f38cc59be97bf3e2ca5d54ffefa4324eef87266bd5e",
+      "source_type": "spec",
+      "logical_locator": "registry_canonicalize",
+      "source_uri": "file://experiments/specs/registry_canonicalize.yaml",
+      "observed_at": "2026-08-19T13:42:54.923104+00:00",
+      "indexed_at": "2026-08-19T23:13:36.492664+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=e3ad680e5c96730ae470b68bc118a4a9a8d5efd8cfd70e4bd03ea3520dbcc5a7",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "ba145566b42a7a1f64c9a2800801bed950a7b75897ab305ec454574e757feab1",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.960545+00:00",
+          "indexed_at": "2026-08-19T23:13:36.459473+00:00",
+          "reason": "spec-lifecycle-content=dc09fb5077e745640c732a2546d1ec10f07746fb160d99300fe4f6683ae66412"
+        },
+        {
+          "knowledge_id": "23f58aec59e699b3819e8f38cc59be97bf3e2ca5d54ffefa4324eef87266bd5e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T13:42:54.923104+00:00",
+          "indexed_at": "2026-08-19T23:13:36.492664+00:00",
+          "reason": "spec-lifecycle-content=e3ad680e5c96730ae470b68bc118a4a9a8d5efd8cfd70e4bd03ea3520dbcc5a7"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:remediation_data_integrity",
+      "knowledge_id": "ad60b4d2ec7b1837f3011eac47777e31bdce6820548ae0c6653ebef0297f5347",
+      "source_type": "spec",
+      "logical_locator": "remediation_data_integrity",
+      "source_uri": "file://experiments/specs/remediation_data_integrity.yaml",
+      "observed_at": "2026-08-15T20:31:06.058602+00:00",
+      "indexed_at": "2026-08-19T23:13:36.493108+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=3f9f54f0caa6df3c812e9a4cf81c75f3a264f9226f75e045e8b5f9f5a0903ccf",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "71f59c49b901fd718e003936c316abb0e1deabcda7ad6d9654e9a41b68a4d4a9",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.965023+00:00",
+          "indexed_at": "2026-08-19T23:13:36.459866+00:00",
+          "reason": "spec-lifecycle-content=4fe040ddc0e6deaf7cae0b99a39e1d696249dc0114af75cf2141e397588703fd"
+        },
+        {
+          "knowledge_id": "ad60b4d2ec7b1837f3011eac47777e31bdce6820548ae0c6653ebef0297f5347",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-15T20:31:06.058602+00:00",
+          "indexed_at": "2026-08-19T23:13:36.493108+00:00",
+          "reason": "spec-lifecycle-content=3f9f54f0caa6df3c812e9a4cf81c75f3a264f9226f75e045e8b5f9f5a0903ccf"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:repo_review_fable",
+      "knowledge_id": "e530a6b3d74ef46af00db5d9d086b96a4976e5a4bcfbd71fc8f59cb08e3ca921",
+      "source_type": "spec",
+      "logical_locator": "repo_review_fable",
+      "source_uri": "file://experiments/specs/repo_review_fable.yaml",
+      "observed_at": "2026-08-18T23:24:11.851786+00:00",
+      "indexed_at": "2026-08-19T23:13:36.493553+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=5409f4cc34d8dbae9eaba3b0488b80305d7dc03392e7771c3070ee09b02e5519",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "9822bf4dbab3744965406b9bca3788789e46676232f1d274d7a79f279ad24962",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.969447+00:00",
+          "indexed_at": "2026-08-19T23:13:36.460273+00:00",
+          "reason": "spec-lifecycle-content=9021103af4b2a0f8b8c034147bfc7e4a96eb299d01088c416d527786886aeed8"
+        },
+        {
+          "knowledge_id": "e530a6b3d74ef46af00db5d9d086b96a4976e5a4bcfbd71fc8f59cb08e3ca921",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T23:24:11.851786+00:00",
+          "indexed_at": "2026-08-19T23:13:36.493553+00:00",
+          "reason": "spec-lifecycle-content=5409f4cc34d8dbae9eaba3b0488b80305d7dc03392e7771c3070ee09b02e5519"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:routing_follow_up",
+      "knowledge_id": "5cb039d4d313510edcc947c5385cd4cd6598864b7947662c5098d2483b659f74",
+      "source_type": "spec",
+      "logical_locator": "routing_follow_up",
+      "source_uri": "file://experiments/specs/routing_follow_up.yaml",
+      "observed_at": "2026-08-14T22:26:59.032534+00:00",
+      "indexed_at": "2026-08-19T23:13:36.494089+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=468ae3b2ce45b3ea294daf3d1f6482984d92d102d9e5347dbacf9df8e3017648",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "49d54a627200a9a29ea8d66c752826c8eae6ae73225e53f45dadaf8467239b04",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.973325+00:00",
+          "indexed_at": "2026-08-19T23:13:36.460663+00:00",
+          "reason": "spec-lifecycle-content=a1711a3d832a94e0b2b094ab7622df3e8b9c4002279da695097df89a790467a3"
+        },
+        {
+          "knowledge_id": "5cb039d4d313510edcc947c5385cd4cd6598864b7947662c5098d2483b659f74",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T22:26:59.032534+00:00",
+          "indexed_at": "2026-08-19T23:13:36.494089+00:00",
+          "reason": "spec-lifecycle-content=468ae3b2ce45b3ea294daf3d1f6482984d92d102d9e5347dbacf9df8e3017648"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:routing_kb_dispatch",
+      "knowledge_id": "feb8e3fbe5fbbf487ceca5a0e73b3a3fd15d80c410e08a46a21d67ef839111de",
+      "source_type": "spec",
+      "logical_locator": "routing_kb_dispatch",
+      "source_uri": "file://experiments/specs/routing_kb_dispatch.yaml",
+      "observed_at": "2026-08-19T23:13:32.897961+00:00",
+      "indexed_at": "2026-08-19T23:13:36.494551+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=924292776d59c8e366e40fdcc5b368200c76b23bfa47b72b58ea41f63c398455",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "9ce26554713a01dc7418a8751729d0322db0bf275d9b2695d9fb6b2ac17697aa",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.977424+00:00",
+          "indexed_at": "2026-08-19T23:13:36.461062+00:00",
+          "reason": "spec-lifecycle-content=924292776d59c8e366e40fdcc5b368200c76b23bfa47b72b58ea41f63c398455"
+        },
+        {
+          "knowledge_id": "feb8e3fbe5fbbf487ceca5a0e73b3a3fd15d80c410e08a46a21d67ef839111de",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T23:13:32.897961+00:00",
+          "indexed_at": "2026-08-19T23:13:36.494551+00:00",
+          "reason": "spec-lifecycle-content=924292776d59c8e366e40fdcc5b368200c76b23bfa47b72b58ea41f63c398455"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:routing_kb_experiment_design",
+      "knowledge_id": "72ed487136a7a6bc871b0436c23018ea1ed9a9f3851c24041d2dc3a3c708358e",
+      "source_type": "spec",
+      "logical_locator": "routing_kb_experiment_design",
+      "source_uri": "file://experiments/specs/routing_kb_experiment_design.yaml",
+      "observed_at": "2026-08-17T18:28:24.110442+00:00",
+      "indexed_at": "2026-08-19T23:13:36.494999+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=408b1d3bd4a4ad3234a114bc299703c0fe3f0c651b014b6dd2cee650c08bd76e",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "4c57980f22ea6deafb455c0dc333c755153d4d4dd56b1c392202ee527ef939d2",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.981531+00:00",
+          "indexed_at": "2026-08-19T23:13:36.461450+00:00",
+          "reason": "spec-lifecycle-content=4c8702c4ac3542c9e2b64bc06dafbe0441adc0efbb7bdee98a6ded360cd7d2ac"
+        },
+        {
+          "knowledge_id": "72ed487136a7a6bc871b0436c23018ea1ed9a9f3851c24041d2dc3a3c708358e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T18:28:24.110442+00:00",
+          "indexed_at": "2026-08-19T23:13:36.494999+00:00",
+          "reason": "spec-lifecycle-content=408b1d3bd4a4ad3234a114bc299703c0fe3f0c651b014b6dd2cee650c08bd76e"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:routing_kb_experiment_design_research",
+      "knowledge_id": "b69775d10845c371af95667cca89be6439c072b75a075676e07f1b80d37a1de1",
+      "source_type": "spec",
+      "logical_locator": "routing_kb_experiment_design_research",
+      "source_uri": "file://experiments/specs/routing_kb_experiment_design_research.yaml",
+      "observed_at": "2026-08-17T18:12:55.493658+00:00",
+      "indexed_at": "2026-08-19T23:13:36.495446+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=9f705e35af44ba6a9cf2bb5cce938b43acfef805818202b5e1b79e3aa467405d",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "106c65ff0a658d6e699b0e1b55742c27c2b96692cc87d4186256b4e9e90b70dd",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.985872+00:00",
+          "indexed_at": "2026-08-19T23:13:36.461838+00:00",
+          "reason": "spec-lifecycle-content=b70b330f7d489290e12dd713dbc7dffc454068caf7c1ec616c08094961a0d679"
+        },
+        {
+          "knowledge_id": "b69775d10845c371af95667cca89be6439c072b75a075676e07f1b80d37a1de1",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T18:12:55.493658+00:00",
+          "indexed_at": "2026-08-19T23:13:36.495446+00:00",
+          "reason": "spec-lifecycle-content=9f705e35af44ba6a9cf2bb5cce938b43acfef805818202b5e1b79e3aa467405d"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:routing_kb_more_itertools",
+      "knowledge_id": "8c0de0f9bd0649f435e2d48b1e33cab59fdb7820ae61d1877c309195355d78a6",
+      "source_type": "spec",
+      "logical_locator": "routing_kb_more_itertools",
+      "source_uri": "file://experiments/specs/routing_kb_more_itertools.yaml",
+      "observed_at": "2026-08-17T18:38:52.519623+00:00",
+      "indexed_at": "2026-08-19T23:13:36.495881+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=8911f5172eca7f8ead9573302d3da2096aca83b2597fe4dff975490a4b85e971",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "bbce5580e8c62cc3360d7bd810ca40baab8497703070a7ee282c3a7e222969ad",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.989869+00:00",
+          "indexed_at": "2026-08-19T23:13:36.462250+00:00",
+          "reason": "spec-lifecycle-content=4e0b1771d0f061cf7e2fa13ff85940cbc03b6538da57b7bf6f086236feaa8168"
+        },
+        {
+          "knowledge_id": "8c0de0f9bd0649f435e2d48b1e33cab59fdb7820ae61d1877c309195355d78a6",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T18:38:52.519623+00:00",
+          "indexed_at": "2026-08-19T23:13:36.495881+00:00",
+          "reason": "spec-lifecycle-content=8911f5172eca7f8ead9573302d3da2096aca83b2597fe4dff975490a4b85e971"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:routing_kb_wiring",
+      "knowledge_id": "8e03ff316f5e2d06da4fc50c8674ded8c26cf8afd3dd5ff3b6a15df5792b3c32",
+      "source_type": "spec",
+      "logical_locator": "routing_kb_wiring",
+      "source_uri": "file://experiments/specs/routing_kb_wiring.yaml",
+      "observed_at": "2026-08-17T19:52:22.042492+00:00",
+      "indexed_at": "2026-08-19T23:13:36.496339+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=3747e1eb4cdf0fe889ff4f3f692b35ad73bae2199ae32f0ba2c99acc1a421372",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "c79f035055741e797259885cc256bdf25e50a80baa52c62f92584f5f169aa354",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:40.994549+00:00",
+          "indexed_at": "2026-08-19T23:13:36.462641+00:00",
+          "reason": "spec-lifecycle-content=e7301c5ec6ada411d1a82cb45b17f988d339047174a6e944ba894aa0f42d373f"
+        },
+        {
+          "knowledge_id": "8e03ff316f5e2d06da4fc50c8674ded8c26cf8afd3dd5ff3b6a15df5792b3c32",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T19:52:22.042492+00:00",
+          "indexed_at": "2026-08-19T23:13:36.496339+00:00",
+          "reason": "spec-lifecycle-content=3747e1eb4cdf0fe889ff4f3f692b35ad73bae2199ae32f0ba2c99acc1a421372"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:routing_regret_under_degradation",
+      "knowledge_id": "69a77f46e4a4ec952e4dc2e345124fd52ceab8ea5a360047322db1a73f7516fb",
+      "source_type": "spec",
+      "logical_locator": "routing_regret_under_degradation",
+      "source_uri": "file://experiments/specs/routing_regret_under_degradation.yaml",
+      "observed_at": "2026-08-19T23:13:32.913072+00:00",
+      "indexed_at": "2026-08-19T23:13:36.496778+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=77858da3fbac2639dbdbbbd67168669afe288e7f0f9d4c9357aae7483ad9e079",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "ff49a3b778f5a8389ba6bc1a579102393c1f490478e9a4af46db5ef9e11e4359",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.001449+00:00",
+          "indexed_at": "2026-08-19T23:13:36.463100+00:00",
+          "reason": "spec-lifecycle-content=77858da3fbac2639dbdbbbd67168669afe288e7f0f9d4c9357aae7483ad9e079"
+        },
+        {
+          "knowledge_id": "69a77f46e4a4ec952e4dc2e345124fd52ceab8ea5a360047322db1a73f7516fb",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T23:13:32.913072+00:00",
+          "indexed_at": "2026-08-19T23:13:36.496778+00:00",
+          "reason": "spec-lifecycle-content=77858da3fbac2639dbdbbbd67168669afe288e7f0f9d4c9357aae7483ad9e079"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:self_recommending_experiment",
+      "knowledge_id": "eae50e08ecad56dd1d6cba1fe0f2575fd13f0f027c5654fdf10e2ce546fc9d33",
+      "source_type": "spec",
+      "logical_locator": "self_recommending_experiment",
+      "source_uri": "file://experiments/specs/self_recommending_experiment.yaml",
+      "observed_at": "2026-08-19T23:13:32.916112+00:00",
+      "indexed_at": "2026-08-19T23:13:36.497205+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=d04cf2c92b2cb91d174e6441c27995d7f8281bf57d5fe0a038e908a82f5aec15",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "fc5fdbc1dd2d69d0750ec8e354da561e733ea170bd9e3bcffd769243df26564d",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.005902+00:00",
+          "indexed_at": "2026-08-19T23:13:36.463505+00:00",
+          "reason": "spec-lifecycle-content=d04cf2c92b2cb91d174e6441c27995d7f8281bf57d5fe0a038e908a82f5aec15"
+        },
+        {
+          "knowledge_id": "eae50e08ecad56dd1d6cba1fe0f2575fd13f0f027c5654fdf10e2ce546fc9d33",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T23:13:32.916112+00:00",
+          "indexed_at": "2026-08-19T23:13:36.497205+00:00",
+          "reason": "spec-lifecycle-content=d04cf2c92b2cb91d174e6441c27995d7f8281bf57d5fe0a038e908a82f5aec15"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:site_golden_circle",
+      "knowledge_id": "fd5c1dd31d7b0ec05e3573aaed32535a1cbeb33b2036db1f1efe6b20a946c5ac",
+      "source_type": "spec",
+      "logical_locator": "site_golden_circle",
+      "source_uri": "file://experiments/specs/site_golden_circle.yaml",
+      "observed_at": "2026-08-14T07:36:59.975239+00:00",
+      "indexed_at": "2026-08-19T23:13:36.497645+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=b57bb72cc519178e45cc5f4c1ca594ed66b53136708dc6c39fbbd72675eeb56e",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "fb286340ad98d3e2b89599d7628a230585684156d77028d6c3cedcd96bc1f03b",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.010805+00:00",
+          "indexed_at": "2026-08-19T23:13:36.463889+00:00",
+          "reason": "spec-lifecycle-content=49ae042a6b181b33b8e94886e4f428a6579cc439acf770d22c9e25f82532ead5"
+        },
+        {
+          "knowledge_id": "fd5c1dd31d7b0ec05e3573aaed32535a1cbeb33b2036db1f1efe6b20a946c5ac",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T07:36:59.975239+00:00",
+          "indexed_at": "2026-08-19T23:13:36.497645+00:00",
+          "reason": "spec-lifecycle-content=b57bb72cc519178e45cc5f4c1ca594ed66b53136708dc6c39fbbd72675eeb56e"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:spec_lifecycle",
+      "knowledge_id": "0583c8aac8ac1d9305589e609e63068f3e0ccff6e7911842ba89c2b33e7709d3",
+      "source_type": "spec",
+      "logical_locator": "spec_lifecycle",
+      "source_uri": "file://experiments/specs/spec_lifecycle.yaml",
+      "observed_at": "2026-08-19T22:53:32.957461+00:00",
+      "indexed_at": "2026-08-19T23:13:36.498071+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=52f385b8a62740ba4b0f87d3052677a37fbbe334f301793993c44e68f95425f8",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "4a0130b0abd6bb11217967d674fbc436f2a0af92c880ba21df8a9a2b35f58006",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.016054+00:00",
+          "indexed_at": "2026-08-19T23:13:36.464395+00:00",
+          "reason": "spec-lifecycle-content=2742d74d7c272fdfb6fd56a6a063568769b893d70f6b840da5dc25a683e1c641"
+        },
+        {
+          "knowledge_id": "0583c8aac8ac1d9305589e609e63068f3e0ccff6e7911842ba89c2b33e7709d3",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:53:32.957461+00:00",
+          "indexed_at": "2026-08-19T23:13:36.498071+00:00",
+          "reason": "spec-lifecycle-content=52f385b8a62740ba4b0f87d3052677a37fbbe334f301793993c44e68f95425f8"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:supervisor_control_room",
+      "knowledge_id": "46135c0721a7b6be299476b2706ba1228e7d71f574dd17d17ce09a8bbea8f914",
+      "source_type": "spec",
+      "logical_locator": "supervisor_control_room",
+      "source_uri": "file://experiments/specs/supervisor_control_room.yaml",
+      "observed_at": "2026-08-14T16:09:13.140645+00:00",
+      "indexed_at": "2026-08-19T23:13:36.498507+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=6144696c8d8d55dfe509f59e07e810a3a5d4a6552391fafa10df62c4b4ebdfe6",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "0fd4bea917a950e2948e39506c1362322dc44077ae8c5cc92671a3403e81f711",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.021355+00:00",
+          "indexed_at": "2026-08-19T23:13:36.464853+00:00",
+          "reason": "spec-lifecycle-content=f27260818694578c5ede249effc64026ef33c2e563172afbad920eda1b211222"
+        },
+        {
+          "knowledge_id": "46135c0721a7b6be299476b2706ba1228e7d71f574dd17d17ce09a8bbea8f914",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T16:09:13.140645+00:00",
+          "indexed_at": "2026-08-19T23:13:36.498507+00:00",
+          "reason": "spec-lifecycle-content=6144696c8d8d55dfe509f59e07e810a3a5d4a6552391fafa10df62c4b4ebdfe6"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:task_vocabulary_unify",
+      "knowledge_id": "239e0b912086c7062b09e26f264d7973aa939e9d78eae2e01a639bca47f18ddc",
+      "source_type": "spec",
+      "logical_locator": "task_vocabulary_unify",
+      "source_uri": "file://experiments/specs/task_vocabulary_unify.yaml",
+      "observed_at": "2026-08-18T23:41:26.157888+00:00",
+      "indexed_at": "2026-08-19T23:13:36.498965+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=c2e2c08b2ed94306a6fb47297704df659f7e13777bfd44f51db86a6e677da38d",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1e366c6757706805b627c15f2318907af046751fb3a7cf8ffa6f627190a98ea6",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.026578+00:00",
+          "indexed_at": "2026-08-19T23:13:36.465282+00:00",
+          "reason": "spec-lifecycle-content=d2f9e34e2b0e083aec2eacc79f03bb33825e63685b75bea60b62421a4a13edf2"
+        },
+        {
+          "knowledge_id": "239e0b912086c7062b09e26f264d7973aa939e9d78eae2e01a639bca47f18ddc",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-18T23:41:26.157888+00:00",
+          "indexed_at": "2026-08-19T23:13:36.498965+00:00",
+          "reason": "spec-lifecycle-content=c2e2c08b2ed94306a6fb47297704df659f7e13777bfd44f51db86a6e677da38d"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:website_data_pipeline",
+      "knowledge_id": "186cad8b399f2871410d08c5ab20c815b379f41ffcc5c82154a18b48fb964bef",
+      "source_type": "spec",
+      "logical_locator": "website_data_pipeline",
+      "source_uri": "file://experiments/specs/website_data_pipeline.yaml",
+      "observed_at": "2026-08-17T20:08:09.326708+00:00",
+      "indexed_at": "2026-08-19T23:13:36.499403+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=c0e786fdbead0b2f38ee97cd4822573cb2bf88a8701631c4f283b52c30d91422",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1bd6fbc95f539b2ccbb2a2d250396be7382a8ef6ec1f6a0978b00d7117827212",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.031634+00:00",
+          "indexed_at": "2026-08-19T23:13:36.465675+00:00",
+          "reason": "spec-lifecycle-content=4e4362ec775e1daba8677622e72c1d04f92d28ec457c1d50d159773dbca7437a"
+        },
+        {
+          "knowledge_id": "186cad8b399f2871410d08c5ab20c815b379f41ffcc5c82154a18b48fb964bef",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T20:08:09.326708+00:00",
+          "indexed_at": "2026-08-19T23:13:36.499403+00:00",
+          "reason": "spec-lifecycle-content=c0e786fdbead0b2f38ee97cd4822573cb2bf88a8701631c4f283b52c30d91422"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:website_registry_repoint",
+      "knowledge_id": "0038f382ce3618a46afb573f9a8f6c83f59ebff8bf21edf5d2d6c16663641bf2",
+      "source_type": "spec",
+      "logical_locator": "website_registry_repoint",
+      "source_uri": "file://experiments/specs/website_registry_repoint.yaml",
+      "observed_at": "2026-08-19T22:26:52.443095+00:00",
+      "indexed_at": "2026-08-19T23:13:36.499833+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=14624f11c19a4d7716546596aa68b2258706102bf08ab717a5a223b9e5d926e8",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "0038f382ce3618a46afb573f9a8f6c83f59ebff8bf21edf5d2d6c16663641bf2",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:26:52.443095+00:00",
+          "indexed_at": "2026-08-19T23:13:36.499833+00:00",
+          "reason": "spec-lifecycle-content=14624f11c19a4d7716546596aa68b2258706102bf08ab717a5a223b9e5d926e8"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:website_repoint",
+      "knowledge_id": "ed27b553b0778ce3de599b05caac1745b399f47c20a68a55efa7b9f0368cfe8c",
+      "source_type": "spec",
+      "logical_locator": "website_repoint",
+      "source_uri": "file://experiments/specs/website_repoint.yaml",
+      "observed_at": "2026-08-19T23:08:45.249473+00:00",
+      "indexed_at": "2026-08-19T23:13:36.500227+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=19363206117c683f37dab652e4965fe1f87de2022f8aa607cb6663f46a248b9a",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "b3e844fbfc9ad4911795672363eb3f405ac28c81392827901595411ea2db9e5a",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.036521+00:00",
+          "indexed_at": "2026-08-19T23:13:36.466423+00:00",
+          "reason": "spec-lifecycle-content=8682e2604a25a15e7098548bc5094d84413ce033139fa086fe28ff2ca113ad86"
+        },
+        {
+          "knowledge_id": "ed27b553b0778ce3de599b05caac1745b399f47c20a68a55efa7b9f0368cfe8c",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T23:08:45.249473+00:00",
+          "indexed_at": "2026-08-19T23:13:36.500227+00:00",
+          "reason": "spec-lifecycle-content=19363206117c683f37dab652e4965fe1f87de2022f8aa607cb6663f46a248b9a"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:website_rewrite",
+      "knowledge_id": "7d4974edbf8ac858aa99ec8c45872a26fa16ea4f1ca34c4ceb07fbdb6d3be022",
+      "source_type": "spec",
+      "logical_locator": "website_rewrite",
+      "source_uri": "file://experiments/specs/website_rewrite.yaml",
+      "observed_at": "2026-08-17T21:00:37.937541+00:00",
+      "indexed_at": "2026-08-19T23:13:36.500612+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=ee0f4acfd195996eac839494d064751ec8b832bae9c8e95103511f9181be92de",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "e267ad3256ecd3bde214c73e020c36217e95b00e64a5c63628fda12c772b3af6",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.041306+00:00",
+          "indexed_at": "2026-08-19T23:13:36.466817+00:00",
+          "reason": "spec-lifecycle-content=0590bd3a11752cdc0a9fadc97d8dfa6f1b73057e5b2e6cf8388529872f50d670"
+        },
+        {
+          "knowledge_id": "7d4974edbf8ac858aa99ec8c45872a26fa16ea4f1ca34c4ceb07fbdb6d3be022",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-17T21:00:37.937541+00:00",
+          "indexed_at": "2026-08-19T23:13:36.500612+00:00",
+          "reason": "spec-lifecycle-content=ee0f4acfd195996eac839494d064751ec8b832bae9c8e95103511f9181be92de"
+        }
+      ]
+    },
+    {
+      "entity_id": "spec:workflow_step_routing",
+      "knowledge_id": "f5a2f2b81d6d872394144bb085d0842837e0b54602332b6d8eb5d3255dadf382",
+      "source_type": "spec",
+      "logical_locator": "workflow_step_routing",
+      "source_uri": "file://experiments/specs/workflow_step_routing.yaml",
+      "observed_at": "2026-08-14T21:45:46.582035+00:00",
+      "indexed_at": "2026-08-19T23:13:36.501009+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "spec-lifecycle-content=ab90f4ae2d2e7475cd5f8a5cd18c9ee2dee5db464399ecc5b2b82bb0f51e3308",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "83a0844ce3247b85470b4ae0e86118b24b2c0dcbc84480baf24f4fe640d7fde2",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-19T22:46:41.045797+00:00",
+          "indexed_at": "2026-08-19T23:13:36.467385+00:00",
+          "reason": "spec-lifecycle-content=62316205d566bb338b4d5a0bae9736653724f0103e218555193734157b7fa329"
+        },
+        {
+          "knowledge_id": "f5a2f2b81d6d872394144bb085d0842837e0b54602332b6d8eb5d3255dadf382",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-14T21:45:46.582035+00:00",
+          "indexed_at": "2026-08-19T23:13:36.501009+00:00",
+          "reason": "spec-lifecycle-content=ab90f4ae2d2e7475cd5f8a5cd18c9ee2dee5db464399ecc5b2b82bb0f51e3308"
         }
       ]
     }
