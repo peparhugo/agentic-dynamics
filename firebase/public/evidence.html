@@ -1021,6 +1021,14 @@ document.addEventListener('DOMContentLoaded', function () {
   (function () {
     var ctx = document.getElementById('narrationChart');
     if (!ctx) return;
+    var measurable = narrData.filter(function (v) { return v != null; });
+    if (measurable.length === 0) {
+      var wrap = ctx.closest('.chart-wrap') || ctx.parentElement;
+      if (wrap) {
+        wrap.innerHTML = '<p class="t3" style="padding:1rem;text-align:center">Narration rate is not measured in the canonical corpus (retired with the legacy summary) \u2014 see methodology.</p>';
+      }
+      return;
+    }
     precursorCharts.set('narrationChart', new Chart(ctx, {
       type: 'bar',
       data: {
@@ -1289,7 +1297,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // --- Populate data-driven tables ---
-  function fmtUSD(v) { return '$' + (typeof v === 'number' ? v.toFixed(2) : v); }
+  function fmtUSD(v) { return v == null ? '\u2014' : '$' + (typeof v === 'number' ? v.toFixed(2) : v); }
   function pct(v) { return (typeof v === 'number' ? (v * 100).toFixed(0) + '%' : v); }
 
   // --- AST Code Quality Table ---
@@ -1303,11 +1311,11 @@ document.addEventListener('DOMContentLoaded', function () {
     var rows = [
       { name: 'Reports', key: 'reports', fmt: function(v) { return v; }, best: 'max' },
       { name: 'Avg LOC/worktree', key: 'avg_loc', fmt: function(v) { return v; }, best: 'max' },
-      { name: 'Avg files/worktree', key: 'ast_files', fmt: function(v) { return v.toFixed(1); }, best: 'max' },
-      { name: 'Avg functions', key: 'ast_functions', fmt: function(v) { return v; }, best: 'max' },
-      { name: 'Avg classes', key: 'ast_classes', fmt: function(v) { return v; }, best: 'max' },
-      { name: 'Type hints', key: 'ast_type_hint_pct', fmt: function(v) { return v + '%'; }, best: 'max' },
-      { name: 'Docstrings', key: 'ast_docstring_pct', fmt: function(v) { return v + '%'; }, best: 'max' },
+      { name: 'Avg files/worktree', key: 'ast_files', fmt: function(v) { return v == null ? '\u2014' : v.toFixed(1); }, best: 'max' },
+      { name: 'Avg functions', key: 'ast_functions', fmt: function(v) { return v == null ? '\u2014' : v; }, best: 'max' },
+      { name: 'Avg classes', key: 'ast_classes', fmt: function(v) { return v == null ? '\u2014' : v; }, best: 'max' },
+      { name: 'Type hints', key: 'ast_type_hint_pct', fmt: function(v) { return v == null ? '\u2014' : v + '%'; }, best: 'max' },
+      { name: 'Docstrings', key: 'ast_docstring_pct', fmt: function(v) { return v == null ? '\u2014' : v + '%'; }, best: 'max' },
       { name: 'Constraint score', key: 'constraint_score', fmt: function(v) { return v; }, best: 'max' },
       { name: 'Avg thinking ratio', key: 'avg_thinking_ratio', fmt: function(v) { return (v * 100).toFixed(0) + '%'; }, best: 'min' },
     ];
@@ -1317,11 +1325,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Body
     rows.forEach(function(r) {
-      var vals = models.map(function(m) { return r.key === 'constraint_score' ? (m.avg_constraints_met||0) + '/' + (m.avg_constraints_total||7) : (m[r.key] != null ? m[r.key] : 0); });
-      var bestVal = r.best === 'max' ? Math.max.apply(null, vals.filter(function(v) { return typeof v === 'number'; })) : Math.min.apply(null, vals.filter(function(v) { return typeof v === 'number'; }));
+      var vals = models.map(function(m) { return r.key === 'constraint_score' ? (m.avg_constraints_met||0) + '/' + (m.avg_constraints_total||7) : m[r.key]; });
+      var numeric = vals.filter(function(v) { return typeof v === 'number'; });
+      var bestVal = r.best === 'max'
+        ? Math.max.apply(null, numeric.concat([-Infinity]))
+        : Math.min.apply(null, numeric.concat([Infinity]));
       body.innerHTML += '<tr><td><strong>' + r.name + '</strong></td>' +
         vals.map(function(v, i) {
-          var cls = (r.fmt(v) === r.fmt(bestVal) && bestVal > 0) ? ' class="green"' : '';
+          var cls = (v != null && v === bestVal && numeric.length > 0 && bestVal > 0) ? ' class="green"' : '';
           return '<td' + cls + '>' + r.fmt(v) + '</td>';
         }).join('') + '</tr>';
     });
@@ -1330,7 +1341,11 @@ document.addEventListener('DOMContentLoaded', function () {
     var topLoc = models[0];
     var topHints = models.slice().sort(function(a,b){ return (b.ast_type_hint_pct||0) - (a.ast_type_hint_pct||0); })[0];
     if (insight && topLoc) {
-      insight.innerHTML = '<strong>Key insight:</strong> ' + topLoc.label + ' produces the most modular code (avg ' + topLoc.ast_files.toFixed(1) + ' files, ' + topLoc.ast_functions + ' functions, ' + topLoc.ast_classes + ' classes per worktree). ' + topHints.label + ' leads on type hints (' + topHints.ast_type_hint_pct + '%). Generated from live experiment data.';
+      if (topLoc.ast_files != null) {
+        insight.innerHTML = '<strong>Key insight:</strong> ' + topLoc.label + ' produces the most modular code (avg ' + topLoc.ast_files.toFixed(1) + ' files, ' + topLoc.ast_functions + ' functions, ' + topLoc.ast_classes + ' classes per worktree). ' + topHints.label + ' leads on type hints (' + topHints.ast_type_hint_pct + '%). Generated from live experiment data.';
+      } else {
+        insight.innerHTML = '<strong>Key insight:</strong> AST structure metrics (files, functions, classes, type hints) were retired with the legacy summary corpus \u2014 the canonical registry does not reproduce them. See the measured replacement surface in the table above.';
+      }
     }
   })();
 
@@ -1339,6 +1354,10 @@ document.addEventListener('DOMContentLoaded', function () {
     var tbody = document.querySelector('#sonar-quality-body');
     if (!tbody || !D || !D.sonar || Object.keys(D.sonar).length === 0) return;
     tbody.innerHTML = '';
+    if (D.sonar._historical) {
+      tbody.innerHTML = '<tr><td colspan="7" class="t3">' + (D.sonar._note || 'Historical — no canonical measurement.') + '</td></tr>';
+      return;
+    }
     var sorted = Object.entries(D.sonar).sort(function(a, b) { return b[1].avg_loc - a[1].avg_loc; });
     sorted.forEach(function(entry) {
       var label = entry[0], v = entry[1];
@@ -1408,13 +1427,13 @@ document.addEventListener('DOMContentLoaded', function () {
       'openai/gpt-5-nano': 'Pure narration — 1.01 reasoning-to-output ratio, zero functional outputs'
     };
     precursorModels.forEach(function(m) {
-      var nr = m.narration_rate || 0;
-      var cls = nr > 30 ? 'amber' : (nr < 10 ? 'green' : '');
+      var nr = m.narration_rate;
+      var cls = nr == null ? '' : (nr > 30 ? 'amber' : (nr < 10 ? 'green' : ''));
       narrTbl.innerHTML += '<tr>' +
         '<td>' + m.label + '</td>' +
         '<td>' + m.reports + '</td>' +
         '<td>' + m.reports_narrated + '</td>' +
-        '<td class="' + cls + '">' + nr + '%</td>' +
+        '<td class="' + cls + '">' + (nr == null ? '\u2014' : nr + '%') + '</td>' +
         '<td class="' + (m.avg_cost > 0.5 ? 'amber' : cls) + '">' + fmtUSD(m.avg_cost) + '</td>' +
         '<td>' + (narrDesc[m.id] || '') + '</td>' +
         '</tr>';
