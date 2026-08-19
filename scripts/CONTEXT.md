@@ -29,7 +29,8 @@
 | `sweep_parallel.sh` | 141 | Bash equivalent of parallel silent-mode sweep. |
 | `batch_stories.py` | 116 | Batch experiment runner — executes all DeepSeek matrix cells sequentially. |
 | `recover_stories.py` | 217 | Session timeout recovery — continues timed-out opencode sessions via `--session`. |
-| `run_workflow.py` | 69 | Runs an `agent_task` workflow (the execute phase) against a goal inside a git worktree; wrapped by the `run_workflow` tool (§3.1). |
+| `run_workflow.py` | 88 | Runs an `agent_task` workflow (the execute phase) against a goal inside a git worktree; wrapped by the `run_workflow` tool (§3.1). Refreshes the spec status index (best-effort) after writing the run ledger. |
+| `spec_status.py` | 94 | Regenerates the **derived** spec lifecycle index — `experiments/specs/index.json` (machine schema) + `experiments/specs/STATUS.md` (agent-facing table) — from `experiments/specs/*.yaml` and the run ledgers in `experiments/results/workflows/<spec>/*.json`. Thin CLI over `instrument.spec_status`; `--dry-run`, `--json`, `--print`, `--spec <name>`. Never hand-edit the two artifacts. |
 
 ## Post-Hoc Analysis
 

@@ -64,6 +64,8 @@ from .entropy import (
 # v1.0: ExperimentSpec — declarative specs + the requires/produces validator
 from .experiment_spec import (
     LEDGER_FIELDS,
+    SPEC_KEYS,
+    SPEC_STATUSES,
     AdaptSpec,
     ComparisonSpec,
     ExperimentSpec,
@@ -354,6 +356,27 @@ from .knowledge_stream import (
 # Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
 from .semantic_validation import analyze_ast, analyze_markers
 
+# v1.0: the derived spec lifecycle index — experiments/specs/{index.json,STATUS.md}
+from .spec_status import (
+    INDEX_FILENAME,
+    INDEX_SCHEMA_VERSION,
+    STATUS_FILENAME,
+    STATUS_ORDER,
+    RunSummary,
+    SpecStatusEntry,
+    SpecStatusReport,
+    build_entry,
+    build_index,
+    collect_entries,
+    derive_status,
+    index_entry,
+    load_index,
+    load_runs,
+    refresh_spec_status,
+    render_status_md,
+    sort_entries,
+)
+
 # v1.0: the signal store — measured per-model signals derived from _results_summary.json
 from .signal_store import (
     MODEL_ALIASES,
@@ -500,6 +523,13 @@ __all__ = [
     "ExperimentSpec", "Workflow", "Factor", "RuleSpec", "MetricSpec",
     "ComparisonSpec", "WriteupSpec", "StopSpec", "AdaptSpec",
     "LEDGER_FIELDS", "load_spec", "validate_rules", "validate_spec",
+    # v1.0 spec lifecycle — status fields + the derived index
+    "SPEC_STATUSES", "SPEC_KEYS",
+    "SpecStatusEntry", "SpecStatusReport", "RunSummary",
+    "collect_entries", "build_entry", "derive_status", "sort_entries",
+    "build_index", "render_status_md", "refresh_spec_status",
+    "load_index", "index_entry", "load_runs",
+    "INDEX_FILENAME", "STATUS_FILENAME", "INDEX_SCHEMA_VERSION", "STATUS_ORDER",
     "DAG", "Phase", "SpecError", "RuleResult", "MEASUREMENT_RULES",
     "compile_spec", "experiment_matrix", "compare_arms", "evaluate_rules",
     "first_pass_quality",

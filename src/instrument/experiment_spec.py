@@ -12,6 +12,7 @@ Design: ``code_reviews/2026-08-14_experiment-spec-and-compiler-design.md``.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,51 @@ METRIC_OVERS = frozenset({"outcome", "attempt", "job", "cell"})
 ADAPT_STRATEGIES = frozenset({"coordinate_descent", "manual"})
 ADAPT_SELECTIONS = frozenset(
     {"highest_uncertainty", "highest_regret", "largest_effect"}
+)
+
+# ── Spec lifecycle vocabulary ───────────────────────────────────
+#
+# A spec's lifecycle is *authored* in the YAML when the operator already knows it and
+# *derived* otherwise (see :mod:`instrument.spec_status`, which turns the spec corpus plus
+# the run ledgers into ``experiments/specs/index.json`` + ``STATUS.md``). The vocabulary
+# lives here — beside the other validated enums — so ``validate_spec`` stays the single
+# gate for it and the derived index imports this frozenset instead of re-listing it.
+#
+#   draft       — authored, never run to completion; not yet a claim about anything.
+#   active      — the current spec for its question; runnable now.
+#   superseded  — a later spec took over its question (see ``superseded_by``).
+#   tombstoned  — retired; kept for lineage, never to be run again.
+SPEC_STATUSES = frozenset({"draft", "active", "superseded", "tombstoned"})
+
+#: Every top-level key a spec YAML may carry. ``from_dict`` warns (loudly, via
+#: :mod:`warnings`) about anything outside this set rather than dropping it silently —
+#: a typo'd ``supercedes:`` used to vanish without a trace.
+SPEC_KEYS: frozenset[str] = frozenset(
+    {
+        # core
+        "name",
+        "question",
+        "version",
+        "workflow",
+        "factors",
+        "design",
+        "rules",
+        "metrics",
+        "comparison",
+        "writeup",
+        "stop",
+        "adapt",
+        "git_sha",
+        "pricing_version",
+        "seed",
+        # lifecycle
+        "status",
+        "supersedes",
+        "superseded_by",
+        "completed_at",
+        "last_run_at",
+        "results_pointer",
+    }
 )
 
 # Base information fields the ledger emits. Measurement rules consume these directly;
@@ -101,6 +147,28 @@ LEDGER_FIELDS: frozenset[str] = frozenset(
         "test_executed_success",
     }
 )
+
+def _as_name_list(value: Any) -> list[str]:
+    """Normalize a spec-name field that may be a bare string, a list, or absent.
+
+    ``supersedes`` is authored either way in practice (``supersedes: old_spec`` and
+    ``supersedes: [a, b]`` are both natural YAML), so normalize to a list once, here,
+    rather than making every consumer branch on the type.
+    """
+    if value is None or value == "":
+        return []
+    if isinstance(value, str):
+        return [value]
+    return [str(v) for v in value]
+
+
+def _as_optional_str(value: Any) -> str | None:
+    """Normalize an optional scalar field: ``None``/``""`` both mean "unset"."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
 
 
 # ── Core objects ────────────────────────────────────────────────
@@ -306,6 +374,28 @@ class ExperimentSpec:
     pricing_version: str = ""
     seed: int | None = None
 
+    # ── lifecycle (the status layer) ──────────────────────────────────────────
+    # Authored in the YAML when known; otherwise derived by :mod:`instrument.spec_status`.
+    # ``status`` is deliberately allowed to be "" (unset) so that the 63 committed specs,
+    # none of which carry the field, keep loading and validating unchanged — the index
+    # derives their status instead of the YAML asserting it.
+    status: str = ""
+    supersedes: list[str] = field(default_factory=list)  # spec name(s) this one replaces
+    superseded_by: str | None = None  # the spec that replaced this one, if any
+    completed_at: str | None = None  # ISO-8601 — when the spec's work was declared done
+    last_run_at: str | None = None  # ISO-8601 — last observed run (index refreshes this)
+    results_pointer: str | None = None  # repo-relative path to the latest run ledger
+
+    @property
+    def spec_id(self) -> str:
+        """The ledger's ``spec_id`` for this spec: ``"<name>@<version>"``.
+
+        ``spec_id`` has been declared in :data:`LEDGER_FIELDS` since the schema was
+        written but was never actually emitted; this is the one canonical way to build
+        it, so job and attempt records cannot drift into two different formats.
+        """
+        return f"{self.name}@{self.version}"
+
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
             "name": self.name,
@@ -321,6 +411,14 @@ class ExperimentSpec:
             "git_sha": self.git_sha,
             "pricing_version": self.pricing_version,
             "seed": self.seed,
+            # lifecycle — always emitted so the serialized schema is stable for the
+            # index/registry consumers, even when every value is at its unset default.
+            "status": self.status,
+            "supersedes": list(self.supersedes),
+            "superseded_by": self.superseded_by,
+            "completed_at": self.completed_at,
+            "last_run_at": self.last_run_at,
+            "results_pointer": self.results_pointer,
         }
         if self.comparison is not None:
             out["comparison"] = self.comparison.to_dict()
@@ -333,6 +431,20 @@ class ExperimentSpec:
         missing = [k for k in ("name", "question", "version", "workflow", "factors", "design") if k not in d]
         if missing:
             raise ValueError(f"ExperimentSpec missing required fields: {missing}")
+
+        # Unknown top-level keys used to be dropped silently, so a typo'd lifecycle key
+        # (``supercedes:``) looked like it had been honoured. Warn instead: visible on the
+        # CLI, catchable by ``pytest.warns``, and still non-fatal so an unrecognized key
+        # from a newer spec version never bricks an older checkout.
+        unknown = sorted(k for k in d if k not in SPEC_KEYS)
+        if unknown:
+            warnings.warn(
+                f"spec {d.get('name', '<unnamed>')!r}: unknown top-level key(s) {unknown} "
+                f"— ignored. Check for a typo, or add the field to ExperimentSpec.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         comparison = d.get("comparison")
         writeup = d.get("writeup")
         return cls(
@@ -351,6 +463,12 @@ class ExperimentSpec:
             git_sha=d.get("git_sha", ""),
             pricing_version=d.get("pricing_version", ""),
             seed=d.get("seed"),
+            status=str(d.get("status") or ""),
+            supersedes=_as_name_list(d.get("supersedes")),
+            superseded_by=_as_optional_str(d.get("superseded_by")),
+            completed_at=_as_optional_str(d.get("completed_at")),
+            last_run_at=_as_optional_str(d.get("last_run_at")),
+            results_pointer=_as_optional_str(d.get("results_pointer")),
         )
 
     @classmethod
@@ -447,6 +565,17 @@ def validate_spec(spec: ExperimentSpec) -> list[str]:
         errors.append(
             f'adapt.selection {spec.adapt.selection!r} is not one of {sorted(ADAPT_SELECTIONS)}'
         )
+
+    # Lifecycle gate: "" means unset (the index derives it) — any other value must be one
+    # of the four defined states, so a spec can never claim a status nothing understands.
+    if spec.status and spec.status not in SPEC_STATUSES:
+        errors.append(
+            f"status {spec.status!r} is not one of {sorted(SPEC_STATUSES)}"
+        )
+    if spec.superseded_by is not None and spec.superseded_by == spec.name:
+        errors.append(f"superseded_by {spec.superseded_by!r} points at the spec itself")
+    if spec.name in spec.supersedes:
+        errors.append(f"supersedes lists the spec itself ({spec.name!r})")
 
     errors.extend(validate_rules(spec))
     return errors

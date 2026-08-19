@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from instrument.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from instrument.signal_store import build_signal_store, load_results  # noqa: E402
+from instrument.spec_status import refresh_spec_status  # noqa: E402
 from instrument.step_routing import ModelSignals  # noqa: E402
 from instrument.workflow_runner import run_workflow  # noqa: E402
 
@@ -62,7 +63,9 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=1800, help="per-phase timeout (s)")
     ap.add_argument("--no-commit", action="store_true", help="do not commit after phases")
     ap.add_argument("--resume", action="store_true",
-                    help="skip phases that already have a [workflow] <phase> commit")
+                    help="skip phases that already have a [workflow] <phase> commit; when the "
+                         "worktree has no such commits, fall back to the phases the derived "
+                         "spec index (experiments/specs/index.json) shows as ok for this goal")
     ap.add_argument("--signals", default=None,
                     help="path to a JSON file mapping model id -> measured signals "
                          "(overrides the auto-built signal store)")
@@ -108,6 +111,27 @@ def main() -> None:
     out_path.write_text(json.dumps(result.to_dict(), indent=2))
     print(f"\nledger: {out_path}", file=sys.stderr)
     print(f"cost: ${result.total_cost_usd:.4f}  ok: {result.ok}", file=sys.stderr)
+
+    _refresh_index(spec.name)
+
+
+def _refresh_index(spec_name: str) -> None:
+    """Refresh the derived spec index now that this run's ledger is on disk.
+
+    Best-effort by construction (the ``emit_self`` pattern of
+    ``workflow_runner.py:254-267``): the run has already completed and its ledger is
+    already written, so an index problem — an unreadable spec YAML, a read-only
+    ``experiments/specs/``, anything — must degrade to a printed warning. It may never
+    fail the run or change its exit status.
+    """
+    try:
+        report = refresh_spec_status(spec_name, root=ROOT)
+        print(f"spec index: {report.index_path} ({report.n_specs} specs)", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 — a post-run bookkeeping step, never a gate
+        print(
+            f"warning: spec index refresh failed ({exc}) — run itself unaffected",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":
