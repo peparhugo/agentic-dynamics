@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """Build data.js for the Agentic Dynamics website.
 
-Reads inventory.json, _results_summary.json, and opencode.db,
-produces a single data.js with window.DYNAMICS_DATA containing
-all measured/computed/derived values with provenance tags.
+Reads the canonical-state registry (experiments/data_manifest.json) and the
+measurement payloads it points at (``finding`` single-task re-runs and ``story``
+multi-session results), plus inventory.json, and produces a single data.js with
+``window.DYNAMICS_DATA`` containing all measured/computed/derived values with
+provenance tags.
+
+The flawed 144-entry legacy summary JSON is retired as a build input
+(``docs/data_integrity_findings.md`` treatment rule 4): the perturbation corpus
+now comes from the 64 clean ``finding`` records and the story corpus from the
+current ``story`` records, with the 77 tombstoned story records excluded.
 
 Usage:
     python scripts/build_data.py              # Write firebase/public/data.js
@@ -12,36 +19,40 @@ Usage:
 
 import json
 import os
-import sqlite3
 import sys
+from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 INVENTORY_PATH = ROOT / "experiments" / "inventory.json"
-SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
-REPORTS_DIR = ROOT / "experiments" / "results" / "reports"
+MANIFEST_PATH = ROOT / "experiments" / "data_manifest.json"
+RESULTS_DIR = ROOT / "experiments" / "results"
+STORIES_DIR = RESULTS_DIR / "stories"
+REPORTS_DIR = RESULTS_DIR / "reports"
 DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 OUTPUT_PATH = ROOT / "firebase" / "public" / "data.js"
 
 DATA_DIR = ROOT / "experiments" / "data"
 
-from _constants import MODEL_LABELS, WORKTREE_ROOT, bootstrap_ci, probe_session_schema
+from _constants import MODEL_LABELS, bootstrap_ci
 
 from instrument.routing import compute_routing  # noqa: E402
 from instrument.solution import COMPOSITE_WEIGHTS  # noqa: E402
 
-MODEL_DISPLAY_ORDER = [
-    "deepseek/deepseek-v4-pro",
-    "openai/gpt-5-nano",
-    "openai/gpt-5-mini",
-    "openai/gpt-5",
-    "openai/gpt-5.5",
-    "openai/gpt-5.6",
-    "openai/gpt-5.6-fast",
-    "anthropic/claude-fable-5",
-]
+#: The registry ``source_type`` values the site consumes as measurement corpus.
+#: ``finding`` = the clean single-task perturbation cells (replacing the retired
+#: summary); ``story`` = the multi-session story cells. ``review``/``meta_session``
+#: and the other source types are not build_data inputs today.
+CANONICAL_SOURCE_TYPES = frozenset({"story", "finding"})
+
+#: The perturbation-condition labels that were no-ops in the pre-fix corpus
+#: (``docs/data_integrity_findings.md`` treatment rule 1). Mirrors
+#: ``instrument.story_ingestion.NOOP_CONDITIONS`` — duplicated here (not imported)
+#: so build_data keeps a light import surface (no chroma/neo4j/retrieval stack).
+NOOP_CONDITIONS = frozenset({"early_degrade", "bad_seed"})
 
 def _fmt_usd(v):
     return round(v, 4)
@@ -65,15 +76,275 @@ def load_inventory():
     return json.loads(INVENTORY_PATH.read_text())
 
 
-def load_summary():
-    if not SUMMARY_PATH.exists():
-        print(f"WARNING: _results_summary.json not found at {SUMMARY_PATH}", file=sys.stderr)
-        print("  Run: python scripts/analyze_worktrees.py", file=sys.stderr)
-        return {"entries": [], "by_model": {}, "by_operator": {}, "by_operator_model": {}, "strategy_distribution": {}}
-    data = json.loads(SUMMARY_PATH.read_text())
-    if "entries" in data:
-        return data
-    return {"entries": data, "by_model": {}, "by_operator": {}, "by_operator_model": {}, "strategy_distribution": {}}
+@dataclass
+class CanonicalCorpus:
+    """The canonical measurement corpus a repointed build_data consumes.
+
+    ``entries`` is the perturbation corpus — every current ``finding`` registry row
+    joined to its measurement payload and mapped into the summary-shaped entry dict
+    the existing per-model/per-operator aggregators expect. ``stories`` is every
+    current ``story`` payload with its no-op condition relabeled to ``clean``.
+    ``by_operator_model`` and ``strategy_distribution`` are re-derived from
+    ``entries`` (the retired summary's pre-aggregated blocks are gone with it).
+    """
+
+    entries: list = field(default_factory=list)
+    stories: list = field(default_factory=list)
+    by_operator_model: dict = field(default_factory=dict)
+    strategy_distribution: dict = field(default_factory=dict)
+    story_count: int = 0
+    finding_count: int = 0
+    tombstoned_count: int = 0
+
+
+def _effective_story_condition(payload: dict) -> str:
+    """Return a story's condition with the no-op relabel rule applied.
+
+    ``docs/data_integrity_findings.md`` treatment rule 1 (mirrored from
+    ``instrument.story_ingestion._effective_condition``): a story whose
+    ``perturbation_condition`` is ``early_degrade``/``bad_seed`` AND which lacks an
+    instrumented verdict (``test_executed_success`` is not a bool — the pre-fix cells
+    never ran the independent test runner) is a no-op, relabeled ``clean``. Its cost +
+    code-quality measurements remain valid; only the perturbation label is corrected.
+    """
+    condition = str(payload.get("perturbation_condition") or "")
+    if condition in NOOP_CONDITIONS and not isinstance(payload.get("test_executed_success"), bool):
+        return "clean"
+    return condition
+
+
+def _resolve_file_uri(source_uri: str) -> Path | None:
+    """Resolve a ``file://`` registry ``source_uri`` to a repo-root-relative path.
+
+    Registry ``finding`` rows carry ``file://experiments/results/…`` URIs (the
+    ``knowledge_ingestion.SOURCE_URI`` contract). Returns ``None`` for any non-file
+    URI (e.g. ``story:<id>``) so the caller can fall back to the story resolver.
+    """
+    if not source_uri or not source_uri.startswith("file://"):
+        return None
+    return ROOT / source_uri[len("file://"):]
+
+
+def _find_story_file(story_id: str) -> Path | None:
+    """Find the ``stories/*.json`` payload for a story id (the filename's last segment).
+
+    Story result filenames end in ``_<story_id>.json`` (``story.save_story_result``);
+    the registry's ``logical_locator`` for a ``story`` row *is* that ``story_id``. The
+    payload's own ``story_id`` field equals it, so this glob is the file→payload join.
+    """
+    if not story_id:
+        return None
+    matches = sorted(STORIES_DIR.glob(f"*_{story_id}.json"))
+    return matches[0] if matches else None
+
+
+def _resolve_story_payload(row: dict) -> dict | None:
+    """Join one current ``story`` registry row to its payload, relabeling the condition.
+
+    Returns the payload dict with a ``_canonical_condition`` key (the no-op-relabeled
+    condition) and a minimal ``_registry`` provenance stub. Returns ``None`` when the
+    payload file is missing or unreadable — a row whose measurement file can no longer
+    be found contributes nothing rather than a fabricated zero.
+    """
+    story_id = str(row.get("logical_locator") or "")
+    path = _find_story_file(story_id)
+    if path is None:
+        return None
+    try:
+        payload = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    payload["_canonical_condition"] = _effective_story_condition(payload)
+    payload["_registry"] = {
+        "source_uri": row.get("source_uri"),
+        "lifecycle_state": row.get("lifecycle_state"),
+    }
+    return payload
+
+
+def _finding_entry_from_run(experiment: str, run: dict, locator: str) -> dict:
+    """Map one finding payload ``run`` into a summary-shaped entry dict.
+
+    This is the vocabulary translation the retired summary's consumers already speak:
+    the finding's native field names (``cost_usd``, ``lines_of_code``, ``escape_score``,
+    ``prompt_tokens``…) are remapped to the summary field names, and every field the
+    finding corpus does not measure is emitted as ``None`` (renders em-dash, never a
+    fabricated value). ``test_results``/``evaluator_source`` come from the measured
+    ``tests_passed``/``tests_total``/``test_executed_success`` only.
+    """
+    cost = float(run.get("cost_usd") or 0.0)
+    tests_total = int(run.get("tests_total") or 0)
+    tests_passed = int(run.get("tests_passed") or 0)
+    correctness = run.get("correctness")
+    return {
+        "experiment": experiment,
+        "type": run.get("type", "perturbed"),
+        "worktree_name": locator,
+        "model": run.get("model", "unknown"),
+        # The clean re-runs are never "narrated" — the flail dimension is unmeasured
+        # in the finding corpus, so narration_failure is always False here.
+        "narration_failure": False,
+        "correctness": correctness if isinstance(correctness, (int, float)) else 0.0,
+        "cost": cost,
+        "strategy": run.get("strategy", ""),
+        "code_lines": int(run.get("lines_of_code") or 0),
+        "thinking_ratio": float(run.get("thinking_ratio") or 0.0),
+        "escape": float(run.get("escape_score") or 0.0),
+        "architecture_divergence": float(run.get("architecture_divergence") or 0.0),
+        "composite_score": float(run.get("composite_score") or 0.0),
+        "energy_total_j": float(run.get("energy_j") or 0.0),
+        "quality_per_joule": float(run.get("quality_per_joule") or 0.0),
+        "constraints_met": int(run.get("constraints_met") or 0),
+        "constraints_total": int(run.get("constraints_total") or 0),
+        "tokens": int(run.get("total_tokens") or 0),
+        "tokens_input": int(run.get("prompt_tokens") or 0),
+        "tokens_output": int(run.get("completion_tokens") or 0),
+        "tokens_reasoning": int(run.get("reasoning_tokens") or 0),
+        "operator": run.get("operator", "unknown"),
+        "perturbation_class": run.get("perturbation_class", "unknown"),
+        "perturbation_strength": run.get("perturbation_strength"),
+        "test_executed_success": run.get("test_executed_success"),
+        "confidence": run.get("confidence"),
+        "test_results": {"total": tests_total, "passed": tests_passed},
+        "evaluator_source": "tests" if tests_total > 0 else "heuristic",
+        # ── no canonical replacement → None, never fabricated ──
+        "narration_penalty": None,
+        "structure_divergence": None,
+        "code_quality_score": None,
+        "comment_ratio": None,
+        "correctness_per_dollar": None,
+        "ast": None,
+    }
+
+
+def _resolve_finding_entry(row: dict) -> dict | None:
+    """Join one current ``finding`` registry row to its run inside the payload file.
+
+    The registry row points at the aggregate file via ``source_uri`` and names the
+    specific cell via ``logical_locator`` (== ``basename(run["workdir"])``). Returns the
+    mapped entry, or ``None`` when the file/run cannot be resolved.
+    """
+    path = _resolve_file_uri(row.get("source_uri") or "")
+    locator = str(row.get("logical_locator") or "")
+    if path is None or not path.exists() or not locator:
+        return None
+    try:
+        payload = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    experiment = payload.get("experiment", "")
+    for run in payload.get("runs") or []:
+        workdir = str(run.get("workdir") or "")
+        if workdir.rsplit("/", 1)[-1] == locator:
+            return _finding_entry_from_run(experiment, run, locator)
+    return None
+
+
+def _compute_by_operator_model(entries: list) -> dict:
+    """Re-derive the per-operator × per-model aggregation the retired summary carried.
+
+    Key shape matches the retired ``by_operator_model`` block
+    (``"<type>|<perturbation_class>|<model>"``) so the existing ``op_comparison`` loop
+    in :func:`build` is unchanged. Aggregates are computed from the canonical entries,
+    not read pre-aggregated.
+    """
+    groups: dict[str, list] = defaultdict(list)
+    for e in entries:
+        typ = e.get("type", "perturbed")
+        pc = e.get("perturbation_class", "unknown")
+        mdl = e.get("model", "unknown")
+        groups[f"{typ}|{pc}|{mdl}"].append(e)
+
+    result = {}
+    for key, rows in groups.items():
+        costs = [r.get("cost", 0) for r in rows]
+        escapes = [r.get("escape", 0) for r in rows]
+        correctness = [r.get("correctness", 0) for r in rows]
+        thinking = [r.get("thinking_ratio", 0) for r in rows]
+        energy = [r.get("energy_total_j", 0) for r in rows]
+        n = len(rows)
+        result[key] = {
+            "n": n,
+            "count": n,
+            "cost_avg": round(sum(costs) / n, 4),
+            "cost_ci95_lo": bootstrap_ci(costs)[0] if n >= 5 else None,
+            "cost_ci95_hi": bootstrap_ci(costs)[1] if n >= 5 else None,
+            "escape_avg": round(sum(escapes) / n, 2),
+            "escape_ci95_lo": bootstrap_ci(escapes)[0] if n >= 5 else None,
+            "escape_ci95_hi": bootstrap_ci(escapes)[1] if n >= 5 else None,
+            "correctness_avg": round(sum(correctness) / n, 2),
+            "correctness_ci95_lo": bootstrap_ci(correctness)[0] if n >= 5 else None,
+            "correctness_ci95_hi": bootstrap_ci(correctness)[1] if n >= 5 else None,
+            "thinking_ratio_avg": round(sum(thinking) / n, 3),
+            "energy_total_j_avg": round(sum(energy) / n, 1),
+        }
+    return result
+
+
+def _compute_strategy_distribution(entries: list) -> dict:
+    """Re-derive the strategy-archetype counts from the canonical entries."""
+    dist: dict[str, int] = defaultdict(int)
+    for e in entries:
+        dist[(e.get("strategy") or "?").lower()] += 1
+    return dict(dist)
+
+
+def load_canonical_corpus(manifest_path: Path | None = None) -> CanonicalCorpus:
+    """Load the canonical measurement corpus from the registry + its payload files.
+
+    This is the registry-backed replacement for the retired summary loader. Reads the
+    manifest's ``registry`` array (via
+    ``scripts.registry.load_registry``), keeps only ``lifecycle_state == "current"`` rows
+    with ``source_type in {story, finding}``, and joins each row to its measurement
+    payload. Tombstoned rows (the 77 contaminated ``early_degrade`` cells) are counted
+    for reporting but never contribute a measurement. A missing/unreadable manifest
+    degrades to an empty corpus with a warning — never a hard failure (mirroring
+    ``registry.load_registry``'s file-fallback posture).
+    """
+    # Local import keeps the module import surface light (registry.py is a sibling
+    # script; it has no chroma/neo4j/redis dependency).
+    from registry import load_registry  # noqa: E402
+
+    path = Path(manifest_path) if manifest_path is not None else MANIFEST_PATH
+    rows = load_registry(path)
+    if not rows:
+        print(
+            f"WARNING: canonical registry empty or missing at {path} — "
+            "run scripts/generate_manifest.py first; emitting an empty corpus.",
+            file=sys.stderr,
+        )
+
+    current = [
+        r for r in rows
+        if r.get("lifecycle_state") == "current" and r.get("source_type") in CANONICAL_SOURCE_TYPES
+    ]
+    tombstoned = [
+        r for r in rows
+        if r.get("lifecycle_state") == "tombstoned" and r.get("source_type") in CANONICAL_SOURCE_TYPES
+    ]
+
+    entries: list = []
+    stories: list = []
+    for r in current:
+        source_type = r.get("source_type")
+        if source_type == "finding":
+            entry = _resolve_finding_entry(r)
+            if entry is not None:
+                entries.append(entry)
+        elif source_type == "story":
+            payload = _resolve_story_payload(r)
+            if payload is not None:
+                stories.append(payload)
+
+    return CanonicalCorpus(
+        entries=entries,
+        stories=stories,
+        by_operator_model=_compute_by_operator_model(entries),
+        strategy_distribution=_compute_strategy_distribution(entries),
+        story_count=sum(1 for r in current if r.get("source_type") == "story"),
+        finding_count=sum(1 for r in current if r.get("source_type") == "finding"),
+        tombstoned_count=len(tombstoned),
+    )
 
 
 def _load_grit_matrix():
@@ -89,47 +360,22 @@ def _load_grit_matrix():
 
 
 def _compute_sonar(entries):
-    """Per-model SonarQube quality aggregates, excluding known library-copy outliers."""
-    from collections import defaultdict
+    """[P] historical — SonarQube per-cell aggregates have no canonical replacement.
 
-    SONAR_OUTLIERS = {"exp_batch_fastapi_maintenance_natural"}  # noqa: N806
-    models = defaultdict(lambda: {"bugs": [], "smells": [], "ncloc": [],
-                                   "scores": [], "ratings": [], "gates_ok": 0, "total": 0})
-
-    for e in entries:
-        if not e.get("sonar_analyzed"):
-            continue
-        if e.get("worktree_name", "") in SONAR_OUTLIERS:
-            continue
-        model = e.get("model", "unknown")
-        m = models[model]
-        m["bugs"].append(e.get("sonar_bugs", 0))
-        m["smells"].append(e.get("sonar_code_smells", 0))
-        m["ncloc"].append(e.get("sonar_ncloc", 0))
-        m["scores"].append(e.get("sonar_quality_score", 0))
-        m["ratings"].append(e.get("sonar_maintainability_rating", ""))
-        m["total"] += 1
-        if e.get("sonar_quality_gate", "").upper() == "OK":
-            m["gates_ok"] += 1
-
-    result = {}
-    for mid, v in sorted(models.items()):
-        if not v["ncloc"]:
-            continue
-        total_loc = sum(v["ncloc"])
-        label = mid.split("/")[-1]
-        result[label] = {
-            "avg_bugs": round(sum(v["bugs"]) / len(v["bugs"]), 1),
-            "avg_smells": round(sum(v["smells"]) / len(v["smells"]), 1),
-            "avg_loc": round(total_loc / len(v["ncloc"])),
-            "bugs_per_kloc": round(sum(v["bugs"]) / max(total_loc, 1) * 1000, 1),
-            "smells_per_kloc": round(sum(v["smells"]) / max(total_loc, 1) * 1000, 1),
-            "avg_quality_score": round(sum(v["scores"]) / len(v["scores"]), 3),
-            "maintainability": max(set(v["ratings"]), key=v["ratings"].count) if v["ratings"] else "?",
-            "gate_pass_rate": round(v["gates_ok"] / v["total"] * 100) if v["total"] > 0 else 0,
-            "worktrees_analyzed": v["total"],
-        }
-    return result
+    The retired summary carried per-cell ``sonar_*`` fields; neither the ``finding`` nor
+    the ``story`` canonical payload reproduces them, and the current corpus carries zero
+    ``sonar_analyzed`` cells. Rather than fabricate zero-filled aggregates, this section
+    is emitted as an explicit historical marker with a ``[P]`` (policy/prior) note so the
+    site renders it as an em-dash, not a number.
+    """
+    return {
+        "models": {},
+        "_historical": True,
+        "_note": (
+            "[P] SonarQube per-cell aggregates retired with the legacy summary corpus — "
+            "no canonical replacement in the registry."
+        ),
+    }
 
 
 def count_game_reports():
@@ -137,36 +383,6 @@ def count_game_reports():
     if not REPORTS_DIR.exists():
         return 0
     return len([f for f in REPORTS_DIR.iterdir() if f.suffix == ".md"])
-
-
-def query_token_breakdown():
-    """Get per-model token aggregates from opencode DB."""
-    if not DB_PATH.exists():
-        print(f"WARNING: opencode DB not found at {DB_PATH}", file=sys.stderr)
-        return {}
-    probe_session_schema(
-        str(DB_PATH),
-        ("model", "directory", "cost", "tokens_input", "tokens_output",
-         "tokens_reasoning", "tokens_cache_read", "tokens_cache_write"),
-    )
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT json_extract(model,'$.id') as model_id, "
-        "SUM(tokens_input) as total_input, SUM(tokens_output) as total_output, "
-        "SUM(tokens_reasoning) as total_reasoning, "
-        "SUM(tokens_cache_read) as cache_read, SUM(tokens_cache_write) as cache_write, "
-        "SUM(cost) as total_cost, COUNT(*) as sessions "
-        f"FROM session WHERE directory LIKE '{WORKTREE_ROOT}/exp_%' AND cost > 0 "
-        "GROUP BY 1 ORDER BY SUM(cost) ASC"
-    ).fetchall()
-    conn.close()
-    result = {}
-    for row in rows:
-        mid = row["model_id"]
-        if mid:
-            result[mid] = dict(row)
-    return result
 
 
 def get_provider(model_id):
@@ -177,44 +393,45 @@ def get_provider(model_id):
     return "openai"
 
 
-def compute_model_data(inventory, summary, db_breakdown):
-    """Compute per-model aggregate metrics."""
-    model_breakdown = inventory.get("model_breakdown", {})
-    models = []
+def compute_model_data(entries):
+    """Compute per-model aggregate metrics from the canonical finding entries.
 
-    for mid in MODEL_DISPLAY_ORDER:
-        inv = model_breakdown.get(mid, {})
+    Phase-2 repoint: the single-task perturbation corpus now comes from the clean
+    ``finding`` records (the 64 re-runs that replace the retired 144-entry summary), so
+    the model list is derived from the entries themselves rather than a hard-coded
+    display order. Pass rate is derived ONLY from measured ``test_results`` — with no
+    measured tests it is ``None`` (renders as an em-dash), never a fabricated rate from
+    unverified self-report (``data_integrity_findings.md`` P0-1). Fields the finding
+    corpus does not measure are emitted as ``None`` and listed in ``_historical_fields``.
+    """
+    by_model: dict[str, list] = defaultdict(list)
+    for e in entries:
+        by_model[_parse_model_id(e.get("model", ""))].append(e)
+
+    models = []
+    # Deterministic order: cheapest-first median cost (keeps DeepSeek's low-cost models
+    # at the head, mirroring the old MODEL_DISPLAY_ORDER intent without hard-coding it).
+    for mid, reports in sorted(by_model.items(), key=lambda kv: _median_cost(kv[1])):
         label = MODEL_LABELS.get(mid, mid)
         provider = get_provider(mid)
-
-        db_breakdown.get(mid, {})
-        entries = summary.get("entries", summary) if isinstance(summary, dict) else []
-        reports = [r for r in entries if _parse_model_id(r.get("model", "")) == mid]
 
         valid = [r for r in reports if not r.get("narration_failure") and r.get("correctness", 0) >= 0]
         narrated = [r for r in reports if r.get("narration_failure")]
 
         avg_cost = _fmt_usd(sum(r.get("cost", 0) for r in valid) / max(len(valid), 1))
-        total_cost = _fmt_usd(inv.get("cost", 0) if inv else sum(r.get("cost", 0) for r in reports))
+        total_cost = _fmt_usd(sum(r.get("cost", 0) for r in reports))
 
-        pass_rate_val = None
+        # Pass rate — measured tests only. No fabricated correctness-heuristic fallback.
         total_tests = 0
         total_passed = 0
-        n_tested = 0
-        n_heuristic = 0
         for r in valid:
-            tr = r.get("test_results")
-            if tr and tr.get("total", 0) > 0:
+            tr = r.get("test_results") or {}
+            if tr.get("total", 0) > 0:
                 total_tests += tr["total"]
                 total_passed += tr["passed"]
-                n_tested += 1
-            elif r.get("evaluator_source") == "heuristic":
-                n_heuristic += 1
+        pass_rate_val = None
         if total_tests > 0:
-            tag = " [mixed]" if n_heuristic > 0 else " [tests]"
-            pass_rate_val = f"{total_passed / total_tests:.0%} ({total_passed}/{total_tests}){tag}"
-        elif valid:
-            pass_rate_val = f"{(sum(r['correctness'] for r in valid) / len(valid)):.0%} [H]"
+            pass_rate_val = f"{total_passed / total_tests:.0%} ({total_passed}/{total_tests}) [tests]"
 
         strategies = {"conservative": 0, "exploratory": 0, "wasteful": 0, "efficient": 0}
         for r in valid:
@@ -225,57 +442,38 @@ def compute_model_data(inventory, summary, db_breakdown):
         avg_loc = round(sum(r.get("code_lines", 0) for r in valid) / max(len(valid), 1))
         avg_thinking = round(sum(r.get("thinking_ratio", 0) for r in valid) / max(len(valid), 1), 3)
         avg_escape = round(sum(r.get("escape", 0) for r in valid) / max(len(valid), 1), 2)
-        avg_narration = round(sum(r.get("narration_penalty", 0) for r in valid) / max(len(valid), 1), 2)
         avg_arch_div = round(sum(r.get("architecture_divergence", 0) for r in valid) / max(len(valid), 1), 3)
-        avg_struct_div = round(sum(r.get("structure_divergence", 0) for r in valid) / max(len(valid), 1), 3)
         avg_composite = round(sum(r.get("composite_score", 0) for r in valid) / max(len(valid), 1), 3)
-        avg_code_quality = round(sum(r.get("code_quality_score", 0) for r in valid) / max(len(valid), 1), 3)
-        avg_comment_ratio = round(sum(r.get("comment_ratio", 0) for r in valid) / max(len(valid), 1), 3)
 
         avg_energy = round(sum(r.get("energy_total_j", 0) for r in valid) / max(len(valid), 1), 1)
         avg_energy_per_loc = round(avg_energy / max(avg_loc, 1), 2)
-        correctness_per_dollar = round(sum(r.get("correctness_per_dollar", 0) for r in valid) / max(len(valid), 1), 4)
+        correctness_per_dollar = round(
+            sum((r.get("correctness") or 0) / max(r.get("cost", 0), 1e-9) for r in valid) / max(len(valid), 1), 4
+        )
         avg_joules_per_loc = round(sum(r.get("quality_per_joule", 0) for r in valid) / max(len(valid), 1), 4)
 
-        # AST-derived aggregates
-        ast_files = round(sum((r.get("ast", {}) or {}).get("py_files", 0) + (r.get("ast", {}) or {}).get("ts_files", 0) for r in valid) / max(len(valid), 1), 1)
-        ast_functions = round(sum((r.get("ast", {}) or {}).get("total_functions", 0) for r in valid) / max(len(valid), 1))
-        ast_classes = round(sum((r.get("ast", {}) or {}).get("total_classes", 0) for r in valid) / max(len(valid), 1))
-        ast_type_hint_pct = round(sum((r.get("ast", {}) or {}).get("type_hint_pct", 0) for r in valid) / max(len(valid), 1)) if valid else 0
-        ast_docstring_pct = round(sum((r.get("ast", {}) or {}).get("docstring_pct", 0) for r in valid) / max(len(valid), 1)) if valid else 0
         avg_constraints_met = round(sum(r.get("constraints_met", 0) for r in valid) / max(len(valid), 1), 1)
         avg_constraints_total = round(sum(r.get("constraints_total", 0) for r in valid) / max(len(valid), 1), 1)
-
-        cost_in = _fmt_usd(sum(r.get("cost_input_usd", 0) for r in valid))
-        cost_out = _fmt_usd(sum(r.get("cost_output_usd", 0) for r in valid))
-        cost_reason = _fmt_usd(sum(r.get("cost_reasoning_usd", 0) for r in valid))
-        cost_cache_actual = _fmt_usd(sum(r.get("cost_cache_usd", 0) for r in valid))
-
-        narration_rate = round(len(narrated) / max(len(reports), 1) * 100) if reports else 0
 
         tokens_in = sum(r.get("tokens_input", 0) for r in valid)
         tokens_out = sum(r.get("tokens_output", 0) for r in valid)
         tokens_reason = sum(r.get("tokens_reasoning", 0) for r in valid)
-        cache_r = sum(r.get("tokens_cache_read", 0) for r in valid)
-        cache_w = sum(r.get("tokens_cache_write", 0) for r in valid)
-
         total_tok = tokens_in + tokens_out + tokens_reason
 
         models.append({
             "id": mid,
             "label": label,
             "provider": provider,
-            "sessions": inv.get("sessions", len(reports)),
-            "n_reports": len(reports),
-            "n_valid": len(valid),
-            "n_narrated": len(narrated),
             "reports": len(reports),
             "reports_valid": len(valid),
             "reports_narrated": len(narrated),
+            "n_reports": len(reports),
+            "n_valid": len(valid),
+            "n_narrated": len(narrated),
             "avg_cost": avg_cost,
             "total_cost": total_cost,
             "cost_ci95": bootstrap_ci([r.get("cost", 0) for r in valid]) if len(valid) >= 5 else None,
-            "pass_rate": pass_rate_val or "N/A",
+            "pass_rate": pass_rate_val,
             "strategy_cons": strategies["conservative"],
             "strategy_expl": strategies["exploratory"],
             "strategy_waste": strategies["wasteful"],
@@ -283,56 +481,69 @@ def compute_model_data(inventory, summary, db_breakdown):
             "avg_loc": avg_loc,
             "avg_thinking_ratio": avg_thinking,
             "avg_escape": avg_escape,
-            "avg_narration_penalty": avg_narration,
             "avg_arch_divergence": avg_arch_div,
-            "avg_struct_divergence": avg_struct_div,
             "avg_composite_score": avg_composite,
-            "avg_code_quality": avg_code_quality,
-            "avg_comment_ratio": avg_comment_ratio,
             "avg_energy_j": avg_energy,
             "avg_energy_j_per_loc": avg_energy_per_loc,
             "correctness_per_dollar": correctness_per_dollar,
             "avg_quality_per_joule": avg_joules_per_loc,
-            "narration_rate": narration_rate,
-            "ast_files": ast_files,
-            "ast_functions": ast_functions,
-            "ast_classes": ast_classes,
-            "ast_type_hint_pct": ast_type_hint_pct,
-            "ast_docstring_pct": ast_docstring_pct,
             "avg_constraints_met": avg_constraints_met,
             "avg_constraints_total": avg_constraints_total,
-            "cost_input": cost_in,
-            "cost_output": cost_out,
-            "cost_reasoning": cost_reason,
-            "cost_cache": cost_cache_actual,
             "tokens_total": total_tok,
             "tokens_input": tokens_in,
             "tokens_output": tokens_out,
             "tokens_reasoning": tokens_reason,
-            "tokens_cache_read": cache_r,
-            "tokens_cache_write": cache_w,
+            # ── historical: no canonical replacement in the finding corpus → None ──
+            "avg_narration_penalty": None,
+            "avg_struct_divergence": None,
+            "avg_code_quality": None,
+            "avg_comment_ratio": None,
+            "narration_rate": None,
+            "ast_files": None,
+            "ast_functions": None,
+            "ast_classes": None,
+            "ast_type_hint_pct": None,
+            "ast_docstring_pct": None,
+            "cost_input": None,
+            "cost_output": None,
+            "cost_reasoning": None,
+            "cost_cache": None,
+            "tokens_cache_read": None,
+            "tokens_cache_write": None,
+            "_historical_fields": [
+                "avg_narration_penalty", "avg_struct_divergence", "avg_code_quality",
+                "avg_comment_ratio", "narration_rate", "ast_files", "ast_functions",
+                "ast_classes", "ast_type_hint_pct", "ast_docstring_pct",
+                "cost_input", "cost_output", "cost_reasoning", "cost_cache",
+                "tokens_cache_read", "tokens_cache_write",
+            ],
             "_provenance": {
-                "sessions": "M", "n_reports": "M", "n_valid": "M", "n_narrated": "M",
+                "reports": "M", "reports_valid": "M", "reports_narrated": "M",
                 "total_cost": "M", "tokens_input": "M", "tokens_output": "M",
-                "tokens_reasoning": "M", "tokens_cache_read": "M", "tokens_cache_write": "M",
-                "tokens_total": "M",
+                "tokens_reasoning": "M", "tokens_total": "M",
                 "avg_cost": "C", "cost_ci95": "C", "avg_loc": "C",
-                "avg_thinking_ratio": "C", "avg_escape": "C", "avg_narration_penalty": "C",
-                "avg_arch_divergence": "C", "avg_struct_divergence": "C",
-                "avg_composite_score": "C", "avg_code_quality": "C", "avg_comment_ratio": "C",
+                "avg_thinking_ratio": "C", "avg_escape": "C",
+                "avg_arch_divergence": "C", "avg_composite_score": "C",
                 "avg_energy_j": "C", "avg_energy_j_per_loc": "C",
-                "avg_quality_per_joule": "C",
-                "correctness_per_dollar": "C", "ast_files": "C", "ast_functions": "C",
-                "ast_classes": "C", "ast_type_hint_pct": "C", "ast_docstring_pct": "C",
+                "avg_quality_per_joule": "C", "correctness_per_dollar": "C",
                 "avg_constraints_met": "C", "avg_constraints_total": "C",
-                "narration_rate": "C",
-                "cost_input": "C", "cost_output": "C", "cost_reasoning": "C", "cost_cache": "C",
-                "strategy_cons": "C", "strategy_expl": "C", "strategy_waste": "C", "strategy_efficient": "C",
-                "pass_rate": "H" if total_tests == 0 else ("M/C" if n_heuristic > 0 else "M"),
-            }
+                "strategy_cons": "C", "strategy_expl": "C", "strategy_waste": "C",
+                "strategy_efficient": "C",
+                "pass_rate": "M" if total_tests > 0 else None,
+            },
         })
 
     return models
+
+
+def _median_cost(entries: list) -> float:
+    """Median cost of a model's entries (a robust ordering key for the model list)."""
+    costs = sorted(r.get("cost", 0) for r in entries)
+    if not costs:
+        return float("inf")
+    n = len(costs)
+    mid = n // 2
+    return costs[mid] if n % 2 else (costs[mid - 1] + costs[mid]) / 2
 
 
 def compute_charts(models):
@@ -964,19 +1175,20 @@ def build():
     inventory = load_inventory()
     print(f"  Loaded inventory: {inventory['counts']['db_sessions_experiments']} experiment sessions")
 
-    summary = load_summary()
-    entries = summary.get("entries", [])
-    print(f"  Loaded summary: {len(entries)} worktree entries")
+    corpus = load_canonical_corpus()
+    entries = corpus.entries
+    print(
+        f"  Loaded canonical corpus: {corpus.finding_count} finding + "
+        f"{corpus.story_count} story current records "
+        f"({corpus.tombstoned_count} tombstoned excluded); {len(entries)} perturbation entries"
+    )
 
     report_count = count_game_reports()
     print(f"  Game reports on disk: {report_count}")
 
-    db_breakdown = query_token_breakdown()
-    print(f"  DB query: {len(db_breakdown)} models with token data")
-
-    models = compute_model_data(inventory, summary, db_breakdown)
-    perturbation_models = models  # preserve real perturbation metrics (energy/strategy/narration)
-    print(f"  Computed: {len(models)} models")
+    models = compute_model_data(entries)
+    perturbation_models = models  # preserve real perturbation metrics (energy/strategy/…)
+    print(f"  Computed: {len(models)} perturbation models")
 
     # Story pipeline models are the source of truth for cross-model comparison.
     # The perturbation models are preserved under a separate key — never discarded.
@@ -992,7 +1204,8 @@ def build():
     derived = compute_derived(models, inventory, report_count)
 
     # ── Operator comparison — per-operator × per-model matrices ──
-    by_op_model = summary.get("by_operator_model", {})
+    # Re-derived from the canonical finding entries (corpus.by_operator_model).
+    by_op_model = corpus.by_operator_model
     op_comparison = {}
     for key, agg in by_op_model.items():
         parts = key.split("|", 2)
@@ -1028,7 +1241,7 @@ def build():
         model_label = MODEL_LABELS.get(mdl, mdl)
         if model_label not in pert_class_breakdown[pc]:
             pert_class_breakdown[pc][model_label] = {"count": 0, "costs": [], "escapes": [],
-                "correctness": [], "thinking_ratios": [], "locs": [], "tokens": [], "narration_penalties": []}
+                "correctness": [], "thinking_ratios": [], "locs": [], "tokens": []}
         pb = pert_class_breakdown[pc][model_label]
         pb["count"] += 1
         pb["costs"].append(e.get("cost", 0))
@@ -1037,7 +1250,6 @@ def build():
         pb["thinking_ratios"].append(e.get("thinking_ratio", 0))
         pb["locs"].append(e.get("code_lines", 0))
         pb["tokens"].append(e.get("tokens", 0))
-        pb["narration_penalties"].append(e.get("narration_penalty", 0))
 
     pert_class_summary = {}
     for pc, pc_models in pert_class_breakdown.items():
@@ -1056,7 +1268,8 @@ def build():
                 "avg_thinking_ratio": round(sum(pb["thinking_ratios"]) / n, 3),
                 "avg_loc": round(sum(pb["locs"]) / n),
                 "avg_tokens": round(sum(pb["tokens"]) / n),
-                "avg_narration_penalty": round(sum(pb["narration_penalties"]) / n, 2),
+                # Historical: narration is not measured in the finding corpus → None.
+                "avg_narration_penalty": None,
             }
 
     # ── Energy ranking — per-model energy metrics ──
@@ -1075,7 +1288,7 @@ def build():
         "_meta": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "source_inventory": str(INVENTORY_PATH),
-            "source_summary": str(SUMMARY_PATH),
+            "source_registry": str(MANIFEST_PATH),
             "source_db": str(DB_PATH),
             "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html.",
         },
@@ -1092,12 +1305,18 @@ def build():
             "story_sessions": sum(m.get("sessions", 0) for m in models),
             "story_total_cost": _fmt_usd(sum(m.get("total_cost", 0) for m in models)),
             "configs": counts.get("config_files", 0),
+            # Canonical-state counts (from the registry — the repointed source of truth).
+            "canonical_stories": corpus.story_count,
+            "canonical_findings": corpus.finding_count,
+            "tombstoned_excluded": corpus.tombstoned_count,
             "_provenance": {
                 "worktrees_total": "M", "sessions_total": "M", "game_reports": "M",
                 "total_cost": "M", "architectures": "M", "variants": "M",
                 "stories_total": "C", "stories_unique": "C", "stories_re_runs": "C",
                 "story_sessions": "C", "story_total_cost": "C",
                 "configs": "M",
+                "canonical_stories": "M", "canonical_findings": "M",
+                "tombstoned_excluded": "M",
             },
         },
         "models": models,
@@ -1108,7 +1327,7 @@ def build():
         "operator_comparison": op_comparison,
         "perturbation_class_breakdown": pert_class_summary,
         "energy_ranking": energy_ranking,
-        "strategy_distribution": summary.get("strategy_distribution", {}),
+        "strategy_distribution": corpus.strategy_distribution,
         "routing": compute_routing(entries),
         "grit_matrix": _load_grit_matrix(),
         "sonar": _compute_sonar(entries),
@@ -1147,7 +1366,7 @@ def build():
         if isinstance(obj, float) and math.isnan(obj):
             return None
         if isinstance(obj, dict):
-            return {k: _clean_value(v) for k, v in obj.items() if k not in ('source_inventory', 'source_summary', 'source_db')}
+            return {k: _clean_value(v) for k, v in obj.items() if k not in ('source_inventory', 'source_registry', 'source_db')}
         if isinstance(obj, list):
             return [_clean_value(v) for v in obj]
         if isinstance(obj, str):
