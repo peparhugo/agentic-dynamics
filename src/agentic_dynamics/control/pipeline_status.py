@@ -1,6 +1,6 @@
 """Pipeline-stage status — summarize the execute/analyze/review Redis queues.
 
-Shared by ``admin/server.py`` (the Control Room matrix) and ``scripts/monitor.py``
+Shared by ``apps/control_room/server.py`` (the Control Room matrix) and ``scripts/monitor.py``
 (the ``--json`` dashboard) so the three-stage pipeline view can never drift.
 
 Stage layout on the framework Redis (127.0.0.1:6380 db 1):

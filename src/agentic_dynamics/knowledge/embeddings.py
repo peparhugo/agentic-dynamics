@@ -14,7 +14,7 @@ from typing import Any
 
 # ── Endpoint configuration (mirrors live.py's FINOPS_REDIS_* pattern) ──
 # The store is no longer hardcoded to localhost:8000 — which collides with
-# ``admin/server.py`` — because CHROMA_HOST / CHROMA_PORT override it. The
+# ``apps/control_room/server.py`` — because CHROMA_HOST / CHROMA_PORT override it. The
 # default values are read once at import (as in live.py), but ``ChromaStore.__init__``
 # re-checks the environment so a test or a forked worker can still override them.
 CHROMA_HOST = os.environ.get("CHROMA_HOST", "localhost")

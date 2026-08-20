@@ -9,7 +9,7 @@ producer in this package, which only ever describes what already happened.
 READ THIS BEFORE ADDING A CALL SITE — THAT IS THE WHOLE POINT OF THIS MODULE EXISTING:
 :func:`derive_actuation_record` is built and unit-tested so its schema is exercised before
 anything in the running system ever calls it. The **one legitimate call site** is the
-Control Room's human-gated steer/interrupt handlers (``admin/server.py``'s
+Control Room's human-gated steer/interrupt handlers (``apps/control_room/server.py``'s
 ``_emit_actuation_record``, review §5.4 — a POST to ``/api/flags/<sid>/steer`` or
 ``/interrupt`` after the human operator explicitly decided to act), and
 :func:`instrument.knowledge_stream.publish_event`'s actuation gate

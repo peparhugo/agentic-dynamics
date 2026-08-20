@@ -3,7 +3,7 @@
 Structurally parallel to ``scripts/supervise.py``, but simpler: there is no
 AI health-flagging loop here (deferred, see ``docs/spec.md`` §1.1). This
 process is the *only* thing that shells out to ``claude agents``/``claude
-logs`` on a poll interval — ``admin/server.py`` only reads the Redis keys
+logs`` on a poll interval — ``apps/control_room/server.py`` only reads the Redis keys
 this process writes (``claude_bg:roster``, ``claude_bg:cursor:<id>``), so the
 single-process Flask dev server never accumulates polling threads.
 
@@ -28,7 +28,7 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "admin"))
+sys.path.insert(0, str(ROOT / "apps" / "control_room"))
 try:
     import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path

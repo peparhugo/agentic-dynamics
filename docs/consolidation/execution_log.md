@@ -504,6 +504,38 @@ Notes:
 - Three stray `experiments/results/stories/*.json` files (smoke-test side effects from a
   `batch_stories.py` subprocess) were removed, not committed.
 
+---
+
+## S5 — move apps (phase `move_apps`)
+
+Spec: `workflows/repository/consolidation_stage_5_apps_realignment.yaml` · phase `move_apps`
+(phase A). Deliverable: `admin/` → `apps/control_room/`, `firebase/public/` → `apps/website/`,
+imports re-pointed at `agentic_dynamics.*`, dual-Firebase invariant preserved.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `admin/` → `apps/control_room/` (server.py, design_sessions.py, claude_agents_client.py, opencode_client.py, static/*) + `firebase/public/` → `apps/website/` via `git mv` | PASS |
+| 2 | Imports re-pointed: internal `from admin.X` → `from apps.control_room.X`; `server.py` bootstrap depth fixed (`parent.parent` → `parent.parent.parent`); `scripts/supervise.py`/`claude_agents_supervisor.py` admin-insert → `apps/control_room` | PASS |
+| 3 | `firebase/firebase.json` `"public"` → `"../apps/website"`; dual-host `.firebaserc` (ai-finops-rulebook + agentic-dynamics) preserved verbatim | PASS |
+| 4 | Website data.js writers re-pointed: `build_data.py` + `generate_manifest.py` → `apps/website/data.js` | PASS |
+| 5 | `agent_config/` references `firebase/public` → `apps/website`; both surfaces regenerated (drift guard green) | PASS |
+| 6 | `pytest tests/ -m "not external"` green + Stage 1 dependency-lint apps-rule green | PASS (1189 passed, 106 deselected; lint 9 passed) |
+
+**S5-move_apps result: 6/6 PASS.**
+
+Notes:
+
+- **Directory naming:** the spec/design's conceptual name `apps/control-room` (dash) is realised
+  as the Python package `apps/control_room/` (underscore) — dashes are not valid Python import
+  identifiers, and `from apps.control_room import server` must resolve. `apps/website/` is a
+  static site (no Python imports), so its name is unchanged.
+- `apps/` remains a namespace package (no `__init__.py`, mirroring the old `admin/`), so
+  `from apps.control_room import server` resolves via the repo-root `sys.path` entry already in
+  `server.py` + `tests/conftest.py`.
+- The admin test suite (`test_admin_*`, `test_claude_agents_*`) imports via the new
+  `apps.control_room` path and reads static assets from `apps/control_room/static/`.
+
+
 
 
 

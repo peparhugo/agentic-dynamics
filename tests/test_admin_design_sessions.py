@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from admin import design_sessions, opencode_client, server
-from admin.design_sessions import DESIGN_SESSIONS_KEY, DesignSessionManager
-from admin.opencode_client import OpenCodeClient
+from apps.control_room import design_sessions, opencode_client, server
+from apps.control_room.design_sessions import DESIGN_SESSIONS_KEY, DesignSessionManager
+from apps.control_room.opencode_client import OpenCodeClient
 
 
 class FakeRedis:

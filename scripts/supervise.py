@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "admin"))
+sys.path.insert(0, str(ROOT / "apps" / "control_room"))
 try:
     import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path

@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from admin import server
-from admin.claude_agents_client import OWNED_SESSIONS_KEY, ROSTER_KEY, ClaudeAgentsError
+from apps.control_room import server
+from apps.control_room.claude_agents_client import OWNED_SESSIONS_KEY, ROSTER_KEY, ClaudeAgentsError
 
 
 class FakeRedis:

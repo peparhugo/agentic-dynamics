@@ -252,7 +252,7 @@ def main():
         "inventory.json": PROJECT_ROOT / "experiments" / "inventory.json",
         "_results_summary.json": RESULTS_DIR / "_results_summary.json",
         "_trajectory_aggregate.json": RESULTS_DIR / "_trajectory_aggregate.json",
-        "data.js": PROJECT_ROOT / "firebase" / "public" / "data.js",
+        "data.js": PROJECT_ROOT / "apps" / "website" / "data.js",
     }
     for name, path in files_to_hash.items():
         if path.exists():

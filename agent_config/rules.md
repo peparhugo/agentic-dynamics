@@ -9,7 +9,7 @@
    and design experiments — new operators, story scenarios, configs, measurement signals, and
    research questions — grounded in the existing measurement stack and prior results
    (`_results_summary.json`, trajectories, reviews).
-3. **Editor** — `firebase/public/*`: write, refine, and fact-check the website prose, grounding
+3. **Editor** — `apps/website/*`: write, refine, and fact-check the website prose, grounding
    every claim in `data.js` / `_results_summary.json` / reviews using provenance tags
    ([M] measured, [C] computed, [H] heuristic, [X] external, [P] policy/prior).
 

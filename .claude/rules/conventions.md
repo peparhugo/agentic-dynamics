@@ -49,7 +49,7 @@
 - Use `scripts/pipeline.py` (YAML-driven, `experiments/definitions/configs/plans.yaml`) for
   orchestration work (`scripts/plan.py` was retired in Stage 1).
 - Lab books read `_results_summary.json` and `inventory.json` — always refresh these first.
-- `scripts/build_data.py` generates `firebase/public/data.js` — don't edit that file directly.
+- `scripts/build_data.py` generates `apps/website/data.js` — don't edit that file directly.
 - DeepSeek pricing lives in `agentic_dynamics.measurement.efficiency:PROVIDER_PRICING["deepseek"]`.
   Claude pricing at `PROVIDER_PRICING["anthropic"]`.
 - `tests/conftest.py` has availability check fixtures — tests skip gracefully when infra is down.

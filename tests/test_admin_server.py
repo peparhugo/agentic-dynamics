@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from admin import server
+from apps.control_room import server
 
 
 class FakePubSub:

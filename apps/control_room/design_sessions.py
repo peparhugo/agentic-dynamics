@@ -41,7 +41,7 @@ from agentic_dynamics.control.step_routing import validate_workflow_routing
 from agentic_dynamics.control.supervisor import register_event_mapping
 
 try:  # Package import under pytest; sibling import for ``python admin/server.py``.
-    from admin.opencode_client import OpenCodeClient, OpenCodeError
+    from apps.control_room.opencode_client import OpenCodeClient, OpenCodeError
 except ModuleNotFoundError:  # pragma: no cover - exercised by the documented CLI launch
     from opencode_client import OpenCodeClient, OpenCodeError
 

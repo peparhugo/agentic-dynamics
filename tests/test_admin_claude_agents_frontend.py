@@ -8,7 +8,7 @@ selection/SSE machinery, without executing the client.
 
 from pathlib import Path
 
-STATIC = Path(__file__).resolve().parent.parent / "admin" / "static"
+STATIC = Path(__file__).resolve().parent.parent / "apps" / "control_room" / "static"
 
 
 def test_claude_agents_shell_exposes_roster_daemon_and_control_regions():

@@ -13,7 +13,7 @@ now comes from the 64 clean ``finding`` records and the story corpus from the
 current ``story`` records, with the 77 tombstoned story records excluded.
 
 Usage:
-    python scripts/build_data.py              # Write firebase/public/data.js
+    python scripts/build_data.py              # Write apps/website/data.js
     python scripts/build_data.py --dry-run    # Print what would be written
 """
 
@@ -37,7 +37,7 @@ RESULTS_DIR = ROOT / "experiments" / "results"
 STORIES_DIR = RESULTS_DIR / "stories"
 REPORTS_DIR = RESULTS_DIR / "reports"
 DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
-OUTPUT_PATH = ROOT / "firebase" / "public" / "data.js"
+OUTPUT_PATH = ROOT / "apps" / "website" / "data.js"
 
 DATA_DIR = ROOT / "experiments" / "data"
 

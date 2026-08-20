@@ -21,7 +21,7 @@ flag-only rail's existing invariant unchanged by this round::
         # Filtered listing over experiments/data_manifest.json's `registry` array — the
         # compacted output of generate_manifest.py's _compact_registry_index (plan step
         # 15). Zero external dependency: this command never touches Redis or Neo4j,
-        # matching /api/flags' existing file-fallback philosophy (admin/server.py).
+        # matching /api/flags' existing file-fallback philosophy (apps/control_room/server.py).
 
     python scripts/registry.py lineage <entity_id> [--live]
         # The registry array is ALREADY compacted to one (current) row per entity_id —

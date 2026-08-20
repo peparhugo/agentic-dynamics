@@ -17,7 +17,7 @@ You are working with the post-hoc analysis pipeline for AI FinOps Dynamics exper
                      └──→ validate_session.py ──→ test pass/fail per worktree
 
 stories/*.json ──→ sync_data.py ──→ sessions.parquet, stories.parquet ──┐
-_results_summary.json  ────────────────────────────────────────────────┼──→ build_data.py ──→ firebase/public/data.js
+_results_summary.json  ────────────────────────────────────────────────┼──→ build_data.py ──→ apps/website/data.js
 _trajectory_aggregate.json ─────────────────────────────────────────────┤                              │
 inventory.json           ───────────────────────────────────────────────┘                              ▼
                                                                                               firebase deploy → web.app
@@ -143,15 +143,15 @@ element after it — the query text is read as the *last* CLI argument
 ## build_data.py (1188L) — Website Data Generator
 
 ```bash
-python scripts/build_data.py            # write firebase/public/data.js
+python scripts/build_data.py            # write apps/website/data.js
 python scripts/build_data.py --dry-run  # print the data instead of writing (confirmed scripts/build_data.py:1168)
 ```
 
 Reads: inventory.json, _results_summary.json, _trajectory_aggregate.json.
-Writes: `firebase/public/data.js` → `window.DYNAMICS_DATA` containing:
+Writes: `apps/website/data.js` → `window.DYNAMICS_DATA` containing:
 - experiments[], models[], operators[], strategies[]
 - All metrics provenance-tagged [M]/[C]/[H]/[X]
-- Used by firebase/public/app.js to render evidence page charts
+- Used by apps/website/app.js to render evidence page charts
 
 ## Data Maintenance Scripts
 
@@ -220,7 +220,7 @@ rule before the compiler admits it (see `conventions.md`). Design:
 
 - Always `inventory.py refresh` before analysis — stale inventory corrupts results.
 - _results_summary.json is the source for lab books and build_data.py — regenerate it.
-- firebase/public/data.js is generated — never edit it directly.
+- apps/website/data.js is generated — never edit it directly.
 - Worktrees at /tmp/exp_* may be cleaned by OS reboot. Always backfill first.
 - SonarQube requires Docker running (`docker-compose up -d sonarqube`).
 - The 5 DEPRECATED lab book scripts (`*_bge_m3`) have been superseded — use the non-DEPRECATED versions.

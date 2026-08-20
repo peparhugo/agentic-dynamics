@@ -19,7 +19,7 @@ You are the **Data Analysis Agent** for AI FinOps Dynamics. Your domain is the a
            → validate_session.py → test pass/fail
 
 _results_summary.json ──┐
-_trajectory_aggregate.json ──→ build_data.py → firebase/public/data.js → web.app
+_trajectory_aggregate.json ──→ build_data.py → apps/website/data.js → web.app
 inventory.json             ──┘
 ```
 
@@ -86,7 +86,7 @@ firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy 
 
 ### Gotchas
 - Always `inventory.py refresh` before analysis — stale inventory corrupts results
-- `firebase/public/data.js` is generated — never edit directly
+- `apps/website/data.js` is generated — never edit directly
 - SonarQube needs Docker: `docker-compose up -d sonarqube`
 - Worktrees at `/tmp/exp_*` may be cleaned by reboot — backfill first
 - opencode.db path: `~/.local/share/opencode/opencode.db` or env `OPENCODE_DB`

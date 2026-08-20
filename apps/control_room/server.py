@@ -38,7 +38,7 @@ Endpoints (28 routes across 5 API categories, plus the static shell):
         POST /api/claude-agents/daemon/stop        — stop the local claude daemon
 
     Static shell (1):
-        GET  /                    — static dashboard (admin/static)
+        GET  /                    — static dashboard (apps/control_room/static)
 
 Run:
     python3 admin/server.py      # default port 8000 (FINOPS_PORT override)
@@ -69,14 +69,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 # canonical-state round 2, plan step 17: scripts/ is not an importable package (no
 # __init__.py), so — mirroring scripts/supervise.py's own cross-directory import of
 # admin/opencode_client.py via an analogous sys.path insert — the repo root is added
 # here so `from scripts import registry` resolves via Python's implicit
 # namespace-package support rather than duplicating registry.py's filter logic
 # a second time in this file.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from flask import Flask, Response, jsonify, make_response, request
 
@@ -108,7 +108,7 @@ from agentic_dynamics.control.queue_reinterleave import (
 from agentic_dynamics.control.pipeline_status import stage_summary
 
 try:  # Package imports under pytest and WSGI.
-    from admin.claude_agents_client import (
+    from apps.control_room.claude_agents_client import (
         CURSOR_KEY_PREFIX,
         OWNED_SESSIONS_KEY,
         ROSTER_KEY,
@@ -116,8 +116,8 @@ try:  # Package imports under pytest and WSGI.
         ClaudeAgentsClient,
         ClaudeAgentsError,
     )
-    from admin.design_sessions import DESIGN_SESSIONS_KEY, DesignSessionManager
-    from admin.opencode_client import OpenCodeClient, OpenCodeError
+    from apps.control_room.design_sessions import DESIGN_SESSIONS_KEY, DesignSessionManager
+    from apps.control_room.opencode_client import OpenCodeClient, OpenCodeError
 except ModuleNotFoundError:  # pragma: no cover - documented ``python admin/server.py`` launch
     from claude_agents_client import (
         CURSOR_KEY_PREFIX,

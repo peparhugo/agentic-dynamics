@@ -7,8 +7,8 @@ import subprocess
 
 import pytest
 
-from admin import claude_agents_client
-from admin.claude_agents_client import ClaudeAgentsClient, ClaudeAgentsError
+from apps.control_room import claude_agents_client
+from apps.control_room.claude_agents_client import ClaudeAgentsClient, ClaudeAgentsError
 
 
 class FakeCompletedProcess:

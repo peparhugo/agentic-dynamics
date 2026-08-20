@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from admin import server
+from apps.control_room import server
 from agentic_dynamics.control.supervisor import (
     SUPERVISOR_FLAGS_KEY,
     SUPERVISOR_SESSION_CELLS_KEY,
