@@ -2,15 +2,15 @@
 
 Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) (canonical, already
 shared with peers) and mirrored at [agentic-dynamics.web.app](https://agentic-dynamics.web.app).
-Firebase static hosting. The website *source* lives here (`apps/website/`); the Firebase *deploy
-config* lives in `firebase/` (`firebase.json`, `.firebaserc`).
+Firebase static hosting. The website *source* and the Firebase *deploy config* both live here
+(`apps/website/`).
 
-## Deploy Config (in `firebase/`)
+## Deploy Config
 
 | File | Purpose |
 |------|---------|
-| `firebase/.firebaserc` | Projects: `ai-finops-rulebook` (default) + `agentic-dynamics` (mirror) |
-| `firebase/firebase.json` | Hosting config — `"public": "../apps/website"` |
+| `.firebaserc` | Projects: `ai-finops-rulebook` (default) + `agentic-dynamics` (mirror) |
+| `firebase.json` | Hosting config — `"public": "."` (this directory) |
 
 ## Pages + Assets
 

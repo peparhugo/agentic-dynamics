@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-20T16:39:55.875616+00:00",
+  "generated_at": "2026-08-20T17:23:54.836033+00:00",
   "opencode_version": "unknown",
-  "git_commit": "d5ec1f18",
+  "git_commit": "14108498",
   "files": {
     "inventory.json": {
       "sha256": "a2aa4974de23c094533ddb4c5d6d593c96a5208bb3bf80495782f4115058746c",

@@ -616,6 +616,33 @@ Deliverable: `docs/consolidation/stage_6_gates.md` (PASS/FAIL per gate).
 
 **S6-gates result: 7/7 PASS.**
 
+---
+
+## S6 — release (phase `release`)
+
+Spec: `workflows/repository/consolidation_stage_6_verification_release.yaml` · phase `release`.
+Deliverable: `docs/consolidation/verification.md` + the synced dual-Firebase deploy.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | Dual-Firebase deploy in sync — `firebase deploy --only hosting` (ai-finops-rulebook) + `--project agentic-dynamics` (mirror), same `apps/website/` source | PASS (both "Deploy complete!") |
+| 2 | `data_manifest.json` regenerated (`python scripts/generate_manifest.py`) | PASS (registry: 701 entities) |
+| 3 | Spec index regenerated (`python scripts/spec_status.py`, 77 specs) | PASS |
+| 4 | `docs/consolidation/verification.md` written (PASS/FAIL across coverage · gates · invariants · both deploys) | PASS |
+| 5 | `pytest tests/ -m "not external"` green | PASS (1189 passed, 106 deselected) |
+
+**S6-release result: 5/5 PASS — the consolidation release is COMPLETE (S0–S6, all gate-green).**
+
+Notes:
+
+- **Deploy-config home corrected:** Firebase requires `firebase.json`'s `"public"` to sit *inside*
+  the project directory, so the earlier `"public": "../apps/website"` was rejected at deploy time
+  ("outside of project directory"). `firebase.json` + `.firebaserc` were moved to `apps/website/`
+  with `"public": "."`, and the `deploy`/`full_matrix`/`cross_models` pipeline plans gained
+  `cwd: apps/website`.
+- Both hosts deployed from the same `apps/website/` source — in sync by construction.
+
+
 
 
 

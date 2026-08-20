@@ -39,7 +39,7 @@ Reads: inventory.json, _results_summary.json, _trajectory_aggregate.json.
 Writes: `apps/website/data.js` (~31KB) with `window.DYNAMICS_DATA`.
 All metrics provenance-tagged [M]/[C]/[H]/[X]. Consumed by 8 HTML pages via app.js.
 
-### Website (firebase/)
+### Website (apps/website/)
 ```bash
 firebase deploy --only hosting                          # canonical (ai-finops-rulebook)
 firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy BOTH
