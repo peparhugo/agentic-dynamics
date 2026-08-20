@@ -350,6 +350,34 @@ Notes:
   69 × `workflows/**`), while `index.json`/`STATUS.md` themselves stay in `experiments/specs/`
   (the historical index home).
 
+---
+
+## S3 — CLI (phase `cli`)
+
+Spec: `workflows/repository/consolidation_stage_3_cli_classification.yaml` · phase `cli` (phase A).
+Deliverable: `agentic_dynamics/cli.py` + the `agentic-dynamics` console-scripts entry point.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `agentic_dynamics/cli.py` added — a thin argparse-less dispatcher over the maintained `scripts/` surface | PASS |
+| 2 | `[project.scripts] agentic-dynamics = "agentic_dynamics.cli:main"` added to `pyproject.toml` | PASS |
+| 3 | Subcommands cover the design §5 tree (experiment/story/workflow/queue/analyze/data/knowledge/registry/review/spec/validate/supervise, incl. the dynamic `analyze lab <name>` and `registry query|show|lineage` families) | PASS |
+| 4 | Each subcommand is a thin wrapper — forwards argv to the backing script via subprocess, composes rather than re-implements (rec 8); imports no `control` for steering | PASS |
+| 5 | CLI smoke-tested (`--help`, `spec status --dry-run`, `analyze lab grit_matrix`, unknown-command) | PASS |
+| 6 | `pytest tests/ -m "not external"` green | PASS (1186 passed, 106 deselected) |
+
+**S3-cli result: 6/6 PASS.**
+
+Notes:
+
+- The CLI is a **passthrough dispatcher**: `_COMMANDS` maps an argv prefix → backing script, and the
+  remaining argv is forwarded to `python scripts/<backing>.py`. Special cases: `registry
+  query|show|lineage` → `registry.py <subcommand>`, and `analyze lab <name>` → `lab_<name>.py`.
+  `--help` prints the command tree; unknown commands exit 2.
+- Lab scripts have no `--help` (they run their analysis directly), so `analyze lab <name>` runs
+  the lab book as-is — expected behaviour, not a CLI bug.
+
+
 
 
 

@@ -29,6 +29,11 @@ ollama = ["ollama>=0.3.0"]
 neo4j = ["neo4j>=5.20"]
 admin = ["flask>=3.0", "redis>=5.0"]
 
+# One entry point over the maintained scripts/ surface (rec 5): `agentic-dynamics` dispatches to
+# the backing scripts via `agentic_dynamics.cli`. Each subcommand is a thin adapter (rec 8).
+[project.scripts]
+agentic-dynamics = "agentic_dynamics.cli:main"
+
 # Editable-install target: `pip install -e .` discovers every package under src/ — the
 # modular monorepo `agentic_dynamics` (distribution "agentic-dynamics", dash; import package
 # "agentic_dynamics", underscore). The transient `instrument.*` compat shim was removed at
