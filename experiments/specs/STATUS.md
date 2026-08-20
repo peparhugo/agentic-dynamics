@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-20T00:56:43.924803+00:00`  ·  67 spec(s)
+Generated at: `2026-08-20T17:28:43.862621+00:00`  ·  77 spec(s)
 
 | name | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|
@@ -16,6 +16,15 @@ Generated at: `2026-08-20T00:56:43.924803+00:00`  ·  67 spec(s)
 | `claude_background_sessions` | active | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
 | `claude_tools_to_skills` | active | 0.1 | — | 2026-08-14 22:29 | ok | anthropic/claude-fable-5 | $8.3582 | 1 |
 | `code_review` | active | 0.1 | — | 2026-08-14 05:38 | ok | anthropic/claude-fable-5 | $2.4257 | 1 |
+| `consolidation_release` | active | 0.1 | — | 2026-08-20 13:10 | ok | deepseek/deepseek-v4-pro | $0.1756 | 1 |
+| `consolidation_release_execute` | active | 0.1 | — | 2026-08-20 17:28 | ok | deepseek/deepseek-v4-pro | $4.7695 | 1 |
+| `consolidation_stage_0_architecture_spine` | active | 0.1 | — | — | — | — | — | 0 |
+| `consolidation_stage_1_package_move` | active | 0.1 | — | — | — | — | — | 0 |
+| `consolidation_stage_2_experiments_workflows_split` | active | 0.1 | — | — | — | — | — | 0 |
+| `consolidation_stage_3_cli_classification` | active | 0.1 | — | — | — | — | — | 0 |
+| `consolidation_stage_4_instruction_surfaces` | active | 0.1 | — | — | — | — | — | 0 |
+| `consolidation_stage_5_apps_realignment` | active | 0.1 | — | — | — | — | — | 0 |
+| `consolidation_stage_6_verification_release` | active | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | active | 0.1 | — | 2026-08-20 00:56 | fail | anthropic/claude-opus-5 | $0.0000 | 2 |
 | `context_abstraction_plane` | active | 0.1 | — | 2026-08-19 23:03 | ok | anthropic/claude-opus-5 | $10.3774 | 1 |
 | `control_room_hardening` | active | 0.1 | — | 2026-08-18 23:56 | ok | deepseek/deepseek-v4-pro | $0.1898 | 1 |
@@ -54,6 +63,7 @@ Generated at: `2026-08-20T00:56:43.924803+00:00`  ·  67 spec(s)
 | `rag_knowledge_sources` | active | 0.1 | — | 2026-08-16 01:39 | ok | deepseek/deepseek-v4-pro | $0.7690 | 1 |
 | `rag_scope_emit` | active | 0.1 | — | 2026-08-17 15:28 | ok | deepseek/deepseek-v4-pro | $0.7587 | 1 |
 | `rag_seam_split` | active | 0.1 | — | 2026-08-18 23:44 | ok | deepseek/deepseek-v4-pro | $0.2958 | 1 |
+| `refactor_master_plan` | active | 0.1 | — | 2026-08-20 02:44 | ok | deepseek/deepseek-v4-pro | $0.5423 | 1 |
 | `registry_canonicalize` | active | 0.1 | — | 2026-08-19 13:42 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |
 | `remediation_data_integrity` | active | 0.1 | — | 2026-08-15 20:31 | ok | deepseek/deepseek-v4-pro | $0.6293 | 1 |
 | `repo_review_fable` | active | 0.1 | — | 2026-08-18 23:24 | ok | deepseek/deepseek-v4-pro | $0.5659 | 2 |
