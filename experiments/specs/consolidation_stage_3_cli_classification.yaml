@@ -113,9 +113,11 @@ workflow:
             batch_analyze_ts_ssg, finish_sweep, regen_typescript_ssg, backfill_sonar, backfill_costs,
             compute_sonar_deltas, embed_sessions, recovery_cost_table, rescore_conventions,
             recover_stories, kb_produce_registry.
-          - Retire the deprecated scripts (fold WS-01 remainder): plan.py, analyze_with_ollama.py,
-            analyze_with_opencode.py, build_graph.py (already covered in Stage 1 if not retired
-            there — ensure exactly once, no duplicate execution).
+          - Do NOT retire the WS-01 scripts here (plan.py, analyze_with_ollama.py,
+            analyze_with_opencode.py, build_graph.py, and the 8 lab_*_DEPRECATED_bge_m3.py): those
+            are folded into Stage 1's retire_shim phase and are its sole responsibility — no
+            duplicate execution. This phase retires ONLY review_worker.py (WS-09) and archives the
+            one-time migrations (WS-10).
           - Run pytest tests/ -m "not external" — green; smoke-run every maintained entry point
             (python scripts/<script>.py --help or equivalent) and record PASS/FAIL.
 
