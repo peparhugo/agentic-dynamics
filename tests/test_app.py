@@ -203,3 +203,57 @@ def test_user_cannot_access_other_users_task(client):
 
     resp = client.put(f"/tasks/{alice_task['id']}", json={"title": "Hijack"}, headers=bob)
     assert resp.status_code == 404
+
+
+# ── Notification trigger tests ────────────────────────────────
+
+def test_completing_task_triggers_notification(client, mocker):
+    auth = register_and_login(client)
+    created = client.post("/tasks", json={"title": "Ship it"}, headers=auth).get_json()
+    mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+
+    assert resp.status_code == 200
+    mock_delay.assert_called_once_with("alice@example.com", "Ship it")
+
+
+def test_non_completed_status_does_not_trigger_notification(client, mocker):
+    auth = register_and_login(client)
+    created = client.post("/tasks", json={"title": "Ship it"}, headers=auth).get_json()
+    mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=auth)
+
+    assert resp.status_code == 200
+    mock_delay.assert_not_called()
+
+
+def test_title_only_update_does_not_trigger_notification(client, mocker):
+    auth = register_and_login(client)
+    created = client.post("/tasks", json={"title": "Ship it"}, headers=auth).get_json()
+    mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+    resp = client.put(f"/tasks/{created['id']}", json={"title": "Ship it v2"}, headers=auth)
+
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "pending"
+    mock_delay.assert_not_called()
+
+
+def test_repeated_completed_does_not_retrigger_notification(client, mocker):
+    auth = register_and_login(client)
+    created = client.post("/tasks", json={"title": "Ship it"}, headers=auth).get_json()
+    mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+
+    mock_delay.assert_called_once()
+
+
+def test_send_notification_email_task_mock():
+    result = app_module.send_notification_email.run("alice@example.com", "Ship it")
+
+    assert "alice@example.com" in result
+    assert "Ship it" in result

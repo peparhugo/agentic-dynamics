@@ -15,6 +15,8 @@ import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -113,6 +115,10 @@ def get_user_by_id(user_id: int) -> dict | None:
             "SELECT * FROM users WHERE id = ?", (user_id,)
         ).fetchone()
         return dict(row) if row else None
+
+
+def get_user_email(user: dict) -> str:
+    return f"{user['username']}@example.com"
 
 
 def create_task(title: str, owner_id: int) -> dict:
@@ -235,6 +241,7 @@ def show_task(task_id: int):
 @require_auth
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    old_task = get_task(task_id, g.current_user_id)
     task = update_task(
         task_id,
         g.current_user_id,
@@ -243,6 +250,9 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if task["status"] == "completed" and old_task["status"] != "completed":
+        owner = get_user_by_id(g.current_user_id)
+        send_notification_email.delay(get_user_email(owner), task["title"])
     return jsonify(task)
 
 
