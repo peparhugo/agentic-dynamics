@@ -296,7 +296,7 @@ class TestPerturbationCondition:
 
     def test_early_degrade_returns_session1_mutation(self, monkeypatch):
         monkeypatch.setattr(
-            "instrument.story.compile_mutation",
+            "agentic_dynamics.runtime.story.compile_mutation",
             lambda specification, operator, strength, model, cache_dir: None,
         )
         cm, sm = condition_to_mutations(

@@ -158,7 +158,7 @@ def test_knowledge_id_folds_revision_hash_and_extractor():
 def test_extractor_version_bump_changes_knowledge_id(monkeypatch):
     entry = _entry()
     record_v1 = build_record(entry)
-    monkeypatch.setattr("instrument.knowledge_ingestion.EXTRACTOR_VERSION", "measured-finding/v2")
+    monkeypatch.setattr("agentic_dynamics.knowledge.knowledge_ingestion.EXTRACTOR_VERSION", "measured-finding/v2")
     record_v2 = build_record(entry)
     # A new extractor generation yields a new knowledge_id ...
     assert record_v2.knowledge_id != record_v1.knowledge_id

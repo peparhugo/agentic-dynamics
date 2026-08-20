@@ -225,6 +225,35 @@ Implementation notes:
   `derive_actuation_record` (the sole occurrence is the `knowledge/__init__.py` docstring, which
   the AST test correctly ignores).
 
+---
+
+## S1 — retire shim (phase `retire_shim`)
+
+Spec: `experiments/specs/consolidation_stage_1_package_move.yaml` · phase `retire_shim` (phase E).
+Deliverable: shim + dead modules retired (rec 7) + `docs/consolidation/stage_1_verification.md`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `grep "from instrument\|import instrument"` over `scripts/ admin/ tests/ src/` = zero → shim `src/instrument/` deleted | PASS |
+| 2 | `legacy/` dead modules retired (5 modules) + `scripts/plan.py` + 8 `lab_*_DEPRECATED_bge_m3.py` + `analyze_with_ollama/opencode` + `build_graph` + their 3 tests | PASS |
+| 3 | 5 residual `monkeypatch.setattr("instrument.*", …)` string targets repointed to `agentic_dynamics.*` (uncovered by the import-grep, broke only at shim deletion) | PASS |
+| 4 | `pytest tests/ -m "not external"` green | PASS (1183 passed, 106 deselected) |
+| 5 | Compile-gate validate on all 77 specs (`validate_spec` + `validate_rules`) | PASS (0 errors) |
+| 6 | `docs/consolidation/stage_1_verification.md` written (imports_resolve · dependency_lint_green · deprecated_retired · bootstrap_centralized) | PASS |
+
+**S1-retire_shim result: 6/6 PASS — Stage 1 complete (skeleton/move/rewrite_consumers/dependency_lint/retire_shim).**
+
+Notes:
+
+- Final active package: **59 modules / 8 planes** (core 5 incl. the moved `constants.py` ·
+  experiment 3 · measurement 15 · runtime 4 · adapters 3 · knowledge 16 · control 9 · reporting 4).
+- `pyproject.toml` `known-first-party` repointed `instrument` → `agentic_dynamics`; the
+  editable-install note dropped the shim mention; the top-level `agentic_dynamics/__init__.py`
+  docstring no longer names `legacy`.
+- The "strip now-dead `# Deprecated:` comments" step was a no-op: those comments lived only in the
+  deleted shim barrel, not in the plane `__init__.py`s.
+
+
 
 
 
