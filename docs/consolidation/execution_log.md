@@ -96,5 +96,23 @@ Deliverable: `docs/consolidation/stage_0_verification.md`.
 
 **S0-verify result: 8/8 PASS — Stage 0 complete and gate-green.**
 
+---
+
+## S1 — package skeleton (phase `skeleton`)
+
+Spec: `experiments/specs/consolidation_stage_1_package_move.yaml` · phase `skeleton` (phase A).
+Deliverable: empty `src/agentic_dynamics/` package skeleton (additive; nothing moves).
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `src/agentic_dynamics/` created with the nine subpackage dirs (`core/`, `experiment/`, `measurement/`, `runtime/`, `adapters/`, `knowledge/`, `control/`, `reporting/`, `legacy/`) | PASS |
+| 2 | Each `__init__.py` is docstring-only, naming its plane's ownership (+ `control/` names the reserved CAP homes I0–I7) | PASS |
+| 3 | `pyproject.toml` note added so `agentic_dynamics` is an editable-install target from `src/` (distribution `agentic-dynamics` ↔ import package `agentic_dynamics`), without touching the scripts' sys.path bootstrap | PASS |
+| 4 | Package imports cleanly (all 9 planes importable under `PYTHONPATH=src`) | PASS |
+| 5 | `pytest tests/ -m "not external"` stays green (additive phase) | PASS (1179 passed, 121 deselected) |
+
+**S1-skeleton result: 5/5 PASS.**
+
+
 
 

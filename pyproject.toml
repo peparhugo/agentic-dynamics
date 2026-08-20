@@ -29,6 +29,12 @@ ollama = ["ollama>=0.3.0"]
 neo4j = ["neo4j>=5.20"]
 admin = ["flask>=3.0", "redis>=5.0"]
 
+# Editable-install target: `pip install -e .` discovers every package under src/ — both
+# `agentic_dynamics` (the modular monorepo, consolidation Stage 1) and `instrument` (the
+# transient compat shim, removed at Stage 1's retire phase). The distribution name is
+# "agentic-dynamics" (dash); the import package is "agentic_dynamics" (underscore). The
+# scripts' per-file sys.path bootstrap is preserved until Stage 1 phase C replaces it with
+# scripts/_bootstrap.py.
 [tool.setuptools.packages.find]
 where = ["src"]
 
