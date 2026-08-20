@@ -76,4 +76,25 @@ would have wiped the measured run columns (`last_run`/`ok`/`model`/`cost`/`n_run
 specs. `spec_status.py --dry-run` confirms the derived status is `draft`, so the targeted edit is
 consistent with the generator.
 
+---
+
+## S0 — verification (phase `verify`)
+
+Spec: `experiments/specs/consolidation_stage_0_architecture_spine.yaml` · phase `verify`.
+Deliverable: `docs/consolidation/stage_0_verification.md`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `pytest tests/test_doc_lifecycle.py` green | PASS (5 passed) |
+| 2 | Exactly one root `ARCHITECTURE.md` with the six §2 sections | PASS |
+| 3 | No `BLUEPRINT*.md` at the repo root | PASS |
+| 4 | `context_abstraction_implement` PAUSED (grep), not deleted, not superseded | PASS |
+| 5 | rec 1 → freeze declared; rec 4 → single authority + lifecycle status | PASS |
+| 6 | Zero orphan files from the migration (every moved doc in its new home) | PASS |
+| 7 | Full suite green — `pytest tests/ -m "not external"` | PASS (1179 passed, 121 deselected) |
+| 8 | `stage_map.md` named as the release plan in `ARCHITECTURE.md` §4 | PASS |
+
+**S0-verify result: 8/8 PASS — Stage 0 complete and gate-green.**
+
+
 
