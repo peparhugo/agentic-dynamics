@@ -692,6 +692,21 @@ Per-finding acceptance-criterion results for the refactor-repair release (review
 
 **P1-2 result: 7/7 PASS.**
 
+### P1-2 (packaging) — CLI declared checkout-only + wheel smoke gate
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | Decision implemented: the CLI is **checkout-only** — it forwards to repo-level `scripts/`, which a wheel does not ship; no script-logic migration in this release (deferred post-repair hardening) | PASS |
+| 2 | Documented in `pyproject.toml` — `[project.scripts]` comment declares checkout-only, cites the `where = ["src"]` package layout, and names `cli.CHECKOUT_REQUIRED` | PASS |
+| 3 | Documented in CLI `--help` — a "Checkout-only" note states commands forward to the repo `scripts/` and an installed wheel can only print help | PASS |
+| 4 | `cli.main` emits a clear `CHECKOUT_REQUIRED` message (exit 2) when `scripts/` is absent; `--help` still works (exit 0) from a wheel | PASS (verified: wheel has no `scripts/`, `cli.py` carries the guard) |
+| 5 | Unit tests added — help documents checkout-only; command from a missing-`scripts/` dir returns 2 + "checkout required"; `--help` works from a missing-`scripts/` dir | PASS (49 passed) |
+| 6 | CI wheel smoke gate added (`packaging` job) — build wheel → install into a clean venv → `--help` greps "checkout-only" → command greps "checkout required" with non-zero exit | PASS |
+| 7 | `ruff check` clean on `cli.py` + `test_cli_resolution.py`; `pytest` green (51 passed on the two touched areas) | PASS |
+
+**P1-2 (packaging) result: 7/7 PASS.**
+
+
 
 
 

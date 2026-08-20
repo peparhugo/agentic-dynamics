@@ -172,3 +172,31 @@ def test_every_documented_leaf_is_covered_by_the_table() -> None:
     documented = _documented_leaf_commands()
     table = {argv for argv, _, _ in DOCUMENTED_RESOLUTIONS}
     assert documented == table
+
+
+# --- P1-2 packaging: the CLI is checkout-only (forwards to repo scripts/, not the wheel) ---
+
+
+def test_help_documents_checkout_only() -> None:
+    """The help text declares the checkout-only constraint (the packaging decision)."""
+    assert "checkout-only" in cli._HELP.lower()
+    assert "scripts/" in cli._HELP
+
+
+def test_command_from_installed_wheel_emits_checkout_required(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    """Without a scripts/ sibling (an installed wheel), a command explains the requirement."""
+    monkeypatch.setattr(cli, "_SCRIPTS_DIR", tmp_path / "scripts")  # deliberately nonexistent
+    rc = cli.main(["experiment", "run"])
+    captured = capsys.readouterr()
+    assert rc == 2
+    assert "checkout required" in captured.err
+
+
+def test_help_still_works_from_installed_wheel(tmp_path, monkeypatch, capsys) -> None:
+    """``--help`` remains usable from a wheel — only command dispatch needs the checkout."""
+    monkeypatch.setattr(cli, "_SCRIPTS_DIR", tmp_path / "scripts")  # deliberately nonexistent
+    rc = cli.main(["--help"])
+    assert rc == 0
+    assert "checkout-only" in capsys.readouterr().out.lower()

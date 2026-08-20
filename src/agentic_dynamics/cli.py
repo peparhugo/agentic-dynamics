@@ -100,7 +100,22 @@ Subcommands (each forwards to its backing script):
   supervise   [claude-agents]
 
 Run `agentic-dynamics <subcommand> --help` for the backing script's own options.
+
+Checkout-only: this CLI is a thin dispatcher — every subcommand forwards to a script in the
+repository's ``scripts/`` directory, so it only works from a git checkout (``pip install -e .``).
+An installed wheel carries no ``scripts/`` and can only print this help.
 """
+
+#: Message emitted when a real command is attempted from an installed distribution that has no
+#: ``scripts/`` sibling. The CLI is checkout-only (refactor-repair P1-2 packaging): it forwards
+#: to repo-level scripts rather than shipping them in the wheel, so a wheel install can print
+#: help but cannot dispatch a command. This text is the machine-checkable contract the CI wheel
+#: smoke test greps for.
+CHECKOUT_REQUIRED = (
+    "agentic-dynamics: checkout required — this CLI forwards each command to the repository's "
+    "scripts/ directory, which is not present here (installed wheel?). Install from a git "
+    "checkout with `pip install -e .`, or run the backing script directly."
+)
 
 
 def _forward(script: str, argv: list[str]) -> int:
@@ -132,6 +147,12 @@ def main(argv: list[str] | None = None) -> int:
     script, rest = _resolve(argv)
     if script is None:
         print(f"agentic-dynamics: unknown command {' '.join(argv)}", file=sys.stderr)
+        return 2
+    # Checkout-only guard: without a scripts/ sibling (e.g. an installed wheel) the dispatcher
+    # has nothing to forward to. Placed AFTER resolution so ``--help`` (handled above) still
+    # works from a wheel, but any real command explains the checkout requirement.
+    if not _SCRIPTS_DIR.is_dir():
+        print(CHECKOUT_REQUIRED, file=sys.stderr)
         return 2
     if not (_SCRIPTS_DIR / script).exists():
         print(f"agentic-dynamics: no such command {' '.join(argv)}", file=sys.stderr)

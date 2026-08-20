@@ -31,6 +31,12 @@ admin = ["flask>=3.0", "redis>=5.0"]
 
 # One entry point over the maintained scripts/ surface (rec 5): `agentic-dynamics` dispatches to
 # the backing scripts via `agentic_dynamics.cli`. Each subcommand is a thin adapter (rec 8).
+#
+# CHECKOUT-ONLY (refactor-repair P1-2 packaging): the CLI forwards to repo-level scripts/ (which
+# a wheel does NOT ship — see `[tool.setuptools.packages.find] where = ["src"]`), so it only
+# works from a git checkout (`pip install -e .`). An installed wheel can print `--help` but
+# dispatching a command emits a "checkout required" message (cli.CHECKOUT_REQUIRED). Script-logic
+# migration into the package is deferred post-repair hardening, not done here.
 [project.scripts]
 agentic-dynamics = "agentic_dynamics.cli:main"
 
