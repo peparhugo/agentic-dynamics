@@ -5,6 +5,12 @@ question: >-
   cell -> same perturbed prompt), and are they covered by tests? Fix the operators and lock the
   invariants in before any downstream spec consumes their output.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

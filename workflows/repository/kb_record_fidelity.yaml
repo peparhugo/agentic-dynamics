@@ -6,6 +6,12 @@ question: >-
   0.0 in the summary-recovery migration, violating None != 0.0. Assumes kb_producer_factory has
   landed (R1) — this builds on its record-field surface.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

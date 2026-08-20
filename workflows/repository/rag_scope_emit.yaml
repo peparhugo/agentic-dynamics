@@ -8,6 +8,12 @@ question: >-
   becomes testable, and (3) pins the isolation with tests. Control/telemetry (LivePublisher) stays
   unscoped and observe-only; only the knowledge channel is scoped.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

@@ -8,6 +8,12 @@ question: >-
   lineage edges must be written. Run once with claude-fable-5 (the design's author + prior
   implementer).
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

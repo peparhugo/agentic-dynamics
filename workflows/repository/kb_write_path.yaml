@@ -6,6 +6,12 @@ question: >-
   hand-synced across five scripts; (c) two separate adapters reshape a non-StoryResult into a
   StoryResult. Assumes kb_producer_factory has landed (R1).
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

@@ -12,6 +12,12 @@ question: >-
   new structure. The full package map, shim strategy, import-rewrite order, and dependency lint are
   specified in docs/consolidation/design.md §1.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

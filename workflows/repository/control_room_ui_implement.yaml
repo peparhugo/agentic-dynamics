@@ -7,6 +7,12 @@ question: >-
   dark+light token palette. No new endpoints; the flag-only rail, single-context EventSource, and
   textContent-only invariants are preserved.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

@@ -6,6 +6,12 @@ question: >-
   and src/instrument/CONTEXT.md + the mental-model are now stale (zero mention of the five new
   producer modules, says "40 modules" when there are 58, no message_family/registry/tombstone docs).
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

@@ -9,6 +9,12 @@ question: >-
   seam outward: wire stores first, then harden the commit filter, then repair graph
   expansion, then wire the remaining pure functions, then independent verification.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

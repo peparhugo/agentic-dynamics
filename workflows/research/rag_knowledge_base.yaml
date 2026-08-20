@@ -9,6 +9,12 @@ question: >-
   independently, in its own worktree, grounded in this repo's existing infra and the external
   cutting edge. Output per cell is a proposal + integration/impact plan.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

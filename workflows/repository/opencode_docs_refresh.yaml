@@ -1,6 +1,12 @@
 name: opencode_docs_refresh
 question: "Can the opencode documentation (.opencode/*.md, AGENTS.md, CONTEXT.md files, opencode.json, and tools) be brought current with the code — and then ported to the Claude Code/CLI file taxonomy?"
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

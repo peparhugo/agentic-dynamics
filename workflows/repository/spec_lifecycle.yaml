@@ -8,6 +8,12 @@ question: >-
   every piece of transport (load_spec, the run ledger, the knowledge stream, the registry
   compaction) already exists and is simply not wired to specs.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

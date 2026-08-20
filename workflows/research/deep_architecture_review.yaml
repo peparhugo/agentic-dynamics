@@ -9,6 +9,12 @@ question: >-
   and retrieve — not just this one repo. Produce an as-is architecture map, a coupling/seed-repo
   generalization assessment, and a prioritized refactor roadmap.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

@@ -5,6 +5,12 @@ question: >-
   registry_index.jsonl), and reconcile_missing has no production caller — dead-lettered events and
   events lost before a consumer group existed have no repair path.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

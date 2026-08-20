@@ -11,6 +11,12 @@ question: >-
   KB / measurement stack. Output per cell is a proposal: the seed repo + task, the factor grid,
   the measurement, and how it isolates routing and KB effects.
 version: "0.1"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
 workflow:
   kind: agent_task
   params:

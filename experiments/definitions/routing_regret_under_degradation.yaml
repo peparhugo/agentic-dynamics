@@ -3,6 +3,12 @@ question: >-
   Does a dynamics controller that escalates on measured confidence beat
   static cheapest/premium policies in accepted-cost-per-outcome?
 version: "0.2"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
 workflow:
   kind: story
   params: {stories: [task_manager_api, static_site_gen, notification_service]}

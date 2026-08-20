@@ -7,6 +7,12 @@ question: >-
   SCREEN (16 cells), not the confirmatory trial — its job is to de-risk the substrate, the held-out
   test, the signal-store warm-up, and the factor->runtime wiring before committing to a powered grid.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

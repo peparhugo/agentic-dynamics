@@ -6,6 +6,12 @@ question: >-
   added, preserving the front diagram and framework SVG? Run once per model to produce three
   independent, pull-able branches.
 version: "0.3"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

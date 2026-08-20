@@ -10,6 +10,12 @@ question: >-
   the RAG stack stays (async is the target architecture), and both sides' functionality must
   survive.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

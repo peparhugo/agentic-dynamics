@@ -5,6 +5,12 @@ question: >-
   imbalance, interrupt the workers, re-interleave the queue round-robin, and respawn a
   provider-bounded worker set — the "interrupt + re-interleave + continue" queue-level steer?
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
 workflow:
   kind: agent_task
   params:

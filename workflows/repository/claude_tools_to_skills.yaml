@@ -1,6 +1,12 @@
 name: claude_tools_to_skills
 question: "Can the opencode tools (.opencode/tools/*.ts) be reframed as Claude Code skills that run the underlying scripts, without duplicating what the existing ported skills and commands already cover?"
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

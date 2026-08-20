@@ -11,6 +11,12 @@ question: >-
   ARCHITECTURE.md, moves docs, and adds lifecycle status fields — it edits no production code and
   no test file except the new tests/test_doc_lifecycle.py.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

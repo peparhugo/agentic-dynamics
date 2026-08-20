@@ -6,6 +6,12 @@ question: >-
   return the same value), so the whole load is useless yet can break `import instrument` if the
   scripts tree is missing. normalize_task is also duplicated in routing.py and _constants.py.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

@@ -6,6 +6,12 @@ question: >-
   workflow_runner.py as each phase starts, and render it as a phase badge on the workflow
   cell in the Control Room matrix/status?
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

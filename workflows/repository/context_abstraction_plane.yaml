@@ -16,6 +16,12 @@ question: >-
   schemas and an implementation order that honors measure-before-policy. REVIEW first, then
   DESIGN. Run once with anthropic/claude-opus-5.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

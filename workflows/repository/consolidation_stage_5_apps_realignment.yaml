@@ -10,6 +10,12 @@ question: >-
   The dual-Firebase invariant is re-asserted here. Full detail in docs/consolidation/design.md §6
   Stage 5.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

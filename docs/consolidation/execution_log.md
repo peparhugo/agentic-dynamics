@@ -776,6 +776,25 @@ Per-finding acceptance-criterion results for the refactor-repair release (review
 
 **P1-3 (placement) result: 7/7 PASS.**
 
+### P1-3 (backfill) — explicit identity metadata on all 77 specs + index regen
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `artifact_kind`/`intent`/`side_effects`/`repeatable` written into every one of the 77 specs (6 definitions + 71 workflows), mechanical, no content changes (6 lines inserted after `version:`) | PASS |
+| 2 | Classification is directory-driven and consistent with the 2 already-tagged specs: definitions → `experiment`/`measure`/no side effects/`repeatable`; `workflows/operations/` → `workflow`/`mutate`/repo+ext side effects/`repeatable`; `workflows/{repository,research}/` → `workflow`/`mutate`/repo only/`repeatable: false` | PASS |
+| 3 | Spec index regenerated (`python scripts/spec_status.py`) — 77 spec(s); the two moved specs now index `workflows/operations/posthoc_pipeline.yaml` + `workflows/repository/workflow_step_routing.yaml`; zero `spec_path` values point at a nonexistent file | PASS |
+| 4 | Compile gate green — `compile_spec(load_spec(p))` succeeds for all 77 specs; `validate_spec == []` on every spec, and each spec's `artifact_kind` matches its directory | PASS |
+| 5 | `test_committed_specs_all_load_without_unknown_key_warnings` green (all 77 load with no unknown-key warnings) | PASS |
+| 6 | Full `-m "not external"` suite: 1265 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P1-3 (backfill) result: 6/6 PASS.**
+
+Note: this checkout has no untracked `experiments/results/workflows/` run ledgers, so the regenerated
+`index.json`/`STATUS.md` report `n_runs=0` for every spec (spec_status.py's documented "missing data
+is normal" behaviour). Run history is derived from those untracked ledgers and repopulates on the next
+regeneration in an environment that has them; the backfill itself only writes the identity metadata.
+
+
 
 
 

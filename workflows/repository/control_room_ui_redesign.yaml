@@ -7,6 +7,12 @@ question: >-
   decision in real, cited examples rather than taste. Deliver research + a design spec a human (or a
   stronger UI model) can implement; do NOT implement.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

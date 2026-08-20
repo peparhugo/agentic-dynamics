@@ -5,6 +5,12 @@ question: >-
   Control Room, and apply the hygiene fixes (items 1, 2, and 5) — leaving signal
   instrumentation and the routing campaign as separate follow-ups?
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

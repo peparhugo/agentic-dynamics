@@ -7,6 +7,12 @@ question: >-
   perturbation_strength to KnowledgeRecord (they are currently dropped to prose), then clear the
   stuck stream, re-emit, drain, and verify the stores actually populate.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

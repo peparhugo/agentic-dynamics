@@ -9,6 +9,12 @@ question: >-
   scripts move to scripts/archive/). The deeper pipeline.py→review_all.py shared-runner rewire is
   DEFERRED. The full subcommand tree + classification buckets are in docs/consolidation/design.md §5.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

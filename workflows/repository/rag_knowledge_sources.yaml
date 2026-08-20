@@ -9,6 +9,12 @@ question: >-
   SAME pointer contract the finding-producer fix established, so the KB holds findings + code +
   quality + policy, not just findings.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

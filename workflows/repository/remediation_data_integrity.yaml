@@ -7,6 +7,12 @@ question: >-
   only the genuinely contaminated cells, and (d) re-admitting the gated policy arms only once
   their inputs exist?
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

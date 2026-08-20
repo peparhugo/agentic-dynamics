@@ -7,6 +7,12 @@ question: >-
   itself the problem. This run builds a fresh foundation instead of patching it. The design docs
   are the authority; the 28 routes and the hard invariants are the boundary.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:
