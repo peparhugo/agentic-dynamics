@@ -1,0 +1,145 @@
+name: consolidation_stage_5_apps_realignment
+question: >-
+  Stage 5 of the consolidation release: treat the website and control room as applications (critique
+  rec 9) and realign the public identity (critique rec 5's identity half) — move admin/ →
+  apps/control-room/ and firebase/public/ → apps/website/, re-point their imports at
+  agentic_dynamics.*, and re-frame the README from "perturbation instrument" to the research
+  operating system. PLACE IN ORDERING: needs — Stages 1 (imports), 2 (data paths), 3 (site build /
+  knowledge ingest / registry query subcommands); blocks — Stage 6. SUPERSESSION: the deferred
+  refactor_master_plan WS-08 (admin step_sample dedup) runs AFTER this move, inside apps/control-room.
+  The dual-Firebase invariant is re-asserted here. Full detail in docs/consolidation/design.md §6
+  Stage 5.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      critique: >-
+        READ docs/review/semantic_monolith_review.md rec 9 (website + control room as apps/ that
+        consume the system; domain results → publication data → website, not interleaved with runtime
+        architecture) and rec 5's identity half (the README principally describes a perturbation
+        instrument, but the repo is becoming a research operating system for agent experimentation and
+        control — the six systems).
+      read_first: >-
+        docs/consolidation/design.md §6 Stage 5 + docs/consolidation/stage_map.md §4 Stage 5. Also
+        read admin/server.py (the 28-route Control Room) and firebase/CONTEXT.md + docs/agentic_dynamics_
+        vision.md (the identity reframe material).
+      hard_rules: >-
+        (1) apps/ consumes the system: admin/server.py + firebase/public/ live under apps/ and import
+        agentic_dynamics.*, never the reverse. (2) apps contain no domain rules — the Stage 1
+        dependency-lint apps-rule (no ExperimentSpec/RuleSpec/Factor construction) stays green.
+        (3) Dual-Firebase invariant: firebase deploy --only hosting must target BOTH ai-finops-rulebook
+        (canonical) and agentic-dynamics (mirror), same public/. Never retire the canonical project.
+        (4) Domain results → publication data → website: build_data.py's load_canonical_corpus is the
+        only path; no runtime code is interleaved into apps/. (5) The Control Room remains observe-only
+        for agents (POST steer/interrupt routes are human-operator-only) — the move must not change that
+        contract. (6) pytest green at every phase boundary.
+      run_shape: >-
+        SINGLE-model: deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/consolidation-release). Python language. Each phase commits [workflow] <phase>;
+        code-touching phases carry enforce_pytest: true.
+    phases:
+      - name: move_apps
+        kind: agent
+        timeout: 10800
+        enforce_pytest: true
+        prompt: |
+          Move admin/ and firebase/public/ under apps/ and re-point imports.
+
+          GOAL:
+          {goal}
+
+          READ FIRST: docs/consolidation/design.md §6 Stage 5 + admin/server.py.
+
+          DO:
+          - git mv admin/ → apps/control-room/ (server.py, design_sessions.py, claude_agents_client.py,
+            opencode_client.py, static/*) and firebase/public/ → apps/website/.
+          - Re-point every import in apps/ from instrument.* → agentic_dynamics.* (control, knowledge,
+            reporting as appropriate) and update the sys.path/bootstrap to match scripts/_bootstrap.py.
+          - Keep firebase/ deploy config (firebase.json, .firebaserc) pointing at apps/website/ as its
+            public directory; preserve the dual-host .firebaserc (ai-finops-rulebook + agentic-dynamics).
+          - Run pytest tests/ -m "not external" — green (the admin/website tests must pass from the new
+            paths); assert the Stage 1 dependency-lint apps-rule stays green.
+
+          DELIVER the moved apps/ + re-pointed imports.
+      - name: reframe_readme
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Re-frame the public identity.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/review/semantic_monolith_review.md §"What the repository actually contains"
+          (the six systems) + docs/agentic_dynamics_vision.md.
+
+          DO:
+          - Rewrite README.md to describe the research operating system for agent experimentation and
+            control: measurement apparatus, experiment platform, agent execution runtime,
+            knowledge/augmentation system, emerging control system, research/publication environment —
+            with the perturbation instrument as ONE system, not the sole framing. Point at
+            ARCHITECTURE.md (the authority) and the agentic-dynamics CLI.
+          - Update firebase/CONTEXT.md → apps/website/CONTEXT.md and the deploy notes to reflect the
+            new location; keep the dual-Firebase instruction verbatim.
+          - Run pytest tests/ -m "not external" — green.
+
+          DELIVER the re-framed README + apps/website/CONTEXT.md.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Verify apps/ realignment + dual-Firebase.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Assert apps/ imports agentic_dynamics.* only (grep the reverse direction returns zero).
+          - Assert the dependency-lint apps-rule (no domain rules in apps/) is green.
+          - Assert the dual-Firebase config still lists BOTH ai-finops-rulebook and agentic-dynamics
+            with the same public dir; run firebase deploy --only hosting --dry-run if available (else
+            inspect .firebaserc + firebase.json).
+          - Run pytest tests/ -m "not external" — green.
+          - Write docs/consolidation/stage_5_verification.md with PASS/FAIL per criterion
+            (apps_import_system, apps_no_domain_rules, dual_firebase_synced, readme_reframed).
+
+          DELIVER docs/consolidation/stage_5_verification.md.
+      - name: test
+        kind: test
+        timeout: 7200
+        prompt: |
+          Full-suite gate. Runs the language test suite (pytest) via the independent test runner.
+
+          GOAL:
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: apps_realignment_delivered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [apps_import_system, apps_no_domain_rules, dual_firebase_synced, readme_reframed]
+metrics:
+  - {name: apps_import_system, agg: mean, over: cell}
+  - {name: apps_no_domain_rules, agg: mean, over: cell}
+  - {name: dual_firebase_synced, agg: mean, over: cell}
+  - {name: readme_reframed, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, move_apps, reframe_readme, verify, test]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

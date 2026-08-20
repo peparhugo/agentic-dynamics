@@ -1,0 +1,141 @@
+name: consolidation_stage_6_verification_release
+question: >-
+  Stage 6 of the consolidation release — the verification gate for all nine recommendations: prove
+  coverage, run every stage-specific acceptance test in one pass, re-assert the operational invariants,
+  and deploy the dual-Firebase sites in sync. PLACE IN ORDERING: needs — Stages 0–5 (all prior stage
+  outputs); blocks — nothing (completing this stage UNBLOCKS the deferred WS-02..08 workstreams and the
+  post-consolidation CAP implementation inside the new structure). SUPERSESSION: this stage verifies the
+  full WS-01..10 disposition declared in docs/consolidation/stage_map.md §5 (folded 3, deferred 7,
+  retired 1 sub-part) — no orphan, no duplicate execution. Full detail in docs/consolidation/design.md §6
+  Stage 6.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      critique: >-
+        READ docs/review/semantic_monolith_review.md — this stage verifies the release outcome named in
+        the blunt summary: one architectural spine, clear bounded packages, experiments separated from
+        work orders, one CLI, one instruction source, one current architecture document, old generations
+        archived or deleted — with the Context Abstraction Plane implementation PAUSED until the
+        structural homes exist.
+      read_first: >-
+        docs/consolidation/stage_map.md (the full stage map, WS disposition §5, CAP freeze §6,
+        invariants §7) + docs/consolidation/design.md §6 Stage 6 (the acceptance-test list). Also
+        docs/data_integrity_findings.md (the data-integrity boundary).
+      hard_rules: >-
+        (1) Coverage proof: all 9 recommendations → ≥1 stage; all WS-01..10 dispositioned exactly
+        once; zero orphans. (2) All stage-specific tests green in one run: test_doc_lifecycle,
+        test_dependency_direction, test_experiment_workflow_classification, test_script_classification,
+        test_generated_surfaces_match, plus the data-flow tests. (3) The compile-gate validate on every
+        committed experiments/specs/**/*.yaml is green (the load-bearing rule intact end-to-end).
+        (4) Invariant audit: Redis isolation (6380 queue DB1 + KB DB2; 6379 sandbox), dual Firebase,
+        CAP frozen-not-deleted, no _results_summary.json resurrected as a live build/lab input.
+        (5) Both Firebase hosts deployed in sync (ai-finops-rulebook + agentic-dynamics, same public/).
+        (6) pytest tests/ -m "not external" green.
+      run_shape: >-
+        SINGLE-model: deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/consolidation-release). Python language. Each phase commits [workflow] <phase>.
+    phases:
+      - name: coverage
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Prove recommendation + workstream coverage.
+
+          GOAL:
+          {goal}
+
+          READ FIRST: docs/consolidation/stage_map.md §2 (rec→stage) + §5 (WS disposition) + §8 (coverage proof).
+
+          DO:
+          - Assert all 9 recommendations map to ≥1 stage (rec 1,4→S0; 2,7,8→S1; 3→S2; 5→S3,S5; 6→S4;
+            9,5→S5; all→S6).
+          - Assert WS-01..10 each have exactly one disposition (folded/deferred/retired) and no
+            workstream is executed in two stages nor left un-dispositioned.
+          - Assert the six systems each have a package home (measurement/experiment/runtime+adapters/
+            knowledge/control/reporting+apps).
+
+          DELIVER docs/consolidation/stage_6_coverage.md.
+      - name: gates
+        kind: agent
+        timeout: 14400
+        enforce_pytest: true
+        prompt: |
+          Run every stage-specific acceptance test + the compile gate + the invariant audit.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §6 (the per-stage test list).
+
+          DO:
+          - Run, in one pass, pytest tests/test_doc_lifecycle.py tests/test_dependency_direction.py
+            tests/test_experiment_workflow_classification.py tests/test_script_classification.py
+            tests/test_generated_surfaces_match.py + the data-flow tests, and include the output.
+          - Run the compile-gate validate snippet on EVERY committed spec under experiments/definitions/
+            and workflows/** (python -c importing agentic_dynamics.experiment.experiment_spec.validate_spec)
+            and include the output — zero refusals.
+          - Invariant audit (grep + config inspection): Redis ports 6380 (queue DB1, KB DB2) vs 6379
+            (sandbox); .firebaserc lists both ai-finops-rulebook + agentic-dynamics; context_abstraction_
+            implement still PAUSED (not deleted); no active code opens _results_summary.json as a live
+            input (only analyze_worktrees.py's writer, or zero).
+
+          DELIVER docs/consolidation/stage_6_gates.md (PASS/FAIL per check).
+      - name: release
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Deploy the dual-Firebase sites in sync and write the final verification report.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/stage_map.md §7 (global invariants).
+
+          DO:
+          - firebase deploy --only hosting (canonical ai-finops-rulebook) and
+            firebase deploy --only hosting --project agentic-dynamics (mirror) — both from the same
+            apps/website/ public dir; confirm they did not drift.
+          - Regenerate data_manifest.json (python scripts/generate_manifest.py) and the spec index
+            (python scripts/spec_status.py) so the release is self-describing.
+          - Write docs/consolidation/verification.md: PASS/FAIL per check across coverage, gates,
+            invariants, and both deploys.
+
+          DELIVER docs/consolidation/verification.md + the synced dual deploy.
+      - name: test
+        kind: test
+        timeout: 7200
+        prompt: |
+          Full-suite gate. Runs the language test suite (pytest) via the independent test runner.
+
+          GOAL:
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: consolidation_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [coverage_complete, ws_dispositioned, invariants_intact, dual_firebase_deployed]
+metrics:
+  - {name: coverage_complete, agg: mean, over: cell}
+  - {name: ws_dispositioned, agg: mean, over: cell}
+  - {name: invariants_intact, agg: mean, over: cell}
+  - {name: dual_firebase_deployed, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, coverage, gates, release, test]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
