@@ -678,6 +678,21 @@ Per-finding acceptance-criterion results for the refactor-repair release (review
 
 **P1-1 result: 7/7 PASS.**
 
+### P1-2 — CLI longest-prefix resolution
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `src/agentic_dynamics/cli.py` `_resolve` implements TRUE longest-prefix matching — `_COMMANDS` prefixes sorted by length descending (`_SORTED_PREFIXES`) before the first-match walk | PASS |
+| 2 | `agentic-dynamics supervise claude-agents` resolves to `claude_agents_supervisor.py` (was `supervise.py` under insertion-order matching) | PASS |
+| 3 | Latent bug fixed: the bare-supervise key was `("supervise")` (a string, not a 1-tuple), so `agentic-dynamics supervise` silently never resolved — corrected to `("supervise",)` | PASS |
+| 4 | `tests/test_cli_resolution.py` added — table-driven, expectation table hand-authored from `_HELP` + the CLI-surface doc (not from `_COMMANDS`); asserts every documented command resolves to its intended script AND the script exists on disk | PASS (46 passed) |
+| 5 | Coverage guard — `_HELP`-parsed documented leaf set == table argv set (both directions: no documented command missing, no undocumented row) | PASS |
+| 6 | Forwarded-argv semantics preserved (`supervise --once`, `experiment run --model ...`); special cases (`registry <sub>`, `analyze lab <name>`) pinned | PASS |
+| 7 | `ruff check` clean on `cli.py` + `test_cli_resolution.py`; full `-m "not external"` suite: 1238 passed, no new failures | PASS |
+
+**P1-2 result: 7/7 PASS.**
+
+
 
 
 
