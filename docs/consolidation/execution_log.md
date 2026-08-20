@@ -564,6 +564,24 @@ Notes:
   that mention `firebase/public/` are left as-is — they describe the state at the time, not the
   current layout.
 
+---
+
+## S5 — verify (phase `verify`)
+
+Spec: `workflows/repository/consolidation_stage_5_apps_realignment.yaml` · phase `verify`.
+Deliverable: `docs/consolidation/stage_5_verification.md`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `apps_import_system` — apps import `agentic_dynamics.*` only; the reverse (`agentic_dynamics` → `apps`) is zero | PASS |
+| 2 | `apps_no_domain_rules` — the Stage 1 dependency-lint apps-rule (no `ExperimentSpec`/`RuleSpec`/`Factor` in `apps/`) green | PASS (9 passed) |
+| 3 | `dual_firebase_synced` — `.firebaserc` lists both `ai-finops-rulebook` + `agentic-dynamics`; `firebase.json` `public` → `apps/website`; `firebase deploy --only hosting --dry-run` validates | PASS |
+| 4 | `readme_reframed` — README six-system framing + `apps/website/CONTEXT.md` | PASS |
+| 5 | `pytest tests/ -m "not external"` green | PASS (1189 passed, 106 deselected) |
+
+**S5-verify result: 5/5 PASS — Stage 5 complete (move_apps/reframe_readme/verify).**
+
+
 
 
 
