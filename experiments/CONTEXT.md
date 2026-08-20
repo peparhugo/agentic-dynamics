@@ -18,7 +18,7 @@ into the knowledge base as `source_type: spec` records with supersedes lineage
 The spec/compiler introduces an `ExperimentSpec` layer above the configs. A spec declares
 `workflow`, `factors` (model, condition, **policy** as a first-class factor), `design`
 (factorial), `rules` (measurement vs control), `metrics`, `comparison`, `writeup`, `stop`, and
-`adapt`. Example (one of the committed specs): `experiments/definitions/workflow_step_routing.yaml`:
+`adapt`. Example (one of the committed specs): `workflows/repository/workflow_step_routing.yaml`:
 
 ```yaml
 factors:

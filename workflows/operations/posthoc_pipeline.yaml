@@ -5,6 +5,15 @@ question: >-
   experiment finishes, ALL results (raw + analysis + review + regenerated data) are ready, with
   no manual gap like the 2026-08-15 remediation?
 version: "0.1"
+# Artifact identity (refactor-repair P1-3): an operational work order — it drains the
+# analysis/review queues and regenerates the derived data, so it is a *workflow*, not an
+# experiment. Idempotent (completes only what is missing), hence repeatable.
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
 workflow:
   kind: agent_task
   params:

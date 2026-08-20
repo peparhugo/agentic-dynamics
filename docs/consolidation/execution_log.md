@@ -762,6 +762,21 @@ Per-finding acceptance-criterion results for the refactor-repair release (review
 
 **P1-3 (schema) result: 7/7 PASS.**
 
+### P1-3 (placement) — re-home the two misplacements + metadata-driven guard
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `experiments/definitions/posthoc_pipeline.yaml` → `workflows/operations/posthoc_pipeline.yaml` with explicit metadata (`artifact_kind: workflow`, `intent: mutate`, `side_effects: {repository, external_services}` true, `repeatable: true` — idempotent operational work order) | PASS |
+| 2 | `experiments/definitions/workflow_step_routing.yaml` → `workflows/repository/workflow_step_routing.yaml` with explicit metadata (`artifact_kind: workflow`, `intent: mutate`, `side_effects: {repository: true, external_services: false}`, `repeatable: false` — one-shot source development) | PASS |
+| 3 | Substring-heuristic classifier removed from `tests/test_experiment_workflow_classification.py` (`is_work_order`, the question/hard-rule marker tables) — replaced with metadata-driven placement (`_declared_kind` reads `artifact_kind`; the guard fails on a declared kind that mismatches its directory) | PASS |
+| 4 | New tests pin the move — `test_misplaced_specs_are_rehomed` (both now under `workflows/` and declare `workflow`), `test_definitions_declare_experiment_kind`, `test_workflows_declare_workflow_kind` | PASS |
+| 5 | Path references re-pointed — `agent_config/skills/{run-workflow,instrument}.md` (and the regenerated `.opencode/` + `.claude/` surfaces), `experiments/CONTEXT.md` → `workflows/repository/workflow_step_routing.yaml` | PASS |
+| 6 | Both moved specs load + validate clean (`validate_spec == []`); `ruff` clean; `test_agent_config_render.py` still green after regeneration | PASS |
+| 7 | Full `-m "not external"` suite: 1265 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged — `refactor_repair_review.md` frontmatter, and `refactor_repair_release.yaml` still in `experiments/specs/`, both out of this finding's named scope) | PASS |
+
+**P1-3 (placement) result: 7/7 PASS.**
+
+
 
 
 

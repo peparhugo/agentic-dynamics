@@ -1,25 +1,18 @@
-"""Experiment-vs-workflow classification guard (critique rec 3).
+"""Experiment-vs-workflow placement guard (critique rec 3, refactor-repair P1-3 placement).
 
-Rec 3: ``experiments/specs/`` currently holds genuine experimental definitions beside
+Rec 3: ``experiments/specs/`` used to hold genuine experimental definitions beside
 implementation projects and repo-development workflows, making it impossible to tell an
-experiment that studies a hypothesis from an automated work order that changes the repository.
-This test enforces the split (``docs/consolidation/design.md`` §4) *as a test, not a
-convention*: a work-order spec dropped into ``experiments/definitions/`` fails, and a
-measurement spec dropped into ``workflows/`` fails the reciprocal direction.
+experiment that studies a hypothesis from a work order that changes the repository.
 
-Classification rule (design §4):
+The Stage-2 fix re-homed the corpus, but it decided placement with a *substring heuristic* over
+question text — which let real misplacements survive (``posthoc_pipeline`` — operational — and
+``workflow_step_routing`` — source-modifying — both lived in ``experiments/definitions/``).
 
-* **experiment** — studies a hypothesis about a model's behaviour/cost/quality under some
-  condition and produces a *measured result*. Signature: ``workflow.kind`` in
-  ``{story, task, experiment}`` (or any non-``agent_task`` measurement kind), *or* an
-  ``agent_task`` whose question is a hypothesis (no repo-change deliverable).
-* **workflow** — a work order that changes the repository (build/write/fix/repoint/rebrand)
-  with a deliverable artifact. Signature: ``workflow.kind == agent_task`` whose
-  ``context.hard_rules`` name a production-code edit, *or* whose ``question`` names a
-  repo-change deliverable.
-
-The guard is deliberately heuristic (substring markers, not a hardcoded name list) so it
-catches *new* misplacements; it is verified against the re-homed corpus in the move phase.
+This guard now decides placement from the spec's EXPLICIT ``artifact_kind`` metadata
+(``experiment`` | ``workflow``), never from text: the declared kind must match the directory the
+spec lives in, and a mismatch fails. Until the P1-3 backfill writes ``artifact_kind`` into every
+one of the 77 specs, an *unset* kind is treated as "not yet classified" (no assertion) — the
+backfill makes the guard strict over the whole corpus.
 """
 
 from __future__ import annotations
@@ -33,43 +26,12 @@ SPECS_FLAT = ROOT / "experiments" / "specs"
 DEFINITIONS = ROOT / "experiments" / "definitions"
 WORKFLOWS = ROOT / "workflows"
 
-# Repo-change deliverable markers that a work order's question names (design §4). Lowercased
-# substring match on the question text. Two families:
-#   * repo-change *verbs* — imperatives that build/fix/repoint the repository;
-#   * repo-area *nouns* — named deliverables (website, control-room, registry, queue, …).
-# Deliberately heuristic (not a hardcoded name list) so it catches *new* misplacements; it is
-# verified against the re-homed corpus in the move phase. "knowledge base"/"design" are
-# intentionally ABSENT — they appear in the experiment-design specs too.
-WORKORDER_QUESTION_MARKERS = (
-    # repo-change verbs
-    "implement", "build", "fix", "rewrite", "repoint", "re-point", "rebrand", "reframe",
-    "wire", "introduce", "centralize", "deduplicate", "harden", "reconcile", "rebuild",
-    "redesign", "migrate", "unify", "canonicalize", "repair", "refresh", "modernize",
-    "facelift", "consolidat", "release", "establish", "execute", "produce", "conduct",
-    "refine", "enqueue", "author the", "trigger", "re-interleave", "reinterleave", "steer",
-    "interrupt", "respawn", "re-narrat", "retire", "split", "close the", "make ",
-    "populate", "break ", "pinned", "bugfix", "propose", "re-run",
-    # repo-area nouns
-    "website", "public site", "control room", "control-room", "control_room", "evidence",
-    "lab book", "labbook", "registry", "queue", "spec lifecycle", "golden circle",
-    "golden-circle", "data pipeline", "context abstraction", "context-abstraction",
-    "supervisor", "design session", "background session", "opencode documentation",
-    "opencode tools", "claude code", "canonical",
-)
-
-# ``context.hard_rules`` markers that declare a production-code edit (the consolidation specs
-# use these; older work orders rely on the question markers above).
-WORKORDER_HARDRULE_MARKERS = ("production code", "edit production", "design/implement", "implement")
-
-# Hypothesis markers that OVERRIDE the work-order heuristics: an ``agent_task`` whose question
-# is designing/studying an experiment is a measurement spec even if it names a repo area in its
-# context (e.g. routing_kb_experiment_design names "knowledge-base machinery" but *designs an
-# experiment* rather than changing the repo).
-EXPERIMENT_MARKERS = ("design an experiment",)
+#: The two specs the placement task re-homed out of ``experiments/definitions/``.
+REHOMED = ("operations/posthoc_pipeline.yaml", "repository/workflow_step_routing.yaml")
 
 
 def _load_spec(path: Path) -> dict:
-    """Load a spec YAML into a plain dict (classification, not validation)."""
+    """Load a spec YAML into a plain dict (placement check, not full validation)."""
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
@@ -77,58 +39,57 @@ def _spec_files(directory: Path, *, recursive: bool) -> list[Path]:
     """Every ``*.yaml`` under ``directory``.
 
     ``definitions/`` is scanned at the top level only — its ``configs/`` subdirectory holds
-    measurement *configs* (not ExperimentSpecs), which are out of scope for the guard.
-    ``workflows/`` is scanned recursively (repository/operations/research/examples).
+    measurement *configs* (not ExperimentSpecs), out of scope for the guard. ``workflows/`` is
+    scanned recursively (repository/operations/research/examples).
     """
     if not directory.exists():
         return []
     return sorted(directory.rglob("*.yaml") if recursive else directory.glob("*.yaml"))
 
 
-def is_work_order(spec: dict) -> bool:
-    """Return True if ``spec`` carries the work-order signature (design §4)."""
-    workflow = spec.get("workflow") or {}
-    if workflow.get("kind") != "agent_task":
-        return False
-    question = str(spec.get("question") or "").lower()
-    # An experiment-design hypothesis is a measurement spec, not a work order (override).
-    if any(m in question for m in EXPERIMENT_MARKERS):
-        return False
-    context = (workflow.get("params") or {}).get("context") or {}
-    hard_rules = str(context.get("hard_rules") or "").lower()
-    if any(m in hard_rules for m in WORKORDER_HARDRULE_MARKERS):
-        return True
-    return any(m in question for m in WORKORDER_QUESTION_MARKERS)
+def _declared_kind(spec: dict) -> str | None:
+    """The authored ``artifact_kind``, or ``None`` when not yet backfilled (pre-P1-3-backfill)."""
+    kind = spec.get("artifact_kind")
+    return kind if isinstance(kind, str) and kind in ("experiment", "workflow") else None
 
 
 def test_experiments_specs_flat_dir_is_drained():
-    """The as-is mixing: ``experiments/specs/`` must hold no ``*.yaml`` specs — the split has
-    re-homed them under ``experiments/definitions/`` and ``workflows/**``."""
+    """``experiments/specs/`` must hold no ``*.yaml`` — only the generated STATUS.md/index.json."""
     leftovers = sorted(SPECS_FLAT.glob("*.yaml"))
     assert not leftovers, (
         "experiments/specs/ still holds un-split specs: " + ", ".join(p.name for p in leftovers)
     )
 
 
-def test_definitions_are_experiments_not_work_orders():
-    """Every ``experiments/definitions/**`` spec is a measurement workflow, not a work order."""
+def test_misplaced_specs_are_rehomed():
+    """The two previously-misplaced specs now live under workflows/ and declare ``workflow``."""
+    for rel in REHOMED:
+        path = WORKFLOWS / rel
+        assert path.exists(), f"{rel} was not re-homed"
+        assert _declared_kind(_load_spec(path)) == "workflow", (
+            f"{rel} must declare artifact_kind: workflow"
+        )
+
+
+def test_definitions_declare_experiment_kind():
+    """No spec in ``experiments/definitions/`` declares ``artifact_kind: workflow``."""
     misplaced = []
     for path in _spec_files(DEFINITIONS, recursive=False):
-        spec = _load_spec(path)
-        if is_work_order(spec):
-            misplaced.append(path.name)
+        if _declared_kind(_load_spec(path)) == "workflow":
+            misplaced.append(f"{path.name} (artifact_kind=workflow)")
     assert not misplaced, (
-        "work-order specs misplaced in experiments/definitions/: " + ", ".join(misplaced)
+        "workflow specs misplaced in experiments/definitions/ (re-home under workflows/): "
+        + ", ".join(misplaced)
     )
 
 
-def test_workflows_carry_the_work_order_signature():
-    """Reciprocal: every ``workflows/**`` spec carries the work-order signature."""
-    missing = []
+def test_workflows_declare_workflow_kind():
+    """No spec under ``workflows/`` declares ``artifact_kind: experiment``."""
+    misplaced = []
     for path in _spec_files(WORKFLOWS, recursive=True):
-        spec = _load_spec(path)
-        if not is_work_order(spec):
-            missing.append(path.name)
-    assert not missing, (
-        "measurement specs misplaced in workflows/: " + ", ".join(missing)
+        if _declared_kind(_load_spec(path)) == "experiment":
+            misplaced.append(f"{path.relative_to(WORKFLOWS)} (artifact_kind=experiment)")
+    assert not misplaced, (
+        "experiment specs misplaced under workflows/ (re-home under experiments/definitions/): "
+        + ", ".join(misplaced)
     )
