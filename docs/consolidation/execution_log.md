@@ -871,6 +871,36 @@ from the ledgers on the next regeneration in an environment that has them.
 
 **Debt-1 result: 7/7 PASS.**
 
+### Debt-1 (second) — split runtime/story.py into a story package
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `runtime/story.py` (~61KB) split into `runtime/story/` — `models.py` (the four dataclasses), `conditions.py` (`PerturbationCondition` + `condition_to_mutations`), `orchestration.py` (`run_story` + per-session execution), `persistence.py` (save/load + git + opencode-DB cost accounting), and a justified 5th module `builtins.py` (the three shipped stories + `BUILTIN_STORIES` — a ~400-line responsibility the review's 4-module list didn't name) | PASS |
+| 2 | `story/__init__.py` re-exports the whole surface (incl. `compile_mutation`, which the story test suite monkeypatches via `story.compile_mutation`) so `from agentic_dynamics.runtime.story import …` breaks nothing | PASS |
+| 3 | `condition_to_mutations` resolves `compile_mutation` lazily through the package so the `monkeypatch.setattr("…story.compile_mutation", …)` test keeps working | PASS |
+| 4 | `runtime/story.py` removed; `runtime/__init__.py`'s `from . import story` now resolves the package | PASS |
+| 5 | The story suite passes unchanged (`test_story` + `test_ledger_fields`: 43 tests); all consumers (`scripts/run_story.py`, analyzers, lab books) import from the same path | PASS (43 passed) |
+| 6 | `ruff` clean on the new package; full `-m "not external"` suite: 1286 passed | PASS |
+
+**Debt-1 (second) result: 6/6 PASS.**
+
+### f1_repair_verification — release gate
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | Coverage proof — every review finding maps to a phase with a PASS entry (P0-1→b1, P0-2→b2+b3, P0-3→a1, P1-1→a2, P1-2→a3+a4, P1-3→c1+c2+c3, P1-4→d1+d2, Debt-1→e3+e4, Debt-2→e1, Debt-3→e2); zero orphans | PASS |
+| 2 | Full suite green — `pytest tests/ -m "not external"`: 1286 passed, 0 failures (the two `f6acbcf41` leftovers resolved here: `refactor_repair_review.md` gained `status: accepted`; `refactor_repair_release.yaml` re-homed to `workflows/repository/` + metadata) | PASS (1286 passed) |
+| 3 | All guard suites green — dependency, data-flow, classification, script, doc-lifecycle, generated-surface, stale-path, signal-registry, control-room paths (+ spec/compile/artifact-identity/lifecycle/CLI-resolution): 203 passed | PASS (203 passed) |
+| 4 | Compile-gate — `compile_spec(load_spec(p))` succeeds for all 78 specs; every `artifact_kind` matches its directory | PASS (78/78) |
+| 5 | CI-equivalent gates — `docker build .` (PASS), `agentic-dynamics --help` (PASS, exit 0), `bash scripts/reproduce.sh --dry-run` (PASS, exit 0) | PASS |
+| 6 | Invariant audit — Redis isolation (framework queue on 6380, story sandbox 6379), Firebase dual-host (`.firebaserc` = `ai-finops-rulebook` + `agentic-dynamics`), CAP frozen (reserved homes absent; design doc `status: accepted`) | PASS |
+| 7 | `docs/review/refactor_repair_verification.md` written with per-check PASS/FAIL + final verdict | PASS |
+
+**f1_repair_verification result: 7/7 PASS.**
+
+**RELEASE VERDICT: the refactor-repair release is COMPLETE — all 17 phases green.**
+
+
 
 
 

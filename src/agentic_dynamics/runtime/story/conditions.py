@@ -11,6 +11,7 @@ from pathlib import Path
 
 from agentic_dynamics.measurement.mutation import MutationArtifact
 
+
 class PerturbationCondition(str, Enum):
     """Experimental conditions for perturbing multi-session stories."""
 
@@ -27,13 +28,6 @@ class PerturbationCondition(str, Enum):
 # categorical ``perturbation_condition`` string.
 CONDITION_STRENGTH = 0.5
 
-
-# Canonical mutation strength for the degrading conditions (BAD_SEED / EARLY_DEGRADE /
-# LATE_DEGRADE). The strength axis is a first-class ledger field: CLEAN maps to
-# s = 0.0 (the unperturbed baseline) and every degrading condition to this value,
-# so a story result carries a numeric ``perturbation_strength``, not just the
-# categorical ``perturbation_condition`` string.
-CONDITION_STRENGTH = 0.5
 
 def condition_to_mutations(
     condition: PerturbationCondition,
@@ -111,7 +105,4 @@ def condition_to_mutations(
         return None, {4: artifact}
 
     return None, {}
-
-
-# ── Data Structures ────────────────────────────────────────────
 

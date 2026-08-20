@@ -14,6 +14,7 @@ import yaml
 from agentic_dynamics.adapters.opencode import AgenticResult
 from agentic_dynamics.core.session_types import DEFAULT_TASK_TYPE
 
+
 @dataclass
 class SessionSpec:
     """Definition of one session in a story."""
@@ -310,7 +311,4 @@ class StoryResult:
             },
             "sessions": [s.to_dict() for s in self.sessions],
         }
-
-
-# ── Story Runner ───────────────────────────────────────────────
 

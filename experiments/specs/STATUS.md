@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-20T20:41:21.052131+00:00`  ·  77 spec(s)
-**Work remaining:** 68 runnable-now · 9 completed/retired
+Generated at: `2026-08-20T22:09:26.937874+00:00`  ·  78 spec(s)
+**Work remaining:** 69 runnable-now · 9 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -48,6 +48,7 @@ Generated at: `2026-08-20T20:41:21.052131+00:00`  ·  77 spec(s)
 | `rag_scope_emit` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `rag_seam_split` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `refactor_master_plan` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `refactor_repair_release` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `remediation_data_integrity` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `repo_review_fable` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_follow_up` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |

@@ -13,8 +13,8 @@ from pathlib import Path
 
 from agentic_dynamics.adapters.opencode import AgenticResult
 from agentic_dynamics.core.language import detect_language
-
 from agentic_dynamics.runtime.story.models import SessionResult, StoryResult
+
 
 def _opencode_db() -> Path:
     """Path to opencode's SQLite database (session cost/token ground truth)."""
@@ -259,7 +259,4 @@ def load_story_result(path: Path) -> StoryResult:
             )
         )
     return result
-
-
-# ── Built-in Story Catalog ─────────────────────────────────────
 

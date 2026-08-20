@@ -12,6 +12,14 @@ question: >-
   repair is green. The load-bearing rule, the consolidation's guard rails, and the operational
   invariants survive every phase.
 version: "0.1"
+# Artifact identity (refactor-repair P1-3 backfill): the release orchestration is a one-shot
+# repo-development workflow (mutate the checkout), not a measurement experiment.
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

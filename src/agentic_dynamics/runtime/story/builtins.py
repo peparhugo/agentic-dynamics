@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from agentic_dynamics.runtime.story.models import SessionSpec, StoryConfig
 
+
 def task_manager_story() -> StoryConfig:
     """A 5-session story building a task management API.
 
@@ -406,13 +407,6 @@ def notification_service_story() -> StoryConfig:
             ),
         ],
     )
-
-
-BUILTIN_STORIES: dict[str, StoryConfig] = {
-    "task_manager_api": task_manager_story(),
-    "static_site_gen": static_site_gen_story(),
-    "notification_service": notification_service_story(),
-}
 
 
 BUILTIN_STORIES: dict[str, StoryConfig] = {
