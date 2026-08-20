@@ -253,6 +253,28 @@ def test_nonrepeatable_workflow_derives_status_from_ledgers_in_the_index(tmp_pat
     assert entry.n_runs == 1
 
 
+def test_summary_and_kind_columns_separate_runnable_from_completed(tmp_path: Path):
+    # The P1-4 index pass: the summary line answers "what work remains?", and a completed
+    # one-shot sorts out of the runnable-now view below it.
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    (specs / "todo.yaml").write_text(
+        _spec_yaml("todo", repeatable=False, artifact_kind="workflow")
+    )
+    (specs / "done.yaml").write_text(
+        _spec_yaml("done", repeatable=False, artifact_kind="workflow", status="completed")
+    )
+    md = render_status_md(collect_entries(root=tmp_path), generated_at="2026-08-20T00:00:00+00:00")
+    assert "**Work remaining:** 1 runnable-now · 1 completed/retired" in md
+    rows = _table_rows(md)
+    assert [r.split("`")[1] for r in rows] == ["todo", "done"]
+    # The identity columns are present and populated from the YAML.
+    todo_row = next(ln for ln in rows if ln.startswith("| `todo`"))
+    assert "| workflow |" in todo_row and "| no |" in todo_row and "| runnable |" in todo_row
+    done_row = next(ln for ln in rows if ln.startswith("| `done`"))
+    assert "| workflow |" in done_row and "| no |" in done_row and "| completed |" in done_row
+
+
 # ── Run ledgers ─────────────────────────────────────────────────
 
 
@@ -407,9 +429,9 @@ def test_index_schema(repo: Path):
 
     entry = next(e for e in index["specs"] if e["name"] == "alpha_v2")
     assert set(entry) == {
-        "name", "version", "status", "spec_path", "supersedes", "superseded_by",
-        "completed_at", "last_run_at", "latest_ok", "latest_model", "latest_cost_usd",
-        "latest_git_sha", "results_pointer", "n_runs",
+        "name", "version", "status", "spec_path", "artifact_kind", "repeatable",
+        "supersedes", "superseded_by", "completed_at", "last_run_at", "latest_ok",
+        "latest_model", "latest_cost_usd", "latest_git_sha", "results_pointer", "n_runs",
     }
     assert entry["spec_path"] == "experiments/definitions/alpha_v2.yaml"
 
@@ -430,9 +452,10 @@ def test_generated_at_is_present_and_parseable(repo: Path):
 
 def test_status_md_header_and_columns(repo: Path):
     md = render_status_md(collect_entries(root=repo), generated_at="2026-08-20T00:00:00+00:00")
-    assert "| name | status | version | supersedes | last_run | ok | model | cost | n_runs |" in md
+    assert "| name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |" in md
     assert "Generated at: `2026-08-20T00:00:00+00:00`" in md
     assert "4 spec(s)" in md
+    assert "**Work remaining:**" in md
 
 
 def test_status_md_one_row_per_spec_in_sorted_order(repo: Path):
@@ -468,9 +491,11 @@ def test_status_md_renders_missing_runs_as_em_dashes(repo: Path):
     md = render_status_md(collect_entries(root=repo))
     row = next(ln for ln in _table_rows(md) if ln.startswith("| `beta_draft`"))
     cells = [c.strip() for c in row.strip().strip("|").split("|")]
-    name, status, version, supersedes, last_run, ok, model, cost, n_runs = cells
+    name, kind, repeatable, status, version, supersedes, last_run, ok, model, cost, n_runs = cells
     assert (supersedes, last_run, ok, model, cost) == (MISSING,) * 5
     assert (status, n_runs) == ("draft", "0")
+    assert kind == "experiment"
+    assert repeatable == "yes"
 
 
 def test_status_md_legend_explains_every_status_and_column(repo: Path):

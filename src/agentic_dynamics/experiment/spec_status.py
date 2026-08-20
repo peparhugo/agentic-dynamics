@@ -51,8 +51,9 @@ INDEX_FILENAME = "index.json"
 STATUS_FILENAME = "STATUS.md"
 
 #: Bumped when the shape of an ``index.json`` entry changes, so a consumer that cached an
-#: older index can tell rather than mis-parse it.
-INDEX_SCHEMA_VERSION = "spec-status/v1"
+#: older index can tell rather than mis-parse it. v2 added the ``artifact_kind`` and
+#: ``repeatable`` identity columns (refactor-repair P1-4 index).
+INDEX_SCHEMA_VERSION = "spec-status/v2"
 
 #: Rendered in place of any column with no evidence behind it. An em-dash reads as
 #: "nothing measured", where a ``0``/``false``/``None`` would read as a measured failure.
@@ -215,6 +216,11 @@ class SpecStatusEntry:
     version: str
     status: str
     spec_path: str  # repo-relative path to the spec YAML
+    #: Artifact identity (refactor-repair P1-4 index) — surfaced so STATUS.md can answer
+    #: "what work remains?" per kind, not just per name. ``repeatable`` is ``None`` only for
+    #: an entry that predates the backfill; post-backfill every spec carries a concrete bool.
+    artifact_kind: str = ""
+    repeatable: bool | None = None
     supersedes: list[str] = field(default_factory=list)
     superseded_by: str | None = None
     completed_at: str | None = None  # authored in the YAML; the index never invents it
@@ -232,6 +238,8 @@ class SpecStatusEntry:
             "version": self.version,
             "status": self.status,
             "spec_path": self.spec_path,
+            "artifact_kind": self.artifact_kind,
+            "repeatable": self.repeatable,
             "supersedes": list(self.supersedes),
             "superseded_by": self.superseded_by,
             "completed_at": self.completed_at,
@@ -252,6 +260,8 @@ class SpecStatusEntry:
             version=d.get("version", ""),
             status=d.get("status", ""),
             spec_path=d.get("spec_path", ""),
+            artifact_kind=d.get("artifact_kind", ""),
+            repeatable=d.get("repeatable") if isinstance(d.get("repeatable"), bool) else None,
             supersedes=list(d.get("supersedes") or []),
             superseded_by=d.get("superseded_by"),
             completed_at=d.get("completed_at"),
@@ -314,6 +324,8 @@ def build_entry(
         version=spec.version,
         status=derive_status(spec, runs),
         spec_path=_relative_to(spec_path, root),
+        artifact_kind=spec.artifact_kind,
+        repeatable=spec.repeatable,
         supersedes=list(spec.supersedes),
         superseded_by=spec.superseded_by,
         completed_at=spec.completed_at,
@@ -418,14 +430,40 @@ def _fmt_text(value: str | None) -> str:
     return value if value else MISSING
 
 
-def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None = None) -> str:
-    """Render the agent-facing ``STATUS.md``: stamp, table, legend.
+def _fmt_kind(value: str) -> str:
+    """The artifact kind column — ``experiment``/``workflow``, or an em-dash when unset."""
+    return value if value else MISSING
 
-    Columns are fixed by the design: ``name | status | version | supersedes | last_run |
-    ok | model | cost | n_runs``. The legend is part of the artifact rather than a doc
-    elsewhere, so an agent that opens only this file still knows how to read it.
+
+def _fmt_repeatable(value: bool | None) -> str:
+    """The repeatable column — ``yes``/``no``, or an em-dash when unset (pre-backfill)."""
+    if value is None:
+        return MISSING
+    return "yes" if value else "no"
+
+
+#: The statuses an authoring agent treats as "work still to do" — this is the "runnable
+#: now" view the summary line counts.
+RUNNABLE_NOW_STATUSES = frozenset({"runnable", "running", "active", "draft"})
+
+#: The statuses that mean "finished" — completed one-shots and retired lineage sink out of
+#: the runnable-now view (refactor-repair P1-4 index).
+DONE_STATUSES = frozenset({"completed", "superseded", "tombstoned"})
+
+
+def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None = None) -> str:
+    """Render the agent-facing ``STATUS.md``: summary, table, legend.
+
+    Columns are ``name | kind | repeatable | status | version | supersedes | last_run |
+    ok | model | cost | n_runs`` — the ``kind``/``repeatable`` identity columns are new in
+    the P1-4 index pass. A one-line summary above the table answers "what work remains?",
+    and the sort order (see :data:`STATUS_ORDER`) separates the runnable-now group from the
+    completed/retired group. The legend is part of the artifact rather than a doc elsewhere,
+    so an agent that opens only this file still knows how to read it.
     """
     stamp = generated_at or _iso(_now())
+    runnable_now = sum(1 for e in entries if e.status in RUNNABLE_NOW_STATUSES)
+    done = sum(1 for e in entries if e.status in DONE_STATUSES)
     lines: list[str] = [
         "# Spec status index",
         "",
@@ -433,9 +471,10 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
         "`scripts/run_workflow.py` also refreshes it at the end of every run.",
         "",
         f"Generated at: `{stamp}`  ·  {len(entries)} spec(s)",
+        f"**Work remaining:** {runnable_now} runnable-now · {done} completed/retired",
         "",
-        "| name | status | version | supersedes | last_run | ok | model | cost | n_runs |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
     for e in entries:
@@ -444,6 +483,8 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
             + " | ".join(
                 [
                     f"`{e.name}`",
+                    _fmt_kind(e.artifact_kind),
+                    _fmt_repeatable(e.repeatable),
                     e.status,
                     _fmt_text(e.version),
                     _fmt_list(e.supersedes),
@@ -483,6 +524,8 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
         "| column | derivation |",
         "|---|---|",
         "| `name` / `version` | the spec YAML's `name:` / `version:` |",
+        "| `kind` | the spec YAML's `artifact_kind:` — `experiment` or `workflow` |",
+        "| `repeatable` | the spec YAML's `repeatable:` — `yes` (re-runnable) or `no` (one-shot) |",
         "| `supersedes` | spec name(s) this spec replaces, from the YAML's `supersedes:` |",
         f"| `last_run` | latest run ledger's `ended_at` (UTC), over "
         f"`{WORKFLOW_RESULTS_DIR_REL}/<name>/*.json` |",

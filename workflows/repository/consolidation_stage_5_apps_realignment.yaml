@@ -16,6 +16,7 @@ side_effects:
   repository: true
   external_services: false
 repeatable: false
+status: completed
 workflow:
   kind: agent_task
   params:

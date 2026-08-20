@@ -811,6 +811,25 @@ Note: the index itself (`STATUS.md`/`index.json`) is deliberately NOT regenerate
 (index) follow-up owns that (it adds the `artifact_kind`/`repeatable` columns and marks completed
 one-shots), and this sandbox has no run ledgers to derive the new states from anyway.
 
+### P1-4 (index) — index with identity columns + runnable-vs-done view
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `SpecStatusEntry` + `index.json` gained `artifact_kind` + `repeatable` columns (schema bumped to `spec-status/v2`); `build_entry` populates them from the spec | PASS |
+| 2 | `STATUS.md` shows `kind` + `repeatable` columns (with legend rows) and a summary line — `**Work remaining:** N runnable-now · M completed/retired` — so it answers "what work remains?" | PASS |
+| 3 | Runnable-now separated from done: `STATUS_ORDER` puts `runnable`/`running`/`active`/`draft` first and `completed`/`superseded`/`tombstoned` last, so completed one-shots sink out of the active view | PASS |
+| 4 | The 9 completed consolidation one-shots (`consolidation_release` + `consolidation_release_execute` + `consolidation_stage_0..6`) marked `status: completed` | PASS |
+| 5 | `index.json`/`STATUS.md` regenerated with the new semantics (77 specs); tests updated for the new columns + a new summary/kind-column test | PASS (44 passed) |
+| 6 | `ruff` clean; full `-m "not external"` suite: 1275 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P1-4 (index) result: 6/6 PASS.**
+
+Note: same as the backfill, this sandbox has no untracked `experiments/results/workflows/` run
+ledgers, so the regenerated index reports `n_runs=0` and the 57 other non-repeatable workflows
+derive `runnable` (never-run) rather than their real `completed`/`running` state — that state comes
+from the ledgers on the next regeneration in an environment that has them.
+
+
 
 
 
