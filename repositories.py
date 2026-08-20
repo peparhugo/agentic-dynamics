@@ -109,6 +109,33 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def find_page(self, owner_id: int, cursor: int | None, limit: int) -> dict:
+        """Return a cursor-paginated page of the owner's tasks.
+
+        Tasks are ordered newest-first (by id). ``cursor`` is the id of the
+        last item on the previous page; the next page contains older items
+        (``id < cursor``).
+        """
+        with self._connect() as conn:
+            where = "owner_id = ?"
+            params: list = [owner_id]
+            if cursor is not None:
+                where += " AND id < ?"
+                params.append(cursor)
+            params.append(limit + 1)
+            rows = conn.execute(
+                f"SELECT * FROM tasks WHERE {where} ORDER BY id DESC LIMIT ?",
+                params,
+            ).fetchall()
+            has_more = len(rows) > limit
+            items = [dict(r) for r in rows[:limit]]
+            next_cursor = str(items[-1]["id"]) if (has_more and items) else None
+            total_row = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()
+            total = total_row[0]
+        return {"data": items, "next_cursor": next_cursor, "total": total}
+
     def find_by_id_and_owner(self, task_id: int, owner_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(

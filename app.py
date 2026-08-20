@@ -12,6 +12,8 @@ import os
 
 import jwt as pyjwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from tasks import send_notification_email
 from repositories import UserRepository, TaskRepository
@@ -21,6 +23,9 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me-in-production-0123456789")
 JWT_ALGORITHM = "HS256"
+RATE_LIMIT_STORAGE_URI = os.environ.get(
+    "RATE_LIMIT_STORAGE_URI", "redis://localhost:6379/0"
+)
 
 
 def get_db():
@@ -105,6 +110,27 @@ def require_auth(fn):
     return wrapper
 
 
+# ── Rate limiting ─────────────────────────────────────────────
+
+def rate_limit_key() -> str:
+    """Key authenticated requests by user, everything else by client address."""
+    user = current_user()
+    if user is not None:
+        return f"user:{user['id']}"
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    default_limits=["100 per minute"],
+    headers_enabled=True,
+    strategy="fixed-window",
+)
+
+app.config.setdefault("RATELIMIT_STORAGE_URI", RATE_LIMIT_STORAGE_URI)
+limiter.init_app(app)
+
+
 # ── Auth routes ───────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
@@ -138,7 +164,18 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks(user):
-    return jsonify(task_repository.find_all(user["id"]))
+    cursor = request.args.get("cursor")
+    if cursor is not None:
+        try:
+            cursor = int(cursor)
+        except (TypeError, ValueError):
+            cursor = None
+    try:
+        limit = int(request.args.get("limit", 20))
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(100, limit))
+    return jsonify(task_repository.find_page(user["id"], cursor, limit))
 
 
 @app.route("/tasks", methods=["POST"])
