@@ -14,6 +14,8 @@ from flask import Flask, g, jsonify, request
 import jwt
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -100,6 +102,13 @@ def get_user_by_username(username: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         return dict(row) if row else None
+
+
+def get_user_email(user_id: int) -> str | None:
+    """Resolve a user's notification email address from their account."""
+    with get_db() as conn:
+        row = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
+        return f"{row['username']}@example.com" if row else None
 
 
 def create_task(owner_id: int, title: str) -> dict:
@@ -224,14 +233,19 @@ def show_task(task_id: int):
 @token_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    previous = get_task(g.user_id, task_id)
+    if previous is None:
+        return jsonify({"error": "task not found"}), 404
     task = update_task(
         g.user_id,
         task_id,
         title=data.get("title"),
         status=data.get("status"),
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
+    if task["status"] == "completed" and previous["status"] != "completed":
+        user_email = get_user_email(g.user_id)
+        if user_email is not None:
+            send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 
