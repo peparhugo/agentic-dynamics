@@ -535,6 +535,36 @@ Notes:
 - The admin test suite (`test_admin_*`, `test_claude_agents_*`) imports via the new
   `apps.control_room` path and reads static assets from `apps/control_room/static/`.
 
+---
+
+## S5 — reframe README (phase `reframe_readme`)
+
+Spec: `workflows/repository/consolidation_stage_5_apps_realignment.yaml` · phase `reframe_readme`
+(phase B). Deliverable: the re-framed README (six systems) + `apps/website/CONTEXT.md`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `README.md` rewritten around the six systems (measurement / experiment / execution / knowledge / control / publication) — the perturbation instrument is ONE system, not the sole framing | PASS |
+| 2 | README points at `ARCHITECTURE.md` (the authority) + the `agentic-dynamics` CLI (the command surface) | PASS |
+| 3 | `firebase/CONTEXT.md` → `apps/website/CONTEXT.md` (deploy notes updated to the new location; the dual-Firebase instruction kept verbatim) | PASS |
+| 4 | Stale references corrected: `src/instrument` → `agentic_dynamics` planes, `experiments/configs` → `definitions/configs`, `firebase/public` → `apps/website`, retired modules dropped, counts updated (37 configs · 77 specs · 19 lab books); `AGENTS.md`/`CONTRIBUTING.md`/`agent_config/mental-model.md` re-pointed | PASS |
+| 5 | `pytest tests/ -m "not external"` green | PASS (1189 passed, 106 deselected) |
+
+**S5-reframe_readme result: 5/5 PASS.**
+
+Notes:
+
+- The README keeps the measured evidence (key findings, observed-dynamics table, 10 operators,
+  citation) and changes only the *framing*: the six-system table replaces the "perturbation
+  instrument" as the whole identity, and the repository-structure tree now shows the
+  `src/agentic_dynamics/` planes, the `experiments/`/`workflows/` split, and `apps/{control_room,website}`.
+- `apps/website/CONTEXT.md` documents the website *source* here while pointing at `firebase/` for
+  the deploy config (`firebase.json` `"public": "../apps/website"`, dual-host `.firebaserc`).
+- Historical `docs/` records (fixplan, remediation_verify, verify_evidence, review/website.md)
+  that mention `firebase/public/` are left as-is — they describe the state at the time, not the
+  current layout.
+
+
 
 
 

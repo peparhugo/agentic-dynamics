@@ -7,7 +7,7 @@ status: accepted
 
 1. **Engineer** — `src/`, `scripts/`, `tests/`: edit code, run tests, wire the pipeline. Explain mechanics and operations freely (how a script works, why a run takes N minutes). Don't volunteer editorializing or research conclusions unless relevant to the task.
 2. **Creative scientist** — `experiments/`, perturbation operators, stories, lab books: propose and design experiments — new operators, story scenarios, configs, measurement signals, and research questions — grounded in the existing measurement stack and prior results (`_results_summary.json`, trajectories, reviews).
-3. **Editor** — `firebase/public/*`: write, refine, and fact-check the website prose, grounding every claim in `data.js` / `_results_summary.json` / reviews using provenance tags ([M] measured, [C] computed, [H] heuristic, [X] external, [P] policy/prior).
+3. **Editor** — `apps/website/*`: write, refine, and fact-check the website prose, grounding every claim in `data.js` / `_results_summary.json` / reviews using provenance tags ([M] measured, [C] computed, [H] heuristic, [X] external, [P] policy/prior).
 
 Answer direct questions about the subject matter fully in any role. The rule is about staying on task, not being evasive.
 
@@ -39,7 +39,7 @@ firebase deploy --only hosting --project agentic-dynamics  # mirror site — dep
 
 - **Redis isolation (two instances):** the framework queue lives in `finops-queue` on port **6380** (`FINOPS_REDIS_PORT` default 6380). Story agents build Flask/Celery apps against `finops-redis` on **6379** and call `flushdb()`/`flushall()` while testing — since they hardcode 6379, they can never reach the framework queue. Never run the queue on 6379.
 - **Models in use:** `deepseek/deepseek-v4-flash`, `deepseek/deepseek-v4-pro`, `anthropic/claude-haiku-4-5`, `anthropic/claude-sonnet-5`, `openai/gpt-5.6-luna`, `openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`.
-- **Firebase dual-host (keep both synced):** the site is served from **two** Firebase projects — `ai-finops-rulebook` (canonical; the URL already shared with peers — never change or retire it) and `agentic-dynamics` (mirror, forward-looking identity). Every deploy must target BOTH: `firebase deploy --only hosting` and `firebase deploy --only hosting --project agentic-dynamics`. Both serve the same `firebase/public/` — never let them drift. If the `agentic-dynamics` project ID is unavailable, STOP and ask before choosing a fallback.
+- **Firebase dual-host (keep both synced):** the site is served from **two** Firebase projects — `ai-finops-rulebook` (canonical; the URL already shared with peers — never change or retire it) and `agentic-dynamics` (mirror, forward-looking identity). Every deploy must target BOTH: `firebase deploy --only hosting` and `firebase deploy --only hosting --project agentic-dynamics`. Both serve the same `apps/website/` — never let them drift. If the `agentic-dynamics` project ID is unavailable, STOP and ask before choosing a fallback.
 
 ## Key files (read on demand, not preemptively)
 
@@ -50,7 +50,7 @@ firebase deploy --only hosting --project agentic-dynamics  # mirror site — dep
 - `src/instrument/CONTEXT.md` (Runtime RAG / Knowledge Base section) — the merged KB (`knowledge.py` / `retrieval.py` / `prompt_constructor.py` / `knowledge_stream.py`); wired into `run_workflow()` as `rag_augment`, default OFF.
 - `scripts/CONTEXT.md` — script reference
 - `experiments/CONTEXT.md` — experiment ecosystem
-- `firebase/CONTEXT.md` — website documentation
+- `apps/website/CONTEXT.md` — website documentation
 - `docs/supervisor_design.md` — Control Room / supervisor subsystem (flag-only rail: observe, never steer); see also `docs/spec.md`, `docs/scope.md` for the fuller design cluster.
 
 Both `src/instrument/experiment_spec.py` and `src/instrument/compile_experiment.py` are **written** — see `src/instrument/CONTEXT.md` for the module table and the ledger (the four formerly-missing fields are now measured).

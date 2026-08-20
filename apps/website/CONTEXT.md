@@ -1,20 +1,23 @@
-# `firebase/` — Public Website
+# `apps/website/` — Public Website
 
-Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) (canonical, already shared with peers) and mirrored at [agentic-dynamics.web.app](https://agentic-dynamics.web.app). Firebase static hosting.
+Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) (canonical, already
+shared with peers) and mirrored at [agentic-dynamics.web.app](https://agentic-dynamics.web.app).
+Firebase static hosting. The website *source* lives here (`apps/website/`); the Firebase *deploy
+config* lives in `firebase/` (`firebase.json`, `.firebaserc`).
 
-## Config Files
+## Deploy Config (in `firebase/`)
 
 | File | Purpose |
 |------|---------|
-| `.firebaserc` | Projects: `ai-finops-rulebook` (default) + `agentic-dynamics` (mirror) |
-| `firebase.json` | Hosting config (source: `public/`) |
+| `firebase/.firebaserc` | Projects: `ai-finops-rulebook` (default) + `agentic-dynamics` (mirror) |
+| `firebase/firebase.json` | Hosting config — `"public": "../apps/website"` |
 
-## `public/` — 8 Pages + 3 Assets
+## Pages + Assets
 
 | File | Page | Content |
 |------|------|---------|
 | `index.html` | Home | Agentic Dynamics hero + key findings |
-| `framework.html` | Operational Framework | 10 principles, levers, interactive calculator, provider playbook |
+| `framework.html` | Operational Framework | Dynamics → business outcomes, levers, calculator, provider playbook |
 | `evidence.html` | The Evidence | Grit spectrum, cost ranking, AST analysis, perturbation response |
 | `story.html` | The Story | How a $20 API key became an experimental instrument |
 | `methodology.html` | The Instrument | Experiment design, 10 perturbation operators, 7 recovery signals |
@@ -31,11 +34,15 @@ Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) (cano
 python scripts/inventory.py refresh       # scan DB + worktrees
 python scripts/sync_data.py               # story results → sessions/stories.parquet
 python scripts/analyze_worktrees.py       # produce _results_summary.json
-python scripts/build_data.py              # generate public/data.js (~179KB)
+python scripts/build_data.py              # generate apps/website/data.js (~179KB)
 python scripts/generate_manifest.py       # generate data_manifest.json
 ```
 
-`data.js` is the sole dynamic file. Every number on the website is live-generated from experimental data with provenance tags: `[M]` measured, `[C]` computed, `[H]` heuristic, `[X]` external. Run `build_data.py` to refresh after new experiments. Review metrics are aggregated from `experiments/results/reviews/`. The `deploy` plan in `scripts/pipeline.py` (refresh → sync → build → deploy) runs this end-to-end.
+`data.js` is the sole dynamic file. Every number on the website is live-generated from
+experimental data with provenance tags: `[M]` measured, `[C]` computed, `[H]` heuristic, `[X]`
+external. Run `build_data.py` to refresh after new experiments. Review metrics are aggregated
+from `experiments/results/reviews/`. The `deploy` plan in `scripts/pipeline.py` (refresh → sync →
+build → deploy) runs this end-to-end.
 
 ## Deploy
 
@@ -44,4 +51,5 @@ firebase deploy --only hosting                          # canonical (ai-finops-r
 firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy BOTH
 ```
 
-Both projects serve the same `public/` — never let them drift.
+Both projects serve the same `apps/website/` — never let them drift. Never retire the canonical
+`ai-finops-rulebook` project (the URL is already shared with peers).

@@ -28,7 +28,7 @@ Lab books are `experiments/lab_books/lab_*.md` (the plan) + `scripts/lab_*.py` (
 Open a GitHub issue. Be specific: what you expected, what happened, and how to reproduce it.
 
 ### I Want to Improve the Website
-The site lives in `firebase/public/`. Pure HTML/CSS/JS — no build step. Edit and open a PR.
+The site lives in `apps/website/`. Pure HTML/CSS/JS — no build step. Edit and open a PR.
 
 ---
 

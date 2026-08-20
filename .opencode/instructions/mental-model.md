@@ -430,7 +430,7 @@ Task: experiments     → Load skill: instrument
 Task: analysis        → Load skill: analyze
 Task: lab books       → Load skill: lab-books
 Task: pipeline        → Read scripts/CONTEXT.md
-Task: website         → Read firebase/CONTEXT.md
+Task: website         → Read apps/website/CONTEXT.md
 Task: configs         → Read experiments/CONTEXT.md
 Task: spec/compiler   → Read docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md
 ```
