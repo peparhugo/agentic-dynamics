@@ -1,0 +1,206 @@
+name: consolidation_release
+question: >-
+  Break the semantic-monolith critique (docs/review/semantic_monolith_review.md — an external,
+  operator-provided review with 9 recommendations) into a dependency-ordered set of executable
+  STAGES for the consolidation release, and emit one gate-passing ExperimentSpec per stage. The
+  release outcome per the critique: one architectural spine, clear bounded packages (a modular
+  monorepo under src/agentic_dynamics/), experiments separated from work orders, one CLI, one
+  instruction source, one current ARCHITECTURE.md, old generations archived or deleted — with the
+  Context Abstraction Plane implementation PAUSED until the structural homes exist. This workflow
+  SUPERSEDES the execution ordering of refactor_master_plan (which deferred the package split in
+  ADR-2): its functional workstreams survive, but they run INSIDE the new structure, and its
+  dead-code (WS-01) and sys.path (WS-10) workstreams fold into the consolidation stages. Design +
+  staging only — the stage specs execute in later workflows, in order.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: markdown
+    fork: true
+    context:
+      critique: >-
+        READ docs/review/semantic_monolith_review.md FIRST — the full critique (diagnosis: a
+        semantic monolith, not spaghetti; six coexisting systems: measurement apparatus,
+        experiment platform, agent execution runtime, knowledge/augmentation system, emerging
+        control system, research/publication environment; nine recommendations: (1) freeze
+        architectural expansion until structural homes exist, (2) modular monorepo under
+        src/agentic_dynamics/ with core/experiment/measurement/runtime/adapters/knowledge/control/
+        reporting/, (3) experiments/definitions vs workflows/{repository,operations,research,
+        examples} split, (4) one root ARCHITECTURE.md authority + doc lifecycle status
+        (proposed|accepted|implementing|implemented|superseded|abandoned + supersedes: +
+        implemented_by:) + docs/designs/{current,implemented} + docs/archive/, (5) one
+        agentic-dynamics CLI replacing the 85-script surface + script classification (maintained
+        command / one-time migration / historical analysis / deprecated), (6) one canonical
+        instruction source (agent_config/) generating .opencode/ and .claude/, (7) delete
+        deprecated modules outright or quarantine to legacy/ with no current imports, (8) an
+        automatically-enforced dependency-direction lint (core <- experiment/measurement/runtime/
+        knowledge <- control <- applications; knowledge never actuates; retrieval never supplies
+        canonical facts; apps contain no domain rules), (9) website + control room as apps/ that
+        consume the system).
+      current_state: >-
+        Ground truth 2026-08-20: src/instrument/ = 64 .py modules; scripts/ = 85 .py; tests/ = 70
+        files; admin/ = 12 files; firebase/public/ = one surface. The canonical-state registry,
+        the build_data registry repoint, and the website repoint are all MERGED on main. The
+        refactor_master_plan workflow (docs/refactor/*) produced 10 functional workstreams
+        (refactor_01..10) whose execution ordering this workflow SUPERSEDES — their content is
+        input, their sequencing is revised. The context_abstraction_implement spec exists
+        (status: fail, 2 runs) — it is FROZEN by recommendation 1: the design survives, the
+        implementation pauses until the package map exists. Deprecated-but-present:
+        src/instrument/{experiment,adapter,lab_book,recovery,trajectory}.py; parallel instruction
+        surfaces .opencode/ and .claude/; root BLUEPRINT.md + BLUEPRINT_v2.md + BLUEPRINT_v3.md;
+        many dated handoffs/code reviews in docs/ and root.
+      read_first: >-
+        docs/review/semantic_monolith_review.md  (the critique — authoritative input)
+        docs/refactor/review.md + plan.md + tradeoffs.md  (the prior plan being re-sequenced)
+        .opencode/instructions/mental-model.md
+        src/instrument/CONTEXT.md, scripts/CONTEXT.md, experiments/CONTEXT.md, firebase/CONTEXT.md
+        experiments/specs/STATUS.md  (spec lifecycle index — the freeze must land here)
+      hard_rules: >-
+        (1) DESIGN + STAGING ONLY: write docs/consolidation/*.md and
+        experiments/specs/consolidation_stage_*.yaml — no production code edits. (2) Every stage
+        spec MUST pass the compile gate (validate mode) — no gate-pass, no stage. (3) The
+        load-bearing rule survives every stage: instrument -> derive -> policy ordering and the
+        requires/produces gate are untouchable; stage specs that move modules must prove the gate
+        still works (imports resolve, tests green at every stage boundary). (4) Operational
+        invariants: Redis isolation (6380 framework queue DB1 + KB stream DB2; 6379 sandbox),
+        dual Firebase hosting, Control Room 8001/Chroma 8000, finops-queue never on 6379. (5) The
+        freeze (rec 1) means: context_abstraction_implement is marked PAUSED in the plan (status
+        note, not deleted); the stage map reserves the structural homes the CAP components will
+        occupy (control/facts.py, control/reducers/, control/context_compiler.py, control/
+        decisions.py, control/validator.py, core/contracts.py) so post-consolidation implementation
+        is drop-in. (6) Supersession, not duplication: every refactor_master_plan workstream
+        (WS-01..10) is explicitly mapped to a consolidation stage (folded, deferred into the new
+        structure, or retired) in the stage map. (7) The stage order keeps the pipeline working
+        between stages: each stage spec's verify phase proves green tests + green compile gate
+        before the next stage runs. (8) Cite everything: file:line for internal claims; the
+        critique section for recommendation coverage.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/consolidation-release); each phase commits [workflow] <phase>. Design workflow —
+        markdown language, no code edits.
+    phases:
+      - name: stage_map
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Decompose the critique into a dependency-ordered stage set.
+
+          GOAL:
+          {goal}
+
+          READ FIRST: docs/review/semantic_monolith_review.md + docs/refactor/{plan,tradeoffs}.md.
+
+          DO:
+          - Define the stages, each: id, name, which recommendation(s) it delivers (1-9), scope
+            (files/dirs touched), inputs, outputs, acceptance criteria, risk, effort (S/M/L), and
+            which stages it needs/blocks. Suggested skeleton (refine, do not inherit blindly):
+            Stage 0 architecture spine + doc lifecycle + freeze (rec 1, 4); Stage 1 modular
+            monorepo package move with compatibility re-exports (rec 2, 7, 8); Stage 2
+            experiments-vs-workflows split (rec 3); Stage 3 CLI + script classification (rec 5);
+            Stage 4 instruction surfaces (rec 6); Stage 5 apps/ + public-identity realignment
+            (rec 9, 5); Stage 6 consolidation verification release (all).
+          - Map EVERY refactor_master_plan workstream WS-01..10 onto the stages (folded / deferred
+            / retired) — no orphan, no duplicate execution.
+          - Declare where the CAP freeze lands (spec index note + reserved package homes).
+
+          DELIVER docs/consolidation/stage_map.md.
+      - name: design
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Per-stage design with migration mechanics.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/stage_map.md + the mental model + src/instrument/CONTEXT.md.
+
+          DO:
+          - Stage 1 is the crux — design it in full: the final package map (every one of the 64
+            instrument modules dispositioned into core/experiment/measurement/runtime/adapters/
+            knowledge/control/reporting/legacy with a reason), the compatibility re-export strategy
+            (instrument.* shim package so the 85 scripts + 70 tests keep importing during the
+            transition), the import-rewrite order, and the dependency-direction lint as a pytest
+            (walks the import graph, asserts core <- planes <- control <- apps).
+          - Design the ARCHITECTURE.md skeleton (planes, boundaries, dependency direction,
+            implemented vs proposed, canonical loop, supersession map) and the doc-lifecycle
+            migration (which root/docs files move to docs/archive/ with what status fields).
+          - Design the experiments/workflows classification rule (a test that fails when a
+            work-order spec lands in experiments/definitions/) and the CLI command surface mapping
+            (every maintained script -> subcommand; the rest classified).
+          - Give each stage an acceptance test list a later execution workflow must run.
+
+          DELIVER docs/consolidation/design.md.
+      - name: stage_specs
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Write one executable ExperimentSpec per stage.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/{stage_map,design}.md + experiments/specs/STATUS.md.
+
+          DO:
+          - Write experiments/specs/consolidation_stage_<n>_<slug>.yaml for each stage, in the
+            ExperimentSpec format (name, question, version, workflow agent_task with phases and
+            per-phase commits + pytest gates where code is touched, factors single-model
+            deepseek/deepseek-v4-pro, rules with requires/produces obeying the load-bearing rule,
+            metrics, comparison, writeup, stop, adapt).
+          - The stage's own rules must reflect its acceptance criteria as measurable produces
+            (e.g. Stage 1 produces dependency_lint_green, imports_resolve; Stage 4 produces
+            generated_surfaces_match).
+          - Stage specs reference their place in the ordering (needs/blocks in the question text)
+            and the supersession of the folded refactor workstreams.
+
+          DELIVER the consolidation_stage_*.yaml spec files.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Verify the staged consolidation plan end to end.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Coverage proof: all 9 recommendations -> >=1 stage; every refactor_master_plan
+            workstream WS-01..10 explicitly dispositioned; zero orphans.
+          - Run the compile-gate validate snippet on EVERY produced consolidation_stage_*.yaml and
+            include the output; fix any failing spec (part of this phase).
+          - Sequence audit: topological check that no stage leaves the pipeline broken between
+            stages; each stage's verify gate is defined and feeds the next stage's needs.
+          - Invariant audit: Redis ports, dual Firebase, load-bearing rule, CAP frozen (not
+            deleted), deprecated modules only retired inside the package move.
+          - Write the final report with PASS/FAIL per check.
+
+          DELIVER docs/consolidation/verification.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: consolidation_staged
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [coverage_complete, specs_gate_passing, sequence_sound]
+metrics:
+  - {name: coverage_complete, agg: mean, over: cell}
+  - {name: specs_gate_passing, agg: mean, over: cell}
+  - {name: sequence_sound, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, stage_map, design, stage_specs, verify]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
