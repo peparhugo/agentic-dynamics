@@ -857,6 +857,21 @@ from the ledgers on the next regeneration in an environment that has them.
 
 **Debt-3 result: 7/7 PASS.**
 
+### Debt-1 — split the Control Room monolith (server.py + design_sessions.py)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `apps/control_room/server.py` (~70KB) split into the review's named structure — `routes/` (6 modules, 28 routes), `services/` (5 modules), `clients/` (2 clients), `paths.py`; `server.py` is now a ~208-line composition root (constants, factories, `app`, re-exports, `register(app)`) | PASS |
+| 2 | `design_sessions.py` re-homed to `services/design_sessions.py` — its single cohesive `DesignSessionManager` class is one responsibility, so no further sub-split is justified (per the review's "split only where responsibilities justify") | PASS |
+| 3 | Behaviour-identical — the full admin/control-room suite (155 tests: `test_admin_server` + `test_admin_design_sessions` + `test_admin_claude_agents` + `test_admin_supervisor` + `test_control_room_paths` + `test_admin_frontend` + `test_admin_claude_agents_frontend` + `test_claude_agents_client` + `test_claude_agents_supervisor`) passes unchanged | PASS (155 passed) |
+| 4 | Monkeypatch compatibility preserved — routes/services read shared state (``_redis``, ``DATA_MANIFEST_PATH``, ``EVENT_LOG_MAX``, ``_emit_actuation_record``, …) through ``server.*`` at request time; `server` re-exports the patched names | PASS |
+| 5 | No new endpoints — the 28 routes + static shell are unchanged (verified via `app.url_map`) | PASS |
+| 6 | Launch paths fixed — `python3 apps/control_room/server.py` and `python -m apps.control_room.server` both load (the script launch is registered under its canonical module name so the routes/services don't double-load `app`) | PASS |
+| 7 | Import paths re-pointed (`scripts/supervise.py`, `scripts/claude_agents_supervisor.py`, 4 test files → `clients/`/`services/`); `ruff` clean on the split modules (only the pre-existing `SIM105` in the moved `claude_agents_client.py` remains); full `-m "not external"` suite: 1284 passed, no new failures | PASS |
+
+**Debt-1 result: 7/7 PASS.**
+
+
 
 
 
