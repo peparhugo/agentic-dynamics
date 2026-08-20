@@ -597,6 +597,26 @@ Deliverable: `docs/consolidation/stage_6_coverage.md` (the coverage proof).
 
 **S6-coverage result: 4/4 PASS.**
 
+---
+
+## S6 — gates (phase `gates`)
+
+Spec: `workflows/repository/consolidation_stage_6_verification_release.yaml` · phase `gates`.
+Deliverable: `docs/consolidation/stage_6_gates.md` (PASS/FAIL per gate).
+
+| # | Gate | Result |
+|---|---|---|
+| 1 | Stage-specific acceptance tests in one pass (test_doc_lifecycle · test_dependency_direction · test_experiment_workflow_classification · test_script_classification · test_generated_surfaces_match · test_data_flow) | PASS (24 passed) |
+| 2 | Compile gate — `validate_spec` + `validate_rules` on all 77 specs | PASS (0 refusals) |
+| 3 | Redis isolation (6380 queue DB1 / KB DB2; 6379 sandbox) | PASS |
+| 4 | Dual Firebase (`.firebaserc` both projects) | PASS |
+| 5 | CAP frozen-not-deleted (`context_abstraction_implement` `status: draft` + PAUSED) | PASS |
+| 6 | No `_results_summary.json` resurrection (build_data.py — the website build — does not read it) | PASS |
+| 7 | Full suite green | PASS (1189 passed, 106 deselected) |
+
+**S6-gates result: 7/7 PASS.**
+
+
 
 
 
