@@ -16,6 +16,8 @@ import time
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 
 from repositories import TaskRepository, UserRepository
@@ -26,6 +28,12 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me-0123456789abcdef")
 TOKEN_TTL_SECONDS = 86400
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+RATELIMIT_STORAGE_URI = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"
+)
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
 
 
 def get_db():
@@ -94,6 +102,25 @@ def require_auth(f):
     return wrapper
 
 
+def rate_limit_key() -> str:
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1]
+        user_id = decode_token(token)
+        if user_id is not None:
+            return f"user:{user_id}"
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    storage_uri=RATELIMIT_STORAGE_URI,
+    default_limits=[RATE_LIMIT],
+    headers_enabled=True,
+)
+limiter.init_app(app)
+
+
 # ── Helpers ───────────────────────────────────────────────────
 
 def get_user_email(user: dict) -> str:
@@ -131,7 +158,13 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(task_repo.get_all(g.current_user_id))
+    limit = request.args.get("limit", default=DEFAULT_PAGE_SIZE, type=int)
+    if limit is None or limit < 1:
+        limit = DEFAULT_PAGE_SIZE
+    limit = min(limit, MAX_PAGE_SIZE)
+    cursor = request.args.get("cursor", type=int)
+    page = task_repo.get_page(g.current_user_id, cursor=cursor, limit=limit)
+    return jsonify(page)
 
 
 @app.route("/tasks", methods=["POST"])
