@@ -706,6 +706,21 @@ Per-finding acceptance-criterion results for the refactor-repair release (review
 
 **P1-2 (packaging) result: 7/7 PASS.**
 
+### P0-1 — semantic agent-config source + two platform renderers
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `agent_config/` is the single semantic source; `scripts/_gen_instructions.py` restructured into TWO renderers — `render_opencode()` and `render_claude()` — each emitting its platform's real format | PASS |
+| 2 | Agent schema projection: opencode keeps `description`/`mode`/`model`/`permission`; Claude keeps only `name`+`description` (drops `mode`/`model`/`permission` — no per-capability/permissionMode or provider/model equivalent) | PASS |
+| 3 | Command schema projection: opencode keeps `description`/`agent`/`subtask`; Claude keeps only `description` (drops `agent`/`subtask`); positional args re-indexed 1→0 (`$2`→`$1`), `$ARGUMENTS` preserved | PASS |
+| 4 | Per-target schema validators added — `validate_opencode()`/`validate_claude()` assert required fields and reject opencode-only keys (`mode`/`permission`/`temperature`/`hidden`, `agent`/`subtask`, `provider/model` ids) in Claude output | PASS |
+| 5 | Byte-equality drift test (`test_generated_surfaces_match.py`) replaced with `test_agent_config_render.py`: meaning-equivalence (bodies/descriptions preserved; rules+skills byte-identical) + per-target schema-validity + committed==rendered drift + orphan checks | PASS (10 passed) |
+| 6 | `.opencode/` + `.claude/` regenerated from the renderers — `.opencode/` byte-identical to before; only `.claude/agents/*.md` + `.claude/commands/*.md` changed (now valid Claude schema) | PASS |
+| 7 | Content semantically unchanged (agent bodies, descriptions, skills, rules untouched); `ruff check` clean; full `-m "not external"` suite 1249 passed, no new failures | PASS |
+
+**P0-1 result: 7/7 PASS.**
+
+
 
 
 
