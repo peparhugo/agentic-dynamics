@@ -198,6 +198,37 @@ class TaskRepository(BaseRepository):
         )
         return [self._row_to_dict(r) for r in rows]
 
+    def paginate_for_owner(self, owner_id, cursor=None, limit=20):
+        with self._connect() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+
+            params = [owner_id]
+            if cursor is not None:
+                sql = (
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? "
+                    "ORDER BY id DESC LIMIT ?"
+                )
+                params.append(cursor)
+            else:
+                sql = (
+                    "SELECT * FROM tasks WHERE owner_id = ? "
+                    "ORDER BY id DESC LIMIT ?"
+                )
+            params.append(limit + 1)
+            rows = conn.execute(sql, params).fetchall()
+
+        items = [self._row_to_dict(r) for r in rows]
+        has_more = len(items) > limit
+        page = items[:limit]
+        next_cursor = str(page[-1]["id"]) if has_more else None
+        return {
+            "data": page,
+            "next_cursor": next_cursor,
+            "total": total,
+        }
+
     def update_for_owner(self, owner_id, task_id, title=None, status=None):
         task = self.get_for_owner(owner_id, task_id)
         if task is None:

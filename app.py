@@ -10,6 +10,7 @@ from functools import wraps
 import os
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
 import jwt
 from werkzeug.security import check_password_hash
 
@@ -29,8 +30,40 @@ app.config["SECRET_KEY"] = os.environ.get(
 )
 JWT_ALGORITHM = "HS256"
 
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATE_LIMIT_STORAGE_URL", "redis://localhost:6379"
+)
+app.config["RATELIMIT_DEFAULT"] = os.environ.get(
+    "RATE_LIMIT_DEFAULT", "100 per minute"
+)
+app.config["RATELIMIT_STRATEGY"] = "fixed-window"
+app.config["RATELIMIT_HEADERS_ENABLED"] = True
+
 user_repository = UserRepository()
 task_repository = TaskRepository()
+
+
+def get_rate_limit_key() -> str:
+    """Identify the caller for rate limiting.
+
+    Authenticated requests are tracked per user id (from the JWT), while
+    unauthenticated requests (e.g. the auth routes) are tracked per IP.
+    """
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[len("Bearer "):].strip()
+        try:
+            payload = jwt.decode(
+                token, app.config["SECRET_KEY"], algorithms=[JWT_ALGORITHM]
+            )
+            return f"user:{payload['sub']}"
+        except jwt.InvalidTokenError:
+            pass
+    return f"ip:{request.remote_addr or 'anonymous'}"
+
+
+limiter = Limiter(key_func=get_rate_limit_key)
+limiter.init_app(app)
 
 
 # ── Auth helpers ──────────────────────────────────────────────
@@ -91,7 +124,20 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @token_required
 def list_tasks():
-    return jsonify(task_repository.list_for_owner(g.user_id))
+    cursor = request.args.get("cursor")
+    limit = request.args.get("limit", default=20, type=int) or 20
+    limit = max(1, min(limit, 100))
+
+    cursor_id = None
+    if cursor is not None:
+        try:
+            cursor_id = int(cursor)
+        except (TypeError, ValueError):
+            cursor_id = None
+
+    return jsonify(
+        task_repository.paginate_for_owner(g.user_id, cursor_id, limit)
+    )
 
 
 @app.route("/tasks", methods=["POST"])
