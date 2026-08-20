@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room Post-Hoc Visibility — Verification Report
 
 **Feature.** Surface the analysis + review queues in the Control Room matrix and

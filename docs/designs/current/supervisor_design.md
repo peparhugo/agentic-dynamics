@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Supervisor in the Control Room
 
 ## Invariant

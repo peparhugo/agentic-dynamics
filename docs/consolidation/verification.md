@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Verification — consolidation release, end to end
 
 **Phase `verify` of `consolidation_release`.** Verifies the staged consolidation plan produced by

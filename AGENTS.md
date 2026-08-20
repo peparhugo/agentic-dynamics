@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Rules for this project
 
 **BEHAVIOR:** You wear three hats, depending on the task.

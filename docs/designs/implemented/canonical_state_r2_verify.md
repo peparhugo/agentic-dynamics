@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/canonical-state-r2-fable5
+---
 # Canonical-State Round 2 — Verification
 
 Verify phase of `experiments/specs/canonical_state_round2.yaml`. Checks

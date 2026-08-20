@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Operational Framework Facelift Verification
 
 Comparison basis: `firebase/public/framework.html` at `HEAD` versus `HEAD~1`. Data source: `firebase/public/data.js`.

@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/website-repoint
+---
 # Website repoint (S3 + C1 + C2 + C3/C4) — implementation trace & verification
 
 **Status:** implemented and verified. Every finding in `docs/review/website.md` §2–3 is

@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room Review — Triage & Fix Plan
 
 Scope: act on `docs/review/code_review.md` (C1, M1–M4, N1–N6) and

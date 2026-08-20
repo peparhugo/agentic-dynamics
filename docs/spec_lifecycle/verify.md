@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Spec lifecycle — verification report
 
 **Spec:** `experiments/specs/spec_lifecycle.yaml` (v0.1)

@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Agentic Dynamics
 
 <p align="center">

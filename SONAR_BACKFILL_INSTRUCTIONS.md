@@ -1,3 +1,7 @@
+---
+status: superseded
+superseded_by: consolidation_release/stage_map §5 (one-time backfill, archived in S3)
+---
 # SonarQube Backfill Instructions
 
 You have the full project context loaded. Your single task:

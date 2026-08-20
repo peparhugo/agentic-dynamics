@@ -1,3 +1,7 @@
+---
+status: superseded
+superseded_by: ARCHITECTURE.md
+---
 # Blueprint v3 — Information-Acquisition Machine (ExperimentSpec + Compiler)
 
 **Status:** Design approved (`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`).

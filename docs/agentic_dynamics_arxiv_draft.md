@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Agentic Dynamics: A Measurement Apparatus and Field Program for the Empirical Study of How AI Agents Behave Under Change
 
 **Draft — conference-length preprint (field-defining framing)**

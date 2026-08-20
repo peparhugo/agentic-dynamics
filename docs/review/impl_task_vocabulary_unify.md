@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/task-vocabulary-unify
+---
 # Implementation trace — R3 + R9 + BUG-2 (task-type vocabulary unification)
 
 Phase 3 (trace) of `repo_review_fable`. Traces every change required by R3/R9

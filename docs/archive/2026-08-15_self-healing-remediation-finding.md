@@ -1,3 +1,7 @@
+---
+status: superseded
+superseded_by: ARCHITECTURE.md
+---
 # Finding: an async worker self-healed its own data by writing and running a new experiment
 
 **Date:** 2026-08-15

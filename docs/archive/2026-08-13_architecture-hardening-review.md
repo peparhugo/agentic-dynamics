@@ -1,3 +1,7 @@
+---
+status: superseded
+superseded_by: ARCHITECTURE.md
+---
 # Agent Code Review — Architecture Hardening & Improvement
 
 | Field | Value |

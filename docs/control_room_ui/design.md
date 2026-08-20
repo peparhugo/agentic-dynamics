@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room UI Redesign — Design Spec
 
 > Phase: **design** (`control_room_ui_redesign` spec, phase 2 of 3).

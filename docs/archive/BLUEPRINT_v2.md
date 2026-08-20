@@ -1,3 +1,7 @@
+---
+status: superseded
+superseded_by: ARCHITECTURE.md
+---
 # Blueprint v3 — AI FinOps Dynamics: Actual State & Next Steps
 
 > **Superseded by `BLUEPRINT_v3.md`** — this doc ends at v0.9 / pre-spec next-steps. The

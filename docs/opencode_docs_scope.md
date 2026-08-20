@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # OpenCode Docs Refresh — Scope
 
 Verified drift inventory between this repo's actual code and its onboarding docs

@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/canonical-state-fable5
+---
 # Canonical-State Design — Verification
 
 Verify phase of `experiments/specs/canonical_state_design.yaml`. Checks

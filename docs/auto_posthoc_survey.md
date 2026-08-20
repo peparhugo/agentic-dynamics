@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Auto Post-Hoc Wiring Survey
 
 Map of the `execute → analyze → review` handoff and the exact trigger points where

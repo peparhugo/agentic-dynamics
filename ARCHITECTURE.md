@@ -1,7 +1,9 @@
-# ARCHITECTURE.md — the single architectural authority
+---
+status: accepted
+supersedes: BLUEPRINT.md, BLUEPRINT_v2.md, BLUEPRINT_v3.md, dated handoffs, superseded reviews (see §6)
+---
 
-**Status:** `accepted` · **supersedes:** `BLUEPRINT.md`, `BLUEPRINT_v2.md`, `BLUEPRINT_v3.md`,
-dated handoffs, superseded reviews (see §6)
+# ARCHITECTURE.md — the single architectural authority
 
 This document is the one current architectural authority for the repository (critique rec 4,
 `docs/review/semantic_monolith_review.md` §"The nine recommendations"). It answers, in order: the

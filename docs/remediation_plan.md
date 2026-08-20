@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Remediation Plan — Instrumentation, Recompute, Re-admit
 
 Assesses the current state of the 2026-08-13 hardening review's P0/P1/P2 findings

@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/canonical-state-r2-fable5
+---
 # Canonical-State Architecture — Round 2, Implementation-Ready Design
 
 Refine phase of `experiments/specs/canonical_state_round2.yaml`. This document supersedes

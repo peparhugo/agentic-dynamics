@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Review verify — PASS/FAIL per check
 
 Phase 6 (verify) of `repo_review_fable`. Verifies the five deliverables in `docs/review/` are

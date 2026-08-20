@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Auto Post-Hoc Verify
 
 Verification of the auto-triggered `execute → analyze → review` handoff

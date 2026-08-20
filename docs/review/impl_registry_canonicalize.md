@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/registry-canonicalize
+---
 # Implementation trace — corpus canonicalization
 
 Implements `docs/data_integrity_findings.md`'s four treatment rules against the

@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Context Abstraction Plane — Architecture Review (audit phase)
 
 **Spec:** `experiments/specs/context_abstraction_plane.yaml`

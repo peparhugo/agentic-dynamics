@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Stage Map — consolidation release
 
 **Phase `stage_map` of `consolidation_release`.** Decomposes the semantic-monolith critique

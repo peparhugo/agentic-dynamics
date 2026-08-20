@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/measurement-bug-fixes
+---
 # Measurement bug fixes — implementation trace
 
 Traces the three measurement-apparatus fixes from `docs/review/bugs.md` (BUG-3, BUG-5, BUG-6) to

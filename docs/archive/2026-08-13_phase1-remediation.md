@@ -1,3 +1,7 @@
+---
+status: superseded
+superseded_by: ARCHITECTURE.md
+---
 # Phase-1 Data-Integrity Remediation — Status
 
 Tracks the P0 fixes from `2026-08-13_architecture-hardening-review.md` (Phase 1: data integrity).

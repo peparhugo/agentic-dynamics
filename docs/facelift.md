@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Operational Framework Face-Lift Plan
 
 ## Purpose and non-negotiables

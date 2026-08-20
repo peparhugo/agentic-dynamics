@@ -1,3 +1,7 @@
+---
+status: superseded
+superseded_by: ARCHITECTURE.md
+---
 # Review — Runtime-RAG Knowledge Base & Prompt-Constructor Proposals (3-model grid)
 
 **Date:** 2026-08-15

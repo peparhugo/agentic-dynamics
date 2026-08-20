@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Code of Conduct
 
 ## Our Pledge

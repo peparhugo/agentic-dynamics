@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Evidence Page Story-First Redesign
 
 ## Purpose

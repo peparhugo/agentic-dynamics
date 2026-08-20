@@ -1,3 +1,7 @@
+---
+status: superseded
+superseded_by: ARCHITECTURE.md
+---
 # Blueprint — Audit Correction Pass
 
 Generated from the full end-to-end audit. Each item is traceable to a specific section of the audit, a specific file, and actionable as a discrete unit of work.

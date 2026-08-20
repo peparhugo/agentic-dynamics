@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # ExperimentSpec + Compiler — Design Specification
 
 Status: written (v2, corrected) — spec (experiment_spec.py) and compiler

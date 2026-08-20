@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/canonical-state-implement
+---
 # Canonical-State Round 2 — Implementation Verification
 
 Verify phase of `experiments/specs/canonical_state_implement.yaml`. Confirms every one of

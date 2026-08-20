@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Consolidation execution log
 
 Per-stage acceptance-criterion results for the consolidation release (S0–S6). Each entry records
@@ -24,3 +27,26 @@ Deliverable: root `ARCHITECTURE.md`.
 | 9 | The load-bearing rule is stated verbatim as the architectural invariant, not redefined | PASS |
 
 **S0-spine result: 9/9 PASS.**
+
+---
+
+## S0 — doc lifecycle (phase `lifecycle`)
+
+Spec: `experiments/specs/consolidation_stage_0_architecture_spine.yaml` · phase `lifecycle`.
+Deliverables: migrated doc tree (`docs/archive/`, `docs/designs/{current,implemented}/`),
+status front-matter on every remaining doc, `tests/test_doc_lifecycle.py`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `BLUEPRINT.md`, `BLUEPRINT_v2.md`, `BLUEPRINT_v3.md` moved → `docs/archive/` with `status: superseded` + `superseded_by: ARCHITECTURE.md` | PASS |
+| 2 | Dated handoffs (`docs/HANDOFF_2026-08-17.md`, `docs/HANDOFF_2026-08-19.md`) moved → `docs/archive/` (superseded) | PASS |
+| 3 | Dated `code_reviews/*` predating the registry repoint moved → `docs/archive/` (superseded, kept not deleted) | PASS |
+| 4 | Current-but-frozen designs → `docs/designs/current/` with `status: accepted` (context-abstraction design+verify, `supervisor_design.md`, spec/compiler roadmap `2026-08-14_*`) | PASS |
+| 5 | Shipped designs → `docs/designs/implemented/` with `status: implemented` + `implemented_by:` (canonical-state rounds, RAG seam split, website repoints) | PASS |
+| 6 | Status front-matter added to every remaining root + docs markdown file (vocabulary `proposed|accepted|implementing|implemented|superseded|abandoned`) | PASS |
+| 7 | `tests/test_doc_lifecycle.py` written — walks `docs/**` + root `*.md`, asserts status field + `docs/archive/` superseded | PASS |
+| 8 | `pytest tests/test_doc_lifecycle.py` green | PASS (5 passed) |
+| 9 | No `BLUEPRINT*.md` remains at the repo root | PASS |
+
+**S0-lifecycle result: 9/9 PASS.**
+

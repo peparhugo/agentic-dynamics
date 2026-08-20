@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Per-Step Model Routing + Cache-Aware Forking — Design
 
 Status: design (phase 2 of `experiments/specs/workflow_step_routing.yaml`) · Preceded by

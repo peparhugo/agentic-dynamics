@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # OpenCode Tools → Claude Code Skills Scope
 
 Scope doc for reframing `.opencode/tools/*.ts` (25 files) as Claude Code skills that

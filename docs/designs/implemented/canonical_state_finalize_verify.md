@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/canonical-state-finalize
+---
 # canonical_state_finalize — Verify
 
 Verify pass for `experiments/specs/canonical_state_finalize.yaml`'s `verify` phase, run

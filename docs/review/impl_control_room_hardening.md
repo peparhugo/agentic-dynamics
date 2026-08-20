@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/control-room-hardening
+---
 # Implementation trace — Control Room hardening (F1–F5) + actuation tie-in
 
 This document traces each finding in `docs/review/control_room.md` to its concrete fix in the

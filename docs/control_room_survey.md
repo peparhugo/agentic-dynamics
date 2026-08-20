@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room Queue Surface — Touchpoint Map
 
 **Purpose.** Locate every place the *story* queue is read and rendered, and mark exactly

@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Claude Code Background Sessions Scope
 
 ## 1. Problem

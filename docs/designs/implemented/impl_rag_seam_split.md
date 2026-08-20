@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/rag-seam-split
+---
 # R7 implementation trace — `impl_rag_seam_split.md`
 
 Phase 3 (verify) of `rag_seam_split` (spec `experiments/specs/rag_seam_split.yaml`). Traces the

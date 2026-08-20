@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/canonical-state-r2-fable5
+---
 # Canonical-State Round 2 — Change-Set
 
 Analyze phase of `experiments/specs/canonical_state_round2.yaml`. This is a diff against

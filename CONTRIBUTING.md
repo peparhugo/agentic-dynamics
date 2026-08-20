@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Contributing to Agentic Dynamics
 
 Thanks for your interest in contributing. This is a research instrument — every contribution adds data points that make the cost model more robust and the instrument more universal.

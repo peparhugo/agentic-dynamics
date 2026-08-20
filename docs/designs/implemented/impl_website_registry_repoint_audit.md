@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/website-registry-repoint
+---
 # Phase 2 audit — summary→canonical mapping for the website registry repoint
 
 **Status:** implementation input for phase 2. This document is the *mapping contract*:

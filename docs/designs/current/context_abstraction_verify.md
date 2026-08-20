@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Context Abstraction Plane — Verification
 
 **Spec:** `experiments/specs/context_abstraction_plane.yaml`

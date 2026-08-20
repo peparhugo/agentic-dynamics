@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/website-registry-repoint
+---
 # Website registry repoint — implementation trace & verification
 
 **Status:** implementation verified. Every hard rule in the repoint is traced below to

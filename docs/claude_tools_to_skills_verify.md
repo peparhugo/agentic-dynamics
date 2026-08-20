@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # OpenCode Tools → Claude Code Skills: Verify Pass
 
 Verify phase for the port scoped in `docs/claude_tools_to_skills_scope.md` and built in the

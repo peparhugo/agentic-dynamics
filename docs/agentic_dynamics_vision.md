@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Agentic Dynamics — Vision, Positioning, and State (v0.1)
 
 ## 1. What this is — and what it is not

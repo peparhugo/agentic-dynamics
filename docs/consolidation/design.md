@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Design — per-stage design with migration mechanics
 
 **Phase `design` of `consolidation_release`.** Consumes `docs/consolidation/stage_map.md` (the

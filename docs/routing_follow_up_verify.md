@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Routing Follow-Up — Verification
 
 > Status: **verify** (phase 4 of `experiments/specs/routing_follow_up.yaml`). Verifies the
