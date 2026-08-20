@@ -42,25 +42,29 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agentic_dynamics.adapters.backends import run_agentic
+from agentic_dynamics.core.language import detect_language
+from agentic_dynamics.core.paths import PROJECT_ROOT
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
 from agentic_dynamics.knowledge.augment import (
     DEFAULT_INHERITED_TOOLS,
     augment_prompt,
     default_construct_fn,
     default_retrieve_fn,
 )
-from agentic_dynamics.adapters.backends import run_agentic
-from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
-from agentic_dynamics.core.language import detect_language
-from agentic_dynamics.control.live import LivePublisher
-from agentic_dynamics.core.paths import PROJECT_ROOT
-from agentic_dynamics.control.step_routing import (
+
+# Routing + telemetry are consumed through the runtime-owned contracts (refactor-repair
+# Debt-2): the ``Router`` decision and the ``TelemetryPublisher`` are injected at the
+# composition root (``scripts/run_workflow.py``), so this module never imports ``control``.
+from agentic_dynamics.runtime.routing import (
     ModelSignals,
+    Router,
     RouteState,
     RoutingPreferences,
     resolve_pool,
-    route_step,
     validate_workflow_routing,
 )
+from agentic_dynamics.runtime.telemetry import TelemetryPublisher
 from agentic_dynamics.runtime.test_runner import run_suite, suite_succeeded
 
 
@@ -344,6 +348,8 @@ def run_workflow(
     fork: bool | None = None,
     preferences: RoutingPreferences | None = None,
     signals: dict[str, ModelSignals] | None = None,
+    router: Router | None = None,
+    publisher_factory: Callable[[str], TelemetryPublisher] | None = None,
     run_agentic_fn: Callable[..., Any] | None = None,
     rag_augment: bool | None = None,
     retrieve_fn: Callable[..., Any] | None = None,
@@ -381,12 +387,13 @@ def run_workflow(
     no-op.
 
     Per-step routing (``docs/routing_design.md``): when the spec declares
-    ``workflow.params.model_pool``, each agent phase's model is chosen by
-    :func:`instrument.step_routing.route_step` from the phase's selector (``model`` pin /
-    ``allowed_models`` subset / full pool), scored by ``preferences`` over ``signals``.
-    The router prices the cache-prefix loss of a model switch, so the existing fork chain
-    (``fork: true``) keeps forking for free when it stays on the prior model. Without a
-    ``model_pool`` the workflow is single-model (``model``) — backward compatible.
+    ``workflow.params.model_pool``, each agent phase's model is chosen by the injected
+    ``router`` (``control.step_routing.route_step``, wired at the composition root) from the
+    phase's selector (``model`` pin / ``allowed_models`` subset / full pool), scored by
+    ``preferences`` over ``signals``. The router prices the cache-prefix loss of a model
+    switch, so the existing fork chain (``fork: true``) keeps forking for free when it stays
+    on the prior model. Without a ``model_pool`` the workflow is single-model (``model``) —
+    backward compatible, and it needs no router.
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -437,7 +444,9 @@ def run_workflow(
     # ``FINOPS_CELL_ID``) so status, phase, and events land on the single cell the
     # operator is watching; fall back to the deterministic per-spec id for CLI runs.
     cell_id = os.environ.get("FINOPS_CELL_ID", "").strip() or _cell_id(spec.name, model)
-    publisher = LivePublisher(cell_id) if publish else None
+    # Telemetry is injected, not imported (Debt-2): the composition root supplies the
+    # control-plane publisher factory; without one, the run simply does not publish.
+    publisher = publisher_factory(cell_id) if (publish and publisher_factory) else None
     if publisher is not None and publisher.enabled:
         publisher.set_status("running")
         publisher.publish_event({
@@ -519,7 +528,17 @@ def run_workflow(
                         prev_session_id=prev_session_id,
                         prev_cache_read_tokens=prev_cache_read_tokens,
                     )
-                    model_i = route_step(phase_def, state, preferences, signals=signals)
+                    if router is not None:
+                        model_i = router(phase_def, state, preferences, signals=signals)
+                    elif len(model_pool) <= 1:
+                        # No router injected and a single-model workflow: use the run model
+                        # directly (backward compatible — routing is a no-op here).
+                        model_i = model_pool[0] if model_pool else model
+                    else:
+                        raise ValueError(
+                            "spec declares a multi-model model_pool but no router was injected "
+                            "— inject control.step_routing.route_step at the composition root"
+                        )
 
                     # RAG augmentation seam — retrieve -> construct -> render, placed
                     # between route_step and run_agent (never before routing, so the

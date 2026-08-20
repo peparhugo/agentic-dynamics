@@ -7,7 +7,6 @@ validator gating (edge_case_coverage / confidence), and graceful cold-start fall
 
 from types import SimpleNamespace
 
-from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, Factor, Workflow
 from agentic_dynamics.control.signal_store import build_signal_store
 from agentic_dynamics.control.step_routing import (
     FORBIDDEN_SIGNALS,
@@ -22,6 +21,7 @@ from agentic_dynamics.control.step_routing import (
     validate_step_selector,
     validate_workflow_routing,
 )
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, Factor, Workflow
 from agentic_dynamics.runtime.workflow_runner import run_workflow
 
 DS = "deepseek/deepseek-v4-pro"
@@ -299,6 +299,7 @@ def test_run_workflow_routes_per_step(tmp_path):
         spec, goal="g", model=DS, workdir=tmp_path, commit=False,
         preferences=_prefs(_min("cost")), signals=signals,
         run_agentic_fn=_fake_agent_recording(seen_models, seen_kwargs),
+        router=route_step,
     )
     assert [p.phase for p in result.phases] == ["pinned", "subset", "open"]
     # pinned → DS; subset → cheapest of {CL, FLASH} = FLASH; open → cheapest of pool = FLASH.
@@ -322,6 +323,7 @@ def test_run_workflow_forks_when_model_unchanged(tmp_path):
         spec, goal="g", model=DS, workdir=tmp_path, commit=False,
         signals={DS: _sig(DS, cost=0.001)},
         run_agentic_fn=_fake_agent_recording(seen_models, seen_kwargs),
+        router=route_step,
     )
     # Both phases route to the same (only measured) model → phase 2 forks from phase 1.
     assert seen_models == [DS, DS]

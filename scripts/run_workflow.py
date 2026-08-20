@@ -23,11 +23,12 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
-from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
+from agentic_dynamics.control.live import LivePublisher  # noqa: E402
 from agentic_dynamics.control.signal_store import build_signal_store, load_results  # noqa: E402
-from agentic_dynamics.knowledge.spec_ingestion import emit_spec_record  # noqa: E402
+from agentic_dynamics.control.step_routing import ModelSignals, route_step  # noqa: E402
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
-from agentic_dynamics.control.step_routing import ModelSignals  # noqa: E402
+from agentic_dynamics.knowledge.spec_ingestion import emit_spec_record  # noqa: E402
 from agentic_dynamics.runtime.workflow_runner import run_workflow  # noqa: E402
 
 
@@ -105,6 +106,8 @@ def main() -> None:
         commit=not args.no_commit,
         resume=args.resume,
         signals=signals,
+        router=route_step,
+        publisher_factory=LivePublisher,
     )
 
     print(json.dumps(result.to_dict(), indent=2))

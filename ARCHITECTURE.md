@@ -78,10 +78,12 @@ forbidden edges are the executable rules.
 8. `apps` contain no domain rules — no `ExperimentSpec(`/`RuleSpec(`/`Factor(` construction in
    `apps/**` (AST-marker scan).
 
-Two legitimate execution→control *observation* edges are pinned as positive assertions (below, §3);
-every other tier-1→tier-2 edge fails the lint. Companion data-flow tests assert `retrieve()` never
-returns an `authority==POLICY` candidate and references `publish_event` zero times, and that
-knowledge modules never call `derive_actuation_record` (`design.md` §1.4).
+Two legitimate adapter→control *telemetry* edges are pinned as positive assertions (below, §3);
+runtime's routing *decision* and telemetry are dependency-inverted onto runtime-owned protocols
+(refactor-repair Debt-2), so every other tier-1→tier-2 edge fails the lint. Companion data-flow
+tests assert `retrieve()` never returns an `authority==POLICY` candidate and references
+`publish_event` zero times, and that knowledge modules never call `derive_actuation_record`
+(`design.md` §1.4).
 
 ---
 
@@ -112,22 +114,23 @@ core ← experiment / measurement / runtime / knowledge ← control ← applicat
 `control` consumes the planes and `core`; `applications` compose everything and are imported by
 nothing. This is the directional graph of rec 8 (`semantic_monolith_review.md` recommendation 8).
 
-The two **pinned execution→control observation edges** — the only tier-1→tier-2 imports, asserted
-as the *complete* set by the lint (`design.md` §1.4) — are drawn as dashed, observe-only arrows:
+The two **pinned adapter→control telemetry edges** — the only tier-1→tier-2 imports, asserted
+as the *complete* set by the lint (`tests/test_dependency_direction.py`) — are drawn as dashed,
+observe-only arrows:
 
 ```
-runtime.workflow_runner ─ ─ ▶ control.step_routing, control.live     (execution consults the
-                                                                    per-step router + publishes
-                                                                    telemetry)
 adapters.opencode ─ ─ ─ ─ ▶ control.live                            (adapters publish telemetry)
 adapters.claude_adapter ─ ─▶ control.live
 ```
 
 These are the supervisor design's "observe, never steer" seam made structural: **telemetry up,
-decisions down.** The execution tier publishes observation into `control` (telemetry, the per-step
-router); it never receives steering back through the same edge. `workflow_runner` importing
-`step_routing` and `live`, and `opencode`/`claude_adapter` importing `live`, are the confirmed
-cross-plane edges today (`docs/consolidation/design.md` §0) and are pinned — not blanket-rejected.
+decisions down.** The runtime's routing *decision* is dependency-inverted (refactor-repair
+Debt-2): `runtime.workflow_runner` consumes the runtime-owned `Router` and `TelemetryPublisher`
+protocols (`runtime/routing.py`, `runtime/telemetry.py`) and the control implementations
+(`control.step_routing.route_step`, `control.live.LivePublisher`) are injected at the composition
+root (`scripts/run_workflow.py`) — so `runtime` never imports `control`. The two adapters still
+publish telemetry directly, which is the only remaining cross-plane edge and is pinned, not
+blanket-rejected.
 
 ---
 

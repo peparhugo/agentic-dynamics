@@ -54,9 +54,12 @@ bounded planes (`ARCHITECTURE.md` §1; the dependency direction is enforced by
 | `reporting` | research output — game_report, review, analyzers | 4 |
 
 Tier map: `core` (0) ← `experiment/measurement/runtime/adapters/knowledge/reporting` (1) ←
-`control` (2) ← `apps` (3). The only tier-1→tier-2 edges are the pinned observe-only seam
-(`runtime.workflow_runner → control.step_routing/live`; `adapters.opencode`/`claude_adapter →
-control.live`).
+`control` (2) ← `apps` (3). The only tier-1→tier-2 edges are the pinned adapter telemetry seam
+(`adapters.opencode`/`claude_adapter → control.live`); `runtime.workflow_runner` is
+dependency-inverted (Debt-2) — it consumes the runtime-owned `Router`/`TelemetryPublisher`
+protocols (`runtime/routing.py`/`runtime/telemetry.py`) with the control implementations
+(`control.step_routing.route_step`, `control.live.LivePublisher`) injected at the composition
+root (`scripts/run_workflow.py`), so runtime never imports control.
 
 ## The spec/compiler layer — WRITTEN
 

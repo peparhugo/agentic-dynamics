@@ -829,6 +829,21 @@ ledgers, so the regenerated index reports `n_runs=0` and the 57 other non-repeat
 derive `runnable` (never-run) rather than their real `completed`/`running` state — that state comes
 from the ledgers on the next regeneration in an environment that has them.
 
+### Debt-2 — relative-import lint + runtime→control dependency inversion
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `tests/test_dependency_direction.py` now resolves relative imports — `_module_parts` + `_resolve_relative` walk `from ..control import X` against the package layout, so a plane module can no longer dodge the cross-plane assertions | PASS |
+| 2 | New positive tests prove the hole is closed — `test_relative_imports_resolve_across_planes` + `test_module_parts_align_with_the_import_vocabulary` (11 tests total) | PASS |
+| 3 | `Router` Protocol + routing contract (data model, validation mechanics) moved to `runtime/routing.py`; `TelemetryPublisher` Protocol in `runtime/telemetry.py`; `control/step_routing.py` slimmed to the policy (`route_step` + scoring) with backward-compat re-exports | PASS |
+| 4 | `runtime/workflow_runner.py` consumes the protocols — zero `control` imports; accepts injected `router` + `publisher_factory` (single-model runs need no router; a multi-model pool without one raises a clear error) | PASS |
+| 5 | Composition root wires it — `scripts/run_workflow.py` injects `router=route_step` + `publisher_factory=LivePublisher` | PASS |
+| 6 | Pinned edges updated — the only tier-1→tier-2 edges are now `adapters.{opencode,claude_adapter} → control.live`; `ARCHITECTURE.md` §2/§3 + `agent_config/mental-model.md` (+ regenerated surfaces) describe the inverted seam | PASS |
+| 7 | All guard tests stay green (strengthened, not weakened) — full `-m "not external"` suite: 1277 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**Debt-2 result: 7/7 PASS.**
+
+
 
 
 

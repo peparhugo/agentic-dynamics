@@ -1,10 +1,10 @@
-"""Dependency-direction lint (critique rec 8, verbatim).
+"""Dependency-direction lint (critique rec 8, verbatim; strengthened refactor-repair Debt-2).
 
 Enforces the package-boundary rules of ``ARCHITECTURE.md`` §2 by walking the import graph of
-every ``src/agentic_dynamics/**`` module (plus ``apps/**`` once it exists in Stage 5) with
-``ast``. The tier map is *descriptive*; the forbidden edges are the explicit rules — not a
-blanket tier DAG, because the real graph contains two legitimate execution→control
-observation edges that a blanket rule would falsely reject (design §1.4).
+every ``src/agentic_dynamics/**`` module (plus ``apps/**``) with ``ast`` — including *relative*
+imports, which are resolved against the package layout so ``from ..control import X`` can no
+longer bypass the cross-plane analysis. The tier map is *descriptive*; the forbidden edges are
+the explicit rules — not a blanket tier DAG.
 
 Tier map:
 
@@ -14,9 +14,13 @@ Tier map:
 * tier 2 ``control`` — ``control``
 * tier 3 ``apps`` — ``apps/`` (outside ``src/agentic_dynamics/``, still linted)
 
-The eight forbidden-edge assertions plus the two pinned positive edges are rec-8-verbatim;
-the two data-flow guards (retrieval never supplies POLICY facts / never writes the KB;
-knowledge never actuates) live in ``tests/test_data_flow.py``.
+The eight forbidden-edge assertions are rec-8-verbatim. The *only* tier-1→tier-2 edges allowed
+are the two adapter telemetry edges (``opencode``/``claude_adapter`` → ``control.live``):
+``runtime.workflow_runner`` no longer imports ``control`` at all — it consumes the runtime-owned
+``Router``/``TelemetryPublisher`` protocols (``runtime/routing.py``, ``runtime/telemetry.py``)
+with the control implementations injected at the composition root (``scripts/run_workflow.py``),
+per the Debt-2 dependency inversion. The two data-flow guards (retrieval never supplies POLICY
+facts / never writes the KB; knowledge never actuates) live in ``tests/test_data_flow.py``.
 """
 
 from __future__ import annotations
@@ -37,12 +41,11 @@ TIER1 = PLANES
 TIER2 = {CONTROL}
 
 #: The *complete* set of allowed tier-1 → tier-2 (plane → control) edges — the observe-only
-#: seam ("telemetry up, decisions down"). ``runtime.workflow_runner`` consults the per-step
-#: router + publishes telemetry; the two adapters publish telemetry. Any other plane module
+#: telemetry seam ("telemetry up, decisions down"). After the Debt-2 inversion these are only
+#: the two adapters publishing telemetry; ``runtime.workflow_runner`` uses the injected Router
+#: + TelemetryPublisher protocols instead of importing ``control``. Any other plane module
 #: importing ``control`` is a rec-8 violation.
 PINNED_T1_TO_T2 = frozenset({
-    ("runtime.workflow_runner", "control.step_routing"),
-    ("runtime.workflow_runner", "control.live"),
     ("adapters.opencode", "control.live"),
     ("adapters.claude_adapter", "control.live"),
 })
@@ -99,9 +102,54 @@ def _resolve_target(import_name: str) -> tuple[str, str | None] | None:
     return None  # stdlib / third-party
 
 
+def _module_parts(path: Path) -> list[str]:
+    """The dotted module path of a source file, e.g. ``agentic_dynamics.runtime.foo``.
+
+    ``apps/**`` files keep the ``apps`` prefix; ``src/agentic_dynamics/**`` files drop the
+    ``src`` container so the parts line up with the import vocabulary.
+    """
+    parts = list(path.relative_to(ROOT).parts)
+    parts[-1] = Path(parts[-1]).stem
+    if parts and parts[0] == "src":
+        parts = parts[1:]
+    return parts
+
+
+def _resolve_relative(
+    module_parts: list[str], level: int, module: str | None
+) -> tuple[str, str | None] | None:
+    """Resolve a relative import to ``(plane, module)``, or ``None`` if out of scope.
+
+    ``level`` is the ``ast.ImportFrom.level`` (1 = current package, 2 = parent, …); ``module``
+    is the relative target (``None`` for ``from . import …``). Walks ``level - 1`` package
+    segments up from the current module, appends ``module``, then reuses the same
+    ``agentic_dynamics``/``apps`` mapping as ``_resolve_target``.
+    """
+    package = module_parts[:-1]
+    up = level - 1
+    if up > len(package):
+        return None  # escapes the package entirely — out of scope
+    base = package[: len(package) - up]
+    parts = base + (module.split(".") if module else [])
+    if parts and parts[0] == "agentic_dynamics" and len(parts) >= 2:
+        plane = parts[1]
+        if plane in (CORE, *PLANES, CONTROL):
+            return (plane, parts[2] if len(parts) >= 3 else None)
+        return None
+    if parts and parts[0] == "apps":
+        return ("apps", parts[1] if len(parts) >= 2 else None)
+    return None
+
+
 def _imports_of(path: Path) -> list[tuple[str, str | None]]:
-    """The package-internal import targets ``(plane, module)`` of one source file."""
+    """The package-internal import targets ``(plane, module)`` of one source file.
+
+    Both absolute and *relative* imports are resolved: a relative ``from ..control import X``
+    is walked against the package layout (``_resolve_relative``) so it can no longer bypass the
+    cross-plane analysis (refactor-repair Debt-2).
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    module_parts = _module_parts(path)
     out: list[tuple[str, str | None]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -114,8 +162,10 @@ def _imports_of(path: Path) -> list[tuple[str, str | None]]:
                 target = _resolve_target(node.module or "")
                 if target:
                     out.append(target)
-            # level >= 1 is a relative import within the same plane — never a forbidden
-            # cross-tier edge, so it is deliberately ignored.
+            else:
+                target = _resolve_relative(module_parts, node.level, node.module)
+                if target:
+                    out.append(target)
     return out
 
 
@@ -219,3 +269,28 @@ def test_apps_contain_no_domain_rules():
                     else None
                 )
                 assert name not in markers, f"{path}: apps contain domain-rule construction {name}(...)"
+
+
+def test_relative_imports_resolve_across_planes():
+    """``from ..control import X`` resolves to ``control`` — no longer ignored (Debt-2).
+
+    The pre-Debt-2 lint skipped every ``level >= 1`` import, so a plane module could reach
+    ``control`` via ``from ..control import X`` and dodge the cross-plane assertions. The
+    resolver now walks the package layout, so that hole is closed.
+    """
+    parts = ["agentic_dynamics", "runtime", "foo"]  # src/agentic_dynamics/runtime/foo.py
+    assert _resolve_relative(parts, 1, "bar") == ("runtime", "bar")  # `from .bar import …`
+    assert _resolve_relative(parts, 1, None) == ("runtime", None)  # `from . import …`
+    assert _resolve_relative(parts, 2, "control") == ("control", None)  # `from ..control …`
+    assert _resolve_relative(parts, 2, "control.step_routing") == ("control", "step_routing")
+    assert _resolve_relative(parts, 2, "measurement") == ("measurement", None)
+    # A level that escapes the package entirely is out of scope, not a false edge.
+    assert _resolve_relative(parts, 5, "x") is None
+
+
+def test_module_parts_align_with_the_import_vocabulary():
+    """``_module_parts`` maps a source file to the dotted module path ``_resolve_relative`` uses."""
+    assert _module_parts(AD / "runtime" / "workflow_runner.py") == [
+        "agentic_dynamics", "runtime", "workflow_runner",
+    ]
+    assert _module_parts(AD / "core" / "paths.py") == ["agentic_dynamics", "core", "paths"]
