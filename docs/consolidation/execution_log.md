@@ -748,6 +748,21 @@ Per-finding acceptance-criterion results for the refactor-repair release (review
 
 **P0-2 (guard) result: 7/7 PASS.**
 
+### P1-3 (schema) — validated artifact-identity metadata
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `ExperimentSpec` gains `artifact_kind` (`experiment`\|`workflow`, default `experiment`), `intent` (`measure`\|`mutate`, default `measure`), `side_effects: {repository, external_services}` (a `SideEffects` dataclass), `repeatable` (default `true`), and a `sandboxed` escape hatch (default `false`) | PASS |
+| 2 | All five keys added to `SPEC_KEYS`; `from_dict`/`to_dict` round-trip them (serialized schema stays stable) | PASS |
+| 3 | Validator enforces the artifact-identity gate: `artifact_kind=experiment` with `intent=mutate` (source-modification phases) or `side_effects.repository=true` is REJECTED unless `sandboxed`; `artifact_kind`/`intent` validated against their enums | PASS |
+| 4 | Backward-compatible — the pre-P1-3 corpus (77 specs, none carrying the fields) loads with benign defaults (`experiment`/`measure`/no side effects/`repeatable`/not sandboxed) and validates clean; `test_committed_specs_all_load_without_unknown_key_warnings` green | PASS |
+| 5 | `tests/test_artifact_identity.py` added — 13 tests: defaults, round-trip, enum validation, the gate's reject/admit/sandbox/workflow cases, and `external_services`-alone is metadata not a trigger | PASS (13 passed) |
+| 6 | `ruff check` clean on `experiment_spec.py` + the new test | PASS |
+| 7 | Full `-m "not external"` suite: 1264 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P1-3 (schema) result: 7/7 PASS.**
+
+
 
 
 
