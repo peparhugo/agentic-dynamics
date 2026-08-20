@@ -1,0 +1,164 @@
+name: consolidation_stage_2_experiments_workflows_split
+question: >-
+  Stage 2 of the consolidation release: separate experiments from workflows (critique rec 3) —
+  experiments/{definitions,campaigns,fixtures,results} vs workflows/{repository,operations,research,
+  examples} — enforced by a classification guard test that fails when a work-order spec lands in
+  experiments/definitions/. PLACE IN ORDERING: needs — Stage 1 (the spec/workflow loader paths now
+  live under agentic_dynamics.experiment); blocks — Stages 3 (the CLI's experiment run / workflow run
+  subcommands reference the split paths), 5 (site + workflow data paths), 6. SUPERSESSION: the
+  anti-resurrection guard-test pattern of refactor_master_plan WS-04 is PROMOTED here into the
+  classification guard test, but WS-04's lab-book registry repoint itself is DEFERRED into the new
+  reporting/ structure (see docs/consolidation/stage_map.md §5). The classification rule and known
+  re-homes are in docs/consolidation/design.md §4.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      critique: >-
+        READ docs/review/semantic_monolith_review.md rec 3: experiments/specs currently holds genuine
+        experimental definitions beside implementation projects and repo-development workflows
+        (website rewrites, KB construction, queue steering, control-room development, doc refreshes,
+        data remediation, rebranding) — making it impossible to distinguish an experiment studying a
+        hypothesis from an automated work order that changes the repository. Separate them:
+        experiments/{definitions,campaigns,fixtures,results} vs workflows/{repository,operations,
+        research,examples}; rag_bare_vs_augmented etc. remain experiments; website_rewrite,
+        control_room_portal, rag_knowledge_base_build etc. become workflows.
+      read_first: >-
+        docs/consolidation/design.md §4 (the classification rule + guard test + known re-homes) and
+        docs/consolidation/stage_map.md §4 Stage 2. Also read experiments/specs/STATUS.md (the 67-spec
+        corpus) and scripts/spec_status.py (the path-sensitive regenerator).
+      hard_rules: >-
+        (1) The classification is a TEST, not a convention: tests/test_experiment_workflow_
+        classification.py must fail when a work-order spec is placed in experiments/definitions/ and
+        fail the reciprocal direction too. (2) python scripts/spec_status.py must regenerate
+        experiments/specs/index.json + STATUS.md from the new paths with ZERO orphan specs. (3) The
+        load-bearing rule survives: any spec that carries a control rule with unmet requires is still
+        refused after the move — the split never bypasses the gate. (4) The 34 experiments/configs/*
+        stay experiments (they are hypothesis-testing measurement configs); the results/ + kb/ +
+        registry_index.jsonl stay under experiments/results/. (5) Do not delete or rewrite any spec's
+        content — this is a move + re-point, preserving supersedes lineage. (6) pytest green at every
+        phase boundary.
+      run_shape: >-
+        SINGLE-model: deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/consolidation-release). Python language. Each phase commits [workflow] <phase>;
+        code-touching phases carry enforce_pytest: true.
+    phases:
+      - name: classify
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Write the classification guard test and lay out the two directory trees.
+
+          GOAL:
+          {goal}
+
+          READ FIRST: docs/consolidation/design.md §4 (the rule + the work-order signature heuristic).
+
+          DO:
+          - Create experiments/{definitions,campaigns,fixtures} and workflows/{repository,operations,
+            research,examples} directory skeletons (empty __init__ or README placeholders).
+          - Write tests/test_experiment_workflow_classification.py: (a) loads every
+            experiments/definitions/*.yaml and asserts it is a measurement workflow (workflow.kind in
+            {story,task,experiment} OR agent_task whose question is a hypothesis, not a repo-change
+            work order); (b) asserts every workflows/**/*.yaml carries the work-order signature
+            (agent_task whose context.hard_rules name "DESIGN/IMPLEMENT/EDIT production code" or whose
+            question names a repo-change deliverable). A misplaced spec fails the test in the
+            direction it was misplaced.
+          - Run the test against the CURRENT layout first to confirm it detects the as-is mixing (the
+            test should fail until the move happens in the next phase), then record that behavior.
+
+          DELIVER the guard test + the two directory skeletons.
+      - name: move_specs
+        kind: agent
+        timeout: 10800
+        enforce_pytest: true
+        prompt: |
+          Re-home the 67 specs and 34 configs into experiments/ vs workflows/.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §4 "known re-homes" + experiments/specs/STATUS.md.
+
+          DO:
+          - git mv genuine experiment specs → experiments/definitions/ (rag_bare_vs_augmented,
+            routing_regret_under_degradation, routing_kb_experiment_design*, workflow_step_routing,
+            explanation_tax, process_perturbation_resample, posthoc_pipeline, and the hypothesis-
+            driven measurement specs), the 34 experiments/configs/* → experiments/definitions/configs/
+            (or experiments/campaigns/ for the grid/sweep ones: factorial_compound, silent_mode_sweep,
+            comparative).
+          - git mv work-order specs → workflows/operations/ or workflows/repository/ per their nature
+            (website_rewrite, website_repoint, website_registry_repoint, website_data_pipeline,
+            control_room_*, rag_knowledge_base_build/_wire/_reconcile/_produce, kb_*, queue_steer,
+            canonical_state_*, agentic_dynamics_rebrand, remediation_data_integrity, spec_lifecycle,
+            claude_tools_to_skills, opencode_docs_refresh, framework_facelift, fix_review_findings,
+            supervisor_control_room, task_vocabulary_unify, registry_canonicalize, measurement_bug_fixes,
+            labbook_refresh, design_sessions, code_review, deep_architecture_review, evidence_*,
+            context_abstraction_*, consolidation_release, refactor_master_plan, self_recommending_experiment,
+            site_golden_circle, auto_posthoc_*, control_room_ui_*, routing_follow_up, kb_event_typing,
+            kb_lineage_reconcile, kb_producer_factory, kb_record_fidelity, kb_write_path,
+            rag_knowledge_base, rag_knowledge_sources, rag_scope_emit, rag_seam_split, repo_review_fable,
+            routing_kb_*, perturbation_operators_fix, claude_background_sessions).
+          - Preserve every spec's supersedes/superseded_by lineage; only the path changes. If a spec's
+            classification is genuinely ambiguous, put it in workflows/research/ and note the reason.
+
+          DELIVER the re-homed spec/config tree.
+      - name: repoint
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Re-point the spec consumers at the new paths.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: scripts/spec_status.py + agentic_dynamics.experiment.spec_status (the path join).
+
+          DO:
+          - Update scripts/spec_status.py and agentic_dynamics/experiment/spec_status.py (and
+            scripts/run_workflow.py's default spec path, agentic_dynamics/knowledge/spec_ingestion.py,
+            and policy_ingestion.py's discover_policy_paths if they hardcode experiments/specs/) to
+            resolve specs from experiments/definitions/ + workflows/**.
+          - Run python scripts/spec_status.py and assert experiments/specs/index.json + STATUS.md
+            regenerate with all 67 specs present and zero orphans.
+          - Run pytest tests/ -m "not external" — green; run the classification guard test — green.
+
+          DELIVER the re-pointed consumers + a regenerated index.
+      - name: verify
+        kind: test
+        timeout: 7200
+        prompt: |
+          Full-suite gate. Runs the language test suite (pytest) via the independent test runner.
+
+          GOAL:
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: split_delivered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [classification_guard_green, spec_paths_resolve, workorders_separated]
+metrics:
+  - {name: classification_guard_green, agg: mean, over: cell}
+  - {name: spec_paths_resolve, agg: mean, over: cell}
+  - {name: workorders_separated, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, classify, move_specs, repoint, verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -1,0 +1,232 @@
+name: consolidation_stage_1_package_move
+question: >-
+  Stage 1 of the consolidation release — the crux: move the 64-module src/instrument/ package into
+  a modular monorepo src/agentic_dynamics/{core,experiment,measurement,runtime,adapters,
+  knowledge,control,reporting,legacy} with a compatibility shim, then enforce the dependency
+  direction (critique rec 2 + rec 7 + rec 8). PLACE IN ORDERING: needs — Stage 0 (ARCHITECTURE.md's
+  plane/boundary definitions); blocks — Stages 2, 3, 4, 5, 6 (they operate on the new package
+  layout). SUPERSESSION: folds refactor_master_plan WS-01 (dead-code retirement — the 5 deprecated
+  modules + scripts/plan.py + 8 lab_*_DEPRECATED_bge_m3.py + 3 CLI-unreferenced scripts are retired
+  inside this stage) and the sys.path half of WS-10 (the ~55 per-file sys.path.insert bootstraps →
+  one scripts/_bootstrap.py). The deferred workstreams WS-02..08 resume AFTER this stage, inside the
+  new structure. The full package map, shim strategy, import-rewrite order, and dependency lint are
+  specified in docs/consolidation/design.md §1.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      critique: >-
+        READ docs/review/semantic_monolith_review.md rec 2 (modular monorepo under
+        src/agentic_dynamics/ with core/experiment/measurement/runtime/adapters/knowledge/control/
+        reporting/), rec 7 (delete deprecated code or quarantine to legacy/ with no current
+        imports), rec 8 (automatically-enforced dependency direction: core ←
+        experiment/measurement/runtime/knowledge ← control ← applications; knowledge never actuates;
+        retrieval never supplies canonical facts; control consumes facts; apps contain no domain
+        rules).
+      read_first: >-
+        docs/consolidation/design.md §1 is the authoritative blueprint: §1.1 the 64-module package
+        map (every module dispositioned with a reason), §1.2 the shim strategy, §1.3 the
+        import-rewrite order (phases A–E), §1.4 the dependency lint (8 forbidden-edge assertions +
+        2 pinned positive edges). Also read .opencode/instructions/mental-model.md and
+        src/instrument/CONTEXT.md (module reference).
+      hard_rules: >-
+        (1) The load-bearing rule is untouchable: the requires/produces gate must still pass on
+        every committed spec after the move (python scripts/spec_status.py unaffected; the
+        compile-gate validate on consolidation_stage_*.yaml and every other spec must stay green).
+        (2) Tests green at EVERY phase boundary — pytest tests/ -m "not external". (3) The move is
+        atomic: modules move and the shim is generated in the SAME commit (phase move) so no
+        committed state is half-moved. (4) The shim preserves all three import shapes: from
+        instrument import X, import instrument.X, from instrument.X import Y. (5) Retire only after
+        repoint: legacy/ modules and retired scripts are removed only once grep shows zero
+        importers. (6) Operational invariants: Redis isolation (6380 queue DB1 + KB DB2; 6379
+        sandbox), dual Firebase — untouched, re-asserted in verify. (7) The dependency lint is
+        rec-8-verbatim: 8 forbidden edges + the 2 pinned positive edges (workflow_runner→step_routing/
+        live; opencode/claude_adapter→live) — a blanket 4-tier DAG would falsely reject the
+        execution→control observation edges and is WRONG.
+      run_shape: >-
+        SINGLE-model: deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/consolidation-release). Python language. Each phase commits [workflow] <phase>.
+        Code-touching phases carry enforce_pytest: true; the final verify phase runs the full
+        non-external suite.
+    phases:
+      - name: skeleton
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Create the src/agentic_dynamics/ package skeleton.
+
+          GOAL:
+          {goal}
+
+          READ FIRST: docs/consolidation/design.md §1.1 (the plane taxonomy) + §1.3 phase A.
+
+          DO:
+          - Create src/agentic_dynamics/ with the nine subpackage directories core/, experiment/,
+            measurement/, runtime/, adapters/, knowledge/, control/, reporting/, legacy/.
+          - Each __init__.py is a docstring-only placeholder naming its plane's ownership and (for
+            control/) the reserved CAP homes; nothing imports yet, so the tree stays green.
+          - Add a repo-root pyproject note (or update the existing install metadata if one exists)
+            so `agentic_dynamics` is importable from src/ (editable-install target), but do not
+            break the existing sys.path bootstrap yet.
+          - Run pytest tests/ -m "not external" — must stay green (this phase is additive).
+
+          DELIVER the empty package skeleton.
+      - name: move
+        kind: agent
+        timeout: 14400
+        enforce_pytest: true
+        prompt: |
+          Move all 64 modules to their planes and generate the instrument.* compat shim.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §1.1 (the exact 64-module table) + §1.2 (the shim) + §1.3 phase B.
+
+          DO (atomically — one commit):
+          - git mv every src/instrument/<m>.py to src/agentic_dynamics/<plane>/<m>.py per the §1.1
+            table (core: language,paths,session_types,streaming; experiment: experiment_spec,
+            compile_experiment,spec_status; measurement: perturb,prompt_perturbation,mutation,
+            solution,basin,efficiency,recovery_cost,strategy,semantic_validation,constraint_detection,
+            commit_analysis,sonar,lsp_diagnostics,entropy,codebase_graph; runtime: workflow_runner,
+            test_runner,story,posthoc; adapters: opencode,claude_adapter,backends; knowledge:
+            knowledge,knowledge_stream,record_factory,retrieval,prompt_constructor,augment,graph,
+            embeddings,knowledge_ingestion,code_ingestion,quality_ingestion,policy_ingestion,
+            story_ingestion,review_ingestion,ledger_ingestion,spec_ingestion; control: routing,
+            step_routing,signal_store,supervisor,live,pipeline_status,queue_reinterleave,
+            observation_ingestion,actuation_ingestion; reporting: game_report,review,ollama_analyzer,
+            opencode_analyzer; legacy: experiment,adapter,lab_book,recovery,trajectory).
+          - Rewrite internal imports: from .X import → from agentic_dynamics.<plane>.X import (or
+            keep relative within a plane); from instrument.X → from agentic_dynamics.<plane>.X.
+          - Regenerate each plane __init__.py (re-export its public names) and generate the shim
+            src/instrument/: per moved module a stub `from agentic_dynamics.<plane>.<m> import *`
+            (+ __all__), and a barrel __init__.py mirroring the old 703-line re-export surface with
+            a DeprecationWarning. The shim must serve from instrument import X / import instrument.X
+            / from instrument.X import Y.
+          - Run pytest tests/ -m "not external" — green via the shim; smoke-run 5 representative
+            scripts (run.py, worker.py, analyze_worktrees.py, build_data.py, kb_produce.py).
+
+          DELIVER the moved package + the generated shim (one commit).
+      - name: rewrite_consumers
+        kind: agent
+        timeout: 14400
+        enforce_pytest: true
+        prompt: |
+          Rewrite the consumer imports onto agentic_dynamics.* and centralize the bootstrap.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §1.3 phase C.
+
+          DO:
+          - Rewrite scripts/ + admin/ + tests/ imports from instrument. → agentic_dynamics.<plane>.
+            (batch mechanical sed, reviewed per family).
+          - Replace the ~55 per-file sys.path.insert(…/src) bootstraps with one scripts/_bootstrap.py
+            (inserts src/ identically); preserve the __main__ direct-run contract (python scripts/foo.py
+            still works). Move scripts/_constants.py → agentic_dynamics/core/constants.py and update
+            its importers.
+          - Update the 3 importers of scripts/_constants.py (inventory.py, analyze_*, lab_*) and any
+            docstring/comment that names the old package.
+          - Run pytest tests/ -m "not external" — green; grep "from instrument\|import instrument"
+            over scripts/ admin/ tests/ src/ must return ZERO matches outside src/instrument/ itself.
+
+          DELIVER the rewritten consumers + scripts/_bootstrap.py.
+      - name: dependency_lint
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Add the dependency-direction lint and data-flow tests.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §1.4 (the 8 forbidden-edge assertions + 2 pinned positive edges + 2 data-flow tests).
+
+          DO:
+          - Write tests/test_dependency_direction.py: ast.walk every src/agentic_dynamics/** module
+            + apps/** and assert (1) core imports nothing from tier≥1; (2) measurement does not
+            import control; (3) knowledge does not import control; (4) experiment does not import
+            control; (5) reporting does not import control; (6) control does not import apps and
+            nothing imports apps; (7) control does not import knowledge.retrieval or
+            knowledge.prompt_constructor; (8) apps contain no ExperimentSpec(/RuleSpec(/Factor(
+            construction. Pin the two positive edges (workflow_runner→step_routing/live;
+            opencode/claude_adapter→live) as the COMPLETE tier-1→tier-2 set.
+          - Write the data-flow tests: retrieve() never returns an authority==POLICY candidate and
+            references publish_event zero times; knowledge modules never call
+            actuation_ingestion.derive_actuation_record.
+          - Run the new tests + pytest tests/ -m "not external" — all green.
+
+          DELIVER tests/test_dependency_direction.py + the data-flow tests.
+      - name: retire_shim
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Retire the shim and the dead modules (rec 7).
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §1.3 phase E.
+
+          DO:
+          - Confirm grep "from instrument\|import instrument" over scripts/ admin/ tests/ src/
+            returns zero matches, then delete src/instrument/ (the shim) and the legacy/ modules
+            that WS-01 marks dead (experiment.py, adapter.py, lab_book.py, recovery.py,
+            trajectory.py), plus scripts/plan.py, the 8 scripts/lab_*_DEPRECATED_bge_m3.py, and
+            scripts/{analyze_with_ollama,analyze_with_opencode,build_graph}.py, and their tests
+            (test_adapter.py, test_recovery.py, test_trajectory_embedding.py).
+          - Strip the now-dead "# Deprecated:" re-export comments from the new package __init__s.
+          - Run pytest tests/ -m "not external" — green; run the compile-gate validate snippet on
+            every experiments/specs/*.yaml (python -c using instrument.experiment_spec.validate_spec
+            — note the import now resolves via agentic_dynamics) and include the output.
+          - Write docs/consolidation/stage_1_verification.md with PASS/FAIL per acceptance criterion
+            (imports_resolve, dependency_lint_green, deprecated_retired, bootstrap_centralized).
+
+          DELIVER the retired shim + docs/consolidation/stage_1_verification.md.
+      - name: verify
+        kind: test
+        timeout: 7200
+        prompt: |
+          Full-suite gate. Runs the language test suite (pytest) via the independent test runner.
+
+          GOAL:
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: package_move_delivered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [imports_resolve, dependency_lint_green, deprecated_retired, bootstrap_centralized]
+metrics:
+  - {name: imports_resolve, agg: mean, over: cell}
+  - {name: dependency_lint_green, agg: mean, over: cell}
+  - {name: deprecated_retired, agg: mean, over: cell}
+  - {name: bootstrap_centralized, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, skeleton, move, rewrite_consumers, dependency_lint, retire_shim, verify]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

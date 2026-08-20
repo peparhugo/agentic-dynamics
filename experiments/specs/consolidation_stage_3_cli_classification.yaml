@@ -1,0 +1,152 @@
+name: consolidation_stage_3_cli_classification
+question: >-
+  Stage 3 of the consolidation release: collapse the script surface into one agentic-dynamics CLI
+  and classify the 85 scripts (critique rec 5). PLACE IN ORDERING: needs — Stage 2 (the CLI's
+  experiment run / workflow run subcommands reference the split paths); blocks — Stages 4 (the
+  canonical instruction source documents the CLI surface), 5 (site/knowledge subcommands), 6.
+  SUPERSESSION: folds refactor_master_plan WS-09 (retire review_worker.py — the "superseded but still
+  spawned" contradiction is resolved here) and the archive half of WS-10 (the 15 one-time migration
+  scripts move to scripts/archive/). The deeper pipeline.py→review_all.py shared-runner rewire is
+  DEFERRED. The full subcommand tree + classification buckets are in docs/consolidation/design.md §5.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      critique: >-
+        READ docs/review/semantic_monolith_review.md rec 5: replace the enduring commands with one
+        CLI (agentic-dynamics experiment run / workflow run / queue worker|monitor / analyze
+        worktrees|trajectories / data build / knowledge ingest / registry query / site build) and
+        classify the remaining scripts as maintained command / one-time migration / historical
+        analysis / deprecated. One-time migrations should not live indefinitely beside the maintained
+        runtime.
+      read_first: >-
+        docs/consolidation/design.md §5 (the complete subcommand tree + the classification buckets
+        covering all 85 scripts) and scripts/CONTEXT.md (the authoritative per-script reference). Also
+        docs/consolidation/stage_map.md §4 Stage 3.
+      hard_rules: >-
+        (1) Every maintained script maps to a subcommand; no maintained command lives only as a loose
+        script. (2) The classification manifest (in scripts/CONTEXT.md) covers all 85 scripts with
+        zero orphans — maintained command / one-time migration / historical analysis / deprecated.
+        (3) scripts become thin CLI adapters only (rec 8); the CLI never imports control for steering.
+        (4) review_worker.py is retired and no longer referenced by pipeline.py or trigger_reviews.py.
+        (5) One-time migrations move to scripts/archive/ and are not importable as maintained
+        commands. (6) The 19 active lab_*.py are historical analysis — kept as analyze lab <name>,
+        not rewritten. (7) pytest green at every phase boundary; smoke-run every maintained entry
+        point.
+      run_shape: >-
+        SINGLE-model: deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/consolidation-release). Python language. Each phase commits [workflow] <phase>;
+        code-touching phases carry enforce_pytest: true.
+    phases:
+      - name: cli
+        kind: agent
+        timeout: 10800
+        enforce_pytest: true
+        prompt: |
+          Build the agentic-dynamics CLI command surface.
+
+          GOAL:
+          {goal}
+
+          READ FIRST: docs/consolidation/design.md §5 (the full subcommand tree).
+
+          DO:
+          - Add an agentic-dynamics entry point (e.g. agentic_dynamics/cli.py + a console_scripts
+            entry in pyproject) with the subcommands: experiment run, experiment sweep, story run,
+            story batch, workflow run, queue enqueue|worker|monitor|reinterleave|analysis, analyze
+            worktrees|trajectories|stories|lab, data build|sync|manifest|inventory, knowledge
+            ingest|sources|worker, registry query|show|lineage, review all|stories|trigger|enqueue|
+            finalize, spec status|pipeline, validate session|tests, supervise.
+          - Each subcommand is a thin wrapper (argparse → import the backing script's main or call the
+            backing agentic_dynamics module) — the CLI composes, it does not re-implement.
+          - Run pytest tests/ -m "not external" — green.
+
+          DELIVER the CLI + console-scripts wiring.
+      - name: classify_scripts
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Write the script-classification manifest.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §5 (the buckets) + scripts/CONTEXT.md.
+
+          DO:
+          - Re-issue scripts/CONTEXT.md as the classification manifest: every one of the 85 scripts
+            in exactly one bucket (maintained command / one-time migration / historical analysis /
+            deprecated) with its subcommand or archive/disposition. Zero orphans.
+          - Add a guard test tests/test_script_classification.py that asserts the manifest covers all
+            85 scripts (ls scripts/*.py minus _bootstrap.py) and that no maintained command is absent
+            from the CLI subcommand list.
+
+          DELIVER the manifest + the guard test.
+      - name: retire_and_archive
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Retire review_worker.py and archive the one-time migrations.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §5 (deprecated + one-time buckets).
+
+          DO:
+          - Retire scripts/review_worker.py: re-point scripts/pipeline.py (review phase) and
+            scripts/trigger_reviews.py onto review_all.py (or a shared runner) and delete
+            review_worker.py; assert no script references it.
+          - git mv the 15 one-time migrations to scripts/archive/: backfill_artifacts,
+            backfill_story_artifacts, backfill_story_transcripts, backfill_deep_metrics,
+            batch_analyze_ts_ssg, finish_sweep, regen_typescript_ssg, backfill_sonar, backfill_costs,
+            compute_sonar_deltas, embed_sessions, recovery_cost_table, rescore_conventions,
+            recover_stories, kb_produce_registry.
+          - Do NOT retire the WS-01 scripts here (plan.py, analyze_with_ollama.py,
+            analyze_with_opencode.py, build_graph.py, and the 8 lab_*_DEPRECATED_bge_m3.py): those
+            are folded into Stage 1's retire_shim phase and are its sole responsibility — no
+            duplicate execution. This phase retires ONLY review_worker.py (WS-09) and archives the
+            one-time migrations (WS-10).
+          - Run pytest tests/ -m "not external" — green; smoke-run every maintained entry point
+            (python scripts/<script>.py --help or equivalent) and record PASS/FAIL.
+
+          DELIVER the retired/archived scripts + smoke-run log.
+      - name: verify
+        kind: test
+        timeout: 7200
+        prompt: |
+          Full-suite gate. Runs the language test suite (pytest) via the independent test runner.
+
+          GOAL:
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: cli_classification_delivered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [cli_commands_cover_scripts, scripts_classified, review_worker_retired, archive_populated]
+metrics:
+  - {name: cli_commands_cover_scripts, agg: mean, over: cell}
+  - {name: scripts_classified, agg: mean, over: cell}
+  - {name: review_worker_retired, agg: mean, over: cell}
+  - {name: archive_populated, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, cli, classify_scripts, retire_and_archive, verify]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

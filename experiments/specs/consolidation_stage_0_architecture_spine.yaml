@@ -1,0 +1,187 @@
+name: consolidation_stage_0_architecture_spine
+question: >-
+  Stage 0 of the consolidation release: establish the single architectural spine, apply the
+  doc-lifecycle status vocabulary, and declare the Context Abstraction Plane freeze (critique
+  rec 1 + rec 4). PLACE IN ORDERING: needs — (this is the first stage, baseline); blocks — every
+  later stage (S1–S6) consumes ARCHITECTURE.md's plane/boundary definitions and the reserved CAP
+  homes. SUPERSESSION: the doc-drift half of refactor_master_plan WS-10 is RETIRED here — the
+  module/script/test count corrections and stale-doc notes are superseded by this stage's single
+  ARCHITECTURE.md authority plus Stage 4's regenerated instruction surfaces (see
+  docs/consolidation/stage_map.md §5). This stage is DESIGN + DOC ONLY: it writes
+  ARCHITECTURE.md, moves docs, and adds lifecycle status fields — it edits no production code and
+  no test file except the new tests/test_doc_lifecycle.py.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: markdown
+    fork: true
+    context:
+      critique: >-
+        READ docs/review/semantic_monolith_review.md FIRST. Rec 1: freeze architectural expansion
+        (pause CAP I0–I7 until structural homes exist). Rec 4: one current architectural authority
+        (root ARCHITECTURE.md answering planes, boundaries, dependency direction, implemented vs
+        proposed, the canonical loop, and which documents supersede which), with a structured doc
+        lifecycle status (proposed | accepted | implementing | implemented | superseded | abandoned
+        + supersedes: + implemented_by:) and docs/designs/{current,implemented} + docs/archive/.
+      read_first: >-
+        docs/consolidation/stage_map.md (§2 recommendation matrix, §6 CAP freeze) and
+        docs/consolidation/design.md (§2 ARCHITECTURE.md skeleton, §3 doc-lifecycle migration)
+        are the authoritative blueprints for this stage. Also read
+        docs/context_abstraction/design.md (§9 I0–I7 increment table) and
+        .opencode/instructions/mental-model.md (the cycle + the six systems).
+      hard_rules: >-
+        (1) DOC ONLY — write ARCHITECTURE.md, docs/designs/{current,implemented}, docs/archive/,
+        and tests/test_doc_lifecycle.py; do NOT edit src/, scripts/, admin/, or firebase/. (2) The
+        CAP freeze is a PAUSE, not a delete: context_abstraction_implement.yaml must be marked
+        paused (status note + resume_after consolidation S6), never removed, never superseded.
+        (3) The reserved CAP homes must be declared in ARCHITECTURE.md exactly as
+        docs/consolidation/stage_map.md §6 maps them (control/facts.py, control/reducers/,
+        control/context_compiler.py, control/rules.py, control/validator.py, control/decisions.py,
+        core/contracts.py) — post-consolidation CAP implementation is drop-in. (4) No BLUEPRINT*.md
+        may remain at the root; each moves to docs/archive/ with status: superseded. (5) The
+        load-bearing rule (instrument → derive → policy, the requires/produces gate) is untouchable
+        and must be restated in ARCHITECTURE.md, not redefined. (6) Cite everything: critique
+        section for recommendation coverage, file:line for internal claims.
+      run_shape: >-
+        SINGLE-model: deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/consolidation-release). Markdown language, no code edits beyond
+        tests/test_doc_lifecycle.py. Each phase commits [workflow] <phase>. The verify phase runs
+        pytest on tests/test_doc_lifecycle.py only (no full-suite gate — this stage touches no
+        production code).
+    phases:
+      - name: spine
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Write the single root ARCHITECTURE.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST: docs/consolidation/design.md §2 (the six-section skeleton) + docs/consolidation/stage_map.md §1 (the release outcome).
+
+          DO:
+          - Author ARCHITECTURE.md at the repo root with the six sections: (1) Planes — the eight
+            bounded packages (core/experiment/measurement/runtime/adapters/knowledge/control/reporting)
+            + their one-line ownership, mapped to the critique's six systems; (2) Package boundaries
+            — what each plane may/may not import, pointing at tests/test_dependency_direction.py
+            (to be added in Stage 1); (3) Dependency direction — the spine
+            core ← experiment/measurement/runtime/knowledge ← control ← applications with the two
+            pinned execution→control observation edges (workflow_runner→step_routing/live;
+            opencode/claude_adapter→live) drawn as observe-only arrows; (4) Implemented vs proposed
+            — shipped planes vs reserved-but-empty CAP homes (I0–I7 → control/* + core/contracts.py)
+            vs deferred workstreams (WS-02..08); (5) The canonical execution loop — spec → compile →
+            DAG → cells → jobs → attempts → ledger → information → policy → grid → campaign;
+            (6) Supersession map — which documents this file replaces (BLUEPRINT.md,
+            BLUEPRINT_v2.md, BLUEPRINT_v3.md, dated handoffs, superseded reviews) and which remain
+            authoritative (mental-model, src/instrument/CONTEXT.md, scripts/CONTEXT.md,
+            data_integrity_findings.md, docs/review/).
+          - State the load-bearing rule verbatim as the architectural invariant (do not redefine it).
+
+          DELIVER ARCHITECTURE.md.
+      - name: lifecycle
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Apply the doc-lifecycle migration.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §3 (the migration table + status vocabulary).
+
+          DO:
+          - Move BLUEPRINT.md, BLUEPRINT_v2.md, BLUEPRINT_v3.md → docs/archive/ with a status
+            front-matter (status: superseded, superseded_by: ARCHITECTURE.md).
+          - Move dated handoffs (docs/HANDOFF_2026-08-17.md, docs/HANDOFF_2026-08-19.md) and dated
+            code_reviews/* that predate the registry repoint → docs/archive/ (superseded).
+          - Move current-but-frozen designs (docs/context_abstraction/{design,verify}.md,
+            docs/supervisor_design.md, code_reviews/2026-08-14_experiment-spec-and-compiler-design.md)
+            → docs/designs/current/ with status: accepted (CAP frozen, not implemented).
+          - Move shipped designs (canonical-state rounds, RAG seam split, website repoints) →
+            docs/designs/implemented/ with status: implemented + implemented_by: naming the merged
+            branch/PR.
+          - Add a status front-matter block to every remaining top-level root/docs markdown file that
+            lacks one (README.md, AGENTS.md, CLAUDE.md, docs/*.md), using the vocabulary
+            proposed|accepted|implementing|implemented|superseded|abandoned.
+          - Write tests/test_doc_lifecycle.py: walks docs/** + root *.md and asserts every file
+            carries a status field, and that docs/archive/ entries carry status: superseded.
+
+          DELIVER the migrated doc tree + tests/test_doc_lifecycle.py.
+      - name: freeze
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Declare the Context Abstraction Plane freeze.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/stage_map.md §6 (where the freeze lands) + experiments/specs/context_abstraction_implement.yaml.
+
+          DO:
+          - Add a freeze note to experiments/specs/context_abstraction_implement.yaml: a status
+            note marking it PAUSED (not deleted, not superseded) with freeze_reason:
+            consolidation_release/stage_map and resume_after: consolidation S6. Use the lifecycle
+            fields the schema already understands (status: + a free-text note in the question or a
+            comment) — do NOT invent a status value outside {draft,active,superseded,tombstoned};
+            if no field fits, encode PAUSED in the spec's question text + a docs/consolidation/
+            freeze note and keep the derived index consistent.
+          - Ensure ARCHITECTURE.md's "implemented vs proposed" section declares the reserved CAP
+            homes (control/facts.py, control/reducers/, control/context_compiler.py,
+            control/rules.py, control/validator.py, control/decisions.py, core/contracts.py) as
+            empty-but-reserved placeholders.
+          - Regenerate experiments/specs/index.json + STATUS.md via python scripts/spec_status.py so
+            the index reflects the freeze (the spec must not appear runnable/active for CAP work).
+
+          DELIVER the freeze note + reserved-homes declaration + refreshed spec index.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Verify the spine, lifecycle, and freeze end to end.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Run pytest tests/test_doc_lifecycle.py and include the output; fix any failure.
+          - Assert exactly one root ARCHITECTURE.md exists and contains the six §2 sections.
+          - Assert no BLUEPRINT*.md remains at the repo root.
+          - Assert context_abstraction_implement carries the PAUSED note (grep for it) and is NOT
+            deleted and NOT marked superseded.
+          - Coverage: rec 1 → freeze declared; rec 4 → single authority + lifecycle status. Zero
+            orphan files from the migration (every moved doc appears in its new home).
+          - Write docs/consolidation/stage_0_verification.md with PASS/FAIL per check.
+
+          DELIVER docs/consolidation/stage_0_verification.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: architecture_spine_delivered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [arch_spine_single, doc_lifecycle_statused, cap_frozen, supersession_mapped]
+metrics:
+  - {name: arch_spine_single, agg: mean, over: cell}
+  - {name: doc_lifecycle_statused, agg: mean, over: cell}
+  - {name: cap_frozen, agg: mean, over: cell}
+  - {name: supersession_mapped, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, spine, lifecycle, freeze, verify]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

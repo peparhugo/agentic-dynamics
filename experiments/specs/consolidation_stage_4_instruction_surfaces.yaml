@@ -1,0 +1,111 @@
+name: consolidation_stage_4_instruction_surfaces
+question: >-
+  Stage 4 of the consolidation release: eliminate the duplicate instruction surfaces (critique rec
+  6) — one canonical source agent_config/ that generates .opencode/ and .claude/, so neither is
+  manually authoritative. PLACE IN ORDERING: needs — Stage 3 (the canonical source documents the CLI
+  surface + the new package paths); blocks — Stage 6. SUPERSESSION: absorbs the doc-drift half of
+  refactor_master_plan WS-10 (module/script/test counts and stale-doc notes are corrected in the
+  canonical source, then regenerated — superseded, not re-done). The drift guard test is specified in
+  docs/consolidation/design.md §6 Stage 4.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      critique: >-
+        READ docs/review/semantic_monolith_review.md rec 6: .opencode/ and .claude/ should not both be
+        manually authoritative. One canonical source (agent_config/) generates the other.
+      read_first: >-
+        docs/consolidation/design.md §6 Stage 4 + docs/consolidation/stage_map.md §4 Stage 4. Also
+        read the current .opencode/instructions/mental-model.md and the .claude/ surface so the
+        canonical source captures every instruction the two surfaces currently carry.
+      hard_rules: >-
+        (1) Exactly one canonical, hand-edited source: agent_config/. (2) .opencode/ and .claude/
+        become GENERATED copies, byte-identical to the output of the generation script — the guard
+        test generated_surfaces_match fails on drift. (3) The generation must be deterministic and
+        committed; no .opencode/ or .claude/ file is hand-edited after this stage. (4) The canonical
+        source must reflect the Stage 1 package paths (agentic_dynamics.*), the Stage 2 experiments/
+        workflows split, and the Stage 3 CLI surface — no stale counts or names. (5) No production
+        code changes beyond the generation script + the guard test; pytest green.
+      run_shape: >-
+        SINGLE-model: deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/consolidation-release). Python language. Each phase commits [workflow] <phase>;
+        code-touching phases carry enforce_pytest: true.
+    phases:
+      - name: canonical_source
+        kind: agent
+        timeout: 10800
+        enforce_pytest: true
+        prompt: |
+          Build the canonical agent_config/ instruction source.
+
+          GOAL:
+          {goal}
+
+          READ FIRST: docs/consolidation/design.md §6 Stage 4 + the existing .opencode/ + .claude/ surfaces.
+
+          DO:
+          - Create agent_config/ as the single hand-edited source: the mental model (module map,
+            signatures, dependencies — now naming agentic_dynamics.* planes), the rules (the AGENTS.md
+            hats + load-bearing rule), the skills (instrument/analyze/lab-books/run-workflow/queue/
+            review/control-room), and the CLI surface (the Stage 3 subcommand tree).
+          - Correct the doc-drift (WS-10 doc-drift half, now superseded): current module/script/test
+            counts, the actuation_ingestion call-site note, and any review_worker reference.
+          - Run pytest tests/ -m "not external" — green (this phase is additive).
+
+          DELIVER agent_config/.
+      - name: generate
+        kind: agent
+        timeout: 7200
+        enforce_pytest: true
+        prompt: |
+          Write the generation script and regenerate both surfaces.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/consolidation/design.md §6 Stage 4.
+
+          DO:
+          - Write scripts/_gen_instructions.py (or agentic_dynamics/cli/_gen_instructions.py) that
+            deterministically renders agent_config/ → .opencode/ + .claude/ (the format mapping:
+            which agent_config/ file becomes which .opencode/ and .claude/ file, so both surfaces
+            come from one source).
+          - Run it and commit the regenerated .opencode/ + .claude/ (byte-identical to source
+            output).
+          - Write tests/test_generated_surfaces_match.py: renders agent_config/ and asserts the
+            committed .opencode/ + .claude/ are byte-identical; the test fails on drift.
+          - Run pytest tests/ -m "not external" — green.
+
+          DELIVER the generation script + the guard test + regenerated surfaces.
+      - name: verify
+        kind: test
+        timeout: 7200
+        prompt: |
+          Full-suite gate. Runs the language test suite (pytest) via the independent test runner.
+
+          GOAL:
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: instruction_surfaces_delivered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [generated_surfaces_match, single_instruction_source]
+metrics:
+  - {name: generated_surfaces_match, agg: mean, over: cell}
+  - {name: single_instruction_source, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, canonical_source, generate, verify]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
