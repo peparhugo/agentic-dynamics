@@ -3,7 +3,7 @@
 Covers the wiring introduced in the implement phase:
 
     execute (worker.py)  --trigger_analysis-->  analyze (analysis_worker.py)
-                          --trigger_reviews-->  review (review_worker.py)
+                          --trigger_reviews-->  review (review_all.py)
 
 The four required checks:
 

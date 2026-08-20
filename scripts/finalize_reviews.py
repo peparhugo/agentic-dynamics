@@ -1,6 +1,6 @@
 """finalize_reviews.py — Merge per-session review files into aggregate JSONs.
 
-review_worker.py writes one file per session (review_{story_id}_S{n}.json)
+The review runner writes one file per session (review_{story_id}_S{n}.json)
 plus review_{story_id}_story.json. This merges them into the aggregate
 review_{story_id}.json that build_data.py and the website consume.
 

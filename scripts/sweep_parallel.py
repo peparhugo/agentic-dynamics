@@ -7,6 +7,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 from agentic_dynamics.core.constants import WORKTREE_ROOT
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"

@@ -26,6 +26,11 @@ from pathlib import Path
 from typing import Any
 
 import redis
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 from agentic_dynamics.core.constants import model_slug
 
 # ── Matrix Definition ──────────────────────────────────────────

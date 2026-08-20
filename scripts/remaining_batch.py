@@ -6,6 +6,11 @@ import time
 from pathlib import Path
 
 import yaml
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 from agentic_dynamics.core.constants import WORKTREE_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

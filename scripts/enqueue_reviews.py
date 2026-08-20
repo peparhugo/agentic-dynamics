@@ -1,7 +1,7 @@
 """enqueue_reviews.py — Push review jobs to Redis queue for parallel processing.
 
 Scans all story result JSONs, finds worktree commits, enqueues review jobs.
-Workers (review_worker.py) pop jobs and run review_commit() with DeepSeek Flash.
+review_all.py runs review_commit() synchronously with DeepSeek Flash.
 
 Usage:
   python3 scripts/enqueue_reviews.py          # enqueue all pending reviews
@@ -106,7 +106,7 @@ def main() -> None:
     else:
         print(f"Enqueued {total_jobs} review jobs ({stories_with_worktrees} stories)")
         print(f"Queue: {r.llen(REVIEW_QUEUE)} pending")
-        print("Start workers: nohup python3 scripts/review_worker.py &")
+        print("Run reviews: python3 scripts/review_all.py")
 
 
 if __name__ == "__main__":

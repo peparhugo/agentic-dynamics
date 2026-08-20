@@ -19,6 +19,11 @@ INVENTORY_PATH = PROJECT_ROOT / "experiments" / "inventory.json"
 OPENSCODE_DB = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 CONFIGS_DIR = PROJECT_ROOT / "experiments" / "configs"
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 from agentic_dynamics.core.constants import WORKTREE_GLOB
 
 

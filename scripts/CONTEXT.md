@@ -1,20 +1,22 @@
 # `scripts/` — Scripts Reference (classification manifest)
 
-73 Python scripts, each in exactly one bucket (critique rec 5). `_bootstrap.py` is a shared
-sys.path helper, not a command. The classification below is machine-parsed by
-`tests/test_script_classification.py` — keep the marker lines intact.
+72 command scripts plus the `_bootstrap.py` helper, each command in exactly one bucket
+(critique rec 5). The classification below is machine-parsed by
+`tests/test_script_classification.py` — keep the marker lines intact. The `one-time` bucket
+lives under `scripts/archive/`; the other buckets live at the top of `scripts/`.
 
 <!-- scripts-classification: start -->
 maintained: run.py sweep_parallel.py sweep_silent_mode.py batch_run.py remaining_batch.py multi_phase.py run_story.py batch_stories.py run_workflow.py enqueue.py worker.py monitor.py reinterleave_queue.py enqueue_analysis.py analysis_worker.py analyze_worktrees.py analyze_trajectories.py analyze_stories.py build_data.py sync_data.py generate_manifest.py inventory.py kb_produce.py kb_produce_sources.py kb_worker.py registry.py review_all.py review_stories.py trigger_reviews.py enqueue_reviews.py finalize_reviews.py spec_status.py pipeline.py validate_session.py verify_tests.py supervise.py claude_agents_supervisor.py
 historical: lab_basin_topology.py lab_basin_topology_neo4j.py lab_cache_economics.py lab_claude_audit.py lab_condition_effects.py lab_correctness_premium.py lab_flail_triggers.py lab_grit_matrix.py lab_opencode_meta_analysis.py lab_quality_frontier.py lab_sonar_quality.py lab_story_arc.py lab_story_review.py lab_survival_horizon.py lab_task_routing.py lab_think_do_coupling.py lab_tool_archetypes.py lab_verification_frontier.py lab_verification_value.py
 one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_transcripts.py backfill_deep_metrics.py batch_analyze_ts_ssg.py finish_sweep.py regen_typescript_ssg.py backfill_sonar.py backfill_costs.py compute_sonar_deltas.py embed_sessions.py recovery_cost_table.py rescore_conventions.py recover_stories.py kb_produce_registry.py
-deprecated: review_worker.py
 <!-- scripts-classification: end -->
 
 - **maintained command** — reached via `agentic-dynamics <subcommand>` (the Stage 3 CLI).
 - **historical analysis** — the 19 active lab books, reached via `agentic-dynamics analyze lab <name>`.
 - **one-time migration** — archived to `scripts/archive/` (fold WS-10), not maintained.
-- **deprecated** — retired (WS-09 `review_worker.py`); the WS-01 scripts were retired in Stage 1.
+- **deprecated** — none remain: WS-09 (`review_worker.py`) retired in this phase; the WS-01
+  scripts (`plan.py`, `analyze_with_ollama/opencode`, `build_graph`, 8 `*_DEPRECATED_bge_m3`)
+  were retired in Stage 1.
 
 ## Primary Entry Points
 

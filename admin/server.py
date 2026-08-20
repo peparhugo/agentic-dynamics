@@ -137,7 +137,7 @@ QUEUE_KEY = "story_jobs"
 RESULTS_KEY = "story_results"
 # Post-hoc pipeline stages. The execute stage is the story queue above; the
 # analyze and review stages are separate Redis pairs written by
-# enqueue_analysis.py/analysis_worker.py and enqueue_reviews.py/review_worker.py.
+# enqueue_analysis.py/analysis_worker.py and enqueue_reviews.py/review_all.py.
 # None of the post-hoc workers publish to a pub/sub channel, so these are only
 # visible through the poll-driven /api/matrix snapshot (see §0 of the survey).
 ANALYSIS_QUEUE_KEY = "analysis_jobs"

@@ -5,7 +5,7 @@ isolated framework instance (``finops-queue``, DB 1, port 6380):
 
     story_jobs     -> worker.py            (execute)
     analysis_jobs  -> analysis_worker.py   (analyze)
-    review_jobs    -> review_worker.py     (review)
+    review_jobs    -> review_all.py        (review)
 
 This module is the single source of truth for the job dict shapes and the
 queue/status key names, so the batch backfill scripts (``enqueue_analysis.py``,

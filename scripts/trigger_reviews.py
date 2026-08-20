@@ -3,7 +3,7 @@
 Async handoff between the post-hoc phases, driven by the Redis queue (6380):
   1. Poll ``analysis_jobs`` + ``analysis_status`` until every story is done/failed.
   2. Run ``enqueue_reviews.py`` (populates ``review_jobs``).
-  3. Spawn N ``review_worker.py`` processes (detached).
+  3. Run ``review_all.py`` (synchronous — replaces the retired Redis review worker).
 
 Usage:
     python3 scripts/trigger_reviews.py            # default 4 review workers
@@ -61,19 +61,11 @@ def main() -> None:
     print("Analysis complete. Enqueuing reviews...", flush=True)
     subprocess.run([sys.executable, "scripts/enqueue_reviews.py"], check=True)
 
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Spawning {REVIEW_WORKERS} review workers...", flush=True)
-    for i in range(REVIEW_WORKERS):
-        log_path = LOG_DIR / f"review_worker_{i}.log"
-        with open(log_path, "w") as f:
-            subprocess.Popen(
-                ["nohup", sys.executable, "-u", "scripts/review_worker.py"],
-                stdout=f,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
-
-    print("Done — review workers running against 'review_jobs'.", flush=True)
+    # review_all.py is the synchronous review runner (ThreadPoolExecutor, no Redis) — it
+    # replaces the retired Redis review worker (WS-09). Run it to completion.
+    print("Running review_all.py (synchronous)...", flush=True)
+    subprocess.run([sys.executable, "scripts/review_all.py"], check=False)
+    print("Done — reviews written by review_all.py.", flush=True)
 
 
 if __name__ == "__main__":

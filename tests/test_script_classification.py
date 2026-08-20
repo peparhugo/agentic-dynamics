@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT / "scripts"
 CONTEXT = SCRIPTS_DIR / "CONTEXT.md"
 
-BUCKETS = ("maintained", "historical", "one-time", "deprecated")
+BUCKETS = ("maintained", "historical", "one-time")
 
 _START = "<!-- scripts-classification: start -->"
 _END = "<!-- scripts-classification: end -->"
@@ -39,8 +39,11 @@ def _parse_manifest() -> dict[str, set[str]]:
 
 
 def test_manifest_covers_every_script_with_zero_orphans():
-    """Every ``scripts/*.py`` (minus the ``_bootstrap.py`` helper) is in exactly one bucket."""
-    actual = {p.name for p in SCRIPTS_DIR.glob("*.py")} - {"_bootstrap.py"}
+    """Every ``scripts/**/*.py`` (minus the ``_bootstrap.py`` helper) is in exactly one bucket.
+
+    The ``one-time`` bucket lives under ``scripts/archive/``; the rest at the top of ``scripts/``.
+    """
+    actual = {p.name for p in SCRIPTS_DIR.rglob("*.py")} - {"_bootstrap.py"}
     manifest = _parse_manifest()
     classified = set().union(*manifest.values())
     assert classified == actual, (

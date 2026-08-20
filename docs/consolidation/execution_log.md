@@ -405,6 +405,44 @@ Notes:
   `src/instrument/*` → `agentic_dynamics/*`, `_constants.py` → `agentic_dynamics/core/constants.py`,
   `plan.py` row removed, `review_worker.py` marked deprecated).
 
+---
+
+## S3 — retire + archive (phase `retire_and_archive`)
+
+Spec: `workflows/repository/consolidation_stage_3_cli_classification.yaml` · phase
+`retire_and_archive` (phase C). Deliverable: `review_worker.py` retired + 15 one-time migrations
+archived to `scripts/archive/`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `scripts/review_worker.py` retired (WS-09): `pipeline.py` review phase + `trigger_reviews.py` re-pointed onto `review_all.py` (synchronous), file deleted | PASS |
+| 2 | `grep review_worker` over `scripts/ admin/ tests/ src/` = zero | PASS |
+| 3 | 15 one-time migrations `git mv`'d → `scripts/archive/` | PASS |
+| 4 | WS-01 scripts NOT re-retired here (already retired in Stage 1) — verified `plan.py`/`*_bge_m3`/`analyze_with_*` absent | PASS |
+| 5 | Manifest + guard test updated: `one-time` bucket → `scripts/archive/`, `deprecated` bucket emptied; guard test now globs `scripts/**` recursively | PASS |
+| 6 | `pytest tests/ -m "not external"` green | PASS (1187 passed, 106 deselected) |
+| 7 | Smoke-run all 37 maintained entry points | PASS (37/37 importable/runnable; 5 missing bootstraps fixed) |
+
+**S3-retire_and_archive result: 7/7 PASS — Stage 3 complete (cli/classify_scripts/retire_and_archive).**
+
+Notes:
+
+- **`review_worker.py` retirement** removed the "superseded but still spawned" contradiction:
+  `pipeline.py::_execute_review` now runs `review_all.py` once synchronously (no Redis worker
+  spawn, no dead `REVIEW_QUEUE` enqueue), and `trigger_reviews.py` runs `review_all.py` after
+  enqueuing. The deeper shared-runner rewire stays deferred (design §5).
+- **Five maintained scripts were missing their bootstrap** (`sweep_parallel.py`, `batch_run.py`,
+  `remaining_batch.py`, `enqueue.py`, `inventory.py`) — they had no `sys.path.insert` in Stage 1
+  (they relied on the editable install), so they never received `import _bootstrap` and failed
+  with `ModuleNotFoundError` once the shim was gone. Fixed by inserting the same try/except
+  bootstrap each other script uses.
+- **`tests/test_kb_produce_registry.py`** now imports `scripts.archive.kb_produce_registry`, and
+  its real-repo subprocess smoke test was removed (a maintained-command smoke test for a
+  now-archived one-time migration).
+- The archived scripts' internal `parent.parent` repo-root anchors are stale (one level shallow);
+  left as-is — they are frozen one-time artifacts, not maintained runtime (rec 5).
+
+
 
 
 

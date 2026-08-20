@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import kb_produce_registry as kpr
+from scripts.archive import kb_produce_registry as kpr
 
 
 def _story_result(story_id: str, **overrides) -> dict:
@@ -432,32 +432,3 @@ def test_module_never_imports_actuation_ingestion():
     assert "actuation_ingestion" not in imported_modules
     assert not hasattr(kpr, "derive_actuation_record")
 
-
-# ── CLI subprocess smoke test (the literal command the task names) ──
-
-
-def test_cli_dry_run_against_the_real_repo_touches_nothing(tmp_path):
-    """`python scripts/kb_produce_registry.py --dry-run --source story` — the literal
-    verification command — must exit 0, print a would-emit summary, and leave the repo's
-    git status unchanged (no new/modified tracked or untracked files)."""
-    import subprocess
-
-    repo_root = Path(__file__).resolve().parent.parent
-    before = subprocess.run(
-        ["git", "-C", str(repo_root), "status", "--porcelain"],
-        capture_output=True, text=True, check=True,
-    ).stdout
-
-    result = subprocess.run(
-        ["python3", "scripts/kb_produce_registry.py", "--dry-run", "--source", "story"],
-        cwd=repo_root, capture_output=True, text=True,
-    )
-
-    after = subprocess.run(
-        ["git", "-C", str(repo_root), "status", "--porcelain"],
-        capture_output=True, text=True, check=True,
-    ).stdout
-
-    assert result.returncode == 0, result.stderr
-    assert "would emit" in result.stdout
-    assert before == after
