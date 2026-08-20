@@ -642,9 +642,27 @@ Notes:
   `cwd: apps/website`.
 - Both hosts deployed from the same `apps/website/` source — in sync by construction.
 
+---
 
+## Repair release
 
+Per-finding acceptance-criterion results for the refactor-repair release (review:
+`docs/review/refactor_repair_review.md`). One subsection per finding, in release order.
 
+### P0-3 — Control Room repo root re-point
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `apps/control_room/server.py` `ROOT` re-pointed to `agentic_dynamics.core.paths.PROJECT_ROOT` (was `Path(__file__).resolve().parent.parent` → `<repo>/apps`) | PASS |
+| 2 | `DATA_MANIFEST_PATH` default resolves to `<repo>/experiments/data_manifest.json` (no longer `apps/experiments/...`) | PASS |
+| 3 | `SUPERVISOR_FLAGS_FILE` default resolves to `<repo>/experiments/results/supervisor/flags.jsonl` | PASS |
+| 4 | Design-session (and claude-agent) workdir allowlist defaults to `<repo>` (no longer `apps/`) | PASS |
+| 5 | `_results_summary.json` read (`/api/routing`) and `scripts/enqueue.py` `cwd` re-pointed from `parent.parent` to `ROOT` | PASS |
+| 6 | Launch docs updated — `python3 apps/control_room/server.py` + `gunicorn ... 'apps.control_room.server:app'` | PASS |
+| 7 | `tests/test_control_room_paths.py` added — asserts `server.ROOT == PROJECT_ROOT` + manifest/flags/workdir defaults resolve inside the repo | PASS (5 passed) |
+| 8 | `pytest tests/test_control_room_paths.py tests/test_admin_server.py tests/test_admin_design_sessions.py tests/test_admin_claude_agents.py tests/test_admin_supervisor.py tests/test_admin_frontend.py tests/test_admin_claude_agents_frontend.py` green | PASS (123 passed) |
+
+**P0-3 result: 8/8 PASS.**
 
 
 

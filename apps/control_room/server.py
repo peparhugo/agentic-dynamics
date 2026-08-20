@@ -41,7 +41,7 @@ Endpoints (28 routes across 5 API categories, plus the static shell):
         GET  /                    — static dashboard (apps/control_room/static)
 
 Run:
-    python3 admin/server.py      # default port 8000 (FINOPS_PORT override)
+    python3 apps/control_room/server.py      # default port 8000 (FINOPS_PORT override)
 
 Deployment note: ``app.run(threaded=True)`` is Flask's built-in single-process
 development server, intended for a local operator tool rather than production.
@@ -50,7 +50,7 @@ thread plus one Redis Pub/Sub subscription for the life of the tab, so there is
 no connection cap. For multi-operator use, front it with a threaded gunicorn:
 
     gunicorn --worker-class gthread --threads 4 --workers 1 \
-      --bind 127.0.0.1:8000 'admin.server:app'
+      --bind 127.0.0.1:8000 'apps.control_room.server:app'
 """
 
 from __future__ import annotations
@@ -106,6 +106,7 @@ from agentic_dynamics.control.queue_reinterleave import (
     write_queue,
 )
 from agentic_dynamics.control.pipeline_status import stage_summary
+from agentic_dynamics.core.paths import PROJECT_ROOT
 
 try:  # Package imports under pytest and WSGI.
     from apps.control_room.claude_agents_client import (
@@ -159,7 +160,12 @@ RETAINED_SAMPLES_MAX = 60
 CLAUDE_AGENT_ADVISORS = {"fable", "opus", "sonnet"}
 CLAUDE_AGENT_ADVISOR_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{2,80}$")
 IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
-ROOT = Path(__file__).resolve().parent.parent
+#: Repository root. Re-pointed to the single source of truth
+#: (``agentic_dynamics.core.paths.PROJECT_ROOT``) after the admin/ → apps/control_room/
+#: move — the former ``Path(__file__).resolve().parent.parent`` resolved to
+#: ``<repo>/apps``, which silently re-homed every default path below under
+#: ``apps/experiments/...`` (refactor-repair P0-3).
+ROOT = PROJECT_ROOT
 SUPERVISOR_FLAGS_FILE = ROOT / "experiments" / "results" / "supervisor" / "flags.jsonl"
 SUPERVISOR_FILE_TAIL_BYTES = 512 * 1024
 SUPERVISOR_ACTIVE_WINDOW_SECONDS = int(os.environ.get("SUPERVISOR_ACTIVE_WINDOW", "900"))
@@ -1110,9 +1116,7 @@ def api_events(cell_id) -> Response:
 
 @app.get("/api/routing")
 def api_routing() -> Response:
-    summary_path = (
-        Path(__file__).resolve().parent.parent / "experiments" / "results" / "_results_summary.json"
-    )
+    summary_path = ROOT / "experiments" / "results" / "_results_summary.json"
     try:
         data = json.loads(summary_path.read_text())
         entries = data.get("entries", [])
@@ -1155,7 +1159,7 @@ def api_experiments() -> Response:
             capture_output=True,
             text=True,
             timeout=30,
-            cwd=Path(__file__).resolve().parent.parent,
+            cwd=ROOT,
         )
         return jsonify({"ok": proc.returncode == 0, "output": (proc.stdout or proc.stderr).strip()})
 
