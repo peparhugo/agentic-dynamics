@@ -91,4 +91,4 @@ The eight package planes (`core` · `experiment` · `measurement` · `runtime` �
 
 ## Conventions
 
-Snake_case functions, PascalCase classes, type hints on public signatures. Deprecated: `experiment.py`, `adapter.py`, `lab_book.py` — use `opencode.py` / `run_opencode_agentic()`. Update `__init__.py` for new exports. Dataclasses over dicts. Source lives under `src/agentic_dynamics/` (never `src/instrument/`); configs under `experiments/definitions/configs/`; apps under `apps/`; designs under `docs/designs/current/`.
+Snake_case functions, PascalCase classes, type hints on public signatures. Deprecated: `experiment.py`, `adapter.py`, `lab_book.py` — use `opencode.py` / `run_opencode_agentic()`. Update `__init__.py` for new exports. Dataclasses over dicts. Source lives under `src/agentic_dynamics/`; configs under `experiments/definitions/configs/`; apps under `apps/`; designs under `docs/designs/current/`.

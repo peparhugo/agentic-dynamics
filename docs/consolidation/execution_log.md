@@ -734,6 +734,21 @@ Per-finding acceptance-criterion results for the refactor-repair release (review
 
 **P0-2 result: 7/7 PASS.**
 
+### P0-2 (guard) — stale-path guard over accepted + current-design docs
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `tests/test_stale_path_guard.py` added — scans every `status: accepted` doc (root + `docs/**`) and every `docs/designs/current/*` for the five retired families (`src/instrument/`, `experiments/configs/`, `admin/server.py`, `firebase/public/`, `code_reviews/2026-08-14`) | PASS |
+| 2 | Narrow, explicit allowlist — per-file / directory-prefix entries with justification (reviews, consolidation records, rebrand/survey/verify docs, `ARCHITECTURE.md`'s §1 decommission note); no blanket exception | PASS |
+| 3 | Current-design docs repointed, not allowlisted — `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md` (`src/instrument/experiment_spec.py`→`src/agentic_dynamics/experiment/`), `docs/designs/current/context_abstraction_design.md` (`src/instrument/reducers/`→`src/agentic_dynamics/control/reducers/`) | PASS |
+| 4 | `AGENTS.md` cleaned (removed the redundant `never src/instrument/` parenthetical); `agent_config/rules.md` re-synced + surfaces regenerated | PASS |
+| 5 | Guard verifies every allowlist key resolves to an existing file/directory (no stale entries) | PASS |
+| 6 | Wired into the suite — auto-discovered by `pytest tests/` (runs in CI's `-m "not external"` gate); `ruff` clean | PASS |
+| 7 | Full `-m "not external"` suite: 1251 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P0-2 (guard) result: 7/7 PASS.**
+
+
 
 
 
