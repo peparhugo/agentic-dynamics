@@ -1,0 +1,239 @@
+name: consolidation_release_execute
+question: >-
+  Execute ALL seven consolidation stages (S0-S6) from docs/consolidation/stage_map.md in one
+  continuous workflow run, such that by the end every stage is complete: the architecture spine +
+  doc lifecycle + CAP freeze (S0), the modular-monorepo package move with shim + dependency lint
+  (S1), the experiments/workflows split (S2), the CLI + script classification (S3), the single
+  instruction surface (S4), the apps/ + public-identity realignment (S5), and the verification
+  release (S6). This spec is ONLY the sequencer — the instruction authority for each phase is the
+  corresponding consolidation_stage_<n>_<slug>.yaml spec (merged on main); each phase here
+  delegates to it, executes it, and logs PASS/FAIL per acceptance criterion to
+  docs/consolidation/execution_log.md so the run is inspectable and resumable. Note: this spec
+  itself is a work order, not a scientific experiment — S2 reclassifies it under workflows/.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      stage_authority: >-
+        The seven stage specs in experiments/specs/consolidation_stage_{0..6}_*.yaml are the
+        INSTRUCTION AUTHORITY — each phase below executes one named phase of one stage spec. The
+        stage spec's own phase prompt (GOAL/READ FIRST/DO/VERIFY) is the complete instruction set;
+        this sequencer adds only ordering, state, and the execution log. Read the stage spec's
+        phase prompt BEFORE doing anything else in that phase.
+      state: >-
+        docs/consolidation/execution_log.md is the run's checkpoint record — one PASS/FAIL line per
+        acceptance criterion per phase, appended at the END of each phase (committed with the
+        phase). The next phase reads it first. If a phase cannot satisfy an acceptance criterion
+        within its session, log FAIL with the reason and stop cleanly — the operator resumes with
+        --resume (the runner skips phases whose [workflow] commit exists).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests — the runner runs pytest
+        after each phase for language=python; a red gate must be fixed inside the same phase or
+        logged FAIL. (2) The load-bearing rule survives every stage: instrument -> derive -> policy
+        ordering and the requires/produces gate stay intact (compile-gate all specs at S1-E and
+        S6). (3) Operational invariants: Redis isolation (6380 queue DB1 + KB stream DB2; 6379
+        sandbox — never conflated), dual Firebase hosting (ai-finops-rulebook + agentic-dynamics,
+        same public/), Control Room 8001 / Chroma 8000. (4) The CAP freeze holds: S0 marks
+        context_abstraction_implement PAUSED (never deleted); S1 reserves the I0-I7 package homes;
+        nothing in this run implements CAP components. (5) Supersession discipline: refactor
+        WS-01/09/10 fold into S1/S3 per stage_map §5; WS-02..08 stay deferred (not executed here).
+        (6) The execution log is append-only and truthful — never mark PASS without running the
+        check. (7) Do not merge or deploy — S6's release phase deploys to BOTH Firebase hosts only
+        after its own gates pass.
+      read_first: >-
+        docs/consolidation/stage_map.md + docs/consolidation/design.md  (the plan + designs)
+        docs/review/semantic_monolith_review.md  (the critique — recommendation coverage)
+        .opencode/instructions/mental-model.md, scripts/CONTEXT.md, experiments/CONTEXT.md
+        experiments/specs/STATUS.md  (the freeze must land here)
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/consolidation-execute); each phase commits [workflow] <phase>. Continuous run:
+        all 23 phases execute in order; total wall time may reach 10+ hours — background run,
+        monitored via the execution log and phase commits.
+    phases:
+      - name: s0_spine
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `spine` phase of experiments/specs/consolidation_stage_0_architecture_spine.yaml (its phase prompt is your instruction set — read it first). READ ALSO: docs/consolidation/execution_log.md (create it if absent, with a header line), docs/consolidation/stage_map.md §4 S0.
+          LOG: append PASS/FAIL per S0-spine acceptance criterion to docs/consolidation/execution_log.md, then commit.
+      - name: s0_lifecycle
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `lifecycle` phase of experiments/specs/consolidation_stage_0_architecture_spine.yaml. READ: execution_log.md first.
+          LOG: append PASS/FAIL lines; commit.
+      - name: s0_freeze
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `freeze` phase of experiments/specs/consolidation_stage_0_architecture_spine.yaml (mark context_abstraction_implement PAUSED per stage_map §6 — never deleted; reserve the I0-I7 homes per design §1.1). READ: execution_log.md first.
+          LOG: append PASS/FAIL lines; commit.
+      - name: s0_verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `verify` phase of experiments/specs/consolidation_stage_0_architecture_spine.yaml — check the S0 acceptance criteria (one root ARCHITECTURE.md with supersession map, zero BLUEPRINTs at root, lifecycle headers present, CAP frozen-not-deleted, full suite green).
+          LOG: append PASS/FAIL per criterion; commit.
+      - name: s1_skeleton
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `skeleton` phase of experiments/specs/consolidation_stage_1_package_move.yaml (phase A: create src/agentic_dynamics/ with the 9 plane dirs + docstring-only __init__.py + legacy/; additive only). READ: execution_log.md, design.md §1.1.
+          LOG: append PASS/FAIL; commit.
+      - name: s1_move
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `move` phase of experiments/specs/consolidation_stage_1_package_move.yaml (phase B: git mv all 64 modules per design.md §1.1, rewrite internal imports, generate the instrument shim + barrel — atomic, one commit). READ: execution_log.md, design.md §1.1-1.2.
+          LOG: append PASS/FAIL per criterion (all 64 dispositioned; shim generated; pytest green via shim); commit.
+      - name: s1_rewrite_consumers
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `rewrite_consumers` phase of experiments/specs/consolidation_stage_1_package_move.yaml (phase C: rewrite scripts/ admin/ tests/ imports to agentic_dynamics.*; replace ~55 sys.path.insert with scripts/_bootstrap.py; _constants.py -> agentic_dynamics/core/). READ: execution_log.md, design.md §1.3.
+          LOG: append PASS/FAIL; commit.
+      - name: s1_dependency_lint
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `dependency_lint` phase of experiments/specs/consolidation_stage_1_package_move.yaml (phase D: tests/test_dependency_direction.py walking the import graph, core <- planes <- control <- apps; knowledge never actuates; retrieval never supplies canonical facts). READ: execution_log.md, design.md §1.4.
+          LOG: append PASS/FAIL; commit.
+      - name: s1_retire_shim
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `retire_shim` phase of experiments/specs/consolidation_stage_1_package_move.yaml (phase E: delete src/instrument/ shim — gate: grep for 'from instrument\|import instrument' returns zero outside the shim; retire dead legacy modules per WS-01; compile-gate every committed spec). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s2_classify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `classify` phase of experiments/specs/consolidation_stage_2_experiments_workflows_split.yaml (every spec classified experiment-vs-work-order per design.md §4). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s2_move_specs
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `move_specs` phase of experiments/specs/consolidation_stage_2_experiments_workflows_split.yaml (move specs/configs to experiments/definitions + workflows/{repository,operations,research,examples}; add the classification guard test). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s2_repoint
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `repoint` phase of experiments/specs/consolidation_stage_2_experiments_workflows_split.yaml (re-point run_workflow.py, spec_status.py, spec_ingestion.py paths; regenerate STATUS.md + index.json with zero orphans). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s3_cli
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `cli` phase of experiments/specs/consolidation_stage_3_cli_classification.yaml (the agentic-dynamics CLI + the command-tree mapping per design.md §5). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s3_classify_scripts
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `classify_scripts` phase of experiments/specs/consolidation_stage_3_cli_classification.yaml (all 85 scripts classified: maintained/one-time/historical/deprecated; scripts/CONTEXT.md re-issued). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s3_retire_and_archive
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `retire_and_archive` phase of experiments/specs/consolidation_stage_3_cli_classification.yaml (scripts/archive/ for one-time migrations; retire plan.py, review_worker.py, *_bge_m3, analyze_with_*; smoke-run maintained entry points). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s4_canonical_source
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `canonical_source` phase of experiments/specs/consolidation_stage_4_instruction_surfaces.yaml (agent_config/ canonical instruction source: mental model, module map, skills, rules, CLI surface). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s4_generate
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `generate` phase of experiments/specs/consolidation_stage_4_instruction_surfaces.yaml (generate .opencode/ + .claude/ from agent_config/; add generated_surfaces_match drift test). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s5_move_apps
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `move_apps` phase of experiments/specs/consolidation_stage_5_apps_realignment.yaml (admin/ -> apps/control-room/; firebase/public/ -> apps/website/; imports point at src/agentic_dynamics/; dual-Firebase invariant preserved). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s5_reframe_readme
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `reframe_readme` phase of experiments/specs/consolidation_stage_5_apps_realignment.yaml (README re-framed around the six systems; the perturbation instrument is one system). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s5_verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `verify` phase of experiments/specs/consolidation_stage_5_apps_realignment.yaml (S5 acceptance criteria: apps import from agentic_dynamics not the reverse; no domain rules in apps per the S1 lint; deploy paths intact). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s6_coverage
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `coverage` phase of experiments/specs/consolidation_stage_6_verification_release.yaml (coverage proof: 9 recs -> >=1 stage; WS-01..10 dispositioned; zero orphans). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+      - name: s6_gates
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `gates` phase of experiments/specs/consolidation_stage_6_verification_release.yaml (full suite green; dependency lint green; all guard tests green; compile-gate every committed spec; invariant audit: Redis isolation, dual Firebase, CAP frozen-not-deleted, no _results_summary.json resurrection). READ: execution_log.md.
+          LOG: append PASS/FAIL per gate; commit.
+      - name: s6_release
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          EXECUTE: the `release` phase of experiments/specs/consolidation_stage_6_verification_release.yaml (final docs/consolidation/verification.md with PASS/FAIL; data_manifest regen; deploy to BOTH Firebase hosts — ai-finops-rulebook + agentic-dynamics — only after the S6 gates pass). READ: execution_log.md.
+          LOG: append PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: consolidation_executed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [stages_complete, gates_green, log_complete]
+metrics:
+  - {name: stages_complete, agg: mean, over: cell}
+  - {name: gates_green, agg: mean, over: cell}
+  - {name: log_complete, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, s0_spine, s0_lifecycle, s0_freeze, s0_verify, s1_skeleton, s1_move,
+             s1_rewrite_consumers, s1_dependency_lint, s1_retire_shim, s2_classify, s2_move_specs,
+             s2_repoint, s3_cli, s3_classify_scripts, s3_retire_and_archive, s4_canonical_source,
+             s4_generate, s5_move_apps, s5_reframe_readme, s5_verify, s6_coverage, s6_gates, s6_release]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
