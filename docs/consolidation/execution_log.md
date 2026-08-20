@@ -664,9 +664,19 @@ Per-finding acceptance-criterion results for the refactor-repair release (review
 
 **P0-3 result: 8/8 PASS.**
 
+### P1-1 — Reproduction environment + CI gates
 
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `Dockerfile` COPY paths fixed — `experiments/configs/` → `experiments/definitions/` (configs live at `experiments/definitions/configs/`); every COPY source (`pyproject.toml`, `src/`, `scripts/`, `experiments/definitions/`, `experiments/results/`) exists in the tree | PASS |
+| 2 | Stale `ai-finops-framework` override comment in `Dockerfile` corrected to `agentic-dynamics` | PASS |
+| 3 | `scripts/reproduce.sh` rewritten against the current tree — current project framing ("Agentic Dynamics"), no retired lab scripts (the three `*_DEPRECATED_bge_m3` labs removed, replaced by the 19 active lab books) | PASS |
+| 4 | `scripts/reproduce.sh` reports `apps/website/data.js` (not `firebase/public/data.js`) and instructs deploy from `apps/website/` (dual-Firebase, both hosts) | PASS |
+| 5 | `scripts/reproduce.sh --dry-run` added — prints every step's exact argv without executing; exits 0 | PASS (verified locally) |
+| 6 | CI (`pytest.yml`) gates added — `docker build .`, `agentic-dynamics --help`, `bash scripts/reproduce.sh --dry-run` | PASS |
+| 7 | `bash -n scripts/reproduce.sh` clean; `--dry-run` lists all 19 lab books + the 7 pipeline steps | PASS |
 
-
+**P1-1 result: 7/7 PASS.**
 
 
 
