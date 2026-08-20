@@ -25,9 +25,11 @@ Design decisions, per ``docs/routing_next_steps.md`` §1:
   ``correctness``/``cost`` — ``docs/routing_next_steps.md`` item 5.3), so a sparse entry cannot
   bias a mean by contributing a spurious 0.0.
 
-The load-bearing rule is respected: ``confidence`` and ``edge_case_coverage`` are never read
-here. ``edge_case_coverage`` remains ``None`` on every ``ModelSignals`` until it is
-instrumented (item 3); the store simply does not touch it.
+The load-bearing rule is respected: the store consults the signal registry
+(``measurement/signal_registry.py``) — ``confidence`` is measured [H] but *reserved for the
+cascade control arms* (not a routing signal), so it is not a ``ModelSignals`` field and is never
+read here; ``edge_case_coverage`` is unmeasured and remains ``None`` on every ``ModelSignals``
+until it is instrumented (item 3).
 """
 
 from __future__ import annotations

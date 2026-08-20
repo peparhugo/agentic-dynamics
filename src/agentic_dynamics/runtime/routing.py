@@ -17,19 +17,28 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
+from agentic_dynamics.measurement.signal_registry import (
+    ROUTING,
+    reserved_for_other,
+    signals_for,
+)
+
 if TYPE_CHECKING:  # pragma: no cover - import only for static typing
     from agentic_dynamics.experiment.experiment_spec import ExperimentSpec
 
 # ── Signal vocabulary ───────────────────────────────────────────
 #
-# The signals a routing policy may consume today. ``edge_case_coverage`` is deliberately
-# ABSENT from MEASURED_SIGNALS: it is not yet measured and must be gated behind a measurement
-# rule (see ``validate_preferences``). ``confidence`` is FORBIDDEN — it remains reserved for
-# the ``model_cascade``/``dynamics`` control arms.
+# The signals a routing policy may consume today, DERIVED from the signal registry
+# (refactor-repair Debt-3) — never hand-listed here, so the routing vocabulary can no longer
+# drift from the ledger's "measured" facts. ``edge_case_coverage`` is unmeasured and must be
+# gated behind a measurement rule (see ``validate_preferences``). ``confidence`` IS measured
+# [H], but it is reserved for the ``model_cascade``/``dynamics`` control arms, so it is not
+# permitted for generic model routing.
 
 # Map a signal name to the ``ModelSignals`` field that carries it. ``edge_case_coverage`` is
 # listed so a ``ModelSignals`` object can carry it once instrumented, but it is NOT in
-# ``MEASURED_SIGNALS`` and therefore cannot be consumed until ``produced`` admits it.
+# ``MEASURED_SIGNALS`` (the registry marks it unmeasured) and therefore cannot be consumed until
+# ``produced`` admits it.
 SIGNAL_FIELDS: dict[str, str] = {
     "correctness": "correctness",
     "cost": "cost",
@@ -42,13 +51,12 @@ SIGNAL_FIELDS: dict[str, str] = {
     "edge_case_coverage": "edge_case_coverage",
 }
 
-# Measured today: everything in SIGNAL_FIELDS except edge_case_coverage.
-MEASURED_SIGNALS: frozenset[str] = frozenset(
-    s for s in SIGNAL_FIELDS if s != "edge_case_coverage"
-)
+# Measured *and* routing-permitted today (the registry is the source of truth).
+MEASURED_SIGNALS: frozenset[str] = signals_for(ROUTING)
 
-# Never consumable by the routing policy (unmeasured, reserved for model_cascade).
-FORBIDDEN_SIGNALS: frozenset[str] = frozenset({"confidence"})
+# Measured, but the routing policy may not consume them — ``confidence`` is reserved for the
+# cascade control arms (measured [H], not "unmeasured").
+FORBIDDEN_SIGNALS: frozenset[str] = reserved_for_other(ROUTING)
 
 _DIRECTIONS: frozenset[str] = frozenset({"minimize", "maximize"})
 
@@ -189,16 +197,17 @@ def validate_preferences(
     """Validate a preferences block against the measured signal vocabulary.
 
     ``produced`` is the set of information a measurement rule ``produces`` in the same spec;
-    ``edge_case_coverage`` is admissible only when present there. ``confidence`` is always
-    refused. Returns a list of error strings (empty = valid).
+    ``edge_case_coverage`` is admissible only when present there. A signal the registry marks
+    measured but reserves for another consumer (``confidence`` → cascade) is refused with a
+    *reservation* error — never a false "unmeasured" one. Returns a list of error strings.
     """
     errors: list[str] = []
     available = set(MEASURED_SIGNALS) | set(produced)
     for obj in prefs.objectives:
         if obj.signal in FORBIDDEN_SIGNALS:
             errors.append(
-                f'preference objective {obj.signal!r} is forbidden: it is unmeasured and '
-                f'must not be consumed by a routing policy.'
+                f'preference objective {obj.signal!r} is measured but reserved for the '
+                f'cascade control arms — it is not permitted for generic model routing.'
             )
         elif obj.signal not in available:
             errors.append(

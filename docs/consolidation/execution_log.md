@@ -843,6 +843,21 @@ from the ledgers on the next regeneration in an environment that has them.
 
 **Debt-2 result: 7/7 PASS.**
 
+### Debt-3 — one signal registry, reconciling the measured vocabulary
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `src/agentic_dynamics/measurement/signal_registry.py` added — one registry of measured signals with the full contract (`name`, `producer`, `evidence_class`, `scope`, `value_type`, `measured`, `permitted_consumers`, `freshness`) + query helpers (`is_measured`, `signals_for`, `reserved_for_other`, `measured_signals`, …) | PASS |
+| 2 | Seeded from the ledger fields — the four formerly-missing signals (`confidence` [H], `perturbation_strength`, `test_executed_success`, `tokens_answer`/`tokens_explanation`) plus the 8 routing signals and `edge_case_coverage` | PASS |
+| 3 | `confidence` reconciled to the review's exact vocabulary — `measured: yes`, `evidence_class: [H]`, `allowed for generic model routing: no`, `reserved for cascade experiments: yes` (`permitted_consumers == {CASCADE}`) | PASS |
+| 4 | Split-brain fixed — `runtime/routing.py` derives `MEASURED_SIGNALS`/`FORBIDDEN_SIGNALS` from the registry (not hand-listed); the `validate_preferences` error for `confidence` says "measured but reserved for the cascade control arms" — never "unmeasured"; `signal_store.py` comment corrected | PASS |
+| 5 | `experiment_spec.py` `LEDGER_FIELDS` comment now points at the registry as the single source of truth; the registry's formerly-missing signals are asserted ⊆ `LEDGER_FIELDS` | PASS |
+| 6 | Tests added (`tests/test_signal_registry.py`, 7 tests) — measured facts, the reconciled `confidence` vocabulary, registry↔ledger consistency, vocabulary derivation, reserved-vs-unmeasured error, and a scan asserting no reconciliation site calls a measured signal "unmeasured" | PASS (7 passed) |
+| 7 | `ruff` clean; full `-m "not external"` suite: 1284 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**Debt-3 result: 7/7 PASS.**
+
+
 
 
 

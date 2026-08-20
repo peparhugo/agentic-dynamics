@@ -189,8 +189,11 @@ def test_validate_step_selector_rejects_empty_and_unknown():
 
 
 def test_validate_preferences_forbids_confidence():
+    # `confidence` is MEASURED [H] but reserved for the cascade arms (Debt-3), so the routing
+    # policy refuses it with a *reservation* error — never a false "unmeasured" one.
     errors = validate_preferences(_prefs(_min("confidence")))
-    assert any("confidence" in e and "forbidden" in e for e in errors)
+    assert any("confidence" in e and "reserved" in e for e in errors)
+    assert all("unmeasured" not in e for e in errors)
     assert "confidence" in FORBIDDEN_SIGNALS
     assert "confidence" not in MEASURED_SIGNALS
     assert "edge_case_coverage" not in MEASURED_SIGNALS

@@ -127,6 +127,10 @@ SPEC_KEYS: frozenset[str] = frozenset(
 # Because they are ledger-produced, the validator now admits the ``grit`` rule (needs
 # perturbation_strength + test_executed_success) and the ``model_cascade``/``dynamics``
 # control arms (need confidence).
+#
+# The *single source of truth* for a signal's measured status, evidence class, and permitted
+# consumers is ``measurement/signal_registry.py`` (refactor-repair Debt-3) — this frozenset is
+# the ledger field list, and the registry's measured signals are checked against it in the tests.
 LEDGER_FIELDS: frozenset[str] = frozenset(
     {
         # job-level
