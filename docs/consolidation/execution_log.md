@@ -442,6 +442,38 @@ Notes:
 - The archived scripts' internal `parent.parent` repo-root anchors are stale (one level shallow);
   left as-is — they are frozen one-time artifacts, not maintained runtime (rec 5).
 
+---
+
+## S4 — canonical source (phase `canonical_source`)
+
+Spec: `workflows/repository/consolidation_stage_4_instruction_surfaces.yaml` · phase
+`canonical_source` (phase A). Deliverable: `agent_config/` — the single hand-edited instruction
+source (mental model · rules · skills · CLI surface), with doc-drift corrected.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `agent_config/` created as the single hand-edited source (mental-model, rules, conventions, 7 skills, 3 agents, 5 commands) | PASS |
+| 2 | Mental model updated — names `agentic_dynamics.*` planes, adds the 8-plane package map + the Stage 3 CLI surface | PASS |
+| 3 | Rules captured (`agent_config/rules.md` — the AGENTS.md hats + load-bearing rule + commands + operational notes) | PASS |
+| 4 | Skills consolidated to 7 (instrument/analyze/lab-books/run-workflow/queue/review/control-room) — `.claude`-only skills pulled in | PASS |
+| 5 | Doc-drift corrected (WS-10 doc-drift half): `src/instrument/*` → `agentic_dynamics/*`, `experiments/configs` → `definitions/configs`, `experiments/specs` → split layout, module count 46→60, `review_worker`/`*_DEPRECATED_bge_m3`/`test_recovery` stale notes fixed | PASS |
+| 6 | `pytest tests/ -m "not external"` green (additive — no production-code change) | PASS (1187 passed, 106 deselected) |
+
+**S4-canonical_source result: 6/6 PASS.**
+
+Notes:
+
+- `.opencode/` is the *current* surface (loaded unconditionally); `.claude/` is a stale "ported"
+  copy (missing the actuation/story/observation ingestion details, carrying a "Ported from …"
+  header). `agent_config/` therefore uses `.opencode/` as the base for the mental model,
+  conventions, agents, and commands, and pulls the four `.claude`-only skills
+  (control-room/queue/review/run-workflow) in so all seven are canonical.
+- The mental model now carries a **package-planes** section (8 planes, tier map, the pinned
+  observe-only seam) and a **CLI surface** section (the Stage 3 subcommand tree).
+- Stale references that *describe* a retirement (e.g. "review_worker.py was retired in Stage 3")
+  are intentionally kept — they are provenance, not drift.
+
+
 
 
 
