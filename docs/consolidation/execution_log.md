@@ -50,3 +50,30 @@ status front-matter on every remaining doc, `tests/test_doc_lifecycle.py`.
 
 **S0-lifecycle result: 9/9 PASS.**
 
+---
+
+## S0 — CAP freeze (phase `freeze`)
+
+Spec: `experiments/specs/consolidation_stage_0_architecture_spine.yaml` · phase `freeze`.
+Deliverables: PAUSED marker on `context_abstraction_implement`, reserved CAP homes declaration,
+refreshed spec index.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `context_abstraction_implement.yaml` marked PAUSED (freeze_reason `consolidation_release/stage_map`, resume_after `consolidation S6`) — not deleted, not superseded (`superseded_by` absent) | PASS |
+| 2 | Status uses the schema vocabulary only (`status: draft` — the "not runnable now" state); no value outside `{draft,active,superseded,tombstoned}` invented | PASS |
+| 3 | `ARCHITECTURE.md` §4 declares the reserved CAP homes (`control/facts.py`, `control/reducers/`, `control/context_compiler.py`, `control/rules.py`, `control/validator.py`, `control/decisions.py`, `core/contracts.py`) as empty-but-reserved placeholders | PASS |
+| 4 | Spec index reflects the freeze — `index.json` + `STATUS.md` show `context_abstraction_implement` as `draft`, never `active` | PASS |
+| 5 | `docs/consolidation/cap_freeze_note.md` written (durable freeze note: what/why/where/how) | PASS |
+| 6 | `validate_spec` passes on the modified spec (status valid, no self-supersession) | PASS |
+
+**S0-freeze result: 6/6 PASS.**
+
+Note: the index was updated with a *targeted* status edit (active → draft in `index.json` +
+`STATUS.md`) rather than a full `spec_status.py` regeneration — the run ledgers under
+`experiments/results/workflows/` are untracked and absent from this worktree, so a full regen
+would have wiped the measured run columns (`last_run`/`ok`/`model`/`cost`/`n_runs`) for all 77
+specs. `spec_status.py --dry-run` confirms the derived status is `draft`, so the targeted edit is
+consistent with the generator.
+
+

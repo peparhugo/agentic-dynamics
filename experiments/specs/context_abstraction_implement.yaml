@@ -1,5 +1,19 @@
+# ── CAP FREEZE — consolidation_release / stage_map §6 ─────────────────────────
+# PAUSED — not deleted, not superseded. Rec 1 of the semantic-monolith critique
+# (docs/review/semantic_monolith_review.md) freezes CAP I0–I7 until the consolidation
+# release reserves their structural homes.
+#   freeze_reason: consolidation_release/stage_map
+#   resume_after:  consolidation S6
+# The design survives (docs/designs/current/context_abstraction_design.md); only execution
+# pauses. `status: draft` is the schema's "not runnable now" state — the derived index must
+# never show this spec as `active` while frozen. Design-path references inside this file are
+# re-pointed at the moved docs/designs/current/ locations when the spec resumes.
 name: context_abstraction_implement
 question: >-
+  [PAUSED — CAP freeze, consolidation_release/stage_map §6. freeze_reason:
+  consolidation_release/stage_map; resume_after: consolidation S6. NOT deleted, NOT
+  superseded; this spec resumes after the consolidation release.]
+
   Implement the Context Abstraction Plane incrementally, exactly per
   docs/context_abstraction/design.md (the merged opus-5 design; review.md is its audit). The
   plane transforms authoritative evidence into canonical, scope-aware state at the
@@ -11,6 +25,7 @@ question: >-
   controller + validator, I7 the apply seam (kept OFF until measured non-inferior). Run once
   with anthropic/claude-opus-5.
 version: "0.1"
+status: draft
 workflow:
   kind: agent_task
   params:

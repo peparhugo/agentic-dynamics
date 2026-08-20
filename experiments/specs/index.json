@@ -150,7 +150,7 @@
     {
       "name": "context_abstraction_implement",
       "version": "0.1",
-      "status": "active",
+      "status": "draft",
       "spec_path": "experiments/specs/context_abstraction_implement.yaml",
       "supersedes": [],
       "superseded_by": null,
