@@ -191,6 +191,41 @@ Implementation notes:
   (`scripts/_constants.py` → `src/agentic_dynamics/core/constants.py`) and
   `tests/test_ledger_ingestion.py` (loads `constants.py` beside `session_types.py`).
 
+---
+
+## S1 — dependency lint (phase `dependency_lint`)
+
+Spec: `experiments/specs/consolidation_stage_1_package_move.yaml` · phase `dependency_lint`
+(phase D). Deliverable: `tests/test_dependency_direction.py` (import-graph lint) +
+`tests/test_data_flow.py` (data-flow guards).
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `tests/test_dependency_direction.py` walks every `src/agentic_dynamics/**` module + `apps/**` and asserts the 8 forbidden-edge rules | PASS |
+| 2 | The two execution→control observation edges pinned as the COMPLETE tier-1→tier-2 set (`workflow_runner→step_routing/live`; `opencode`/`claude_adapter`→`live`) | PASS |
+| 3 | Data-flow tests: `retrieve()` never supplies POLICY candidates + references `publish_event` zero times; knowledge modules never call `derive_actuation_record` | PASS |
+| 4 | Lint demonstrably red on a forbidden edge (injected `measurement → control`, test failed; reverted, green) | PASS |
+| 5 | New tests + `pytest tests/ -m "not external"` all green | PASS (1191 passed, 121 deselected) |
+
+**S1-dependency_lint result: 5/5 PASS.**
+
+Implementation notes:
+
+- **`legacy/` excluded from the tier map** — quarantined dead code (retired in phase E); the
+  design §1.4 tier map covers only `core` / `planes` / `control` / `apps`.
+- **`apps/` handled but vacuously green** until Stage 5 creates it (the test scans `apps/**`
+  when present).
+- **Import resolution** handles absolute `import agentic_dynamics.<plane>.<m>` and
+  `from agentic_dynamics.<plane>.<m> import …`; relative (`level ≥ 1`) imports are same-plane by
+  construction and ignored. A first draft had `_plane_of` read the repo-relative path wrong
+  (missed the leading `src/`), which made the whole graph empty — caught by the pinned-edge test
+  (empty set ≠ pinned set), then fixed.
+- **Data-flow guards are AST/source-level**, not behaviour-only: `retrieval.py` source contains
+  `publish_event` zero times (verified), and knowledge modules never import/call
+  `derive_actuation_record` (the sole occurrence is the `knowledge/__init__.py` docstring, which
+  the AST test correctly ignores).
+
+
 
 
 
