@@ -377,6 +377,35 @@ Notes:
 - Lab scripts have no `--help` (they run their analysis directly), so `analyze lab <name>` runs
   the lab book as-is — expected behaviour, not a CLI bug.
 
+---
+
+## S3 — classify scripts (phase `classify_scripts`)
+
+Spec: `workflows/repository/consolidation_stage_3_cli_classification.yaml` · phase
+`classify_scripts` (phase B). Deliverable: `scripts/CONTEXT.md` re-issued as the classification
+manifest + `tests/test_script_classification.py`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `scripts/CONTEXT.md` re-issued as the classification manifest — 73 scripts in exactly one bucket | PASS |
+| 2 | Bucket tally: maintained 37 · historical 19 (lab books) · one-time 15 (→ `scripts/archive/`) · deprecated 1 (`review_worker.py`); `_bootstrap.py` is a helper, not a command | PASS |
+| 3 | `tests/test_script_classification.py` written — parses the manifest, asserts zero orphans + no cross-bucket overlap | PASS |
+| 4 | Every maintained command is CLI-reachable (`agentic_dynamics.cli` `_COMMANDS` + the `registry` special case) | PASS |
+| 5 | `pytest tests/ -m "not external"` green | PASS (1188 passed, 106 deselected) |
+
+**S3-classify_scripts result: 5/5 PASS.**
+
+Notes:
+
+- The "85 scripts" in design §5 was the pre-Stage-1 count; after Stage 1 retired 12 scripts
+  (`plan.py`, `analyze_with_ollama/opencode`, `build_graph`, 8 `*_DEPRECATED_bge_m3`) and moved
+  `_constants.py` into the package (+ added `_bootstrap.py`), the surface is 73 files — the
+  manifest covers that actual set.
+- `scripts/CONTEXT.md` stale references were cleaned in the re-issue (plans.yaml path,
+  `src/instrument/*` → `agentic_dynamics/*`, `_constants.py` → `agentic_dynamics/core/constants.py`,
+  `plan.py` row removed, `review_worker.py` marked deprecated).
+
+
 
 
 

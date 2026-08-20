@@ -1,7 +1,20 @@
-# `scripts/` — Scripts Reference
+# `scripts/` — Scripts Reference (classification manifest)
 
-78 Python scripts across 5 categories: experiment runners, post-hoc analysis, data pipeline,
-19 active lab books, and 8 deprecated `_bge_m3` labs.
+73 Python scripts, each in exactly one bucket (critique rec 5). `_bootstrap.py` is a shared
+sys.path helper, not a command. The classification below is machine-parsed by
+`tests/test_script_classification.py` — keep the marker lines intact.
+
+<!-- scripts-classification: start -->
+maintained: run.py sweep_parallel.py sweep_silent_mode.py batch_run.py remaining_batch.py multi_phase.py run_story.py batch_stories.py run_workflow.py enqueue.py worker.py monitor.py reinterleave_queue.py enqueue_analysis.py analysis_worker.py analyze_worktrees.py analyze_trajectories.py analyze_stories.py build_data.py sync_data.py generate_manifest.py inventory.py kb_produce.py kb_produce_sources.py kb_worker.py registry.py review_all.py review_stories.py trigger_reviews.py enqueue_reviews.py finalize_reviews.py spec_status.py pipeline.py validate_session.py verify_tests.py supervise.py claude_agents_supervisor.py
+historical: lab_basin_topology.py lab_basin_topology_neo4j.py lab_cache_economics.py lab_claude_audit.py lab_condition_effects.py lab_correctness_premium.py lab_flail_triggers.py lab_grit_matrix.py lab_opencode_meta_analysis.py lab_quality_frontier.py lab_sonar_quality.py lab_story_arc.py lab_story_review.py lab_survival_horizon.py lab_task_routing.py lab_think_do_coupling.py lab_tool_archetypes.py lab_verification_frontier.py lab_verification_value.py
+one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_transcripts.py backfill_deep_metrics.py batch_analyze_ts_ssg.py finish_sweep.py regen_typescript_ssg.py backfill_sonar.py backfill_costs.py compute_sonar_deltas.py embed_sessions.py recovery_cost_table.py rescore_conventions.py recover_stories.py kb_produce_registry.py
+deprecated: review_worker.py
+<!-- scripts-classification: end -->
+
+- **maintained command** — reached via `agentic-dynamics <subcommand>` (the Stage 3 CLI).
+- **historical analysis** — the 19 active lab books, reached via `agentic-dynamics analyze lab <name>`.
+- **one-time migration** — archived to `scripts/archive/` (fold WS-10), not maintained.
+- **deprecated** — retired (WS-09 `review_worker.py`); the WS-01 scripts were retired in Stage 1.
 
 ## Primary Entry Points
 
@@ -11,9 +24,8 @@
 | `analyze_worktrees.py` (1398 lines) | Post-hoc Game Report generator from `/tmp/exp_*` worktrees | After experiments complete; fills gap for sessions that only collected raw cost data |
 | `inventory.py` (392 lines) | Experiment/worktree inventory CLI | `inventory.py refresh` to rebuild, `list`/`stats`/`report` to inspect |
 | `build_data.py` (1188 lines) | Generates `firebase/public/data.js` from inventory + results | Push updated data to website |
-| `pipeline.py` (1267 lines) | YAML-driven phase orchestration (`experiments/configs/plans.yaml`) | Multi-phase DAG runs (ci, deploy, full_matrix, feature, ship_features, cross_models) |
-| `plan.py` (549 lines) | [deprecated] hardcoded phase orchestration, superseded by `pipeline.py` | Don't use for new work |
-| `src/instrument/compile_experiment.py` (not in scripts/) | spec → DAG compiler, **written**; no standalone CLI — invoke via the `compile_experiment` tool (§3.1) or the Python API directly | Compiling a spec into a DAG |
+| `pipeline.py` (1267 lines) | YAML-driven phase orchestration (`experiments/definitions/configs/plans.yaml`) | Multi-phase DAG runs (ci, deploy, full_matrix, feature, ship_features, cross_models) |
+| `agentic_dynamics/experiment/compile_experiment.py` (not in scripts/) | spec → DAG compiler, **written**; no standalone CLI — invoke via the `compile_experiment` tool (§3.1) or the Python API directly | Compiling a spec into a DAG |
 
 ## Experiment Runners
 
@@ -30,7 +42,7 @@
 | `batch_stories.py` | 116 | Batch experiment runner — executes all DeepSeek matrix cells sequentially. |
 | `recover_stories.py` | 217 | Session timeout recovery — continues timed-out opencode sessions via `--session`. |
 | `run_workflow.py` | 88 | Runs an `agent_task` workflow (the execute phase) against a goal inside a git worktree; wrapped by the `run_workflow` tool (§3.1). Refreshes the spec status index (best-effort) after writing the run ledger. |
-| `spec_status.py` | 94 | Regenerates the **derived** spec lifecycle index — `experiments/specs/index.json` (machine schema) + `experiments/specs/STATUS.md` (agent-facing table) — from `experiments/specs/*.yaml` and the run ledgers in `experiments/results/workflows/<spec>/*.json`. Thin CLI over `instrument.spec_status`; `--dry-run`, `--json`, `--print`, `--spec <name>`. Never hand-edit the two artifacts. |
+| `spec_status.py` | 94 | Regenerates the **derived** spec lifecycle index — `experiments/specs/index.json` (machine schema) + `experiments/specs/STATUS.md` (agent-facing table) — from `experiments/definitions/*.yaml` + `workflows/**/*.yaml` and the run ledgers in `experiments/results/workflows/<spec>/*.json`. Thin CLI over `agentic_dynamics.experiment.spec_status`; `--dry-run`, `--json`, `--print`, `--spec <name>`. Never hand-edit the two artifacts. |
 
 ## Post-Hoc Analysis
 
@@ -42,7 +54,7 @@
 | `verify_tests.py` | 140 | Independent test execution — runs each story cell's own test suite; sole source of truth for the `test_executed_success` ledger field. |
 | `review_all.py` | 156 | Review every story directly (ThreadPoolExecutor, no Redis). Writes `reviews/review_{story_id}.json`. Grounds reviews in AST/Sonar/convention mechanics. |
 | `review_stories.py` | 91 | Batch commit + story review runner. |
-| `review_worker.py` | 190 | Redis review-queue worker (SDK bridge). Superseded by `review_all.py`. |
+| `review_worker.py` | 190 | [deprecated] Redis review-queue worker (SDK bridge). Superseded by `review_all.py`; retired in Stage 3. |
 | `trigger_reviews.py` | 79 | Waits for analysis to drain, then enqueues + spawns review workers (async handoff between post-hoc phases via the Redis queue on 6380). |
 | `enqueue_reviews.py` | 145 | Scans story result JSONs, finds worktree commits, enqueues review jobs to Redis. |
 | `finalize_reviews.py` | 89 | Merges per-session review files (`review_{story_id}_S{n}.json`) written by `review_worker.py` into aggregate JSONs. |
@@ -61,7 +73,7 @@
 | Script | Lines | Purpose |
 |--------|-------|---------|
 | `inventory.py` | 392 | Reads opencode.db, worktrees, results JSONs, config YAMLs. Commands: `refresh`, `list`, `stats`, `worktrees`, `report`. |
-| `_constants.py` | 100 | Shared constants (DB path, result dirs, model configs). Imported by inventory, analyze, and lab scripts. |
+| `agentic_dynamics/core/constants.py` | — | Shared constants (DB path, result dirs, model configs). Was `scripts/_constants.py`; moved into the package in Stage 1. |
 | `build_data.py` | 1188 | Produces `window.DYNAMICS_DATA` with provenance-tagged [M]/[C]/[H]/[P]/[X] measurements for the website. Includes a `routing` section from `instrument.routing.compute_routing`. |
 | `sync_data.py` | 290 | Normalizes every `stories/*.json` result into `sessions.parquet` + `stories.parquet` for clean querying; run before `build_data.py`. |
 | `generate_manifest.py` | 79 | Generates `data_manifest.json` — schema version, file SHA256s, git commit, opencode version, known limitations. |
@@ -80,7 +92,7 @@
 | `kb_produce.py` | 191 | Batch producer for the knowledge base — `load_results` → `derive_records` → `record_to_artifact` (writes the per-record `experiments/results/kb/<knowledge_id>.json`) → `record_to_event` → `publish_event` onto `kb:v1:changes` (DB 2 on 6380). `--dry-run` previews the would-emit count + samples, best-effort deduping against the checkpoint hash (degrades to the raw count when Redis is down); `--limit N` caps; `--repository-id` scopes `entity_id`. Idempotent via the `CHECKPOINT_KEY` hash (`knowledge_id` is the idempotence key). Sets `FINOPS_KB_WRITE=1` (the `publish_event` write guard) for the run. |
 | `kb_produce_sources.py` | 337 | Batch producer for the code / quality / policy / spec sources (sibling of `kb_produce.py`) — `derive_code_records` / `derive_quality_records` / `derive_policy_records` / `derive_spec_records` → the same pointer contract (`record_to_artifact` → `record_to_event` → `publish_event`) onto `kb:v1:changes` (DB 2 on 6380). `--source {code,quality,policy,spec,all}`, `--limit N`, `--repository-id`, `--revision`. Idempotent via the `CHECKPOINT_KEY` hash; sets `FINOPS_KB_WRITE=1` (the write guard) for the run. The `spec` source reads the generated `experiments/specs/index.json` and is the only one that can emit `operation=supersede` (same-entity version chain → `generate_manifest.py`'s `lifecycle_state`). |
 | `monitor.py` | 144 | Redis queue dashboard. `--watch` live, `--json` machine output (used by `admin/` dashboard). |
-| `supervise.py` | 378 | Supervises running opencode sessions via a dedicated flash monitor session — flag-only, never steers. CLI for `src/instrument/supervisor.py`'s Redis contracts. |
+| `supervise.py` | 378 | Supervises running opencode sessions via a dedicated flash monitor session — flag-only, never steers. CLI for `agentic_dynamics/control/supervisor.py`'s Redis contracts. |
 | `claude_agents_supervisor.py` | 260 | Supervises `claude --bg` background sessions — roster + owned-session relay only, structurally parallel to `supervise.py` but simpler. |
 
 ## Lab Books (19 active scripts + 8 deprecated)
@@ -132,7 +144,7 @@ The portal is a human-facing live dashboard; the control-plane agent pulls state
 
 ## Spec/Compiler (written)
 
-`compile_experiment.py` (`src/instrument/compile_experiment.py` — not in `scripts/`, no standalone
+`compile_experiment.py` (`agentic_dynamics/experiment/compile_experiment.py` — not in `scripts/`, no standalone
 CLI) compiles an `ExperimentSpec` into a DAG (validate → cells → execute → measure → compare →
 writeup → adapt) and generalizes the existing transport:
 
