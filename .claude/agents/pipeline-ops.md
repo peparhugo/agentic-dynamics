@@ -43,6 +43,7 @@ All metrics provenance-tagged [M]/[C]/[H]/[X]. Consumed by 8 HTML pages via app.
 ```bash
 firebase deploy --only hosting                          # canonical (ai-finops-rulebook)
 firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy BOTH
+# NOTE: run firebase deploy FROM apps/website/ (firebase.json + .firebaserc live there; public: ".")
 ```
 Site: https://ai-finops-rulebook.web.app (canonical, already shared with peers) + https://agentic-dynamics.web.app (mirror)
 Pages: index, framework, evidence, story, methodology, accelerator, databricks, glossary

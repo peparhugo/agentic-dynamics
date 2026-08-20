@@ -19,11 +19,13 @@ internal it carries a `file:line`; where it derives from the critique it names t
 
 ## 1. Planes — eight bounded packages
 
-The repository's single semantic monolith (`src/instrument/` means "almost everything" — critique
-finding 1) is partitioned into eight bounded planes. A module's plane is the conceptual system it
-serves (critique §"What the repository actually contains (six systems)"), not its current directory.
-The physical move into `src/agentic_dynamics/<plane>/` is Stage 1 (`docs/consolidation/stage_map.md`
-§4 Stage 1); the full 64-module disposition is `docs/consolidation/design.md` §1.1.
+The repository's single semantic monolith (the old `src/instrument/` — "almost everything" —
+critique finding 1) is partitioned into eight bounded planes, realized as
+`src/agentic_dynamics/<plane>/` (Stage 1, `docs/consolidation/stage_map.md` §4). A module's plane
+is the conceptual system it serves (critique §"What the repository actually contains (six
+systems)"), not its former directory. The full 64-module disposition — executed, with the
+transient `instrument.*` compatibility shim retired at the end of Stage 1 — is
+`docs/consolidation/design.md` §1.1.
 
 | Plane | One-line ownership | Six-system map |
 |---|---|---|
@@ -41,16 +43,17 @@ The physical move into `src/agentic_dynamics/<plane>/` is Stage 1 (`docs/consoli
 rules. `apps/` is the ninth top-level unit but is *not* a Python package plane — it is the
 application tier at the top of the dependency spine (§3).
 
-The current physical reality: all eight planes still live flat in `src/instrument/` (64 modules —
-`docs/consolidation/design.md` §0). The planes above are the *target* boundary; Stage 1 realizes it
-and `src/instrument/` becomes a transient compatibility shim (`design.md` §1.2).
+The physical reality today: all eight planes live in `src/agentic_dynamics/<plane>/` (59 live
+modules + the `agentic-dynamics` CLI; the deprecated five were retired in Stage 1 — see
+`docs/consolidation/design.md` §1.1's `legacy/` rows). `src/instrument/` no longer exists; its
+compatibility shim was deleted once every consumer had been rewritten (Stage 1, phase E).
 
 ---
 
 ## 2. Package boundaries — what each plane may and may not import
 
 Boundaries are enforced by a dependency-direction lint, `tests/test_dependency_direction.py`
-(added in Stage 1 — `design.md` §1.4), not by prose convention. The tier map is descriptive; the
+(`design.md` §1.4), not by prose convention. The tier map is descriptive; the
 forbidden edges are the executable rules.
 
 **Tier map** (`design.md` §1.4):
@@ -130,7 +133,7 @@ cross-plane edges today (`docs/consolidation/design.md` §0) and are pinned — 
 
 ## 4. Implemented vs proposed
 
-### Shipped today (real code, `src/instrument/` until Stage 1 moves it)
+### Shipped today (real code, all under `src/agentic_dynamics/` since Stage 1)
 
 - **Execution core** — `perturb.py → backends.py → opencode.py / claude_adapter.py → [LLM] →
   trajectory`, then `solution.py + basin.py + efficiency.py + recovery.py → strategy.py →
@@ -148,10 +151,11 @@ cross-plane edges today (`docs/consolidation/design.md` §0) and are pinned — 
 
 ### Reserved-but-empty — the Context Abstraction Plane homes (CAP I0–I7)
 
-The CAP design (`docs/context_abstraction/design.md` §9) is **frozen** by this release
-(`stage_map.md` §6): its implementation pauses until consolidation S6, but its structural homes are
-declared here so post-consolidation implementation is **drop-in**. Each reserved home is an empty
-placeholder (module docstring + `# reserved for CAP I<n>`):
+The CAP design (`docs/designs/current/context_abstraction_design.md` §9) is **frozen** by this
+release (`stage_map.md` §6): its implementation pauses until the operator resumes it
+(`resume_after: consolidation S6`, now complete), but its structural homes are declared here so
+post-consolidation implementation is **drop-in**. Each reserved home is an empty placeholder
+(module docstring + `# reserved for CAP I<n>`):
 
 | CAP increment | Component | Reserved home (`src/agentic_dynamics/`) |
 |---|---|---|
@@ -190,9 +194,9 @@ regenerated instruction surfaces. `stage_map.md` §5.)
 
 ### The release plan
 
-This consolidation is staged by **`docs/consolidation/stage_map.md`** — the dependency-ordered
-release plan (S0 → S1 → S2 → S3 → S4/S5 → S6). Stage 0 (this file + doc lifecycle + CAP freeze)
-is the baseline; every later stage consumes this file's plane/boundary definitions.
+This consolidation was staged by **`docs/consolidation/stage_map.md`** — the dependency-ordered
+release plan (S0 → S1 → S2 → S3 → S4/S5 → S6), now complete (S6: `docs/consolidation/verification.md`
+"Final result: PASS"). This file's plane/boundary definitions are the release's architectural spine.
 
 ---
 
@@ -230,9 +234,8 @@ ARCHITECTURE.md`):**
 
 | Document | Role |
 |---|---|
-| `.opencode/instructions/mental-model.md` | The file map, signatures, and dependencies — the operational reference, not the architectural authority. |
-| `src/instrument/CONTEXT.md` | The instrument module reference (operator/metric authoring, the merged KB). |
-| `scripts/CONTEXT.md` | The per-script reference (the authoritative script table). |
+| `agent_config/mental-model.md` (generated into `.opencode/instructions/mental-model.md` + `.claude/`) | The file map, signatures, and dependencies — the operational reference, not the architectural authority. |
+| `scripts/CONTEXT.md` | The per-script reference (the authoritative script table, machine-parsed by the classification guard). |
 | `docs/data_integrity_findings.md` | The data-integrity boundary (no `_results_summary.json` resurrection). |
 | `docs/review/` | The review directory — including the critique this file answers (`semantic_monolith_review.md`). |
 | `docs/consolidation/{stage_map,design}.md` | The release plan + per-stage design this file is one output of. |

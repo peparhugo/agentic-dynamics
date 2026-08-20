@@ -47,6 +47,7 @@ pytest tests/
 pytest tests/test_<module>.py -v
 firebase deploy --only hosting                       # canonical site (ai-finops-rulebook)
 firebase deploy --only hosting --project agentic-dynamics  # mirror site — deploy BOTH
+# NOTE: firebase deploy runs FROM apps/website/ (firebase.json + .firebaserc live there; public: ".")
 ```
 
 ## Operational notes
