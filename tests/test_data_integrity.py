@@ -29,7 +29,7 @@ def test_no_fabricated_pass_rate_in_build_data():
 
 def test_basin_cost_fallback_uses_get_pricing():
     # P0-2: basin.py must not hardcode a literal per-token rate.
-    src = _read("src/instrument/basin.py")
+    src = _read("src/agentic_dynamics/measurement/basin.py")
     assert "0.27" not in src
     assert "get_pricing" in src
 
@@ -44,7 +44,7 @@ def test_no_resurrected_arch_constants_in_build_data():
 def test_correctness_tag_uses_independent_evaluator():
     # P0-11: game_report.py must tag correctness [M] only when the evaluator is
     # independent, not merely when tests were run (agent-authored tests ≠ [M]).
-    src = _read("src/instrument/game_report.py")
+    src = _read("src/agentic_dynamics/reporting/game_report.py")
     assert "evaluator_independent" in src
     assert "'[M]' if sol.tests_total > 0" not in src
 
@@ -66,7 +66,7 @@ def test_no_cross_experiment_baseline_fallback():
 
 def test_go_rust_patterns_in_ast_diff():
     # P0-10: commit_analysis.py diff stats must cover Go (func) and Rust (fn).
-    src = _read("src/instrument/commit_analysis.py")
+    src = _read("src/agentic_dynamics/measurement/commit_analysis.py")
     assert r"\n\+func " in src
     assert r"\n\+fn " in src
     assert r"\n\+use " in src

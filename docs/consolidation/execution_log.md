@@ -113,6 +113,46 @@ Deliverable: empty `src/agentic_dynamics/` package skeleton (additive; nothing m
 
 **S1-skeleton result: 5/5 PASS.**
 
+---
+
+## S1 — package move (phase `move`)
+
+Spec: `experiments/specs/consolidation_stage_1_package_move.yaml` · phase `move` (phase B).
+Deliverable: all 64 modules moved to planes + internal imports rewritten + the `instrument.*`
+compat shim (atomic, one commit).
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | All 63 modules `git mv`'d to their plane per design §1.1 (core 4 · experiment 3 · measurement 15 · runtime 4 · adapters 3 · knowledge 16 · control 9 · reporting 4 · legacy 5) | PASS |
+| 2 | Internal imports rewritten (`from .X` / `from instrument.X` → `from agentic_dynamics.<plane>.X`); zero residual `from .X` / `from instrument` inside `agentic_dynamics/` | PASS |
+| 3 | Plane `__init__.py` re-exports (`from . import …` + `__all__`) + shim `src/instrument/` generated (regenerated 703-line barrel + 63 per-module stubs) | PASS |
+| 4 | Shim serves all three import shapes (`from instrument import X` / `import instrument.X` / `from instrument.X import Y`) transparently, incl. mock-patching | PASS |
+| 5 | `pytest tests/ -m "not external"` green via the shim | PASS (1179 passed, 121 deselected) |
+| 6 | Smoke-run 5 representative scripts | PASS (run/analyze_worktrees/build_data/kb_produce `--help` OK; worker.py is a blocking BRPOP worker — its `_constants → instrument.session_types` import chain verified via the shim) |
+
+**S1-move result: 6/6 PASS.**
+
+Implementation notes (necessary adjustments during the atomic move, documented for traceability):
+
+- **Shim = `sys.modules` aliasing, not `import *`.** A plain `from agentic_dynamics.<plane>.<m>
+  import *` stub drops `_`-prefixed names (e.g. `_PROFILES`, `_constraint_keywords`) that tests
+  import directly, and breaks `monkeypatch.setattr(instrument.<m>, …)` — the real code resolves
+  names in the *real* module's namespace. Each stub therefore aliases `sys.modules[__name__] =
+  agentic_dynamics.<plane>.<m>`, making `instrument.<m>` *be* the real module (imports, attribute
+  access, and mock-patching all transparent).
+- **`__file__`-relative path depth fix (3→4 levels).** Modules moved one directory deeper
+  (`src/instrument/X.py` → `src/agentic_dynamics/<plane>/X.py`), so `Path(__file__)…parent.parent.parent`
+  now resolves to `src/` instead of the repo root. Fixed in `core/paths.py` (PROJECT_ROOT — the KB
+  path source of truth), `graph.py`, `knowledge_ingestion.py`, `ollama_analyzer.py`,
+  `opencode_analyzer.py` (PROJECT_ROOT), `commit_analysis.py` (`_CONVENTIONS_DIR`), `review.py` ×2,
+  and `signal_store.py` (`parents[2]`→`parents[3]`).
+- **Two source-path test reads repointed** (the shim cannot relocate files read by hardcoded path,
+  not by import): `tests/test_data_integrity.py` (`src/instrument/{basin,game_report,commit_analysis}.py`
+  → `src/agentic_dynamics/…`) and `tests/test_ledger_ingestion.py` (`parents[2]`→`parents[3]`).
+  These are the only consumer edits this phase (the rest of scripts/tests still import `instrument.*`
+  via the shim, awaiting phase C).
+
+
 
 
 

@@ -8,54 +8,61 @@ cost, and correctness under degraded input.
 
 v0.6: Multi-language analysis via tree-sitter. Flash V4 mutation compiler.
 """
+import warnings
+warnings.warn(
+    "instrument.* is a compat shim — import agentic_dynamics.* instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 
 # Deprecated: Perturbation, PerturbationOperator — only build_operators/perturb_prompt used by current scripts
 # canonical-state round 2, Delta 3: producer-side actuation derivation (authority=POLICY,
 # built + unit-tested with ZERO call sites — see actuation_ingestion.py's module docstring)
-from .actuation_ingestion import (
+from agentic_dynamics.control.actuation_ingestion import (
     ACL_SCOPE as ACTUATION_ACL_SCOPE,
 )
-from .actuation_ingestion import (
+from agentic_dynamics.control.actuation_ingestion import (
     ACTUATION_KINDS,
     derive_actuation_record,
 )
-from .actuation_ingestion import (
+from agentic_dynamics.control.actuation_ingestion import (
     EXTRACTOR_VERSION as ACTUATION_EXTRACTOR_VERSION,
 )
-from .actuation_ingestion import (
+from agentic_dynamics.control.actuation_ingestion import (
     SOURCE_TYPE as ACTUATION_SOURCE_TYPE,
 )
 
 # v1.0: the retrieve->construct->render augmentation seam (R7 — split out of workflow_runner)
-from .augment import (
+from agentic_dynamics.knowledge.augment import (
     DEFAULT_INHERITED_TOOLS,
     AugmentationOutcome,
     augment_prompt,
     default_construct_fn,
     default_retrieve_fn,
 )
-from .backends import get_backend_for_model, resolve_backend, run_agentic
+from agentic_dynamics.adapters.backends import get_backend_for_model, resolve_backend, run_agentic
 
 # Deprecated: ReasoningTrajectory, TrajectoryStep, compute_trajectory_distance — not used by current scripts
-from .basin import BasinMetrics, measure_basin_escape
-from .claude_adapter import ClaudeStreamAdapter, adapt_usage, run_claude_agentic
+from agentic_dynamics.measurement.basin import BasinMetrics, measure_basin_escape
+from agentic_dynamics.adapters.claude_adapter import ClaudeStreamAdapter, adapt_usage, run_claude_agentic
 
 # v1.0: producer-side code-structure derivation (source_type=code records + graph wiring)
-from .code_ingestion import (
+from agentic_dynamics.knowledge.code_ingestion import (
     ACL_SCOPE as CODE_ACL_SCOPE,
 )
-from .code_ingestion import (
+from agentic_dynamics.knowledge.code_ingestion import (
     EXTRACTOR_VERSION as CODE_EXTRACTOR_VERSION,
 )
-from .code_ingestion import (
+from agentic_dynamics.knowledge.code_ingestion import (
     SOURCE_TYPE as CODE_SOURCE_TYPE,
 )
-from .code_ingestion import (
+from agentic_dynamics.knowledge.code_ingestion import (
     build_code_record,
     derive_code_records,
     ingest_codebase_graph,
 )
-from .codebase_graph import (
+from agentic_dynamics.measurement.codebase_graph import (
     CodebaseGraph,
     GraphDelta,
     GraphMetrics,
@@ -64,7 +71,7 @@ from .codebase_graph import (
     compute_graph_delta,
     compute_metrics,
 )
-from .commit_analysis import (
+from agentic_dynamics.measurement.commit_analysis import (
     CommitAnalysis,
     StoryAnalysis,
     analyze_commit,
@@ -75,7 +82,7 @@ from .commit_analysis import (
 )
 
 # v1.0: the compiler — spec → DAG
-from .compile_experiment import (
+from agentic_dynamics.experiment.compile_experiment import (
     DAG,
     MEASUREMENT_RULES,
     Phase,
@@ -89,12 +96,12 @@ from .compile_experiment import (
 )
 
 # Deprecated: ConstraintDetection, DetectionReport, detection_summary — not used by current scripts
-from .constraint_detection import detect_constraints
-from .efficiency import EfficiencyMetrics, compute_cost_estimate, compute_efficiency
+from agentic_dynamics.measurement.constraint_detection import detect_constraints
+from agentic_dynamics.measurement.efficiency import EfficiencyMetrics, compute_cost_estimate, compute_efficiency
 
 # Deprecated: EmbeddingClient, extract_session_text — not used by current scripts
-from .embeddings import ChromaStore, ChromaStoreError, extract_session_steps, step_doc_id
-from .entropy import (
+from agentic_dynamics.knowledge.embeddings import ChromaStore, ChromaStoreError, extract_session_steps, step_doc_id
+from agentic_dynamics.measurement.entropy import (
     EntropyProfile,
     compute_entropy,
     entropy_delta,
@@ -102,7 +109,7 @@ from .entropy import (
 )
 
 # v1.0: ExperimentSpec — declarative specs + the requires/produces validator
-from .experiment_spec import (
+from agentic_dynamics.experiment.experiment_spec import (
     LEDGER_FIELDS,
     SPEC_KEYS,
     SPEC_STATUSES,
@@ -119,17 +126,17 @@ from .experiment_spec import (
     validate_rules,
     validate_spec,
 )
-from .game_report import GameReport
+from agentic_dynamics.reporting.game_report import GameReport
 
 # Deprecated: InstrumentedAdapter, InvokeTimeoutError — old pipeline; run_opencode_agentic replaces adapter.py
 # Deprecated: ExperimentConfig, ExperimentRun, ExperimentResult, run_experiment — old pipeline; not used by current scripts
 # Deprecated: build_hypothesis, build_methodology, persist_to_lab_book — lab scripts bypass this module
-from .graph import ALLOWED_EXPANSION_RELS, Neo4jClient
+from agentic_dynamics.knowledge.graph import ALLOWED_EXPANSION_RELS, Neo4jClient
 
 # v1.0: canonical identity + authority contract for the runtime-RAG knowledge base
 # canonical-state round 2 (step 1): ACTUATION_TYPES/OBSERVATION_TYPES/message_family added;
 # R2 (restructure): the single SOURCE_TYPES vocabulary + SourceTypeSpec
-from .knowledge import (
+from agentic_dynamics.knowledge.knowledge import (
     ACTUATION_TYPES,
     EVIDENCE_CLASSES,
     OBSERVATION_TYPES,
@@ -147,7 +154,7 @@ from .knowledge import (
 )
 
 # v1.0: producer-side measured-finding derivation (richer extractor over the summary)
-from .knowledge_ingestion import (
+from agentic_dynamics.knowledge.knowledge_ingestion import (
     ACL_SCOPE,
     ARTIFACT_DIR,
     EXTRACTOR_VERSION,
@@ -168,7 +175,7 @@ from .knowledge_ingestion import (
 )
 
 # v1.0: durable ingestion over Redis Streams (DB 2, pointer-only events)
-from .knowledge_stream import (
+from agentic_dynamics.knowledge.knowledge_stream import (
     CONSUMER_GROUPS,
     DEAD_LETTER_KEY,
     STREAM_KEY,
@@ -189,12 +196,12 @@ from .knowledge_stream import (
     register_records,
     verify_content_hash,
 )
-from .knowledge_stream import (
+from agentic_dynamics.knowledge.knowledge_stream import (
     connect as kb_stream_connect,
 )
 
 # v0.6: Multi-language analysis + mutation compiler + story orchestrator
-from .language import (
+from agentic_dynamics.core.language import (
     CodebaseAST,
     LanguageProfile,
     collect_functions,
@@ -206,36 +213,36 @@ from .language import (
 
 # canonical-state round 2: producer-side ledger derivation (ledger_job / ledger_attempt /
 # meta_session records — closes gap (a) no-session fallback and gap (b) meta_* pollution)
-from .ledger_ingestion import (
+from agentic_dynamics.knowledge.ledger_ingestion import (
     EXTRACTOR_VERSION as LEDGER_EXTRACTOR_VERSION,
 )
-from .ledger_ingestion import (
+from agentic_dynamics.knowledge.ledger_ingestion import (
     FALLBACK_EXTRACTOR_VERSION as LEDGER_FALLBACK_EXTRACTOR_VERSION,
 )
-from .ledger_ingestion import (
+from agentic_dynamics.knowledge.ledger_ingestion import (
     SOURCE_TYPE_ATTEMPT as LEDGER_SOURCE_TYPE_ATTEMPT,
 )
-from .ledger_ingestion import (
+from agentic_dynamics.knowledge.ledger_ingestion import (
     SOURCE_TYPE_JOB as LEDGER_SOURCE_TYPE_JOB,
 )
-from .ledger_ingestion import (
+from agentic_dynamics.knowledge.ledger_ingestion import (
     SOURCE_TYPE_META as LEDGER_SOURCE_TYPE_META,
 )
-from .ledger_ingestion import (
+from agentic_dynamics.knowledge.ledger_ingestion import (
     build_attempt_record,
     build_job_record,
     classify_session,
     derive_ledger_records,
 )
-from .live import LivePublisher, make_publisher
-from .lsp_diagnostics import (
+from agentic_dynamics.control.live import LivePublisher, make_publisher
+from agentic_dynamics.measurement.lsp_diagnostics import (
     LSPDiagnostic,
     LSPReport,
     available_tools,
     diagnostics_delta,
     run_diagnostics,
 )
-from .mutation import (
+from agentic_dynamics.measurement.mutation import (
     ALL_OPERATORS,
     CODEBASE_OPERATORS,
     SPECIFICATION_OPERATORS,
@@ -246,13 +253,13 @@ from .mutation import (
 
 # canonical-state round 2: producer-side observation/flag derivation (every supervisor
 # verdict is now registrable, not only flagged ones — closes round 1's OQ6a audit gap)
-from .observation_ingestion import (
+from agentic_dynamics.control.observation_ingestion import (
     ACL_SCOPE as OBSERVATION_ACL_SCOPE,
 )
-from .observation_ingestion import (
+from agentic_dynamics.control.observation_ingestion import (
     EXTRACTOR_VERSION as OBSERVATION_EXTRACTOR_VERSION,
 )
-from .observation_ingestion import (
+from agentic_dynamics.control.observation_ingestion import (
     SOURCE_TYPE_FLAG,
     SOURCE_TYPE_OBSERVATION,
     build_flag_record,
@@ -260,36 +267,36 @@ from .observation_ingestion import (
     derive_flag_record,
     derive_observation_record,
 )
-from .ollama_analyzer import OllamaAnalyzer, load_summary_data
-from .opencode import AgenticResult, normalize_opencode_event, run_opencode_agentic
-from .opencode_analyzer import REPORTS_DIR, OpencodeAnalyzer
-from .perturb import (
+from agentic_dynamics.reporting.ollama_analyzer import OllamaAnalyzer, load_summary_data
+from agentic_dynamics.adapters.opencode import AgenticResult, normalize_opencode_event, run_opencode_agentic
+from agentic_dynamics.reporting.opencode_analyzer import REPORTS_DIR, OpencodeAnalyzer
+from agentic_dynamics.measurement.perturb import (
     PERTURBATION_CLASSES,
     build_operators,
     derive_seed,
     perturb_prompt,
     perturbation_class_for,
 )
-from .pipeline_status import STAGE_KEYS, stage_summary
+from agentic_dynamics.control.pipeline_status import STAGE_KEYS, stage_summary
 
 # v1.0: producer-side policy ingestion (authority=POLICY records)
-from .policy_ingestion import (
+from agentic_dynamics.knowledge.policy_ingestion import (
     ACL_SCOPE as POLICY_ACL_SCOPE,
 )
-from .policy_ingestion import (
+from agentic_dynamics.knowledge.policy_ingestion import (
     EXTRACTOR_VERSION as POLICY_EXTRACTOR_VERSION,
 )
-from .policy_ingestion import (
+from agentic_dynamics.knowledge.policy_ingestion import (
     SOURCE_TYPE as POLICY_SOURCE_TYPE,
 )
-from .policy_ingestion import (
+from agentic_dynamics.knowledge.policy_ingestion import (
     build_policy_record,
     derive_policy_records,
     discover_policy_paths,
 )
 
 # v1.0: shared post-hoc job shapes + enqueue primitives (execute -> analyze -> review)
-from .posthoc import (
+from agentic_dynamics.runtime.posthoc import (
     ANALYSIS_QUEUE,
     ANALYSIS_STATUS,
     DEFAULT_REVIEW_MODEL,
@@ -307,7 +314,7 @@ from .posthoc import (
 )
 
 # v1.0: the prompt-constructor agent (typed plan, validator, deterministic renderer)
-from .prompt_constructor import (
+from agentic_dynamics.knowledge.prompt_constructor import (
     DEFAULT_CONSTRUCTOR_MODEL,
     AcceptanceCheck,
     AugmentedPrompt,
@@ -326,10 +333,10 @@ from .prompt_constructor import (
     render_prompt,
     validate_plan,
 )
-from .prompt_constructor import (
+from agentic_dynamics.knowledge.prompt_constructor import (
     SCHEMA_VERSION as PROMPT_PLAN_SCHEMA_VERSION,
 )
-from .prompt_perturbation import (
+from agentic_dynamics.measurement.prompt_perturbation import (
     FLASH_MODEL,
     PromptPerturbation,
     compile_prompt_perturbation,
@@ -337,20 +344,20 @@ from .prompt_perturbation import (
 )
 
 # v1.0: producer-side code-quality derivation (source_type=report records)
-from .quality_ingestion import (
+from agentic_dynamics.knowledge.quality_ingestion import (
     ACL_SCOPE as QUALITY_ACL_SCOPE,
 )
-from .quality_ingestion import (
+from agentic_dynamics.knowledge.quality_ingestion import (
     EXTRACTOR_VERSION as QUALITY_EXTRACTOR_VERSION,
 )
-from .quality_ingestion import (
+from agentic_dynamics.knowledge.quality_ingestion import (
     SOURCE_TYPE as QUALITY_SOURCE_TYPE,
 )
-from .quality_ingestion import (
+from agentic_dynamics.knowledge.quality_ingestion import (
     build_quality_record,
     derive_quality_records,
 )
-from .queue_reinterleave import (
+from agentic_dynamics.control.queue_reinterleave import (
     connect,
     provider_of,
     provider_summary,
@@ -361,13 +368,13 @@ from .queue_reinterleave import (
 
 # R1 (restructure): the shared record-builder factory — the single owner of the
 # content-hash back-fill ordering every producer was previously copy-pasting.
-from .record_factory import build_record as build_record_from_parts
+from agentic_dynamics.knowledge.record_factory import build_record as build_record_from_parts
 
 # Deprecated: RecoveryCost, recovery_summary_table — not used by current scripts
-from .recovery_cost import compute_recovery_cost
+from agentic_dynamics.measurement.recovery_cost import compute_recovery_cost
 
 # v1.0: deterministic retrieval + evidence cards for the runtime-RAG layer
-from .retrieval import (
+from agentic_dynamics.knowledge.retrieval import (
     AUTHORITY_MULTIPLIER,
     RELATIONSHIP_WEIGHTS,
     WEIGHTS_VERSION,
@@ -391,7 +398,7 @@ from .retrieval import (
     rrf_base,
     select_evidence,
 )
-from .review import (
+from agentic_dynamics.reporting.review import (
     CommitReview,
     StoryReview,
     compare_implementations,
@@ -401,24 +408,24 @@ from .review import (
 )
 
 # canonical-state round 2: producer-side review derivation (source_type=review records)
-from .review_ingestion import (
+from agentic_dynamics.knowledge.review_ingestion import (
     ACL_SCOPE as REVIEW_ACL_SCOPE,
 )
-from .review_ingestion import (
+from agentic_dynamics.knowledge.review_ingestion import (
     EXTRACTOR_VERSION as REVIEW_EXTRACTOR_VERSION,
 )
-from .review_ingestion import (
+from agentic_dynamics.knowledge.review_ingestion import (
     SOURCE_TYPE as REVIEW_SOURCE_TYPE,
 )
-from .review_ingestion import (
+from agentic_dynamics.knowledge.review_ingestion import (
     build_review_record,
     derive_review_records,
 )
-from .routing import compute_routing, recommend_route, simulate_strategies
+from agentic_dynamics.control.routing import compute_routing, recommend_route, simulate_strategies
 
 # Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
-from .semantic_validation import analyze_ast, analyze_markers
-from .session_types import (
+from agentic_dynamics.measurement.semantic_validation import analyze_ast, analyze_markers
+from agentic_dynamics.core.session_types import (
     DEFAULT_TASK_TYPE,
     EXPERIMENT_SESSION_PATTERNS,
     TASK_TYPES,
@@ -426,7 +433,7 @@ from .session_types import (
 )
 
 # v1.0: the signal store — measured per-model signals derived from _results_summary.json
-from .signal_store import (
+from agentic_dynamics.control.signal_store import (
     MODEL_ALIASES,
     build_signal_store,
     derive_cache_hit_rate,
@@ -436,17 +443,17 @@ from .signal_store import (
 )
 
 # Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
-from .solution import SolutionMetrics, evaluate_solution
-from .sonar import SonarMetrics, compute_sonar_diff, run_sonar_analysis, sonar_quality_score
+from agentic_dynamics.measurement.solution import SolutionMetrics, evaluate_solution
+from agentic_dynamics.measurement.sonar import SonarMetrics, compute_sonar_diff, run_sonar_analysis, sonar_quality_score
 
 # v1.0: spec lifecycle -> knowledge base (source_type "spec", supersedes lineage)
-from .spec_ingestion import (
+from agentic_dynamics.knowledge.spec_ingestion import (
     EXTRACTOR_VERSION as SPEC_EXTRACTOR_VERSION,
 )
-from .spec_ingestion import (
+from agentic_dynamics.knowledge.spec_ingestion import (
     REASON_PREFIX as SPEC_REASON_PREFIX,
 )
-from .spec_ingestion import (
+from agentic_dynamics.knowledge.spec_ingestion import (
     RegistryHead,
     build_spec_record,
     derive_spec_records,
@@ -463,7 +470,7 @@ from .spec_ingestion import (
 )
 
 # v1.0: the derived spec lifecycle index — experiments/specs/{index.json,STATUS.md}
-from .spec_status import (
+from agentic_dynamics.experiment.spec_status import (
     INDEX_FILENAME,
     INDEX_SCHEMA_VERSION,
     STATUS_FILENAME,
@@ -484,7 +491,7 @@ from .spec_status import (
 )
 
 # v1.0: per-step routing — preference-scored, cache-aware model selection per workflow step
-from .step_routing import (
+from agentic_dynamics.control.step_routing import (
     FORBIDDEN_SIGNALS,
     MEASURED_SIGNALS,
     ModelSignals,
@@ -500,7 +507,7 @@ from .step_routing import (
     validate_step_selector,
     validate_workflow_routing,
 )
-from .story import (
+from agentic_dynamics.runtime.story import (
     BUILTIN_STORIES,
     PerturbationCondition,
     SessionResult,
@@ -514,16 +521,16 @@ from .story import (
 )
 
 # canonical-state round 2: producer-side story derivation (source_type=story records)
-from .story_ingestion import (
+from agentic_dynamics.knowledge.story_ingestion import (
     ACL_SCOPE as STORY_ACL_SCOPE,
 )
-from .story_ingestion import (
+from agentic_dynamics.knowledge.story_ingestion import (
     EXTRACTOR_VERSION as STORY_EXTRACTOR_VERSION,
 )
-from .story_ingestion import (
+from agentic_dynamics.knowledge.story_ingestion import (
     SOURCE_TYPE as STORY_SOURCE_TYPE,
 )
-from .story_ingestion import (
+from agentic_dynamics.knowledge.story_ingestion import (
     adapt_to_story_result,
     build_story_record,
     derive_story_records,
@@ -531,18 +538,18 @@ from .story_ingestion import (
 )
 
 # Deprecated: StrategyType — not used by current scripts
-from .strategy import StrategyReport, classify_strategy
-from .streaming import StreamResult, stream_subprocess
-from .supervisor import (
+from agentic_dynamics.measurement.strategy import StrategyReport, classify_strategy
+from agentic_dynamics.core.streaming import StreamResult, stream_subprocess
+from agentic_dynamics.control.supervisor import (
     SUPERVISOR_FLAGS_KEY,
     SUPERVISOR_SESSION_CELLS_KEY,
     normalize_flag,
     register_session_mapping,
 )
-from .test_runner import run_suite, suite_succeeded
+from agentic_dynamics.runtime.test_runner import run_suite, suite_succeeded
 
 # v1.0: the execute phase — run an agent_task workflow in a worktree
-from .workflow_runner import (
+from agentic_dynamics.runtime.workflow_runner import (
     PhaseResult,
     WorkflowRunResult,
     run_workflow,

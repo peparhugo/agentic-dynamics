@@ -4,3 +4,9 @@ Ownership: the five deprecated/dead modules (``experiment``, ``adapter``, ``lab_
 ``recovery``, ``trajectory``) moved here with zero current importers. Removed entirely in
 Stage 1's retire phase, once grep confirms no importer remains.
 """
+
+from . import adapter, experiment, lab_book, recovery, trajectory
+
+
+
+__all__ = ['adapter', 'experiment', 'lab_book', 'recovery', 'trajectory']

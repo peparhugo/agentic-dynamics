@@ -10,3 +10,9 @@ Enforced by ``tests/test_dependency_direction.py`` (Stage 1, phase D).
 Reserved (empty until post-consolidation CAP implementation, per ``ARCHITECTURE.md`` §4):
 ``contracts.py`` — the CAP I5 fact-contracts home.
 """
+
+from . import language, paths, session_types, streaming
+
+
+
+__all__ = ['language', 'paths', 'session_types', 'streaming']

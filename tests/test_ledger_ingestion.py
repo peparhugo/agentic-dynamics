@@ -128,7 +128,7 @@ def test_experiment_session_patterns_live_in_instrument_not_scripts():
 
     from instrument import session_types as st
 
-    path = Path(st.__file__).resolve().parents[2] / "scripts" / "_constants.py"
+    path = Path(st.__file__).resolve().parents[3] / "scripts" / "_constants.py"
     spec = importlib.util.spec_from_file_location("_check_constants", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
