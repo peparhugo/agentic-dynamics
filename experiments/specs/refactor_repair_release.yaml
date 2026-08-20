@@ -1,0 +1,208 @@
+name: refactor_repair_release
+question: >-
+  Execute the refactor-repair release (docs/review/refactor_repair_review.md — an external,
+  operator-provided review of main at 1e360335f, every load-bearing claim re-verified against the
+  tree) as small incremental stages, each a green-committed phase: repair operational breakage
+  (Control Room ROOT, Docker/reproduce.sh + CI gates, CLI resolution + packaging), repair agent
+  context (semantic source + two schema-validated renderers, instruction-doc rewrite, stale-path
+  guard), make artifact identity explicit (artifact_kind/intent/repeatable metadata + compiler
+  validation + reclassification), make the lifecycle index useful (per-kind semantics + completed
+  states), harden (relative-import lint resolution, routing/telemetry protocols, split the worst
+  local monoliths), and verify end-to-end. No new subsystem work — the CAP stays frozen until the
+  repair is green. The load-bearing rule, the consolidation's guard rails, and the operational
+  invariants survive every phase.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      review: >-
+        READ docs/review/refactor_repair_review.md FIRST — the authoritative input; every phase
+        below executes one of its findings. P0-1 two renderers; P0-2 stale instruction docs +
+        stale-path guard; P0-3 server.py:162 ROOT resolves to apps/; P1-1 Dockerfile:28 COPYs a
+        moved dir + reproduce.sh runs retired scripts; P1-2 cli.py:101-106 _resolve iterates
+        insertion order (supervise vs supervise claude-agents) + wheel packaging gap; P1-3
+        substring classifier leaves posthoc_pipeline.yaml + workflow_step_routing.yaml in
+        experiments/definitions; P1-4 derive_status defaults everything active; Debt-1 local
+        monoliths (server.py 70KB, story.py 61KB); Debt-2 relative imports bypass the dependency
+        lint + runtime->control decision coupling; Debt-3 confidence split-brain
+        (experiment_spec measured vs step_routing.py:44 unmeasured).
+      current_state: >-
+        Consolidation release (S0-S6) merged on main at 1e360335f: eight planes under
+        src/agentic_dynamics/, apps/{website,control_room}, workflows/ + experiments/definitions,
+        one CLI, agent_config/ generating .opencode/.claude byte-identically, guard tests
+        (dependency direction, data flow, script classification, spec classification, doc
+        lifecycle, generated-surface drift), 1189 tests green. The queue is cleared. The CAP is
+        frozen (context_abstraction_implement PAUSED; reserved homes exist on paper only — the
+        placeholder files were never created; that is a later CAP-prep item, not this release).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests (the runner pytest-gates
+        each python phase). (2) No new subsystem work: the CAP stays frozen; nothing here
+        implements facts/reducers/compiler. (3) The load-bearing rule survives: instrument ->
+        derive -> policy ordering, the requires/produces gate, and every existing guard test stay
+        green (fixes may STRENGTHEN guards, never weaken them). (4) Operational invariants: Redis
+        isolation (6380 queue DB1 + KB stream DB2; 6379 sandbox), dual Firebase (deploy from
+        apps/website/, public "."), Control Room observe-only. (5) The review's "do not undo the
+        refactor" holds — no top-level restructuring; only the targeted splits in Debt-1, and
+        only where the review names them. (6) Rewrites must be grounded: instruction-doc
+        rewrites (b2) must cite file:line of the current tree they describe; the stale-path
+        guard (b3) needs a narrow allowlist for historical discussion, not a blanket pass.
+        (7) Append PASS/FAIL per acceptance criterion to docs/consolidation/execution_log.md's
+        repair-release section (reuse the same checkpoint discipline — resumable via --resume).
+      read_first: >-
+        docs/review/refactor_repair_review.md, ARCHITECTURE.md,
+        agent_config/mental-model.md (the operational reference), scripts/CONTEXT.md,
+        experiments/CONTEXT.md, src/agentic_dynamics/experiment/{experiment_spec,compile_experiment,
+        spec_status}.py, src/agentic_dynamics/cli.py, apps/control_room/server.py, Dockerfile,
+        scripts/reproduce.sh
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/refactor-repair); each phase commits [workflow] <phase>. Continuous run of all
+        phases; resumable with --resume.
+    phases:
+      - name: a1_control_room_paths
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          FIX: P0-3 — apps/control_room/server.py:162 computes ROOT as parent.parent (= <repo>/apps). Re-point every default path to agentic_dynamics.core.paths.PROJECT_ROOT (data_manifest, supervisor flags, design-session workdir). Update the launch docs (python3 apps/control_room/server.py; gunicorn apps.control_room.server:app). Add tests/test_control_room_paths.py asserting server.ROOT == PROJECT_ROOT and the manifest/flags defaults resolve inside the repo. Grep apps/control_room/ for other parent.parent root computations and fix them too.
+          LOG: append PASS/FAIL lines for each criterion to docs/consolidation/execution_log.md (new '## Repair release' section, created if absent); commit.
+      - name: a2_repro_environment
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          FIX: P1-1 — Dockerfile:28 COPYs experiments/configs/ (moved to experiments/definitions/configs/); fix all COPY paths. Rewrite scripts/reproduce.sh against the current tree (no retired lab scripts, apps/website/data.js, deploy from apps/website/, current project framing) and give it a --dry-run mode. Update the CI workflow (.github/workflows/) to gate: docker build ., agentic-dynamics --help, scripts/reproduce.sh --dry-run.
+          LOG: PASS/FAIL lines; commit.
+      - name: a3_cli_resolution
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          FIX: P1-2 (resolution) — src/agentic_dynamics/cli.py:101-106: implement TRUE longest-prefix matching (sort _COMMANDS prefixes by length descending before iterating) so 'agentic-dynamics supervise claude-agents' resolves to claude_agents_supervisor.py. Add table-driven tests (tests/test_cli_resolution.py) asserting EVERY documented command resolves to its intended script (build the expectation table from the CLI docstring/README surface, not from _COMMANDS itself).
+          LOG: PASS/FAIL; commit.
+      - name: a4_cli_packaging
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          FIX: P1-2 (packaging) — decide and implement: declare the CLI checkout-only (document in pyproject.toml + CLI --help that it dispatches to repo scripts/ and requires the checkout) AND add a wheel-install smoke test to CI that builds a wheel, installs it into a venv, runs agentic-dynamics --help, and expects a clear checkout-required message when scripts/ is absent. No script-logic migration in this release (that is post-repair hardening).
+          LOG: PASS/FAIL; commit.
+      - name: b1_dual_renderers
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P0-1 — restructure agent_config/ as a semantic source (plain data: agents, commands, skills, rules in a neutral schema) with TWO renderers: render_opencode() and render_claude(), each emitting its platform's real format (mode/model/permission mapping, command argument indexing, frontmatter). Validate each output against a per-target schema (assert required fields, reject OpenCode-only keys in Claude output). Replace the byte-equality drift test with (a) meaning-equivalence checks where platforms permit and (b) per-target schema-validity checks. Regenerate .opencode/ + .claude/ from the new renderers. Keep the existing agent_config content semantically unchanged (this phase changes HOW it is rendered, not WHAT it says — b2 changes the content).
+          LOG: PASS/FAIL; commit.
+      - name: b2_instruction_rewrite
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P0-2 — rewrite AGENTS.md, CLAUDE.md, CONTRIBUTING.md, scripts/CONTEXT.md, experiments/CONTEXT.md against the CURRENT tree: paths (experiments/definitions, workflows/, apps/, agentic_dynamics/...), the generator model (no manual sync), current commands (CLI + scripts), and the measured-ledger facts (confidence/perturbation_strength/test_executed_success ARE measured). Every claim carries file:line evidence of the current tree. Regenerate surfaces via the new renderers.
+          LOG: PASS/FAIL; commit.
+      - name: b3_stale_path_guard
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          FIX: P0-2 (guard) — add tests/test_stale_path_guard.py scanning every status: accepted doc and docs/designs/current/* for retired path families: src/instrument/, experiments/configs/, admin/server.py, firebase/public/, code_reviews/2026-08-14_... — with a narrow, explicit allowlist for historical discussion (e.g. 'the old src/instrument/' inside docs/review/ or archive). Wire it into the suite; fix any accepted doc it flags (repoint or add to the allowlist with a justification).
+          LOG: PASS/FAIL; commit.
+      - name: c1_artifact_metadata
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P1-3 (schema) — add validated metadata to ExperimentSpec: artifact_kind: experiment|workflow (default 'experiment'), intent: measure|mutate, side_effects: {repository: bool, external_services: bool}, repeatable: bool (default true). The compiler/validator enforces: artifact_kind=experiment with source-modification phases or repository side effects is REJECTED unless explicitly sandboxed. Backward-compatible (existing 77 specs load unchanged).
+          LOG: PASS/FAIL; commit.
+      - name: c2_reclassify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          FIX: P1-3 (placement) — move experiments/definitions/posthoc_pipeline.yaml + workflow_step_routing.yaml to workflows/operations/ (or repository/ as their nature dictates) with explicit metadata. Replace the substring-heuristic classifier in tests/test_experiment_workflow_classification.py with metadata-driven placement (artifact_kind must match the directory; the guard fails on mismatch). Re-point any path references.
+          LOG: PASS/FAIL; commit.
+      - name: c3_metadata_backfill
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P1-3 (backfill) — add explicit artifact_kind/intent/side_effects/repeatable to ALL 77 specs (definitions + workflows) — mechanical, per spec, no content changes. Regenerate the spec index. The compile gate must pass on every spec after backfill.
+          LOG: PASS/FAIL; commit.
+      - name: d1_lifecycle_semantics
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P1-4 (semantics) — derive_status() (src/agentic_dynamics/experiment/spec_status.py:265) gains per-kind semantics: repeatable experiments keep draft|active|superseded|tombstoned; non-repeatable workflows use draft|runnable|running|completed|superseded|tombstoned, and a successful run of a non-repeatable workflow yields 'completed' (from the run ledgers). Add tests for each transition.
+          LOG: PASS/FAIL; commit.
+      - name: d2_status_rewrite
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          FIX: P1-4 (index) — regenerate STATUS.md/index.json with the new semantics; show artifact_kind + repeatable columns; separate 'runnable now' from 'ran successfully in history' (e.g. completed one-shots move out of the active view). Mark the completed consolidation/repo-repair one-shots completed or superseded. STATUS.md must answer 'what work remains?'.
+          LOG: PASS/FAIL; commit.
+      - name: e1_lint_relative_and_protocols
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: Debt-2 — extend tests/test_dependency_direction.py to resolve relative imports (ast walk resolving '..' against package layout) so 'from ..control import X' cannot bypass cross-plane analysis. Then address runtime->control coupling: introduce a Router Protocol (core or runtime) + a telemetry publisher Protocol, with control implementations injected at the composition root (apps/scripts); runtime depends on the protocol, not on control. Keep the two existing pinned observe-only edges as protocol usages. All existing guard tests stay green (strengthened, not weakened).
+          LOG: PASS/FAIL; commit.
+      - name: e2_signal_registry
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: Debt-3 — add src/agentic_dynamics/measurement/signal_registry.py (or core/) — one registry of measured signals: name, producer, evidence class, scope, value type, measured status, permitted consumers, freshness — seeded from the ledger fields (confidence [H] measured, perturbation_strength, test_executed_success, answer/explanation split, ...). Reconcile the split-brain: experiment_spec.py (measured) vs control/step_routing.py:44 + control/signal_store.py (unmeasured) — vocabulary becomes 'measured: yes, evidence class: heuristic, allowed for generic model routing: no, reserved for cascade experiments: yes'. Update both sides to consult the registry; add tests asserting no module calls a signal 'unmeasured' that the registry marks measured.
+          LOG: PASS/FAIL; commit.
+      - name: e3_split_control_room
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          FIX: Debt-1 (first) — split apps/control_room/server.py (~70KB) into routes/, services/, clients/, paths.py per the review's named structure; design_sessions.py along the same lines if its change patterns justify. Behavior-identical: the existing admin/control-room test suite must pass unchanged. No new endpoints.
+          LOG: PASS/FAIL; commit.
+      - name: e4_split_story
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          FIX: Debt-1 (second) — split runtime/story.py (~61KB) into runtime/story/{models.py, orchestration.py, persistence.py, conditions.py} per the review, importing story re-exports so existing consumers break nothing; the story test suite passes unchanged. Only split where responsibilities justify; if a proposed split is not justified by the code's actual structure, say so in the log and keep the file intact (justify, don't force).
+          LOG: PASS/FAIL; commit.
+      - name: f1_repair_verification
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: release gate — coverage proof vs docs/review/refactor_repair_review.md (every P0/P1/debt finding -> a phase -> PASS in the execution log; zero orphans). Full suite green; all guard suites green (dependency, data-flow, classification, script, doc-lifecycle, generated-surface, stale-path, signal-registry, control-room paths); CI-equivalent gates re-run locally (docker build, CLI --help, reproduce --dry-run where feasible); compile-gate all 77 specs; invariant audit (Redis, Firebase, CAP frozen). Write docs/review/refactor_repair_verification.md with PASS/FAIL per check and the final verdict.
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: repair_released
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [ops_repaired, context_repaired, identity_explicit, lifecycle_useful, hardened]
+metrics:
+  - {name: ops_repaired, agg: mean, over: cell}
+  - {name: context_repaired, agg: mean, over: cell}
+  - {name: identity_explicit, agg: mean, over: cell}
+  - {name: lifecycle_useful, agg: mean, over: cell}
+  - {name: hardened, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, a1_control_room_paths, a2_repro_environment, a3_cli_resolution,
+             a4_cli_packaging, b1_dual_renderers, b2_instruction_rewrite, b3_stale_path_guard,
+             c1_artifact_metadata, c2_reclassify, c3_metadata_backfill, d1_lifecycle_semantics,
+             d2_status_rewrite, e1_lint_relative_and_protocols, e2_signal_registry,
+             e3_split_control_room, e4_split_story, f1_repair_verification]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
