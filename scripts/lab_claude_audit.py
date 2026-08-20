@@ -17,7 +17,7 @@ SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_PATH = ROOT / "experiments" / "results" / "_trajectory_aggregate.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_claude_audit.json"
 
-from _constants import normalize_task
+from agentic_dynamics.core.constants import normalize_task
 
 DEEPSEEK_ID = "deepseek/deepseek-v4-pro"
 CLAUDE_ID = "anthropic/claude-fable-5"

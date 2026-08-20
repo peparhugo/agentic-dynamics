@@ -25,11 +25,15 @@ REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 
 # Job shapes, queue/status keys, and the canonical enqueue path all come from
 # the shared module so this backfill tool can't drift from the worker triggers.
-from instrument.posthoc import (  # noqa: E402
+from agentic_dynamics.runtime.posthoc import (  # noqa: E402
     ANALYSIS_QUEUE,
     ANALYSIS_STATUS,
     build_analysis_job,

@@ -681,7 +681,7 @@ class TestSaveResultsRegistryEmission:
 
     def test_skips_emission_when_kb_write_unset(self, tmp_path, monkeypatch):
         import run
-        from instrument import knowledge_stream as ks
+        from agentic_dynamics.knowledge import knowledge_stream as ks
 
         monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
 
@@ -695,7 +695,7 @@ class TestSaveResultsRegistryEmission:
 
     def test_emits_registry_event_when_kb_write_enabled(self, tmp_path, monkeypatch):
         import run
-        from instrument import knowledge_stream as ks
+        from agentic_dynamics.knowledge import knowledge_stream as ks
 
         monkeypatch.setenv("FINOPS_KB_WRITE", "1")
         published = []

@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from instrument.knowledge import (
+from agentic_dynamics.knowledge.knowledge import (
     ACTUATION_TYPES,
     OBSERVATION_TYPES,
     SCHEMA_VERSION,
@@ -30,8 +30,8 @@ from instrument.knowledge import (
     compute_knowledge_id,
     message_family,
 )
-from instrument.knowledge_ingestion import artifact_uri, extract_record, record_to_artifact
-from instrument.spec_ingestion import (
+from agentic_dynamics.knowledge.knowledge_ingestion import artifact_uri, extract_record, record_to_artifact
+from agentic_dynamics.knowledge.spec_ingestion import (
     ACL_SCOPE,
     EXTRACTOR_VERSION,
     REASON_PREFIX,
@@ -50,7 +50,7 @@ from instrument.spec_ingestion import (
     spec_reason,
     spec_text,
 )
-from instrument.spec_status import SpecStatusEntry
+from agentic_dynamics.experiment.spec_status import SpecStatusEntry
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REVISION = "0123456789abcdef0123456789abcdef01234567"
@@ -512,8 +512,8 @@ def test_emit_never_raises_when_the_stream_is_unreachable(tmp_path: Path, monkey
         json.dumps({"schema_version": "spec-status/v1", "n_specs": 1,
                     "specs": [_entry().to_dict()]})
     )
-    import instrument.knowledge_stream as ks
-    import instrument.spec_ingestion as si
+    import agentic_dynamics.knowledge.knowledge_stream as ks
+    import agentic_dynamics.knowledge.spec_ingestion as si
 
     # The artifact is written BEFORE the publish (the ordering contract), so redirect the
     # artifact directory too — otherwise this test litters the real experiments/results/kb/.
@@ -535,8 +535,8 @@ def test_emit_writes_the_artifact_before_publishing(tmp_path: Path, monkeypatch)
                     "specs": [_entry().to_dict()]})
     )
 
-    import instrument.knowledge_stream as ks
-    import instrument.spec_ingestion as si
+    import agentic_dynamics.knowledge.knowledge_stream as ks
+    import agentic_dynamics.knowledge.spec_ingestion as si
 
     artifact_dir = tmp_path / "kb"
     monkeypatch.setattr(si, "KB_ARTIFACT_DIR", artifact_dir)
@@ -573,7 +573,7 @@ def test_emit_returns_none_when_the_lifecycle_is_unchanged(tmp_path: Path, monke
     v1 = build_spec_record(_entry(), revision=REVISION)
     path = _registry(tmp_path, _registration_line(v1))
 
-    import instrument.knowledge_stream as ks
+    import agentic_dynamics.knowledge.knowledge_stream as ks
 
     monkeypatch.setattr(ks, "connect", lambda *a, **k: pytest.fail("must not connect"))
     assert emit_spec_record("alpha", root=tmp_path, revision=REVISION, registry_path=path) is None

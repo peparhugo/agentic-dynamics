@@ -18,17 +18,23 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 
-from instrument import (
-    build_operators, perturb_prompt, derive_seed,
-    evaluate_solution, compute_efficiency,
-    detect_constraints, compute_recovery_cost,
-)
-from instrument.semantic_validation import analyze_markers
-from instrument.opencode import run_opencode_agentic
+from agentic_dynamics.measurement.perturb import build_operators
+from agentic_dynamics.measurement.perturb import perturb_prompt
+from agentic_dynamics.measurement.perturb import derive_seed
+from agentic_dynamics.measurement.solution import evaluate_solution
+from agentic_dynamics.measurement.efficiency import compute_efficiency
+from agentic_dynamics.measurement.constraint_detection import detect_constraints
+from agentic_dynamics.measurement.recovery_cost import compute_recovery_cost
+from agentic_dynamics.measurement.semantic_validation import analyze_markers
+from agentic_dynamics.adapters.opencode import run_opencode_agentic
 
 # Core models for the sweep
 DEFAULT_MODELS = [

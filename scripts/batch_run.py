@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import yaml
-from _constants import WORKTREE_ROOT
+from agentic_dynamics.core.constants import WORKTREE_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = PROJECT_ROOT / "experiments/configs"

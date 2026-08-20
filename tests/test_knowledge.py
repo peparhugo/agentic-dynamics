@@ -9,7 +9,7 @@ from dataclasses import FrozenInstanceError, fields
 
 import pytest
 
-from instrument.knowledge import (
+from agentic_dynamics.knowledge.knowledge import (
     ACTUATION_TYPES,
     OBSERVATION_TYPES,
     SCHEMA_VERSION,

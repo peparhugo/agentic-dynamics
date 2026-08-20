@@ -19,10 +19,14 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.commit_analysis import agentic_token_dicts, compute_deep_metrics
-from instrument.story import load_story_result
+
+from agentic_dynamics.measurement.commit_analysis import agentic_token_dicts, compute_deep_metrics
+from agentic_dynamics.runtime.story import load_story_result
 
 RESULTS_DIR = ROOT / "experiments" / "results" / "stories"
 ANALYSIS_DIR = ROOT / "experiments" / "results" / "analysis"

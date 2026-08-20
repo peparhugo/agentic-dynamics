@@ -13,9 +13,13 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.graph import Neo4jClient
+
+from agentic_dynamics.knowledge.graph import Neo4jClient
 
 ORIGINAL_PATH = ROOT / "experiments" / "results" / "lab_basin_topology.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_basin_topology_neo4j.json"

@@ -28,17 +28,17 @@ from typing import Any
 
 import yaml
 
-from instrument.compile_experiment import experiment_matrix
-from instrument.experiment_spec import ExperimentSpec, validate_spec
-from instrument.live import (
+from agentic_dynamics.experiment.compile_experiment import experiment_matrix
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
+from agentic_dynamics.control.live import (
     EVENT_CHANNEL_PREFIX,
     EVENT_LOG_MAX,
     EVENT_LOG_PREFIX,
     STATUS_CHANNEL,
     STATUS_KEY,
 )
-from instrument.step_routing import validate_workflow_routing
-from instrument.supervisor import register_event_mapping
+from agentic_dynamics.control.step_routing import validate_workflow_routing
+from agentic_dynamics.control.supervisor import register_event_mapping
 
 try:  # Package import under pytest; sibling import for ``python admin/server.py``.
     from admin.opencode_client import OpenCodeClient, OpenCodeError

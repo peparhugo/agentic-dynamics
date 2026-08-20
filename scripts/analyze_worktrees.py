@@ -27,28 +27,30 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-from _constants import (
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
+from agentic_dynamics.core.constants import (
     EXPERIMENT_SESSION_PATTERNS,
     WORKTREE_GLOB,
     bootstrap_ci,
     probe_session_schema,
 )
 
-from instrument import (
-    GameReport,
-    analyze_ast,
-    build_operators,
-    classify_strategy,
-    compute_efficiency,
-    compute_sonar_diff,
-    evaluate_solution,
-    measure_basin_escape,
-    perturbation_class_for,
-    run_sonar_analysis,
-    sonar_quality_score,
-)
-from instrument.solution import COMPOSITE_WEIGHTS, COMPOSITE_WEIGHTS_SONAR
+from agentic_dynamics.reporting.game_report import GameReport
+from agentic_dynamics.measurement.semantic_validation import analyze_ast
+from agentic_dynamics.measurement.perturb import build_operators
+from agentic_dynamics.measurement.strategy import classify_strategy
+from agentic_dynamics.measurement.efficiency import compute_efficiency
+from agentic_dynamics.measurement.sonar import compute_sonar_diff
+from agentic_dynamics.measurement.solution import evaluate_solution
+from agentic_dynamics.measurement.basin import measure_basin_escape
+from agentic_dynamics.measurement.perturb import perturbation_class_for
+from agentic_dynamics.measurement.sonar import run_sonar_analysis
+from agentic_dynamics.measurement.sonar import sonar_quality_score
+from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS, COMPOSITE_WEIGHTS_SONAR
 
 OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
@@ -615,7 +617,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     no_baseline = not baseline_code
     self_comparison = bool(baseline_code) and baseline_code == code
     if no_baseline or self_comparison:
-        from instrument.basin import BasinMetrics
+        from agentic_dynamics.measurement.basin import BasinMetrics
         basin = BasinMetrics(
             perturbation_operator=info.get("operator", "baseline"),
             perturbation_class=pert_class,
@@ -642,7 +644,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     else:
         sonar_diff_data = None
         if baseline_sm and baseline_sm.analyzed and solution.sonar_analyzed:
-            from instrument.sonar import SonarMetrics
+            from agentic_dynamics.measurement.sonar import SonarMetrics
             perturbed_sm = SonarMetrics(
                 analyzed=True, bugs=solution.sonar_bugs,
                 vulnerabilities=solution.sonar_vulnerabilities,

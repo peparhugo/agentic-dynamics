@@ -1,7 +1,7 @@
 """Shared constants for the FinOps framework pipeline scripts."""
 
-from instrument.session_types import EXPERIMENT_SESSION_PATTERNS as EXPERIMENT_SESSION_PATTERNS
-from instrument.session_types import normalize_task as normalize_task
+from agentic_dynamics.core.session_types import EXPERIMENT_SESSION_PATTERNS as EXPERIMENT_SESSION_PATTERNS
+from agentic_dynamics.core.session_types import normalize_task as normalize_task
 
 MODEL_LABELS = {
     "deepseek/deepseek-v4-pro": "DeepSeek v4 Pro",
@@ -24,10 +24,10 @@ MODEL_LABELS = {
 
 # Pricing lives in src/instrument/efficiency.py (single source of truth).
 # Do not re-add provider pricing here — import `get_pricing` from
-# instrument.efficiency instead.
+# agentic_dynamics.measurement.efficiency instead.
 
 # EXPERIMENT_SESSION_PATTERNS and normalize_task are imported from
-# instrument.session_types (the single task-type / session-pattern vocabulary) —
+# agentic_dynamics.core.session_types (the single task-type / session-pattern vocabulary) —
 # the dependency direction here is scripts -> src, not the reverse. Keep this
 # re-export for the scripts that already do `from _constants import ...`.
 

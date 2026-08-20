@@ -23,12 +23,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "admin"))
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 
 from opencode_client import OpenCodeClient, OpenCodeError  # noqa: E402
 
-from instrument.live import LivePublisher  # noqa: E402
-from instrument.supervisor import (  # noqa: E402
+from agentic_dynamics.control.live import LivePublisher  # noqa: E402
+from agentic_dynamics.control.supervisor import (  # noqa: E402
     SUPERVISOR_FLAGS_KEY,
     SUPERVISOR_FLAGS_MAX,
     SUPERVISOR_SESSION_CELLS_KEY,
@@ -261,9 +265,9 @@ def emit_flag(session: dict, status: str, why: str) -> None:
     # line, both of which already succeeded by this point.
     if os.environ.get("FINOPS_KB_WRITE") == "1":
         try:
-            from instrument import knowledge_stream as ks
-            from instrument.knowledge_ingestion import REPOSITORY_ID
-            from instrument.observation_ingestion import derive_flag_record
+            from agentic_dynamics.knowledge import knowledge_stream as ks
+            from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
+            from agentic_dynamics.control.observation_ingestion import derive_flag_record
 
             record = derive_flag_record(flag, repository_id=REPOSITORY_ID)
             ks.register_records([record], fail_loud=False)
@@ -376,9 +380,9 @@ def supervise_once(client: OpenCodeClient, monitor_id: str, redis_client) -> Non
         # existing best-effort treatment of ITS Redis push, just below.
         if os.environ.get("FINOPS_KB_WRITE") == "1":
             try:
-                from instrument import knowledge_stream as ks
-                from instrument.knowledge_ingestion import REPOSITORY_ID
-                from instrument.observation_ingestion import derive_observation_record
+                from agentic_dynamics.knowledge import knowledge_stream as ks
+                from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
+                from agentic_dynamics.control.observation_ingestion import derive_observation_record
 
                 record = derive_observation_record(
                     {"cell_id": cell_id, "status": status, "why": why, "model": model},

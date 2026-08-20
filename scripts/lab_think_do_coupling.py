@@ -15,7 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
-from _constants import MODEL_LABELS
+from agentic_dynamics.core.constants import MODEL_LABELS
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 

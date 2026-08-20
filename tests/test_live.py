@@ -2,8 +2,8 @@
 
 import json
 
-from instrument import live as live_module
-from instrument.live import LivePublisher, make_publisher
+from agentic_dynamics.control import live as live_module
+from agentic_dynamics.control.live import LivePublisher, make_publisher
 
 
 class FakeRedis:

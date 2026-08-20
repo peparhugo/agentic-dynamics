@@ -13,14 +13,14 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from instrument import code_ingestion as ci
-from instrument.knowledge import Authority, KnowledgeRecord, compute_entity_id, compute_knowledge_id
-from instrument.knowledge_ingestion import (
+from agentic_dynamics.knowledge import code_ingestion as ci
+from agentic_dynamics.knowledge.knowledge import Authority, KnowledgeRecord, compute_entity_id, compute_knowledge_id
+from agentic_dynamics.knowledge.knowledge_ingestion import (
     extract_record,
     record_to_artifact,
     record_to_event,
 )
-from instrument.language import _PROFILES, parse_codebase
+from agentic_dynamics.core.language import _PROFILES, parse_codebase
 
 REPO = "test-repo"
 REVISION = "abc1234"

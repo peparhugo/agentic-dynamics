@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from instrument import knowledge_stream as ks
-from instrument.supervisor import SUPERVISOR_FLAGS_KEY
+from agentic_dynamics.knowledge import knowledge_stream as ks
+from agentic_dynamics.control.supervisor import SUPERVISOR_FLAGS_KEY
 from scripts import supervise
 
 

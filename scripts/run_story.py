@@ -13,11 +13,15 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from _constants import SESSION_TIMEOUT, model_slug
 
-from instrument.story import (
+from agentic_dynamics.core.constants import SESSION_TIMEOUT, model_slug
+
+from agentic_dynamics.runtime.story import (
     BUILTIN_STORIES,
     PerturbationCondition,
     StoryConfig,

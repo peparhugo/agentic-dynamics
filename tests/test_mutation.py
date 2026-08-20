@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from instrument.mutation import (
+from agentic_dynamics.measurement.mutation import (
     ALL_OPERATORS,
     CODEBASE_OPERATORS,
     SPECIFICATION_OPERATORS,

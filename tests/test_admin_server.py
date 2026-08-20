@@ -932,9 +932,9 @@ def _flagged_session(**overrides):
 
 def test_supervisor_steer_emits_exactly_one_actuation_record(monkeypatch):
     """A successful steer emits exactly one actuation record citing the flag's knowledge_id."""
-    from instrument import knowledge_stream as ks
-    from instrument.knowledge_ingestion import REPOSITORY_ID
-    from instrument.observation_ingestion import derive_flag_record
+    from agentic_dynamics.knowledge import knowledge_stream as ks
+    from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
+    from agentic_dynamics.control.observation_ingestion import derive_flag_record
 
     redis = QueueRedis(queue=[])
     monkeypatch.setattr(server, "_redis", lambda: redis)
@@ -1023,7 +1023,7 @@ def test_supervisor_interrupt_emits_exactly_one_actuation_record(monkeypatch):
 
 def test_actuation_emit_is_best_effort_and_never_blocks_the_steer(monkeypatch):
     """A KB-plane failure swallows the actuation emit and still returns 200."""
-    from instrument import knowledge_stream as ks
+    from agentic_dynamics.knowledge import knowledge_stream as ks
 
     redis = QueueRedis(queue=[])
     monkeypatch.setattr(server, "_redis", lambda: redis)

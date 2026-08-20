@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from instrument.ollama_analyzer import OllamaAnalyzer, load_summary_data
+from agentic_dynamics.reporting.ollama_analyzer import OllamaAnalyzer, load_summary_data
 
 try:
     s = socket.create_connection(("localhost", 11434), timeout=2)

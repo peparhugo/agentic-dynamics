@@ -9,8 +9,12 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from instrument.perturb import perturbation_class_for
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
+from agentic_dynamics.measurement.perturb import perturbation_class_for
 
 DB = Path.home() / ".local/share/opencode/opencode.db"
 

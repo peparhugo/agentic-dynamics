@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from instrument.experiment_spec import (
+from agentic_dynamics.experiment.experiment_spec import (
     LEDGER_FIELDS,
     SPEC_KEYS,
     SPEC_STATUSES,

@@ -9,7 +9,7 @@ import socket
 
 import pytest
 
-from instrument.trajectory import (
+from agentic_dynamics.legacy.trajectory import (
     ReasoningTrajectory,
     TrajectoryStep,
     _content_distance,

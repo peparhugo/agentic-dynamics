@@ -10,9 +10,9 @@ Covers the instrumentation gap closure (remediation step 3):
 import json
 from pathlib import Path
 
-from instrument.opencode import AgenticResult, _parse_session_output
-from instrument.story import SessionResult, StoryResult
-from instrument.workflow_runner import PhaseResult
+from agentic_dynamics.adapters.opencode import AgenticResult, _parse_session_output
+from agentic_dynamics.runtime.story import SessionResult, StoryResult
+from agentic_dynamics.runtime.workflow_runner import PhaseResult
 
 ROOT = Path(__file__).resolve().parent.parent
 

@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from instrument import actuation_ingestion as ai
-from instrument.knowledge import Authority
-from instrument.knowledge_ingestion import record_to_artifact
+from agentic_dynamics.control import actuation_ingestion as ai
+from agentic_dynamics.knowledge.knowledge import Authority
+from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

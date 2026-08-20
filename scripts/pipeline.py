@@ -51,7 +51,11 @@ from typing import Any
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 
 # ── Redis configuration ──────────────────────────────────────────
 
@@ -423,7 +427,7 @@ def _gen_matrix_cells(kind_params: dict) -> list[dict]:
 
 
 def _completed_cells(model_filter: str, stories: list[str], conditions: dict) -> set[str]:
-    from instrument.story import load_story_result
+    from agentic_dynamics.runtime.story import load_story_result
 
     completed = set()
     results_dir = ROOT / "experiments" / "results" / "stories"
@@ -549,7 +553,7 @@ def _execute_review(phase: PlanPhase, context: dict) -> bool:
 
 
 def _gen_review_jobs(review_model: str) -> list[dict]:
-    from instrument.story import load_story_result
+    from agentic_dynamics.runtime.story import load_story_result
 
     results_dir = ROOT / "experiments" / "results" / "stories"
     reviews_dir = ROOT / "experiments" / "results" / "reviews"

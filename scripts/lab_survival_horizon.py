@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_survival_horizon.json"
 
-from _constants import MODEL_LABELS
+from agentic_dynamics.core.constants import MODEL_LABELS
 
 SCENARIOS = [
     {"label": "Low perturbation (5%) | $1,000 budget", "perturbation_rate": 0.05, "budget": 1000},

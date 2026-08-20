@@ -19,17 +19,21 @@ from pathlib import Path
 
 import redis
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 
 import contextlib
 
-from instrument.commit_analysis import (
+from agentic_dynamics.measurement.commit_analysis import (
     agentic_token_dicts,
     analyze_story_worktree,
     compute_deep_metrics,
 )
-from instrument.posthoc import trigger_reviews
-from instrument.story import load_story_result
+from agentic_dynamics.runtime.posthoc import trigger_reviews
+from agentic_dynamics.runtime.story import load_story_result
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))

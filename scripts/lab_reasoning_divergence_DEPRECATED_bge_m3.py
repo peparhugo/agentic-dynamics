@@ -14,13 +14,17 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.embeddings import ChromaStore
+
+from agentic_dynamics.knowledge.embeddings import ChromaStore
 
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_reasoning_divergence.json"
 
-from _constants import MODEL_LABELS
+from agentic_dynamics.core.constants import MODEL_LABELS
 
 
 def _cosine_distance(a, b) -> float:

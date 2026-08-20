@@ -7,7 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from _constants import WORKTREE_ROOT
+from agentic_dynamics.core.constants import WORKTREE_ROOT
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))

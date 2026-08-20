@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from instrument.experiment_spec import ExperimentSpec, Factor, Workflow
-from instrument.spec_status import (
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, Factor, Workflow
+from agentic_dynamics.experiment.spec_status import (
     INDEX_SCHEMA_VERSION,
     MISSING,
     STATUS_ORDER,

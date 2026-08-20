@@ -5,11 +5,12 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
-from instrument import spec_status, workflow_runner
-from instrument.augment import default_retrieve_fn
-from instrument.experiment_spec import load_spec, validate_spec
-from instrument.spec_status import SpecStatusEntry
-from instrument.workflow_runner import (
+from agentic_dynamics.experiment import spec_status
+from agentic_dynamics.runtime import workflow_runner
+from agentic_dynamics.knowledge.augment import default_retrieve_fn
+from agentic_dynamics.experiment.experiment_spec import load_spec, validate_spec
+from agentic_dynamics.experiment.spec_status import SpecStatusEntry
+from agentic_dynamics.runtime.workflow_runner import (
     _build_phase_prompt,
     _completed_phases_from_index,
     cell_scope,
@@ -71,7 +72,7 @@ def test_run_workflow_phases_in_order(tmp_path):
 
 def test_run_workflow_publishes_phase_per_phase(tmp_path, monkeypatch):
     """Each phase start publishes {name, index, total} to the live publisher."""
-    import instrument.workflow_runner as wr
+    import agentic_dynamics.runtime.workflow_runner as wr
 
     published = []
 
@@ -103,7 +104,7 @@ def test_run_workflow_publishes_phase_per_phase(tmp_path, monkeypatch):
 
 def test_run_workflow_publishes_phase_before_agent_runs(tmp_path, monkeypatch):
     """The phase badge is set at phase *start*, before the agent is invoked."""
-    import instrument.workflow_runner as wr
+    import agentic_dynamics.runtime.workflow_runner as wr
 
     order = []
 
@@ -144,7 +145,7 @@ def test_run_workflow_publishes_phase_before_agent_runs(tmp_path, monkeypatch):
 
 def test_run_workflow_resume_publishes_original_phase_index(tmp_path, monkeypatch):
     """On resume, the badge keeps the 1-based absolute index, not a re-based one."""
-    import instrument.workflow_runner as wr
+    import agentic_dynamics.runtime.workflow_runner as wr
 
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
@@ -469,8 +470,8 @@ def test_default_retrieve_fn_binds_dense_and_graph_stores(monkeypatch):
     ``knowledge_chunks_v1`` collection and ``Neo4jClient`` with its own defaults,
     then returns a ``functools.partial`` carrying both as keyword args.
     """
-    import instrument.embeddings as embeddings
-    import instrument.graph as graph
+    import agentic_dynamics.knowledge.embeddings as embeddings
+    import agentic_dynamics.knowledge.graph as graph
 
     constructed = {}
 
@@ -500,8 +501,8 @@ def test_default_retrieve_fn_degrades_to_no_rag_when_stores_down(tmp_path, monke
     time (a lazy driver whose infra is down). ``retrieve``'s per-leg try/except marks
     each leg down, so the phase falls back to the base prompt and stays ``ok``.
     """
-    import instrument.embeddings as embeddings
-    import instrument.graph as graph
+    import agentic_dynamics.knowledge.embeddings as embeddings
+    import agentic_dynamics.knowledge.graph as graph
 
     class _DownChroma:
         def __init__(self, **kwargs):
@@ -598,10 +599,10 @@ def test_retrieve_construct_render_path_never_writes():
     """
     import inspect
 
-    import instrument.augment as augment
-    import instrument.prompt_constructor as pc
-    import instrument.retrieval as retrieval_mod
-    from instrument import workflow_runner as wr
+    import agentic_dynamics.knowledge.augment as augment
+    import agentic_dynamics.knowledge.prompt_constructor as pc
+    import agentic_dynamics.knowledge.retrieval as retrieval_mod
+    from agentic_dynamics.runtime import workflow_runner as wr
 
     # The two read-side modules never reference publish_event.
     for mod in (retrieval_mod, pc):

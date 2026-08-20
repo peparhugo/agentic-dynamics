@@ -20,7 +20,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = PROJECT_ROOT / "experiments" / "results" / "reports"
 OPENCODE_DB = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
-from _constants import WORKTREE_ROOT
+from agentic_dynamics.core.constants import WORKTREE_ROOT
 
 SKIP_DIRS = {
     "__pycache__", ".git", "venv", ".venv", "env", "site-packages",

@@ -14,9 +14,13 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.opencode_analyzer import OpencodeAnalyzer, _load_summary
+
+from agentic_dynamics.reporting.opencode_analyzer import OpencodeAnalyzer, _load_summary
 
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_opencode_meta_analysis.json"
 

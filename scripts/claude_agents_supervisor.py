@@ -29,7 +29,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "admin"))
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 
 from claude_agents_client import (  # noqa: E402
     CELL_ID_PREFIX,
@@ -40,7 +44,7 @@ from claude_agents_client import (  # noqa: E402
     ClaudeAgentsError,
 )
 
-from instrument.live import LivePublisher  # noqa: E402
+from agentic_dynamics.control.live import LivePublisher  # noqa: E402
 
 logger = logging.getLogger("claude_agents_supervisor")
 

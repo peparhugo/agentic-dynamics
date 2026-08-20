@@ -15,18 +15,25 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument import (
-    build_operators, resolve_perturbed_prompt,
-    evaluate_solution, compute_efficiency,
-    classify_strategy, measure_basin_escape,
-    BasinMetrics, GameReport,
-    detect_constraints,
-    run_suite, suite_succeeded,
-)
-from instrument.backends import run_agentic
-from instrument.language import detect_language
+
+from agentic_dynamics.measurement.perturb import build_operators
+from agentic_dynamics.measurement.prompt_perturbation import resolve_perturbed_prompt
+from agentic_dynamics.measurement.solution import evaluate_solution
+from agentic_dynamics.measurement.efficiency import compute_efficiency
+from agentic_dynamics.measurement.strategy import classify_strategy
+from agentic_dynamics.measurement.basin import measure_basin_escape
+from agentic_dynamics.measurement.basin import BasinMetrics
+from agentic_dynamics.reporting.game_report import GameReport
+from agentic_dynamics.measurement.constraint_detection import detect_constraints
+from agentic_dynamics.runtime.test_runner import run_suite
+from agentic_dynamics.runtime.test_runner import suite_succeeded
+from agentic_dynamics.adapters.backends import run_agentic
+from agentic_dynamics.core.language import detect_language
 
 
 def _model_label(model_id: str) -> str:
@@ -398,9 +405,9 @@ def _save_results(runs, name, model_label, results_dir, model_id=None):
     # docstring in src/instrument/story.py for why this call site intentionally lets a
     # downed knowledge stream raise rather than swallowing it.
     if os.environ.get("FINOPS_KB_WRITE") == "1":
-        from instrument.knowledge_ingestion import REPOSITORY_ID
-        from instrument.knowledge_stream import register_records
-        from instrument.story_ingestion import derive_story_records_from_run_output
+        from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
+        from agentic_dynamics.knowledge.knowledge_stream import register_records
+        from agentic_dynamics.knowledge.story_ingestion import derive_story_records_from_run_output
 
         register_records(
             derive_story_records_from_run_output(out, repository_id=REPOSITORY_ID),

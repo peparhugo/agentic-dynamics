@@ -20,10 +20,14 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.opencode import AgenticResult
-from instrument.opencode_analyzer import REPORTS_DIR, OpencodeAnalyzer
+
+from agentic_dynamics.adapters.opencode import AgenticResult
+from agentic_dynamics.reporting.opencode_analyzer import REPORTS_DIR, OpencodeAnalyzer
 
 
 def _persist_result(result: AgenticResult, tag: str) -> Path:
@@ -126,7 +130,7 @@ def main():
         tag = f"meta_compare_{args.compare[0]}_vs_{args.compare[1]}"
 
     elif args.batch:
-        from instrument.opencode_analyzer import _load_summary
+        from agentic_dynamics.reporting.opencode_analyzer import _load_summary
         entries = _load_summary()
         if not entries:
             print("No entries found in summary data.")

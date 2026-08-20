@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from instrument.embeddings import (
+from agentic_dynamics.knowledge.embeddings import (
     ChromaStore,
     ChromaStoreError,
     EmbeddingClient,

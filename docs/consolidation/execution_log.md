@@ -152,6 +152,46 @@ Implementation notes (necessary adjustments during the atomic move, documented f
   These are the only consumer edits this phase (the rest of scripts/tests still import `instrument.*`
   via the shim, awaiting phase C).
 
+---
+
+## S1 — rewrite consumers (phase `rewrite_consumers`)
+
+Spec: `experiments/specs/consolidation_stage_1_package_move.yaml` · phase `rewrite_consumers`
+(phase C). Deliverable: scripts/admin/tests imports → `agentic_dynamics.*`, centralized
+`scripts/_bootstrap.py`, `_constants.py` → `agentic_dynamics/core/constants.py`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `scripts/` + `admin/` + `tests/` imports rewritten `instrument.*` → `agentic_dynamics.<plane>.*` | PASS |
+| 2 | Per-file `sys.path.insert(.../src)` bootstraps → one `scripts/_bootstrap.py` (50 replaced); `python scripts/foo.py` direct-run contract preserved | PASS |
+| 3 | `scripts/_constants.py` → `agentic_dynamics/core/constants.py` + all importers updated (`from agentic_dynamics.core.constants import …`) | PASS |
+| 4 | `pytest tests/ -m "not external"` green | PASS (1179 passed, 121 deselected) |
+| 5 | `grep "from instrument\|import instrument"` over `scripts/ admin/ tests/ src/` = zero outside `src/instrument/` itself | PASS |
+
+**S1-rewrite_consumers result: 5/5 PASS.**
+
+Implementation notes:
+
+- **`_bootstrap.py` import is a robust try/except.** Scripts are imported two ways: directly
+  (`python scripts/foo.py` — `scripts/` is `sys.path[0]`) and as submodules (`from scripts import
+  registry` from `admin/server.py`/tests — repo root is on `sys.path`). A bare `import _bootstrap`
+  only resolves in the first case, so every bootstrap site is:
+  `try: import _bootstrap` / `except ImportError: from scripts import _bootstrap`.
+- **Bootstrap regex used `[ \t]*`, not `\s*`** — `\s*` swallows newlines and (with `re.M`) mangled
+  the surrounding blank lines; horizontal-whitespace-only matching preserves layout, including the
+  one indented (in-function) bootstrap in `analyze_trajectories.py`.
+- **Special bootstrap cases** (not the common `.../src` form): `generate_manifest.py` now imports
+  `agentic_dynamics.core.paths` via `_bootstrap` (its old `src/instrument` direct-insert + top-level
+  `from paths import` was retired); `supervise.py`/`claude_agents_supervisor.py` keep their
+  `ROOT/"admin"` insert (admin-module access, not a src bootstrap); `batch_analyze_ts_ssg.py` keeps
+  its `scripts/` insert (cross-script import).
+- **`worker.py` ordering fix** — its `from _constants import …` sat *above* the bootstrap; the
+  bootstrap now precedes the `agentic_dynamics.core.constants` import.
+- **Two test path reads repointed** for the `_constants.py` move: `tests/test_data_integrity.py`
+  (`scripts/_constants.py` → `src/agentic_dynamics/core/constants.py`) and
+  `tests/test_ledger_ingestion.py` (loads `constants.py` beside `session_types.py`).
+
+
 
 
 

@@ -82,8 +82,8 @@ from flask import Flask, Response, jsonify, make_response, request
 
 from scripts import registry as registry_cli
 
-from instrument.claude_adapter import _resolve_claude_model
-from instrument.live import (
+from agentic_dynamics.adapters.claude_adapter import _resolve_claude_model
+from agentic_dynamics.control.live import (
     EVENT_CHANNEL_PREFIX,
     EVENT_LOG_MAX,
     EVENT_LOG_PREFIX,
@@ -91,21 +91,21 @@ from instrument.live import (
     STATUS_CHANNEL,
     STATUS_KEY,
 )
-from instrument.routing import compute_routing
-from instrument.supervisor import (
+from agentic_dynamics.control.routing import compute_routing
+from agentic_dynamics.control.supervisor import (
     SUPERVISOR_FLAGS_KEY,
     SUPERVISOR_FLAGS_MAX,
     SUPERVISOR_SESSION_CELLS_KEY,
     normalize_flag,
     parse_mapping,
 )
-from instrument.queue_reinterleave import (
+from agentic_dynamics.control.queue_reinterleave import (
     provider_summary,
     read_queue,
     reinterleave_cells,
     write_queue,
 )
-from instrument.pipeline_status import stage_summary
+from agentic_dynamics.control.pipeline_status import stage_summary
 
 try:  # Package imports under pytest and WSGI.
     from admin.claude_agents_client import (
@@ -409,10 +409,10 @@ def _emit_actuation_record(
     registry's one-hop "why did the system act" lookup resolves end-to-end.
     """
     try:
-        from instrument import knowledge_stream as ks
-        from instrument.actuation_ingestion import derive_actuation_record
-        from instrument.knowledge_ingestion import REPOSITORY_ID, record_to_event
-        from instrument.observation_ingestion import derive_flag_record
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+        from agentic_dynamics.control.actuation_ingestion import derive_actuation_record
+        from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID, record_to_event
+        from agentic_dynamics.control.observation_ingestion import derive_flag_record
 
         # The flag is the justifying observation: derive its canonical knowledge_id
         # so ``causes`` points at the exact record ``supervise.py`` emitted for it.

@@ -1,5 +1,5 @@
-from instrument.recovery import SegmentClass, classify_trajectory_segments
-from instrument.trajectory import ReasoningTrajectory, TrajectoryStep
+from agentic_dynamics.legacy.recovery import SegmentClass, classify_trajectory_segments
+from agentic_dynamics.legacy.trajectory import ReasoningTrajectory, TrajectoryStep
 
 
 def _make_step(i, thought="", action="", tool_name=""):

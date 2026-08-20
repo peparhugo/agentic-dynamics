@@ -2,7 +2,7 @@ import hashlib
 
 import pytest
 import random
-from instrument.perturb import (
+from agentic_dynamics.measurement.perturb import (
     ALIEN_VOCABULARIES,
     PERTURBATION_CLASSES,
     build_operators,
@@ -10,7 +10,7 @@ from instrument.perturb import (
     perturb_prompt,
     perturbation_class_for,
 )
-from instrument.basin import BasinMetrics
+from agentic_dynamics.measurement.basin import BasinMetrics
 
 
 def test_remove_critical_constraint_removes_constraint():

@@ -1,4 +1,4 @@
-from instrument.adapter import InstrumentedAdapter
+from agentic_dynamics.legacy.adapter import InstrumentedAdapter
 
 
 class FakeResult:

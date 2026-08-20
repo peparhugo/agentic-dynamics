@@ -19,11 +19,15 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.efficiency import compute_cost_estimate
-from instrument.opencode import AgenticResult, _parse_session_output
-from instrument.story import _count_tests
+
+from agentic_dynamics.measurement.efficiency import compute_cost_estimate
+from agentic_dynamics.adapters.opencode import AgenticResult, _parse_session_output
+from agentic_dynamics.runtime.story import _count_tests
 
 RESULTS_DIR = ROOT / "experiments" / "results" / "stories"
 BACKUP_DIR = RESULTS_DIR / ".backfill_backup"

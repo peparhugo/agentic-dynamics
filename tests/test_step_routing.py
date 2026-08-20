@@ -7,9 +7,9 @@ validator gating (edge_case_coverage / confidence), and graceful cold-start fall
 
 from types import SimpleNamespace
 
-from instrument.experiment_spec import ExperimentSpec, Factor, Workflow
-from instrument.signal_store import build_signal_store
-from instrument.step_routing import (
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, Factor, Workflow
+from agentic_dynamics.control.signal_store import build_signal_store
+from agentic_dynamics.control.step_routing import (
     FORBIDDEN_SIGNALS,
     MEASURED_SIGNALS,
     ModelSignals,
@@ -22,7 +22,7 @@ from instrument.step_routing import (
     validate_step_selector,
     validate_workflow_routing,
 )
-from instrument.workflow_runner import run_workflow
+from agentic_dynamics.runtime.workflow_runner import run_workflow
 
 DS = "deepseek/deepseek-v4-pro"
 CL = "anthropic/claude-sonnet-5"
@@ -35,13 +35,13 @@ def _prefs(*objectives):
 
 
 def _min(signal, weight=1.0):
-    from instrument.step_routing import Objective
+    from agentic_dynamics.control.step_routing import Objective
 
     return Objective(signal, "minimize", weight)
 
 
 def _max(signal, weight=1.0):
-    from instrument.step_routing import Objective
+    from agentic_dynamics.control.step_routing import Objective
 
     return Objective(signal, "maximize", weight)
 
@@ -199,7 +199,7 @@ def test_validate_preferences_forbids_confidence():
 def test_validate_preferences_rejects_unknown_signal_and_bad_direction():
     errors = validate_preferences(_prefs(_min("not_a_signal")))
     assert any("not_a_signal" in e for e in errors)
-    from instrument.step_routing import Objective
+    from agentic_dynamics.control.step_routing import Objective
 
     errors = validate_preferences(RoutingPreferences(objectives=[Objective("cost", "sideways", 1.0)]))
     assert any("sideways" in e for e in errors)

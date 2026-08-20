@@ -47,14 +47,18 @@ from typing import Any
 
 # scripts/ → repo root → src, so the local instrument package wins over any installed one
 # (matches the bootstrap in worker.py / kb_worker.py / kb_produce.py / kb_produce_sources.py).
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument import knowledge_ingestion as ki  # noqa: E402
-from instrument import knowledge_stream as ks  # noqa: E402
-from instrument import ledger_ingestion as li  # noqa: E402
-from instrument import review_ingestion as ri  # noqa: E402
-from instrument import story_ingestion as si  # noqa: E402
-from instrument.paths import KB_ARTIFACT_DIR  # noqa: E402
+
+from agentic_dynamics.knowledge import knowledge_ingestion as ki  # noqa: E402
+from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
+from agentic_dynamics.knowledge import ledger_ingestion as li  # noqa: E402
+from agentic_dynamics.knowledge import review_ingestion as ri  # noqa: E402
+from agentic_dynamics.knowledge import story_ingestion as si  # noqa: E402
+from agentic_dynamics.core.paths import KB_ARTIFACT_DIR  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -433,7 +437,7 @@ def emit_records(
     lands *before* the event, so a consumer can always read + verify the exact bytes the
     event's ``content_hash`` covers.
     """
-    from instrument.knowledge_ingestion import record_to_artifact, record_to_event
+    from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact, record_to_event
 
     emitted = 0
     skipped = 0

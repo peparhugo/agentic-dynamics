@@ -27,7 +27,11 @@ from pathlib import Path
 import redis
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 
 REDIS_HOST = "127.0.0.1"
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -59,7 +63,7 @@ _BAD = ["clean", "early_degrade"]
 
 def _completed_cells(model_filter: str) -> set[str]:
     """Find which matrix cells already have results on disk."""
-    from instrument.story import load_story_result
+    from agentic_dynamics.runtime.story import load_story_result
 
     completed = set()
     results_dir = ROOT / "experiments" / "results" / "stories"
@@ -219,7 +223,7 @@ class ReviewPhase(Phase):
         )
 
     def generate_jobs(self) -> list[dict]:
-        from instrument.story import load_story_result
+        from agentic_dynamics.runtime.story import load_story_result
 
         results_dir = ROOT / "experiments" / "results" / "stories"
         reviews_dir = ROOT / "experiments" / "results" / "reviews"

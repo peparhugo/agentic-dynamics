@@ -7,7 +7,7 @@ and v2 (current) opencode event formats, producing a canonical representation.
 import subprocess
 from pathlib import Path
 
-from instrument.opencode import _init_git_workdir, normalize_opencode_event
+from agentic_dynamics.adapters.opencode import _init_git_workdir, normalize_opencode_event
 
 # ── v1 format (historical — flat structure, no "part" key) ───────────────────
 

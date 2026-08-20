@@ -13,14 +13,16 @@ RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 
 #: Where scripts/kb_worker.py's "kb-registry-v1" consumer group appends one compacted
 #: JSON line per indexed knowledge record (canonical-state round 2, plan step 8). This is
-#: a *value-only leaf import* from ``instrument.paths`` (canonical-state R6), the single
-#: owner of the path: ``sys.path`` is pointed straight at ``src/instrument`` and the
-#: pure-pathlib ``paths`` module is imported as a top-level module — deliberately NOT
-#: ``instrument.paths`` — so this script never triggers the heavy ``instrument/__init__.py``
-#: (redis/neo4j/chroma) and stays a fast, always-available pipeline step
-#: (hashlib/json/subprocess/pathlib only, plus this one pathlib-only leaf import).
-sys.path.insert(0, str(PROJECT_ROOT / "src" / "instrument"))
-from paths import REGISTRY_INDEX_PATH  # noqa: E402  # isort: skip
+#: a *value-only leaf import* from ``agentic_dynamics.core.paths`` (canonical-state R6),
+#: the single owner of the path: the pure-pathlib ``paths`` module is imported directly
+#: (deliberately NOT the barrel ``instrument/__init__.py``) so this script never triggers
+#: the heavy re-export surface (redis/neo4j/chroma) and stays a fast, always-available
+#: pipeline step (hashlib/json/subprocess/pathlib only, plus this one pathlib-only leaf import).
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+from agentic_dynamics.core.paths import REGISTRY_INDEX_PATH  # noqa: E402  # isort: skip
 
 def sha256(path):
     """SHA-256 hash of a file."""

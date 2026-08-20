@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 import redis
-from _constants import model_slug
+from agentic_dynamics.core.constants import model_slug
 
 # ── Matrix Definition ──────────────────────────────────────────
 

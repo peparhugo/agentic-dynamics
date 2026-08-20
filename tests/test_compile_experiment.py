@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from instrument.compile_experiment import (
+from agentic_dynamics.experiment.compile_experiment import (
     DAG,
     MEASUREMENT_RULES,
     Phase,
@@ -15,7 +15,7 @@ from instrument.compile_experiment import (
     experiment_matrix,
     first_pass_quality,
 )
-from instrument.experiment_spec import (
+from agentic_dynamics.experiment.experiment_spec import (
     ExperimentSpec,
     Factor,
     RuleSpec,
@@ -48,7 +48,7 @@ def test_compile_spec_emits_full_dag():
 
 def test_compile_spec_refuses_unmet_requires(tmp_path):
 
-    from instrument.experiment_spec import ExperimentSpec
+    from agentic_dynamics.experiment.experiment_spec import ExperimentSpec
 
     p = tmp_path / "s.yaml"
     p.write_text(

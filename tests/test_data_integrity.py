@@ -16,7 +16,7 @@ def _read(rel: str) -> str:
 
 def test_no_duplicate_pricing_in_constants():
     # P0-2: _constants.py must not carry a second PROVIDER_PRICING.
-    assert "PROVIDER_PRICING" not in _read("scripts/_constants.py")
+    assert "PROVIDER_PRICING" not in _read("src/agentic_dynamics/core/constants.py")
 
 
 def test_no_fabricated_pass_rate_in_build_data():

@@ -11,7 +11,7 @@ Reserved (empty until post-consolidation CAP implementation, per ``ARCHITECTURE.
 ``contracts.py`` — the CAP I5 fact-contracts home.
 """
 
-from . import language, paths, session_types, streaming
+from . import constants, language, paths, session_types, streaming
 
 
 

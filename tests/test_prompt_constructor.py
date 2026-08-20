@@ -4,7 +4,7 @@ one-repair, deterministic fallback, and no-fork keying."""
 import json
 from dataclasses import fields
 
-from instrument.prompt_constructor import (
+from agentic_dynamics.knowledge.prompt_constructor import (
     DEFAULT_CONSTRUCTOR_MODEL,
     SCHEMA_VERSION,
     STABLE_INSTRUCTION_PREFIX,

@@ -5,10 +5,10 @@ lock in that classification is invariant under a uniform price rescale and that
 no model is "expensive" or "efficient" purely by its price tier.
 """
 
-from instrument.basin import BasinMetrics
-from instrument.efficiency import EfficiencyMetrics
-from instrument.solution import SolutionMetrics
-from instrument.strategy import StrategyType, classify_strategy
+from agentic_dynamics.measurement.basin import BasinMetrics
+from agentic_dynamics.measurement.efficiency import EfficiencyMetrics
+from agentic_dynamics.measurement.solution import SolutionMetrics
+from agentic_dynamics.measurement.strategy import StrategyType, classify_strategy
 
 
 def _classify(correctness, novelty, escape, thinking_ratio, cost) -> StrategyType:

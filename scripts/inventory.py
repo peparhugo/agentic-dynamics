@@ -19,7 +19,7 @@ INVENTORY_PATH = PROJECT_ROOT / "experiments" / "inventory.json"
 OPENSCODE_DB = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 CONFIGS_DIR = PROJECT_ROOT / "experiments" / "configs"
-from _constants import WORKTREE_GLOB
+from agentic_dynamics.core.constants import WORKTREE_GLOB
 
 
 def _now():
@@ -38,7 +38,7 @@ def _fmt_int(v):
     return f"{v:,}"
 
 
-from _constants import EXPERIMENT_SESSION_PATTERNS
+from agentic_dynamics.core.constants import EXPERIMENT_SESSION_PATTERNS
 
 
 def _is_experiment_title(title: str) -> bool:

@@ -1,6 +1,6 @@
 import pytest
 
-from instrument.efficiency import compute_cost_estimate, get_pricing
+from agentic_dynamics.measurement.efficiency import compute_cost_estimate, get_pricing
 
 
 def test_get_pricing_deepseek():

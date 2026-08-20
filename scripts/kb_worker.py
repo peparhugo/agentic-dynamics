@@ -30,13 +30,17 @@ from pathlib import Path
 import redis
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument import knowledge_ingestion as ki  # noqa: E402
-from instrument import knowledge_stream as ks  # noqa: E402
-from instrument import observation_ingestion as oi  # noqa: E402
-from instrument.knowledge import compute_knowledge_id  # noqa: E402
-from instrument.paths import KB_ARTIFACT_DIR, REGISTRY_INDEX_PATH  # noqa: E402
+
+from agentic_dynamics.knowledge import knowledge_ingestion as ki  # noqa: E402
+from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
+from agentic_dynamics.control import observation_ingestion as oi  # noqa: E402
+from agentic_dynamics.knowledge.knowledge import compute_knowledge_id  # noqa: E402
+from agentic_dynamics.core.paths import KB_ARTIFACT_DIR, REGISTRY_INDEX_PATH  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -332,7 +336,7 @@ def build_handler(group: str, r: redis.Redis):
 
     if group == "kb-chroma-v1":
         def handler(record):
-            from instrument.embeddings import ChromaStore
+            from agentic_dynamics.knowledge.embeddings import ChromaStore
 
             store = ChromaStore(collection_name="knowledge_chunks_v1")
             store.upsert(
@@ -357,7 +361,7 @@ def build_handler(group: str, r: redis.Redis):
 
     if group == "kb-neo4j-v1":
         def handler(record, *, operation="upsert", reason=""):
-            from instrument.graph import Neo4jClient
+            from agentic_dynamics.knowledge.graph import Neo4jClient
 
             client = Neo4jClient()
             try:

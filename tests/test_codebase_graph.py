@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from instrument.codebase_graph import (
+from agentic_dynamics.measurement.codebase_graph import (
     CodebaseGraph,
     GraphMetrics,
     ModuleNode,
@@ -16,7 +16,7 @@ from instrument.codebase_graph import (
     compute_graph_delta,
     compute_metrics,
 )
-from instrument.language import _PROFILES
+from agentic_dynamics.core.language import _PROFILES
 
 
 class TestBuildGraph:

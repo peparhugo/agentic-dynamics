@@ -30,7 +30,7 @@ from pathlib import Path
 
 import pytest
 
-import instrument.posthoc as posthoc
+import agentic_dynamics.runtime.posthoc as posthoc
 
 # scripts/ is not on the default test path (conftest only adds repo root + src),
 # so add it and load the scripts by file path under controlled module names.

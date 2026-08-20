@@ -14,9 +14,13 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.queue_reinterleave import (  # noqa: E402
+
+from agentic_dynamics.control.queue_reinterleave import (  # noqa: E402
     connect,
     provider_summary,
     read_queue,

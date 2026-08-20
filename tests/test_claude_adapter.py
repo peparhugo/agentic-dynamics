@@ -2,8 +2,8 @@
 
 import json
 
-from instrument import claude_adapter as module_under_test
-from instrument.claude_adapter import (
+from agentic_dynamics.adapters import claude_adapter as module_under_test
+from agentic_dynamics.adapters.claude_adapter import (
     ClaudeStreamAdapter,
     _claude_model_arg,
     _resolve_claude_model,

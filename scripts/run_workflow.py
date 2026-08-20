@@ -17,14 +17,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
-from instrument.signal_store import build_signal_store, load_results  # noqa: E402
-from instrument.spec_ingestion import emit_spec_record  # noqa: E402
-from instrument.spec_status import refresh_spec_status  # noqa: E402
-from instrument.step_routing import ModelSignals  # noqa: E402
-from instrument.workflow_runner import run_workflow  # noqa: E402
+
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
+from agentic_dynamics.control.signal_store import build_signal_store, load_results  # noqa: E402
+from agentic_dynamics.knowledge.spec_ingestion import emit_spec_record  # noqa: E402
+from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
+from agentic_dynamics.control.step_routing import ModelSignals  # noqa: E402
+from agentic_dynamics.runtime.workflow_runner import run_workflow  # noqa: E402
 
 
 def _spec_declares_routing(spec: ExperimentSpec) -> bool:

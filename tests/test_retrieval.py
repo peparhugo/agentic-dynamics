@@ -10,8 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from instrument.knowledge import Authority
-from instrument.retrieval import (
+from agentic_dynamics.knowledge.knowledge import Authority
+from agentic_dynamics.knowledge.retrieval import (
     ADVISORY_FRESH_30D,
     ADVISORY_FRESH_90D,
     AUTHORITY_MULTIPLIER,
@@ -699,7 +699,7 @@ def test_retrieve_end_to_end_pipeline():
 
 
 def test_retrieve_collapse_redundant_wired(monkeypatch):
-    import instrument.embeddings as embeddings
+    import agentic_dynamics.knowledge.embeddings as embeddings
 
     class _FakeEmbedder:
         """Deterministic embedder double: text → fixed vector, real cosine distance."""

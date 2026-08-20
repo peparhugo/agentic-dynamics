@@ -14,17 +14,17 @@ from datetime import datetime, timezone
 
 import pytest
 
-from instrument import code_ingestion as ci
-from instrument import knowledge_ingestion as ki
-from instrument import ledger_ingestion as li
-from instrument import observation_ingestion as oi
-from instrument import policy_ingestion as pi
-from instrument import quality_ingestion as qi
-from instrument import record_factory as rf
-from instrument import review_ingestion as ri
-from instrument import story_ingestion as si
-from instrument import actuation_ingestion as ai
-from instrument.knowledge import (
+from agentic_dynamics.knowledge import code_ingestion as ci
+from agentic_dynamics.knowledge import knowledge_ingestion as ki
+from agentic_dynamics.knowledge import ledger_ingestion as li
+from agentic_dynamics.control import observation_ingestion as oi
+from agentic_dynamics.knowledge import policy_ingestion as pi
+from agentic_dynamics.knowledge import quality_ingestion as qi
+from agentic_dynamics.knowledge import record_factory as rf
+from agentic_dynamics.knowledge import review_ingestion as ri
+from agentic_dynamics.knowledge import story_ingestion as si
+from agentic_dynamics.control import actuation_ingestion as ai
+from agentic_dynamics.knowledge.knowledge import (
     Authority,
     KnowledgeRecord,
     compute_entity_id,

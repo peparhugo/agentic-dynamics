@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from instrument.entropy import (
+from agentic_dynamics.measurement.entropy import (
     EntropyProfile,
     _classify_name,
     _dict_entropy,

@@ -17,9 +17,13 @@ import time
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.story import load_story_result, save_story_result
+
+from agentic_dynamics.runtime.story import load_story_result, save_story_result
 
 OPENCODE_BIN = Path.home() / ".opencode/bin/opencode"
 

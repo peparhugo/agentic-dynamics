@@ -4,8 +4,8 @@ import hashlib
 
 import pytest
 
-import instrument.prompt_perturbation as pp
-from instrument.perturb import derive_seed, perturb_prompt
+import agentic_dynamics.measurement.prompt_perturbation as pp
+from agentic_dynamics.measurement.perturb import derive_seed, perturb_prompt
 
 
 def test_prompt_perturbation_roundtrip():

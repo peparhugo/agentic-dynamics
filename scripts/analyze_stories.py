@@ -10,15 +10,19 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.commit_analysis import (
+
+from agentic_dynamics.measurement.commit_analysis import (
     StoryAnalysis,
     agentic_token_dicts,
     analyze_story_worktree,
     compute_deep_metrics,
 )
-from instrument.story import StoryResult, load_story_result
+from agentic_dynamics.runtime.story import StoryResult, load_story_result
 
 
 def main():
