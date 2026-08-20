@@ -1179,7 +1179,7 @@ def reset_plan(plan: PlanDefinition) -> None:
 
 def main():
     args = sys.argv[1:]
-    plan_path = ROOT / "experiments" / "configs" / "plans.yaml"
+    plan_path = ROOT / "experiments" / "definitions" / "configs" / "plans.yaml"
 
     if not plan_path.exists():
         print(f"Config not found: {plan_path}")

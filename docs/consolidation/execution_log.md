@@ -281,6 +281,45 @@ Notes:
 - The flat-dir-drained check (`experiments/specs/*.yaml` empty) is a *transition* guard distinct
   from the two permanent classification guards — it is `xfail` until `move_specs` drains the dir.
 
+---
+
+## S2 — move specs (phase `move_specs`)
+
+Spec: `experiments/specs/consolidation_stage_2_experiments_workflows_split.yaml` · phase
+`move_specs` (phase B). Deliverable: the re-homed spec/config tree (77 specs + 37 configs).
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | 8 genuine experiment specs → `experiments/definitions/` (rag_bare_vs_augmented, routing_regret_under_degradation, routing_kb_experiment_design+research, workflow_step_routing, explanation_tax, process_perturbation_resample, posthoc_pipeline) | PASS |
+| 2 | 69 work-order specs → `workflows/{repository(59),operations(4),research(6)}` | PASS |
+| 3 | 33 measurement configs + `plans.yaml` → `experiments/definitions/configs/`; 3 grid/sweep configs (comparative/factorial_compound/silent_mode_sweep) → `experiments/campaigns/` | PASS |
+| 4 | `supersedes`/`superseded_by` lineage preserved (`git mv`, content unchanged) | PASS |
+| 5 | `experiments/specs/*.yaml` + `experiments/configs/*.yaml` drained (0 left) | PASS |
+| 6 | Classification guard test green (heuristic tuned against the re-homed corpus; `xfail` removed) | PASS (3 passed) |
+| 7 | `pytest tests/ -m "not external"` green | PASS (1186 passed, 106 deselected) |
+
+**S2-move_specs result: 7/7 PASS.**
+
+Notes:
+
+- **Loader repointed as part of the move** (to keep the boundary green): `collect_entries` now
+  globs `experiments/definitions/*.yaml` + `workflows/**/*.yaml` (77 specs) instead of
+  `experiments/specs/`; the generated `index.json`/`STATUS.md` still write to `experiments/specs/`
+  (the repoint phase regenerates them). `scripts/pipeline.py` + `tests/test_pipeline.py` were
+  repointed to `experiments/definitions/configs/plans.yaml`; `tests/test_workflow_runner.py` and
+  `tests/test_spec_status.py`/`tests/test_experiment_spec.py` follow the new corpus paths.
+- **Guard heuristic tuned to the corpus** (verified red→green against the real re-homed specs):
+  a repo-change marker list (imperative verbs + deliverable nouns) plus an experiment-design
+  override (`"design an experiment"`). Ambiguous markers dropped to avoid false positives:
+  `knowledge base`/`knowledge-base` (appears in the experiment-design specs), `refactor` (appears
+  as an experiment task type), `remediate`/`regenerate`/`finish` (appear in `posthoc_pipeline`'s
+  experiment question). `definitions/` is scanned top-level only (its `configs/` subdir holds
+  measurement configs, not specs).
+- **`workflows/research/`** holds the borderline specs (`code_review`, `deep_architecture_review`,
+  `repo_review_fable`, `self_recommending_experiment`, `routing_kb_more_itertools`,
+  `rag_knowledge_base`) — work orders that produce documents/analysis rather than code.
+
+
 
 
 

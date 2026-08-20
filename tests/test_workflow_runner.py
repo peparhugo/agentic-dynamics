@@ -17,7 +17,7 @@ from agentic_dynamics.runtime.workflow_runner import (
     run_workflow,
 )
 
-SPEC = Path(__file__).resolve().parent.parent / "experiments" / "specs" / "control_room_portal.yaml"
+SPEC = Path(__file__).resolve().parent.parent / "workflows" / "repository" / "control_room_portal.yaml"
 
 
 def _fake_agent(**overrides):
@@ -653,7 +653,7 @@ def _index_ledger(tmp_path: Path, goal: str, phases: list[dict]) -> SpecStatusEn
     )
     return SpecStatusEntry(
         name="control_room_portal", version="0.2", status="active",
-        spec_path="experiments/specs/control_room_portal.yaml",
+        spec_path="workflows/repository/control_room_portal.yaml",
         last_run_at="2026-08-19T00:00:00+00:00", results_pointer=rel, n_runs=1,
     )
 

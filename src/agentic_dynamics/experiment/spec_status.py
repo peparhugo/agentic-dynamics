@@ -326,6 +326,19 @@ def sort_entries(entries: list[SpecStatusEntry]) -> list[SpecStatusEntry]:
     return sorted(entries, key=key)
 
 
+def _spec_paths(root_path: Path) -> list[Path]:
+    """Every committed spec YAML across the split layout (design §4).
+
+    Genuine experiment definitions live at the top level of ``experiments/definitions/``;
+    work-order specs live under ``workflows/`` (recursively). The measurement configs
+    (``experiments/definitions/configs/``) and grid/sweep configs (``experiments/campaigns/``)
+    are configs, not ExperimentSpecs, and are deliberately excluded.
+    """
+    paths = sorted((root_path / "experiments" / "definitions").glob("*.yaml"))
+    paths += sorted((root_path / "workflows").rglob("*.yaml"))
+    return paths
+
+
 def collect_entries(*, root: Path | str = PROJECT_ROOT) -> list[SpecStatusEntry]:
     """Scan the spec corpus and the run ledgers; return sorted index entries.
 
@@ -333,11 +346,10 @@ def collect_entries(*, root: Path | str = PROJECT_ROOT) -> list[SpecStatusEntry]
     skipped rather than aborting the scan — one broken spec must not hide the other 63.
     """
     root_path = Path(root).resolve()
-    specs_dir = root_path / SPECS_DIR_REL
     results_dir = root_path / WORKFLOW_RESULTS_DIR_REL
 
     entries: list[SpecStatusEntry] = []
-    for spec_path in sorted(specs_dir.glob("*.yaml")):
+    for spec_path in _spec_paths(root_path):
         try:
             spec = load_spec(spec_path)
         except Exception as exc:  # noqa: BLE001 — any load failure is a skip, never a crash

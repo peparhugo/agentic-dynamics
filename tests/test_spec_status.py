@@ -1,6 +1,6 @@
 """Tests for the derived spec lifecycle index (``instrument.spec_status``).
 
-Everything here runs against a synthetic repo built in ``tmp_path`` — a ``experiments/specs/``
+Everything here runs against a synthetic repo built in ``tmp_path`` — an ``experiments/definitions/``
 of fixture YAMLs plus a ``experiments/results/workflows/<name>/*.json`` of fixture run
 ledgers — so the assertions are exact rather than "whatever the real corpus happens to
 contain today". The one exception is the final test, which scans the real checkout to prove
@@ -78,7 +78,7 @@ def repo(tmp_path: Path) -> Path:
     * ``beta_draft``— authored ``status: draft``; never run.
     * ``gamma``     — no lifecycle keys at all (the shape of all 63 committed specs).
     """
-    specs = tmp_path / "experiments" / "specs"
+    specs = tmp_path / "experiments" / "definitions"
     specs.mkdir(parents=True)
 
     (specs / "alpha_v1.yaml").write_text(
@@ -265,7 +265,7 @@ def test_supersede_lineage_survives_into_the_entries(repo: Path):
 
 def test_measured_run_beats_the_yaml_seed(tmp_path: Path):
     """The YAML is the seed; a real run ledger is the evidence and wins."""
-    specs = tmp_path / "experiments" / "specs"
+    specs = tmp_path / "experiments" / "definitions"
     specs.mkdir(parents=True)
     (specs / "seeded.yaml").write_text(
         _spec_yaml(
@@ -285,7 +285,7 @@ def test_measured_run_beats_the_yaml_seed(tmp_path: Path):
 
 def test_yaml_seed_survives_when_no_run_ledger_exists(tmp_path: Path):
     """... and with no measured evidence, the authored seed is all there is."""
-    specs = tmp_path / "experiments" / "specs"
+    specs = tmp_path / "experiments" / "definitions"
     specs.mkdir(parents=True)
     (specs / "seeded.yaml").write_text(
         _spec_yaml(
@@ -304,7 +304,7 @@ def test_yaml_seed_survives_when_no_run_ledger_exists(tmp_path: Path):
 
 def test_collect_entries_skips_an_unloadable_spec_with_a_warning(repo: Path):
     # no question/version -> load_spec raises
-    (repo / "experiments" / "specs" / "broken.yaml").write_text("name: broken\n")
+    (repo / "experiments" / "definitions" / "broken.yaml").write_text("name: broken\n")
     with pytest.warns(UserWarning, match="unloadable spec"):
         entries = collect_entries(root=repo)
     # One broken spec must not hide the other four.
@@ -345,7 +345,7 @@ def test_index_schema(repo: Path):
         "completed_at", "last_run_at", "latest_ok", "latest_model", "latest_cost_usd",
         "latest_git_sha", "results_pointer", "n_runs",
     }
-    assert entry["spec_path"] == "experiments/specs/alpha_v2.yaml"
+    assert entry["spec_path"] == "experiments/definitions/alpha_v2.yaml"
 
 
 def test_index_is_json_serializable_and_round_trips(repo: Path):
@@ -448,7 +448,7 @@ def test_refresh_reports_the_requested_spec(repo: Path):
     assert report.entry_for("alpha_v2").latest_git_sha == "ccc3333"
     assert report.entry_for("nope") is None
     # A spec_name outside the corpus is a warning, not a failure — a spec can be run from
-    # a path outside experiments/specs/.
+    # a path outside experiments/definitions/.
     with pytest.warns(UserWarning, match="does not contain spec"):
         refresh_spec_status("not_in_corpus", root=repo)
 
@@ -466,9 +466,9 @@ def test_read_back_never_raises_on_a_missing_or_broken_index(tmp_path: Path):
     # through to the prior behaviour. Neither may raise.
     assert load_index(root=tmp_path) == {}
     assert index_entry("anything", root=tmp_path) is None
-    specs = tmp_path / "experiments" / "specs"
-    specs.mkdir(parents=True)
-    (specs / "index.json").write_text("{ not json")
+    index_dir = tmp_path / "experiments" / "specs"
+    index_dir.mkdir(parents=True)
+    (index_dir / "index.json").write_text("{ not json")
     assert load_index(root=tmp_path) == {}
     assert index_entry("anything", root=tmp_path) is None
 
@@ -479,7 +479,8 @@ def test_read_back_never_raises_on_a_missing_or_broken_index(tmp_path: Path):
 def test_the_committed_spec_corpus_indexes_without_exceptions():
     """Every committed spec must appear in the index, derived from the real checkout."""
     entries = collect_entries(root=PROJECT_ROOT)
-    committed = sorted((PROJECT_ROOT / "experiments" / "specs").glob("*.yaml"))
+    committed = sorted((PROJECT_ROOT / "experiments" / "definitions").glob("*.yaml"))
+    committed += sorted((PROJECT_ROOT / "workflows").rglob("*.yaml"))
     assert len(committed) >= 63, f"expected the committed corpus, found {len(committed)}"
     assert len(entries) == len(committed), "every committed spec must appear in the index"
     assert all(e.name and e.version for e in entries)
