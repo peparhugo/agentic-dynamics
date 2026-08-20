@@ -794,6 +794,24 @@ Note: this checkout has no untracked `experiments/results/workflows/` run ledger
 is normal" behaviour). Run history is derived from those untracked ledgers and repopulates on the next
 regeneration in an environment that has them; the backfill itself only writes the identity metadata.
 
+### P1-4 (semantics) — per-kind lifecycle status derivation
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `derive_status()` gains per-kind semantics — now takes the run ledgers: a *repeatable* spec keeps `draft`/`active`/`superseded`/`tombstoned`; a *non-repeatable* workflow uses `draft`/`runnable`/`running`/`completed`/`superseded`/`tombstoned` | PASS |
+| 2 | A successful run of a non-repeatable workflow yields `completed` (derived from the ledgers, `any(run.ok)`); failed/unknown runs → `running`; never run → `runnable` | PASS |
+| 3 | Precedence preserved — authored `status` wins, `superseded_by` → `superseded`; run history never demotes a repeatable spec (still `active` even with successful runs) | PASS |
+| 4 | `SPEC_STATUSES` (the validator's vocabulary) extended with `runnable`/`running`/`completed`; `STATUS_ORDER` + the STATUS.md legend updated for the new states | PASS |
+| 5 | Tests added for every transition — runnable/running/completed, authored-status + supersession precedence, repeatable-never-completed, and an end-to-end index-derivation case (7 new tests) | PASS (7 passed) |
+| 6 | `ruff` clean; full `-m "not external"` suite: 1274 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P1-4 (semantics) result: 6/6 PASS.**
+
+Note: the index itself (`STATUS.md`/`index.json`) is deliberately NOT regenerated here — the P1-4
+(index) follow-up owns that (it adds the `artifact_kind`/`repeatable` columns and marks completed
+one-shots), and this sandbox has no run ledgers to derive the new states from anyway.
+
+
 
 
 

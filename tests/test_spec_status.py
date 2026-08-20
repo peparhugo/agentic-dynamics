@@ -19,6 +19,7 @@ from agentic_dynamics.experiment.spec_status import (
     INDEX_SCHEMA_VERSION,
     MISSING,
     STATUS_ORDER,
+    RunSummary,
     SpecStatusEntry,
     build_index,
     collect_entries,
@@ -185,6 +186,71 @@ def test_run_history_never_demotes_a_spec_to_draft(repo: Path):
     entry = _by_name(collect_entries(root=repo))["gamma"]
     assert entry.status == "active"
     assert entry.n_runs == 0
+
+
+# ── P1-4: per-kind status semantics ─────────────────────────────
+
+
+def _run(ok: bool | None) -> RunSummary:
+    """A minimal run summary with the given success flag."""
+    return RunSummary(path="experiments/results/workflows/wf/run.json", timestamp="", ok=ok)
+
+
+def _workflow(**kw: object) -> ExperimentSpec:
+    """A non-repeatable workflow — the P1-4 work-order shape."""
+    return _spec("wf", artifact_kind="workflow", repeatable=False, **kw)
+
+
+def test_nonrepeatable_workflow_never_run_is_runnable():
+    assert derive_status(_workflow()) == "runnable"
+    assert derive_status(_workflow(), runs=[]) == "runnable"
+
+
+def test_nonrepeatable_workflow_with_only_failed_runs_is_running():
+    assert derive_status(_workflow(), runs=[_run(False)]) == "running"
+    # A run whose outcome is unrecorded (ok=None) is evidence of activity, not of success.
+    assert derive_status(_workflow(), runs=[_run(None)]) == "running"
+
+
+def test_nonrepeatable_workflow_with_a_successful_run_is_completed():
+    assert derive_status(_workflow(), runs=[_run(True)]) == "completed"
+    # Once completed, a later failed re-run must not un-complete the one-shot.
+    assert derive_status(_workflow(), runs=[_run(True), _run(False)]) == "completed"
+
+
+def test_nonrepeatable_workflow_respects_authored_status_and_supersession():
+    # Authored draft/tombstoned are human claims and win over run-derived states.
+    assert derive_status(_workflow(status="draft"), runs=[_run(True)]) == "draft"
+    assert derive_status(_workflow(status="tombstoned"), runs=[_run(True)]) == "tombstoned"
+    # Supersession also wins over a successful run.
+    assert derive_status(_workflow(superseded_by="other"), runs=[_run(True)]) == "superseded"
+
+
+def test_repeatable_spec_never_derives_completed_from_runs():
+    # A repeatable spec (an experiment, or an idempotent operation) keeps the four
+    # measurement states; run history never folds a `completed`/`running`/`runnable`
+    # work-order state into its status column.
+    assert derive_status(_spec("exp"), runs=[_run(True)]) == "active"
+    assert derive_status(_spec("exp"), runs=[_run(False)]) == "active"
+    assert derive_status(_spec("exp", repeatable=True), runs=[_run(True)]) == "active"
+
+
+def test_nonrepeatable_workflow_derives_status_from_ledgers_in_the_index(tmp_path: Path):
+    # End-to-end: a non-repeatable workflow under workflows/ derives its index status
+    # from the run ledgers, not the YAML.
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    (specs / "ship.yaml").write_text(
+        _spec_yaml("ship", repeatable=False, artifact_kind="workflow")
+    )
+    _write_run(
+        tmp_path, "ship", "20260820T120000Z",
+        spec_name="ship", ok=True, ended_at="2026-08-20T12:00:00+00:00",
+    )
+    entry = _by_name(collect_entries(root=tmp_path))["ship"]
+    assert entry.status == "completed"
+    assert entry.latest_ok is True
+    assert entry.n_runs == 1
 
 
 # ── Run ledgers ─────────────────────────────────────────────────

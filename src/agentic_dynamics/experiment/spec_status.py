@@ -36,8 +36,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec
 from agentic_dynamics.core.paths import PROJECT_ROOT
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec
 
 # ── Constants ───────────────────────────────────────────────────
 
@@ -59,10 +59,13 @@ INDEX_SCHEMA_VERSION = "spec-status/v1"
 MISSING = "—"
 
 #: Row ordering for ``STATUS.md``: rank by status, then by name. Runnable-now specs come
-#: first because that is what an authoring agent is scanning for; retired lineage sinks to
-#: the bottom. Any status outside this tuple sorts after all of them (defensive: the
-#: validator already restricts the vocabulary, but the index must never crash on a stray).
-STATUS_ORDER: tuple[str, ...] = ("active", "draft", "superseded", "tombstoned")
+#: first because that is what an authoring agent is scanning for; completed one-shots and
+#: retired lineage sink to the bottom. Any status outside this tuple sorts after all of them
+#: (defensive: the validator already restricts the vocabulary, but the index must never
+#: crash on a stray).
+STATUS_ORDER: tuple[str, ...] = (
+    "runnable", "running", "active", "draft", "completed", "superseded", "tombstoned"
+)
 
 #: Timestamp format of a run-ledger filename (``20260819T142530Z.json``) — the fallback
 #: when the ledger body carries no ``ended_at``/``started_at``.
@@ -262,8 +265,8 @@ class SpecStatusEntry:
         )
 
 
-def derive_status(spec: ExperimentSpec) -> str:
-    """Resolve a spec's lifecycle status.
+def derive_status(spec: ExperimentSpec, runs: list[RunSummary] | None = None) -> str:
+    """Resolve a spec's lifecycle status (refactor-repair P1-4 — per-kind semantics).
 
     The precedence is fixed by the spec-lifecycle design:
 
@@ -271,16 +274,28 @@ def derive_status(spec: ExperimentSpec) -> str:
        ``tombstoned`` is a claim only a human can make);
     2. otherwise ``superseded`` when ``superseded_by`` is set — a spec that names its
        replacement has, by definition, been replaced;
-    3. otherwise ``active``.
+    3. otherwise, **per-kind**:
+       * a *repeatable* spec (an experiment, or an idempotent operation) defaults to
+         ``active`` — its status is a measurement claim, not a one-shot lifecycle;
+       * a *non-repeatable* workflow derives its state from the run ledgers: ``completed``
+         when any run succeeded, ``running`` when runs exist but none succeeded, and
+         ``runnable`` when it has never been run.
 
-    Note what is deliberately *absent*: run history never demotes a spec to ``draft``.
-    "Never run" and "draft" are different facts, and the table shows the first one
-    directly (``n_runs``/``last_run``) rather than folding it into the status column.
+    Note what is deliberately *absent*: run history never demotes a *repeatable* spec to
+    ``draft``. "Never run" and "draft" are different facts, and the table shows the first
+    one directly (``n_runs``/``last_run``) rather than folding it into the status column.
     """
     if spec.status:
         return spec.status
     if spec.superseded_by:
         return "superseded"
+    if not spec.repeatable:
+        runs = runs or []
+        if any(run.ok for run in runs):
+            return "completed"
+        if runs:
+            return "running"
+        return "runnable"
     return "active"
 
 
@@ -297,7 +312,7 @@ def build_entry(
     return SpecStatusEntry(
         name=spec.name,
         version=spec.version,
-        status=derive_status(spec),
+        status=derive_status(spec, runs),
         spec_path=_relative_to(spec_path, root),
         supersedes=list(spec.supersedes),
         superseded_by=spec.superseded_by,
@@ -447,12 +462,18 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
         "## Legend",
         "",
         "**Status** — authored in the spec YAML's `status:` when the operator asserted one,",
-        "otherwise derived: `superseded` when the spec names a `superseded_by:`, else `active`.",
+        "otherwise derived: `superseded` when the spec names a `superseded_by:`; for a",
+        "non-repeatable workflow, `completed` when a run succeeded, `running` when runs exist",
+        "but none succeeded, `runnable` when never run; else `active`.",
         "",
         "| status | meaning |",
         "|---|---|",
-        "| `active` | the current spec for its question — runnable now |",
+        "| `runnable` | a non-repeatable workflow never run successfully — ready to run |",
+        "| `running` | a non-repeatable workflow that has been run but not yet completed |",
+        "| `active` | the current repeatable spec for its question — runnable now |",
         "| `draft` | authored, not yet run to completion; not yet a claim about anything |",
+        "| `completed` | a non-repeatable workflow whose run succeeded (derived from the "
+        "run ledgers) |",
         "| `superseded` | a later spec took over its question (see that spec's "
         "`supersedes` column) |",
         "| `tombstoned` | retired; kept for lineage, never to be run again |",

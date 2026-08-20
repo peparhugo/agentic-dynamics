@@ -55,11 +55,29 @@ INTENTS = frozenset({"measure", "mutate"})
 # lives here — beside the other validated enums — so ``validate_spec`` stays the single
 # gate for it and the derived index imports this frozenset instead of re-listing it.
 #
+# Per-kind semantics (refactor-repair P1-4): a *repeatable* spec (an experiment, or an
+# idempotent operation) uses the four measurement states; a *non-repeatable* workflow uses
+# the six work-order states, where ``completed`` is DERIVED from a successful run ledger,
+# not authored:
+#
 #   draft       — authored, never run to completion; not yet a claim about anything.
-#   active      — the current spec for its question; runnable now.
+#   active      — the current repeatable spec for its question; runnable now.
+#   runnable    — a non-repeatable workflow never run successfully; ready to run.
+#   running     — a non-repeatable workflow that has been run but not yet completed.
+#   completed   — a non-repeatable workflow whose run succeeded (derived from the ledgers).
 #   superseded  — a later spec took over its question (see ``superseded_by``).
 #   tombstoned  — retired; kept for lineage, never to be run again.
-SPEC_STATUSES = frozenset({"draft", "active", "superseded", "tombstoned"})
+SPEC_STATUSES = frozenset(
+    {
+        "draft",
+        "active",
+        "runnable",
+        "running",
+        "completed",
+        "superseded",
+        "tombstoned",
+    }
+)
 
 #: Every top-level key a spec YAML may carry. ``from_dict`` warns (loudly, via
 #: :mod:`warnings`) about anything outside this set rather than dropping it silently —
