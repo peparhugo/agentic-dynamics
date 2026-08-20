@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-19T23:13:05.137270+00:00`  ·  66 spec(s)
+Generated at: `2026-08-20T00:56:43.924803+00:00`  ·  67 spec(s)
 
 | name | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|
@@ -16,6 +16,7 @@ Generated at: `2026-08-19T23:13:05.137270+00:00`  ·  66 spec(s)
 | `claude_background_sessions` | active | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
 | `claude_tools_to_skills` | active | 0.1 | — | 2026-08-14 22:29 | ok | anthropic/claude-fable-5 | $8.3582 | 1 |
 | `code_review` | active | 0.1 | — | 2026-08-14 05:38 | ok | anthropic/claude-fable-5 | $2.4257 | 1 |
+| `context_abstraction_implement` | active | 0.1 | — | 2026-08-20 00:56 | fail | anthropic/claude-opus-5 | $0.0000 | 2 |
 | `context_abstraction_plane` | active | 0.1 | — | 2026-08-19 23:03 | ok | anthropic/claude-opus-5 | $10.3774 | 1 |
 | `control_room_hardening` | active | 0.1 | — | 2026-08-18 23:56 | ok | deepseek/deepseek-v4-pro | $0.1898 | 1 |
 | `control_room_portal` | active | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |

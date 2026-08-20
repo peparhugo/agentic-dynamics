@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v1",
-  "generated_at": "2026-08-19T23:13:05.137270+00:00",
-  "n_specs": 66,
+  "generated_at": "2026-08-20T00:56:43.924803+00:00",
+  "n_specs": 67,
   "specs": [
     {
       "name": "agentic_dynamics_rebrand",
@@ -146,6 +146,22 @@
       "latest_git_sha": "120a48ff4",
       "results_pointer": "experiments/results/workflows/code_review/20260814T053858Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "context_abstraction_implement",
+      "version": "0.1",
+      "status": "active",
+      "spec_path": "experiments/specs/context_abstraction_implement.yaml",
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-20T00:56:43.897968+00:00",
+      "latest_ok": false,
+      "latest_model": "anthropic/claude-opus-5",
+      "latest_cost_usd": 0.0,
+      "latest_git_sha": "bf05f1c82",
+      "results_pointer": "experiments/results/workflows/context_abstraction_implement/20260820T005643Z.json",
+      "n_runs": 2
     },
     {
       "name": "context_abstraction_plane",

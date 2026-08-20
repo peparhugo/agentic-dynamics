@@ -1,0 +1,290 @@
+name: refactor_master_plan
+question: >-
+  Produce a comprehensive, verified refactor master plan for this codebase. The repo has become a
+  wasteland: the linear execution core predates the spec/compiler that is supposed to generalize
+  it, 78 scripts span five overlapping categories, three modules are deprecated but still
+  imported, the lab books still read the retired flawed _results_summary.json, prior review docs
+  (docs/review/restructure.md R1-R9, bugs.md, architecture_review.md) were written BEFORE the
+  canonical-state registry and website repoints landed, and unmerged branches (kb_event_typing,
+  kb_lineage_reconcile) dangle. The workflow runs the full pipeline the operator asked for:
+  review -> research (real research, internal archaeology + upstream evidence) -> plan -> design
+  -> consider (trade-offs/ADRs) -> redesign -> verify. Output is an integrated master plan plus
+  executable per-workstream ExperimentSpecs that pass the requires/produces gate. This is a
+  REVIEW + DESIGN workflow: it writes docs/refactor/* and experiments/specs/refactor_*.yaml only —
+  it does NOT edit production code (execution follows in later workflows).
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: markdown
+    fork: true
+    context:
+      frame: >-
+        The repo is an information-acquisition machine for AI economics: instrument -> derive
+        (measurement rules -> information) -> policy (control rules) -> grid -> campaign. The
+        load-bearing rule: to make policies we need information — a control rule whose `requires`
+        are not yet measured is unwritable, and the compiler refuses it. Any refactor must keep
+        that chain intact and must keep the measurement pipeline honest (docs/
+        data_integrity_findings.md is the authoritative record of which data is trustworthy).
+      current_state: >-
+        As of 2026-08-20: the canonical-state registry is populated (635 entities: 558 current,
+        77 tombstoned; registry_index.jsonl + data_manifest.json + kb/ artifacts all tracked in
+        git);         build_data.py is repointed at the registry (feature/website-registry-repoint MERGED
+        on main); the website_repoint workflow (S3 findModel/C1 labels/C2 pricing/C3-C4 counts)
+        has ALSO landed — MERGED on main as of this spec's launch (2026-08-20). Sequence any
+        overlapping workstream after that work, which is now part of the baseline.
+        Still true: three deprecated modules (experiment.py, adapter.py, lab_book.py) per the
+        mental model; 8 deprecated *_bge_m3 lab scripts; the 19 active lab books still read
+        _results_summary.json (the flawed 144-entry store, retired as a build_data input but still
+        consumed by labs); the execution core is still the linear chain (perturb.py -> backends ->
+        opencode.py/claude_adapter.py) that compile_experiment.py is supposed to generalize (the
+        reuse map in the mental model is the declared target); unmerged branches feature/
+        kb-event-typing + feature/kb-lineage-reconcile (2 commits each, partly superseded).
+      prior_work: >-
+        INPUTS, not gospel — re-validate every claim against the CURRENT tree before using it:
+        docs/review/restructure.md (R1-R9 ranked restructuring + "do not do" list + ordering),
+        docs/review/bugs.md, docs/review/architecture_review.md, docs/review/website.md,
+        docs/review/knowledge_base.md, docs/data_integrity_findings.md,
+        code_reviews/2026-08-14_experiment-spec-and-compiler-design.md (the spec/compiler roadmap),
+        docs/HANDOFF_2026-08-19.md (session state + open items). Some of these predate the
+        registry repoint, which changed build_data.py substantially (load_summary ->
+        load_canonical_corpus, MODEL_DISPLAY_ORDER removed).
+      read_first: >-
+        .opencode/instructions/mental-model.md  (module map, signatures, dependencies)
+        src/instrument/CONTEXT.md               (module + KB + ledger reference)
+        scripts/CONTEXT.md, experiments/CONTEXT.md, firebase/CONTEXT.md
+        docs/supervisor_design.md, docs/data_integrity_findings.md
+      hard_rules: >-
+        (1) DESIGN ONLY: write docs/refactor/*.md and experiments/specs/refactor_*.yaml; do NOT
+        edit production code or tests in this workflow — execution is a later workflow per
+        workstream. (2) The load-bearing rule is untouchable: any proposal that weakens
+        instrument -> derive -> policy ordering or the requires/produces gate is wrong by
+        definition. (3) Every produced refactor_*.yaml spec MUST pass the compile gate (validate
+        mode) — a workstream without a passing spec is not in the plan. (4) Operational invariants
+        survive the design: Redis isolation (6380 = framework queue DB1 + KB stream DB2; 6379 =
+        story-agent sandbox — never conflated), dual Firebase hosting (ai-finops-rulebook +
+        agentic-dynamics, same public/), Control Room on 8001 / Chroma Docker on 8000, the
+        finops-queue never on 6379. (5) Every claim is cited: internal findings carry file:line,
+        external research carries a URL — no uncited assertions. (6) The website_repoint workflow
+        has LANDED on main — treat its work as baseline, never redo or undo it. (7) Real research:
+        offload exploration to parallel explore subagents (do not read 40 files serially), and
+        fetch upstream docs for the actual dependencies (opencode, ChromaDB, Neo4j, Redis Streams,
+        Firebase) instead of assuming.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/refactor-master-plan); each phase commits [workflow] <phase>. Design workflow —
+        markdown language, no code edits, no pytest gates on code (the verify phase runs the
+        compile-gate validate snippet on every produced spec instead).
+    phases:
+      - name: review
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Audit the as-is state of the codebase and produce the wasteland map.
+
+          GOAL:
+          {goal}
+
+          READ FIRST: the spec context's read_first list (mental model first).
+
+          DO:
+          - Produce a COMPLETE module accounting: every file in src/, scripts/, admin/, tests/
+            (group firebase/public as one surface) — one row each with: role, size, who imports
+            it, deprecated? (experiment.py, adapter.py, lab_book.py, plan.py, review_worker.py,
+            *_bge_m3), still-executed? (referenced by a spec, a lab script, the queue, or the
+            pipeline), and a verdict: keep / move / retire / undecided.
+          - Re-validate the prior review claims (docs/review/restructure.md R1-R9, bugs.md)
+            against the CURRENT tree — mark each still-true / superseded / fixed, with file:line
+            evidence. Note what the registry repoint + website repoint already changed.
+          - Identify the top duplication clusters (e.g. the 9-copy RecordBuilder boilerplate R1,
+            the reshape-a-StoryResult adapters R8) with concrete line evidence.
+          - Use parallel explore subagents for module families; cite file:line throughout.
+
+          DELIVER docs/refactor/review.md (the accounting table + re-validated findings).
+      - name: research
+        kind: agent
+        timeout: 10800
+        prompt: |
+          Real research: internal archaeology + upstream evidence.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/refactor/review.md (prior phase) + the spec context's prior_work list.
+
+          DO:
+          - INTERNAL archaeology: git log of the key seams (when the linear core vs the
+            spec/compiler each landed; what the 19 lab books consume; which scripts nothing
+            imports — dead-code census via import graph; what the tests actually pin down vs
+            leave unguarded). Offload to explore subagents per family.
+          - UPSTREAM: fetch and cite real docs for the dependencies the refactor will touch —
+            opencode CLI/config, ChromaDB deployment/limits (the ~500-upsert wedge), Neo4j
+            full-text, Redis Streams consumer groups, Firebase static hosting — and record which
+            upstream capabilities the repo is NOT using (or misusing).
+          - EXTERNAL baseline: how comparable measurement/experiment codebases structure
+            instrument/derive/policy separation (cite URLs); what is idiomatic vs bespoke here.
+          - Cross-reference the spec/compiler roadmap (code_reviews/2026-08-14) with what is
+            actually implemented — list the delta.
+
+          DELIVER docs/refactor/research.md — every claim cited (file:line or URL).
+      - name: plan
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Sequence the refactor into executable workstreams.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/refactor/review.md + docs/refactor/research.md.
+
+          DO:
+          - Turn the re-validated findings into WORKSTREAMS, each: goal, files touched, tests
+            affected, risk, effort (S/M/L), and which other workstreams it blocks/needs.
+          - Sequence them so the pipeline never breaks mid-refactor: tests green at every step,
+            the load-bearing rule intact, deprecated modules retired AFTER their last importer is
+            repointed (the 19 lab books reading _results_summary.json get repointed or explicitly
+            quarantined as historical-only), the compiler generalization lands before the linear
+            core is removed, kb_event_typing/kb_lineage_reconcile are decided (merge/drop).
+          - Treat the website_repoint work (already merged on main) as baseline: sequence overlapping workstreams after
+            it merges.
+          - Assign each workstream a spec name (experiments/specs/refactor_<n>_<slug>.yaml) that
+            a later workflow will fill in and execute.
+
+          DELIVER docs/refactor/plan.md (ordered workstream table + dependency graph + risk
+          register).
+      - name: design
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Target architecture v1 for the refactored repo.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/refactor/plan.md + the mental model's architecture + reuse map.
+
+          DO:
+          - Draw the TARGET module map: package layout, ownership of each layer (instrument /
+            derive / policy / grid / campaign; KB; control surface; site pipeline), public
+            interfaces, and where the reuse map resolves (compile_experiment generalizing
+            _gen_matrix_cells, evaluate_rules vs lab books, compare_arms vs
+            routing.simulate_strategies, adapt as the campaign loop).
+          - Specify the seams that make the refactor reversible: registry as single corpus gate,
+            one write-path helper, the RecordBuilder factory, the source_type vocabulary, task
+            vocabulary (R9), the RAG seam split (R7).
+          - State the migration strategy per workstream (strangler vs retire-and-replace) and the
+            stop-the-line conditions.
+
+          DELIVER docs/refactor/design.md.
+      - name: consider
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Trade-off analysis and ADRs for the design.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/refactor/design.md + docs/refactor/plan.md.
+
+          DO:
+          - For EACH major design decision write an ADR: the alternatives actually considered
+            (including doing nothing), the costs/benefits measured against the repo's own
+            constraints (measurement honesty, operator time, the load-bearing rule), and the
+            decision with its reversal path. At minimum: retire vs keep deprecated modules; mono
+            package vs split; repoint labs at the registry vs quarantine labs as historical;
+            merge vs drop kb_event_typing/kb_lineage_reconcile; per-workstream execution order
+            (two orderings compared); whether the linear core is removed or kept as a compatibility
+            shim during the compiler rollout.
+          - Pressure-test the plan against the "do NOT do" list in docs/review/restructure.md §5
+            (re-checked for drift) and the data-integrity findings (nothing may resurrect the
+            flawed summary as a live source).
+          - Quantify where possible: dead-code size, test coverage of each seam, expected
+            breakage surface per workstream.
+
+          DELIVER docs/refactor/tradeoffs.md (the ADR set).
+      - name: redesign
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Revised design v2 + executable workstream specs.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST: docs/refactor/design.md + docs/refactor/tradeoffs.md.
+
+          DO:
+          - Fold the ADR decisions into a final design (docs/refactor/design_final.md) — the
+            module map, seam list, and migration order, now decision-complete.
+          - Write the workstream specs from the plan: experiments/specs/refactor_<n>_<slug>.yaml,
+            one per workstream, in the ExperimentSpec format (name, question, workflow
+            agent_task with phases, factors, rules with requires/produces, metrics, comparison,
+            writeup, stop, adapt). Small workstreams may share one spec if they form a single
+            phase set. Every rule must obey the load-bearing rule (control rules only after their
+            `requires` are produced).
+          - Keep each spec SINGLE-model (deepseek/deepseek-v4-pro) and design its phases to
+            commit per phase with pytest gates where code is touched.
+
+          DELIVER docs/refactor/design_final.md + the refactor_*.yaml spec files.
+      - name: verify
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Verify the master plan end to end.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Coverage proof: every file from docs/refactor/review.md's accounting appears in a
+            workstream (keep/move/retire) — zero orphans.
+          - Run the compile-gate validate snippet on EVERY produced experiments/specs/refactor_*.yaml
+            and include the output; fix any spec that fails the gate (it is part of this phase).
+          - Invariant audit: grep-check the design against the operational invariants (Redis ports,
+            dual Firebase, no _results_summary.json resurrected as a live source, deprecated
+            modules only retired after importers are repointed).
+          - Sequence audit: topological check that the workstream order never leaves the pipeline
+            broken between steps; the merged website_repoint work is treated as baseline.
+          - Write the final verification report with PASS/FAIL per check.
+
+          DELIVER docs/refactor/verification.md.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: master_plan_delivered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [audit_complete, research_grounded, plan_sequenced, specs_gate_passing]
+metrics:
+  - {name: audit_complete, agg: mean, over: cell}
+  - {name: research_grounded, agg: mean, over: cell}
+  - {name: plan_sequenced, agg: mean, over: cell}
+  - {name: specs_gate_passing, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, review, research, plan, design, consider, redesign, verify]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
