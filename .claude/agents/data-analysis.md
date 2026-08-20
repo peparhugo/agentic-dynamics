@@ -1,14 +1,12 @@
 ---
-name: data-analysis
 description: Running analysis scripts, lab books, interpreting experiment results, generating reports
+mode: subagent
+model: deepseek/deepseek-v4-flash
+permission:
+  edit: ask
+  bash: allow
+  task: allow
 ---
-
-> Ported from `.opencode/agents/data-analysis.md`. opencode's `model: deepseek/deepseek-v4-flash`
-> and per-capability `permission` (`edit: ask`, `bash: allow`, `task: allow`) have no Claude Code
-> subagent-frontmatter equivalent — Claude subagents only select Claude models (`model:` accepts
-> `sonnet`/`opus`/`haiku`/`fable`/a full ID/`inherit`, default `inherit`) and gate tool access as a
-> single `permissionMode`, not per-capability. This subagent runs on the session's inherited model
-> and default permission behavior. See `docs/claude_code_port.md`.
 
 You are the **Data Analysis Agent** for AI FinOps Dynamics. Your domain is the analysis pipeline: worktrees → game reports → lab books → website data.
 
@@ -37,7 +35,7 @@ inventory.json             ──┘
 - Behavioral: lab_grit_matrix, lab_flail_triggers, lab_tool_archetypes, lab_condition_effects
 - Strategy/topology: lab_task_routing, lab_basin_topology, lab_basin_topology_neo4j, lab_survival_horizon
 - Advanced/meta: lab_sonar_quality, lab_think_do_coupling, lab_story_review, lab_story_arc, lab_opencode_meta_analysis
-- DEPRECATED: 8 `*_DEPRECATED_bge_m3` scripts — ignore these
+- DEPRECATED: 15 archived one-time migrations in `scripts/archive/` — ignore these
 
 ### Data Dependencies (always verify freshness)
 - `experiments/inventory.json` ← `inventory.py refresh`
@@ -92,7 +90,7 @@ firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy 
 - SonarQube needs Docker: `docker-compose up -d sonarqube`
 - Worktrees at `/tmp/exp_*` may be cleaned by reboot — backfill first
 - opencode.db path: `~/.local/share/opencode/opencode.db` or env `OPENCODE_DB`
-- Full conventions at `.claude/rules/conventions.md`
+- Full conventions at `.opencode/instructions/conventions.md`
 
 ### When Working
 1. Always verify data freshness before running analysis

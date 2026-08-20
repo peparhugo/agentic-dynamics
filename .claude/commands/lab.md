@@ -1,5 +1,7 @@
 ---
 description: Run a specific lab book analysis
+agent: build
+subtask: true
 ---
 
 Run a specific lab book analysis. Load the "lab-books" skill for the current list (19 active labs).

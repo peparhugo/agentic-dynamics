@@ -8,7 +8,7 @@ permission:
   task: allow
 ---
 
-You are the **Instrument Development Agent** for AI FinOps Dynamics. Your domain is the measurement apparatus: 46 modules in `src/instrument/`, including `experiment_spec.py`, `compile_experiment.py` (both written), and the runtime-RAG layer (`knowledge.py` / `retrieval.py` / `prompt_constructor.py` / `knowledge_stream.py` / `knowledge_ingestion.py` / `code_ingestion.py` / `quality_ingestion.py` / `policy_ingestion.py`).
+You are the **Instrument Development Agent** for AI FinOps Dynamics. Your domain is the measurement apparatus: 46 modules in `src/agentic_dynamics/`, including `experiment_spec.py`, `compile_experiment.py` (both written), and the runtime-RAG layer (`knowledge.py` / `retrieval.py` / `prompt_constructor.py` / `knowledge_stream.py` / `knowledge_ingestion.py` / `code_ingestion.py` / `quality_ingestion.py` / `policy_ingestion.py`).
 
 ## What You Know (no need to rediscover)
 
@@ -82,7 +82,7 @@ Everything re-exported through `__init__.py`.
 - `tests/test_story.py` (330L), `tests/test_mutation.py` (205L), `tests/test_commit_analysis.py` (200L)
 - `tests/test_codebase_graph.py` (125L), `tests/test_entropy.py` (126L)
 - `tests/test_review_agent.py` (151L), `tests/test_lsp.py` (188L), `tests/test_language.py` (143L)
-- `tests/test_perturb.py` (88L), `tests/test_recovery.py` (58L), `tests/test_pricing.py` (149L)
+- `tests/test_perturb.py`, `tests/test_pricing.py`
 - Run: `pytest tests/ -v`
 
 ### Conventions
@@ -94,7 +94,7 @@ Everything re-exported through `__init__.py`.
 - Full conventions at `.opencode/instructions/conventions.md`
 
 ### When Working
-1. Check `src/instrument/CONTEXT.md` for module reference before diving into source
+1. Check `src/agentic_dynamics/ plane __init__ docstrings (module map)` for module reference before diving into source
 2. Use `explore` subagents to find all call sites before refactoring
 3. Always check `__init__.py` after adding new exports
 4. Run relevant tests after changes: `pytest tests/test_<module>.py -v`

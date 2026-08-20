@@ -18,7 +18,7 @@ Prompts ──→ perturb.py ──→ perturb_prompt() ──→ perturbed prom
                                               recovery.py, strategy.py ──→ game_report.py
 ```
 
-Key files you'll modify: `scripts/run.py` (502L), `src/instrument/opencode.py` (614L), `src/instrument/perturb.py` (752L), `src/instrument/story.py` (1374L), `src/instrument/mutation.py` (438L).
+Key files you'll modify: `scripts/run.py` (502L), `src/agentic_dynamics/opencode.py` (614L), `src/agentic_dynamics/perturb.py` (752L), `src/agentic_dynamics/story.py` (1374L), `src/agentic_dynamics/mutation.py` (438L).
 
 ## Spec & Compiler (written)
 
@@ -29,9 +29,9 @@ information) → write policy (control rules consuming that information) → gri
 Two modules, both **written**:
 
 ```
-src/instrument/experiment_spec.py    # ExperimentSpec, Workflow, Factor, RuleSpec, MetricSpec,
+src/agentic_dynamics/experiment/experiment_spec.py    # ExperimentSpec, Workflow, Factor, RuleSpec, MetricSpec,
                                      # ComparisonSpec, WriteupSpec, StopSpec, AdaptSpec + validator
-src/instrument/compile_experiment.py # compile_spec(spec) -> DAG; validate_rules(spec) -> errors
+src/agentic_dynamics/experiment/compile_experiment.py # compile_spec(spec) -> DAG; validate_rules(spec) -> errors
 ```
 
 **The load-bearing rule (enforced by the validator):** `RuleSpec` declares `requires` (information
@@ -81,15 +81,13 @@ perturbed_prompt, perturbation = perturb_prompt(
 ## Running Experiments (scripts/run.py)
 
 ```bash
-# Single experiment (primary entry point). `config` is a bare positional arg, not
-# `--config` (scripts/run.py:488: `parser.add_argument("config", ...)` — no `--config`
-# option exists; `--config ...` errors with "unrecognized arguments"):
-python scripts/run.py experiments/configs/task_manager.yaml --model deepseek
+# Single experiment (primary entry point):
+python scripts/run.py experiments/definitions/configs/task_manager.yaml --model deepseek
 
 # Cross-model comparison:
-python scripts/run.py experiments/configs/comparative.yaml --model deepseek
+python scripts/run.py experiments/definitions/configs/comparative.yaml --model deepseek
 
-# The 34 configs are at experiments/configs/*.yaml. Each defines:
+# The 34 configs are at experiments/definitions/configs/*.yaml. Each defines:
 # task, constraints[], operators[], strengths[], model, turns, thinking_effort
 ```
 
@@ -124,8 +122,7 @@ result = run_opencode_agentic(
 ## Multi-Session Stories (story.py + mutation.py + run_story.py)
 
 ```bash
-# Run a 5-session story with perturbation. `story` is a positional arg (nargs="?"),
-# not `--story` (scripts/run_story.py:45-49):
+# Run a 5-session story with perturbation:
 python scripts/run_story.py task_manager_api --condition early_degrade \
     --codebase-quality good --tier tier1_minimal --model deepseek
 ```
@@ -201,8 +198,7 @@ from instrument.efficiency import PROVIDER_PRICING
 ## Batch & Parallel Runners
 
 ```bash
-# Parallel batch on DeepSeek — runs a FIXED 13-config subset (scripts/batch_run.py:CONFIGS),
-# not all 34 configs in experiments/configs/. Don't assume it covers the full matrix.
+# Parallel batch on DeepSeek:
 python scripts/batch_run.py
 
 # Redis queue parallel (v0.9, for story experiments):
@@ -217,7 +213,7 @@ python scripts/pipeline.py --plan full_matrix --graph   # print DAG
 python scripts/pipeline.py --plan full_matrix --from reviews  # resume mid-pipeline
 
 # Sweep runners:
-python scripts/sweep_parallel.py     # 16 cells = 4 models x 2 silent modes x 2 operators, parallel
+python scripts/sweep_parallel.py     # 4 models × 2 modes × 2 ops = 16 parallel
 python scripts/sweep_silent_mode.py  # Explanation Tax decomposition
 python scripts/finish_sweep.py       # Incomplete sweep cells
 ```
@@ -225,8 +221,8 @@ python scripts/finish_sweep.py       # Incomplete sweep cells
 ## Common Workflows
 
 ### Running a single experiment end-to-end:
-1. Pick config from experiments/configs/
-2. `python scripts/run.py experiments/configs/<name>.yaml --model deepseek`
+1. Pick config from experiments/definitions/configs/
+2. `python scripts/run.py experiments/definitions/configs/<name>.yaml --model deepseek`
 3. Check output in experiments/results/ and /tmp/exp_*
 
 ### Running a story experiment (v0.9):
@@ -249,7 +245,7 @@ python scripts/finish_sweep.py       # Incomplete sweep cells
 4. Language flags — critical for correctness measurement:
    - Go/Rust: `standardized: {enabled: true, enforce_pytest: false}` — runs `go test`/`cargo test`, NOT pytest.
    - Python: `standardized.enforce_pytest: true` (default pytest).
-5. Run: `python scripts/run.py experiments/configs/<name>.yaml --model deepseek`.
+5. Run: `python scripts/run.py experiments/definitions/configs/<name>.yaml --model deepseek` (or the `run_experiment` tool).
 6. Verify: GameReport + artifacts under `experiments/results/`, worktree at `/tmp/exp_*`.
 7. Downstream: `python scripts/analyze_worktrees.py` then `python scripts/pipeline.py --plan deploy` to publish to the website.
 
@@ -314,7 +310,7 @@ languages "just work"; for an unbundled grammar you'd swap in `tree_sitter_langu
 register a grammar manually — the exception, not the rule.
 
 ### Fixing a measurement bug:
-1. Read src/instrument/CONTEXT.md for the module reference
+1. Read src/agentic_dynamics/ plane __init__ docstrings (module map) for the module reference
 2. Check tests/test_<module>.py for existing coverage
 3. Fix the module
 4. Run `pytest tests/test_<module>.py -v`
@@ -329,34 +325,3 @@ register a grammar manually — the exception, not the rule.
 - Silent mode suppresses the model's reasoning text — measured for Explanation Tax.
 - Story sessions can timeout (1200s default). Recovery handles continuation automatically.
 - Flash V4 mutation compilation requires FLASH_API_KEY for compile_mutation().
-
-## Tool invocations (ported from `.opencode/tools/*.ts`)
-
-The opencode tools below shell to the scripts already documented in this skill. On the
-Claude Code side there's no tool wrapper — invoke the script directly via Bash, using the
-exact flags below (verified against each script's own arg parsing, not the tool's schema).
-
-- **`run_experiment.ts`** → `scripts/run.py` — **`config` is positional, not `--config`**
-  (`scripts/run.py:488`); see "Running Experiments" above for the corrected invocation.
-  The `run_experiment` tool itself gets this right; this skill's own examples previously
-  didn't and have been corrected. Full confirmed flag set (`scripts/run.py:488-494`):
-  `--model PROVIDER/MODEL`, `--compare MODEL [MODEL...]` (multi-model comparison — mutually
-  exclusive with a plain single run; when set, `--model` is ignored and `multi_model_compare`
-  runs instead), `--limit INT` (default `0` = all operators), `--timeout INT` (default
-  `200`s), `--repetitions INT` (default `1`), `--backend {auto,opencode,claude_cli}`
-  (default `auto`).
-- **`run_story.ts`** → `scripts/run_story.py`. The story name is a bare **positional** arg
-  (`nargs="?"`), not `--story` — see "Multi-Session Stories" above for the corrected
-  invocation. Beyond the 4 flags shown there (`--condition`, `--codebase-quality`, `--tier`,
-  `--model`), confirmed flags (`scripts/run_story.py:45-106`): `--backend
-  {auto,opencode,claude_cli}` (default `auto`), `--codebase PATH` (overrides
-  `--codebase-quality`/`--tier`), `--timeout INT` (default `SESSION_TIMEOUT`),
-  `--worktree-root PATH` (default `/tmp`), `--results-dir PATH` (default
-  `experiments/results/stories`), `--thinking-budget INT`, `--output-limit INT`,
-  `--standardize`/`--no-standardize` (default: standardize on), and `--list` (prints
-  `BUILTIN_STORIES` keys and exits — this is exactly what `list_stories.ts` runs:
-  `python3 scripts/run_story.py --list`).
-- **`batch.ts`** → `scripts/batch_run.py` — fixed 13-config subset, see "Batch & Parallel
-  Runners" above.
-- **`sweep.ts`** → `scripts/sweep_parallel.py` — 16 cells (4 models × 2 silent modes × 2
-  operators), see "Batch & Parallel Runners" above.

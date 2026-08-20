@@ -17,6 +17,10 @@ CONTEXT = SCRIPTS_DIR / "CONTEXT.md"
 
 BUCKETS = ("maintained", "historical", "one-time")
 
+# Helper modules (underscore-prefixed) are shared infrastructure, not commands: `_bootstrap.py`
+# inserts src/ onto sys.path; `_gen_instructions.py` regenerates the instruction surfaces.
+HELPERS = {"_bootstrap.py", "_gen_instructions.py"}
+
 _START = "<!-- scripts-classification: start -->"
 _END = "<!-- scripts-classification: end -->"
 
@@ -43,7 +47,7 @@ def test_manifest_covers_every_script_with_zero_orphans():
 
     The ``one-time`` bucket lives under ``scripts/archive/``; the rest at the top of ``scripts/``.
     """
-    actual = {p.name for p in SCRIPTS_DIR.rglob("*.py")} - {"_bootstrap.py"}
+    actual = {p.name for p in SCRIPTS_DIR.rglob("*.py")} - HELPERS
     manifest = _parse_manifest()
     classified = set().union(*manifest.values())
     assert classified == actual, (

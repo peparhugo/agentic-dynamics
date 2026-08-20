@@ -126,20 +126,12 @@ Lab books read from these files in `experiments/results/`:
 - Agent-authored vs independent-evaluator value delta
 - Output: `experiments/results/lab_verification_value.json`
 
-## DEPRECATED Lab Books (DO NOT RUN — use non-deprecated alternatives)
+## DEPRECATED Lab Books (retired in Stage 1)
 
-```
-lab_drift_trajectories_DEPRECATED_bge_m3.py          (240L)
-lab_reasoning_volatility_DEPRECATED_bge_m3.py         (203L)
-lab_cross_model_reasoning_DEPRECATED_bge_m3.py        (177L)
-lab_divergence_cascades_DEPRECATED_bge_m3.py           (211L)
-lab_cluster_stability_DEPRECATED_bge_m3.py             (218L)
-lab_recovery_curves_DEPRECATED_bge_m3.py               (367L)
-lab_reasoning_divergence_DEPRECATED_bge_m3.py          (166L)
-lab_semantic_clusters_DEPRECATED_bge_m3.py             (160L)
-```
-
-These used bge-m3 embeddings via Ollama. Superseded by new semantic_validation.py approach (no embeddings needed).
+The 8 `*_DEPRECATED_bge_m3.py` lab scripts (drift_trajectories, reasoning_volatility,
+cross_model_reasoning, divergence_cascades, cluster_stability, recovery_curves,
+reasoning_divergence, semantic_clusters) used bge-m3 embeddings via Ollama and were retired in
+Stage 1 — superseded by `agentic_dynamics.measurement.semantic_validation` (no embeddings).
 
 ## Running a Lab
 
@@ -204,14 +196,3 @@ produced by a measurement rule — instrument before policy. Design:
 - Lab output JSON files are intermediate — they're consumed by website but not committed directly.
 - If a lab crashes with KeyError, likely _results_summary.json is stale. Regenerate it.
 - `lab_story_review.py` depends on story worktrees having been run first.
-
-## Tool invocations (ported from `.opencode/tools/*.ts`)
-
-- **`run_lab.ts`** → `python scripts/lab_<name>.py`, same pattern documented above. **Drop
-  the tool's `max_steps`/`--max-steps` argument entirely — it does not exist on any lab
-  script.** Verified by grepping every `scripts/lab_*.py` for `add_argument`/`ArgumentParser`:
-  only 2 of the 19 active labs parse any CLI args at all —
-  `lab_sonar_quality.py` (`--summary PATH`, `--json`) and
-  `lab_opencode_meta_analysis.py` (`--skip-expensive` default on, `--limit-tasks INT`,
-  `--all` — sets `skip_expensive=False`) — and neither has `--max-steps`. The other 17
-  non-deprecated labs take **zero** arguments; passing any flag to them errors out.

@@ -28,7 +28,7 @@ python scripts/inventory.py stats      # Aggregate statistics
 python scripts/inventory.py report     # Evidence page numbers
 python scripts/inventory.py worktrees  # List worktree directories
 ```
-Reads: `opencode.db` (SQLite), `/tmp/exp_*` worktrees, `experiments/configs/*.yaml`, `experiments/results/` JSONs.
+Reads: `opencode.db` (SQLite), `/tmp/exp_*` worktrees, `experiments/definitions/configs/*.yaml`, `experiments/results/` JSONs.
 Writes: `experiments/inventory.json`
 
 ### Build (build_data.py, 649L)
@@ -67,7 +67,7 @@ python scripts/monitor.py               # Dashboard
 ```
 
 ### Phase Orchestration (pipeline.py)
-YAML-driven DAG orchestration. Plans live in `experiments/configs/plans.yaml`.
+YAML-driven DAG orchestration. Plans live in `experiments/definitions/configs/plans.yaml`.
 ```bash
 python scripts/pipeline.py --plan <name>           # run a plan
 python scripts/pipeline.py --plan <name> --graph   # print dependency tree
@@ -102,7 +102,7 @@ new campaign loop (tweak one factor, emit the next grid). Ordering: instrument `
 ### Working Directory Map
 - `opencode.db` → `~/.local/share/opencode/opencode.db` or env `OPENCODE_DB`
 - Worktrees → `/tmp/exp_*`
-- Configs → `experiments/configs/*.yaml`
+- Configs → `experiments/definitions/configs/*.yaml`
 - Results → `experiments/results/_results_summary.json`
 - Inventory → `experiments/inventory.json`
 - Website data → `firebase/public/data.js`

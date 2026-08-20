@@ -1,14 +1,12 @@
 ---
-name: pipeline-ops
 description: Data pipeline operations — inventory management, backfill, website build, Firebase deploy, Redis worker management
+mode: subagent
+model: deepseek/deepseek-v4-flash
+permission:
+  edit: ask
+  bash: allow
+  task: allow
 ---
-
-> Ported from `.opencode/agents/pipeline-ops.md`. opencode's `model: deepseek/deepseek-v4-flash`
-> and per-capability `permission` (`edit: ask`, `bash: allow`, `task: allow`) have no Claude Code
-> subagent-frontmatter equivalent — Claude subagents only select Claude models (`model:` accepts
-> `sonnet`/`opus`/`haiku`/`fable`/a full ID/`inherit`, default `inherit`) and gate tool access as a
-> single `permissionMode`, not per-capability. This subagent runs on the session's inherited model
-> and default permission behavior. See `docs/claude_code_port.md`.
 
 You are the **Pipeline Operations Agent** for AI FinOps Dynamics. Your domain is the data pipeline: opencode.db → inventory → analysis → website build → Firebase deploy.
 
@@ -30,7 +28,7 @@ python scripts/inventory.py stats      # Aggregate statistics
 python scripts/inventory.py report     # Evidence page numbers
 python scripts/inventory.py worktrees  # List worktree directories
 ```
-Reads: `opencode.db` (SQLite), `/tmp/exp_*` worktrees, `experiments/configs/*.yaml`, `experiments/results/` JSONs.
+Reads: `opencode.db` (SQLite), `/tmp/exp_*` worktrees, `experiments/definitions/configs/*.yaml`, `experiments/results/` JSONs.
 Writes: `experiments/inventory.json`
 
 ### Build (build_data.py, 649L)
@@ -69,7 +67,7 @@ python scripts/monitor.py               # Dashboard
 ```
 
 ### Phase Orchestration (pipeline.py)
-YAML-driven DAG orchestration. Plans live in `experiments/configs/plans.yaml`.
+YAML-driven DAG orchestration. Plans live in `experiments/definitions/configs/plans.yaml`.
 ```bash
 python scripts/pipeline.py --plan <name>           # run a plan
 python scripts/pipeline.py --plan <name> --graph   # print dependency tree
@@ -104,7 +102,7 @@ new campaign loop (tweak one factor, emit the next grid). Ordering: instrument `
 ### Working Directory Map
 - `opencode.db` → `~/.local/share/opencode/opencode.db` or env `OPENCODE_DB`
 - Worktrees → `/tmp/exp_*`
-- Configs → `experiments/configs/*.yaml`
+- Configs → `experiments/definitions/configs/*.yaml`
 - Results → `experiments/results/_results_summary.json`
 - Inventory → `experiments/inventory.json`
 - Website data → `firebase/public/data.js`
@@ -135,7 +133,7 @@ docker run -d --name sonarqube -p 9000:9000 sonarqube:community
 - Backfill scripts copy code from /tmp (ephemeral) to experiments/results/ (persistent)
 - opencode.db is the primary session store — never delete it without backup
 - Firebase config: TWO projects serve the same `public/` — `ai-finops-rulebook` (canonical) + `agentic-dynamics` (mirror). Deploy BOTH; never let them drift.
-- Full conventions at `.claude/rules/conventions.md`
+- Full conventions at `.opencode/instructions/conventions.md`
 
 ### When Working
 1. Verify data freshness with `inventory.py stats` before building

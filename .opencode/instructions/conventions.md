@@ -21,21 +21,20 @@
   `[P]` policy/prior. Control rules are `[H]`/`[P]`; measurement rules are `[M]`/`[C]`.
 - **Policy is a factor level.** `decide(job, state) -> {route, depth, retry, escalate, budget,
   deadline}` goes in the grid as a `Factor` level, not a side-channel.
-- **Specs live in `experiments/specs/*.yaml`** (see the directory for the current set, e.g. `workflow_step_routing.yaml`). `Workflow.kind` is
-  `story | task | experiment | agent_task`; `experiment` makes a campaign an experiment of
-  experiments (same interpreter at every level). **Read `experiments/specs/STATUS.md` FIRST**
-  before authoring a new one — it is the generated spec lifecycle index (what exists, what is
-  done, when it was completed, and the supersedes chains); `experiments/specs/index.json` is its
-  machine-readable twin. Both are derived, never hand-edited — regenerate with
-  `python scripts/spec_status.py`.
+- **Specs live in `experiments/definitions/*.yaml` (experiments) + `workflows/**/*.yaml` (work
+  orders)** — the rec-3 split. `Workflow.kind` is `story | task | experiment | agent_task`;
+  `experiment` makes a campaign an experiment of experiments (same interpreter at every level).
+  **Read `experiments/specs/STATUS.md` FIRST** before authoring a new one — it is the generated
+  spec lifecycle index; `experiments/specs/index.json` is its machine-readable twin. Both are
+  derived, never hand-edited — regenerate with `python scripts/spec_status.py`.
 
 ## Anti-Patterns
 
-- Do NOT import from deprecated modules: `experiment.py`, `adapter.py`, `lab_book.py`.
-  Use `opencode.py` / `run_opencode_agentic()` instead.
+- Do NOT import from retired modules (`experiment.py`, `adapter.py`, `lab_book.py` were
+  retired in Stage 1). Use `agentic_dynamics.adapters.opencode` / `run_opencode_agentic()`.
 - Do NOT add heavy deps to core modules. Optional heavy deps go behind try/except.
-- Do NOT hardcode model names or pricing. Use `efficiency.py:PROVIDER_PRICING`.
-- Do NOT read `experiment.py` or `adapter.py` for new work — they have deprecation warnings.
+- Do NOT hardcode model names or pricing. Use `agentic_dynamics.measurement.efficiency:PROVIDER_PRICING`.
+- Do NOT read `experiment.py` or `adapter.py` for new work — they were retired in Stage 1.
 - Do NOT hand-author policy logic as a one-off in scripts. `compile_experiment.py` is written and
   generalizes `_gen_matrix_cells` (`pipeline.py:394`) as `experiment_matrix` and
   `routing.simulate_strategies` (`routing.py:98`) as `compare_arms` — route new grid/comparison
@@ -47,11 +46,11 @@
 - `scripts/analyze_worktrees.py` is 1396 lines — the biggest file. Be careful editing it.
 - `scripts/run.py` and `scripts/analyze_worktrees.py` share similar logic but are NOT unified.
   If you fix a bug in one, check the other.
-- `scripts/plan.py` is DEPRECATED (hardcoded phases). Use `scripts/pipeline.py` (YAML-driven,
-  `experiments/configs/plans.yaml`) for any new orchestration work. Don't edit plan.py.
+- Use `scripts/pipeline.py` (YAML-driven, `experiments/definitions/configs/plans.yaml`) for
+  orchestration work (`scripts/plan.py` was retired in Stage 1).
 - Lab books read `_results_summary.json` and `inventory.json` — always refresh these first.
 - `scripts/build_data.py` generates `firebase/public/data.js` — don't edit that file directly.
-- DeepSeek pricing lives in `efficiency.py:PROVIDER_PRICING["deepseek"]`.
+- DeepSeek pricing lives in `agentic_dynamics.measurement.efficiency:PROVIDER_PRICING["deepseek"]`.
   Claude pricing at `PROVIDER_PRICING["anthropic"]`.
 - `tests/conftest.py` has availability check fixtures — tests skip gracefully when infra is down.
 - `BUILTIN_STORIES` in story.py has 3 stories: task_manager_api, static_site_gen,

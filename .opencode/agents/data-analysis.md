@@ -35,7 +35,7 @@ inventory.json             ──┘
 - Behavioral: lab_grit_matrix, lab_flail_triggers, lab_tool_archetypes, lab_condition_effects
 - Strategy/topology: lab_task_routing, lab_basin_topology, lab_basin_topology_neo4j, lab_survival_horizon
 - Advanced/meta: lab_sonar_quality, lab_think_do_coupling, lab_story_review, lab_story_arc, lab_opencode_meta_analysis
-- DEPRECATED: 8 `*_DEPRECATED_bge_m3` scripts — ignore these
+- DEPRECATED: 15 archived one-time migrations in `scripts/archive/` — ignore these
 
 ### Data Dependencies (always verify freshness)
 - `experiments/inventory.json` ← `inventory.py refresh`

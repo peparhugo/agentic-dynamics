@@ -1,5 +1,7 @@
 ---
 description: Run post-hoc analysis on experiment worktrees
+agent: build
+subtask: true
 ---
 
 Run the full post-hoc analysis pipeline on experiment worktrees.

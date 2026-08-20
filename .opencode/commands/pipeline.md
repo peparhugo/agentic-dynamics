@@ -6,7 +6,7 @@ subtask: true
 
 Run the complete data pipeline: inventory refresh → analysis → website build → deploy.
 
-This is the `deploy` plan in `experiments/configs/plans.yaml`. Prefer running it via
+This is the `deploy` plan in `experiments/definitions/configs/plans.yaml`. Prefer running it via
 `python scripts/pipeline.py --plan deploy` for dependency tracking and idempotent resumption.
 To run the steps manually (or when Redis is unavailable), load the "analyze" skill and execute in order:
 

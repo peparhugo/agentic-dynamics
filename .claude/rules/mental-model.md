@@ -1,12 +1,9 @@
-Ported from `.opencode/instructions/mental-model.md` (loaded unconditionally there via
-`opencode.json`'s `instructions` array). Kept in sync by hand — see `docs/claude_code_port.md`.
-
 # File map, signatures, and dependencies. No theory. No methodology.
 
 This repo is an **information-acquisition machine for AI economics**: controlled
 trials (cells) → raw events → information (measurement rules) → policies (control
 rules) → policy arms → grid → campaign → repeat. Everything below is one stage in
-that chain. Design of the spec/compiler: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
+that chain. Design of the spec/compiler: `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Architecture
 
@@ -34,10 +31,32 @@ live.py ──── Redis pub/sub telemetry (feeds admin portal)
 ```
 
 ```
-supervisor.py ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/supervisor_design.md)
+supervisor.py ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/designs/current/supervisor_design.md)
 workflow_runner.py ── executes an agent_task workflow's phases inside a git worktree, committing + ledgering each
 test_runner.py ── independent pytest/jest/go-test/cargo-test runner; sole source of truth for test_executed_success
 ```
+
+## Package planes (Stage 1 — the modular monorepo)
+
+The former flat `src/agentic_dynamics/` package is re-homed as `src/agentic_dynamics/` with eight
+bounded planes (`ARCHITECTURE.md` §1; the dependency direction is enforced by
+`tests/test_dependency_direction.py`):
+
+| Plane | Ownership | Modules |
+|---|---|---|
+| `core` | foundation — language, paths, session vocabulary, streaming, constants | 5 |
+| `experiment` | the platform — `ExperimentSpec`, the `requires`/`produces` gate, spec→DAG, spec-lifecycle index | 3 |
+| `measurement` | the measurement apparatus — perturb/mutation/solution/basin/efficiency/… + static analysis | 15 |
+| `runtime` | execution runtime — workflow_runner, test_runner, story, posthoc | 4 |
+| `adapters` | model backends — opencode, claude_adapter, backends | 3 |
+| `knowledge` | knowledge + augmentation — identity/authority, retrieval, prompt-construction, ingestion producers | 16 |
+| `control` | emerging control — routing, signal store, supervisor, telemetry, queue steering, observation/actuation | 9 |
+| `reporting` | research output — game_report, review, analyzers | 4 |
+
+Tier map: `core` (0) ← `experiment/measurement/runtime/adapters/knowledge/reporting` (1) ←
+`control` (2) ← `apps` (3). The only tier-1→tier-2 edges are the pinned observe-only seam
+(`runtime.workflow_runner → control.step_routing/live`; `adapters.opencode`/`claude_adapter →
+control.live`).
 
 ## The spec/compiler layer — WRITTEN
 
@@ -147,7 +166,7 @@ compute_routing(entries) -> dict   # per-task recs + strategy simulation
 recommend_route(task_type, entries, *, correctness_threshold, lead_margin) -> dict
 ```
 
-### Spec/compiler signatures (written — src/instrument/{experiment_spec,compile_experiment}.py)
+### Spec/compiler signatures (written — agentic_dynamics/experiment/{experiment_spec,compile_experiment}.py)
 
 ```
 # experiment_spec.py
@@ -182,6 +201,13 @@ model_cascade(attempts, state) -> RuleResult # control (consumes confidence)
 # knowledge.py — canonical identity + authority contract (two sha256 ids, ordered Authority)
 Authority, KnowledgeRecord, KnowledgeEvent
 compute_entity_id(), compute_knowledge_id(), compute_content_hash()
+  # lineage + version fields on KnowledgeRecord (and KnowledgeEvent):
+  #   supersedes: str|None — predecessor knowledge_id for the SAME entity_id (version chain link)
+  #   causes:     str|None — observation-family knowledge_id that justified an actuation (cross-entity)
+  #   operation:  upsert | supersede | delete  (delete = tombstone; requires a non-empty `reason`)
+  # observation-vs-actuation split (no third envelope; source_type + operation are the only discriminators):
+  #   OBSERVATION_TYPES / ACTUATION_TYPES, message_family(source_type) -> "observation"|"actuation"
+  #   ACTUATION_TYPES = {"actuation"} is a closed-by-default allowlist; unknown types -> "observation"
 
 # retrieval.py — deterministic retrieval (dense Chroma + lexical Neo4j full-text → RRF fusion)
 QueryPlan, Candidate, RetrievalAttempt, FallbackMode
@@ -193,8 +219,11 @@ PromptConstructor, ModelPromptConstructor, PromptPlan, AugmentedPrompt, render_p
 
 # knowledge_stream.py — durable Redis Streams ingestion (DB 2 on 6380)
 connect(), publish_event(), process_entry(), reconcile_missing()
-  CONSUMER_GROUPS: kb-chroma-v1 | kb-neo4j-v1 | kb-ledger-v1
+  CONSUMER_GROUPS: kb-chroma-v1 | kb-neo4j-v1 | kb-ledger-v1 | kb-registry-v1
   # WRITE GUARD: publish_event raises RuntimeError unless FINOPS_KB_WRITE=1 or authorized=True
+  # three orthogonal gates keyed off message_family(source_type): write guard (all) ->
+  #   actuation-armed (actuation: FINOPS_ACTUATION_ARMED=1 or armed=True) ->
+  #   lineage (actuation: event.causes must resolve to an observation via SOURCE_TYPE_INDEX_KEY)
 
 # knowledge_ingestion.py — producer-side measured-finding derivation (richer extractor)
 EXTRACTOR_VERSION = "measured-finding/v1"
@@ -232,7 +261,44 @@ build_policy_record(locator, text, *, repository_id, revision, now=None) -> Know
 discover_policy_paths(repo_root) -> list[Path]
   # authority=POLICY (top tier), evidence_class="[P]"; discoverability/citation only — never RRF candidates
 
-# workflow_runner.py — the rag_augment seam (default OFF)
+# story_ingestion.py — canonical-state producer (source_type=story)
+EXTRACTOR_VERSION = "story/v1"
+derive_story_records(story_result, *, repository_id, revision, now=None) -> list[KnowledgeRecord]
+build_story_record(story_result, *, repository_id, revision, now=None) -> KnowledgeRecord
+derive_story_records_from_run_output(run_output, *, repository_id, now=None) -> list[KnowledgeRecord]
+  # authority=MEASURED "[M]"; write-time registration call site in story.save_story_result / scripts/run.py
+
+# review_ingestion.py — canonical-state producer (source_type=review)
+EXTRACTOR_VERSION = "review/v1"
+derive_review_records(review, *, repository_id, revision, now=None) -> list[KnowledgeRecord]
+build_review_record(review, *, repository_id, revision, now=None) -> KnowledgeRecord
+  # authority=ADVISORY "[H]"; write-time call site in scripts/finalize_reviews.py
+
+# ledger_ingestion.py — canonical-state producer (ledger_job / ledger_attempt / meta_session)
+EXTRACTOR_VERSION = "ledger/v1"
+derive_ledger_records(summary_entry, *, repository_id, revision, now=None) -> list[KnowledgeRecord]
+build_job_record(...) / build_attempt_record(...) / classify_session(title) -> source_type
+  # ledger_job/ledger_attempt -> MEASURED "[M]"; meta_session -> ADVISORY (closes gaps a+b)
+
+# observation_ingestion.py — canonical-state producer (source_type=observation / flag)
+EXTRACTOR_VERSION = "observation/v1"
+derive_observation_record(...) / build_observation_record(...) -> KnowledgeRecord
+derive_flag_record(...) / build_flag_record(...) -> KnowledgeRecord
+  # authority=ADVISORY "[H]"; every supervisor verdict registrable (closes OQ6a)
+
+# actuation_ingestion.py — canonical-state producer, Delta 3 (source_type=actuation)
+EXTRACTOR_VERSION = "actuation/v1"
+derive_actuation_record(..., *, causes, repository_id, now=None) -> KnowledgeRecord
+  # authority=POLICY "[P]"; causes-linked to an observation; ZERO call sites (nothing fires it yet)
+
+# augment.py — the retrieve->construct->render seam (R7; split out of workflow_runner, default OFF)
+augment_prompt(*, base_prompt, goal, phase_def, model, commit_sha, inherited_tools,
+               pinned_policy, rag_params, retrieve_fn, construct_fn) -> AugmentationOutcome
+default_retrieve_fn() -> Callable    # dense ChromaStore + graph Neo4jClient -> functools.partial(retrieve)
+default_construct_fn(rag_params, run_agent) -> Callable  # ModelPromptConstructor on DEFAULT_CONSTRUCTOR_MODEL
+  # pure w.r.t. the worktree; any failure -> base_prompt + named fallback_mode; NEVER blocks the phase
+
+# workflow_runner.py — phase execution + the opt-in self-build emit (default OFF)
 cell_scope(workdir) -> str   # f"self-{workdir.name}"; FINOPS_CELL_ID overrides — the cell's KB scope
 run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=None,
              construct_fn=None, rag_params=None) -> WorkflowRunResult
@@ -242,17 +308,30 @@ run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=N
 # one agent phase (only when rag_augment enabled):
 route_step ──▶ retrieve ──▶ construct ──▶ render ──▶ run_agent
 
-# producer data flow (batch ingestion): any of four sources ──▶ derive_*_records ──▶
+# producer data flow (batch ingestion): any source ──▶ derive_*_records ──▶
 #   record_to_artifact (write kb/<id>.json) ──▶ record_to_event ──▶ publish_event ──▶
 #   stream ──▶ process_entry (read → verify sha256(artifact) → extract_record → upsert)
-# four record types, over the authority ordering (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY):
-#   finding → MEASURED [M] | code → SOURCE [C] | report → MEASURED [M] (Sonar/LSP) or DERIVED [C] (entropy) | policy → POLICY [P]
+# nine source_type values, over the authority ordering (POLICY > SOURCE > MEASURED > DERIVED > ADVISORY):
+#   finding → MEASURED [M] | code → SOURCE [C] | report → MEASURED [M] (Sonar/LSP) or DERIVED [C] (entropy)
+#   | policy → POLICY [P] | story → MEASURED [M] | review → ADVISORY [H]
+#   | ledger_job/ledger_attempt → MEASURED [M] + meta_session → ADVISORY
+#   | observation/flag → ADVISORY [H] | actuation → POLICY [P]
+# ONE typed stream: source_type + operation are the only discriminators, one pointer envelope,
+#   one idempotent knowledge_id key. Write-time registration is now live in four call sites
+#   (story.py, run.py, finalize_reviews.py, supervise.py) + the kb_produce* scripts + the opt-in
+#   emit_self path — NOT only emit_self anymore (see docs/review/restructure.md §1).
+
+# registry / tombstone / compaction (canonical-state):
+#   kb-registry-v1 consumer -> append-only experiments/results/registry_index.jsonl (one line/record)
+#   generate_manifest.py compacts it into the manifest `registry` array (latest-per-entity,
+#     lifecycle_state current|superseded|tombstoned derived from the supersede/delete chain)
+#   scripts/registry.py (show/query/lineage) + Control Room /api/registry* read it back
 
 # two-channel rule (do not conflate the two Redis planes):
 #   knowledge = per-cell repository_id scope (default self-<worktree>); an explicit non-empty
 #               repository_id is the SHARED-scope override (parallel workstreams). Empty never
 #               means "global". retrieve→construct→render references publish_event ZERO times —
-#               the ONLY KB writer is the opt-in emit_self path.
+#               the write is the opt-in emit_self path (and the batch producers above).
 #   control/telemetry = live.LivePublisher (pub/sub, DB 1) — UNscoped, observe-only, never writes KB.
 ```
 
@@ -277,35 +356,35 @@ AttemptRecord: attempt_id, job_id, parent_attempt_id, attempt_number, retry_reas
 
 ## Script map
 
-78 scripts across 5 categories (experiment runners, post-hoc analysis, data pipeline,
-19 active lab_*.py + 8 deprecated *_bge_m3, Redis queue/review workers). Full table:
-`scripts/CONTEXT.md` (the authoritative, per-script reference — keep this pointer,
-don't re-duplicate the table here).
+73 scripts (37 maintained commands + 19 active lab books + 15 archived one-time
+migrations + a `_bootstrap.py` helper), each in exactly one bucket of `scripts/CONTEXT.md`'s
+classification manifest (maintained / historical / one-time — machine-parsed by
+`tests/test_script_classification.py`, keep the markers intact).
 
-Primary entry points: run.py, run_story.py, run_workflow.py, pipeline.py,
-inventory.py, build_data.py, sync_data.py, analyze_worktrees.py,
-analyze_trajectories.py, validate_session.py, enqueue.py + worker.py,
-review_all.py (+ review_stories.py/review_worker.py/trigger_reviews.py/
-enqueue_reviews.py/finalize_reviews.py), monitor.py, generate_manifest.py.
+One entry point: `agentic-dynamics` (Stage 3) — every maintained command maps to a subcommand;
+the 15 one-time migrations live under `scripts/archive/`.
+
+Primary maintained commands: run.py, run_story.py, run_workflow.py, pipeline.py,
+inventory.py, build_data.py, sync_data.py, analyze_worktrees.py, analyze_trajectories.py,
+validate_session.py, enqueue.py + worker.py, review_all.py (+ review_stories.py/
+trigger_reviews.py/enqueue_reviews.py/finalize_reviews.py), monitor.py, generate_manifest.py.
 
 admin/server.py — Control Room portal: SSE telemetry, routing, supervisor flags,
 design sessions, Claude background sessions (port 8000, FINOPS_PORT). Full route
 list: scripts/CONTEXT.md.
 .opencode/tools/dashboard.ts — pull tool: Redis status matrix via monitor.py --json
-(opencode-only; on the Claude Code side, run `python scripts/monitor.py --json` via Bash).
 
 ## Test files
 
-39 files total (`ls tests/test_*.py | wc -l` — verify current count), by module family:
+71 files total (`ls tests/test_*.py | wc -l`), by module family:
 
 ```
-Core pipeline (27): test_pipeline.py, test_story.py, test_opencode_events.py,
+Core pipeline: test_pipeline.py, test_story.py, test_opencode_events.py,
 test_mutation.py, test_embeddings.py, test_commit_analysis.py, test_lsp.py,
-test_claude_adapter.py, test_trajectory_embedding.py, test_review_agent.py,
-test_pricing.py, test_correctness_lineage.py, test_language.py,
-test_opencode_analyzer.py, test_graph.py, test_entropy.py, test_codebase_graph.py,
-test_ollama_analyzer.py, test_live.py, test_perturb.py, test_data_integrity.py,
-test_routing.py, test_strategy.py, test_recovery.py, test_adapter.py,
+test_claude_adapter.py, test_review_agent.py, test_pricing.py,
+test_correctness_lineage.py, test_language.py, test_opencode_analyzer.py, test_graph.py,
+test_entropy.py, test_codebase_graph.py, test_ollama_analyzer.py, test_live.py,
+test_perturb.py, test_data_integrity.py, test_routing.py, test_strategy.py,
 test_streaming.py, test_backends.py
 
 Admin/supervisor (6): test_admin_claude_agents.py, test_admin_claude_agents_frontend.py,
@@ -316,17 +395,42 @@ Claude-agents (2): test_claude_agents_client.py, test_claude_agents_supervisor.p
 
 Spec/compiler + workflow (4): test_compile_experiment.py, test_experiment_spec.py,
 test_workflow_runner.py, test_supervise.py
+
+Consolidation guards (6): test_doc_lifecycle.py, test_dependency_direction.py,
+test_data_flow.py, test_experiment_workflow_classification.py, test_script_classification.py,
+test_kb_produce_registry.py
+```
+
+## CLI surface (Stage 3 — one entry point)
+
+`agentic-dynamics` (a thin dispatcher over the maintained `scripts/`, `agentic_dynamics/cli.py`) —
+each subcommand forwards argv to its backing script; the CLI composes, never re-implements.
+
+```
+agentic-dynamics
+├─ experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase
+├─ story       run|batch
+├─ workflow    run
+├─ queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
+├─ analyze     worktrees|trajectories|stories|lab <name>
+├─ data        build|sync|manifest|inventory
+├─ knowledge   ingest|sources|worker
+├─ registry    query|show|lineage
+├─ review      all|stories|trigger|enqueue|finalize
+├─ spec        status|pipeline
+├─ validate    session|tests
+└─ supervise   [claude-agents]
 ```
 
 ## Navigation
 
 ```
-Task: instrument logic → Read src/instrument/CONTEXT.md
+Task: instrument logic → Read the agentic_dynamics/ plane __init__ docstrings (the module map)
 Task: experiments     → Load skill: instrument
 Task: analysis        → Load skill: analyze
 Task: lab books       → Load skill: lab-books
 Task: pipeline        → Read scripts/CONTEXT.md
 Task: website         → Read firebase/CONTEXT.md
 Task: configs         → Read experiments/CONTEXT.md
-Task: spec/compiler   → Read code_reviews/2026-08-14_experiment-spec-and-compiler-design.md
+Task: spec/compiler   → Read docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md
 ```

@@ -473,6 +473,38 @@ Notes:
 - Stale references that *describe* a retirement (e.g. "review_worker.py was retired in Stage 3")
   are intentionally kept — they are provenance, not drift.
 
+---
+
+## S4 — generate (phase `generate`)
+
+Spec: `workflows/repository/consolidation_stage_4_instruction_surfaces.yaml` · phase `generate`
+(phase B). Deliverable: `scripts/_gen_instructions.py` (the single writer) + regenerated
+`.opencode/` + `.claude/` + `tests/test_generated_surfaces_match.py`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `scripts/_gen_instructions.py` written — deterministically renders `agent_config/` → `.opencode/` + `.claude/` via an explicit format mapping | PASS |
+| 2 | Regenerated surfaces committed byte-identical to `render_surfaces()` (36 files: 3 instruction docs ×2, 7 skills ×2, 3 agents ×2, 5 commands ×2) | PASS |
+| 3 | `tests/test_generated_surfaces_match.py` written — byte-identity + orphan-file checks; demonstrably red on injected drift | PASS |
+| 4 | `pytest tests/ -m "not external"` green | PASS (1189 passed, 106 deselected) |
+
+**S4-generate result: 4/4 PASS — Stage 4 complete (canonical_source/generate).**
+
+Notes:
+
+- **Format mapping** (the rec-6 contract): `agent_config/{mental-model,rules,conventions}.md` →
+  `.opencode/instructions/<name>.md` + `.claude/rules/<name>.md`; `agent_config/skills/<name>.md` →
+  `<surface>/skills/<name>/SKILL.md`; `agents/` + `commands/` map 1:1 to both surfaces.
+- The regeneration **added** to the surfaces what the canonical source consolidated: `rules.md`
+  (the hats + load-bearing rule) now appears in both `.opencode/instructions/` and `.claude/rules/`,
+  and `.opencode/skills/` gained the four `.claude`-only skills (control-room/queue/review/
+  run-workflow) — both surfaces now carry the identical 7-skill set.
+- `_gen_instructions.py` is classified as a helper (excluded from the command buckets, alongside
+  `_bootstrap.py`) in the script-classification manifest + guard.
+- Three stray `experiments/results/stories/*.json` files (smoke-test side effects from a
+  `batch_stories.py` subprocess) were removed, not committed.
+
+
 
 
 

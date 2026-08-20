@@ -126,20 +126,12 @@ Lab books read from these files in `experiments/results/`:
 - Agent-authored vs independent-evaluator value delta
 - Output: `experiments/results/lab_verification_value.json`
 
-## DEPRECATED Lab Books (DO NOT RUN — use non-deprecated alternatives)
+## DEPRECATED Lab Books (retired in Stage 1)
 
-```
-lab_drift_trajectories_DEPRECATED_bge_m3.py          (240L)
-lab_reasoning_volatility_DEPRECATED_bge_m3.py         (203L)
-lab_cross_model_reasoning_DEPRECATED_bge_m3.py        (177L)
-lab_divergence_cascades_DEPRECATED_bge_m3.py           (211L)
-lab_cluster_stability_DEPRECATED_bge_m3.py             (218L)
-lab_recovery_curves_DEPRECATED_bge_m3.py               (367L)
-lab_reasoning_divergence_DEPRECATED_bge_m3.py          (166L)
-lab_semantic_clusters_DEPRECATED_bge_m3.py             (160L)
-```
-
-These used bge-m3 embeddings via Ollama. Superseded by new semantic_validation.py approach (no embeddings needed).
+The 8 `*_DEPRECATED_bge_m3.py` lab scripts (drift_trajectories, reasoning_volatility,
+cross_model_reasoning, divergence_cascades, cluster_stability, recovery_curves,
+reasoning_divergence, semantic_clusters) used bge-m3 embeddings via Ollama and were retired in
+Stage 1 — superseded by `agentic_dynamics.measurement.semantic_validation` (no embeddings).
 
 ## Running a Lab
 
