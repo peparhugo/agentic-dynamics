@@ -7,7 +7,7 @@ source files into ``SOURCE``-authority code records: one record per function and
 each carrying its symbol name, a short signature summary (name + parameters + docstring
 head — never the full body), its language, and the file path it lives in.
 
-Design: ``experiments/specs/rag_knowledge_sources.yaml`` phase ``code``. The schema already
+Design: ``workflows/repository/rag_knowledge_sources.yaml`` phase ``code``. The schema already
 anticipates this — ``KnowledgeRecord.source_type`` includes ``"code"`` and the ``language`` /
 ``symbols`` fields exist for exactly this purpose — but the corpus was code-blind:
 ``graph.load_codebase_graph`` had zero callers and code structure never reached the KB. This

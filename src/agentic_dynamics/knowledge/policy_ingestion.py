@@ -4,9 +4,9 @@ This module is the *policy* ingestion path — the fourth and highest-authority 
 path feeding the KB, alongside the finding (:mod:`instrument.knowledge_ingestion`), code
 (:mod:`instrument.code_ingestion`), and quality (:mod:`instrument.quality_ingestion`) paths.
 It emits the pinned policy surface — ``AGENTS.md``, ``conventions/*.yaml``,
-``experiments/specs/*.yaml``, and the mental-model files — as ``POLICY``-authority records.
+``experiments/definitions/*.yaml`` + ``workflows/**/*.yaml``, and the mental-model files — as ``POLICY``-authority records.
 
-Design: ``experiments/specs/rag_knowledge_sources.yaml`` phase ``policy``. ``Authority.POLICY``
+Design: ``workflows/repository/rag_knowledge_sources.yaml`` phase ``policy``. ``Authority.POLICY``
 is the top trust tier (``POLICY > SOURCE > MEASURED > DERIVED > ADVISORY``); per
 ``knowledge.py`` it is "read directly from the current checkout and *never* probabilistically
 retrieved, so retrieved text can never displace it."
@@ -128,7 +128,7 @@ def discover_policy_paths(repo_root: Path = Path(".")) -> list[Path]:
     """Return the canonical pinned policy surface (existing files), deterministically sorted.
 
     The surface is the set of authoritative repository-policy artifacts: ``AGENTS.md``, the
-    convention rules (``conventions/*.yaml``), the experiment specs (``experiments/specs/*.yaml``),
+    convention rules (``conventions/*.yaml``), the experiment specs (``experiments/definitions/*.yaml`` + ``workflows/**/*.yaml``),
     and the mental-model files (both the ``.opencode`` source and its ``.claude`` port). Only
     files that actually exist on disk are returned, and each path is resolved relative to
     ``repo_root`` so the resulting record locators are stable across checkouts.
@@ -138,8 +138,10 @@ def discover_policy_paths(repo_root: Path = Path(".")) -> list[Path]:
         repo_root / ".opencode" / "instructions" / "mental-model.md",
         repo_root / ".claude" / "rules" / "mental-model.md",
     ]
-    for pattern in ("conventions", "experiments/specs"):
-        candidates.extend(sorted((repo_root / pattern).glob("*.yaml")))
+    # The split spec layout (design §4): genuine experiment definitions + every workflow spec.
+    candidates.extend(sorted((repo_root / "conventions").glob("*.yaml")))
+    candidates.extend(sorted((repo_root / "experiments" / "definitions").glob("*.yaml")))
+    candidates.extend(sorted((repo_root / "workflows").rglob("*.yaml")))
     return [p for p in candidates if p.is_file()]
 
 

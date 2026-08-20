@@ -481,7 +481,7 @@ class ExperimentSpec:
 
 
 def load_spec(path: Path) -> ExperimentSpec:
-    """Load an ExperimentSpec from a YAML file (``experiments/specs/*.yaml``)."""
+    """Load an ExperimentSpec from a YAML file (``experiments/definitions/*.yaml`` + ``workflows/**/*.yaml``)."""
     return ExperimentSpec.from_yaml(Path(path))
 
 

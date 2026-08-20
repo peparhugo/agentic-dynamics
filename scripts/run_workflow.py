@@ -1,7 +1,7 @@
 """Run an agent_task workflow (the execute phase) against a goal in a git worktree.
 
 Usage:
-    python scripts/run_workflow.py --spec experiments/specs/control_room_portal.yaml \
+    python scripts/run_workflow.py --spec workflows/repository/control_room_portal.yaml \
         --goal "Enhance the admin portal into a Control Room..." \
         --model openai/gpt-5.6-sol --workdir /tmp/pipeline/feature_admin-portal-control-plane
 

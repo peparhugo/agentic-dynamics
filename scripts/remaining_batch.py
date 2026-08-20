@@ -9,12 +9,27 @@ import yaml
 from agentic_dynamics.core.constants import WORKTREE_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CONFIG_DIR = PROJECT_ROOT / "experiments/configs"
+# Configs are split (design §4): measurement configs under experiments/definitions/configs/
+# and grid/sweep configs under experiments/campaigns/. Resolve a name across both.
+CONFIG_DIRS = [
+    PROJECT_ROOT / "experiments" / "definitions" / "configs",
+    PROJECT_ROOT / "experiments" / "campaigns",
+]
+
+
+def _config_path(name: str) -> Path:
+    """Resolve a config filename across the split config layout."""
+    for d in CONFIG_DIRS:
+        p = d / name
+        if p.exists():
+            return p
+    return CONFIG_DIRS[0] / name
+
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 
 def load_task(config_filename):
-    with open(CONFIG_DIR / config_filename) as f:
+    with open(_config_path(config_filename)) as f:
         cfg = yaml.safe_load(f)
     return cfg["task"].strip()
 

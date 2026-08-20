@@ -8,7 +8,7 @@ what supersedes what.**
 
 Relationship to the sibling producers (do NOT conflate them):
 
-* :mod:`instrument.policy_ingestion` already globs ``experiments/specs/*.yaml`` and emits a
+* :mod:`agentic_dynamics.knowledge.policy_ingestion` already globs the split spec layout (``experiments/definitions/*.yaml`` + ``workflows/**/*.yaml``) and emits a
   ``source_type="policy"`` record carrying the file's leading *text excerpt*, for citation.
   That is the spec **document**.
 * This module emits a ``source_type="spec"`` record carrying the spec's **lifecycle** —
@@ -48,7 +48,7 @@ depend on ``record.supersedes``, so the same lifecycle content always fingerprin
 way regardless of where it sits in the chain). ``now`` is injectable for tests. No LLM is
 involved.
 
-Design: ``experiments/specs/spec_lifecycle.yaml`` phase ``kb_registry``.
+Design: ``workflows/repository/spec_lifecycle.yaml`` phase ``kb_registry``.
 """
 
 from __future__ import annotations

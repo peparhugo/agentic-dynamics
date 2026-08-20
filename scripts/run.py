@@ -1,7 +1,7 @@
 """Complete experiment pipeline — config-driven, agentic, multi-model.
 
 One command:
-    python3 scripts/run.py experiments/configs/url_shortener.yaml
+    python3 scripts/run.py experiments/definitions/configs/url_shortener.yaml
 
 Produces:
     experiments/results/{name}_{model}.json    — machine-readable

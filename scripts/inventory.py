@@ -4,7 +4,7 @@
 A persistent inventory of all experiments, worktrees, and opencode sessions.
 Rebuild with `refresh`, then query instantly with `list`, `stats`, `worktrees`, `report`.
 
-Sources: opencode.db SQLite, /tmp/exp_* worktrees, experiments/results/*.json, experiments/configs/*.yaml
+Sources: opencode.db SQLite, /tmp/exp_* worktrees, experiments/results/*.json, experiments/definitions/configs/*.yaml
 """
 
 import argparse

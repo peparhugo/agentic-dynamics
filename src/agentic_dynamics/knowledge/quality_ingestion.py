@@ -6,7 +6,7 @@ alongside the measured-finding path (:mod:`instrument.knowledge_ingestion`) and 
 or a source symbol into a ``SOURCE`` record, this one turns three *quality* signals —
 SonarQube, LSP diagnostics, and architectural entropy — into ``report`` records.
 
-Design: ``experiments/specs/rag_knowledge_sources.yaml`` phase ``quality``. The schema already
+Design: ``workflows/repository/rag_knowledge_sources.yaml`` phase ``quality``. The schema already
 anticipates it (``KnowledgeRecord.source_type`` includes ``"report"``), and ``sonar.py`` /
 ``lsp_diagnostics.py`` / ``entropy.py`` feed post-hoc analysis but never the KB. This module
 derives one record per *available* quality signal and emits it through the SAME pointer

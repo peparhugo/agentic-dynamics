@@ -319,6 +319,38 @@ Notes:
   `repo_review_fable`, `self_recommending_experiment`, `routing_kb_more_itertools`,
   `rag_knowledge_base`) — work orders that produce documents/analysis rather than code.
 
+---
+
+## S2 — repoint (phase `repoint`)
+
+Spec: `experiments/specs/consolidation_stage_2_experiments_workflows_split.yaml` · phase `repoint`
+(phase C). Deliverable: re-pointed spec/config consumers + a regenerated index.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `agentic_dynamics/experiment/spec_status.py` `collect_entries` resolves specs from `experiments/definitions/` + `workflows/**` (done at move_specs; index location `experiments/specs/` preserved) | PASS |
+| 2 | `agentic_dynamics/knowledge/policy_ingestion.py` `discover_policy_paths` globs the split layout (definitions + workflows) | PASS |
+| 3 | `scripts/run_workflow.py` example path + `scripts/spec_status.py`/`spec_ingestion.py`/`quality_ingestion.py`/`code_ingestion.py` docstrings repointed | PASS |
+| 4 | Config consumers repointed: `scripts/batch_run.py` + `scripts/remaining_batch.py` resolve configs from `experiments/definitions/configs/` + `experiments/campaigns/` (`_config_path`) | PASS |
+| 5 | `python scripts/spec_status.py` regenerates `index.json` + `STATUS.md` — 77 specs, zero orphans, zero missing | PASS |
+| 6 | `pytest tests/ -m "not external"` + the classification guard test green | PASS (1186 passed, 106 deselected; guard 3 passed) |
+
+**S2-repoint result: 6/6 PASS — Stage 2 complete (classify/move_specs/repoint).**
+
+Notes:
+
+- **Index regenerated, run columns reset to fresh-checkout state.** The run ledgers under
+  `experiments/results/workflows/` are untracked/gitignored and absent from this worktree, so
+  `spec_status.py` correctly derives null run columns (em-dash / `n_runs: 0`) — the documented
+  fresh-checkout state (the previous index carried run data generated in a ledger-bearing
+  checkout). Structural columns (name/version/status/spec_path/supersedes) are intact, and
+  `context_abstraction_implement` remains `status: draft` (CAP freeze preserved) at its new
+  `workflows/repository/` path.
+- The generated index now records `spec_path` under the split layout (8 × `experiments/definitions/`,
+  69 × `workflows/**`), while `index.json`/`STATUS.md` themselves stay in `experiments/specs/`
+  (the historical index home).
+
+
 
 
 
