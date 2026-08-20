@@ -10,13 +10,15 @@
 - No bare excepts — always catch specific exceptions.
 - Dataclasses preferred over dicts for structured data.
 
-## Spec/Compiler Conventions (written — see code_reviews/2026-08-14)
+## Spec/Compiler Conventions (written — see docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md)
 
 - **Measure before policy.** `RuleSpec` declares `requires` (information it consumes) and
   `produces` (information it emits). `plane` is `"measurement"` (produces) or `"control"`
-  (consumes). The validator refuses a control rule whose `requires` are unmet. Instrument the
-  information (`confidence`, `answer`/`explanation` token split, attempt/timestamp fields)
-  before writing `model_cascade`/`dynamics` arms.
+  (consumes). The validator refuses a control rule whose `requires` are unmet. The formerly-
+  missing signals are now measured — `confidence` [H] (`src/agentic_dynamics/adapters/opencode.py:113`),
+  `perturbation_strength` + `test_executed_success` (`src/agentic_dynamics/knowledge/ledger_ingestion.py:180-181`),
+  `answer`/`explanation` token split, attempt/timestamp fields — so `model_cascade`/`dynamics`/
+  `grit` arms are writable.
 - **Evidence classes:** `[M]` measured, `[C]` computed, `[H]` heuristic, `[X]` external,
   `[P]` policy/prior. Control rules are `[H]`/`[P]`; measurement rules are `[M]`/`[C]`.
 - **Policy is a factor level.** `decide(job, state) -> {route, depth, retry, escalate, budget,

@@ -369,7 +369,7 @@ inventory.py, build_data.py, sync_data.py, analyze_worktrees.py, analyze_traject
 validate_session.py, enqueue.py + worker.py, review_all.py (+ review_stories.py/
 trigger_reviews.py/enqueue_reviews.py/finalize_reviews.py), monitor.py, generate_manifest.py.
 
-admin/server.py — Control Room portal: SSE telemetry, routing, supervisor flags,
+apps/control_room/server.py — Control Room portal: SSE telemetry, routing, supervisor flags,
 design sessions, Claude background sessions (port 8000, FINOPS_PORT). Full route
 list: scripts/CONTEXT.md.
 .opencode/tools/dashboard.ts — pull tool: Redis status matrix via monitor.py --json

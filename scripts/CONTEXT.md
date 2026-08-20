@@ -25,7 +25,7 @@ one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_trans
 | `run.py` (502 lines) | Full experiment pipeline — perturb → invoke → evaluate → report | Running a single experiment config |
 | `analyze_worktrees.py` (1398 lines) | Post-hoc Game Report generator from `/tmp/exp_*` worktrees | After experiments complete; fills gap for sessions that only collected raw cost data |
 | `inventory.py` (392 lines) | Experiment/worktree inventory CLI | `inventory.py refresh` to rebuild, `list`/`stats`/`report` to inspect |
-| `build_data.py` (1188 lines) | Generates `firebase/public/data.js` from inventory + results | Push updated data to website |
+| `build_data.py` (1188 lines) | Generates `apps/website/data.js` from inventory + results | Push updated data to website |
 | `pipeline.py` (1267 lines) | YAML-driven phase orchestration (`experiments/definitions/configs/plans.yaml`) | Multi-phase DAG runs (ci, deploy, full_matrix, feature, ship_features, cross_models) |
 | `agentic_dynamics/experiment/compile_experiment.py` (not in scripts/) | spec → DAG compiler, **written**; no standalone CLI — invoke via the `compile_experiment` tool (§3.1) or the Python API directly | Compiling a spec into a DAG |
 
@@ -76,7 +76,7 @@ one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_trans
 |--------|-------|---------|
 | `inventory.py` | 392 | Reads opencode.db, worktrees, results JSONs, config YAMLs. Commands: `refresh`, `list`, `stats`, `worktrees`, `report`. |
 | `agentic_dynamics/core/constants.py` | — | Shared constants (DB path, result dirs, model configs). Was `scripts/_constants.py`; moved into the package in Stage 1. |
-| `build_data.py` | 1188 | Produces `window.DYNAMICS_DATA` with provenance-tagged [M]/[C]/[H]/[P]/[X] measurements for the website. Includes a `routing` section from `instrument.routing.compute_routing`. |
+| `build_data.py` | 1188 | Produces `window.DYNAMICS_DATA` with provenance-tagged [M]/[C]/[H]/[P]/[X] measurements for the website. Includes a `routing` section from `agentic_dynamics.control.routing.compute_routing`. |
 | `sync_data.py` | 290 | Normalizes every `stories/*.json` result into `sessions.parquet` + `stories.parquet` for clean querying; run before `build_data.py`. |
 | `generate_manifest.py` | 79 | Generates `data_manifest.json` — schema version, file SHA256s, git commit, opencode version, known limitations. |
 | `backfill_artifacts.py` | 264 | Copies generated code from `/tmp/exp_*` to `experiments/results/reports/`. Extracts session transcripts from SQLite. |
@@ -93,7 +93,7 @@ one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_trans
 | `kb_worker.py` | 204 | Knowledge-base ingestion worker — runs a named consumer group (`kb-chroma-v1` / `kb-neo4j-v1` / `kb-ledger-v1`) against the Redis Streams change plane (`kb:v1:changes`, DB 2 on 6380), structurally parallel to `worker.py`. Reclaims stale messages, XACKs only after the destination confirms the idempotent upsert keyed by `knowledge_id`, dead-letters after capped retries. |
 | `kb_produce.py` | 191 | Batch producer for the knowledge base — `load_results` → `derive_records` → `record_to_artifact` (writes the per-record `experiments/results/kb/<knowledge_id>.json`) → `record_to_event` → `publish_event` onto `kb:v1:changes` (DB 2 on 6380). `--dry-run` previews the would-emit count + samples, best-effort deduping against the checkpoint hash (degrades to the raw count when Redis is down); `--limit N` caps; `--repository-id` scopes `entity_id`. Idempotent via the `CHECKPOINT_KEY` hash (`knowledge_id` is the idempotence key). Sets `FINOPS_KB_WRITE=1` (the `publish_event` write guard) for the run. |
 | `kb_produce_sources.py` | 337 | Batch producer for the code / quality / policy / spec sources (sibling of `kb_produce.py`) — `derive_code_records` / `derive_quality_records` / `derive_policy_records` / `derive_spec_records` → the same pointer contract (`record_to_artifact` → `record_to_event` → `publish_event`) onto `kb:v1:changes` (DB 2 on 6380). `--source {code,quality,policy,spec,all}`, `--limit N`, `--repository-id`, `--revision`. Idempotent via the `CHECKPOINT_KEY` hash; sets `FINOPS_KB_WRITE=1` (the write guard) for the run. The `spec` source reads the generated `experiments/specs/index.json` and is the only one that can emit `operation=supersede` (same-entity version chain → `generate_manifest.py`'s `lifecycle_state`). |
-| `monitor.py` | 144 | Redis queue dashboard. `--watch` live, `--json` machine output (used by `admin/` dashboard). |
+| `monitor.py` | 144 | Redis queue dashboard. `--watch` live, `--json` machine output (used by `apps/control_room/` dashboard). |
 | `supervise.py` | 378 | Supervises running opencode sessions via a dedicated flash monitor session — flag-only, never steers. CLI for `agentic_dynamics/control/supervisor.py`'s Redis contracts. |
 | `claude_agents_supervisor.py` | 260 | Supervises `claude --bg` background sessions — roster + owned-session relay only, structurally parallel to `supervise.py` but simpler. |
 
@@ -125,14 +125,14 @@ Deprecated (`*_DEPRECATED_bge_m3`, 8 scripts): drift_trajectories, reasoning_vol
 cross_model_reasoning, divergence_cascades, cluster_stability, recovery_curves,
 reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 
-## Admin Portal (`admin/`)
+## Control Room Portal (`apps/control_room/`)
 
 | File | Purpose |
 |------|---------|
-| `admin/server.py` | Flask backend — now the **Control Room portal**, 28 routes across 5 API categories plus the static shell (below). Serves `admin/static/`. Port 8000 (`FINOPS_PORT`). |
-| `admin/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board, supervisor flags, design sessions, Claude background sessions. |
+| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 28 routes across 5 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
+| `apps/control_room/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board, supervisor flags, design sessions, Claude background sessions. |
 
-`admin/server.py`'s 28 routes, categorized:
+`apps/control_room/server.py`'s 28 routes, categorized:
 - **Legacy telemetry** (6): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/routing`, `POST /api/experiments`, `POST /api/queue/reinterleave`
 - **Supervisor flags** (3): `/api/flags`, `POST /api/flags/<session_id>/steer`, `POST /api/flags/<session_id>/interrupt`
 - **Registry** (2): `/api/registry`, `/api/registry/<entity_id>`
@@ -140,7 +140,7 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 - **Claude background sessions** (9): `/api/claude-agents`, `POST /api/claude-agents`, `/api/claude-agents/<session_id>/logs`, `POST /api/claude-agents/<session_id>/stop`, `POST /api/claude-agents/<session_id>/respawn`, `POST /api/claude-agents/<session_id>/rm`, `POST /api/claude-agents/<session_id>/steer`, `/api/claude-agents/daemon`, `POST /api/claude-agents/daemon/stop`
 - **Static shell** (1): `GET /`
 
-Full endpoint reference: `docs/supervisor_design.md`, `docs/spec.md`.
+Full endpoint reference: `docs/designs/current/supervisor_design.md`, `docs/spec.md`.
 
 The portal is a human-facing live dashboard; the control-plane agent pulls state via `.opencode/tools/dashboard.ts` (which calls `monitor.py --json`) and `.opencode/tools/control_room.ts` (§3.1, read-only GET routes only). No agent-callable tool wraps the `POST` steer/interrupt/control routes — those are human-operator-only, by design (see `supervisor.ts`/`control_room.ts` in §3.1). No events are pushed back into opencode — Redis is the single shared state.
 
@@ -161,4 +161,5 @@ writeup → adapt) and generalizes the existing transport:
 
 Ordering: instrument `confidence` (plus `answer`/`explanation` token split, attempt/timestamp
 fields) before authoring `model_cascade`/`dynamics` control arms — the validator refuses unmet
-`requires`. Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
+`requires`. `confidence` is now measured ([H] per-attempt, `src/agentic_dynamics/adapters/opencode.py:113`),
+so those arms are writable. Design: `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.

@@ -2,7 +2,7 @@
 
 34 experiment YAML configs (+ `plans.yaml`), 224+ game reports, 20 lab book plans (19 active scripts, 8 deprecated), 6 peer reviews.
 
-## `experiments/specs/` — ExperimentSpec YAML (written — see the directory for the current set)
+## Specs — ExperimentSpec YAML (definitions in `experiments/definitions/` + `workflows/`; generated index in `experiments/specs/`)
 
 **Read `experiments/specs/STATUS.md` FIRST** before authoring a new spec — it is the generated
 spec lifecycle index (what exists, what is done, when it was completed, and the supersedes
@@ -13,12 +13,12 @@ Every spec also carries optional lifecycle keys (`status`, `supersedes`, `supers
 `completed_at`, `last_run_at`, `results_pointer`); when absent, the index derives the status
 (`superseded` when a `superseded_by` is named, else `active`). The lifecycle additionally flows
 into the knowledge base as `source_type: spec` records with supersedes lineage
-(`src/instrument/spec_ingestion.py`, `python scripts/kb_produce_sources.py --source spec`).
+(`src/agentic_dynamics/knowledge/spec_ingestion.py`, `python scripts/kb_produce_sources.py --source spec`).
 
 The spec/compiler introduces an `ExperimentSpec` layer above the configs. A spec declares
 `workflow`, `factors` (model, condition, **policy** as a first-class factor), `design`
 (factorial), `rules` (measurement vs control), `metrics`, `comparison`, `writeup`, `stop`, and
-`adapt`. Example (one of the committed specs in the directory): `experiments/specs/workflow_step_routing.yaml`:
+`adapt`. Example (one of the committed specs): `experiments/definitions/workflow_step_routing.yaml`:
 
 ```yaml
 factors:
@@ -27,11 +27,12 @@ factors:
   - {name: policy,    levels: [cheapest, premium_static, quality_cascade, dynamics]}
 rules:
   - {name: model_cascade, plane: control, evidence_class: "[H]",
-     requires: [confidence], produces: [escalation_decision]}   # ← refused until confidence is measured
+     requires: [confidence], produces: [escalation_decision]}   # confidence is measured — writable
 ```
 
 The compiler refuses `dynamics`/`model_cascade` until `confidence` is instrumented (measure
-before policy). Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
+before policy); `confidence` is now measured ([H] per-attempt, `src/agentic_dynamics/adapters/opencode.py:113`),
+so those arms are writable. Design: `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 The runtime-RAG workflow family is a committed spec set — `rag_knowledge_base.yaml` →
 `rag_knowledge_base_build.yaml` → `rag_knowledge_base_wire.yaml` → `rag_knowledge_base_reconcile.yaml`
@@ -39,7 +40,7 @@ The runtime-RAG workflow family is a committed spec set — `rag_knowledge_base.
 reconciliation, and the producer edge (`scripts/kb_produce.py` → `knowledge_ingestion` →
 `knowledge_stream`).
 
-## `experiments/configs/` — 34 Experiment Definitions
+## `experiments/definitions/configs/` — 34 Experiment Definitions
 
 Each YAML defines: task description, constraints, perturbation operators, strength levels, model, turns.
 

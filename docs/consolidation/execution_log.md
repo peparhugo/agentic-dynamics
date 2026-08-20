@@ -720,6 +720,21 @@ Per-finding acceptance-criterion results for the refactor-repair release (review
 
 **P0-1 result: 7/7 PASS.**
 
+### P0-2 — instruction docs rewritten against the current tree
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `AGENTS.md` rewritten — current paths (`experiments/definitions/configs/`, `src/agentic_dynamics/`, `apps/`), the generator model, the full CLI tree + scripts, and measured-ledger facts (`confidence`/`perturbation_strength`/`test_executed_success` ARE measured) with `file:line` evidence | PASS |
+| 2 | `CLAUDE.md` rewritten — "keep both surfaces in sync by hand / no build step" removed; cites `scripts/_gen_instructions.py` (`render_claude()`) as the generator | PASS |
+| 3 | `CONTRIBUTING.md` rewritten — `experiments/definitions/configs/`, `src/agentic_dynamics/{measurement,runtime,adapters}/`, accurate `perturb.py` API (`PerturbationOperator`, `PERTURBATION_CLASSES`), generator model, CLI + `reproduce.sh` | PASS |
+| 4 | `scripts/CONTEXT.md` — retired paths fixed (`firebase/public/data.js`→`apps/website/data.js`, `admin/`→`apps/control_room/`, `instrument.routing`→`agentic_dynamics.control.routing`, `code_reviews/…`→`docs/designs/current/…`, `docs/supervisor_design.md`→`docs/designs/current/supervisor_design.md`) | PASS |
+| 5 | `experiments/CONTEXT.md` — retired paths fixed (`experiments/configs/`→`experiments/definitions/configs/`, `src/instrument/spec_ingestion.py`→`src/agentic_dynamics/knowledge/spec_ingestion.py`, spec example → `definitions/`, design doc → `docs/designs/current/`); "confidence is measured" corrected | PASS |
+| 6 | `agent_config/{rules,mental-model,conventions}.md` (the generator source) updated — `admin/server.py`→`apps/control_room/server.py`, `code_reviews/…`→`docs/designs/current/…`, measured-facts correction | PASS |
+| 7 | Surfaces regenerated via the two renderers (`python scripts/_gen_instructions.py`); `test_agent_config_render.py` 10 passed; grep confirms zero retired path families remain in the 7 rewritten files; full `-m "not external"` suite 1249 passed, no new failures | PASS |
+
+**P0-2 result: 7/7 PASS.**
+
+
 
 
 
