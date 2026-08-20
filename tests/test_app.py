@@ -174,3 +174,71 @@ def test_user_cannot_access_other_users_task(client, auth_headers, other_headers
     assert resp.status_code == 404
     resp = client.put("/tasks/1", json={"title": "stolen"}, headers=other_headers)
     assert resp.status_code == 404
+
+
+# ── Notification trigger ──────────────────────────────────────
+
+class _FakeTask:
+    def __init__(self):
+        self.calls = []
+
+    def delay(self, user_email, task_title):
+        self.calls.append((user_email, task_title))
+
+
+@pytest.fixture()
+def fake_notifier(monkeypatch):
+    fake = _FakeTask()
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+    return fake
+
+
+def test_completing_task_triggers_notification(client, auth_headers, fake_notifier):
+    client.post("/tasks", json={"title": "Finish report"}, headers=auth_headers)
+    resp = client.put("/tasks/1", json={"status": "completed"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+    assert fake_notifier.calls == [("alice@example.com", "Finish report")]
+
+
+def test_completing_task_uses_owner_email(client, monkeypatch):
+    fake = _FakeTask()
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+    client.post(
+        "/auth/register",
+        json={"username": "carol", "password": "secret", "email": "carol@example.com"},
+    )
+    resp = client.post(
+        "/auth/login", json={"username": "carol", "password": "secret"}
+    )
+    headers = {"Authorization": f"Bearer {resp.get_json()['token']}"}
+    client.post("/tasks", json={"title": "Ship it"}, headers=headers)
+    client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+    assert fake.calls == [("carol@example.com", "Ship it")]
+
+
+def test_non_completed_status_does_not_trigger_notification(
+    client, auth_headers, fake_notifier
+):
+    client.post("/tasks", json={"title": "WIP"}, headers=auth_headers)
+    resp = client.put("/tasks/1", json={"status": "in progress"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert fake_notifier.calls == []
+
+
+def test_recompleting_task_does_not_retrigger_notification(
+    client, auth_headers, fake_notifier
+):
+    client.post("/tasks", json={"title": "Done twice"}, headers=auth_headers)
+    client.put("/tasks/1", json={"status": "completed"}, headers=auth_headers)
+    client.put("/tasks/1", json={"status": "completed"}, headers=auth_headers)
+    assert fake_notifier.calls == [("alice@example.com", "Done twice")]
+
+
+def test_title_only_update_does_not_trigger_notification(
+    client, auth_headers, fake_notifier
+):
+    client.post("/tasks", json={"title": "rename me"}, headers=auth_headers)
+    resp = client.put("/tasks/1", json={"title": "renamed"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert fake_notifier.calls == []

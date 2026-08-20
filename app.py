@@ -14,6 +14,8 @@ import os
 import jwt as pyjwt
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -33,7 +35,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -50,27 +53,30 @@ def init_db():
 
 
 def migrate():
-    """Add owner_id to tasks if missing, without breaking existing data."""
+    """Add missing columns (owner_id, email) without breaking existing data."""
     with get_db() as conn:
-        columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
-        if "owner_id" not in columns:
+        task_columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
+        if "owner_id" not in task_columns:
             conn.execute(
                 "ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)"
             )
-            conn.commit()
+        user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        conn.commit()
 
 
 # ── Models ────────────────────────────────────────────────────
 
-def create_user(username: str, password_hash: str) -> dict | None:
+def create_user(username: str, password_hash: str, email: str | None = None) -> dict | None:
     with get_db() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
-            return {"id": cursor.lastrowid, "username": username}
+            return {"id": cursor.lastrowid, "username": username, "email": email}
         except sqlite3.IntegrityError:
             return None
 
@@ -194,11 +200,12 @@ def register():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
+    email = (data.get("email") or "").strip() or None
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
     if get_user_by_username(username) is not None:
         return jsonify({"error": "username already exists"}), 409
-    user = create_user(username, generate_password_hash(password))
+    user = create_user(username, generate_password_hash(password), email)
     return jsonify(user), 201
 
 
@@ -246,6 +253,7 @@ def show_task(user, task_id: int):
 @require_auth
 def edit_task(user, task_id: int):
     data = request.get_json(silent=True) or {}
+    previous = get_task(task_id, user["id"])
     task = update_task(
         task_id,
         user["id"],
@@ -254,6 +262,15 @@ def edit_task(user, task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if (
+        data.get("status") == "completed"
+        and (previous is None or previous.get("status") != "completed")
+    ):
+        user_email = user.get("email") or f"{user['username']}@example.com"
+        try:
+            send_notification_email.delay(user_email, task["title"])
+        except Exception:
+            app.logger.exception("Failed to enqueue notification email")
     return jsonify(task)
 
 
