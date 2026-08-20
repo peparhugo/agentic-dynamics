@@ -581,6 +581,23 @@ Deliverable: `docs/consolidation/stage_5_verification.md`.
 
 **S5-verify result: 5/5 PASS — Stage 5 complete (move_apps/reframe_readme/verify).**
 
+---
+
+## S6 — coverage (phase `coverage`)
+
+Spec: `workflows/repository/consolidation_stage_6_verification_release.yaml` · phase `coverage`.
+Deliverable: `docs/consolidation/stage_6_coverage.md` (the coverage proof).
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | All 9 recommendations → ≥1 stage (rec 1,4→S0; 2,7,8→S1; 3→S2; 5→S3,S5; 6→S4; 9→S5; all→S6) | PASS |
+| 2 | WS-01..10 each dispositioned exactly once (folded 3 · deferred 7 · retired 1 sub-part), no duplicate/orphan | PASS |
+| 3 | Six systems each have a package home (measurement 15 · experiment 3 · runtime 4 + adapters 3 · knowledge 16 · control 9 · reporting 4 + apps) | PASS |
+| 4 | CAP freeze still intact (`context_abstraction_implement` `status: draft` + PAUSED note) + 7 stage specs + 3 stage verification docs present | PASS |
+
+**S6-coverage result: 4/4 PASS.**
+
+
 
 
 
