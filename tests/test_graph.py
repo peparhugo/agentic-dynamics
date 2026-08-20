@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from instrument.graph import ALLOWED_EXPANSION_RELS, Neo4jClient, _BufferedResult
-from instrument.embeddings import step_doc_id
+from agentic_dynamics.knowledge.graph import ALLOWED_EXPANSION_RELS, Neo4jClient, _BufferedResult
+from agentic_dynamics.knowledge.embeddings import step_doc_id
 
 try:
     socket.create_connection(("localhost", 7687), timeout=2).close()
@@ -241,7 +241,7 @@ class TestCodeModuleGraph(_Neo4jTestBase):
         )
 
     def test_load_codebase_graph_writes_nodes_and_edges(self):
-        from instrument.codebase_graph import CodebaseGraph, ModuleNode
+        from agentic_dynamics.measurement.codebase_graph import CodebaseGraph, ModuleNode
 
         graph = CodebaseGraph(language="python")
         graph.modules = {

@@ -284,7 +284,7 @@ def test_cmd_lineage_with_live_queries_neo4j_and_closes(monkeypatch, capsys):
     ]
     fake_client = _FakeNeo4jClient(chain)
 
-    import instrument.graph as graph_module
+    import agentic_dynamics.knowledge.graph as graph_module
 
     monkeypatch.setattr(graph_module, "Neo4jClient", lambda: fake_client)
 

@@ -1,7 +1,7 @@
 
 
-from instrument.basin import BasinMetrics
-from instrument.solution import SolutionMetrics
+from agentic_dynamics.measurement.basin import BasinMetrics
+from agentic_dynamics.measurement.solution import SolutionMetrics
 
 
 def _scrub_nan(d: dict) -> dict:

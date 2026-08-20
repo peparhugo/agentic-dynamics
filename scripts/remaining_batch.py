@@ -6,15 +6,35 @@ import time
 from pathlib import Path
 
 import yaml
-from _constants import WORKTREE_ROOT
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
+from agentic_dynamics.core.constants import WORKTREE_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CONFIG_DIR = PROJECT_ROOT / "experiments/configs"
+# Configs are split (design §4): measurement configs under experiments/definitions/configs/
+# and grid/sweep configs under experiments/campaigns/. Resolve a name across both.
+CONFIG_DIRS = [
+    PROJECT_ROOT / "experiments" / "definitions" / "configs",
+    PROJECT_ROOT / "experiments" / "campaigns",
+]
+
+
+def _config_path(name: str) -> Path:
+    """Resolve a config filename across the split config layout."""
+    for d in CONFIG_DIRS:
+        p = d / name
+        if p.exists():
+            return p
+    return CONFIG_DIRS[0] / name
+
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 
 def load_task(config_filename):
-    with open(CONFIG_DIR / config_filename) as f:
+    with open(_config_path(config_filename)) as f:
         cfg = yaml.safe_load(f)
     return cfg["task"].strip()
 

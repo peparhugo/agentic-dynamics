@@ -21,7 +21,7 @@ flag-only rail's existing invariant unchanged by this round::
         # Filtered listing over experiments/data_manifest.json's `registry` array — the
         # compacted output of generate_manifest.py's _compact_registry_index (plan step
         # 15). Zero external dependency: this command never touches Redis or Neo4j,
-        # matching /api/flags' existing file-fallback philosophy (admin/server.py).
+        # matching /api/flags' existing file-fallback philosophy (apps/control_room/server.py).
 
     python scripts/registry.py lineage <entity_id> [--live]
         # The registry array is ALREADY compacted to one (current) row per entity_id —
@@ -47,9 +47,13 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.knowledge import SOURCE_TYPES  # noqa: E402
+
+from agentic_dynamics.knowledge.knowledge import SOURCE_TYPES  # noqa: E402
 
 #: Where generate_manifest.py (plan step 15) writes the compacted registry array.
 DATA_MANIFEST_PATH = PROJECT_ROOT / "experiments" / "data_manifest.json"
@@ -232,7 +236,7 @@ def cmd_lineage(args: argparse.Namespace, rows: list[dict]) -> int:
         print(_format_row(current))
         return 0
 
-    from instrument.graph import Neo4jClient
+    from agentic_dynamics.knowledge.graph import Neo4jClient
 
     client = Neo4jClient()
     try:

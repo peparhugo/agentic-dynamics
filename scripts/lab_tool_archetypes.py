@@ -17,7 +17,7 @@ SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_AGG_PATH = ROOT / "experiments" / "results" / "_trajectory_aggregate.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_tool_archetypes.json"
 
-from _constants import MODEL_LABELS
+from agentic_dynamics.core.constants import MODEL_LABELS
 
 
 def classify_archetype(write_pct, bash_pct):

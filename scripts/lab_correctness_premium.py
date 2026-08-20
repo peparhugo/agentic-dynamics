@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_correctness_premium.json"
 
-from _constants import normalize_task
+from agentic_dynamics.core.constants import normalize_task
 
 DEEPSEEK_ID = "deepseek/deepseek-v4-pro"
 CLAUDE_ID = "anthropic/claude-fable-5"

@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Evidence Redesign Verification
 
 **Overall: PASS.** The redesign meets the brief and preserves the page's runtime data contracts.

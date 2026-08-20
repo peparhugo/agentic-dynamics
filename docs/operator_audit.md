@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Operator Audit — Perturbation Operators (`src/instrument/perturb.py`)
 
 Audited file: `src/instrument/perturb.py` (752 lines, 10 registered operators).

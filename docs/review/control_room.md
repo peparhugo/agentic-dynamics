@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room review — UI + endpoints
 
 Phase 4 (control_room) of `repo_review_fable`. Scope: `admin/server.py` (28 routes),

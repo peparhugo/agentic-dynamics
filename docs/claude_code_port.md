@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # OpenCode ↔ Claude Code Taxonomy Port
 
 Living spec for porting this repo's OpenCode file-based configuration

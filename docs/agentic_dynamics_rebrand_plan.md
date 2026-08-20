@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Agentic Dynamics Rebrand Implementation Brief
 
 > **SUPERSEDED (2026-08-15):** the "keep the existing Firebase host, do not acquire a new domain" decision in this brief is reversed. The site is now served from **two** Firebase projects — `ai-finops-rulebook` (canonical; the URL already shared with peers) and `agentic-dynamics` (mirror, forward-looking identity). Both serve the same `firebase/public/` and must be deployed together. See `AGENTS.md` → "Firebase dual-host (keep both synced)".

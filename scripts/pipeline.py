@@ -51,7 +51,11 @@ from typing import Any
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 
 # ── Redis configuration ──────────────────────────────────────────
 
@@ -423,7 +427,7 @@ def _gen_matrix_cells(kind_params: dict) -> list[dict]:
 
 
 def _completed_cells(model_filter: str, stories: list[str], conditions: dict) -> set[str]:
-    from instrument.story import load_story_result
+    from agentic_dynamics.runtime.story import load_story_result
 
     completed = set()
     results_dir = ROOT / "experiments" / "results" / "stories"
@@ -499,57 +503,30 @@ def _execute_matrix(phase: PlanPhase, context: dict) -> bool:
 
 
 def _execute_review(phase: PlanPhase, context: dict) -> bool:
-
-    rdb = _r()
     plan_name = context.get("plan_name", "review")
     kind_params = phase.kind_params
     workers = kind_params.get("workers", 4)
-    review_model = kind_params.get("review_model", "deepseek/deepseek-v4-flash")
 
     state = _get_state(plan_name, phase.id)
-
     if state.status == "done":
         return True
 
-    if state.status == "pending":
-        jobs = _gen_review_jobs(review_model)
-        if not jobs:
-            _set_state(plan_name, phase.id, status="done")
-            return True
-
-        for job in jobs:
-            rdb.lpush(REVIEW_QUEUE, json.dumps(job))
-            jid = job.get("job_id", "?")
-            rdb.hset(REVIEW_STATUS, jid, "queued")
-
-        _set_state(plan_name, phase.id, status="running", jobs_total=len(jobs))
-        _set_current(plan_name, phase.id)
-
-    if state.status in ("pending", "running"):
-        _set_current(plan_name, phase.id)
-
-        alive = _workers_alive("scripts/review_worker.py")
-        queue_size = rdb.llen(REVIEW_QUEUE)
-        if queue_size > 0 and alive < workers:
-            needed = workers - alive
-            print(f"  Launching {needed} review workers...")
-            _spawn_workers("scripts/review_worker.py", needed, phase.id)
-
-        done = sum(1 for v in rdb.hgetall(REVIEW_STATUS).values()
-                   if v in ("done", "failed"))
-        total = state.jobs_total
-        pct = f"{done}/{total}" if total > 0 else "?"
-        print(f"  {pct} done, {queue_size} in queue, {alive} workers")
-
-        if queue_size == 0 and done >= total and total > 0:
-            _set_state(plan_name, phase.id, status="done", jobs_done=done)
-            return True
-
-    return False
+    _set_state(plan_name, phase.id, status="running")
+    _set_current(plan_name, phase.id)
+    # review_all.py is the synchronous review runner (ThreadPoolExecutor, no Redis). It
+    # replaces the retired Redis review worker (WS-09 — resolves the "superseded but still
+    # spawned" contradiction). The deeper shared-runner rewire is deferred (design §5).
+    print("  Running review_all.py (synchronous)…")
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "review_all.py"), "--workers", str(workers)],
+        check=False,
+    )
+    _set_state(plan_name, phase.id, status="done")
+    return True
 
 
 def _gen_review_jobs(review_model: str) -> list[dict]:
-    from instrument.story import load_story_result
+    from agentic_dynamics.runtime.story import load_story_result
 
     results_dir = ROOT / "experiments" / "results" / "stories"
     reviews_dir = ROOT / "experiments" / "results" / "reviews"
@@ -1145,7 +1122,7 @@ def show_status(plan: PlanDefinition) -> None:
         if phase.kind == "matrix":
             workers = _workers_alive("scripts/worker.py")
         elif phase.kind == "review":
-            workers = _workers_alive("scripts/review_worker.py")
+            workers = 0  # review_all.py is synchronous — no detached workers
         s = state.status
         d = state.jobs_done
         t = state.jobs_total
@@ -1175,7 +1152,7 @@ def reset_plan(plan: PlanDefinition) -> None:
 
 def main():
     args = sys.argv[1:]
-    plan_path = ROOT / "experiments" / "configs" / "plans.yaml"
+    plan_path = ROOT / "experiments" / "definitions" / "configs" / "plans.yaml"
 
     if not plan_path.exists():
         print(f"Config not found: {plan_path}")

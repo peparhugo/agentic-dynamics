@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/kb-record-fidelity
+---
 # Implementation trace — record-field fidelity (BUG-1 / BUG-4+R5 / BUG-7)
 
 Closes the three record-fidelity findings from `docs/review/bugs.md` and the R5

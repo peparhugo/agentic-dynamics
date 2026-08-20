@@ -19,7 +19,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from instrument.knowledge import (
+from agentic_dynamics.knowledge.knowledge import (
     SCHEMA_VERSION,
     Authority,
     KnowledgeEvent,
@@ -27,7 +27,7 @@ from instrument.knowledge import (
     compute_entity_id,
     compute_knowledge_id,
 )
-from instrument.knowledge_ingestion import (
+from agentic_dynamics.knowledge.knowledge_ingestion import (
     ACL_SCOPE,
     EXTRACTOR_VERSION,
     REPOSITORY_ID,
@@ -158,7 +158,7 @@ def test_knowledge_id_folds_revision_hash_and_extractor():
 def test_extractor_version_bump_changes_knowledge_id(monkeypatch):
     entry = _entry()
     record_v1 = build_record(entry)
-    monkeypatch.setattr("instrument.knowledge_ingestion.EXTRACTOR_VERSION", "measured-finding/v2")
+    monkeypatch.setattr("agentic_dynamics.knowledge.knowledge_ingestion.EXTRACTOR_VERSION", "measured-finding/v2")
     record_v2 = build_record(entry)
     # A new extractor generation yields a new knowledge_id ...
     assert record_v2.knowledge_id != record_v1.knowledge_id
@@ -524,7 +524,7 @@ def test_producer_emitted_event_verifies_and_lands_measured(tmp_path, monkeypatc
     producer writes the per-record JSON artifact and hashes *its* bytes; the consumer reads
     those same bytes, verifies, and reconstructs a ``MEASURED`` record via ``extract_record``.
     """
-    from instrument import knowledge_stream as ks
+    from agentic_dynamics.knowledge import knowledge_stream as ks
 
     # 1. Producer path — derive, serialize, and durably write the per-record artifact.
     record = build_record(_entry(worktree_name="exp_int", run_id="exp_int"))
@@ -647,7 +647,7 @@ def test_derive_phase_record_idempotent():
 
 
 def test_publish_event_write_guard(monkeypatch):
-    import instrument.knowledge_stream as ks
+    import agentic_dynamics.knowledge.knowledge_stream as ks
 
     monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
     event = record_to_event(build_record(_entry()))
@@ -670,8 +670,8 @@ def test_publish_event_write_guard(monkeypatch):
 def test_emit_phase_finding_scoped_to_repository_id(tmp_path, monkeypatch):
     import hashlib as _hashlib
 
-    import instrument.knowledge_ingestion as ki
-    import instrument.knowledge_stream as ks
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+    import agentic_dynamics.knowledge.knowledge_stream as ks
 
     monkeypatch.setattr(ki, "PROJECT_ROOT", tmp_path)
     published = {}
@@ -711,8 +711,8 @@ def test_emit_phase_finding_scoped_to_repository_id(tmp_path, monkeypatch):
 
 
 def test_emit_phase_finding_idempotent(tmp_path, monkeypatch):
-    import instrument.knowledge_ingestion as ki
-    import instrument.knowledge_stream as ks
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+    import agentic_dynamics.knowledge.knowledge_stream as ks
 
     monkeypatch.setattr(ki, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(ks, "connect", lambda: object())

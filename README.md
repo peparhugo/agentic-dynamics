@@ -1,8 +1,13 @@
+---
+status: accepted
+---
+
 # Agentic Dynamics
 
 <p align="center">
-  <strong>Success isn't value. An experimental instrument measuring what drives the cost and value of agentic AI outcomes.</strong><br>
-  1,097 story sessions, 10 perturbation operators, 7 model variants across 3 providers. $288.69 measured spend.
+  <strong>A research operating system for agent experimentation and control.</strong><br>
+  Six cooperating systems — measurement, experimentation, execution, knowledge, control,
+  publication — for studying how AI agents behave, adapt, recover, and produce value under change.
 </p>
 
 <p align="center">
@@ -14,36 +19,54 @@
 
 ## What This Is
 
-**Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time.**
+**Agentic Dynamics is the empirical study of how AI agents behave under change — measured as
+business outcomes.** The repository is a *research operating system*: six cooperating systems,
+not a single tool. The perturbation instrument is **one** of the six.
 
-Economics, verification, recovery, resilience, behavior, coordination, and governance are dimensions and research areas within Agentic Dynamics. This repository currently measures a bounded subset through coding-agent experiments; it does not yet claim broad evidence about swarms or organizational outcomes.
+> **AI agents don't have a price — they have dynamics.** Cost, reliability, and debt are
+> properties of how the agent behaves under change, and we measured them.
 
-A measurement instrument that deliberately degrades engineering specifications — missing constraints, false premises, contradictory requirements, alien vocabulary — then runs coding agents against them and measures the full chain:
+1,097 story sessions, 10 perturbation operators, 7 model variants across 3 providers. $288.69
+measured spend.
 
-- **Decisions made** (observable execution trace: tool calls, file operations, reasoning)
-- **Correctness evidence** (agent-authored tests executed against generated artifacts)
-- **Task economics** (actual billed cost, token breakdown, cache behavior)
-- **Behavioral divergence** (structural escape from baseline solution patterns)
+---
 
-Most coding-agent benchmarks ask: can the model solve a clean task? This instrument asks: **does your AI assistant make your system better, or just bigger?**
+## The Six Systems
 
-The approach: controlled perturbation as an experimental independent variable. Each of 10 operators applies a specific, repeatable degradation to the prompt before the coding agent sees it. The instrument captures the full execution trace, generated artifact, and cost telemetry.
+| System | What it is |
+|---|---|
+| **1. Measurement apparatus** | The perturbation instrument: 10 operators degrade engineering specifications (missing constraints, false premises, contradictory requirements, alien vocabulary), then the full chain — decisions, correctness evidence, task economics, behavioral divergence — is measured. It asks: *does your AI assistant make your system better, or just bigger?* |
+| **2. Experiment platform** | `ExperimentSpec` + the `requires`/`produces` gate: `spec → compile → DAG → cells → jobs → attempts → ledger → information → policy → grid → campaign`. **To make policies, we need information** — the compiler refuses a control rule whose inputs aren't yet measured. |
+| **3. Agent execution runtime** | The opencode + Claude CLI backends, the workflow runner (phase execution inside a git worktree), the independent test runner, and the multi-session story orchestrator. |
+| **4. Knowledge & augmentation** | The runtime-RAG knowledge base: canonical identity/authority, the nine ingestion producers, deterministic retrieval, and the `retrieve → construct → render` prompt-construction seam. |
+| **5. Emerging control** | Per-task/per-step model routing, the observe-only supervisor, Redis telemetry, and queue steering — the "telemetry up, decisions down" seam. |
+| **6. Research & publication** | Game reports, the cross-model review pool, and the publication surface — the website (provenance-tagged live data) and the Control Room portal. |
+
+The dependency direction is enforced by a lint (`tests/test_dependency_direction.py`): `core ←
+experiment/measurement/runtime/knowledge ← control ← apps`. See [`ARCHITECTURE.md`](ARCHITECTURE.md)
+— the single architectural authority — and the `agentic-dynamics` CLI for the command surface.
 
 ---
 
 ## Key Findings
 
 **1. Per-token price does not tell you task economics.**
-Models produce similar generated token volumes yet bill at ratios driven by provider pricing architecture, not capability.
+Models produce similar generated token volumes yet bill at ratios driven by provider pricing
+architecture, not capability.
 
 **2. Agent reliability changes differently as specification quality degrades.**
-When specifications are corrupted, models exhibit materially different recovery behavior, output patterns, and cost trajectories. Grit (Ground-Truth Integrity) measures this: `G(s) = P(test_executed_success | perturbation_strength=s)`.
+When specifications are corrupted, models exhibit materially different recovery behavior, output
+patterns, and cost trajectories. Grit (Ground-Truth Integrity) measures this:
+`G(s) = P(test_executed_success | perturbation_strength=s)`.
 
 **3. Recovery itself has a cost signature.**
-When a model succeeds under perturbation, the overhead is measurable — both as extra tokens and as retry/narration cost. Recovery premium varies by provider family and perturbation class.
+When a model succeeds under perturbation, the overhead is measurable — both as extra tokens and
+as retry/narration cost. Recovery premium varies by provider family and perturbation class.
 
 **4. Success isn't value.**
-An agent can pass its own tests at low cost while making architectural decisions that increase future maintenance burden. The instrument captures correctness evidence; the FinOps question is whether each outcome increases or decreases the system's durable value.
+An agent can pass its own tests at low cost while making architectural decisions that increase
+future maintenance burden. The instrument captures correctness evidence; the FinOps question is
+whether each outcome increases or decreases the system's durable value.
 
 ---
 
@@ -55,11 +78,10 @@ Observed from the experiment corpus:
 |--------|-------------|
 | Cost-per-task variation | Token pricing, cache write policies, and provider economics stack into cost gaps |
 | Outcome retention under perturbation | Grit: `G(s) = P(test_executed_success \| perturbation_strength=s)` |
-| Recovery overhead | Explanation Tax — tokens and cost burned returning to familiar patterns |
+| Recovery overhead | Output decomposition — tokens and cost burned returning to familiar patterns |
 
-Derived metrics: WOC ratio (first-pass success), cost per test-executed outcome, AI Value Efficiency (durable outcome value / total cost).
-
-Modeling extensions: Snowball (N² codebase growth compounding), EPM (energy price projection), batch/cascade/SLA — modeled, not independently tested.
+Derived metrics: WOC ratio (first-pass success), cost per test-executed outcome, AI Value
+Efficiency (durable outcome value / total cost).
 
 ---
 
@@ -70,100 +92,43 @@ Modeling extensions: Snowball (N² codebase growth compounding), EPM (energy pri
 | Story sessions | 1,097 (3,370 DB sessions total) |
 | Game reports | 224 |
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
-| Experiment configs | 35 (34 task definitions + pipeline plan) |
+| Experiment configs | 37 (34 measurement + 3 grid/sweep) |
+| Experiment + workflow specs | 77 (8 experiments + 69 workflows) |
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
-| Lab books | 21 (19 active scripts, 8 deprecated) |
+| Lab books | 19 active |
 | Total measured spend | $288.69 |
-
----
-
-## Related Work
-
-- [Databricks coding-agent benchmark](https://www.databricks.com/blog/benchmarking-coding-agents-databricks-multi-million-line-codebase) (July 2026) — enterprise-scale coding-agent evaluation using held-out tests
-- [FinOps Foundation: AI tools & services](https://www.finops.org/wg/finops-for-ai-tools-services-considerations/) — use-case economics and model right-sizing
-
-Run `python scripts/inventory.py stats` for a live breakdown.
 
 ---
 
 ## Repository Structure
 
 ```
-├── src/instrument/           # Python measurement apparatus (pip-installable, 40 modules)
-│   ├── perturb.py            # 10 perturbation operators
-│   ├── opencode.py           # opencode session runner (the primary backend)
-│   ├── backends.py           # backend routing: opencode vs Claude CLI
-│   ├── claude_adapter.py     # Claude CLI (stream-json) → opencode events
-│   ├── streaming.py          # shared line-by-line subprocess runner
-│   ├── trajectory.py         # reasoning trajectory capture
-│   ├── solution.py           # solution quality evaluation
-│   ├── basin.py              # attractor basin escape measurement
-│   ├── efficiency.py         # token / cost / energy efficiency
-│   ├── recovery.py           # recovery classification (7 signals)
-│   ├── recovery_cost.py      # cost of recovering from perturbation
-│   ├── strategy.py           # strategy archetype classification
-│   ├── constraint_detection.py   # dual-signal constraint verification
-│   ├── semantic_validation.py    # AST analysis, marker profiling
-│   ├── game_report.py        # markdown game report generation
-│   ├── language.py           # multi-language tree-sitter parsing (Py/TS/Go/Rust)
-│   ├── sonar.py              # SonarQube static analysis
-│   ├── embeddings.py         # embeddings + vector search (ChromaDB/Ollama)
-│   ├── graph.py              # Neo4j experiment knowledge graph
-│   ├── story.py              # multi-session story orchestrator
-│   ├── mutation.py           # semantic spec/code mutation compiler
-│   ├── commit_analysis.py    # per-commit AST/Sonar/convention analysis
-│   ├── review.py             # LLM code review pool
-│   ├── entropy.py            # architectural entropy
-│   ├── codebase_graph.py     # import-graph structural metrics
-│   ├── lsp_diagnostics.py    # language-server diagnostics
-│   ├── supervisor.py         # Redis flag/session↔cell contracts (observe-only)
-│   ├── workflow_runner.py    # agent_task workflow executor (the execute phase)
-│   ├── test_runner.py        # independent pytest/jest/go/cargo runner
-│   ├── routing.py            # per-task model routing + strategy simulation
-│   ├── signal_store.py       # per-step routing signal store
-│   ├── step_routing.py       # per-step model routing
-│   ├── live.py               # Redis pub/sub telemetry
-│   ├── experiment_spec.py    # ExperimentSpec dataclasses + YAML loader
-│   ├── compile_experiment.py # spec → DAG compiler (the cycle)
-│   ├── experiment.py         # [deprecated] full experiment runner
-│   ├── adapter.py            # [deprecated] LLM adapter instrumentation
-│   └── lab_book.py           # [deprecated] YAML-frontmatter persistence
-├── scripts/                  # 78 scripts: runners, analysis, labs, queue, admin
-│   ├── run.py                # single experiment runner
-│   ├── run_story.py          # multi-session story runner
-│   ├── pipeline.py           # YAML-driven phase orchestration (ci/deploy/...)
-│   ├── enqueue.py / worker.py / monitor.py   # Redis queue transport
-│   ├── analyze_worktrees.py  # post-hoc analysis → game reports
-│   ├── analyze_trajectories.py  # session transcript parsing
-│   ├── sync_data.py          # story results → parquet
-│   ├── build_data.py         # generate data.js for the website
-│   ├── inventory.py          # experiment/worktree inventory CLI
-│   ├── lab_*.py              # 19 active lab books (+ 8 deprecated)
-│   └── ...
-├── experiments/
-│   ├── configs/              # 35 YAML experiment definitions
-│   ├── specs/                # ExperimentSpec YAMLs (spec/compiler layer)
-│   ├── stories/              # story result JSONs
-│   ├── codebases/            # starter codebases per language
-│   ├── results/              # game reports, summaries, lab outputs
-│   ├── lab_books/            # 21 experiment plans
-│   └── reviews/              # 6 peer review documents
-├── firebase/public/          # website source (8 pages, data pipeline)
-├── admin/                    # Control Room portal (Flask + static dashboard)
-├── docs/                     # design docs, specs, review records
-├── code_reviews/             # dated architecture/design review records
-├── .opencode/                # opencode agents, skills, tools, instructions
-├── .claude/                  # parallel Claude Code surface (ported from opencode)
-├── pyproject.toml
-├── CONTRIBUTING.md
-└── CODE_OF_CONDUCT.md
+├── src/agentic_dynamics/    # the modular monorepo — 8 bounded planes (60 modules)
+│   ├── core/                # foundation: language, paths, session vocabulary, streaming
+│   ├── experiment/          # ExperimentSpec + requires/produces gate + spec→DAG compiler
+│   ├── measurement/         # the measurement apparatus (perturb, solution, basin, entropy, …)
+│   ├── runtime/             # workflow runner, independent test runner, story orchestrator
+│   ├── adapters/            # opencode + Claude CLI backends
+│   ├── knowledge/           # identity/authority, retrieval, the nine ingestion producers, RAG
+│   ├── control/             # routing, supervisor, telemetry, queue steering
+│   └── reporting/           # game reports, review pool, analyzers
+├── scripts/                 # 73 scripts (37 CLI-backed commands, 19 lab books, 15 archived)
+├── experiments/             # definitions/ (specs + configs), campaigns/, results/
+├── workflows/               # repository/, operations/, research/, examples/
+├── apps/                    # the applications (consume the system, contain no domain rules)
+│   ├── control_room/        # the Control Room portal (Flask + static dashboard)
+│   └── website/             # the public website source (provenance-tagged data pipeline)
+├── agent_config/            # the single instruction source → generates .opencode/ + .claude/
+├── docs/                    # ARCHITECTURE.md (authority), designs, review records
+└── firebase/                # deploy config (firebase.json + .firebaserc, dual-host)
 ```
 
 ---
 
 ## The Data Pipeline
 
-The website at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) is powered by a live data pipeline:
+The website at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) is powered by a
+live data pipeline:
 
 ```
 opencode.db ──→ inventory.py refresh          ──→ inventory.json
@@ -180,10 +145,11 @@ opencode.db ──→ inventory.py refresh          ──→ inventory.json
                            _trajectory_aggregate.json  build_data.py
                                                                 │
                                                                 ↓
-                                                   firebase/public/data.js (~179KB)
+                                                   apps/website/data.js
 ```
 
-All numbers on the website are live-generated. Every measurement is provenance-tagged: [M] measured, [C] computed, [H] heuristic, [X] external.
+All numbers on the website are live-generated. Every measurement is provenance-tagged: [M]
+measured, [C] computed, [H] heuristic, [X] external.
 
 ---
 
@@ -191,10 +157,10 @@ All numbers on the website are live-generated. Every measurement is provenance-t
 
 | Page | What |
 |------|------|
-| [Home](https://ai-finops-rulebook.web.app) | The instrument + key findings |
+| [Home](https://ai-finops-rulebook.web.app) | The field + key findings |
 | [The Instrument](https://ai-finops-rulebook.web.app/methodology.html) | Experiment design, perturbation operators, recovery signals |
 | [The Evidence](https://ai-finops-rulebook.web.app/evidence.html) | Grit spectrum, cost ranking, AST analysis, perturbation response |
-| [Operational Framework](https://ai-finops-rulebook.web.app/framework.html) | 10 principles, levers, interactive calculator, provider playbook |
+| [Operational Framework](https://ai-finops-rulebook.web.app/framework.html) | Dynamics → business outcomes, levers, provider playbook |
 | [The Story](https://ai-finops-rulebook.web.app/story.html) | How a $20 API key became this |
 | [Related Work](https://ai-finops-rulebook.web.app/databricks.html) | Databricks benchmark, FinOps Foundation |
 
@@ -207,78 +173,38 @@ All numbers on the website are live-generated. Every measurement is provenance-t
 ```bash
 git clone https://github.com/peparhugo/agentic-dynamics.git
 cd agentic-dynamics
-pip install -e .
+pip install -e .                  # installs the agentic_dynamics package + the agentic-dynamics CLI
 ```
 
-**Note:** The core library (`src/instrument/`) is pip-installable. The scripts in `scripts/` are analysis tools that depend on your local opencode installation and experiment data.
+The core library is `agentic_dynamics/` (pip-installable). The scripts in `scripts/` are analysis
+tools that depend on your local opencode installation and experiment data.
 
 ---
 
 ## Usage
 
-### Run a Single Experiment
+One entry point — `agentic-dynamics` (a thin dispatcher over the maintained `scripts/`):
 
 ```bash
-python scripts/run.py experiments/configs/task_manager.yaml
-python scripts/run.py experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro
-python scripts/run.py experiments/configs/task_manager.yaml --backend claude_cli
+agentic-dynamics experiment run task_manager.yaml --model deepseek/deepseek-v4-pro
+agentic-dynamics story run task_manager_api --model deepseek/deepseek-v4-pro --condition clean
+agentic-dynamics workflow run experiments/definitions/<spec>.yaml --goal "…"
+agentic-dynamics queue enqueue --model deepseek/deepseek-v4-flash --missing-only
+agentic-dynamics queue worker && agentic-dynamics queue monitor
+agentic-dynamics analyze worktrees                 # → game reports + _results_summary.json
+agentic-dynamics data build                        # → apps/website/data.js
+agentic-dynamics analyze lab grit_matrix           # → lab output
+agentic-dynamics spec status                       # → regenerated spec index
 ```
 
-### Run a Multi-Session Story
-
-```bash
-python scripts/run_story.py task_manager_api --model deepseek/deepseek-v4-pro --condition clean
-```
-
-### Run the Pipeline (YAML-driven phases)
-
-```bash
-python scripts/pipeline.py --plan ci          # lint → test → build
-python scripts/pipeline.py --plan full_matrix # matrix → analyze → review → deploy
-```
-
-### Parallel Queue Transport
-
-```bash
-python scripts/enqueue.py --model deepseek/deepseek-v4-flash --missing-only
-python scripts/worker.py        # run N workers in parallel
-python scripts/monitor.py       # queue dashboard
-```
-
-### Run Post-Hoc Analysis
-
-```bash
-python scripts/analyze_worktrees.py                  # → game reports + _results_summary.json
-python scripts/analyze_trajectories.py               # → trajectory aggregates
-python scripts/sync_data.py                          # story results → parquet
-python scripts/build_data.py                         # → firebase/public/data.js
-```
-
-### Inspect the Inventory
-
-```bash
-python scripts/inventory.py refresh    # rebuild from DB + worktrees
-python scripts/inventory.py list       # list experiments
-python scripts/inventory.py stats      # aggregate statistics
-python scripts/inventory.py report     # evidence page numbers
-```
-
-### Run Lab Book Analyses
-
-```bash
-python scripts/lab_grit_matrix.py         # Grit Matrix chart data
-python scripts/lab_correctness_premium.py # head-to-head correctness
-python scripts/lab_flail_triggers.py      # failure patterns
-python scripts/lab_task_routing.py        # optimal model routing
-python scripts/lab_survival_horizon.py    # sessions-to-bankruptcy
-# ...and 14 more — see scripts/CONTEXT.md
-```
+The full subcommand tree: `agentic-dynamics --help`; the per-script reference: `scripts/CONTEXT.md`.
+The backing scripts can also be run directly (`python scripts/<script>.py …`).
 
 ---
 
 ## The 10 Perturbation Operators
 
-**Manifold** (push model off linguistic surface — test search dynamics):
+**Specification corruption** (push model off the linguistic surface — test search dynamics):
 
 | Operator | What It Does |
 |----------|--------------|
@@ -287,7 +213,7 @@ python scripts/lab_survival_horizon.py    # sessions-to-bankruptcy
 | Reverse Causality | Present solution before the problem |
 | Force Abandonment | Force generation and discard of solutions |
 
-**Semantic** (probe reasoning coherence — test truth-seeking):
+**Objective mutation** (probe reasoning coherence — test truth-seeking):
 
 | Operator | What It Does |
 |----------|--------------|
@@ -302,8 +228,8 @@ python scripts/lab_survival_horizon.py    # sessions-to-bankruptcy
 
 ## The Spec / Compiler Layer
 
-The library is transitioning from a linear pipeline to a closed loop (see
-`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`):
+The library has moved from a linear pipeline to a closed loop (see
+[`docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`](docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md)):
 
 ```
 spec (ExperimentSpec) ──compile──▶ DAG ──▶ cells ──▶ jobs ──▶ attempts
@@ -311,22 +237,28 @@ spec (ExperimentSpec) ──compile──▶ DAG ──▶ cells ──▶ jobs 
       └──adapt (tweak one factor)── compare ◀── information ◀── measure ◀── ledger
 ```
 
-The load-bearing rule: **to make policies, we need information.** Measurement rules
-produce information; control rules consume it. The compiler refuses a control rule
-(like `model_cascade`/`dynamics`) whose `requires` (e.g. `confidence`) are not yet
-instrumented. `experiment_spec.py` and `compile_experiment.py` are written; the open
-gap is instrumenting `confidence`, `perturbation_strength`, and `test_executed_success`
-before authoring the policy arms that consume them.
+The load-bearing rule: **to make policies, we need information.** Measurement rules produce
+information; control rules consume it. The compiler refuses a control rule (like
+`model_cascade`/`dynamics`) whose `requires` (e.g. `confidence`) are not yet instrumented.
+`experiment_spec.py` and `compile_experiment.py` are written; the instrumented fields
+(`confidence`, `perturbation_strength`, `test_executed_success`, the `answer`/`explanation`
+split) are measured, so the gated policy arms are now writable.
 
 ---
 
 ## Current Scope
 
-**Validated:** Python/Flask REST APIs, CRUD apps, real-time collaboration frontends, and TypeScript/Node.js. Go and Rust configs are defined and under validation. 10 prompt-level perturbation operators. IEA-baseline energy projection (1.6%/yr). Cost measurement in tokens, dollars, and joules. Multi-session story orchestration, independent test execution, and a Redis-queue parallel transport.
+**Validated:** Python/Flask REST APIs, CRUD apps, real-time collaboration frontends, and
+TypeScript/Node.js. Go and Rust configs are defined and under validation. 10 prompt-level
+perturbation operators. IEA-baseline energy projection (1.6%/yr). Cost measurement in tokens,
+dollars, and joules. Multi-session story orchestration, independent test execution, and a
+Redis-queue parallel transport.
 
-**In progress:** The spec/compiler campaign loop (adapt → next grid) and the policy arms gated on instrumenting `confidence` / `perturbation_strength` / `test_executed_success`.
+**In progress:** The spec/compiler campaign loop (adapt → next grid) and the policy arms.
 
-**Not in scope:** The instrument measures cost — it does not judge whether narration is "wasteful" or "valuable." The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.
+**Not in scope:** The instrument measures cost — it does not judge whether narration is
+"wasteful" or "valuable." The instrument is model-agnostic. DeepSeek was chosen as the anchor
+case study, not an endorsement.
 
 ---
 
@@ -334,7 +266,7 @@ before authoring the policy arms that consume them.
 
 ```bibtex
 @misc{agentic-dynamics-2026,
-  title  = {Agentic Dynamics: An experimental instrument for the economics of agentic AI},
+  title  = {Agentic Dynamics: A research operating system for agent experimentation and control},
   author = {Hugo Pepar},
   year   = {2026},
   url    = {https://ai-finops-rulebook.web.app},

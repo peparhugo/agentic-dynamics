@@ -1,3 +1,7 @@
+---
+status: accepted
+supersedes: docs/review/restructure.md §5.2 (source_type-vocabulary centralization, R2)
+---
 # Knowledge base review — experiments and real workflows
 
 Phase 5 (knowledge_base) of `repo_review_fable`. Scope: the merged KB — `knowledge.py`,

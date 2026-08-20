@@ -6,8 +6,8 @@ surface in another cell's augmented prompt. These tests pin that contract at the
 ``repository_id``, so no live Chroma/Neo4j is required.
 """
 
-from instrument.knowledge import Authority
-from instrument.retrieval import retrieve, scope_excluded
+from agentic_dynamics.knowledge.knowledge import Authority
+from agentic_dynamics.knowledge.retrieval import retrieve, scope_excluded
 
 TEXT = "build a task manager api with create/read/update/delete endpoints"
 

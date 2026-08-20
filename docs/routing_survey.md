@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Routing, Measurement & Session Forking — Survey
 
 Status: survey · Scope: how routing, measurement, and session forking work **today**, and

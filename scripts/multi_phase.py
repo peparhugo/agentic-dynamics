@@ -9,10 +9,14 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument import evaluate_solution
-from instrument.opencode import run_opencode_agentic
+
+from agentic_dynamics.measurement.solution import evaluate_solution
+from agentic_dynamics.adapters.opencode import run_opencode_agentic
 
 PHASES = [
     ("build", "Build a team collaboration platform with Python/Flask and SQLite. "

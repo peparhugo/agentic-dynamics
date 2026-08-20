@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Challenge: Claude Code Background Sessions Scope
 
 Reviewed against `docs/scope.md`, the code it cites

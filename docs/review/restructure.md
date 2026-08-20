@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Restructuring + Refactoring Review
 
 Phase 1 (restructure) of `repo_review_fable`. Builds on DeepSeek's prior architecture review

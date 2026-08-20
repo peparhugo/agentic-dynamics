@@ -2,7 +2,7 @@
 
 import json
 
-from instrument.review import (
+from agentic_dynamics.reporting.review import (
     CommitReview,
     StoryReview,
     _parse_commit_review,

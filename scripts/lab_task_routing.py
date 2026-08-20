@@ -16,7 +16,7 @@ SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_AGG_PATH = ROOT / "experiments" / "results" / "_trajectory_aggregate.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_task_routing.json"
 
-from _constants import MODEL_LABELS, normalize_task
+from agentic_dynamics.core.constants import MODEL_LABELS, normalize_task
 
 DEEPSEEK_ID = "deepseek/deepseek-v4-pro"
 CLAUDE_ID = "anthropic/claude-fable-5"

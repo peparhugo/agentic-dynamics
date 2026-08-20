@@ -4,7 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from instrument.lsp_diagnostics import (
+from agentic_dynamics.measurement.lsp_diagnostics import (
     _TOOLS,
     LSPDiagnostic,
     LSPReport,

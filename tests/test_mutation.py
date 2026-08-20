@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from instrument.mutation import (
+from agentic_dynamics.measurement.mutation import (
     ALL_OPERATORS,
     CODEBASE_OPERATORS,
     SPECIFICATION_OPERATORS,
@@ -105,7 +105,7 @@ class TestCompileMutation:
 
     def test_spec_mutation_returns_artifact(self, monkeypatch):
         monkeypatch.setattr(
-            "instrument.mutation._call_opencode",
+            "agentic_dynamics.measurement.mutation._call_opencode",
             lambda prompt, *, model, timeout: "Mutated spec.",
         )
         result = compile_mutation(
@@ -125,7 +125,7 @@ class TestCompileMutation:
             calls["n"] += 1
             return "Mutated spec."
 
-        monkeypatch.setattr("instrument.mutation._call_opencode", fake_call)
+        monkeypatch.setattr("agentic_dynamics.measurement.mutation._call_opencode", fake_call)
         cache_dir = tmp_path / "cache"
         cache_dir.mkdir()
 
@@ -140,7 +140,7 @@ class TestCompileMutation:
 
     def test_raises_on_compiler_failure(self, monkeypatch):
         monkeypatch.setattr(
-            "instrument.mutation._call_opencode",
+            "agentic_dynamics.measurement.mutation._call_opencode",
             lambda prompt, *, model, timeout: None,
         )
         with pytest.raises(ValueError, match="compilation failed"):

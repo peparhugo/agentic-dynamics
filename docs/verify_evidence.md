@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Evidence Restructure Verification
 
 ## Verdict

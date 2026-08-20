@@ -31,8 +31,12 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
-from instrument.opencode import normalize_opencode_event
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
+from agentic_dynamics.adapters.opencode import normalize_opencode_event
 
 REPORTS_DIR = ROOT / "experiments" / "results" / "reports"
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
@@ -332,10 +336,14 @@ def enrich_with_embeddings(results, model_map):
     """Query ChromaDB for step embeddings and add reasoning_distance per session."""
     try:
         import sys
-        sys.path.insert(0, str(ROOT / "src"))
+        try:
+            import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+        except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+            from scripts import _bootstrap  # noqa: E402,F401
+
         import numpy as np
 
-        from instrument.embeddings import ChromaStore
+        from agentic_dynamics.knowledge.embeddings import ChromaStore
 
         store = ChromaStore()
         chroma = store.collection.get(include=["embeddings", "metadatas"])

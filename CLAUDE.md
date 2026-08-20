@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 @AGENTS.md
 
 ## Claude Code

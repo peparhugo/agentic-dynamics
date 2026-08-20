@@ -17,7 +17,7 @@ You are the **Pipeline Operations Agent** for AI FinOps Dynamics. Your domain is
 opencode.db → inventory.py refresh → inventory.json
      ├──→ analyze_worktrees.py → reports/*.md + _results_summary.json
      ├──→ analyze_trajectories.py → trajectory summary + aggregate JSON
-     └──→ build_data.py → firebase/public/data.js → deploy to web.app
+     └──→ build_data.py → apps/website/data.js → deploy to web.app
 ```
 
 ### Inventory (inventory.py, 392L)
@@ -28,7 +28,7 @@ python scripts/inventory.py stats      # Aggregate statistics
 python scripts/inventory.py report     # Evidence page numbers
 python scripts/inventory.py worktrees  # List worktree directories
 ```
-Reads: `opencode.db` (SQLite), `/tmp/exp_*` worktrees, `experiments/configs/*.yaml`, `experiments/results/` JSONs.
+Reads: `opencode.db` (SQLite), `/tmp/exp_*` worktrees, `experiments/definitions/configs/*.yaml`, `experiments/results/` JSONs.
 Writes: `experiments/inventory.json`
 
 ### Build (build_data.py, 649L)
@@ -36,13 +36,14 @@ Writes: `experiments/inventory.json`
 python scripts/build_data.py
 ```
 Reads: inventory.json, _results_summary.json, _trajectory_aggregate.json.
-Writes: `firebase/public/data.js` (~31KB) with `window.DYNAMICS_DATA`.
+Writes: `apps/website/data.js` (~31KB) with `window.DYNAMICS_DATA`.
 All metrics provenance-tagged [M]/[C]/[H]/[X]. Consumed by 8 HTML pages via app.js.
 
-### Website (firebase/)
+### Website (apps/website/)
 ```bash
 firebase deploy --only hosting                          # canonical (ai-finops-rulebook)
 firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy BOTH
+# NOTE: run firebase deploy FROM apps/website/ (firebase.json + .firebaserc live there; public: ".")
 ```
 Site: https://ai-finops-rulebook.web.app (canonical, already shared with peers) + https://agentic-dynamics.web.app (mirror)
 Pages: index, framework, evidence, story, methodology, accelerator, databricks, glossary
@@ -67,7 +68,7 @@ python scripts/monitor.py               # Dashboard
 ```
 
 ### Phase Orchestration (pipeline.py)
-YAML-driven DAG orchestration. Plans live in `experiments/configs/plans.yaml`.
+YAML-driven DAG orchestration. Plans live in `experiments/definitions/configs/plans.yaml`.
 ```bash
 python scripts/pipeline.py --plan <name>           # run a plan
 python scripts/pipeline.py --plan <name> --graph   # print dependency tree
@@ -102,10 +103,10 @@ new campaign loop (tweak one factor, emit the next grid). Ordering: instrument `
 ### Working Directory Map
 - `opencode.db` → `~/.local/share/opencode/opencode.db` or env `OPENCODE_DB`
 - Worktrees → `/tmp/exp_*`
-- Configs → `experiments/configs/*.yaml`
+- Configs → `experiments/definitions/configs/*.yaml`
 - Results → `experiments/results/_results_summary.json`
 - Inventory → `experiments/inventory.json`
-- Website data → `firebase/public/data.js`
+- Website data → `apps/website/data.js`
 - Website deploy → `firebase deploy --only hosting`
 
 ### Monitoring (monitor.py, 114L)
@@ -127,7 +128,7 @@ docker run -d --name sonarqube -p 9000:9000 sonarqube:community
 
 ### Common Gotchas
 - Always refresh inventory before building — stale data.js shows wrong numbers
-- `firebase/public/data.js` is generated — never edit it directly
+- `apps/website/data.js` is generated — never edit it directly
 - Worktrees at `/tmp/exp_*` persist between sessions but may be cleaned by reboot
 - Redis queue needs Docker running; check with `docker ps`
 - Backfill scripts copy code from /tmp (ephemeral) to experiments/results/ (persistent)

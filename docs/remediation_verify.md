@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Remediation Verification
 
 Verifies the end-to-end remediation: instrument the four missing ledger fields,

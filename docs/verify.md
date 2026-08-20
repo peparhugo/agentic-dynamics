@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Supervisor Surface Verification
 
 ## Verdict

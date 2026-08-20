@@ -10,9 +10,9 @@ import hashlib
 
 import pytest
 
-from instrument import ledger_ingestion as li
-from instrument.knowledge import Authority
-from instrument.knowledge_ingestion import record_to_artifact
+from agentic_dynamics.knowledge import ledger_ingestion as li
+from agentic_dynamics.knowledge.knowledge import Authority
+from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
 
 def _story_result(**overrides) -> dict:
@@ -118,17 +118,18 @@ def test_classify_session_unclassified_title_still_registers():
 
 
 def test_experiment_session_patterns_live_in_instrument_not_scripts():
-    # The dependency edge is now scripts -> src, not the reverse: `_constants.py`
-    # imports EXPERIMENT_SESSION_PATTERNS from instrument.session_types (the single
+    # The dependency edge is now scripts -> src, not the reverse: the shared constants
+    # module (formerly scripts/_constants.py, now agentic_dynamics.core.constants) imports
+    # EXPERIMENT_SESSION_PATTERNS from agentic_dynamics.core.session_types (the single
     # source of truth) instead of being exec'd back into the package at import time.
-    # Loading _constants.py by path must therefore yield the SAME list object the
-    # instrument exports — a re-declared copy in scripts/ would be a regression.
+    # Loading constants.py by path must therefore yield the SAME list object session_types
+    # exports — a re-declared copy would be a regression.
     import importlib.util
     from pathlib import Path
 
-    from instrument import session_types as st
+    from agentic_dynamics.core import session_types as st
 
-    path = Path(st.__file__).resolve().parents[2] / "scripts" / "_constants.py"
+    path = Path(st.__file__).resolve().parent / "constants.py"
     spec = importlib.util.spec_from_file_location("_check_constants", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

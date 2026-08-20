@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from instrument.story import (
+from agentic_dynamics.runtime.story import (
     BUILTIN_STORIES,
     PerturbationCondition,
     SessionResult,
@@ -121,7 +121,7 @@ class TestStoryResult:
         # Default test environment: FINOPS_KB_WRITE is unset, so a plain save must never
         # attempt a knowledge-stream connection — canonical-state round 2, plan step 10.
         monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
-        from instrument import knowledge_stream as ks
+        from agentic_dynamics.knowledge import knowledge_stream as ks
 
         def _explode(*a, **kw):
             raise AssertionError("must not connect to the knowledge stream when KB_WRITE is unset")
@@ -135,7 +135,7 @@ class TestStoryResult:
 
     def test_save_story_result_emits_registry_event_when_kb_write_enabled(self, monkeypatch):
         monkeypatch.setenv("FINOPS_KB_WRITE", "1")
-        from instrument import knowledge_stream as ks
+        from agentic_dynamics.knowledge import knowledge_stream as ks
 
         published = []
         monkeypatch.setattr(ks, "connect", lambda: object())
@@ -296,7 +296,7 @@ class TestPerturbationCondition:
 
     def test_early_degrade_returns_session1_mutation(self, monkeypatch):
         monkeypatch.setattr(
-            "instrument.story.compile_mutation",
+            "agentic_dynamics.runtime.story.compile_mutation",
             lambda specification, operator, strength, model, cache_dir: None,
         )
         cm, sm = condition_to_mutations(
@@ -343,7 +343,7 @@ class TestPerturbationCondition:
         assert result.cascade_recovery is None
 
     def test_cascade_recovery_with_improvement(self):
-        from instrument.opencode import AgenticResult
+        from agentic_dynamics.adapters.opencode import AgenticResult
         s1 = SessionResult(1, "greenfield", "A")
         s1.agentic = AgenticResult(tests_passed=2, tests_total=10)  # 0.2
         s2 = SessionResult(2, "refactor", "B")

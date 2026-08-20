@@ -11,12 +11,12 @@ import hashlib
 import tempfile
 from pathlib import Path
 
-from instrument import quality_ingestion as qi
-from instrument.knowledge import Authority, compute_knowledge_id
-from instrument.knowledge_ingestion import extract_record, record_to_artifact, record_to_event
-from instrument.language import _PROFILES
-from instrument.lsp_diagnostics import LSPReport
-from instrument.sonar import SonarMetrics
+from agentic_dynamics.knowledge import quality_ingestion as qi
+from agentic_dynamics.knowledge.knowledge import Authority, compute_knowledge_id
+from agentic_dynamics.knowledge.knowledge_ingestion import extract_record, record_to_artifact, record_to_event
+from agentic_dynamics.core.language import _PROFILES
+from agentic_dynamics.measurement.lsp_diagnostics import LSPReport
+from agentic_dynamics.measurement.sonar import SonarMetrics
 
 REPO = "test-repo"
 REVISION = "abc1234"

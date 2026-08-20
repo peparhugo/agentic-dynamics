@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Agentic Dynamics Rebrand Verification
 
 Verified on the clean `feature/agentic-dynamics-cutover` branch on 2026-08-15.

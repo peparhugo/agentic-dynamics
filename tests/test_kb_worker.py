@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from instrument.knowledge import Authority, KnowledgeRecord
+from agentic_dynamics.knowledge.knowledge import Authority, KnowledgeRecord
 from scripts import kb_worker
 
 
@@ -223,7 +223,7 @@ def _reset_fake_neo4j_instances():
 
 
 def _patch_neo4j_client(monkeypatch):
-    import instrument.graph as graph_module
+    import agentic_dynamics.knowledge.graph as graph_module
 
     monkeypatch.setattr(graph_module, "Neo4jClient", _FakeNeo4jClient)
 

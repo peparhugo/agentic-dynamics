@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 
-from instrument import knowledge_stream as ks
+from agentic_dynamics.knowledge import knowledge_stream as ks
 from scripts import finalize_reviews as fr
 
 

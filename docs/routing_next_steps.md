@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Routing — Detailed Follow-Up
 
 > Status: per-step routing is **implemented and merged** to `main`

@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # OpenCode Docs Refresh — Challenge
 
 A design review of `docs/opencode_docs_scope.md`, not a re-verification of its facts.

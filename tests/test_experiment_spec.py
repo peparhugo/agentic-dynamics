@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from instrument.experiment_spec import (
+from agentic_dynamics.experiment.experiment_spec import (
     LEDGER_FIELDS,
     SPEC_KEYS,
     SPEC_STATUSES,
@@ -444,8 +444,9 @@ def test_committed_specs_all_load_without_unknown_key_warnings(recwarn):
     This is the regression guard for the corpus itself: adding a lifecycle key to a spec
     YAML that this dataclass does not know about would light up here rather than in a run.
     """
-    specs_dir = Path(__file__).resolve().parent.parent / "experiments" / "specs"
-    paths = sorted(specs_dir.glob("*.yaml"))
+    specs_dir = Path(__file__).resolve().parent.parent
+    paths = sorted((specs_dir / "experiments" / "definitions").glob("*.yaml"))
+    paths += sorted((specs_dir / "workflows").rglob("*.yaml"))
     assert len(paths) >= 63, f"expected the committed spec corpus, found {len(paths)}"
     for path in paths:
         spec = load_spec(path)

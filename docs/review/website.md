@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Website review — structure + content
 
 Phase 3 (website) of `repo_review_fable`. Scope: `firebase/public/` (8 pages + `data.js` +

@@ -10,9 +10,9 @@ import hashlib
 import tempfile
 from pathlib import Path
 
-from instrument import policy_ingestion as pi
-from instrument.knowledge import Authority, compute_knowledge_id
-from instrument.knowledge_ingestion import extract_record, record_to_artifact, record_to_event
+from agentic_dynamics.knowledge import policy_ingestion as pi
+from agentic_dynamics.knowledge.knowledge import Authority, compute_knowledge_id
+from agentic_dynamics.knowledge.knowledge_ingestion import extract_record, record_to_artifact, record_to_event
 
 REPO = "test-repo"
 REVISION = "abc1234"
@@ -23,8 +23,8 @@ def _write_policy_surface(root: Path) -> Path:
     (root / "AGENTS.md").write_text(
         "# Rules for this project\n\nSome rule body.\n\nMore rules.\n"
     )
-    (root / "experiments" / "specs").mkdir(parents=True, exist_ok=True)
-    (root / "experiments" / "specs" / "foo.yaml").write_text(
+    (root / "experiments" / "definitions").mkdir(parents=True, exist_ok=True)
+    (root / "experiments" / "definitions" / "foo.yaml").write_text(
         "name: foo\nquestion: >-\n  What does foo measure?\n"
     )
     (root / "conventions").mkdir(parents=True, exist_ok=True)
@@ -138,9 +138,9 @@ def test_logical_locator_relative_to_repo_root():
     with tempfile.TemporaryDirectory() as d:
         root = _write_policy_surface(Path(d))
         records = pi.derive_policy_records(
-            [root / "experiments" / "specs" / "foo.yaml"], repository_id=REPO, revision=REVISION, repo_root=root
+            [root / "experiments" / "definitions" / "foo.yaml"], repository_id=REPO, revision=REVISION, repo_root=root
         )
-    assert records[0].logical_locator == "experiments/specs/foo.yaml"
+    assert records[0].logical_locator == "experiments/definitions/foo.yaml"
 
 
 def test_distinct_entities_per_file():
@@ -190,7 +190,7 @@ def test_discover_policy_paths_returns_existing_surface():
         ".opencode/instructions/mental-model.md",
         "AGENTS.md",
         "conventions/python.yaml",
-        "experiments/specs/foo.yaml",
+        "experiments/definitions/foo.yaml",
     ]
 
 

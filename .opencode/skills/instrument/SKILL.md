@@ -18,7 +18,7 @@ Prompts ──→ perturb.py ──→ perturb_prompt() ──→ perturbed prom
                                               recovery.py, strategy.py ──→ game_report.py
 ```
 
-Key files you'll modify: `scripts/run.py` (502L), `src/instrument/opencode.py` (614L), `src/instrument/perturb.py` (752L), `src/instrument/story.py` (1374L), `src/instrument/mutation.py` (438L).
+Key files you'll modify: `scripts/run.py` (502L), `src/agentic_dynamics/opencode.py` (614L), `src/agentic_dynamics/perturb.py` (752L), `src/agentic_dynamics/story.py` (1374L), `src/agentic_dynamics/mutation.py` (438L).
 
 ## Spec & Compiler (written)
 
@@ -29,9 +29,9 @@ information) → write policy (control rules consuming that information) → gri
 Two modules, both **written**:
 
 ```
-src/instrument/experiment_spec.py    # ExperimentSpec, Workflow, Factor, RuleSpec, MetricSpec,
+src/agentic_dynamics/experiment/experiment_spec.py    # ExperimentSpec, Workflow, Factor, RuleSpec, MetricSpec,
                                      # ComparisonSpec, WriteupSpec, StopSpec, AdaptSpec + validator
-src/instrument/compile_experiment.py # compile_spec(spec) -> DAG; validate_rules(spec) -> errors
+src/agentic_dynamics/experiment/compile_experiment.py # compile_spec(spec) -> DAG; validate_rules(spec) -> errors
 ```
 
 **The load-bearing rule (enforced by the validator):** `RuleSpec` declares `requires` (information
@@ -82,12 +82,12 @@ perturbed_prompt, perturbation = perturb_prompt(
 
 ```bash
 # Single experiment (primary entry point):
-python scripts/run.py experiments/configs/task_manager.yaml --model deepseek
+python scripts/run.py experiments/definitions/configs/task_manager.yaml --model deepseek
 
 # Cross-model comparison:
-python scripts/run.py experiments/configs/comparative.yaml --model deepseek
+python scripts/run.py experiments/definitions/configs/comparative.yaml --model deepseek
 
-# The 34 configs are at experiments/configs/*.yaml. Each defines:
+# The 34 configs are at experiments/definitions/configs/*.yaml. Each defines:
 # task, constraints[], operators[], strengths[], model, turns, thinking_effort
 ```
 
@@ -221,8 +221,8 @@ python scripts/finish_sweep.py       # Incomplete sweep cells
 ## Common Workflows
 
 ### Running a single experiment end-to-end:
-1. Pick config from experiments/configs/
-2. `python scripts/run.py experiments/configs/<name>.yaml --model deepseek`
+1. Pick config from experiments/definitions/configs/
+2. `python scripts/run.py experiments/definitions/configs/<name>.yaml --model deepseek`
 3. Check output in experiments/results/ and /tmp/exp_*
 
 ### Running a story experiment (v0.9):
@@ -245,7 +245,7 @@ python scripts/finish_sweep.py       # Incomplete sweep cells
 4. Language flags — critical for correctness measurement:
    - Go/Rust: `standardized: {enabled: true, enforce_pytest: false}` — runs `go test`/`cargo test`, NOT pytest.
    - Python: `standardized.enforce_pytest: true` (default pytest).
-5. Run: `python scripts/run.py experiments/configs/<name>.yaml --model deepseek` (or the `run_experiment` tool).
+5. Run: `python scripts/run.py experiments/definitions/configs/<name>.yaml --model deepseek` (or the `run_experiment` tool).
 6. Verify: GameReport + artifacts under `experiments/results/`, worktree at `/tmp/exp_*`.
 7. Downstream: `python scripts/analyze_worktrees.py` then `python scripts/pipeline.py --plan deploy` to publish to the website.
 
@@ -310,7 +310,7 @@ languages "just work"; for an unbundled grammar you'd swap in `tree_sitter_langu
 register a grammar manually — the exception, not the rule.
 
 ### Fixing a measurement bug:
-1. Read src/instrument/CONTEXT.md for the module reference
+1. Read src/agentic_dynamics/ plane __init__ docstrings (module map) for the module reference
 2. Check tests/test_<module>.py for existing coverage
 3. Fix the module
 4. Run `pytest tests/test_<module>.py -v`

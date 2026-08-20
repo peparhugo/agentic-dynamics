@@ -1,7 +1,7 @@
 """enqueue_reviews.py — Push review jobs to Redis queue for parallel processing.
 
 Scans all story result JSONs, finds worktree commits, enqueues review jobs.
-Workers (review_worker.py) pop jobs and run review_commit() with DeepSeek Flash.
+review_all.py runs review_commit() synchronously with DeepSeek Flash.
 
 Usage:
   python3 scripts/enqueue_reviews.py          # enqueue all pending reviews
@@ -17,9 +17,13 @@ from pathlib import Path
 
 import redis
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.posthoc import (  # noqa: E402
+
+from agentic_dynamics.runtime.posthoc import (  # noqa: E402
     REVIEW_QUEUE,
     REVIEW_STATUS,
     DEFAULT_REVIEW_MODEL,
@@ -28,7 +32,7 @@ from instrument.posthoc import (  # noqa: E402
     enqueue_job,
     worktree_commits,
 )
-from instrument.story import load_story_result
+from agentic_dynamics.runtime.story import load_story_result
 
 REDIS_HOST = "127.0.0.1"
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -102,7 +106,7 @@ def main() -> None:
     else:
         print(f"Enqueued {total_jobs} review jobs ({stories_with_worktrees} stories)")
         print(f"Queue: {r.llen(REVIEW_QUEUE)} pending")
-        print("Start workers: nohup python3 scripts/review_worker.py &")
+        print("Run reviews: python3 scripts/review_all.py")
 
 
 if __name__ == "__main__":

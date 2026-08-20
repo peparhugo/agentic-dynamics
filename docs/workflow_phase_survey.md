@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Workflow Cell Publishing & Rendering — Phase Badge Survey
 
 **Scope:** map where a workflow cell's live status is published and rendered, and pin

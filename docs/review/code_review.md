@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room code review
 
 Scope: `admin/server.py` (Flask + SSE backend, 367 lines), `admin/static/app.js`

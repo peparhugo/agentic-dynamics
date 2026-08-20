@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Operator Fix — Verification Report
 
 Verifies the four-phase fix (assess → fix_operators → seed_cell_identity → add_tests)

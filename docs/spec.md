@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Spec: Claude Code Background Sessions in the Control Room
 
 Status: design spec, ready for implementation planning. Builds on

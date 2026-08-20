@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/kb-producer-factory
+---
 # R1 + R2 implementation trace — RecordBuilder factory + source_type vocabulary
 
 Implements R1 and R2 from `docs/review/restructure.md` (the two highest-leverage KB-local

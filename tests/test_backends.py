@@ -1,6 +1,6 @@
 """Tests for backend dispatch."""
 
-from instrument.backends import get_backend_for_model, resolve_backend
+from agentic_dynamics.adapters.backends import get_backend_for_model, resolve_backend
 
 
 def test_anthropic_routes_to_claude_cli():

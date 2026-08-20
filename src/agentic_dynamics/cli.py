@@ -1,0 +1,133 @@
+"""The ``agentic-dynamics`` command-line interface (critique rec 5, rec 8).
+
+A thin dispatcher over the maintained ``scripts/`` surface: each subcommand forwards its
+arguments to the backing script via a subprocess. The CLI composes — it never re-implements a
+script's logic, and it never imports a ``control`` module to steer a running session (observe-only,
+per the supervisor design).
+
+Design: ``docs/consolidation/design.md`` §5 (the complete subcommand tree).
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_SCRIPTS_DIR = _REPO_ROOT / "scripts"
+
+#: Static leaf commands: (argv prefix) -> backing script. Remaining argv is forwarded verbatim.
+_COMMANDS: dict[tuple[str, ...], str] = {
+    # experiment
+    ("experiment", "run"): "run.py",
+    ("experiment", "sweep-parallel"): "sweep_parallel.py",
+    ("experiment", "sweep-silent"): "sweep_silent_mode.py",
+    ("experiment", "batch"): "batch_run.py",
+    ("experiment", "remaining"): "remaining_batch.py",
+    ("experiment", "multi-phase"): "multi_phase.py",
+    # story
+    ("story", "run"): "run_story.py",
+    ("story", "batch"): "batch_stories.py",
+    # workflow
+    ("workflow", "run"): "run_workflow.py",
+    # queue
+    ("queue", "enqueue"): "enqueue.py",
+    ("queue", "worker"): "worker.py",
+    ("queue", "monitor"): "monitor.py",
+    ("queue", "reinterleave"): "reinterleave_queue.py",
+    ("queue", "analysis-enqueue"): "enqueue_analysis.py",
+    ("queue", "analysis-worker"): "analysis_worker.py",
+    # analyze
+    ("analyze", "worktrees"): "analyze_worktrees.py",
+    ("analyze", "trajectories"): "analyze_trajectories.py",
+    ("analyze", "stories"): "analyze_stories.py",
+    # data
+    ("data", "build"): "build_data.py",
+    ("data", "sync"): "sync_data.py",
+    ("data", "manifest"): "generate_manifest.py",
+    ("data", "inventory"): "inventory.py",
+    # knowledge
+    ("knowledge", "ingest"): "kb_produce.py",
+    ("knowledge", "sources"): "kb_produce_sources.py",
+    ("knowledge", "worker"): "kb_worker.py",
+    # review
+    ("review", "all"): "review_all.py",
+    ("review", "stories"): "review_stories.py",
+    ("review", "trigger"): "trigger_reviews.py",
+    ("review", "enqueue"): "enqueue_reviews.py",
+    ("review", "finalize"): "finalize_reviews.py",
+    # spec
+    ("spec", "status"): "spec_status.py",
+    ("spec", "pipeline"): "pipeline.py",
+    # validate
+    ("validate", "session"): "validate_session.py",
+    ("validate", "tests"): "verify_tests.py",
+    # supervise
+    ("supervise"): "supervise.py",
+    ("supervise", "claude-agents"): "claude_agents_supervisor.py",
+}
+
+#: ``registry`` subcommands, all backed by ``registry.py`` (its first positional arg).
+_REGISTRY_SUBCOMMANDS = {"query", "show", "lineage"}
+
+_HELP = """\
+agentic-dynamics — one entry point over the maintained scripts/ surface.
+
+Subcommands (each forwards to its backing script):
+
+  experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase
+  story       run|batch
+  workflow    run
+  queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
+  analyze     worktrees|trajectories|stories|lab <name>
+  data        build|sync|manifest|inventory
+  knowledge   ingest|sources|worker
+  registry    query|show|lineage
+  review      all|stories|trigger|enqueue|finalize
+  spec        status|pipeline
+  validate    session|tests
+  supervise   [claude-agents]
+
+Run `agentic-dynamics <subcommand> --help` for the backing script's own options.
+"""
+
+
+def _forward(script: str, argv: list[str]) -> int:
+    """Run a backing script as a subprocess, forwarding argv."""
+    return subprocess.call([sys.executable, str(_SCRIPTS_DIR / script), *argv])
+
+
+def _resolve(argv: list[str]) -> tuple[str | None, list[str]]:
+    """Resolve argv to ``(backing_script, forwarded_args)`` or ``(None, [])`` if unresolved."""
+    # Longest-prefix match over the static command table.
+    for prefix, script in _COMMANDS.items():
+        if tuple(argv[: len(prefix)]) == prefix:
+            return script, argv[len(prefix):]
+    # ``registry query|show|lineage`` -> registry.py <subcommand> ...
+    if argv[0] == "registry" and len(argv) >= 2 and argv[1] in _REGISTRY_SUBCOMMANDS:
+        return "registry.py", argv[1:]
+    # ``analyze lab <name>`` -> lab_<name>.py ...
+    if len(argv) >= 3 and argv[:2] == ["analyze", "lab"]:
+        return f"lab_{argv[2]}.py", argv[3:]
+    return None, []
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point (also the ``console_scripts`` target)."""
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if not argv or argv[0] in ("-h", "--help", "help"):
+        print(_HELP)
+        return 0
+    script, rest = _resolve(argv)
+    if script is None:
+        print(f"agentic-dynamics: unknown command {' '.join(argv)}", file=sys.stderr)
+        return 2
+    if not (_SCRIPTS_DIR / script).exists():
+        print(f"agentic-dynamics: no such command {' '.join(argv)}", file=sys.stderr)
+        return 2
+    return _forward(script, rest)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

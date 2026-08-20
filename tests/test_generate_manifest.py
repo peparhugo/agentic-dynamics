@@ -291,7 +291,7 @@ def test_main_adds_registry_without_disturbing_the_files_block(tmp_path, monkeyp
     project_root = tmp_path
     results_dir = project_root / "experiments" / "results"
     results_dir.mkdir(parents=True)
-    (project_root / "firebase" / "public").mkdir(parents=True)
+    (project_root / "apps" / "website").mkdir(parents=True)
 
     monkeypatch.setattr(gm, "PROJECT_ROOT", project_root)
     monkeypatch.setattr(gm, "RESULTS_DIR", results_dir)
@@ -319,7 +319,7 @@ def test_main_registry_is_empty_list_when_no_index_file_exists(tmp_path, monkeyp
     project_root = tmp_path
     results_dir = project_root / "experiments" / "results"
     results_dir.mkdir(parents=True)
-    (project_root / "firebase" / "public").mkdir(parents=True)
+    (project_root / "apps" / "website").mkdir(parents=True)
 
     monkeypatch.setattr(gm, "PROJECT_ROOT", project_root)
     monkeypatch.setattr(gm, "RESULTS_DIR", results_dir)

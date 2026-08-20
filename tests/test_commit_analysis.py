@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from instrument.commit_analysis import (
+from agentic_dynamics.measurement.commit_analysis import (
     CommitAnalysis,
     StoryAnalysis,
     _run_git,

@@ -1,0 +1,213 @@
+# Pipeline plans — phase-based orchestration via scripts/pipeline.py
+# Usage: python scripts/pipeline.py --plan <name>
+
+plans:
+  ci:
+    description: "Lint → typecheck → test → build website data"
+    phases:
+      - id: lint
+        kind: lint
+      - id: typecheck
+        kind: shell
+        cmd: [mypy, src/]
+      - id: test
+        kind: test
+        depends_on: [lint, typecheck]
+      - id: build
+        kind: shell
+        cmd: [python, scripts/build_data.py]
+        depends_on: [test]
+
+  deploy:
+    description: "Refresh inventory → sync parquet → build data.js → firebase deploy"
+    phases:
+      - id: refresh
+        kind: shell
+        cmd: [python, scripts/inventory.py, refresh]
+      - id: sync
+        kind: shell
+        cmd: [python, scripts/sync_data.py]
+        depends_on: [refresh]
+      - id: build
+        kind: shell
+        cmd: [python, scripts/build_data.py]
+        depends_on: [sync]
+      - id: deploy
+        kind: pipeline
+        cwd: apps/website
+        depends_on: [build]
+        steps:
+          - [firebase, deploy, --only, hosting]
+          - [firebase, deploy, --only, hosting, --project, agentic-dynamics]
+
+  full_matrix:
+    description: "DS baseline → Luna → analyze → reviews → regenerate → deploy"
+    phases:
+      - id: baseline_ds
+        kind: matrix
+        model: deepseek/deepseek-v4-pro
+        model_filter: deepseek
+        stories:
+          - task_manager_api
+          - static_site_gen
+          - notification_service
+        tiers:
+          - tier1_minimal
+          - tier2_small
+        conditions:
+          good: [clean, bad_seed, early_degrade]
+          bad: [clean, early_degrade]
+        workers: 4
+      - id: cross_luna
+        kind: matrix
+        depends_on: [baseline_ds]
+        model: openai/gpt-5.6-luna
+        model_filter: luna
+        workers: 4
+      - id: analyze
+        kind: shell
+        depends_on: [cross_luna]
+        cmd: [python, scripts/analyze_stories.py]
+      - id: reviews
+        kind: review
+        depends_on: [analyze]
+        review_model: deepseek/deepseek-v4-flash
+        workers: 4
+      - id: regenerate
+        kind: pipeline
+        depends_on: [reviews]
+        steps:
+          - [python, scripts/backfill_costs.py]
+          - [python, scripts/sync_data.py]
+          - [python, scripts/build_data.py]
+          - [python, scripts/lab_story_review.py]
+      - id: deploy
+        kind: pipeline
+        cwd: apps/website
+        depends_on: [regenerate]
+        steps:
+          - [firebase, deploy, --only, hosting]
+          - [firebase, deploy, --only, hosting, --project, agentic-dynamics]
+
+  cross_models:
+    description: "Flash → Haiku → Sonnet → Sol → Terra → analyze → reviews → regenerate → deploy"
+    phases:
+      - id: flash
+        kind: matrix
+        model: deepseek/deepseek-v4-flash
+        model_filter: flash
+        workers: 4
+      - id: haiku
+        kind: matrix
+        depends_on: [flash]
+        model: anthropic/claude-haiku-4-5
+        model_filter: haiku
+        workers: 4
+      - id: sonnet
+        kind: matrix
+        depends_on: [haiku]
+        model: anthropic/claude-sonnet-5
+        model_filter: sonnet
+        workers: 4
+      - id: sol
+        kind: matrix
+        depends_on: [sonnet]
+        model: openai/gpt-5.6-sol
+        model_filter: sol
+        workers: 4
+      - id: terra
+        kind: matrix
+        depends_on: [sol]
+        model: openai/gpt-5.6-terra
+        model_filter: terra
+        workers: 4
+      - id: analyze
+        kind: shell
+        depends_on: [terra]
+        cmd: [python, scripts/analyze_stories.py]
+      - id: reviews
+        kind: review
+        depends_on: [analyze]
+        review_model: deepseek/deepseek-v4-flash
+        workers: 4
+      - id: regenerate
+        kind: pipeline
+        depends_on: [reviews]
+        steps:
+          - [python, scripts/backfill_costs.py]
+          - [python, scripts/sync_data.py]
+          - [python, scripts/build_data.py]
+          - [python, scripts/lab_story_review.py]
+      - id: deploy
+        kind: pipeline
+        cwd: apps/website
+        depends_on: [regenerate]
+        steps:
+          - [firebase, deploy, --only, hosting]
+          - [firebase, deploy, --only, hosting, --project, agentic-dynamics]
+
+  feature:
+    description: "Spec → implement → lint → test → review → ship"
+    phases:
+      - id: spec
+        kind: shell
+        cmd: [opencode, run, "{prompt}", "--model", deepseek/deepseek-v4-pro, "--new"]
+      - id: implement
+        kind: shell
+        depends_on: [spec]
+        cmd: [opencode, run, "{prompt}", "--model", deepseek/deepseek-v4-pro, "--continue"]
+      - id: lint
+        kind: lint
+        depends_on: [implement]
+      - id: test
+        kind: test
+        depends_on: [implement]
+      - id: review
+        kind: review
+        depends_on: [lint, test]
+        review_model: deepseek/deepseek-v4-flash
+      - id: push
+        kind: ship
+        depends_on: [review]
+
+  ship_features:
+    description: "Parallel feature workstreams → conflict detect → PR → merge"
+    phases:
+      - id: build
+        kind: fan_out
+        workers: 3
+        workstreams:
+          auth:
+            branch: feature/auth
+            phases:
+              - {id: spec, kind: shell, cmd: [echo, "spec auth {prompt}"]}
+              - {id: impl, kind: shell, depends_on: [spec], cmd: [echo, "impl auth {prompt}"]}
+              - {id: test, kind: test, depends_on: [impl]}
+          api:
+            branch: feature/api
+            phases:
+              - {id: spec, kind: shell, cmd: [echo, "spec api {prompt}"]}
+              - {id: impl, kind: shell, depends_on: [spec], cmd: [echo, "impl api {prompt}"]}
+              - {id: test, kind: test, depends_on: [impl]}
+          docs:
+            branch: feature/docs
+            depends_on: [api]
+            phases:
+              - {id: spec, kind: shell, cmd: [echo, "spec docs {prompt}"]}
+              - {id: impl, kind: shell, depends_on: [spec], cmd: [echo, "impl docs {prompt}"]}
+      - id: conflicts
+        kind: conflict_detect
+        depends_on: [build]
+        from_fanout: build
+      - id: prs
+        kind: pr_create
+        depends_on: [conflicts]
+        from_fanout: build
+        title: "Feature: {name}"
+      - id: merge
+        kind: pr_merge
+        depends_on: [prs]
+        from_fanout: build
+        conflict_strategy: rebase
+        squash: true
+

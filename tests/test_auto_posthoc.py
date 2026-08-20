@@ -3,7 +3,7 @@
 Covers the wiring introduced in the implement phase:
 
     execute (worker.py)  --trigger_analysis-->  analyze (analysis_worker.py)
-                          --trigger_reviews-->  review (review_worker.py)
+                          --trigger_reviews-->  review (review_all.py)
 
 The four required checks:
 
@@ -30,7 +30,7 @@ from pathlib import Path
 
 import pytest
 
-import instrument.posthoc as posthoc
+import agentic_dynamics.runtime.posthoc as posthoc
 
 # scripts/ is not on the default test path (conftest only adds repo root + src),
 # so add it and load the scripts by file path under controlled module names.

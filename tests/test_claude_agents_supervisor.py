@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from admin.claude_agents_client import CURSOR_KEY_PREFIX, OWNED_SESSIONS_KEY, ROSTER_KEY
+from apps.control_room.claude_agents_client import CURSOR_KEY_PREFIX, OWNED_SESSIONS_KEY, ROSTER_KEY
 from scripts import claude_agents_supervisor as supervisor_module
 from scripts.claude_agents_supervisor import ClaudeAgentsSupervisor
 

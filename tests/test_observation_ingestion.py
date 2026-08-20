@@ -12,9 +12,9 @@ import hashlib
 
 import pytest
 
-from instrument import observation_ingestion as oi
-from instrument.knowledge import Authority, compute_entity_id
-from instrument.knowledge_ingestion import record_to_artifact
+from agentic_dynamics.control import observation_ingestion as oi
+from agentic_dynamics.knowledge.knowledge import Authority, compute_entity_id
+from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
 
 def _verdict(**overrides) -> dict:

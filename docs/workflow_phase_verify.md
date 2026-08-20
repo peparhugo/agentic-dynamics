@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Workflow Phase Badge — Verification
 
 **Goal:** publish the live workflow phase (name / index / total) from `workflow_runner` and

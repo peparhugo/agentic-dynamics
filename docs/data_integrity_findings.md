@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Data-integrity findings — the canonical record
 
 **Status:** the authoritative source for which experiment data is trustworthy and why. This

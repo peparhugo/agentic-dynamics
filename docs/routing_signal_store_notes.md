@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Signal Store — Notes
 
 > Item 1 of `docs/routing_next_steps.md`: **wire the signal store into the run path.**

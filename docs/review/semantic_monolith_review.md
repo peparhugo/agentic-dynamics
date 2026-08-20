@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Semantic Monolith Review — external critique (2026-08-20)
 
 **Provenance [X]:** operator-provided external critique, 2026-08-20. Received verbatim as

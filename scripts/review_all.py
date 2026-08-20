@@ -22,10 +22,14 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument.review import review_commit, review_story
-from instrument.story import load_story_result
+
+from agentic_dynamics.reporting.review import review_commit, review_story
+from agentic_dynamics.runtime.story import load_story_result
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "stories"
 REVIEWS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "reviews"

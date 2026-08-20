@@ -19,7 +19,7 @@ You are the **Data Analysis Agent** for AI FinOps Dynamics. Your domain is the a
            → validate_session.py → test pass/fail
 
 _results_summary.json ──┐
-_trajectory_aggregate.json ──→ build_data.py → firebase/public/data.js → web.app
+_trajectory_aggregate.json ──→ build_data.py → apps/website/data.js → web.app
 inventory.json             ──┘
 ```
 
@@ -35,7 +35,7 @@ inventory.json             ──┘
 - Behavioral: lab_grit_matrix, lab_flail_triggers, lab_tool_archetypes, lab_condition_effects
 - Strategy/topology: lab_task_routing, lab_basin_topology, lab_basin_topology_neo4j, lab_survival_horizon
 - Advanced/meta: lab_sonar_quality, lab_think_do_coupling, lab_story_review, lab_story_arc, lab_opencode_meta_analysis
-- DEPRECATED: 8 `*_DEPRECATED_bge_m3` scripts — ignore these
+- DEPRECATED: 15 archived one-time migrations in `scripts/archive/` — ignore these
 
 ### Data Dependencies (always verify freshness)
 - `experiments/inventory.json` ← `inventory.py refresh`
@@ -86,7 +86,7 @@ firebase deploy --only hosting --project agentic-dynamics   # mirror — deploy 
 
 ### Gotchas
 - Always `inventory.py refresh` before analysis — stale inventory corrupts results
-- `firebase/public/data.js` is generated — never edit directly
+- `apps/website/data.js` is generated — never edit directly
 - SonarQube needs Docker: `docker-compose up -d sonarqube`
 - Worktrees at `/tmp/exp_*` may be cleaned by reboot — backfill first
 - opencode.db path: `~/.local/share/opencode/opencode.db` or env `OPENCODE_DB`

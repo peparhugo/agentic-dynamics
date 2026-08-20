@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import instrument.opencode_analyzer as analyzer_module
-from instrument.opencode_analyzer import (
+import agentic_dynamics.reporting.opencode_analyzer as analyzer_module
+from agentic_dynamics.reporting.opencode_analyzer import (
     OpencodeAnalyzer,
     _build_batch_prompt,
     _build_comparison_prompt,

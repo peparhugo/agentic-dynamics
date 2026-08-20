@@ -5,7 +5,7 @@ Covers the POLICY/[P] provenance, the required-``causes`` construction-time chec
 identity derivation ("one identity per candidate, not per session" — design §3), the
 reused artifact/event contract, and — the plan's own explicit CI-enforced invariant
 (``docs/canonical_state_r2_plan.md`` step 6) — that this producer's ONLY call site is the
-Control Room's steer/interrupt handlers (``admin/server.py``); ``scripts/supervise.py`` and
+Control Room's steer/interrupt handlers (``apps/control_room/server.py``); ``scripts/supervise.py`` and
 ``src/instrument/workflow_runner.py`` stay call-site-free.
 """
 
@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from instrument import actuation_ingestion as ai
-from instrument.knowledge import Authority
-from instrument.knowledge_ingestion import record_to_artifact
+from agentic_dynamics.control import actuation_ingestion as ai
+from agentic_dynamics.knowledge.knowledge import Authority
+from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -139,7 +139,7 @@ def _calls_derive_actuation_record(path: Path) -> bool:
 
 def test_no_call_sites_construct_actuation_records():
     # design §5b / §13: the ONLY legitimate actuation call site today is the Control
-    # Room's steer/interrupt handlers (admin/server.py: _emit_actuation_record, wired
+    # Room's steer/interrupt handlers (apps/control_room/server.py: _emit_actuation_record, wired
     # per review §5.4 — the human-gated "why did the system act" audit trail). The
     # supervisor and workflow runner must stay call-site-free: a control rule for
     # actuation in a compiled ExperimentSpec is still the prerequisite for any OTHER

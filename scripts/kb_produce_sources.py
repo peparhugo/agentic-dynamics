@@ -48,14 +48,18 @@ from pathlib import Path
 
 # scripts/ → repo root → src, so the local instrument package wins over any installed one
 # (matches the bootstrap in worker.py / kb_worker.py / kb_produce.py).
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument import code_ingestion as ci  # noqa: E402
-from instrument import knowledge_stream as ks  # noqa: E402
-from instrument import policy_ingestion as pi  # noqa: E402
-from instrument import quality_ingestion as qi  # noqa: E402
-from instrument import spec_ingestion as si  # noqa: E402
-from instrument.paths import KB_ARTIFACT_DIR  # noqa: E402
+
+from agentic_dynamics.knowledge import code_ingestion as ci  # noqa: E402
+from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
+from agentic_dynamics.knowledge import policy_ingestion as pi  # noqa: E402
+from agentic_dynamics.knowledge import quality_ingestion as qi  # noqa: E402
+from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
+from agentic_dynamics.core.paths import KB_ARTIFACT_DIR  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -193,7 +197,7 @@ def build_event(record):
     derived from the record inside ``spec_ingestion.spec_event``, so this function only has to
     route to it rather than re-implement the rules.
     """
-    from instrument.knowledge_ingestion import record_to_event
+    from agentic_dynamics.knowledge.knowledge_ingestion import record_to_event
 
     if record.source_type == si.SOURCE_TYPE:
         return si.spec_event(record)
@@ -215,7 +219,7 @@ def emit_records(r, records: list) -> tuple[int, int]:
             continue
         # The fixed producer contract (knowledge_ingestion): serialize to the per-record JSON
         # artifact, then emit a pointer-only event whose content_hash covers those exact bytes.
-        from instrument.knowledge_ingestion import record_to_artifact
+        from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
         artifact = record_to_artifact(record)
         KB_ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)

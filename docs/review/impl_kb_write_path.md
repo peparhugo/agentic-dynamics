@@ -1,3 +1,7 @@
+---
+status: implemented
+implemented_by: feature/kb-write-path
+---
 # Implementation trace — R4 / R6 / R8 (KB write-path dedup)
 
 This is the *implementation trace* companion to `docs/review/restructure.md` §3

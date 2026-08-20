@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from instrument.language import (
+from agentic_dynamics.core.language import (
     _PROFILES,
     detect_language,
     get_parser,

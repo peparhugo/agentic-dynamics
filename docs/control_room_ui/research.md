@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room UI Redesign — Research Reference
 
 > Phase: **research** (`control_room_ui_redesign` spec, phase 1 of 3).

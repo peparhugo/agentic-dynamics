@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room Live Design Sessions
 
 The Control Room remains one operational surface: reported spend and burn establish financial context, the fleet shows active work, and the terminal explains what the selected agent is doing. Live design sessions extend that chain upstream so an operator can move from intent to a validated `ExperimentSpec` without leaving the command rail.

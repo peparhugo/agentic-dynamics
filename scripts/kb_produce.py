@@ -31,12 +31,16 @@ from pathlib import Path
 
 # scripts/ → repo root → src, so the local instrument package wins over any installed one
 # (matches the bootstrap in worker.py / kb_worker.py).
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
 
-from instrument import knowledge_ingestion as ki  # noqa: E402
-from instrument import knowledge_stream as ks  # noqa: E402
-from instrument.paths import KB_ARTIFACT_DIR  # noqa: E402
-from instrument.signal_store import load_results  # noqa: E402
+
+from agentic_dynamics.knowledge import knowledge_ingestion as ki  # noqa: E402
+from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
+from agentic_dynamics.core.paths import KB_ARTIFACT_DIR  # noqa: E402
+from agentic_dynamics.control.signal_store import load_results  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))

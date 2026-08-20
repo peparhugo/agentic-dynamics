@@ -15,8 +15,13 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 import redis
-from _constants import SESSION_TIMEOUT, STORY_SESSIONS
+from agentic_dynamics.core.constants import SESSION_TIMEOUT, STORY_SESSIONS
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -31,10 +36,8 @@ IDLE_POLLS_BEFORE_EXIT = 12  # 12 × 10s = 2 minutes idle → exit
 REDIS_MAX_RETRIES = 10
 REDIS_BASE_DELAY = 2.0  # seconds, doubled each retry
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-
-from instrument.live import LivePublisher  # noqa: E402
-from instrument.posthoc import trigger_analysis  # noqa: E402
+from agentic_dynamics.control.live import LivePublisher  # noqa: E402
+from agentic_dynamics.runtime.posthoc import trigger_analysis  # noqa: E402
 
 
 def log(msg: str) -> None:

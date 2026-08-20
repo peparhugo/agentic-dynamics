@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Architecture Visual
 
 ## Purpose

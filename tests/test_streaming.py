@@ -2,7 +2,7 @@
 
 import sys
 
-from instrument.streaming import stream_subprocess
+from agentic_dynamics.core.streaming import stream_subprocess
 
 
 def test_captures_stdout_and_stderr():

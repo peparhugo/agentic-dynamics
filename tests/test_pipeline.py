@@ -414,7 +414,7 @@ class TestPythonModulesLoad:
     def test_load_plans_yaml(self):
         plan_path = (
             Path(__file__).resolve().parent.parent
-            / "experiments" / "configs" / "plans.yaml"
+            / "experiments" / "definitions" / "configs" / "plans.yaml"
         )
         plans = load_plans(plan_path)
         assert {"ci", "deploy", "full_matrix", "feature", "ship_features"} <= set(plans)
@@ -426,7 +426,7 @@ class TestPythonModulesLoad:
     def test_plan_ci_correct_deps(self):
         plan_path = (
             Path(__file__).resolve().parent.parent
-            / "experiments" / "configs" / "plans.yaml"
+            / "experiments" / "definitions" / "configs" / "plans.yaml"
         )
         plans = load_plans(plan_path)
         ci = plans["ci"]
@@ -439,7 +439,7 @@ class TestPythonModulesLoad:
     def test_plan_feature_correct_deps(self):
         plan_path = (
             Path(__file__).resolve().parent.parent
-            / "experiments" / "configs" / "plans.yaml"
+            / "experiments" / "definitions" / "configs" / "plans.yaml"
         )
         plans = load_plans(plan_path)
         feature = plans["feature"]
@@ -627,7 +627,7 @@ class TestFanOutYaml:
     def test_load_ship_features(self):
         plan_path = (
             Path(__file__).resolve().parent.parent
-            / "experiments" / "configs" / "plans.yaml"
+            / "experiments" / "definitions" / "configs" / "plans.yaml"
         )
         plans = load_plans(plan_path)
         sf = plans["ship_features"]
@@ -659,7 +659,7 @@ class TestFanOutYaml:
     def test_nested_phase_depends_on(self):
         plan_path = (
             Path(__file__).resolve().parent.parent
-            / "experiments" / "configs" / "plans.yaml"
+            / "experiments" / "definitions" / "configs" / "plans.yaml"
         )
         plans = load_plans(plan_path)
         sf = plans["ship_features"]
@@ -681,7 +681,7 @@ class TestSaveResultsRegistryEmission:
 
     def test_skips_emission_when_kb_write_unset(self, tmp_path, monkeypatch):
         import run
-        from instrument import knowledge_stream as ks
+        from agentic_dynamics.knowledge import knowledge_stream as ks
 
         monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
 
@@ -695,7 +695,7 @@ class TestSaveResultsRegistryEmission:
 
     def test_emits_registry_event_when_kb_write_enabled(self, tmp_path, monkeypatch):
         import run
-        from instrument import knowledge_stream as ks
+        from agentic_dynamics.knowledge import knowledge_stream as ks
 
         monkeypatch.setenv("FINOPS_KB_WRITE", "1")
         published = []

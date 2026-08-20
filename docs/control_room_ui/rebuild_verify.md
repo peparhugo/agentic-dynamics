@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room UI Rebuild — Implementation Verification
 
 > **Scope.** This document traces the **rebuilt implementation** in `admin/static/` back to

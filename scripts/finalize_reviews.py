@@ -1,6 +1,6 @@
 """finalize_reviews.py — Merge per-session review files into aggregate JSONs.
 
-review_worker.py writes one file per session (review_{story_id}_S{n}.json)
+The review runner writes one file per session (review_{story_id}_S{n}.json)
 plus review_{story_id}_story.json. This merges them into the aggregate
 review_{story_id}.json that build_data.py and the website consume.
 
@@ -19,7 +19,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
 
 REVIEWS_DIR = ROOT / "experiments" / "results" / "reviews"
 MODEL = "deepseek/deepseek-v4-flash"
@@ -74,9 +78,9 @@ def _finalize_story(story_id: str) -> bool:
     # try/except) once the flag is set — see story.py:save_story_result's docstring for
     # why this class of call site intentionally lets a downed knowledge stream raise.
     if os.environ.get("FINOPS_KB_WRITE") == "1":
-        from instrument.knowledge_ingestion import REPOSITORY_ID
-        from instrument.knowledge_stream import register_records
-        from instrument.review_ingestion import derive_review_records
+        from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
+        from agentic_dynamics.knowledge.knowledge_stream import register_records
+        from agentic_dynamics.knowledge.review_ingestion import derive_review_records
 
         register_records(
             derive_review_records(data, repository_id=REPOSITORY_ID),

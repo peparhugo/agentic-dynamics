@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-20T17:28:43.862621+00:00`  ·  77 spec(s)
+Generated at: `2026-08-20T18:36:26.354063+00:00`  ·  77 spec(s)
 
 | name | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|
@@ -25,7 +25,6 @@ Generated at: `2026-08-20T17:28:43.862621+00:00`  ·  77 spec(s)
 | `consolidation_stage_4_instruction_surfaces` | active | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_5_apps_realignment` | active | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_6_verification_release` | active | 0.1 | — | — | — | — | — | 0 |
-| `context_abstraction_implement` | active | 0.1 | — | 2026-08-20 00:56 | fail | anthropic/claude-opus-5 | $0.0000 | 2 |
 | `context_abstraction_plane` | active | 0.1 | — | 2026-08-19 23:03 | ok | anthropic/claude-opus-5 | $10.3774 | 1 |
 | `control_room_hardening` | active | 0.1 | — | 2026-08-18 23:56 | ok | deepseek/deepseek-v4-pro | $0.1898 | 1 |
 | `control_room_portal` | active | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
@@ -84,6 +83,7 @@ Generated at: `2026-08-20T17:28:43.862621+00:00`  ·  77 spec(s)
 | `website_repoint` | active | 0.1 | — | 2026-08-19 23:08 | ok | deepseek/deepseek-v4-pro | $0.3304 | 2 |
 | `website_rewrite` | active | 0.3 | — | 2026-08-17 21:00 | ok | openai/gpt-5.6-sol | $12.6287 | 3 |
 | `workflow_step_routing` | active | 0.2 | — | 2026-08-14 21:45 | ok | deepseek/deepseek-v4-pro | $0.0796 | 1 |
+| `context_abstraction_implement` | draft | 0.1 | — | 2026-08-20 00:56 | fail | anthropic/claude-opus-5 | $0.0000 | 2 |
 
 ## Legend
 

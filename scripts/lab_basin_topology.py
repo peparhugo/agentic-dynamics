@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_basin_topology.json"
 
-from _constants import MODEL_LABELS
+from agentic_dynamics.core.constants import MODEL_LABELS
 
 
 def compute_recovery_multiplier(entries, model_id, pert_class):

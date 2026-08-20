@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # OpenCode Docs Refresh — Spec
 
 Concrete design for two coupled pieces of work: (1) fix verified drift between this

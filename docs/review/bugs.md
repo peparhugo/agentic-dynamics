@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Code review — concrete bugs
 
 Phase 2 (bugs) of `repo_review_fable`. Each finding carries `file:line`, a one-line

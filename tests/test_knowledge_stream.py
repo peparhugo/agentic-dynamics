@@ -15,8 +15,8 @@ import pytest
 # per-test flushdb() cannot wipe the live corpus.
 os.environ.setdefault("FINOPS_KB_DB", "15")
 
-from instrument import knowledge_stream as ks
-from instrument.knowledge import KnowledgeEvent
+from agentic_dynamics.knowledge import knowledge_stream as ks
+from agentic_dynamics.knowledge.knowledge import KnowledgeEvent
 
 #: The DB every fixture in this module connects to, resolved HERE rather than relied upon
 #: through ``ks.REDIS_DB``.

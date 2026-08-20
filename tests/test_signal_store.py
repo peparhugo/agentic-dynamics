@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from instrument.signal_store import (
+from agentic_dynamics.control.signal_store import (
     MODEL_ALIASES,
     build_signal_store,
     derive_cache_hit_rate,

@@ -16,7 +16,7 @@ SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_PATH = ROOT / "experiments" / "results" / "_trajectory_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_flail_triggers.json"
 
-from _constants import MODEL_LABELS, normalize_task
+from agentic_dynamics.core.constants import MODEL_LABELS, normalize_task
 
 
 def compute():

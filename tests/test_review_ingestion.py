@@ -13,9 +13,9 @@ import hashlib
 
 import pytest
 
-from instrument import review_ingestion as ri
-from instrument.knowledge import Authority, compute_entity_id
-from instrument.knowledge_ingestion import record_to_artifact
+from agentic_dynamics.knowledge import review_ingestion as ri
+from agentic_dynamics.knowledge.knowledge import Authority, compute_entity_id
+from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
 
 def _review(**overrides) -> dict:

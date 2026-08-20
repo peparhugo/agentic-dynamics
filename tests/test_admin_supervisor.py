@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from admin import server
-from instrument.supervisor import (
+from apps.control_room import server
+from agentic_dynamics.control.supervisor import (
     SUPERVISOR_FLAGS_KEY,
     SUPERVISOR_SESSION_CELLS_KEY,
     canonical_json,

@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Evidence Page Narrative Design
 
 ## 1. Golden-Circle Thesis

@@ -8,9 +8,9 @@ same knowledge_id; a changed body yields a different one), the MEASURED/[M] prov
 and the batch-derivation pre-filter for a story with no story_id.
 """
 
-from instrument import story_ingestion as si
-from instrument.knowledge import Authority, compute_entity_id
-from instrument.knowledge_ingestion import record_to_artifact
+from agentic_dynamics.knowledge import story_ingestion as si
+from agentic_dynamics.knowledge.knowledge import Authority, compute_entity_id
+from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
 
 def _story_result(**overrides) -> dict:

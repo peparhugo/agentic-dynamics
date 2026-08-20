@@ -4,7 +4,7 @@
 A persistent inventory of all experiments, worktrees, and opencode sessions.
 Rebuild with `refresh`, then query instantly with `list`, `stats`, `worktrees`, `report`.
 
-Sources: opencode.db SQLite, /tmp/exp_* worktrees, experiments/results/*.json, experiments/configs/*.yaml
+Sources: opencode.db SQLite, /tmp/exp_* worktrees, experiments/results/*.json, experiments/definitions/configs/*.yaml
 """
 
 import argparse
@@ -19,7 +19,12 @@ INVENTORY_PATH = PROJECT_ROOT / "experiments" / "inventory.json"
 OPENSCODE_DB = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 CONFIGS_DIR = PROJECT_ROOT / "experiments" / "configs"
-from _constants import WORKTREE_GLOB
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
+from agentic_dynamics.core.constants import WORKTREE_GLOB
 
 
 def _now():
@@ -38,7 +43,7 @@ def _fmt_int(v):
     return f"{v:,}"
 
 
-from _constants import EXPERIMENT_SESSION_PATTERNS
+from agentic_dynamics.core.constants import EXPERIMENT_SESSION_PATTERNS
 
 
 def _is_experiment_title(title: str) -> bool:

@@ -4,7 +4,7 @@ from collections import Counter
 
 import pytest
 
-from instrument.queue_reinterleave import reinterleave_cells
+from agentic_dynamics.control.queue_reinterleave import reinterleave_cells
 
 
 def _cell(provider: str, idx: int) -> dict:
