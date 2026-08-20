@@ -1,0 +1,162 @@
+name: semantic_integrity_release
+question: >-
+  Execute the semantic-integrity release (docs/review/semantic_integrity_review.md — external,
+  operator-provided review of main at 35ef34310, every load-bearing claim re-verified) as small
+  incremental stages: quarantine legacy labs, create the canonical lab contract with
+  publication-eligible lineage, rebuild derived outputs from canonical records only, resolve the
+  Grit collision, rewrite the specialist agent context around the eight planes, extend the guards
+  to agent_config/** (semantic checks, not format), split and actually exercise the reproduction
+  pipeline in CI, finish the lifecycle backfill, invert the Control Room service locator, hygiene
+  + CAP placeholder files, and verify end-to-end. No CAP implementation beyond placeholder files.
+  The load-bearing rule extends to the publication boundary: every derived finding the website
+  publishes must carry provable canonical lineage.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      review: >-
+        READ docs/review/semantic_integrity_review.md FIRST — the authoritative input; each phase
+        executes one of its findings. P0 lab pipeline bypasses the canonical boundary
+        (build_data.py:355 + _load_labs():914 load lab JSONs with zero provenance; 10 labs read
+        _results_summary.json; Grit has two meanings — README formal definition vs
+        lab_grit_matrix.py quadrant). P1 skills stale (control-room/instrument/run-workflow;
+        test_stale_path_guard.py does not scan agent_config/). P1 reproduce.sh includes the Neo4j
+        lab unconditionally (:56-57); Dockerfile copies no conventions/ or apps/. P2 lifecycle
+        marks old workflows running without lease (6 entries). P2 control_room routes import
+        server as service locator (5 modules). P3 hygiene (.scannerwork tracked, unpinned CI,
+        ARCHITECTURE.md placeholder wording, README drift). Neutral-intent capability schema
+        (P1/P2) is sequenced AFTER the lab contract + context guards — it re-touches the new
+        renderers.
+      current_state: >-
+        Refactor-repair release merged at 35ef34310: 1286 tests green, 78 specs compile-gated,
+        artifact_kind/intent/repeatable metadata on all specs, two renderers with per-target
+        validators, runtime-owned routing/telemetry protocols, signal registry, Control Room +
+        story splits. The queue is cleared. CAP is frozen with reserved homes (uncreated). This
+        release makes the publication path and the agent context provably canonical — the
+        review's stated prerequisite for CAP I0.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests (runner pytest-gates each
+        python phase). (2) The load-bearing rule extends to publication: after s2, a lab without
+        a matching manifest identity cannot feed the website — enforce in code, not convention.
+        (3) Data-integrity policy (docs/data_integrity_findings.md) is authoritative: nothing
+        resurrects _results_summary.json as a live source; the MANIFOLD/SEMANTIC taxonomy is
+        retired except in explicitly historical framing. (4) Operational invariants survive:
+        Redis isolation (6380/6379), dual Firebase (apps/website/, public "."), Control Room
+        observe-only. (5) No CAP implementation — s10 only creates the placeholder files
+        (docstring + '# reserved for CAP I<n>') so ARCHITECTURE.md becomes true. (6) Guards may
+        only be strengthened. (7) The neutral-intent capability schema (P1/P2) does NOT land in
+        this release — a follow-up phase's guard must not block on it. (8) Append PASS/FAIL per
+        acceptance criterion to docs/consolidation/execution_log.md's semantic-integrity section
+        (checkpoint discipline; resumable via --resume).
+      read_first: >-
+        docs/review/semantic_integrity_review.md, docs/data_integrity_findings.md,
+        ARCHITECTURE.md, scripts/build_data.py, scripts/reproduce.sh, Dockerfile,
+        tests/test_stale_path_guard.py, tests/test_data_integrity.py, agent_config/ (agents +
+        skills), apps/control_room/routes/, src/agentic_dynamics/experiment/spec_status.py
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/semantic-integrity); each phase commits [workflow] <phase>. Continuous run;
+        resumable with --resume.
+    phases:
+      - name: s1_lab_quarantine
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: review item 1 (quarantine) — classify EVERY lab script in scripts/lab_*.py as lab_status: canonical | historical | quarantined + publication_eligible: true|false, recorded in a machine-readable manifest (e.g. scripts/lab_manifest.json + a guard test parsing it). Quarantine the summary-reading labs: remove them from reproduce.sh's default lab set AND from build_data's default lab loading (publication). A quarantined lab keeps its file (historical) but is not run by reproduce and not published.
+          LOG: PASS/FAIL per criterion (every lab classified; quarantined labs out of reproduce + publication; guard test added); commit.
+      - name: s2_lab_contract
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          FIX: review item 2 (contract) — every publication-eligible lab output JSON must embed: input_dataset_id, input_manifest_sha256, registry_version, metric_definition_version, data_integrity_policy, requires_external_service. labs consume only a canonical exported table or the registry resolver — never _results_summary.json, arbitrary result globs, or unfiltered raw story files. build_data.py rejects any lab JSON whose embedded manifest hash does not match the current data_manifest.json (and logs the rejection with the lab name). Add tests: a stale-manifest lab JSON is rejected; a summary-reading lab cannot be publication_eligible.
+          LOG: PASS/FAIL; commit.
+      - name: s3_rebuild_outputs
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: review item 3 — regenerate every publication-eligible lab output from current canonical records only (registry resolver / canonical export), then rebuild data.js. Verify zero lab outputs carry the retired summary's lineage; the site's lab sections draw only from contract-bearing JSONs.
+          LOG: PASS/FAIL; commit.
+      - name: s4_grit_resolution
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: review item 4 — resolve the Grit collision. Either (a) rename lab_grit_matrix.py -> lab_correctness_escape_quadrants.py (output key, website section, docs, CLI 'analyze lab' references) and reserve 'Grit' for the README's formal definition, or (b) reimplement the lab to compute the formal G(s) = P(test_executed_success | perturbation_strength=s) from canonical records. Choose the option the data supports; document the decision in the lab manifest (metric_definition_version bump). README + website must use ONE meaning afterward.
+          LOG: PASS/FAIL; commit.
+      - name: s5_agent_context_rewrite
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          FIX: review item 5 — rewrite EVERY file under agent_config/agents/ and agent_config/skills/ around the eight-plane architecture: current paths (src/agentic_dynamics/*, apps/, workflows/, experiments/definitions), current imports (agentic_dynamics.control.routing etc.), current commands (agentic-dynamics CLI), the measured-signal vocabulary, no SEMANTIC/MANIFOLD taxonomy, no module/line counts unless generated. Regenerate .opencode/ + .claude/ via the renderers.
+          LOG: PASS/FAIL; commit.
+      - name: s6_semantic_context_guards
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: review item 6 — extend the stale-path guard to the complete agent_config/** tree (agents + skills + rules + mental-model), upgrading from path-family rejection to SEMANTIC checks: referenced repo paths exist; Python import examples resolve against the package; named CLI commands exist in the CLI table; named scripts exist; retired package imports are absent; retired taxonomy terms absent except in historical framing; no hard-coded module/line counts. Wire into the suite; fix every agent_config file it flags.
+          LOG: PASS/FAIL; commit.
+      - name: s7_repro_split
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: review item 7 — split reproduce.sh into 'reproduce core' (deterministic, no external services, canonical registry only) and opt-in '--with-neo4j' / '--with-sonar' flags (the Neo4j basin lab becomes opt-in). Fix the Dockerfile: COPY conventions/ and apps/ (or document persistence), correct entrypoint to run the CORE pipeline, make data.js output persistable (mount docs). CI: run the actual container command on a small checked-in fixture (not just build + dry-run).
+          LOG: PASS/FAIL; commit.
+      - name: s8_lifecycle_backfill
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          FIX: review item 8 — running requires evidence of current execution (active lease/heartbeat OR a live run in the ledger window); otherwise historical attempts yield failed | blocked | completed | superseded per the ledger. Backfill the 6 stale 'running' entries to their honest states. Add lifecycle vocabulary draft|runnable|running|failed|blocked|completed|superseded|tombstoned to derive_status + tests for each transition.
+          LOG: PASS/FAIL; commit.
+      - name: s9_control_room_di
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: review P2 (service locator) — introduce a ControlRoomServices dataclass (telemetry, registry, supervisor, design_sessions) passed into route registration; routes receive it instead of importing server and reading _server._DUCK/_DEMO_MODE. Behavior-identical: the admin/control-room test suite passes unchanged (monkeypatch via the injected services). Local change only — no repository-wide refactor.
+          LOG: PASS/FAIL; commit.
+      - name: s10_hygiene_cap_placeholders
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          FIX: review P3 — create the CAP placeholder files exactly as ARCHITECTURE.md §4 describes (control/facts.py, control/reducers/__init__.py, control/context_compiler.py, control/rules.py, control/validator.py, control/decisions.py, core/contracts.py — each: module docstring + '# reserved for CAP I<n>', nothing more) so the doc becomes true. Add .scannerwork/ to .gitignore and untrack .scannerwork/.sonar_lock. Pin CI dependency/action versions. Fix README counts + deploy paths against the current tree.
+          LOG: PASS/FAIL; commit.
+      - name: s11_verification
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: release gate — coverage proof vs docs/review/semantic_integrity_review.md (every P0/P1/P2/P3 finding -> a phase -> PASS in the execution log; the P1/P2 neutral-intent schema explicitly deferred with a pointer). Full suite green; every guard suite green (incl. the extended agent_config semantic guards + lab contract tests); compile-gate all specs; CI-equivalent gates re-run (docker build, container core run on fixture where feasible, CLI --help, reproduce core --dry-run); invariant audit (Redis, Firebase, CAP frozen-not-implemented, no _results_summary.json in any publication-eligible input). Write docs/review/semantic_integrity_verification.md with PASS/FAIL per check and the final verdict.
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: semantic_integrity_released
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [labs_quarantined, lab_contract_enforced, outputs_canonical, context_canonical]
+metrics:
+  - {name: labs_quarantined, agg: mean, over: cell}
+  - {name: lab_contract_enforced, agg: mean, over: cell}
+  - {name: outputs_canonical, agg: mean, over: cell}
+  - {name: context_canonical, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, s1_lab_quarantine, s2_lab_contract, s3_rebuild_outputs, s4_grit_resolution,
+             s5_agent_context_rewrite, s6_semantic_context_guards, s7_repro_split,
+             s8_lifecycle_backfill, s9_control_room_di, s10_hygiene_cap_placeholders, s11_verification]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
