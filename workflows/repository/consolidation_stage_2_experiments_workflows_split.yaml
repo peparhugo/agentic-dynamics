@@ -11,6 +11,13 @@ question: >-
   reporting/ structure (see docs/consolidation/stage_map.md §5). The classification rule and known
   re-homes are in docs/consolidation/design.md §4.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+status: completed
 workflow:
   kind: agent_task
   params:

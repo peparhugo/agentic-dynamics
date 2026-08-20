@@ -5,6 +5,12 @@ question: >-
   correctness is flat (prompt quality is not the binding constraint); P2 says flail/cost should drop;
   P4 says the current thin KB caps the effect, so a null here is expected and is information.
 version: "0.1"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
 workflow:
   kind: agent_task
   params:

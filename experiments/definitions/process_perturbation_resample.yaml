@@ -4,6 +4,12 @@ question: >-
   class, n=16 under the obsolete 2-way taxonomy) under the current 3-way taxonomy change the
   "zero high-grit under manifold" conclusion and the basin-topology drift estimates?
 version: "0.1"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
 workflow:
   kind: task
   params:

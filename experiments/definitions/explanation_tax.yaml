@@ -9,6 +9,12 @@ question: >-
   `reasoning` is a DeepSeek-only side-channel (Claude folds thinking into output_tokens and
   reports reasoning=0) and is excluded from every cross-provider claim.
 version: "0.2"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
 workflow:
   kind: task
   params:

@@ -54,9 +54,12 @@ bounded planes (`ARCHITECTURE.md` §1; the dependency direction is enforced by
 | `reporting` | research output — game_report, review, analyzers | 4 |
 
 Tier map: `core` (0) ← `experiment/measurement/runtime/adapters/knowledge/reporting` (1) ←
-`control` (2) ← `apps` (3). The only tier-1→tier-2 edges are the pinned observe-only seam
-(`runtime.workflow_runner → control.step_routing/live`; `adapters.opencode`/`claude_adapter →
-control.live`).
+`control` (2) ← `apps` (3). The only tier-1→tier-2 edges are the pinned adapter telemetry seam
+(`adapters.opencode`/`claude_adapter → control.live`); `runtime.workflow_runner` is
+dependency-inverted (Debt-2) — it consumes the runtime-owned `Router`/`TelemetryPublisher`
+protocols (`runtime/routing.py`/`runtime/telemetry.py`) with the control implementations
+(`control.step_routing.route_step`, `control.live.LivePublisher`) injected at the composition
+root (`scripts/run_workflow.py`), so runtime never imports control.
 
 ## The spec/compiler layer — WRITTEN
 
@@ -369,7 +372,7 @@ inventory.py, build_data.py, sync_data.py, analyze_worktrees.py, analyze_traject
 validate_session.py, enqueue.py + worker.py, review_all.py (+ review_stories.py/
 trigger_reviews.py/enqueue_reviews.py/finalize_reviews.py), monitor.py, generate_manifest.py.
 
-admin/server.py — Control Room portal: SSE telemetry, routing, supervisor flags,
+apps/control_room/server.py — Control Room portal: SSE telemetry, routing, supervisor flags,
 design sessions, Claude background sessions (port 8000, FINOPS_PORT). Full route
 list: scripts/CONTEXT.md.
 .opencode/tools/dashboard.ts — pull tool: Redis status matrix via monitor.py --json

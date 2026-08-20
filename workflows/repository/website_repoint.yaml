@@ -5,6 +5,12 @@ question: >-
   the stale DeepSeek pricing + peak/off-peak, and make the corpus counts canonical. The root cause
   is two sources of truth — data.js (regenerated) vs hand-authored HTML fallbacks/claims — diverging.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

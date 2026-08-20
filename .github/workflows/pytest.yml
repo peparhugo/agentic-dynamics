@@ -50,3 +50,65 @@ jobs:
           python scripts/build_data.py --dry-run
         env:
           ALLOW_MISSING_EXPERIMENT_DATA: "1"
+
+  # Refactor-repair P1-1 gates: a clean Docker build must succeed, and both
+  # reproduction entrypoints (CLI + reproduce.sh) must at least parse + dispatch.
+  repro:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install package (console entry point)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[admin]"
+
+      - name: Gate — CLI resolves and prints help (agentic-dynamics --help)
+        run: agentic-dynamics --help
+
+      - name: Gate — reproduction entrypoint dry-run (scripts/reproduce.sh --dry-run)
+        run: bash scripts/reproduce.sh --dry-run
+
+      - name: Gate — clean image build (docker build .)
+        run: docker build .
+
+  # Refactor-repair P1-2 (packaging): the CLI is checkout-only — it forwards to repo-level
+  # scripts/ which a wheel does not ship. This job proves the wheel install is honest about
+  # that: `--help` works and documents the requirement, and dispatching a command emits a
+  # clear "checkout required" message with a non-zero exit.
+  packaging:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Build wheel
+        run: python -m pip wheel . --no-deps -w dist/
+
+      - name: Install wheel into a clean venv (no checkout scripts/)
+        run: |
+          python -m venv /tmp/wheel-venv
+          /tmp/wheel-venv/bin/pip install --no-deps dist/*.whl
+
+      - name: Gate — installed CLI --help documents checkout-only
+        run: /tmp/wheel-venv/bin/agentic-dynamics --help | grep -qi "checkout-only"
+
+      - name: Gate — command from a wheel (no scripts/) requires a checkout
+        run: |
+          set +e
+          /tmp/wheel-venv/bin/agentic-dynamics experiment run >/dev/null 2>/tmp/wheel-command.err
+          rc=$?
+          set -e
+          grep -q "checkout required" /tmp/wheel-command.err
+          test "$rc" -ne 0

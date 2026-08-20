@@ -1,7 +1,5 @@
 ---
 description: Run the full data pipeline from inventory to website deploy
-agent: build
-subtask: true
 ---
 
 Run the complete data pipeline: inventory refresh → analysis → website build → deploy.

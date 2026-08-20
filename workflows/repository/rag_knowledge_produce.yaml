@@ -7,6 +7,12 @@ question: >-
   first heartbeat. The retrieval/constructor/identity core and the consumer side already exist on
   main; only the producer is missing.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

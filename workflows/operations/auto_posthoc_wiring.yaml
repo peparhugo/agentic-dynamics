@@ -6,6 +6,12 @@ question: >-
   results are already ready with no manual enqueue step (the 2026-08-15 gap removed by
   construction)?
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
 workflow:
   kind: agent_task
   params:

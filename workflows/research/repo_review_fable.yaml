@@ -6,6 +6,12 @@ question: >-
   experiments and real workflows — each with file:line evidence and actionable recommendations.
   Run once with claude-fable-5 (now passed through to the real Claude Code model).
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

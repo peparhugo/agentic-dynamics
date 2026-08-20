@@ -5,6 +5,12 @@ question: >-
   four gaps fable5's own verify phase flagged, then produce a file-by-file implementation plan.
   Run once per model (deepseek + fable5) to produce two competing refined designs.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

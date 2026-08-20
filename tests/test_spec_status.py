@@ -19,6 +19,7 @@ from agentic_dynamics.experiment.spec_status import (
     INDEX_SCHEMA_VERSION,
     MISSING,
     STATUS_ORDER,
+    RunSummary,
     SpecStatusEntry,
     build_index,
     collect_entries,
@@ -187,6 +188,93 @@ def test_run_history_never_demotes_a_spec_to_draft(repo: Path):
     assert entry.n_runs == 0
 
 
+# ── P1-4: per-kind status semantics ─────────────────────────────
+
+
+def _run(ok: bool | None) -> RunSummary:
+    """A minimal run summary with the given success flag."""
+    return RunSummary(path="experiments/results/workflows/wf/run.json", timestamp="", ok=ok)
+
+
+def _workflow(**kw: object) -> ExperimentSpec:
+    """A non-repeatable workflow — the P1-4 work-order shape."""
+    return _spec("wf", artifact_kind="workflow", repeatable=False, **kw)
+
+
+def test_nonrepeatable_workflow_never_run_is_runnable():
+    assert derive_status(_workflow()) == "runnable"
+    assert derive_status(_workflow(), runs=[]) == "runnable"
+
+
+def test_nonrepeatable_workflow_with_only_failed_runs_is_running():
+    assert derive_status(_workflow(), runs=[_run(False)]) == "running"
+    # A run whose outcome is unrecorded (ok=None) is evidence of activity, not of success.
+    assert derive_status(_workflow(), runs=[_run(None)]) == "running"
+
+
+def test_nonrepeatable_workflow_with_a_successful_run_is_completed():
+    assert derive_status(_workflow(), runs=[_run(True)]) == "completed"
+    # Once completed, a later failed re-run must not un-complete the one-shot.
+    assert derive_status(_workflow(), runs=[_run(True), _run(False)]) == "completed"
+
+
+def test_nonrepeatable_workflow_respects_authored_status_and_supersession():
+    # Authored draft/tombstoned are human claims and win over run-derived states.
+    assert derive_status(_workflow(status="draft"), runs=[_run(True)]) == "draft"
+    assert derive_status(_workflow(status="tombstoned"), runs=[_run(True)]) == "tombstoned"
+    # Supersession also wins over a successful run.
+    assert derive_status(_workflow(superseded_by="other"), runs=[_run(True)]) == "superseded"
+
+
+def test_repeatable_spec_never_derives_completed_from_runs():
+    # A repeatable spec (an experiment, or an idempotent operation) keeps the four
+    # measurement states; run history never folds a `completed`/`running`/`runnable`
+    # work-order state into its status column.
+    assert derive_status(_spec("exp"), runs=[_run(True)]) == "active"
+    assert derive_status(_spec("exp"), runs=[_run(False)]) == "active"
+    assert derive_status(_spec("exp", repeatable=True), runs=[_run(True)]) == "active"
+
+
+def test_nonrepeatable_workflow_derives_status_from_ledgers_in_the_index(tmp_path: Path):
+    # End-to-end: a non-repeatable workflow under workflows/ derives its index status
+    # from the run ledgers, not the YAML.
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    (specs / "ship.yaml").write_text(
+        _spec_yaml("ship", repeatable=False, artifact_kind="workflow")
+    )
+    _write_run(
+        tmp_path, "ship", "20260820T120000Z",
+        spec_name="ship", ok=True, ended_at="2026-08-20T12:00:00+00:00",
+    )
+    entry = _by_name(collect_entries(root=tmp_path))["ship"]
+    assert entry.status == "completed"
+    assert entry.latest_ok is True
+    assert entry.n_runs == 1
+
+
+def test_summary_and_kind_columns_separate_runnable_from_completed(tmp_path: Path):
+    # The P1-4 index pass: the summary line answers "what work remains?", and a completed
+    # one-shot sorts out of the runnable-now view below it.
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    (specs / "todo.yaml").write_text(
+        _spec_yaml("todo", repeatable=False, artifact_kind="workflow")
+    )
+    (specs / "done.yaml").write_text(
+        _spec_yaml("done", repeatable=False, artifact_kind="workflow", status="completed")
+    )
+    md = render_status_md(collect_entries(root=tmp_path), generated_at="2026-08-20T00:00:00+00:00")
+    assert "**Work remaining:** 1 runnable-now · 1 completed/retired" in md
+    rows = _table_rows(md)
+    assert [r.split("`")[1] for r in rows] == ["todo", "done"]
+    # The identity columns are present and populated from the YAML.
+    todo_row = next(ln for ln in rows if ln.startswith("| `todo`"))
+    assert "| workflow |" in todo_row and "| no |" in todo_row and "| runnable |" in todo_row
+    done_row = next(ln for ln in rows if ln.startswith("| `done`"))
+    assert "| workflow |" in done_row and "| no |" in done_row and "| completed |" in done_row
+
+
 # ── Run ledgers ─────────────────────────────────────────────────
 
 
@@ -341,9 +429,9 @@ def test_index_schema(repo: Path):
 
     entry = next(e for e in index["specs"] if e["name"] == "alpha_v2")
     assert set(entry) == {
-        "name", "version", "status", "spec_path", "supersedes", "superseded_by",
-        "completed_at", "last_run_at", "latest_ok", "latest_model", "latest_cost_usd",
-        "latest_git_sha", "results_pointer", "n_runs",
+        "name", "version", "status", "spec_path", "artifact_kind", "repeatable",
+        "supersedes", "superseded_by", "completed_at", "last_run_at", "latest_ok",
+        "latest_model", "latest_cost_usd", "latest_git_sha", "results_pointer", "n_runs",
     }
     assert entry["spec_path"] == "experiments/definitions/alpha_v2.yaml"
 
@@ -364,9 +452,10 @@ def test_generated_at_is_present_and_parseable(repo: Path):
 
 def test_status_md_header_and_columns(repo: Path):
     md = render_status_md(collect_entries(root=repo), generated_at="2026-08-20T00:00:00+00:00")
-    assert "| name | status | version | supersedes | last_run | ok | model | cost | n_runs |" in md
+    assert "| name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |" in md
     assert "Generated at: `2026-08-20T00:00:00+00:00`" in md
     assert "4 spec(s)" in md
+    assert "**Work remaining:**" in md
 
 
 def test_status_md_one_row_per_spec_in_sorted_order(repo: Path):
@@ -402,9 +491,11 @@ def test_status_md_renders_missing_runs_as_em_dashes(repo: Path):
     md = render_status_md(collect_entries(root=repo))
     row = next(ln for ln in _table_rows(md) if ln.startswith("| `beta_draft`"))
     cells = [c.strip() for c in row.strip().strip("|").split("|")]
-    name, status, version, supersedes, last_run, ok, model, cost, n_runs = cells
+    name, kind, repeatable, status, version, supersedes, last_run, ok, model, cost, n_runs = cells
     assert (supersedes, last_run, ok, model, cost) == (MISSING,) * 5
     assert (status, n_runs) == ("draft", "0")
+    assert kind == "experiment"
+    assert repeatable == "yes"
 
 
 def test_status_md_legend_explains_every_status_and_column(repo: Path):

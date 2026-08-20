@@ -8,6 +8,12 @@ question: >-
   contaminated cells tombstoned. The registry becomes a large clean baseline + a small real
   degraded arm, not a fake three-condition grid.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
 workflow:
   kind: agent_task
   params:

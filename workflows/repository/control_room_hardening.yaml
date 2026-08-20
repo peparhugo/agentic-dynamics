@@ -6,6 +6,12 @@ question: >-
   registry board hold; the defect is an INCONSISTENT boundary — the most expensive mutation
   (/api/experiments) sits outside the trust boundary every other actuation route enforces.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

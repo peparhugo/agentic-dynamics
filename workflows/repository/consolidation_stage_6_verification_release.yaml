@@ -9,6 +9,13 @@ question: >-
   retired 1 sub-part) — no orphan, no duplicate execution. Full detail in docs/consolidation/design.md §6
   Stage 6.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+status: completed
 workflow:
   kind: agent_task
   params:

@@ -35,7 +35,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
-from claude_agents_client import (  # noqa: E402
+from clients.claude_agents_client import (  # noqa: E402
     CELL_ID_PREFIX,
     CURSOR_KEY_PREFIX,
     OWNED_SESSIONS_KEY,

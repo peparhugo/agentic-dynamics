@@ -1,6 +1,12 @@
 name: code_review
 question: "Can an agent produce a grounded code + architecture review of a task's worktree?"
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

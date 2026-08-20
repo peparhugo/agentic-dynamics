@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Refactor-Repair Review — external critique (2026-08-20)
 
 **Provenance [X]:** operator-provided external review of main at `1e360335f` (the S0–S6

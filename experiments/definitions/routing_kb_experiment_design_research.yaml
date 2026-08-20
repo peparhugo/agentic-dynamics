@@ -8,6 +8,12 @@ question: >-
   This is a re-run of the design phase with a hard research contract, because the prior pass was
   corpus-only (no live fetch) and produced an unverified substrate.
 version: "0.1"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
 workflow:
   kind: agent_task
   params:

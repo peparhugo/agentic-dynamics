@@ -6,6 +6,12 @@ question: >-
   replace() back-fill (~300 lines of correctness-sensitive duplication), and the source_type field
   is owned by three overlapping lists. Land first; nothing else depends on it.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

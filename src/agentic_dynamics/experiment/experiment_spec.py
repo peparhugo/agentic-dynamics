@@ -31,6 +31,22 @@ ADAPT_SELECTIONS = frozenset(
     {"highest_uncertainty", "highest_regret", "largest_effect"}
 )
 
+# ── Artifact identity (refactor-repair P1-3) ─────────────────────
+#
+# Identity used to be guessed from the question text (a substring classifier) — fragile and
+# wrong for real specs like ``posthoc_pipeline`` (operational) and ``workflow_step_routing``
+# (source-modifying). Now it is explicit, validated metadata on the spec:
+#
+#   artifact_kind  experiment | workflow   — what the artifact IS.
+#   intent         measure    | mutate     — what it DOES (measure a phenomenon, or change source).
+#   side_effects   {repository, external_services} — where it writes / what it talks to.
+#   repeatable     bool       — safe to run repeatedly (experiments) vs one-shot (workflows).
+#
+# Defaults are the benign "nothing asserted" values, so the 77 committed specs (none of which
+# carry the fields yet — the P1-3 backfill lands later) load and validate unchanged.
+ARTIFACT_KINDS = frozenset({"experiment", "workflow"})
+INTENTS = frozenset({"measure", "mutate"})
+
 # ── Spec lifecycle vocabulary ───────────────────────────────────
 #
 # A spec's lifecycle is *authored* in the YAML when the operator already knows it and
@@ -39,11 +55,29 @@ ADAPT_SELECTIONS = frozenset(
 # lives here — beside the other validated enums — so ``validate_spec`` stays the single
 # gate for it and the derived index imports this frozenset instead of re-listing it.
 #
+# Per-kind semantics (refactor-repair P1-4): a *repeatable* spec (an experiment, or an
+# idempotent operation) uses the four measurement states; a *non-repeatable* workflow uses
+# the six work-order states, where ``completed`` is DERIVED from a successful run ledger,
+# not authored:
+#
 #   draft       — authored, never run to completion; not yet a claim about anything.
-#   active      — the current spec for its question; runnable now.
+#   active      — the current repeatable spec for its question; runnable now.
+#   runnable    — a non-repeatable workflow never run successfully; ready to run.
+#   running     — a non-repeatable workflow that has been run but not yet completed.
+#   completed   — a non-repeatable workflow whose run succeeded (derived from the ledgers).
 #   superseded  — a later spec took over its question (see ``superseded_by``).
 #   tombstoned  — retired; kept for lineage, never to be run again.
-SPEC_STATUSES = frozenset({"draft", "active", "superseded", "tombstoned"})
+SPEC_STATUSES = frozenset(
+    {
+        "draft",
+        "active",
+        "runnable",
+        "running",
+        "completed",
+        "superseded",
+        "tombstoned",
+    }
+)
 
 #: Every top-level key a spec YAML may carry. ``from_dict`` warns (loudly, via
 #: :mod:`warnings`) about anything outside this set rather than dropping it silently —
@@ -73,6 +107,12 @@ SPEC_KEYS: frozenset[str] = frozenset(
         "completed_at",
         "last_run_at",
         "results_pointer",
+        # artifact identity (refactor-repair P1-3)
+        "artifact_kind",
+        "intent",
+        "side_effects",
+        "repeatable",
+        "sandboxed",
     }
 )
 
@@ -87,6 +127,10 @@ SPEC_KEYS: frozenset[str] = frozenset(
 # Because they are ledger-produced, the validator now admits the ``grit`` rule (needs
 # perturbation_strength + test_executed_success) and the ``model_cascade``/``dynamics``
 # control arms (need confidence).
+#
+# The *single source of truth* for a signal's measured status, evidence class, and permitted
+# consumers is ``measurement/signal_registry.py`` (refactor-repair Debt-3) — this frozenset is
+# the ledger field list, and the registry's measured signals are checked against it in the tests.
 LEDGER_FIELDS: frozenset[str] = frozenset(
     {
         # job-level
@@ -354,6 +398,32 @@ class AdaptSpec:
 
 
 @dataclass
+class SideEffects:
+    """The side-effect surface a spec's workflow is allowed to touch (P1-3).
+
+    ``repository`` — the workflow writes files inside the checkout (source, or derived data like
+    ``apps/website/data.js``). ``external_services`` — it talks to Redis/Firebase/etc. Both default
+    to ``False`` ("nothing asserted"), so specs authored before this field existed keep loading
+    unchanged. The validator uses ``repository`` (alongside ``intent=mutate``) to reject a pure
+    ``experiment`` that would modify the repository.
+    """
+
+    repository: bool = False
+    external_services: bool = False
+
+    def to_dict(self) -> dict[str, bool]:
+        return {"repository": self.repository, "external_services": self.external_services}
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any] | None) -> SideEffects:
+        d = d or {}
+        return cls(
+            repository=bool(d.get("repository", False)),
+            external_services=bool(d.get("external_services", False)),
+        )
+
+
+@dataclass
 class ExperimentSpec:
     """A grid of cells — the cross-product of factors — plus the rules/metrics that
     turn its ledger into information and, ultimately, policy arms."""
@@ -373,6 +443,16 @@ class ExperimentSpec:
     git_sha: str = ""
     pricing_version: str = ""
     seed: int | None = None
+
+    # ── artifact identity (refactor-repair P1-3) ──────────────────────────────
+    # Explicit, validated identity metadata. Defaults are the benign "nothing asserted"
+    # values so the pre-P1-3 corpus (no such fields) loads and validates unchanged; the
+    # P1-3 backfill writes the real values into each spec.
+    artifact_kind: str = "experiment"  # experiment | workflow
+    intent: str = "measure"  # measure | mutate (mutate = the workflow has source-modifying phases)
+    side_effects: SideEffects = field(default_factory=SideEffects)
+    repeatable: bool = True  # experiments are re-runnable; one-shot workflows are not
+    sandboxed: bool = False  # runs in a disposable worktree, so mutations never touch the main tree
 
     # ── lifecycle (the status layer) ──────────────────────────────────────────
     # Authored in the YAML when known; otherwise derived by :mod:`instrument.spec_status`.
@@ -411,6 +491,13 @@ class ExperimentSpec:
             "git_sha": self.git_sha,
             "pricing_version": self.pricing_version,
             "seed": self.seed,
+            # artifact identity — always emitted (like the lifecycle block) so the
+            # serialized schema is stable for the index/registry consumers.
+            "artifact_kind": self.artifact_kind,
+            "intent": self.intent,
+            "side_effects": self.side_effects.to_dict(),
+            "repeatable": self.repeatable,
+            "sandboxed": self.sandboxed,
             # lifecycle — always emitted so the serialized schema is stable for the
             # index/registry consumers, even when every value is at its unset default.
             "status": self.status,
@@ -463,6 +550,11 @@ class ExperimentSpec:
             git_sha=d.get("git_sha", ""),
             pricing_version=d.get("pricing_version", ""),
             seed=d.get("seed"),
+            artifact_kind=str(d.get("artifact_kind") or "experiment"),
+            intent=str(d.get("intent") or "measure"),
+            side_effects=SideEffects.from_dict(d.get("side_effects")),
+            repeatable=bool(d.get("repeatable", True)),
+            sandboxed=bool(d.get("sandboxed", False)),
             status=str(d.get("status") or ""),
             supersedes=_as_name_list(d.get("supersedes")),
             superseded_by=_as_optional_str(d.get("superseded_by")),
@@ -576,6 +668,33 @@ def validate_spec(spec: ExperimentSpec) -> list[str]:
         errors.append(f"superseded_by {spec.superseded_by!r} points at the spec itself")
     if spec.name in spec.supersedes:
         errors.append(f"supersedes lists the spec itself ({spec.name!r})")
+
+    # ── Artifact-identity gate (refactor-repair P1-3) ─────────────────────────
+    # Identity is declared, not guessed. ``artifact_kind``/``intent`` are validated enums.
+    if spec.artifact_kind not in ARTIFACT_KINDS:
+        errors.append(
+            f"artifact_kind {spec.artifact_kind!r} is not one of {sorted(ARTIFACT_KINDS)}"
+        )
+    if spec.intent not in INTENTS:
+        errors.append(f"intent {spec.intent!r} is not one of {sorted(INTENTS)}")
+
+    # An "experiment" is a pure measurement: it must not mutate source (``intent=mutate``) and
+    # must not write to the repository (``side_effects.repository``). Such an artifact is a
+    # workflow — declare ``artifact_kind: workflow`` — UNLESS it is explicitly ``sandboxed``
+    # (runs in a disposable git worktree, so its mutations never touch the main tree). This is
+    # the compiler-side half of "stop letting a substring classifier decide identity".
+    if spec.artifact_kind == "experiment":
+        reasons = []
+        if spec.intent == "mutate":
+            reasons.append("intent=mutate (source-modification phases)")
+        if spec.side_effects.repository:
+            reasons.append("side_effects.repository=true")
+        if reasons and not spec.sandboxed:
+            errors.append(
+                f'artifact_kind "experiment" but {" and ".join(reasons)} — an experiment '
+                f'measures, it does not modify the repository; declare artifact_kind "workflow" '
+                f'or set sandboxed: true'
+            )
 
     errors.extend(validate_rules(spec))
     return errors

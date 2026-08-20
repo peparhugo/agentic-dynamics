@@ -12,6 +12,13 @@ question: >-
   dead-code (WS-01) and sys.path (WS-10) workstreams fold into the consolidation stages. Design +
   staging only — the stage specs execute in later workflows, in order.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+status: completed
 workflow:
   kind: agent_task
   params:

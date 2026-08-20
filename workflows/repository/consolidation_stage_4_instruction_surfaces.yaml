@@ -8,6 +8,13 @@ question: >-
   canonical source, then regenerated — superseded, not re-done). The drift guard test is specified in
   docs/consolidation/design.md §6 Stage 4.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+status: completed
 workflow:
   kind: agent_task
   params:

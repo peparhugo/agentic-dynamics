@@ -1,6 +1,12 @@
 name: fix_review_findings
 question: "Can a model apply a well-specified review-findings fix list to the Control Room?"
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

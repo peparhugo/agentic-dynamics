@@ -72,7 +72,7 @@ cannot run until its inputs exist.
 ## 4. Schema
 
 ```python
-# src/instrument/experiment_spec.py
+# src/agentic_dynamics/experiment/experiment_spec.py
 
 @dataclass
 class Workflow:

@@ -28,8 +28,6 @@ from typing import Any
 
 import yaml
 
-from agentic_dynamics.experiment.compile_experiment import experiment_matrix
-from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
 from agentic_dynamics.control.live import (
     EVENT_CHANNEL_PREFIX,
     EVENT_LOG_MAX,
@@ -39,11 +37,13 @@ from agentic_dynamics.control.live import (
 )
 from agentic_dynamics.control.step_routing import validate_workflow_routing
 from agentic_dynamics.control.supervisor import register_event_mapping
+from agentic_dynamics.experiment.compile_experiment import experiment_matrix
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
 
-try:  # Package import under pytest; sibling import for ``python admin/server.py``.
-    from apps.control_room.opencode_client import OpenCodeClient, OpenCodeError
+try:  # Package import under pytest; sibling import for ``python apps/control_room/server.py``.
+    from apps.control_room.clients.opencode_client import OpenCodeClient, OpenCodeError
 except ModuleNotFoundError:  # pragma: no cover - exercised by the documented CLI launch
-    from opencode_client import OpenCodeClient, OpenCodeError
+    from clients.opencode_client import OpenCodeClient, OpenCodeError
 
 
 DESIGN_SESSIONS_KEY = "control_room:design_sessions"

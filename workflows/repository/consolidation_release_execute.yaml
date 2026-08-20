@@ -11,6 +11,13 @@ question: >-
   docs/consolidation/execution_log.md so the run is inspectable and resumable. Note: this spec
   itself is a work order, not a scientific experiment — S2 reclassifies it under workflows/.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+status: completed
 workflow:
   kind: agent_task
   params:

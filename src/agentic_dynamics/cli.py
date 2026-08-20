@@ -64,9 +64,19 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("validate", "session"): "validate_session.py",
     ("validate", "tests"): "verify_tests.py",
     # supervise
-    ("supervise"): "supervise.py",
+    ("supervise",): "supervise.py",
     ("supervise", "claude-agents"): "claude_agents_supervisor.py",
 }
+
+#: ``_COMMANDS`` keys ordered longest-first. ``_resolve`` iterates THIS list rather than
+#: ``_COMMANDS`` directly: ``_COMMANDS`` is a dict literal whose insertion order happens to
+#: register ``("supervise",)`` before ``("supervise", "claude-agents")``, so a first-match
+#: walk over it would resolve ``supervise claude-agents`` to ``supervise.py`` (the shorter
+#: prefix) — a real command-resolution bug (refactor-repair P1-2). Sorting prefixes by
+#: length descending makes the FIRST matching prefix necessarily the LONGEST one, which is
+#: the documented longest-prefix semantics. The sort is stable, so equal-length prefixes
+#: (which can never both match the same argv) keep insertion order.
+_SORTED_PREFIXES: list[tuple[str, ...]] = sorted(_COMMANDS, key=len, reverse=True)
 
 #: ``registry`` subcommands, all backed by ``registry.py`` (its first positional arg).
 _REGISTRY_SUBCOMMANDS = {"query", "show", "lineage"}
@@ -90,7 +100,22 @@ Subcommands (each forwards to its backing script):
   supervise   [claude-agents]
 
 Run `agentic-dynamics <subcommand> --help` for the backing script's own options.
+
+Checkout-only: this CLI is a thin dispatcher — every subcommand forwards to a script in the
+repository's ``scripts/`` directory, so it only works from a git checkout (``pip install -e .``).
+An installed wheel carries no ``scripts/`` and can only print this help.
 """
+
+#: Message emitted when a real command is attempted from an installed distribution that has no
+#: ``scripts/`` sibling. The CLI is checkout-only (refactor-repair P1-2 packaging): it forwards
+#: to repo-level scripts rather than shipping them in the wheel, so a wheel install can print
+#: help but cannot dispatch a command. This text is the machine-checkable contract the CI wheel
+#: smoke test greps for.
+CHECKOUT_REQUIRED = (
+    "agentic-dynamics: checkout required — this CLI forwards each command to the repository's "
+    "scripts/ directory, which is not present here (installed wheel?). Install from a git "
+    "checkout with `pip install -e .`, or run the backing script directly."
+)
 
 
 def _forward(script: str, argv: list[str]) -> int:
@@ -100,10 +125,10 @@ def _forward(script: str, argv: list[str]) -> int:
 
 def _resolve(argv: list[str]) -> tuple[str | None, list[str]]:
     """Resolve argv to ``(backing_script, forwarded_args)`` or ``(None, [])`` if unresolved."""
-    # Longest-prefix match over the static command table.
-    for prefix, script in _COMMANDS.items():
+    # True longest-prefix match over the static command table (longest prefixes first).
+    for prefix in _SORTED_PREFIXES:
         if tuple(argv[: len(prefix)]) == prefix:
-            return script, argv[len(prefix):]
+            return _COMMANDS[prefix], argv[len(prefix):]
     # ``registry query|show|lineage`` -> registry.py <subcommand> ...
     if argv[0] == "registry" and len(argv) >= 2 and argv[1] in _REGISTRY_SUBCOMMANDS:
         return "registry.py", argv[1:]
@@ -122,6 +147,12 @@ def main(argv: list[str] | None = None) -> int:
     script, rest = _resolve(argv)
     if script is None:
         print(f"agentic-dynamics: unknown command {' '.join(argv)}", file=sys.stderr)
+        return 2
+    # Checkout-only guard: without a scripts/ sibling (e.g. an installed wheel) the dispatcher
+    # has nothing to forward to. Placed AFTER resolution so ``--help`` (handled above) still
+    # works from a wheel, but any real command explains the checkout requirement.
+    if not _SCRIPTS_DIR.is_dir():
+        print(CHECKOUT_REQUIRED, file=sys.stderr)
         return 2
     if not (_SCRIPTS_DIR / script).exists():
         print(f"agentic-dynamics: no such command {' '.join(argv)}", file=sys.stderr)

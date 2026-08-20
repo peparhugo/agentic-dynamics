@@ -490,7 +490,7 @@ none may be declared. §9 states what would have to happen first.
 ### 4.1 Where reducers live and what they are
 
 ```
-src/instrument/reducers/
+src/agentic_dynamics/control/reducers/
     __init__.py         # REDUCERS registry; the only public surface
     spec_status.py      # spec_status/v1        (L1, workload scope)   ← ships first (§9, I1)
     attempt_facts.py    # attempt_facts/v1      (L1, attempt scope)

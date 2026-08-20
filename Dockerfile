@@ -23,9 +23,10 @@ COPY pyproject.toml .
 COPY src/ src/
 RUN pip install --no-cache-dir -e .
 
-# Copy scripts and experiments config
+# Copy scripts and experiment definitions (configs moved to
+# experiments/definitions/configs/ — refactor-repair P1-1)
 COPY scripts/ scripts/
-COPY experiments/configs/ experiments/configs/
+COPY experiments/definitions/ experiments/definitions/
 COPY experiments/results/ experiments/results/
 
 # Ensure artifacts directory exists
@@ -40,5 +41,5 @@ ENV FINOPS_WORKTREE_ROOT=/app/experiments/results/artifacts
 # - /app/experiments/results: for output persistence
 
 # Default entrypoint runs the reproduction pipeline
-# Override with: docker run ... ai-finops-framework bash
+# Override with: docker run ... agentic-dynamics bash
 ENTRYPOINT ["bash", "scripts/reproduce.sh"]

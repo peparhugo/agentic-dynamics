@@ -6,6 +6,12 @@ question: >-
   observation-vs-actuation boundary. Do not redesign; implement the plan step-for-step, run the
   specified tests, and leave the flag-only rail intact (zero actuation call sites).
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

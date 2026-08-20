@@ -10,16 +10,16 @@ Thanks for your interest in contributing. This is a research instrument — ever
 ## Ways to Contribute
 
 ### I Have API Credits
-The highest-impact contribution: **run experiments on models or languages we haven't tested yet.** Check the experiment configs in `experiments/configs/` for available task types.
+The highest-impact contribution: **run experiments on models or languages we haven't tested yet.** Check the experiment configs in `experiments/definitions/configs/` for available task types.
 
 ### I Know a Stack We Haven't Tested
-Add a new experiment config in `experiments/configs/`. TypeScript/Node.js, Go, Rust, and Java/Spring are all priorities.
+Add a new experiment config in `experiments/definitions/configs/`. TypeScript/Node.js, Go, Rust, and Java/Spring are all priorities.
 
 ### I Have a Novel Perturbation Idea
-Add a new perturbation operator to `src/instrument/perturb.py`. The operator registry is designed for extensibility.
+Add a new perturbation operator to `src/agentic_dynamics/measurement/perturb.py`. The operator registry is designed for extensibility.
 
 ### I Want to Add a New Story or ExperimentSpec
-Multi-session stories live in `src/instrument/story.py` (`BUILTIN_STORIES`); the spec/compiler layer (`experiments/specs/*.yaml`) declares `workflow`, `factors`, `rules`, and `adapt`. Note the load-bearing rule: a control rule (policy arm) whose `requires` are not yet instrumented will be refused by the compiler — instrument the fields first.
+Multi-session stories live in `src/agentic_dynamics/runtime/story.py` (`BUILTIN_STORIES`); the spec/compiler layer (`experiments/definitions/*.yaml` + `workflows/**/*.yaml`) declares `workflow`, `factors`, `rules`, and `adapt`. Note the load-bearing rule: a control rule (policy arm) whose `requires` are not instrumented will be refused by the compiler — instrument the fields first.
 
 ### I Want to Add a Lab Book
 Lab books are `experiments/lab_books/lab_*.md` (the plan) + `scripts/lab_*.py` (the implementation), consuming `_results_summary.json` and trajectory data.
@@ -44,12 +44,12 @@ pip install -e .
 
 ### 2. Set Up Opencode
 
-You need the [opencode](https://opencode.ai) CLI installed and available on your `PATH` (configure the path in `src/instrument/opencode.py` if needed). Set up your LLM API keys per the opencode documentation.
+You need the [opencode](https://opencode.ai) CLI installed and available on your `PATH` (configure the path in `src/agentic_dynamics/adapters/opencode.py` if needed). Set up your LLM API keys per the opencode documentation.
 
 ### 3. Verify the Instrument Works
 
 ```bash
-python scripts/run.py experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro
+python scripts/run.py experiments/definitions/configs/task_manager.yaml --model deepseek/deepseek-v4-pro
 ```
 
 If this succeeds and produces a result in `experiments/results/`, you're ready.
@@ -60,7 +60,7 @@ If this succeeds and produces a result in `experiments/results/`, you're ready.
 
 ### 1. Create a Config File
 
-Create `experiments/configs/your_experiment.yaml`:
+Create `experiments/definitions/configs/your_experiment.yaml`:
 
 ```yaml
 name: your_experiment
@@ -82,15 +82,21 @@ operators:
 strengths: [0.5, 0.8]
 
 # Model is passed at run time as provider/model (no shorthand):
-#   python scripts/run.py experiments/configs/your_experiment.yaml --model deepseek/deepseek-v4-pro
+#   python scripts/run.py experiments/definitions/configs/your_experiment.yaml --model deepseek/deepseek-v4-pro
 ```
 
-See existing configs in `experiments/configs/` for more examples.
+See existing configs in `experiments/definitions/configs/` for more examples.
 
 ### 2. Run It
 
 ```bash
-python scripts/run.py experiments/configs/your_experiment.yaml --model deepseek/deepseek-v4-pro
+python scripts/run.py experiments/definitions/configs/your_experiment.yaml --model deepseek/deepseek-v4-pro
+```
+
+Or via the unified CLI (checkout-only — forwards to `scripts/run.py`):
+
+```bash
+agentic-dynamics experiment run experiments/definitions/configs/your_experiment.yaml --model deepseek/deepseek-v4-pro
 ```
 
 ### 3. Check Results
@@ -113,7 +119,7 @@ Include:
 
 ## Adding a New Perturbation Operator
 
-Edit `src/instrument/perturb.py`. An operator has two parts:
+Edit `src/agentic_dynamics/measurement/perturb.py`. An operator has two parts:
 
 ### 1. The Apply Function
 
@@ -135,12 +141,15 @@ operators["my_operator"] = PerturbationOperator(
     name="my_operator",
     description="A one-line description of what this does",
     apply_fn=my_operator,
-    perturbation_class="semantic"  # or "manifold"
+    perturbation_class="process_perturbation",
 )
 ```
 
-- `"semantic"` — probes truth-seeking and coherence (contradiction, false premises, inverted constraints)
-- `"manifold"` — probes search dynamics on the linguistic surface (alien vocabulary, framing shifts, causality reversal)
+`perturbation_class` is one of `PERTURBATION_CLASSES` (`src/agentic_dynamics/measurement/perturb.py:78`):
+
+- `"specification_corruption"` — probes truth-seeking and coherence (false premise, contradiction, removed constraint)
+- `"objective_mutation"` — probes goal stability (inverted constraint, competing goal)
+- `"process_perturbation"` — probes search dynamics on the reasoning surface (alien vocabulary, framing shifts, causality reversal)
 
 ---
 
@@ -149,8 +158,8 @@ operators["my_operator"] = PerturbationOperator(
 ### Single Experiment (positional config, model as `provider/model`)
 
 ```bash
-python scripts/run.py experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro
-python scripts/run.py experiments/configs/task_manager.yaml --model anthropic/claude-sonnet-5 --backend claude_cli
+python scripts/run.py experiments/definitions/configs/task_manager.yaml --model deepseek/deepseek-v4-pro
+python scripts/run.py experiments/definitions/configs/task_manager.yaml --model anthropic/claude-sonnet-5 --backend claude_cli
 ```
 
 ### Silent Mode Sweep (Explanation Tax)
@@ -182,6 +191,13 @@ python scripts/pipeline.py --plan ci            # lint → test → build
 python scripts/pipeline.py --plan full_matrix   # matrix → analyze → review → deploy
 ```
 
+### Reproduction Pipeline (analysis + presentation from existing artifacts)
+
+```bash
+scripts/reproduce.sh            # full post-hoc rebuild
+scripts/reproduce.sh --dry-run  # print steps without executing
+```
+
 All scripts use **title-based deduplication** — they query the opencode DB to skip sessions already completed. You can safely re-run them; completed cells are skipped.
 
 **Note on Redis:** the framework queue lives on port **6380** (`FINOPS_REDIS_PORT`). Story agents build Flask/Celery apps against port 6379 and call `flushdb()`/`flushall()` while testing, so they can never reach the framework queue. Never run the queue on 6379.
@@ -191,7 +207,7 @@ All scripts use **title-based deduplication** — they query the opencode DB to 
 ## Repository Conventions
 
 ### Python
-- Follow existing patterns in `src/instrument/`
+- Follow existing patterns in `src/agentic_dynamics/` (eight planes — see `ARCHITECTURE.md` §1)
 - Use `dataclass` for data structures
 - Use type hints throughout
 - No new dependencies without discussion
@@ -204,8 +220,10 @@ All scripts use **title-based deduplication** — they query the opencode DB to 
 - JetBrains Mono for code, system font stack for body text
 
 ### Agent Surfaces
-- `.opencode/` is the primary agent surface (`AGENTS.md`, `opencode.json`, instructions, skills, tools)
-- `.claude/` is a hand-ported parallel surface — keep both in sync by hand (see `docs/claude_code_port.md`); there is no build step
+- `.opencode/` and `.claude/` are **generated** from the neutral `agent_config/` source by
+  `scripts/_gen_instructions.py` (`render_opencode()` + `render_claude()`). Never hand-edit a
+  generated file — edit `agent_config/`, then run `python scripts/_gen_instructions.py`.
+  `AGENTS.md` is the opencode root instructions; `CLAUDE.md` imports it.
 
 ### Commits
 - Write descriptive commit messages

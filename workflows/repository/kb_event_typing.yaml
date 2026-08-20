@@ -6,6 +6,12 @@ question: >-
   repository_id / acl_scope to KnowledgeEvent (trailing-default); make the empty-scope candidate
   fail CLOSED for scoped queries; make the extractor default safe.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

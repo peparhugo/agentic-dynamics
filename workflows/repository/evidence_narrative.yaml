@@ -1,6 +1,12 @@
 name: evidence_narrative
 question: "Can the evidence page be re-narrated as a golden-circle story of the full corpus, with the archived perturbation runs as chronological context?"
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

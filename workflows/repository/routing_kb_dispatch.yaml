@@ -7,6 +7,12 @@ question: >-
   run_workflow and write status/results to the same keys the Control Room /api/matrix reads. Then it
   smokes one queued cell end-to-end and verifies the cell shows up in the matrix.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

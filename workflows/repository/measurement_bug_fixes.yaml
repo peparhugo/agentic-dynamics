@@ -5,6 +5,12 @@ question: >-
   selects the last matching domain instead of the first; recovery.py materializes the baseline tool
   sequence twice.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

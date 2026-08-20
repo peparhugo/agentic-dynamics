@@ -64,14 +64,14 @@ else:
         sys.exit(1)
     print(json.dumps({'valid': True, 'phases': dag.names(), 'edges': dag.edges,
                        'feedback': dag.feedback, 'topological_order': dag.topological_order()}))
-" experiments/specs/workflow_step_routing.yaml validate
+" workflows/repository/workflow_step_routing.yaml validate
 ```
 
 **Compile mode** — swap the final positional arg to `compile` to also build the DAG and
 print `phases`/`edges`/`feedback`/`topological_order`:
 
 ```bash
-python3 -c "..." experiments/specs/workflow_step_routing.yaml compile
+python3 -c "..." workflows/repository/workflow_step_routing.yaml compile
 ```
 
 Both modes take exactly two positional args: the spec YAML path, then `validate` or
@@ -102,7 +102,7 @@ invocations section for that correction).
 
 ```bash
 python3 scripts/run_workflow.py \
-  --spec experiments/specs/workflow_step_routing.yaml \
+  --spec workflows/repository/workflow_step_routing.yaml \
   --goal "Add rate limiting to the API" \
   --model deepseek/deepseek-v4-pro \
   --workdir /tmp/wf_abc123 \

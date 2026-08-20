@@ -25,6 +25,12 @@ question: >-
   controller + validator, I7 the apply seam (kept OFF until measured non-inferior). Run once
   with anthropic/claude-opus-5.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 status: draft
 workflow:
   kind: agent_task

@@ -10,6 +10,12 @@ question: >-
   pipeline, and how the website prose stays provenance-grounded ([M]/[C]/[H]/[X]/[P]) as it is
   regenerated.
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

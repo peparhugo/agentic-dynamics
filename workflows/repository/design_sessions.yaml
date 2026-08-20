@@ -1,6 +1,12 @@
 name: design_sessions
 question: "Can the Control Room host live opencode design sessions that author and validate ExperimentSpecs?"
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

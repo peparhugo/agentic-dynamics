@@ -642,6 +642,270 @@ Notes:
   `cwd: apps/website`.
 - Both hosts deployed from the same `apps/website/` source — in sync by construction.
 
+---
+
+## Repair release
+
+Per-finding acceptance-criterion results for the refactor-repair release (review:
+`docs/review/refactor_repair_review.md`). One subsection per finding, in release order.
+
+### P0-3 — Control Room repo root re-point
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `apps/control_room/server.py` `ROOT` re-pointed to `agentic_dynamics.core.paths.PROJECT_ROOT` (was `Path(__file__).resolve().parent.parent` → `<repo>/apps`) | PASS |
+| 2 | `DATA_MANIFEST_PATH` default resolves to `<repo>/experiments/data_manifest.json` (no longer `apps/experiments/...`) | PASS |
+| 3 | `SUPERVISOR_FLAGS_FILE` default resolves to `<repo>/experiments/results/supervisor/flags.jsonl` | PASS |
+| 4 | Design-session (and claude-agent) workdir allowlist defaults to `<repo>` (no longer `apps/`) | PASS |
+| 5 | `_results_summary.json` read (`/api/routing`) and `scripts/enqueue.py` `cwd` re-pointed from `parent.parent` to `ROOT` | PASS |
+| 6 | Launch docs updated — `python3 apps/control_room/server.py` + `gunicorn ... 'apps.control_room.server:app'` | PASS |
+| 7 | `tests/test_control_room_paths.py` added — asserts `server.ROOT == PROJECT_ROOT` + manifest/flags/workdir defaults resolve inside the repo | PASS (5 passed) |
+| 8 | `pytest tests/test_control_room_paths.py tests/test_admin_server.py tests/test_admin_design_sessions.py tests/test_admin_claude_agents.py tests/test_admin_supervisor.py tests/test_admin_frontend.py tests/test_admin_claude_agents_frontend.py` green | PASS (123 passed) |
+
+**P0-3 result: 8/8 PASS.**
+
+### P1-1 — Reproduction environment + CI gates
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `Dockerfile` COPY paths fixed — `experiments/configs/` → `experiments/definitions/` (configs live at `experiments/definitions/configs/`); every COPY source (`pyproject.toml`, `src/`, `scripts/`, `experiments/definitions/`, `experiments/results/`) exists in the tree | PASS |
+| 2 | Stale `ai-finops-framework` override comment in `Dockerfile` corrected to `agentic-dynamics` | PASS |
+| 3 | `scripts/reproduce.sh` rewritten against the current tree — current project framing ("Agentic Dynamics"), no retired lab scripts (the three `*_DEPRECATED_bge_m3` labs removed, replaced by the 19 active lab books) | PASS |
+| 4 | `scripts/reproduce.sh` reports `apps/website/data.js` (not `firebase/public/data.js`) and instructs deploy from `apps/website/` (dual-Firebase, both hosts) | PASS |
+| 5 | `scripts/reproduce.sh --dry-run` added — prints every step's exact argv without executing; exits 0 | PASS (verified locally) |
+| 6 | CI (`pytest.yml`) gates added — `docker build .`, `agentic-dynamics --help`, `bash scripts/reproduce.sh --dry-run` | PASS |
+| 7 | `bash -n scripts/reproduce.sh` clean; `--dry-run` lists all 19 lab books + the 7 pipeline steps | PASS |
+
+**P1-1 result: 7/7 PASS.**
+
+### P1-2 — CLI longest-prefix resolution
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `src/agentic_dynamics/cli.py` `_resolve` implements TRUE longest-prefix matching — `_COMMANDS` prefixes sorted by length descending (`_SORTED_PREFIXES`) before the first-match walk | PASS |
+| 2 | `agentic-dynamics supervise claude-agents` resolves to `claude_agents_supervisor.py` (was `supervise.py` under insertion-order matching) | PASS |
+| 3 | Latent bug fixed: the bare-supervise key was `("supervise")` (a string, not a 1-tuple), so `agentic-dynamics supervise` silently never resolved — corrected to `("supervise",)` | PASS |
+| 4 | `tests/test_cli_resolution.py` added — table-driven, expectation table hand-authored from `_HELP` + the CLI-surface doc (not from `_COMMANDS`); asserts every documented command resolves to its intended script AND the script exists on disk | PASS (46 passed) |
+| 5 | Coverage guard — `_HELP`-parsed documented leaf set == table argv set (both directions: no documented command missing, no undocumented row) | PASS |
+| 6 | Forwarded-argv semantics preserved (`supervise --once`, `experiment run --model ...`); special cases (`registry <sub>`, `analyze lab <name>`) pinned | PASS |
+| 7 | `ruff check` clean on `cli.py` + `test_cli_resolution.py`; full `-m "not external"` suite: 1238 passed, no new failures | PASS |
+
+**P1-2 result: 7/7 PASS.**
+
+### P1-2 (packaging) — CLI declared checkout-only + wheel smoke gate
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | Decision implemented: the CLI is **checkout-only** — it forwards to repo-level `scripts/`, which a wheel does not ship; no script-logic migration in this release (deferred post-repair hardening) | PASS |
+| 2 | Documented in `pyproject.toml` — `[project.scripts]` comment declares checkout-only, cites the `where = ["src"]` package layout, and names `cli.CHECKOUT_REQUIRED` | PASS |
+| 3 | Documented in CLI `--help` — a "Checkout-only" note states commands forward to the repo `scripts/` and an installed wheel can only print help | PASS |
+| 4 | `cli.main` emits a clear `CHECKOUT_REQUIRED` message (exit 2) when `scripts/` is absent; `--help` still works (exit 0) from a wheel | PASS (verified: wheel has no `scripts/`, `cli.py` carries the guard) |
+| 5 | Unit tests added — help documents checkout-only; command from a missing-`scripts/` dir returns 2 + "checkout required"; `--help` works from a missing-`scripts/` dir | PASS (49 passed) |
+| 6 | CI wheel smoke gate added (`packaging` job) — build wheel → install into a clean venv → `--help` greps "checkout-only" → command greps "checkout required" with non-zero exit | PASS |
+| 7 | `ruff check` clean on `cli.py` + `test_cli_resolution.py`; `pytest` green (51 passed on the two touched areas) | PASS |
+
+**P1-2 (packaging) result: 7/7 PASS.**
+
+### P0-1 — semantic agent-config source + two platform renderers
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `agent_config/` is the single semantic source; `scripts/_gen_instructions.py` restructured into TWO renderers — `render_opencode()` and `render_claude()` — each emitting its platform's real format | PASS |
+| 2 | Agent schema projection: opencode keeps `description`/`mode`/`model`/`permission`; Claude keeps only `name`+`description` (drops `mode`/`model`/`permission` — no per-capability/permissionMode or provider/model equivalent) | PASS |
+| 3 | Command schema projection: opencode keeps `description`/`agent`/`subtask`; Claude keeps only `description` (drops `agent`/`subtask`); positional args re-indexed 1→0 (`$2`→`$1`), `$ARGUMENTS` preserved | PASS |
+| 4 | Per-target schema validators added — `validate_opencode()`/`validate_claude()` assert required fields and reject opencode-only keys (`mode`/`permission`/`temperature`/`hidden`, `agent`/`subtask`, `provider/model` ids) in Claude output | PASS |
+| 5 | Byte-equality drift test (`test_generated_surfaces_match.py`) replaced with `test_agent_config_render.py`: meaning-equivalence (bodies/descriptions preserved; rules+skills byte-identical) + per-target schema-validity + committed==rendered drift + orphan checks | PASS (10 passed) |
+| 6 | `.opencode/` + `.claude/` regenerated from the renderers — `.opencode/` byte-identical to before; only `.claude/agents/*.md` + `.claude/commands/*.md` changed (now valid Claude schema) | PASS |
+| 7 | Content semantically unchanged (agent bodies, descriptions, skills, rules untouched); `ruff check` clean; full `-m "not external"` suite 1249 passed, no new failures | PASS |
+
+**P0-1 result: 7/7 PASS.**
+
+### P0-2 — instruction docs rewritten against the current tree
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `AGENTS.md` rewritten — current paths (`experiments/definitions/configs/`, `src/agentic_dynamics/`, `apps/`), the generator model, the full CLI tree + scripts, and measured-ledger facts (`confidence`/`perturbation_strength`/`test_executed_success` ARE measured) with `file:line` evidence | PASS |
+| 2 | `CLAUDE.md` rewritten — "keep both surfaces in sync by hand / no build step" removed; cites `scripts/_gen_instructions.py` (`render_claude()`) as the generator | PASS |
+| 3 | `CONTRIBUTING.md` rewritten — `experiments/definitions/configs/`, `src/agentic_dynamics/{measurement,runtime,adapters}/`, accurate `perturb.py` API (`PerturbationOperator`, `PERTURBATION_CLASSES`), generator model, CLI + `reproduce.sh` | PASS |
+| 4 | `scripts/CONTEXT.md` — retired paths fixed (`firebase/public/data.js`→`apps/website/data.js`, `admin/`→`apps/control_room/`, `instrument.routing`→`agentic_dynamics.control.routing`, `code_reviews/…`→`docs/designs/current/…`, `docs/supervisor_design.md`→`docs/designs/current/supervisor_design.md`) | PASS |
+| 5 | `experiments/CONTEXT.md` — retired paths fixed (`experiments/configs/`→`experiments/definitions/configs/`, `src/instrument/spec_ingestion.py`→`src/agentic_dynamics/knowledge/spec_ingestion.py`, spec example → `definitions/`, design doc → `docs/designs/current/`); "confidence is measured" corrected | PASS |
+| 6 | `agent_config/{rules,mental-model,conventions}.md` (the generator source) updated — `admin/server.py`→`apps/control_room/server.py`, `code_reviews/…`→`docs/designs/current/…`, measured-facts correction | PASS |
+| 7 | Surfaces regenerated via the two renderers (`python scripts/_gen_instructions.py`); `test_agent_config_render.py` 10 passed; grep confirms zero retired path families remain in the 7 rewritten files; full `-m "not external"` suite 1249 passed, no new failures | PASS |
+
+**P0-2 result: 7/7 PASS.**
+
+### P0-2 (guard) — stale-path guard over accepted + current-design docs
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `tests/test_stale_path_guard.py` added — scans every `status: accepted` doc (root + `docs/**`) and every `docs/designs/current/*` for the five retired families (`src/instrument/`, `experiments/configs/`, `admin/server.py`, `firebase/public/`, `code_reviews/2026-08-14`) | PASS |
+| 2 | Narrow, explicit allowlist — per-file / directory-prefix entries with justification (reviews, consolidation records, rebrand/survey/verify docs, `ARCHITECTURE.md`'s §1 decommission note); no blanket exception | PASS |
+| 3 | Current-design docs repointed, not allowlisted — `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md` (`src/instrument/experiment_spec.py`→`src/agentic_dynamics/experiment/`), `docs/designs/current/context_abstraction_design.md` (`src/instrument/reducers/`→`src/agentic_dynamics/control/reducers/`) | PASS |
+| 4 | `AGENTS.md` cleaned (removed the redundant `never src/instrument/` parenthetical); `agent_config/rules.md` re-synced + surfaces regenerated | PASS |
+| 5 | Guard verifies every allowlist key resolves to an existing file/directory (no stale entries) | PASS |
+| 6 | Wired into the suite — auto-discovered by `pytest tests/` (runs in CI's `-m "not external"` gate); `ruff` clean | PASS |
+| 7 | Full `-m "not external"` suite: 1251 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P0-2 (guard) result: 7/7 PASS.**
+
+### P1-3 (schema) — validated artifact-identity metadata
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `ExperimentSpec` gains `artifact_kind` (`experiment`\|`workflow`, default `experiment`), `intent` (`measure`\|`mutate`, default `measure`), `side_effects: {repository, external_services}` (a `SideEffects` dataclass), `repeatable` (default `true`), and a `sandboxed` escape hatch (default `false`) | PASS |
+| 2 | All five keys added to `SPEC_KEYS`; `from_dict`/`to_dict` round-trip them (serialized schema stays stable) | PASS |
+| 3 | Validator enforces the artifact-identity gate: `artifact_kind=experiment` with `intent=mutate` (source-modification phases) or `side_effects.repository=true` is REJECTED unless `sandboxed`; `artifact_kind`/`intent` validated against their enums | PASS |
+| 4 | Backward-compatible — the pre-P1-3 corpus (77 specs, none carrying the fields) loads with benign defaults (`experiment`/`measure`/no side effects/`repeatable`/not sandboxed) and validates clean; `test_committed_specs_all_load_without_unknown_key_warnings` green | PASS |
+| 5 | `tests/test_artifact_identity.py` added — 13 tests: defaults, round-trip, enum validation, the gate's reject/admit/sandbox/workflow cases, and `external_services`-alone is metadata not a trigger | PASS (13 passed) |
+| 6 | `ruff check` clean on `experiment_spec.py` + the new test | PASS |
+| 7 | Full `-m "not external"` suite: 1264 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P1-3 (schema) result: 7/7 PASS.**
+
+### P1-3 (placement) — re-home the two misplacements + metadata-driven guard
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `experiments/definitions/posthoc_pipeline.yaml` → `workflows/operations/posthoc_pipeline.yaml` with explicit metadata (`artifact_kind: workflow`, `intent: mutate`, `side_effects: {repository, external_services}` true, `repeatable: true` — idempotent operational work order) | PASS |
+| 2 | `experiments/definitions/workflow_step_routing.yaml` → `workflows/repository/workflow_step_routing.yaml` with explicit metadata (`artifact_kind: workflow`, `intent: mutate`, `side_effects: {repository: true, external_services: false}`, `repeatable: false` — one-shot source development) | PASS |
+| 3 | Substring-heuristic classifier removed from `tests/test_experiment_workflow_classification.py` (`is_work_order`, the question/hard-rule marker tables) — replaced with metadata-driven placement (`_declared_kind` reads `artifact_kind`; the guard fails on a declared kind that mismatches its directory) | PASS |
+| 4 | New tests pin the move — `test_misplaced_specs_are_rehomed` (both now under `workflows/` and declare `workflow`), `test_definitions_declare_experiment_kind`, `test_workflows_declare_workflow_kind` | PASS |
+| 5 | Path references re-pointed — `agent_config/skills/{run-workflow,instrument}.md` (and the regenerated `.opencode/` + `.claude/` surfaces), `experiments/CONTEXT.md` → `workflows/repository/workflow_step_routing.yaml` | PASS |
+| 6 | Both moved specs load + validate clean (`validate_spec == []`); `ruff` clean; `test_agent_config_render.py` still green after regeneration | PASS |
+| 7 | Full `-m "not external"` suite: 1265 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged — `refactor_repair_review.md` frontmatter, and `refactor_repair_release.yaml` still in `experiments/specs/`, both out of this finding's named scope) | PASS |
+
+**P1-3 (placement) result: 7/7 PASS.**
+
+### P1-3 (backfill) — explicit identity metadata on all 77 specs + index regen
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `artifact_kind`/`intent`/`side_effects`/`repeatable` written into every one of the 77 specs (6 definitions + 71 workflows), mechanical, no content changes (6 lines inserted after `version:`) | PASS |
+| 2 | Classification is directory-driven and consistent with the 2 already-tagged specs: definitions → `experiment`/`measure`/no side effects/`repeatable`; `workflows/operations/` → `workflow`/`mutate`/repo+ext side effects/`repeatable`; `workflows/{repository,research}/` → `workflow`/`mutate`/repo only/`repeatable: false` | PASS |
+| 3 | Spec index regenerated (`python scripts/spec_status.py`) — 77 spec(s); the two moved specs now index `workflows/operations/posthoc_pipeline.yaml` + `workflows/repository/workflow_step_routing.yaml`; zero `spec_path` values point at a nonexistent file | PASS |
+| 4 | Compile gate green — `compile_spec(load_spec(p))` succeeds for all 77 specs; `validate_spec == []` on every spec, and each spec's `artifact_kind` matches its directory | PASS |
+| 5 | `test_committed_specs_all_load_without_unknown_key_warnings` green (all 77 load with no unknown-key warnings) | PASS |
+| 6 | Full `-m "not external"` suite: 1265 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P1-3 (backfill) result: 6/6 PASS.**
+
+Note: this checkout has no untracked `experiments/results/workflows/` run ledgers, so the regenerated
+`index.json`/`STATUS.md` report `n_runs=0` for every spec (spec_status.py's documented "missing data
+is normal" behaviour). Run history is derived from those untracked ledgers and repopulates on the next
+regeneration in an environment that has them; the backfill itself only writes the identity metadata.
+
+### P1-4 (semantics) — per-kind lifecycle status derivation
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `derive_status()` gains per-kind semantics — now takes the run ledgers: a *repeatable* spec keeps `draft`/`active`/`superseded`/`tombstoned`; a *non-repeatable* workflow uses `draft`/`runnable`/`running`/`completed`/`superseded`/`tombstoned` | PASS |
+| 2 | A successful run of a non-repeatable workflow yields `completed` (derived from the ledgers, `any(run.ok)`); failed/unknown runs → `running`; never run → `runnable` | PASS |
+| 3 | Precedence preserved — authored `status` wins, `superseded_by` → `superseded`; run history never demotes a repeatable spec (still `active` even with successful runs) | PASS |
+| 4 | `SPEC_STATUSES` (the validator's vocabulary) extended with `runnable`/`running`/`completed`; `STATUS_ORDER` + the STATUS.md legend updated for the new states | PASS |
+| 5 | Tests added for every transition — runnable/running/completed, authored-status + supersession precedence, repeatable-never-completed, and an end-to-end index-derivation case (7 new tests) | PASS (7 passed) |
+| 6 | `ruff` clean; full `-m "not external"` suite: 1274 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P1-4 (semantics) result: 6/6 PASS.**
+
+Note: the index itself (`STATUS.md`/`index.json`) is deliberately NOT regenerated here — the P1-4
+(index) follow-up owns that (it adds the `artifact_kind`/`repeatable` columns and marks completed
+one-shots), and this sandbox has no run ledgers to derive the new states from anyway.
+
+### P1-4 (index) — index with identity columns + runnable-vs-done view
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `SpecStatusEntry` + `index.json` gained `artifact_kind` + `repeatable` columns (schema bumped to `spec-status/v2`); `build_entry` populates them from the spec | PASS |
+| 2 | `STATUS.md` shows `kind` + `repeatable` columns (with legend rows) and a summary line — `**Work remaining:** N runnable-now · M completed/retired` — so it answers "what work remains?" | PASS |
+| 3 | Runnable-now separated from done: `STATUS_ORDER` puts `runnable`/`running`/`active`/`draft` first and `completed`/`superseded`/`tombstoned` last, so completed one-shots sink out of the active view | PASS |
+| 4 | The 9 completed consolidation one-shots (`consolidation_release` + `consolidation_release_execute` + `consolidation_stage_0..6`) marked `status: completed` | PASS |
+| 5 | `index.json`/`STATUS.md` regenerated with the new semantics (77 specs); tests updated for the new columns + a new summary/kind-column test | PASS (44 passed) |
+| 6 | `ruff` clean; full `-m "not external"` suite: 1275 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**P1-4 (index) result: 6/6 PASS.**
+
+Note: same as the backfill, this sandbox has no untracked `experiments/results/workflows/` run
+ledgers, so the regenerated index reports `n_runs=0` and the 57 other non-repeatable workflows
+derive `runnable` (never-run) rather than their real `completed`/`running` state — that state comes
+from the ledgers on the next regeneration in an environment that has them.
+
+### Debt-2 — relative-import lint + runtime→control dependency inversion
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `tests/test_dependency_direction.py` now resolves relative imports — `_module_parts` + `_resolve_relative` walk `from ..control import X` against the package layout, so a plane module can no longer dodge the cross-plane assertions | PASS |
+| 2 | New positive tests prove the hole is closed — `test_relative_imports_resolve_across_planes` + `test_module_parts_align_with_the_import_vocabulary` (11 tests total) | PASS |
+| 3 | `Router` Protocol + routing contract (data model, validation mechanics) moved to `runtime/routing.py`; `TelemetryPublisher` Protocol in `runtime/telemetry.py`; `control/step_routing.py` slimmed to the policy (`route_step` + scoring) with backward-compat re-exports | PASS |
+| 4 | `runtime/workflow_runner.py` consumes the protocols — zero `control` imports; accepts injected `router` + `publisher_factory` (single-model runs need no router; a multi-model pool without one raises a clear error) | PASS |
+| 5 | Composition root wires it — `scripts/run_workflow.py` injects `router=route_step` + `publisher_factory=LivePublisher` | PASS |
+| 6 | Pinned edges updated — the only tier-1→tier-2 edges are now `adapters.{opencode,claude_adapter} → control.live`; `ARCHITECTURE.md` §2/§3 + `agent_config/mental-model.md` (+ regenerated surfaces) describe the inverted seam | PASS |
+| 7 | All guard tests stay green (strengthened, not weakened) — full `-m "not external"` suite: 1277 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**Debt-2 result: 7/7 PASS.**
+
+### Debt-3 — one signal registry, reconciling the measured vocabulary
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `src/agentic_dynamics/measurement/signal_registry.py` added — one registry of measured signals with the full contract (`name`, `producer`, `evidence_class`, `scope`, `value_type`, `measured`, `permitted_consumers`, `freshness`) + query helpers (`is_measured`, `signals_for`, `reserved_for_other`, `measured_signals`, …) | PASS |
+| 2 | Seeded from the ledger fields — the four formerly-missing signals (`confidence` [H], `perturbation_strength`, `test_executed_success`, `tokens_answer`/`tokens_explanation`) plus the 8 routing signals and `edge_case_coverage` | PASS |
+| 3 | `confidence` reconciled to the review's exact vocabulary — `measured: yes`, `evidence_class: [H]`, `allowed for generic model routing: no`, `reserved for cascade experiments: yes` (`permitted_consumers == {CASCADE}`) | PASS |
+| 4 | Split-brain fixed — `runtime/routing.py` derives `MEASURED_SIGNALS`/`FORBIDDEN_SIGNALS` from the registry (not hand-listed); the `validate_preferences` error for `confidence` says "measured but reserved for the cascade control arms" — never "unmeasured"; `signal_store.py` comment corrected | PASS |
+| 5 | `experiment_spec.py` `LEDGER_FIELDS` comment now points at the registry as the single source of truth; the registry's formerly-missing signals are asserted ⊆ `LEDGER_FIELDS` | PASS |
+| 6 | Tests added (`tests/test_signal_registry.py`, 7 tests) — measured facts, the reconciled `confidence` vocabulary, registry↔ledger consistency, vocabulary derivation, reserved-vs-unmeasured error, and a scan asserting no reconciliation site calls a measured signal "unmeasured" | PASS (7 passed) |
+| 7 | `ruff` clean; full `-m "not external"` suite: 1284 passed, no new failures (2 pre-existing `f6acbcf41` failures unchanged) | PASS |
+
+**Debt-3 result: 7/7 PASS.**
+
+### Debt-1 — split the Control Room monolith (server.py + design_sessions.py)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `apps/control_room/server.py` (~70KB) split into the review's named structure — `routes/` (6 modules, 28 routes), `services/` (5 modules), `clients/` (2 clients), `paths.py`; `server.py` is now a ~208-line composition root (constants, factories, `app`, re-exports, `register(app)`) | PASS |
+| 2 | `design_sessions.py` re-homed to `services/design_sessions.py` — its single cohesive `DesignSessionManager` class is one responsibility, so no further sub-split is justified (per the review's "split only where responsibilities justify") | PASS |
+| 3 | Behaviour-identical — the full admin/control-room suite (155 tests: `test_admin_server` + `test_admin_design_sessions` + `test_admin_claude_agents` + `test_admin_supervisor` + `test_control_room_paths` + `test_admin_frontend` + `test_admin_claude_agents_frontend` + `test_claude_agents_client` + `test_claude_agents_supervisor`) passes unchanged | PASS (155 passed) |
+| 4 | Monkeypatch compatibility preserved — routes/services read shared state (``_redis``, ``DATA_MANIFEST_PATH``, ``EVENT_LOG_MAX``, ``_emit_actuation_record``, …) through ``server.*`` at request time; `server` re-exports the patched names | PASS |
+| 5 | No new endpoints — the 28 routes + static shell are unchanged (verified via `app.url_map`) | PASS |
+| 6 | Launch paths fixed — `python3 apps/control_room/server.py` and `python -m apps.control_room.server` both load (the script launch is registered under its canonical module name so the routes/services don't double-load `app`) | PASS |
+| 7 | Import paths re-pointed (`scripts/supervise.py`, `scripts/claude_agents_supervisor.py`, 4 test files → `clients/`/`services/`); `ruff` clean on the split modules (only the pre-existing `SIM105` in the moved `claude_agents_client.py` remains); full `-m "not external"` suite: 1284 passed, no new failures | PASS |
+
+**Debt-1 result: 7/7 PASS.**
+
+### Debt-1 (second) — split runtime/story.py into a story package
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `runtime/story.py` (~61KB) split into `runtime/story/` — `models.py` (the four dataclasses), `conditions.py` (`PerturbationCondition` + `condition_to_mutations`), `orchestration.py` (`run_story` + per-session execution), `persistence.py` (save/load + git + opencode-DB cost accounting), and a justified 5th module `builtins.py` (the three shipped stories + `BUILTIN_STORIES` — a ~400-line responsibility the review's 4-module list didn't name) | PASS |
+| 2 | `story/__init__.py` re-exports the whole surface (incl. `compile_mutation`, which the story test suite monkeypatches via `story.compile_mutation`) so `from agentic_dynamics.runtime.story import …` breaks nothing | PASS |
+| 3 | `condition_to_mutations` resolves `compile_mutation` lazily through the package so the `monkeypatch.setattr("…story.compile_mutation", …)` test keeps working | PASS |
+| 4 | `runtime/story.py` removed; `runtime/__init__.py`'s `from . import story` now resolves the package | PASS |
+| 5 | The story suite passes unchanged (`test_story` + `test_ledger_fields`: 43 tests); all consumers (`scripts/run_story.py`, analyzers, lab books) import from the same path | PASS (43 passed) |
+| 6 | `ruff` clean on the new package; full `-m "not external"` suite: 1286 passed | PASS |
+
+**Debt-1 (second) result: 6/6 PASS.**
+
+### f1_repair_verification — release gate
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | Coverage proof — every review finding maps to a phase with a PASS entry (P0-1→b1, P0-2→b2+b3, P0-3→a1, P1-1→a2, P1-2→a3+a4, P1-3→c1+c2+c3, P1-4→d1+d2, Debt-1→e3+e4, Debt-2→e1, Debt-3→e2); zero orphans | PASS |
+| 2 | Full suite green — `pytest tests/ -m "not external"`: 1286 passed, 0 failures (the two `f6acbcf41` leftovers resolved here: `refactor_repair_review.md` gained `status: accepted`; `refactor_repair_release.yaml` re-homed to `workflows/repository/` + metadata) | PASS (1286 passed) |
+| 3 | All guard suites green — dependency, data-flow, classification, script, doc-lifecycle, generated-surface, stale-path, signal-registry, control-room paths (+ spec/compile/artifact-identity/lifecycle/CLI-resolution): 203 passed | PASS (203 passed) |
+| 4 | Compile-gate — `compile_spec(load_spec(p))` succeeds for all 78 specs; every `artifact_kind` matches its directory | PASS (78/78) |
+| 5 | CI-equivalent gates — `docker build .` (PASS), `agentic-dynamics --help` (PASS, exit 0), `bash scripts/reproduce.sh --dry-run` (PASS, exit 0) | PASS |
+| 6 | Invariant audit — Redis isolation (framework queue on 6380, story sandbox 6379), Firebase dual-host (`.firebaserc` = `ai-finops-rulebook` + `agentic-dynamics`), CAP frozen (reserved homes absent; design doc `status: accepted`) | PASS |
+| 7 | `docs/review/refactor_repair_verification.md` written with per-check PASS/FAIL + final verdict | PASS |
+
+**f1_repair_verification result: 7/7 PASS.**
+
+**RELEASE VERDICT: the refactor-repair release is COMPLETE — all 17 phases green.**
+
+
+
+
+
+
+
 
 
 

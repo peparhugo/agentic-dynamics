@@ -13,6 +13,12 @@ question: >-
   REVIEW + DESIGN workflow: it writes docs/refactor/* and experiments/specs/refactor_*.yaml only —
   it does NOT edit production code (execution follows in later workflows).
 version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

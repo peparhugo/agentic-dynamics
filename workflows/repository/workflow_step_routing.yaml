@@ -6,6 +6,15 @@ question: >-
   experiment outputs/costs plus user routing preferences (e.g. lowest cost with highest edge-case code
   coverage), and (d) every step forks from the previous session to maximize DeepSeek cache-read hits?
 version: "0.2"
+# Artifact identity (refactor-repair P1-3): a source-modifying work order (survey/design/
+# implement/verify phases edit src/ and tests), so it is a *workflow*, not an experiment.
+# One-shot repository development, hence non-repeatable.
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:
