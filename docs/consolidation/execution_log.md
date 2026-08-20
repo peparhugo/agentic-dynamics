@@ -253,6 +253,35 @@ Notes:
 - The "strip now-dead `# Deprecated:` comments" step was a no-op: those comments lived only in the
   deleted shim barrel, not in the plane `__init__.py`s.
 
+---
+
+## S2 — classify (phase `classify`)
+
+Spec: `experiments/specs/consolidation_stage_2_experiments_workflows_split.yaml` · phase `classify`.
+Deliverable: `tests/test_experiment_workflow_classification.py` (the rec-3 guard) + the two
+directory-tree skeletons.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | `experiments/{definitions,campaigns,fixtures}` + `workflows/{repository,operations,research,examples}` skeletons created (README placeholders) | PASS |
+| 2 | `tests/test_experiment_workflow_classification.py` written: definitions must be measurement, workflows must carry the work-order signature (reciprocal), plus the flat-dir-drained transition check | PASS |
+| 3 | Test run against the CURRENT layout confirms it detects the as-is mixing (fails pre-move) — recorded as `xfail(strict=False)`, to be removed at `move_specs` | PASS |
+| 4 | `pytest tests/ -m "not external"` stays green | PASS (1185 passed, 106 deselected, 1 xfailed) |
+
+**S2-classify result: 4/4 PASS.**
+
+Notes:
+
+- The work-order signature heuristic (design §4) has two legs: `workflow.kind == agent_task` AND
+  (`context.hard_rules` naming a production-code edit, OR `question` naming a repo-change
+  deliverable — website/control-room/kb-build/rewrite/repoint/rebrand/implement/canonicalize/
+  consolidation/release/…). It is deliberately heuristic (substring markers, not a hardcoded name
+  list) so it catches *new* misplacements; it will be verified against the re-homed corpus (and
+  tuned if a spec sits on the boundary) in `move_specs`.
+- The flat-dir-drained check (`experiments/specs/*.yaml` empty) is a *transition* guard distinct
+  from the two permanent classification guards — it is `xfail` until `move_specs` drains the dir.
+
+
 
 
 
