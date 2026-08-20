@@ -27,10 +27,34 @@
 
     function fmtUSD(v) { return (typeof v === 'number' ? v.toFixed(2) : v); }
 
-    function findModel(D, idPart) {
+    // Declared model resolution — explicit model ids only, never substring matching.
+    //
+    // D.models is the story corpus ordered by avg_cost, so a naive `indexOf` lookup
+    // returns the *cheapest* variant whose id merely *contains* the key:
+    //   'deepseek' -> deepseek/deepseek-v4-flash  (not Pro)
+    //   'claude'   -> anthropic/claude-haiku-4-5  (not Sonnet 5)
+    //   'gpt-5.6'  -> openai/gpt-5.6-luna         (first avg_cost hit)
+    // Those are the wrong models for the cost/narration stats. Each stat key is
+    // therefore mapped to one explicit provider/model id, resolved by exact id
+    // equality below — never by order-sensitive substring matching:
+    //   'deepseek' -> the flagship DeepSeek v4 Pro   (not Flash)
+    //   'claude'   -> the flagship Claude Sonnet 5   (not Haiku)
+    //   'gpt-5.6'  -> the declared GPT-5.6 family default (the flagship Sol tier,
+    //                 chosen by symmetry with the other two provider defaults)
+    //   'nano'     -> the historical GPT-5-nano; absent from the story corpus, so
+    //                 its narration stat correctly resolves to the em-dash fallback.
+    var MODEL_RESOLUTION = {
+      'deepseek': 'deepseek/deepseek-v4-pro',
+      'claude': 'anthropic/claude-sonnet-5',
+      'gpt-5.6': 'openai/gpt-5.6-sol',
+      'nano': 'openai/gpt-5-nano',
+    };
+
+    function findModel(D, key) {
+      var id = MODEL_RESOLUTION[key] || key;
       var ms = D.models || [];
       for (var mi = 0; mi < ms.length; mi++) {
-        if (ms[mi].id.indexOf(idPart) >= 0) return ms[mi];
+        if (ms[mi].id === id) return ms[mi];
       }
       return {};
     }
@@ -48,6 +72,11 @@
       'story_sessions': function() { return D.summary.story_sessions || D.summary.sessions_total; },
       'stories_total': function() { return D.summary.stories_total || 0; },
       'story_total_cost': function() { return fmtUSD(D.summary.story_total_cost || D.summary.total_cost); },
+      // Canonical-registry counts — the repointed source of truth for corpus size
+      // (current stories / clean single-task findings / contaminated tombstoned cells).
+      'canonical_stories': function() { return D.summary.canonical_stories; },
+      'canonical_findings': function() { return D.summary.canonical_findings; },
+      'tombstoned_excluded': function() { return D.summary.tombstoned_excluded; },
       'costgap': function() { return D.derived.cost_gap; },
       'passrate': function() { return D.derived.overall_pass_rate; },
       'deepseek_cost': function() { return fmtUSD(D.derived.total_cost_deepseek); },

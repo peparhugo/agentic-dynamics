@@ -8,7 +8,12 @@ MODEL_LABELS = {
     "openai/gpt-5.6-luna": "GPT-5.6 Luna",
     "anthropic/claude-sonnet-5": "Claude Sonnet 5",
     "deepseek/deepseek-v4-flash": "DeepSeek v4 Flash",
-    "anthropic/claude-fable-5": "Claude Fable 5",
+    # "claude-fable-5" was a historical alias: the Claude CLI adapter silently mapped
+    # fable-5 -> sonnet-5 until the fix, so EVERY historical "claude-fable-5" result
+    # actually ran sonnet-5. Its label is normalized to "Claude Sonnet 5" (see
+    # docs/HANDOFF_2026-08-19.md); the corpus model id is normalized separately in the
+    # process_perturbation_resample payload.
+    "anthropic/claude-fable-5": "Claude Sonnet 5",
     "openai/gpt-5": "GPT-5",
     "openai/gpt-5-mini": "GPT-5-mini",
     "openai/gpt-5-nano": "GPT-5-nano",

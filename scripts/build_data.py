@@ -936,7 +936,9 @@ def _short_model_label(model_id: str) -> str:
         "gpt-5.6-luna": "GPT-5.6 Luna",
         "claude-sonnet-5": "Claude Sonnet 5",
         "deepseek-v4-flash": "DeepSeek v4 Flash",
-        "claude-fable-5": "Claude Fable 5",
+        # "claude-fable-5" is the historical alias that actually ran sonnet-5
+        # (docs/HANDOFF_2026-08-19.md) — normalized to "Claude Sonnet 5".
+        "claude-fable-5": "Claude Sonnet 5",
     }
     if model_id in mapping:
         return mapping[model_id]

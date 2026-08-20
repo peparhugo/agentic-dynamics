@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>The Story — Agentic Dynamics</title>
-<meta name="description" content="How a $20 API key exposed a value-measurement gap and broadened an AI FinOps question into Agentic Dynamics, behind 249 sessions, 8 models, and 224 game reports.">
+<meta name="description" content="How a $20 API key exposed a value-measurement gap and broadened an AI FinOps question into Agentic Dynamics, behind 249 historical sessions, 8 models, and 224 historical game reports.">
 <meta property="og:title" content="The Story — Agentic Dynamics">
 <meta property="og:description" content="The Agentic Dynamics discovery story: how a $20 API key exposed a gap between success and durable value">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/story.html">
@@ -78,7 +78,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
 <li>&rarr; Completely overhauled and refactored a Dreamlab exploratory codebase — the one that eventually became this research instrument</li>
 <li>&rarr; Built a greenfield project for downloading videos, generating subtitles, cutting them into shorts, and publishing to YouTube</li>
-<li>&rarr; Ran every experiment in the Agentic Dynamics corpus — 224 game reports across 8 models</li>
+<li>&rarr; Ran every experiment in the Agentic Dynamics corpus — 224 historical game reports across 8 models</li>
 <li>&rarr; Wrote this entire website — the instrument, the principles, the calculator, the methodology page</li>
 <li>&rarr; Debugged production issues, explored architecture decisions, refactored storage layers, and built collaboration features</li>
 </ul>
@@ -109,7 +109,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p>The measurement produced two dimensions:</p>
 <div class="highlight" style="padding:1.3rem">
 <ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
-<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: 11%. DeepSeek: 8%. GPT-5-nano: 14%. (Single-session perturbation experiment, 227 runs.)</li>
+<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: 11%. DeepSeek: 8%. GPT-5-nano: 14%. (Single-session perturbation experiment, 227 historical runs.)</li>
 <li><strong style="color:var(--cy)">Recovery cost:</strong> When the model DOES succeed, how much extra does it cost to work through the confusion? DeepSeek: negligible narration overhead. Claude: 8.5% narration penalty on successful sessions, plus 11% flail rate. (Single-session perturbation experiment.)</li>
 </ul>
 </div>
@@ -120,7 +120,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>We observe an interesting pattern: some models produce fewer reasoning tokens while maintaining performance. Whether this is caused by GRPO training architecture, provider-side caching, or some combination is not yet determined.</p>
 
-<p>Later analysis revealed the deeper layer: equal token counts do not equate to identical cost. Claude Sonnet 5's tokens cost 11.5&times; more per unit (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$10.00 vs $0.87 per 1M output tokens</span>). And cache behavior splits the models: DeepSeek reuses only 78% of its context, re-reading the codebase every session at 35K tokens, while Luna and Sonnet trust their cache at 97-98% hit rates and send 6K new tokens. Two models produce the same codebase at wildly different token economics.</p>
+<p>Later analysis revealed the deeper layer: equal token counts do not equate to identical cost. Claude Sonnet 5's output tokens cost ~5.1&times; more per unit off-peak (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$10.00 vs $1.98 per 1M output tokens, off-peak</span>); DeepSeek's rate doubles to $3.96/M at peak (01:00&ndash;04:00 &amp; 06:00&ndash;10:00 UTC), narrowing the gap to ~2.5&times;. And cache behavior splits the models: DeepSeek reuses only 78% of its context, re-reading the codebase every session at 35K tokens, while Luna and Sonnet trust their cache at 97-98% hit rates and send 6K new tokens. Two models produce the same codebase at wildly different token economics.</p>
 
 <h2>Scaling the question changed the problem.</h2>
 
@@ -145,7 +145,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p><strong>Campaign — change one variable and repeat.</strong> Running sessions at scale is itself a measurement problem. The queue got wiped twice because the sessions I was running deleted the lab. SonarQube processes one analysis at a time, so I stood up four. Sessions time out mid-story and must resume without losing attribution. None of this is the finding; all of it is required to make repeated comparisons possible.</p>
 </div>
 
-<p><strong>The payoff is information, not session volume.</strong> Over 2,000 sessions — 1,097 story-building runs across 221 cells and seven models, plus 911 independent reviews — made cost and verification differences visible on the same linked work. That evidence can support a proposed policy; only a controlled grid can establish whether the policy improves value.</p>
+<p><strong>The payoff is information, not session volume.</strong> Over 2,000 sessions — 772 story-building runs across 156 cells and seven models, plus 911 independent reviews — made cost and verification differences visible on the same linked work. That evidence can support a proposed policy; only a controlled grid can establish whether the policy improves value.</p>
 
 <blockquote>
 "The outcome of one session is the starting point of the next. Measure it before deciding how to route it."
