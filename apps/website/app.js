@@ -138,7 +138,12 @@
         var field = cell.getAttribute('data-anal');
         var v = model[field];
         if (v !== undefined && v !== null) {
-          cell.textContent = (typeof v === 'number') ? v.toLocaleString() : v;
+          // Optional measurements publish {value, n_available, n_total, coverage};
+          // render the value, and an em-dash when no cell actually measured it.
+          if (v && typeof v === 'object' && 'value' in v) { v = v.value; }
+          cell.textContent = (v === null || v === undefined)
+            ? '\u2014'
+            : ((typeof v === 'number') ? v.toLocaleString() : v);
         }
       }
     }

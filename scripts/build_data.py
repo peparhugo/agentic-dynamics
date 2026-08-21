@@ -793,6 +793,23 @@ def _classify_issue(text: str) -> str:
     return "other"
 
 
+def _optional_measurement(value, n_available: int, n_total: int) -> dict:
+    """One publication shape for an optional measurement (public-truth P0/P1).
+
+    An optional signal (e.g. LSP diagnostics) is not available on every cell. Publishing
+    it as a bare average over all cells turns *not measured* into *measured as zero*.
+    Instead every optional measurement carries ``value`` (the average over the cells that
+    actually measured it, ``None`` when none did) plus the availability accounting, so a
+    reader can tell "0 errors" from "no diagnostics tool ran".
+    """
+    return {
+        "value": value,
+        "n_available": n_available,
+        "n_total": n_total,
+        "coverage": round(n_available / n_total, 4) if n_total else 0.0,
+    }
+
+
 def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
     """Aggregate AST + SonarQube + convention data from canonical analysis payloads.
 
@@ -874,10 +891,12 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
         if deep:
             m["deep_cells"] += 1
             lsp = deep.get("lsp", {})
+            # Zero-as-missing guard: an unavailable language server contributes no
+            # error/warning count, so "not measured" can never dilute the average to 0.
             if lsp.get("available"):
                 m["lsp_available"] += 1
-            m["lsp_errors"] += lsp.get("errors", 0) or 0
-            m["lsp_warnings"] += lsp.get("warnings", 0) or 0
+                m["lsp_errors"] += lsp.get("errors", 0) or 0
+                m["lsp_warnings"] += lsp.get("warnings", 0) or 0
             sol = deep.get("solution", {})
             m["solution_correctness"].append(sol.get("correctness_score", 0) or 0)
             m["solution_constraints"].append(sol.get("constraint_score", 0) or 0)
@@ -894,7 +913,6 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
     models = []
     for reviewed, m in by_model.items():
         n = len(m["convention_scores"])
-        cells = m["deep_cells"] or 1
         models.append(
             {
                 "model": reviewed,
@@ -912,8 +930,18 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
                 "avg_convention": round(sum(m["convention_scores"]) / n, 3) if n else None,
                 "deep_cells": m["deep_cells"],
                 "lsp_available": m["lsp_available"],
-                "lsp_errors_per_cell": round(m["lsp_errors"] / cells, 1),
-                "lsp_warnings_per_cell": round(m["lsp_warnings"] / cells, 1),
+                "lsp_errors_per_cell": _optional_measurement(
+                    round(m["lsp_errors"] / m["lsp_available"], 1) if m["lsp_available"] else None,
+                    m["lsp_available"],
+                    m["deep_cells"],
+                ),
+                "lsp_warnings_per_cell": _optional_measurement(
+                    round(m["lsp_warnings"] / m["lsp_available"], 1)
+                    if m["lsp_available"]
+                    else None,
+                    m["lsp_available"],
+                    m["deep_cells"],
+                ),
                 "solution_correctness": _avg(m["solution_correctness"]),
                 "solution_constraints": _avg(m["solution_constraints"]),
                 "solution_quality": _avg(m["solution_quality"]),
@@ -1107,12 +1135,17 @@ def _load_story_data(stories: list[dict]) -> dict:
     models = []
     for mid, rows in sorted(by_model.items(), key=lambda kv: sum(c["total_cost"] for c in kv[1])):
         n = len(rows)
+        cost_stats = _captured_cost_stats(rows)
         models.append(
             {
                 "model": mid,
                 "cells": n,
                 "total_cost": round(sum(c["total_cost"] for c in rows), 6),
-                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "total_tokens": sum(c["total_tokens"] for c in rows),
                 "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / n, 3),
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
@@ -1128,13 +1161,18 @@ def _load_story_data(stories: list[dict]) -> dict:
         rows = by_condition[cond]
         n = len(rows)
         variants = len({(c["story_name"], c["tier"], c["quality"]) for c in rows})
+        cost_stats = _captured_cost_stats(rows)
         conditions.append(
             {
                 "condition": cond,
                 "cells": n,
                 "variants": variants,
                 "total_cost": round(sum(c["total_cost"] for c in rows), 6),
-                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "success": sum(1 for c in rows if c["all_successful"]),
                 "fail": sum(1 for c in rows if not c["all_successful"]),
             }
@@ -1147,12 +1185,17 @@ def _load_story_data(stories: list[dict]) -> dict:
     stories_out = []
     for name, rows in sorted(by_story.items(), key=lambda kv: sum(c["total_cost"] for c in kv[1])):
         n = len(rows)
+        cost_stats = _captured_cost_stats(rows)
         stories_out.append(
             {
                 "story": name,
                 "cells": n,
                 "total_cost": round(sum(c["total_cost"] for c in rows), 6),
-                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "sessions": sum(c["session_count"] for c in rows),
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
                 "avg_tokens_per_session": round(
@@ -1168,12 +1211,17 @@ def _load_story_data(stories: list[dict]) -> dict:
     tiers = []
     for (tier, quality), rows in sorted(by_tier.items()):
         n = len(rows)
+        cost_stats = _captured_cost_stats(rows)
         tiers.append(
             {
                 "tier": tier,
                 "quality": quality,
                 "cells": n,
-                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "avg_tokens_per_session": round(
                     sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / n, 0
                 ),
@@ -1233,6 +1281,25 @@ def _merge_story_strategy(story_models: list[dict], analysis_data: dict) -> None
         sm["strategy_efficient"] = strat.get("efficient", 0)
 
 
+def _captured_cost_stats(rows: list[dict]) -> dict:
+    """One cost-denominator policy: average captured costs only, never missing-as-zero.
+
+    A cell whose cost was not captured must not enter the average as ``0`` — that would
+    lower the same model's average in one view and not another (public-truth review P1).
+    Every aggregation over cost therefore publishes the same four fields, so two views of
+    the same model can never disagree on its average cost.
+    """
+    costs = [c["total_cost"] for c in rows if c.get("total_cost", 0) > 0]
+    captured = len(costs)
+    total = len(rows)
+    return {
+        "total_cells": total,
+        "cost_captured_cells": captured,
+        "avg_captured_cost": round(sum(costs) / captured, 6) if captured else None,
+        "cost_coverage": round(captured / total, 4) if total else 0.0,
+    }
+
+
 def _captured_cost_key(rows: list[dict]) -> float:
     """Ordering key: mean captured cost (inf when nothing captured), matching the old
     ``ORDER BY avg_cost`` (NULLs last)."""
@@ -1273,9 +1340,9 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
         unique_cells = len(cell_keys)
         t = test_by_model[mid]
         sessions_sum = sum(c["session_count"] for c in rows)
-        cost_values = [c["total_cost"] for c in rows if c["total_cost"] > 0]
-        cost_cells = len(cost_values)
-        avg_cost = round(sum(cost_values) / cost_cells, 6) if cost_values else None
+        cost_stats = _captured_cost_stats(rows)
+        cost_cells = cost_stats["cost_captured_cells"]
+        avg_cost = cost_stats["avg_captured_cost"]
         avg_code_lines = round(sum(c["code_lines"] for c in rows) / total_runs, 0)
         # Energy is a [C]omputed estimate from measured tokens (J per token).
         avg_energy_j = round(
@@ -1295,6 +1362,10 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
                 "total_cost": round(sum(c["total_cost"] for c in rows), 6),
                 "avg_cost": avg_cost,
                 "cost_cells": cost_cells,
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / total_runs, 3),
                 "avg_tests": round(sum(c["test_count"] for c in rows) / total_runs, 1),
                 "avg_test_code_ratio": round(

@@ -504,3 +504,125 @@ def test_real_corpus_resolution_is_waivered():
     waived = build_data._assert_resolution_complete(tables)
     assert tables.resolution.missing == 10
     assert len(waived) == 10
+# ---------------------------------------------------------------------------
+# Null-not-zero (LSP) + one cost denominator (public-truth closure, phase p2)
+# ---------------------------------------------------------------------------
+
+
+def _resolved_story_cell(model, story_name, *, cost, session_count=5, story_id=None):
+    """A resolved-story-shaped payload for ``compute_story_models`` / ``_load_story_data``.
+
+    ``cost is None`` models the review's P1 case: a cell whose cost was never captured
+    (its payload has no ``total_cost``). ``_captured_cost_stats`` must exclude it from
+    the average rather than fold it in as ``0``.
+    """
+    summary = {"session_count": session_count}
+    if cost is not None:
+        summary["total_cost"] = cost
+    return {
+        "story_id": story_id,
+        "model": model,
+        "story_name": story_name,
+        "codebase_path": "experiments/codebases/python/tier1/good",
+        "_canonical_condition": "clean",
+        "summary": summary,
+    }
+
+
+def _analysis_cell(story_id, *, lsp_available, lsp_errors=0):
+    """A minimal analysis payload with one deep cell whose LSP ran (or not)."""
+    return {
+        "_story_id": story_id,
+        "commits": [],
+        "summary": {},
+        "deep": {
+            "lsp": {"available": lsp_available, "errors": lsp_errors, "warnings": 0},
+            "solution": {
+                "correctness_score": 1.0,
+                "constraint_score": 1.0,
+                "code_quality_score": 0.5,
+                "novelty_score": 0.5,
+                "composite_score": 0.7,
+            },
+            "basin": {"escape_score": 0.3},
+            "strategy": {"strategy": "exploratory"},
+        },
+    }
+
+
+def test_analysis_lsp_is_null_when_language_server_never_ran():
+    """An unmeasured LSP signal is ``null``, never an averaged-in zero (P0/P1)."""
+    stories = [{"story_id": "s1", "model": "deepseek/deepseek-v4-pro"}]
+    data = build_data._load_analysis_data([_analysis_cell("s1", lsp_available=False)], stories)
+    m = data["models"][0]
+    assert m["lsp_errors_per_cell"]["value"] is None
+    assert m["lsp_errors_per_cell"]["n_available"] == 0
+    assert m["lsp_errors_per_cell"]["n_total"] == 1
+    assert m["lsp_errors_per_cell"]["coverage"] == 0.0
+
+
+def test_analysis_lsp_averages_over_available_cells_only():
+    """Only cells where the language server ran enter the LSP average (P0/P1)."""
+    stories = [
+        {"story_id": "s1", "model": "deepseek/deepseek-v4-pro"},
+        {"story_id": "s2", "model": "deepseek/deepseek-v4-pro"},
+        {"story_id": "s3", "model": "deepseek/deepseek-v4-pro"},
+    ]
+    analysis = [
+        _analysis_cell("s1", lsp_available=True, lsp_errors=5),
+        _analysis_cell("s2", lsp_available=True, lsp_errors=3),
+        _analysis_cell("s3", lsp_available=False, lsp_errors=999),  # must be ignored
+    ]
+    data = build_data._load_analysis_data(analysis, stories)
+    m = data["models"][0]
+    assert m["lsp_errors_per_cell"]["value"] == 4.0
+    assert m["lsp_errors_per_cell"]["n_available"] == 2
+    assert m["lsp_errors_per_cell"]["n_total"] == 3
+    assert m["lsp_errors_per_cell"]["coverage"] == round(2 / 3, 4)
+
+
+def test_story_model_sections_agree_on_avg_cost():
+    """The two model sections never disagree on the same model's average cost (P1).
+
+    A cell with no captured cost must not dilute the average: both ``compute_story_models``
+    (top-level ``models``) and ``_load_story_data`` (``stories.models``) average over the
+    captured-cost cells only, so the two views of the same model return the same number.
+    """
+    mid = "anthropic/claude-haiku-4-5"
+    stories = [
+        _resolved_story_cell(mid, "task_manager_api", cost=2.0, story_id="a1"),
+        _resolved_story_cell(mid, "task_manager_api", cost=4.0, story_id="a2"),
+        _resolved_story_cell(mid, "task_manager_api", cost=None, story_id="a3"),
+    ]
+    top = {m["id"]: m for m in build_data.compute_story_models(stories)}
+    nested = {m["model"]: m for m in build_data._load_story_data(stories)["models"]}
+
+    # Captured average = (2 + 4) / 2, not (2 + 4 + 0) / 3.
+    assert top[mid]["avg_cost"] == 3.0
+    assert nested[mid]["avg_cost"] == 3.0
+    assert top[mid]["avg_cost"] == nested[mid]["avg_cost"]
+    # The four shared denominator fields are published on both views.
+    assert nested[mid]["cost_captured_cells"] == 2
+    assert nested[mid]["total_cells"] == 3
+    assert nested[mid]["cost_coverage"] == round(2 / 3, 4)
+    assert top[mid]["avg_captured_cost"] == nested[mid]["avg_captured_cost"]
+
+
+def test_real_data_js_model_sections_agree_on_avg_cost():
+    """Integration: the generated data.js model sections agree on every model's avg_cost."""
+    import json
+
+    data_js = Path(__file__).resolve().parent.parent / "apps" / "website" / "data.js"
+    if not data_js.exists():  # pragma: no cover - generated file, present in CI
+        pytest.skip("apps/website/data.js not generated")
+    text = data_js.read_text(encoding="utf-8")
+    payload = json.loads(text[text.index("{") : text.rindex("}") + 1])
+
+    top = {m["id"]: m.get("avg_cost") for m in payload["models"]}
+    nested = {m["model"]: m.get("avg_cost") for m in payload["stories"]["models"]}
+    disagreements = [
+        f"{mid}: top={top[mid]!r} nested={nested[mid]!r}"
+        for mid in top
+        if mid in nested and top[mid] != nested[mid]
+    ]
+    assert not disagreements, "model sections disagree on avg_cost:\n" + "\n".join(disagreements)
