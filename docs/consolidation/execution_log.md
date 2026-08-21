@@ -1243,6 +1243,27 @@ entry (`metric_definition_version` grit/v1 vs committed grit/v0) — c3; honest 
 `n_resolved`/`n_eligible`/`n_used`/`n_excluded` — c4; the test-count scope renames — c5; README/site
 prose reconciliation — c6; the full release-gate verification — c7.
 
+### c3_contract_semantic — semantic lab-contract validation + payload-content identity (review P1 + P2)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Semantic validation** — `validate_contract(payload, manifest_entry, current_identity)` now compares, for exact equality, every field with an authoritative source: `lab` / `metric_definition_version` / `requires_external_service` against the manifest entry, `data_integrity_policy` / `contract_version` against the module constants, `input_dataset_id` against the tables the entry's `input_sources` declare, and `registry_version` against the current identity. Any mismatch fails | PASS |
+| 2 | **No `<lab>/v0` fallback** — `build_contract` now raises for an unclassified lab (no invented metric version); the previous `_metric_definition_version` fallback is gone | PASS |
+| 3 | **P2 rename** — `input_manifest_sha256` → `registry_identity_sha256` across `ManifestIdentity`, `LabContract`, and `REQUIRED_FIELDS` (the hash value is unchanged — it was already the registry projection, just misleadingly named) | PASS |
+| 4 | **P2 content hash** — `canonical_corpus.resolved_input_identity` computes `resolved_input_sha256` over the stable sorted `(table, entity_id, knowledge_id, payload-content-digest)` sequence; `_payload_content` excludes the resolver's underscore-provenance keys (incl. absolute `_source_path`) so only measured bytes move it. `resolve_reviews`/`resolve_analysis` now stamp `_registry` so every resolved payload is keyable | PASS |
+| 5 | **Contracts embed both** — `build_contract` writes `registry_identity_sha256` + `resolved_input_sha256`; `contract_version` bumped to `lab-contract/v2` (field renamed + added); `validate_contract` verifies the content hash when the caller recomputes it (build_data resolves each lab's own tables) | PASS |
+| 6 | **Mutation tests** — `test_semantic_field_mismatch_is_rejected` parametrises over all 7 semantic fields, altering each independently and asserting rejection with the field named; plus the stale-registry-hash and content-hash-sensitivity tests | PASS (7 param + 2 named) |
+| 7 | **grit/v0 fixed** — the committed `lab_grit.json` embedded `grit/v0` while the manifest declares `grit/v1`; all 8 publication-eligible lab artifacts regenerated, `lab_grit.json` now carries `grit/v1`, all at `lab-contract/v2` with both hashes | PASS (8/8 regenerated) |
+| 8 | **data.js rebuilt** — the `labs` section re-published with the v2 contracts (7 published labs, each carrying `registry_identity_sha256` + `resolved_input_sha256`); manifest re-hashed (registry byte-identical, so identity unchanged) | PASS |
+| 9 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1424 passed, 106 deselected**; full `pytest tests/`: **1529 passed, 1 skipped** | PASS |
+
+**c3_contract_semantic result: 9/9 PASS.**
+
+Carried forward (later phases, not dropped): honest record-count scopes
+`n_resolved`/`n_eligible`/`n_used`/`n_excluded` — c4; the test-count scope renames — c5; README/site
+prose reconciliation — c6; the full release-gate verification — c7.
+
+
 
 
 

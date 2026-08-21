@@ -153,17 +153,20 @@ def test_published_artifacts_match_the_current_registry():
     corpus changed passes; one left behind fails.
     """
     identity = cc.current_manifest_identity()
-    if not identity.input_manifest_sha256:  # pragma: no cover - manifest present in CI
+    if not identity.registry_identity_sha256:  # pragma: no cover - manifest present in CI
         pytest.skip("no data_manifest.json registry in this checkout")
 
     # Derived from the resolver's own table registry, so a newly added table (s4 added
     # ``finding`` for the Grit lab) is covered automatically instead of KeyError-ing here.
     everything = cc.load_canonical_tables(*cc.TABLES)
     resolved = {name: len(everything.rows(name)) for name in cc.TABLES}
+    manifest = load_lab_manifest()
 
     for lab, _path, payload in _published_artifacts():
+        entry = manifest.get(lab)
+        assert entry is not None
         contract = payload[CONTRACT_KEY]
-        reason = validate_contract(payload, lab_script=lab, current=identity)
+        reason = validate_contract(payload, manifest_entry=entry, current_identity=identity)
         assert reason is None, reason
 
         # input_dataset_id is "canonical_registry/story+review" — recompute its size.

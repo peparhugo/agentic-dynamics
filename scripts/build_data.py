@@ -52,7 +52,7 @@ from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
     registry_rows,
     unwaivered_issues,
 )
-from agentic_dynamics.reporting.lab_contract import validate_contract  # noqa: E402
+from agentic_dynamics.reporting.lab_contract import expected_tables, validate_contract  # noqa: E402
 from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
     load_lab_manifest,
     publication_labs,
@@ -945,10 +945,12 @@ def _load_labs() -> dict:
        reaches ``data.js`` only when the manifest marks it ``publication_eligible`` *and*
        names a ``website_key``.
     2. **Lineage** — the artifact must carry a ``lab_contract`` block whose
-       ``input_manifest_sha256`` matches the identity of the CURRENT
-       ``data_manifest.json`` registry. Eligibility is a property of the lab; freshness is
-       a property of the file. A lab that was eligible yesterday produced stale numbers if
-       records have since been added, superseded, or tombstoned.
+       ``registry_identity_sha256`` matches the identity of the CURRENT
+       ``data_manifest.json`` registry, whose semantic fields match the manifest entry
+       exactly (review P1), and whose ``resolved_input_sha256`` matches the payload content
+       the CURRENT resolver produces (review P2). Eligibility is a property of the lab;
+       freshness is a property of the file. A lab that was eligible yesterday produced stale
+       numbers if records have since been added, superseded, or tombstoned.
 
     Every rejection is logged with the lab name and the reason — a website section may
     disappear, but never silently. A missing artifact is still skipped quietly: a lab that
@@ -974,7 +976,25 @@ def _load_labs() -> dict:
             continue
 
         # --- gate 2: the canonical lab contract -----------------------------------------
-        reason = validate_contract(payload, lab_script=entry.script, current=identity)
+        # Semantic validation against the manifest entry (review P1) + the registry
+        # identity + the payload-content hash (review P2). The content hash is recomputed
+        # from THIS lab's own resolved tables, so a payload drift is caught per lab, not
+        # per the whole four-table corpus.
+        expected_content = None
+        try:
+            lab_tables = load_canonical_tables(*expected_tables(entry), manifest_path=MANIFEST_PATH)
+            expected_content = lab_tables.resolved_input_sha256
+        except ValueError:
+            # expected_tables returned an empty/unknown slice — validate_contract's
+            # input_dataset_id check will reject it; leave the content hash unverified here.
+            expected_content = None
+
+        reason = validate_contract(
+            payload,
+            manifest_entry=entry,
+            current_identity=identity,
+            expected_resolved_input_sha256=expected_content,
+        )
         if reason is not None:
             print(f"  [lab-gate] rejected — {reason}")
             continue

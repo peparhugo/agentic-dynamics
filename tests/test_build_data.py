@@ -380,7 +380,7 @@ def test_lab_gate_rejects_a_stale_manifest_lab_json(tmp_path, monkeypatch, capsy
     out = capsys.readouterr().out
     assert "[lab-gate] rejected" in out
     assert "lab_story_arc.py" in out, "the rejection must name the lab"
-    assert "stale input_manifest_sha256" in out
+    assert "stale registry_identity_sha256" in out
 
 
 # ---------------------------------------------------------------------------
@@ -498,7 +498,7 @@ def test_real_corpus_resolution_is_waivered():
     An integration guard: if a new payload-less current row appears without a matching
     waiver, this raises — publication fails closed against drift, not just in fixtures.
     """
-    if not cc.current_manifest_identity().input_manifest_sha256:  # pragma: no cover
+    if not cc.current_manifest_identity().registry_identity_sha256:  # pragma: no cover
         pytest.skip("no data_manifest.json registry in this checkout")
     tables = cc.load_canonical_tables("story", "finding", "review")
     waived = build_data._assert_resolution_complete(tables)

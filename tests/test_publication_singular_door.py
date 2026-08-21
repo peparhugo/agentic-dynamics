@@ -121,7 +121,7 @@ def test_public_data_producer_does_not_glob_raw_result_dirs(script: str):
 def test_canonical_condition_split_has_no_bad_seed_arm():
     """The resolver's canonical split is exactly ``clean 135 / early_degrade 80``."""
     identity = cc.current_manifest_identity()
-    if not identity.input_manifest_sha256:  # pragma: no cover - manifest present in CI
+    if not identity.registry_identity_sha256:  # pragma: no cover - manifest present in CI
         pytest.skip("no data_manifest.json registry in this checkout")
 
     tables = cc.load_canonical_tables("story")

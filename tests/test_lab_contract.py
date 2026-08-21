@@ -79,13 +79,27 @@ def tables_factory(tmp_path):
     return _make
 
 
+@pytest.fixture()
+def manifest_entry() -> LabEntry:
+    """The real :class:`LabEntry` for ``lab_story_arc.py`` — the classification source of
+    truth that :func:`validate_contract` compares the contract's semantic fields against."""
+    entry = load_lab_manifest().get("lab_story_arc.py")
+    assert entry is not None
+    return entry
+
+
+def _contract_payload(tables: cc.CanonicalTables, *, entry: LabEntry | None = None) -> dict:
+    """A payload carrying a freshly built contract for ``lab_story_arc.py``."""
+    return {CONTRACT_KEY: build_contract("lab_story_arc.py", tables)}
+
+
 # ---------------------------------------------------------------------------
 # 1. The six required fields
 # ---------------------------------------------------------------------------
 
 
-def test_contract_carries_exactly_the_six_required_fields(tables_factory):
-    """The review's field list, verbatim, on a freshly built contract."""
+def test_contract_carries_exactly_the_seven_required_fields(tables_factory):
+    """The review's field list (with the P2 rename + addition), verbatim, on a fresh contract."""
     tables = tables_factory([_row("aaaaaaaaaaaa")])
     contract = build_contract("lab_story_arc.py", tables)
 
@@ -96,17 +110,65 @@ def test_contract_carries_exactly_the_six_required_fields(tables_factory):
     # metric_definition_version comes from the manifest, not invented by the lab.
     assert contract["metric_definition_version"] == "story_arc/v1"
     assert contract["data_integrity_policy"] == "docs/data_integrity_findings.md"
+    # Both identities are embedded (P2): the selection hash and the content hash.
+    assert len(contract["registry_identity_sha256"]) == 64
+    assert len(contract["resolved_input_sha256"]) == 64
 
 
 def test_contract_identity_tracks_the_manifest_it_was_built_from(tables_factory):
     """Two different registries must produce two different identities."""
     a = build_contract("lab_story_arc.py", tables_factory([_row("aaaaaaaaaaaa")]))
     b = build_contract("lab_story_arc.py", tables_factory([_row("bbbbbbbbbbbb")]))
-    assert a["input_manifest_sha256"] != b["input_manifest_sha256"]
+    assert a["registry_identity_sha256"] != b["registry_identity_sha256"]
 
     # …and the same registry the same identity (the hash is a pure function of content).
     c = build_contract("lab_story_arc.py", tables_factory([_row("aaaaaaaaaaaa")]))
-    assert a["input_manifest_sha256"] == c["input_manifest_sha256"]
+    assert a["registry_identity_sha256"] == c["registry_identity_sha256"]
+
+
+def test_resolved_input_sha256_varies_with_the_table_slice(tables_factory):
+    """The content hash is a function of *which* payloads resolved, not just the registry.
+
+    The synthetic manifest names a story row with no payload file, so ``story`` resolves to
+    an empty sequence; the hash is still a well-formed 64-hex digest, and the same slice
+    over a different row hashes identically (both empty).
+    """
+    a = tables_factory([_row("aaaaaaaaaaaa")])
+    empty = a.resolved_input_sha256
+    assert len(empty) == 64
+
+    # Same slice, different row → same (empty) content sequence.
+    b = tables_factory([_row("bbbbbbbbbbbb")])
+    assert b.resolved_input_sha256 == empty
+
+
+def test_resolved_input_sha256_sensitive_to_payload_content(tmp_path, monkeypatch):
+    """A payload whose measured content changes moves ``resolved_input_sha256`` (review P2).
+
+    This is the gap P2 closes: the registry-identity hash is identical across the two
+    resolutions (same registry, same row), but the content hash must change.
+    """
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    payload_path = stories_dir / "note_service_aaa.json"
+    manifest_path = tmp_path / "data_manifest.json"
+    manifest_path.write_text(json.dumps(_fake_manifest([_row("aaa")])))
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    payload_path.write_text(
+        json.dumps({"story_id": "aaa", "model": "m", "summary": {"total_cost": 1.0}})
+    )
+    first = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    before = first.resolved_input_sha256
+    before_registry = first.identity.registry_identity_sha256
+
+    payload_path.write_text(
+        json.dumps({"story_id": "aaa", "model": "m", "summary": {"total_cost": 2.0}})
+    )
+    second = cc.load_canonical_tables("story", manifest_path=manifest_path)
+
+    assert second.resolved_input_sha256 != before
+    assert second.identity.registry_identity_sha256 == before_registry
 
 
 def test_identity_ignores_volatile_manifest_fields(tmp_path):
@@ -142,8 +204,8 @@ def test_identity_ignores_volatile_manifest_fields(tmp_path):
         )
     )
     assert (
-        cc.manifest_identity(manifest_path=a).input_manifest_sha256
-        == cc.manifest_identity(manifest_path=b).input_manifest_sha256
+        cc.manifest_identity(manifest_path=a).registry_identity_sha256
+        == cc.manifest_identity(manifest_path=b).registry_identity_sha256
     )
 
 
@@ -152,80 +214,147 @@ def test_identity_ignores_volatile_manifest_fields(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_stale_manifest_lab_json_is_rejected(tables_factory):
+def test_stale_manifest_lab_json_is_rejected(tables_factory, manifest_entry):
     """A lab built against an older registry may not publish."""
     old = tables_factory([_row("aaaaaaaaaaaa")])
-    new = tables_factory([_row("aaaaaaaaaaaa"), _row("bbbbbbbbbbbb")])
+    # Same row count (so registry_version is identical) but a *different* row — only the
+    # registry-identity hash can tell the two registries apart.
+    new = tables_factory([_row("bbbbbbbbbbbb")])
 
     payload = {
         "experiment_id": "lab_story_arc",
         CONTRACT_KEY: build_contract("lab_story_arc.py", old),
     }
 
-    reason = validate_contract(payload, lab_script="lab_story_arc.py", current=new.identity)
+    reason = validate_contract(
+        payload, manifest_entry=manifest_entry, current_identity=new.identity
+    )
     assert reason is not None, "a stale artifact must be rejected"
-    assert "stale input_manifest_sha256" in reason
+    assert "stale registry_identity_sha256" in reason
     assert "lab_story_arc.py" in reason, "the rejection must name the lab"
 
     # …and the same payload against its own registry is accepted.
-    assert validate_contract(payload, lab_script="lab_story_arc.py", current=old.identity) is None
+    assert (
+        validate_contract(payload, manifest_entry=manifest_entry, current_identity=old.identity)
+        is None
+    )
 
 
-def test_missing_contract_is_rejected(tables_factory):
+def test_missing_contract_is_rejected(tables_factory, manifest_entry):
     """A pre-contract artifact is exactly as untrustworthy as a stale one."""
     current = tables_factory([_row("aaaaaaaaaaaa")]).identity
     reason = validate_contract(
-        {"experiment_id": "x"}, lab_script="lab_story_arc.py", current=current
+        {"experiment_id": "x"}, manifest_entry=manifest_entry, current_identity=current
     )
     assert reason is not None and CONTRACT_KEY in reason
 
 
 @pytest.mark.parametrize("missing", REQUIRED_FIELDS)
-def test_incomplete_contract_is_rejected(tables_factory, missing):
+def test_incomplete_contract_is_rejected(tables_factory, manifest_entry, missing):
     """Dropping any one required field is a rejection, field by field."""
     tables = tables_factory([_row("aaaaaaaaaaaa")])
     contract = build_contract("lab_story_arc.py", tables)
     contract.pop(missing)
     reason = validate_contract(
-        {CONTRACT_KEY: contract}, lab_script="lab_story_arc.py", current=tables.identity
+        {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=tables.identity
     )
     assert reason is not None and missing in reason
 
 
-def test_empty_identity_field_is_rejected(tables_factory):
+def test_empty_identity_field_is_rejected(tables_factory, manifest_entry):
     """An empty (rather than absent) identity value must not slip through."""
     tables = tables_factory([_row("aaaaaaaaaaaa")])
     contract = build_contract("lab_story_arc.py", tables)
     contract["registry_version"] = "  "
     reason = validate_contract(
-        {CONTRACT_KEY: contract}, lab_script="lab_story_arc.py", current=tables.identity
+        {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=tables.identity
     )
     assert reason is not None and "registry_version" in reason
 
 
-def test_null_requires_external_service_is_allowed(tables_factory):
+def test_null_requires_external_service_is_allowed(tables_factory, manifest_entry):
     """``requires_external_service: null`` is the correct value, not a missing one."""
     tables = tables_factory([_row("aaaaaaaaaaaa")])
     contract = build_contract("lab_story_arc.py", tables)
     assert contract["requires_external_service"] is None
     assert (
         validate_contract(
-            {CONTRACT_KEY: contract}, lab_script="lab_story_arc.py", current=tables.identity
+            {CONTRACT_KEY: contract},
+            manifest_entry=manifest_entry,
+            current_identity=tables.identity,
         )
         is None
     )
 
 
-def test_absent_registry_rejects_everything(tmp_path):
-    """With no manifest there is nothing to prove lineage against — publish nothing."""
+def test_absent_registry_rejects_everything(tmp_path, manifest_entry):
+    """With no manifest there is nothing to prove lineage against — publish nothing.
+
+    The contract's semantic fields are all *correct* (so the semantic check passes); the
+    rejection must come from the missing-registry identity, not from a field mismatch.
+    """
     empty = cc.manifest_identity(manifest_path=tmp_path / "nope.json")
-    assert empty.input_manifest_sha256 == ""
+    assert empty.registry_identity_sha256 == ""
+    contract = {
+        "lab": "lab_story_arc.py",
+        "input_dataset_id": "canonical_registry/story",
+        "registry_identity_sha256": "a" * 64,
+        "resolved_input_sha256": "a" * 64,
+        "registry_version": "absent",
+        "metric_definition_version": "story_arc/v1",
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": None,
+        "contract_version": CONTRACT_VERSION,
+    }
     reason = validate_contract(
-        {CONTRACT_KEY: {f: "x" for f in REQUIRED_FIELDS}},
-        lab_script="lab_story_arc.py",
-        current=empty,
+        {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=empty
     )
     assert reason is not None and "generate_manifest" in reason
+
+
+# ---------------------------------------------------------------------------
+# 2b. Semantic identity — every manifest-authored field is compared exactly
+# ---------------------------------------------------------------------------
+
+#: The seven fields validate_contract compares for exact equality, mapped to a mutated
+#: (wrong) value that must trigger rejection. Each is the concrete drift class the review
+#: named (the grit/v0-vs-v1 mismatch being the headline one).
+SEMANTIC_MUTATIONS = (
+    ("lab", "lab_story_review.py"),
+    ("input_dataset_id", "canonical_registry/review"),
+    ("registry_version", "data-manifest/9.9+0rows"),
+    ("metric_definition_version", "story_arc/v0"),
+    ("data_integrity_policy", "docs/some_other_policy.md"),
+    ("requires_external_service", "sonar"),
+    ("contract_version", "lab-contract/v1"),
+)
+
+
+@pytest.mark.parametrize("field,wrong", SEMANTIC_MUTATIONS)
+def test_semantic_field_mismatch_is_rejected(tables_factory, manifest_entry, field, wrong):
+    """Altering any one semantic field independently rejects publication (review P1).
+
+    The registry-identity hash is left untouched, so only the semantic comparison can
+    catch the mutation — exactly the gap the review found (a grit/v0 artifact accepted
+    because its *hash* matched while its metric version did not).
+    """
+    tables = tables_factory([_row("aaaaaaaaaaaa")])
+    contract = build_contract("lab_story_arc.py", tables)
+    assert contract[field] != wrong, "the mutation value must actually differ"
+
+    contract[field] = wrong
+    reason = validate_contract(
+        {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=tables.identity
+    )
+    assert reason is not None, f"mutation of {field} must be rejected"
+    assert field in reason
+
+
+def test_build_contract_requires_a_classified_lab(tables_factory):
+    """Building a contract for a lab absent from the manifest raises (no /v0 fallback)."""
+    tables = tables_factory([_row("aaaaaaaaaaaa")])
+    with pytest.raises(ValueError, match="not classified"):
+        build_contract("lab_does_not_exist.py", tables)
 
 
 # ---------------------------------------------------------------------------
@@ -372,10 +501,14 @@ def test_published_lab_artifacts_carry_a_valid_contract():
 
     This is the integration check: manifest + resolver + emitter + validator agreeing on
     the real corpus. Skipped only when a lab has not been run yet (a gap, not a failure).
+    The payload-content hash is recomputed from the lab's own resolved tables, so a drift in
+    any resolved payload is caught here, not just a registry change.
     """
+    from agentic_dynamics.reporting.lab_contract import expected_tables
+
     manifest = load_lab_manifest()
     identity = cc.current_manifest_identity()
-    if not identity.input_manifest_sha256:  # pragma: no cover - manifest always present in CI
+    if not identity.registry_identity_sha256:  # pragma: no cover - manifest always present
         pytest.skip("no data_manifest.json registry in this checkout")
 
     checked = 0
@@ -386,7 +519,13 @@ def test_published_lab_artifacts_carry_a_valid_contract():
         if not artifact.exists():
             continue
         payload = json.loads(artifact.read_text(encoding="utf-8"))
-        reason = validate_contract(payload, lab_script=entry.script, current=identity)
+        expected_content = cc.load_canonical_tables(*expected_tables(entry)).resolved_input_sha256
+        reason = validate_contract(
+            payload,
+            manifest_entry=entry,
+            current_identity=identity,
+            expected_resolved_input_sha256=expected_content,
+        )
         assert reason is None, reason
         checked += 1
 

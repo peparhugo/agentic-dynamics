@@ -31,20 +31,23 @@ The rules it implements
 4. **The no-op condition relabel** (``docs/data_integrity_findings.md`` treatment rule 1)
    is applied once, here, so no lab re-implements it.
 5. **Identity is computed, not asserted**: :func:`manifest_identity` produces the
-   ``input_manifest_sha256`` / ``registry_version`` a lab embeds in its output and
-   ``build_data.py`` re-checks at publication time (see ``lab_contract``).
+   ``registry_identity_sha256`` / ``registry_version`` a lab embeds in its output and
+   ``build_data.py`` re-checks at publication time (see ``lab_contract``), and
+   :func:`resolved_input_identity` attests to the exact payload *content*.
 
-Why the identity hash is a *projection* of the manifest, not the file's sha256
------------------------------------------------------------------------------
+Why the registry-identity hash is a *projection* of the manifest, not the file's sha256
+----------------------------------------------------------------------------------
 Hashing ``data_manifest.json`` whole would be circular: the manifest records the sha256
 of ``apps/website/data.js``, which is produced *by publishing the labs*, and it carries a
 fresh ``generated_at`` on every run. A lab's embedded hash would be invalidated by the
 very act of publishing it — every subsequent build would reject every lab.
 
-So the hash covers the manifest's **canonical-state identity**: ``schema_version`` plus
-the full ``registry`` array. That is precisely the input a lab consumed. It changes when
-records are added, superseded, or tombstoned (the lab genuinely is stale) and does not
-change when the pipeline re-stamps a timestamp or re-hashes its own output.
+So the registry-identity hash covers the manifest's **canonical-state identity**:
+``schema_version`` plus the full ``registry`` array. That is precisely the *selection* a
+lab consumed. It changes when records are added, superseded, or tombstoned (the lab
+genuinely is stale) and does not change when the pipeline re-stamps a timestamp or
+re-hashes its own output. It does **not** attest to payload *bytes* — that is what the
+separate ``resolved_input_sha256`` (review P2) is for.
 """
 
 from __future__ import annotations
@@ -101,13 +104,14 @@ TABLE_SOURCE_TYPES = {"story": "story", "review": "review", "finding": "finding"
 class ManifestIdentity:
     """Who the input dataset *is* — the lineage a lab embeds and build_data re-checks.
 
-    ``input_manifest_sha256`` is the projection hash described in the module docstring;
-    ``registry_version`` is a human-readable version string combining the manifest schema
-    version with the canonical row count, so a mismatch is legible in a log line without
-    diffing hashes.
+    ``registry_identity_sha256`` is the projection hash described in the module docstring
+    (``schema_version`` + the ``registry`` array — the registry identity, not the manifest
+    file's bytes and not the payload bytes); ``registry_version`` is a human-readable
+    version string combining the manifest schema version with the canonical row count, so a
+    mismatch is legible in a log line without diffing hashes.
     """
 
-    input_manifest_sha256: str
+    registry_identity_sha256: str
     registry_version: str
     n_rows: int
     n_current: int
@@ -119,7 +123,7 @@ class ManifestIdentity:
         Deliberately NOT a plausible-looking hash: a lab built without a manifest must be
         rejected at publication, and an obviously-empty identity makes that unambiguous.
         """
-        return cls(input_manifest_sha256="", registry_version="absent", n_rows=0, n_current=0)
+        return cls(registry_identity_sha256="", registry_version="absent", n_rows=0, n_current=0)
 
 
 def _canonical_json(obj: Any) -> bytes:
@@ -163,7 +167,7 @@ def manifest_identity(
     ).hexdigest()
     n_current = sum(1 for r in rows if r.get("lifecycle_state") == "current")
     return ManifestIdentity(
-        input_manifest_sha256=digest,
+        registry_identity_sha256=digest,
         registry_version=f"data-manifest/{schema_version}+{len(rows)}rows",
         n_rows=len(rows),
         n_current=n_current,
@@ -173,6 +177,51 @@ def manifest_identity(
 def current_manifest_identity(manifest_path: Path | None = None) -> ManifestIdentity:
     """Identity of the manifest on disk right now — build_data's side of the comparison."""
     return manifest_identity(manifest_path=manifest_path)
+
+
+def _payload_content(payload: dict) -> dict:
+    """The *measurement* content of a resolved payload — resolver provenance removed.
+
+    The resolver stamps each payload with underscore-prefixed provenance keys
+    (``_canonical_condition``, ``_source_path``, ``_registry``, ``_story_id``,
+    ``_experiment``). Those are derived from the registry/join, not from the payload file's
+    own bytes — and ``_source_path`` is an absolute path that would make a content hash
+    environment-dependent. The payload-content digest (review P2) therefore covers only the
+    non-underscore keys, which are exactly the measured fields that a payload-file edit
+    would change.
+    """
+    return {k: v for k, v in payload.items() if not str(k).startswith("_")}
+
+
+def resolved_input_identity(tables: CanonicalTables) -> str:
+    """``sha256`` over the stable sorted ``(table, entity_id, knowledge_id, payload_digest)``
+    sequence (review P2) — attests to the exact payload *content*, not just the selection.
+
+    The registry-identity hash says *which* records a lab consumed; it cannot tell that a
+    payload file's bytes changed underneath a stable registry. This digest covers each
+    resolved payload's measured content (provenance keys excluded), keyed by its canonical
+    identity, sorted so the hash is order-independent. ``build_contract`` embeds it as
+    ``resolved_input_sha256``; ``validate_contract`` recomputes it the same way and rejects
+    a drift.
+    """
+    rows: list[tuple] = []
+    for table in tables.tables:
+        attr = TABLE_ATTRIBUTES.get(table)
+        if attr is None:
+            continue
+        for payload in getattr(tables, attr):
+            reg = payload.get("_registry") or {}
+            content_digest = hashlib.sha256(_canonical_json(_payload_content(payload))).hexdigest()
+            rows.append(
+                (
+                    table,
+                    str(reg.get("entity_id") or ""),
+                    str(reg.get("knowledge_id") or ""),
+                    content_digest,
+                )
+            )
+    rows.sort()
+    return hashlib.sha256(_canonical_json(rows)).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -499,6 +548,12 @@ def resolve_reviews(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]:
             issues.append(_issue("review", row, "unreadable"))
             continue
         payload["_story_id"] = story_id
+        payload["_registry"] = {
+            "entity_id": row.get("entity_id"),
+            "knowledge_id": row.get("knowledge_id"),
+            "source_uri": row.get("source_uri"),
+            "lifecycle_state": row.get("lifecycle_state"),
+        }
         out.append(payload)
     return out, issues
 
@@ -527,6 +582,15 @@ def resolve_analysis(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]
         if payload is None:
             continue
         payload["_story_id"] = story_id
+        # Analysis is derived from a story, so its canonical entity is the story row it
+        # joins onto — the provenance that ``resolved_input_identity`` folds into the
+        # payload-content hash.
+        payload["_registry"] = {
+            "entity_id": row.get("entity_id"),
+            "knowledge_id": row.get("knowledge_id"),
+            "source_uri": row.get("source_uri"),
+            "lifecycle_state": row.get("lifecycle_state"),
+        }
         out.append(payload)
     return out, []
 
@@ -634,6 +698,11 @@ class CanonicalTables:
         return (
             f"canonical_registry/{'+'.join(self.tables)}" if self.tables else "canonical_registry"
         )
+
+    @property
+    def resolved_input_sha256(self) -> str:
+        """The payload-content identity (review P2) — see :func:`resolved_input_identity`."""
+        return resolved_input_identity(self)
 
     @property
     def is_empty(self) -> bool:
