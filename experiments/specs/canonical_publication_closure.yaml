@@ -1,0 +1,125 @@
+name: canonical_publication_closure
+question: >-
+  Execute the canonical-publication closure patch (docs/review/canonical_publication_review.md —
+  external review of main at ec66947d5, claims re-verified) in small incremental stages with
+  DeepSeek Pro: route the primary story/review/analysis publication path through CanonicalTables
+  (killing the raw parquet/glob path and the bad_seed-41 contradiction), add resolution
+  completeness + fail-closed semantics + payload-content identities, strengthen lab-contract
+  validation to semantic identity, scope record counts honestly (n_resolved/n_eligible/n_used/
+  n_excluded), rename the test-count fields to their real scopes, reconcile README + site prose
+  with the canonical dataset, and verify. No CAP implementation. The publication boundary becomes
+  truly singular: one canonical door, one lineage to data.js.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      review: >-
+        READ docs/review/canonical_publication_review.md FIRST — the authoritative input. P0: the
+        primary story path bypasses the resolver (sync_data.py:24,140 globs raw stories;
+        build_data.py:1112-1115,1270-1272 reads parquet as source of truth; :768,:892 glob raw
+        reviews/analysis) — data.js carries bad_seed 41 / early_degrade 91 against the canonical
+        clean 135 / early_degrade 80. P1: validate_contract checks only the registry hash —
+        manifest grit/v1 vs artifact grit/v0 ships. P1: 225 current rows vs 215 payloads silently
+        skipped. P2: n_input_records 279 vs 144 used. P2: hash attests registry identity, not
+        payload bytes. Smaller: test-count scope conflation (tests_total vs tests_passed/run),
+        README figures (1,097/36/$288.69 vs 1,067/35/$309.17), Docker manifest not persisted.
+      current_state: >-
+        Semantic-integrity release merged at ec66947d5: lab manifest + contract + canonical_corpus
+        resolver + publication gates + semantic agent_config guards + reproduce core/container CI.
+        The lab path is canonical; the primary story/model/review/analysis path is not. data.js
+        currently mixes both semantics. Queue cleared; no new runs since Aug 19. 10 payload-less
+        current story rows exist.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) One canonical door:
+        after c1, no public-data producer may glob experiments/results/{stories,reviews,analysis}
+        outside the canonical resolver — enforced by a guard test, not convention. (3) Data
+        integrity: the relabel policy is absolute (bad_seed/early_degrade no-ops ARE clean); no
+        fabricated zeros; unresolved rows fail closed (waiver = explicit, reason-bearing, committed).
+        (4) The lab contract gains semantic validation — never weaken an existing rejection.
+        (5) Operational invariants survive: Redis 6380/6379, dual Firebase, CAP frozen (placeholders
+        only). (6) Every public count carries its scope name (registry_current / resolved /
+        eligible / used); the site prose may not claim a condition split that the canonical dataset
+        does not contain. (7) Append PASS/FAIL to docs/consolidation/execution_log.md
+        ('## Canonical publication closure' section); resumable via --resume.
+      read_first: >-
+        docs/review/canonical_publication_review.md, docs/data_integrity_findings.md,
+        src/agentic_dynamics/reporting/{canonical_corpus,lab_contract,lab_manifest}.py,
+        scripts/{sync_data,build_data}.py, apps/website/{index,evidence,story}.html, README.md
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/canonical-closure); each phase commits [workflow] <phase>. Continuous run;
+        resumable with --resume.
+    phases:
+      - name: c1_canonical_tables
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          FIX: P0 (the singular door) — extend reporting/canonical_corpus.py so build_data.py loads ONE complete canonical input: tables = load_canonical_tables('story','finding','review','analysis'). Rewire sync_data.py to accept registry-selected story payloads (it may no longer glob the raw stories dir); compute_story_models / _load_story_data consume tables.stories; _load_review_data consumes tables.reviews; _load_analysis_data consumes tables.analysis. The story condition split in data.js must match the relabel policy (clean 135 / early_degrade 80 — NO bad_seed 41, NO early_degrade 91). Add the guard test: any public-data producer directly globbing experiments/results/{stories,reviews,analysis} outside the resolver fails the suite. Regenerate parquet + data.js.
+          LOG: PASS/FAIL; commit.
+      - name: c2_resolution_fail_closed
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P1 (completeness) — add ResolutionReport (expected_current, resolved, missing, unreadable, ambiguous, duplicate) to the resolver. Publication FAILS CLOSED when a current row cannot be resolved unless an explicit, reason-bearing waiver exists (committed artifact listing the 10 known payload-less rows with reasons). data.js gains scoped counts: registry_current_records / resolved_measurement_payloads / eligible_records / records_used — and the site copy uses those terms, not a generic 'canonical stories'. Tests: missing-payload row without waiver -> build fails; with waiver -> builds and the waiver is visible in the output.
+          LOG: PASS/FAIL; commit.
+      - name: c3_contract_semantic
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P1 (semantic identity) — validate_contract(payload, manifest_entry, current_identity): exact equality on lab, input_dataset_id, registry_version, metric_definition_version, data_integrity_policy, requires_external_service, contract_version; remove the automatic <lab>/v0 fallback; fail on any mismatch. Mutation tests: alter each contract field independently and prove publication rejection. Fix the committed grit/v0 artifact -> grit/v1, regenerate lab_grit.json + data.js. Also P2 (payload bytes): rename input_manifest_sha256 -> registry_identity_sha256 and add resolved_input_sha256 over the stable sorted (table, entity_id, knowledge_id, payload_digest) sequence; contracts embed both.
+          LOG: PASS/FAIL; commit.
+      - name: c4_record_scopes
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P2 (record counts) — replace n_input_records with n_resolved_records / n_eligible_records / n_used_records / n_excluded_records + an exclusions breakdown (e.g. missing_strength: 135). Update every canonical lab emitter, lab_contract schema, and the guard tests to the new fields. Regenerate all lab outputs + data.js.
+          LOG: PASS/FAIL; commit.
+      - name: c5_test_scope_names
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: smaller (test counts) — rename the conflated public fields: tests_total -> final_tests_discovered (story-level peak), tests_passed/tests_run -> test_executions_passed/test_executions_run (summed across session executions). The model-card pass rate is explicitly labelled as weighted over repeated session-level executions. Update build_data + any site rendering + tests; regenerate data.js.
+          LOG: PASS/FAIL; commit.
+      - name: c6_readme_site_reconcile
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: smaller (statistics) — reconcile README figures (1,097 sessions / 36 configs / $288.69) with the canonical dataset (1,067 / 35 / $309.17): generate them from one public-statistics artifact (e.g. a data.js-derived block) or label each figure's scope explicitly. Fix the home-page findings prose that still describes the bad_seed arm and old figures — bind it to the canonical condition split (clean/early_degrade only) and current numbers. Docker docs: mount or document experiments/data_manifest.json persistence; CI verifies the regenerated manifest survives where claimed.
+          LOG: PASS/FAIL; commit.
+      - name: c7_closure_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: release gate — coverage proof vs docs/review/canonical_publication_review.md (every P0/P1/P2/smaller finding -> a phase -> PASS; zero orphans). Assert data.js carries NO bad_seed-41 condition block and NO early_degrade-91; the canonical split (clean 135 / early_degrade 80) appears exactly once. Full suite green; all guard suites green; compile-gate all specs; reproduce core dry-run + container core run (fixture) produce data.js; invariant audit. Write docs/review/canonical_publication_verification.md with PASS/FAIL per check and the final verdict (semantic-integrity signoff).
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: publication_closed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [singular_door, resolution_fail_closed, contracts_semantic, counts_scoped]
+metrics:
+  - {name: singular_door, agg: mean, over: cell}
+  - {name: resolution_fail_closed, agg: mean, over: cell}
+  - {name: contracts_semantic, agg: mean, over: cell}
+  - {name: counts_scoped, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, c1_canonical_tables, c2_resolution_fail_closed, c3_contract_semantic,
+             c4_record_scopes, c5_test_scope_names, c6_readme_site_reconcile, c7_closure_verify]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
