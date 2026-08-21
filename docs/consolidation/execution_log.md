@@ -1171,6 +1171,31 @@ absent on disk; README counts and the deploy path had drifted from the tree; `.s
 
 **s10_hygiene_cap result: 5/5 PASS.**
 
+### s11_verification — release gate (coverage proof + invariant audit)
+
+**Coverage proof.** Every P0/P1/P2/P3 finding of `docs/review/semantic_integrity_review.md` maps
+to a release phase with a PASS: P0 → s1 (8/8) + s2 (9/9) + s3 (10/10) + s4 (9/9); P1 agent-context
+→ s5 (10/10) + s6 (7/7); P1 container → s7 (7/7); P2 lifecycle → s8 (6/6); P2 service-locator →
+s9 (5/5); P3 hygiene → s10 (5/5). The single P1/P2 neutral-intent-schema finding is **explicitly
+deferred with a pointer** (recorded in `scripts/_gen_instructions.py`'s module docstring and
+`docs/review/semantic_integrity_verification.md` §2), because it re-touches the renderers and is
+sequenced after the now-complete lab contract + context guards.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Coverage proof** — every P0/P1/P2/P3 finding → phase → PASS in the execution log; the P1/P2 neutral-intent schema explicitly deferred with a pointer | PASS |
+| 2 | **Full suite green** — `pytest tests/` → 1505 passed, 1 skipped | PASS |
+| 3 | **Every guard suite green** — all 13 guard files (incl. `test_agent_config_semantic.py` + `test_lab_contract.py` + `test_lab_outputs_canonical.py`) → 174 passed | PASS |
+| 4 | **Compile-gate all specs** — `load_spec` + `compile_spec` over all committed specs → 79/79 compile, 0 fail | PASS |
+| 5 | **CI-equivalent gates** — `agentic-dynamics --help` (exit 0); `reproduce.sh core --dry-run` (exit 0); `docker build` (success); container core run on the committed fixture (exit 0, `data.js` 108,783 bytes) | PASS |
+| 6 | **Invariant audit** — Redis isolation (framework queue on 6380, never 6379); Firebase dual-host (both projects in `.firebaserc`); CAP frozen-not-implemented (seven placeholders, no code); no `_results_summary.json` in any publication-eligible input | PASS |
+| 7 | **Verification artifact** — `docs/review/semantic_integrity_verification.md` written (status: accepted), PASS/FAIL per check + final verdict "PASS"; passes `test_doc_lifecycle.py` + `test_stale_path_guard.py` | PASS |
+
+**s11_verification result: 7/7 PASS.**
+
+**Release verdict: PASS** — the semantic-integrity release is complete (10 implementation phases
++ this gate, one explicit deferral).
+
 
 
 
