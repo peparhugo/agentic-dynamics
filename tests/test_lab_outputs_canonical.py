@@ -1,0 +1,297 @@
+"""Canonical-output guard (semantic-integrity release, phase s3).
+
+``docs/review/semantic_integrity_review.md`` recommended release item 3:
+
+    Rebuild derived outputs — every active lab + website dataset from current canonical
+    records only. […] Verify zero lab outputs carry the retired summary's lineage; the
+    site's lab sections draw only from contract-bearing JSONs.
+
+s1 decided which labs may publish, s2 gave the survivors a contract. This module makes
+item 3's *verification* permanent rather than a one-time observation, asserting four
+things that together mean "the published derivation path is canonical end to end":
+
+1. ``experiments/results/lab_*.json`` contains **only** contract-bearing outputs of
+   publication-eligible labs. Non-canonical artifacts live in ``legacy_labs/``, so a
+   stale file can no longer be mistaken for a current measurement.
+2. No live lab output carries the retired summary's lineage — checked structurally
+   (a valid contract naming the canonical resolver) rather than by keyword.
+3. Every published artifact is **current**: its ``n_input_records`` matches what the
+   resolver returns from today's registry, so "regenerated from current canonical
+   records" is a checkable claim, not a changelog entry.
+4. Every ``D.labs.<key>`` the website reads exists in ``data.js`` and came from a
+   publication-eligible lab — and the quarantined Grit section publishes nothing.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+import pytest
+
+from agentic_dynamics.reporting import canonical_corpus as cc
+from agentic_dynamics.reporting.lab_contract import CONTRACT_KEY, validate_contract
+from agentic_dynamics.reporting.lab_manifest import load_lab_manifest, publication_labs
+
+ROOT = Path(__file__).resolve().parent.parent
+RESULTS_DIR = ROOT / "experiments" / "results"
+LEGACY_DIR = RESULTS_DIR / "legacy_labs"
+DATA_JS = ROOT / "apps" / "website" / "data.js"
+WEBSITE_DIR = ROOT / "apps" / "website"
+
+#: The retired corpus. Its name must not appear in any live lab artifact's lineage.
+RETIRED_SUMMARY = "_results_summary.json"
+
+
+def _data_js_payload() -> dict | None:
+    """Parse ``window.DYNAMICS_DATA`` out of the generated ``data.js``."""
+    if not DATA_JS.exists():  # pragma: no cover - generated file, present in CI
+        return None
+    text = DATA_JS.read_text(encoding="utf-8")
+    return json.loads(text[text.index("{") : text.rindex("}") + 1])
+
+
+# ---------------------------------------------------------------------------
+# 1. The live results directory holds only contract-bearing outputs
+# ---------------------------------------------------------------------------
+
+
+def test_live_results_dir_holds_only_publication_lab_outputs():
+    """Every ``experiments/results/lab_*.json`` belongs to a publication-eligible lab."""
+    manifest = load_lab_manifest()
+    expected = {Path(e.output).name for e in manifest if e.publication_eligible and e.output}
+    on_disk = {p.name for p in RESULTS_DIR.glob("lab_*.json")}
+    assert on_disk == expected, (
+        f"unexpected lab artifacts in the canonical results dir: {sorted(on_disk - expected)} "
+        f"(move non-canonical outputs to legacy_labs/); missing: {sorted(expected - on_disk)}"
+    )
+
+
+def test_quarantined_labs_write_into_legacy_labs():
+    """A quarantined lab's declared output path is inside ``legacy_labs/``.
+
+    Without this, running a quarantined lab by hand would drop a non-canonical artifact
+    back into the canonical directory and quietly break invariant 1.
+    """
+    for entry in load_lab_manifest():
+        if not entry.quarantined or not entry.output:
+            continue
+        assert "legacy_labs/" in entry.output, (
+            f"{entry.script} writes to {entry.output} — a quarantined lab must write into "
+            f"experiments/results/legacy_labs/"
+        )
+
+
+def test_quarantined_lab_scripts_point_at_the_legacy_dir():
+    """Source-level check: the script's own output constant matches the manifest.
+
+    The manifest could say ``legacy_labs/`` while the script still wrote to the canonical
+    directory; this closes that gap.
+    """
+    for entry in load_lab_manifest():
+        if not entry.quarantined or not entry.output:
+            continue
+        src = (ROOT / "scripts" / entry.script).read_text(encoding="utf-8")
+        assert '"legacy_labs"' in src, (
+            f"{entry.script} does not build its output path through legacy_labs/"
+        )
+
+
+def test_legacy_dir_documents_itself():
+    """``legacy_labs/`` carries a README explaining why its contents are not canonical."""
+    readme = LEGACY_DIR / "README.md"
+    assert readme.exists(), "legacy_labs/ must explain itself"
+    text = readme.read_text(encoding="utf-8")
+    assert RETIRED_SUMMARY in text
+    assert "lab_contract" in text
+
+
+# ---------------------------------------------------------------------------
+# 2 + 3. Zero retired lineage; every published artifact is current
+# ---------------------------------------------------------------------------
+
+
+def _published_artifacts() -> list[tuple[str, Path, dict]]:
+    """``(lab_script, path, payload)`` for every publication-eligible artifact on disk."""
+    out = []
+    for _key, entry in sorted(publication_labs(load_lab_manifest()).items()):
+        if not entry.output:
+            continue
+        path = ROOT / entry.output
+        if path.exists():
+            out.append((entry.script, path, json.loads(path.read_text(encoding="utf-8"))))
+    return out
+
+
+def test_no_live_lab_output_carries_retired_summary_lineage():
+    """Item 3's headline claim, checked directly.
+
+    Structural, not keyword-based: a live artifact must carry a contract whose
+    ``input_dataset_id`` names the canonical registry resolver. A lab derived from the
+    retired summary cannot produce one — it has no registry identity to embed.
+    """
+    artifacts = _published_artifacts()
+    assert artifacts, "no publication-eligible lab artifacts found — run the core lab set"
+
+    for lab, path, payload in artifacts:
+        contract = payload.get(CONTRACT_KEY)
+        assert isinstance(contract, dict), f"{lab}: {path.name} has no contract"
+        assert contract["input_dataset_id"].startswith("canonical_registry/"), (
+            f"{lab}: input_dataset_id {contract['input_dataset_id']!r} is not the registry resolver"
+        )
+        assert RETIRED_SUMMARY not in json.dumps(contract), (
+            f"{lab}: contract references the retired corpus"
+        )
+
+
+def test_published_artifacts_match_the_current_registry():
+    """ "Regenerated from current canonical records" is verified, not asserted.
+
+    Each artifact's contract must validate against today's manifest identity, and its
+    ``n_input_records`` must equal what the resolver returns now. A lab re-run before the
+    corpus changed passes; one left behind fails.
+    """
+    identity = cc.current_manifest_identity()
+    if not identity.input_manifest_sha256:  # pragma: no cover - manifest present in CI
+        pytest.skip("no data_manifest.json registry in this checkout")
+
+    # Derived from the resolver's own table registry, so a newly added table (s4 added
+    # ``finding`` for the Grit lab) is covered automatically instead of KeyError-ing here.
+    everything = cc.load_canonical_tables(*cc.TABLES)
+    resolved = {name: len(everything.rows(name)) for name in cc.TABLES}
+
+    for lab, _path, payload in _published_artifacts():
+        contract = payload[CONTRACT_KEY]
+        reason = validate_contract(payload, lab_script=lab, current=identity)
+        assert reason is None, reason
+
+        # input_dataset_id is "canonical_registry/story+review" — recompute its size.
+        slice_name = contract["input_dataset_id"].split("/", 1)[1]
+        expected = sum(resolved[t] for t in slice_name.split("+"))
+        assert contract["n_input_records"] == expected, (
+            f"{lab}: contract claims {contract['n_input_records']} input records but the "
+            f"current registry resolves {expected} for '{slice_name}' — re-run the lab"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 4. The site's lab sections draw only from contract-bearing JSONs
+# ---------------------------------------------------------------------------
+
+
+def test_site_lab_keys_are_all_contract_bearing():
+    """Every ``D.labs.<key>`` referenced by the site resolves to an eligible lab in data.js."""
+    payload = _data_js_payload()
+    if payload is None:  # pragma: no cover
+        pytest.skip("apps/website/data.js not generated")
+
+    published = set(payload.get("labs", {}))
+    eligible = {
+        e.website_key for e in load_lab_manifest() if e.publication_eligible and e.website_key
+    }
+    assert published <= eligible, (
+        f"data.js publishes lab keys that are not publication-eligible: {sorted(published - eligible)}"
+    )
+
+    # Every key the HTML/JS reads must actually be present, or the section renders blank.
+    referenced: set[str] = set()
+    for page in WEBSITE_DIR.glob("*.html"):
+        referenced |= set(
+            re.findall(r"\bD\.labs\.([A-Za-z_][A-Za-z0-9_]*)", page.read_text(encoding="utf-8"))
+        )
+    for page in WEBSITE_DIR.glob("*.js"):
+        if page.name == "data.js":
+            continue
+        referenced |= set(
+            re.findall(r"\bD\.labs\.([A-Za-z_][A-Za-z0-9_]*)", page.read_text(encoding="utf-8"))
+        )
+
+    missing = referenced - published
+    assert not missing, f"the site reads D.labs.{sorted(missing)} but data.js does not publish it"
+
+
+def test_every_published_lab_section_carries_its_contract_into_data_js():
+    """The lineage travels with the numbers: contracts survive into ``data.js``."""
+    payload = _data_js_payload()
+    if payload is None:  # pragma: no cover
+        pytest.skip("apps/website/data.js not generated")
+
+    labs = payload.get("labs", {})
+    assert labs, "data.js publishes no lab sections at all"
+    for key, section in labs.items():
+        assert CONTRACT_KEY in section, (
+            f"data.js labs.{key} has no {CONTRACT_KEY} — it was published without lineage"
+        )
+
+
+def test_quarantined_quadrant_section_publishes_nothing():
+    """The one quarantined lab with a top-level website key stays empty.
+
+    Renamed in s4 with its lab: ``grit_matrix`` -> ``correctness_escape_quadrants``. The old
+    key must be gone entirely, or the site could read a stale section that nothing maintains.
+    """
+    payload = _data_js_payload()
+    if payload is None:  # pragma: no cover
+        pytest.skip("apps/website/data.js not generated")
+    assert "grit_matrix" not in payload, (
+        "the retired data.js key 'grit_matrix' is back — s4 renamed it to "
+        "'correctness_escape_quadrants'"
+    )
+    assert payload.get("correctness_escape_quadrants") == [], (
+        "correctness_escape_quadrants is quarantined (its lab reads the retired summary) and "
+        "must publish no points"
+    )
+
+
+def test_site_does_not_hard_code_lab_table_rows():
+    """The arc + condition tables must render from data.js, not from transcribed HTML.
+
+    They previously carried hand-typed figures from an older corpus — the drift that made
+    item 3 necessary. The tbodies are now populated by JS from ``D.labs``.
+    """
+    evidence = (WEBSITE_DIR / "evidence.html").read_text(encoding="utf-8")
+    for tbody_id in ("arc-session-tbody", "condition-tbody"):
+        assert f'id="{tbody_id}"' in evidence, f"{tbody_id} placeholder missing"
+    # The JS that fills them must reference the contract-bearing labs.
+    assert "labs.story_arc" in evidence
+    assert "labs.condition_effects" in evidence
+
+
+# ---------------------------------------------------------------------------
+# 5. No unmeasured value is published as a measurement
+# ---------------------------------------------------------------------------
+
+
+def test_lsp_signal_is_null_when_the_language_server_never_ran():
+    """An absent signal must be ``null``, never an averaged-in zero.
+
+    Every ``analysis_*.json`` carries ``deep.lsp = {"available": false, "errors": 0}``, so
+    averaging the raw ``errors`` field published "0.0 LSP errors per story" — read on the
+    site as *clean code* when the truth is *no diagnostics tool ran*. The lab now counts
+    only cells where ``available`` is true (``docs/data_integrity_findings.md``: an
+    unmeasured value is null).
+    """
+    path = ROOT / "experiments" / "results" / "lab_quality_frontier.json"
+    if not path.exists():  # pragma: no cover
+        pytest.skip("quality frontier lab not run")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    available = payload["summary"].get("lsp_available_cells", 0)
+    for model in payload["models"]:
+        if model["lsp_cells"] == 0:
+            assert model["lsp_errors_per_cell"] is None, (
+                f"{model['model']}: publishes a fabricated 0.0 LSP rate with no available cells"
+            )
+    if available == 0:
+        assert all(m["lsp_errors_per_cell"] is None for m in payload["models"])
+
+
+def test_site_does_not_hard_code_quality_frontier_figures():
+    """The quality-frontier claim renders from the lab, not from transcribed numbers."""
+    evidence = (WEBSITE_DIR / "evidence.html").read_text(encoding="utf-8")
+    assert 'id="qf-cheapest"' in evidence and 'id="qf-best-quality"' in evidence
+    assert "labs.quality_frontier" in evidence
+    # The superseded transcriptions must not come back.
+    for stale in ("13.5/story", "0.167 on code quality", "cleanest LSP (5.1)"):
+        assert stale not in evidence, f"stale transcribed figure returned: {stale}"

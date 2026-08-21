@@ -28,19 +28,21 @@ from agentic_dynamics.control.queue_reinterleave import (
     write_queue,
 )
 from agentic_dynamics.control.routing import compute_routing
-from apps.control_room import server
+from apps.control_room.services.context import ControlRoomServices
 from apps.control_room.services.design_sessions import DESIGN_SESSIONS_KEY
 from apps.control_room.services.mutations import _design_mutation_body, _idempotent_design_response
 from apps.control_room.services.telemetry import _parse_phases, _retained_telemetry, _sse
 
+#: The injected application context, bound by ``register()`` before any request is served.
+_services: ControlRoomServices | None = None
 
 def api_matrix() -> Response:
     """Return the legacy fleet matrix plus the three-stage pipeline view."""
     try:
-        r = server._redis()
-        execute = stage_summary(r, server.QUEUE_KEY, STATUS_KEY, server.RESULTS_KEY)
-        analyze = stage_summary(r, server.ANALYSIS_QUEUE_KEY, server.ANALYSIS_STATUS_KEY)
-        review = stage_summary(r, server.REVIEW_QUEUE_KEY, server.REVIEW_STATUS_KEY)
+        r = _services.redis()
+        execute = stage_summary(r, _services.queue_key, STATUS_KEY, _services.results_key)
+        analyze = stage_summary(r, _services.analysis_queue_key, _services.analysis_status_key)
+        review = stage_summary(r, _services.review_queue_key, _services.review_status_key)
         phase_payloads = r.hgetall(PHASE_KEY)
     except Exception:
         return jsonify({"error": "redis_unavailable", "cells": {}}), 503
@@ -78,7 +80,7 @@ def api_matrix() -> Response:
 def api_status() -> Response:
     """Stream status transitions while preserving the existing SSE payload."""
     def gen():
-        r = server._redis()
+        r = _services.redis()
         pubsub = r.pubsub()
         pubsub.subscribe(STATUS_CHANNEL)
         last_beat = time.time()
@@ -87,7 +89,7 @@ def api_status() -> Response:
                 msg = pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 if msg:
                     yield f"data: {msg['data']}\n\n"
-                elif time.time() - last_beat >= server.HEARTBEAT_SECONDS:
+                elif time.time() - last_beat >= _services.heartbeat_seconds:
                     yield ": ping\n\n"
                     last_beat = time.time()
         finally:
@@ -110,7 +112,7 @@ def api_events(cell_id) -> Response:
     channel = f"{EVENT_CHANNEL_PREFIX}{cell_id}"
 
     def gen():
-        r = server._redis()
+        r = _services.redis()
         # Subscribe before reading history so an event published during replay
         # is queued by Redis instead of falling through the history/live gap.
         pubsub = r.pubsub()
@@ -128,7 +130,7 @@ def api_events(cell_id) -> Response:
                 msg = pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 if msg:
                     yield f"data: {msg['data']}\n\n"
-                elif time.time() - last_beat >= server.HEARTBEAT_SECONDS:
+                elif time.time() - last_beat >= _services.heartbeat_seconds:
                     yield ": ping\n\n"
                     last_beat = time.time()
         finally:
@@ -141,7 +143,7 @@ def api_events(cell_id) -> Response:
     return _sse(gen())
 
 def api_routing() -> Response:
-    summary_path = server.ROOT / "experiments" / "results" / "_results_summary.json"
+    summary_path = _services.root / "experiments" / "results" / "_results_summary.json"
     try:
         data = json.loads(summary_path.read_text())
         entries = data.get("entries", [])
@@ -182,7 +184,7 @@ def api_experiments() -> Response:
             capture_output=True,
             text=True,
             timeout=30,
-            cwd=server.ROOT,
+            cwd=_services.root,
         )
         return jsonify({"ok": proc.returncode == 0, "output": (proc.stdout or proc.stderr).strip()})
 
@@ -202,7 +204,7 @@ def api_queue_reinterleave() -> Response:
     assert body is not None
 
     def reinterleave() -> tuple[Response, int]:
-        r = server._redis()
+        r = _services.redis()
         before = read_queue(r)
         after = reinterleave_cells(before)
         write_queue(r, after)
@@ -215,8 +217,10 @@ def api_queue_reinterleave() -> Response:
 
     return _idempotent_design_response("queue-reinterleave", body, reinterleave)
 
-def register(app):
-    """Register this module's routes on the Flask app (server.py composition root)."""
+def register(app, services: ControlRoomServices) -> None:
+    """Register this module's routes on the Flask app, receiving the application context."""
+    global _services
+    _services = services
     app.get("/api/matrix")(api_matrix)
     app.get("/api/status")(api_status)
     app.get("/api/events/<cell_id>")(api_events)

@@ -900,6 +900,302 @@ from the ledgers on the next regeneration in an environment that has them.
 
 **RELEASE VERDICT: the refactor-repair release is COMPLETE — all 17 phases green.**
 
+## Semantic-integrity release
+
+Input: `docs/review/semantic_integrity_review.md` (external, operator-provided review of main at
+`35ef34310`). Spec: `workflows/repository/semantic_integrity_release.yaml`.
+
+### s1_lab_quarantine — quarantine the legacy labs (review item 1 / P0)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Every lab classified** — all 19 `scripts/lab_*.py` carry `lab_status` (canonical/historical/quarantined) + `publication_eligible` in the machine-readable `scripts/lab_manifest.json` (schema `lab-manifest/v1`), each with input sources, external-service dependency, contract status, and an evidence-based rationale. Result: **7 canonical, 12 quarantined, 0 historical, 0 unclassified** | PASS |
+| 2 | **Quarantined labs out of reproduction** — `scripts/reproduce.sh`'s hard-coded 19-lab array is deleted; the set is now derived from the manifest via `reproduce_lab_scripts()` (PYTHONPATH pinned to this checkout's `src/`). `bash scripts/reproduce.sh --dry-run` now runs 7 core labs and names none of the 12 quarantined ones. The unconditional Neo4j lab (review P1, `reproduce.sh:56-57`) drops out as a consequence — its `ExperimentRun` nodes are summary-loaded (`knowledge/graph.py:245`) | PASS (7/7 core, 12/12 excluded) |
+| 3 | **Quarantined labs out of publication** — `build_data.py`'s hand-kept `lab_names` list is deleted; `_load_labs()` loads only manifest entries that are `publication_eligible` *and* name a `website_key`, and `_load_grit_matrix()` consults `rejection_reason()`. Every exclusion is logged by lab name (`[lab-gate] not published — <script>: quarantined`), never silent | PASS |
+| 4 | **The published artifact matches the gate** — `apps/website/data.js`'s `grit_matrix` (201 points from the quarantined `lab_grit_matrix.py`) is emptied; `labs` still carries exactly the 6 canonical keys. A full `build_data.py` rebuild was deliberately NOT committed: this environment's corpus is smaller than the committed one, so a rebuild would have deleted unrelated measurements. That regeneration belongs to s3 (rebuild outputs) in a complete environment | PASS (surgical removal, 2816 lines) |
+| 5 | **No fabricated substitute** — `evidence.html`'s `makeFallback()` (3 hard-coded invented sessions rendered whenever `grit_matrix` was empty) is removed. With no canonical points the page hides the chart and shows an explicit `[P]` quarantine notice. Publishing invented bubbles in place of a quarantined lab would have been strictly worse than publishing nothing | PASS |
+| 6 | **Guard test added** — `tests/test_lab_manifest.py` (46 tests): coverage with zero orphans, status vocabulary, quarantine-is-absolute, consumers-driven-by-manifest, loader-vs-JSON agreement, and a **source scan** asserting any lab reaching `_results_summary.json` — directly or through the two known transitive readers (`opencode_analyzer._load_summary`, `Neo4jClient.load_runs`) — is quarantined. Written as a scan, not a fixed list, so a *future* lab reintroducing the retired corpus fails here instead of quietly publishing. Load-time invariants are additionally enforced in `agentic_dynamics.reporting.lab_manifest` so a malformed manifest fails the pipeline, not just the suite | PASS |
+| 7 | **A quarantined lab keeps its file** — no lab script deleted; `agentic-dynamics analyze lab <name>` still runs any of them by hand. Only the automatic paths (reproduce, publication) are closed | PASS |
+| 8 | Full suite green — `pytest tests/ -m "not external"`: **1332 passed**. Two leftovers from the spec-authoring commit `579eed3f1` were resolved here (exactly as the previous release's gate did): `semantic_integrity_review.md` gained `status: accepted`; `semantic_integrity_release.yaml` re-homed `experiments/specs/` → `workflows/repository/` with `artifact_kind: workflow` metadata (**resume with the new path**), index regenerated (79 specs) | PASS (1332 passed) |
+
+**s1_lab_quarantine result: 8/8 PASS.**
+
+Deliberately deferred (named here so the later phases inherit them, not to be silently dropped):
+the 7 canonical labs all glob raw `experiments/results/stories/*.json` rather than resolving
+through the registry, so each carries `contract_status: "pending"` — s2 adds the lineage block
+(`input_dataset_id`, `input_manifest_sha256`, `registry_version`, `metric_definition_version`,
+`data_integrity_policy`, `requires_external_service`) and the manifest-hash rejection.
+`lab_grit_matrix.py`'s naming collision with the README's formal
+G(s) = P(test_executed_success | perturbation_strength = s) is recorded in its manifest entry and
+resolved in s4. The explicit `--with-neo4j` / `--with-sonar` reproduce split is s7; s1 only
+removed the Neo4j lab from the default set as a side effect of its quarantine.
+
+### s2_lab_contract — the canonical lab contract (review item 2 / P0)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Six lineage fields embedded** — every publication-eligible lab output JSON carries a `lab_contract` block with `input_dataset_id`, `input_manifest_sha256`, `registry_version`, `metric_definition_version`, `data_integrity_policy`, `requires_external_service` (+ `contract_version`, `lab`, `n_input_records`, `generated_at`). Producer/consumer live in one module (`src/agentic_dynamics/reporting/lab_contract.py`) so they cannot drift | PASS (7/7 labs) |
+| 2 | **One input door** — `src/agentic_dynamics/reporting/canonical_corpus.py` resolves `lifecycle_state == "current"` registry rows to payloads (`story`, `review`, and an `analysis` join filtered by current story rows). All 7 labs rewritten onto it; zero remaining `_results_summary.json` reads, zero `stories/*.json` / `reviews/*.json` / `analysis/*.json` globs in a publication lab (AST-guarded) | PASS |
+| 3 | **build_data rejects a stale artifact** — `_load_labs()` runs two gates (manifest eligibility, then `validate_contract` against the identity of the current `data_manifest.json`) and prints `[lab-gate] rejected — <lab>: stale input_manifest_sha256 (… != current …)`. An absent contract is treated exactly like a stale one | PASS |
+| 4 | **Test: a stale-manifest lab JSON is rejected** — `tests/test_lab_contract.py::test_stale_manifest_lab_json_is_rejected` (unit) and `tests/test_build_data.py::test_lab_gate_rejects_a_stale_manifest_lab_json` (through `_load_labs`, asserting the lab name appears in the log). Plus per-field parametrised rejection of an incomplete contract | PASS (2 named + 8 supporting) |
+| 5 | **Test: a summary-reading lab cannot be publication_eligible** — `tests/test_lab_contract.py::test_summary_reading_lab_cannot_be_publication_eligible`. Enforced at manifest **load time** (`ValueError`), not only in the test, so the impossible state cannot exist during a pipeline run — and independent of `lab_status`, so no relabelling can smuggle the retired corpus onto the site | PASS |
+| 6 | **Identity is non-circular** — the hash covers `schema_version` + the `registry` array, not the manifest file bytes. Hashing the file would be circular (it records `data.js`'s sha256, which publishing produces) and every publish would invalidate everything it just published. Verified: `generate_manifest.py` re-run leaves the identity unchanged and all contracts valid | PASS |
+| 7 | **Outputs regenerated + published** — all 7 labs re-run against the canonical registry (215 current stories / 242 reviews / 166 analyses of 701 registry rows); `data.js` rebuilt; `data_manifest.json` rehashed. Correction to the s1 note: the earlier "smaller corpus" reading was wrong — the −3507 lines there were the grit_matrix removal. The canonical corpus is *larger* than the committed build (156 → 215 stories, 772 → 1067 sessions), so this is a gain, not a loss | PASS |
+| 8 | **Two measurement errors fixed as a consequence** — `lab_condition_effects` now uses the resolver's no-op-relabelled condition and an exact registry review join (it previously counted every review with no story id toward every condition); `lab_story_review`'s hard-coded "Simulated" reviewer-problem table (percentages against a hard-coded n=26) is deleted — a contract-bearing lab may not print invented numbers | PASS |
+| 9 | Full suite green — `pytest tests/ -m "not external"`: **1365 passed** (+33: 31 contract tests, 2 build_data gate tests); `ruff` clean on the new modules; `reproduce.sh --dry-run` OK | PASS (1365 passed) |
+
+**s2_lab_contract result: 9/9 PASS.**
+
+Carried forward: `metric_definition_version` is declared once per lab in
+`scripts/lab_manifest.json` (all 7 at `<name>/v1`) — s4 bumps the Grit lab's there when it
+resolves the collision. `contract_status` moved `pending` → `enforced` for the 7. s3's remaining
+work is narrow: confirm no publication-eligible input carries the retired summary's lineage and
+that the site's lab sections draw only from contract-bearing JSONs (both now true by
+construction — s3 verifies rather than rebuilds).
+
+### s3_rebuild_outputs — regenerate + verify canonical lineage (review item 3)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Every publication-eligible lab regenerated from canonical records only** — the 7 core labs deleted and re-run from the manifest-derived set against the current registry (215 stories / 242 reviews / 166 analyses of 701 rows) | PASS (7/7) |
+| 2 | **Regeneration is deterministic** — each lab run twice; all 7 outputs byte-identical modulo `generated_at`. "Rebuilt from current canonical records" is therefore a reproducible claim, not a one-off | PASS (0 of 7 drifted) |
+| 3 | **data.js rebuilt; manifest rehashed** — and the registry identity is unchanged across the rebuild (`fbc90be56974`), re-confirming the non-circular hash design from s2 | PASS |
+| 4 | **Zero lab outputs carry the retired summary's lineage** — made structurally true rather than asserted: `experiments/results/lab_*.json` now holds *only* the 7 contract-bearing outputs. The 19 others (11 quarantined + 8 orphans from the `*_DEPRECATED_bge_m3` scripts deleted in Stage 1) moved to `experiments/results/legacy_labs/` with a README. Nothing deleted; git history intact | PASS (7 live / 19 legacy) |
+| 5 | **A quarantined lab cannot re-pollute the canonical directory** — all 11 quarantined scripts now write into `legacy_labs/`; the manifest's `output` paths match; `knowledge/graph.py`'s basin loader and `build_data._load_grit_matrix` re-pointed (the latter now reads the path from the manifest rather than hard-coding it) | PASS |
+| 6 | **The site's lab sections draw only from contract-bearing JSONs** — every `D.labs.<key>` the HTML reads is published and eligible; every published section carries its `lab_contract` into `data.js`; `grit_matrix` publishes `[]` | PASS |
+| 7 | **Two hand-transcribed site sections converted to rendered ones** — the five-session-arc table and the condition-effects table were hard-typed HTML that had drifted from the corpus (arc figures from a 156-story run; a `bad_seed` arm that the no-op relabel had dissolved). Both tbodies now render from `D.labs.story_arc` / `D.labs.condition_effects`, as do the snowball claim and story count. Transcription is how the section drifted; it cannot drift again | PASS |
+| 8 | **A fabricated zero found and removed** — `lab_quality_frontier` averaged `deep.lsp.errors` across all cells, but every analysis payload carries `{"available": false, "errors": 0}`: the language server never ran. The lab published "0.0 LSP errors per story", which the site rendered as *clean code* when the truth is *no diagnostics tool*. Now only `available` cells count and the metric is `null` otherwise (`lsp_available_cells: 0` of 166); the site says so explicitly. The stale prose it replaced ("13.5/story", "0.167 code quality", "cleanest LSP (5.1)") matched no lab output at any point in this release | PASS |
+| 9 | **Verification is permanent** — `tests/test_lab_outputs_canonical.py` (12 tests): live dir holds only publication outputs; quarantined labs write to `legacy_labs/` (manifest *and* source); no live output lacks a registry-resolver contract; each artifact's `n_input_records` equals what the resolver returns today (so a lab left behind fails); site keys are eligible + present; contracts survive into `data.js`; the removed transcriptions cannot return | PASS |
+| 10 | Full suite green — `pytest tests/ -m "not external"`: **1377 passed** (+12); `ruff` clean on the touched files; `reproduce.sh --dry-run` OK; `evidence.html` inline JS parses (`node --check`) | PASS (1377 passed) |
+
+**s3_rebuild_outputs result: 10/10 PASS.**
+
+Note on scope: criteria 7 and 8 were not in the phase brief. They surfaced while verifying
+criterion 6 — a section cannot be said to "draw from contract-bearing JSONs" while it is a
+hand-typed transcription of an older run, and an output cannot be called canonical while it
+publishes an unmeasured zero as a measurement. Both are recorded here rather than deferred.
+
+### s4_grit_resolution — one meaning of Grit (review item 4)
+
+**The decision, and the data behind it.** The review offered (a) rename the quadrant lab or
+(b) implement the formal `G(s) = P(test_executed_success | perturbation_strength = s)`, and
+asked for "the option the data supports". The metric needs both fields on the same cell; the
+canonical registry yields **144 such cells** (64 `finding` + 80 `story`), enough for G(s), a
+per-model ranking and a per-class breakdown — so **(b) is supported and was implemented**.
+(a) was done as well, because (b) alone leaves a script named `lab_grit_matrix.py` emitting a
+`high_grit` key, and (a) alone leaves the README/site publishing a formal definition with
+nothing computing it. Only doing both yields the required "ONE meaning afterward".
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **The formal metric is implemented** — `scripts/lab_grit.py`: canonical, publication-eligible, contract-bearing, in the core reproduce set. Reports G(s) per strength with Wilson intervals (deterministic — no bootstrap RNG), per model, per perturbation class, per operator | PASS |
+| 2 | **A `finding` table added to the resolver** — `canonical_corpus.resolve_findings()` joins current `finding` rows to their runs; that corpus is the one carrying `perturbation_strength`/`operator`, so the metric is computable at all. `CanonicalTables.rows(table)` added so callers stop re-deriving the name→attribute map | PASS |
+| 3 | **The quadrant lab renamed** — `lab_grit_matrix.py` → `lab_correctness_escape_quadrants.py`; quadrant key `high_grit` → `robust`; `experiment_id`, output artifact, data.js key (`grit_matrix` → `correctness_escape_quadrants`), website section title and the quarantine notice all follow. It stays quarantined (retired-summary input) | PASS |
+| 4 | **`metric_definition_version` bumped and the decision documented in the manifest** — quadrant lab `→ correctness_escape_quadrants/v2` with the rename rationale recorded in its entry; new `lab_grit.py` at `grit/v1` | PASS |
+| 5 | **README + website use ONE meaning** — README's definition is now labelled the only one and points at the implementing lab; the glossary says so explicitly; a new canonical **Grit** section on the evidence page renders G(s) from `D.labs.grit`; the archived quadrant chart links to it and states that a quadrant is not Grit | PASS |
+| 6 | **No second meaning survives in the tree** — `high_grit` appears in zero code strings, emitted JSONs, or site files (docstrings explaining the rename are exempt, and tested to be the only exemption); `lab_grit_matrix.py` no longer exists; the CLI example in README and `test_cli_resolution` now name `grit`, a lab that exists | PASS |
+| 7 | **The result is reported honestly** — G(0.0)=0.700 [0.40, 0.89] n=10 vs G(0.5)=0.704 [0.57, 0.81] n=54 within the design-controlled finding corpus: Δ=+0.004, intervals overlapping. At the one strength level the corpus contains, degradation did not measurably reduce test-executed success. The wider signal is across *classes* (process perturbation 0.577 vs specification corruption 0.857, n=26/14). The artifact carries five caveats — two strength levels only, mixed corpora at s=0.5, exclusion-not-imputation, `insufficient_support` below 5 cells, no multiple-comparison correction | PASS |
+| 8 | **Guarded** — `tests/test_lab_contract.py` gains 6 tests: the formal lab is canonical and in the core set; the quadrant lab uses no grit-named metric; `high_grit` is gone everywhere; README/glossary/lab state the same definition; the artifact reports its definition and caveats; every published rate has an interval or is flagged unsupported | PASS |
+| 9 | Full suite green — **1386 passed** (+9); `ruff` clean; `reproduce --dry-run` runs 8 core labs; `evidence.html` inline JS parses | PASS |
+
+**s4_grit_resolution result: 9/9 PASS.**
+
+### s5_agent_context_rewrite — rewrite specialist agent context around the eight planes (review item 5 / P1)
+
+**Scope.** The three subagents under `agent_config/agents/` and the seven skills under
+`agent_config/skills/` were rewritten against the current tree. Two skills (`queue`, `review`)
+already referenced only `scripts/` + the Redis plane + the CLI and carried no stale markers — they
+were re-verified and left unchanged rather than rewritten for noise. `agent_config/commands/`,
+`conventions.md`, `mental-model.md`, `rules.md`, and `.opencode/tools/*.ts` are out of scope here
+(commands/tools sweep belongs to s6's semantic-guard extension, which covers the full
+`agent_config/**` tree).
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Every agent rewritten around the eight planes** — `data-analysis` (reporting plane + canonical corpus), `instrument-dev` (measurement/adapters/runtime plane map, `PERTURBATION_CLASSES`, signal registry), `pipeline-ops` (canonical registry + `agentic-dynamics` CLI) | PASS |
+| 2 | **Every skill rewritten around the eight planes** — `instrument`, `analyze`, `lab-books`, `control-room`, `run-workflow` rewritten; `queue` + `review` verified clean (no stale refs) | PASS |
+| 3 | **Current paths** — `src/agentic_dynamics/<plane>/`, `apps/control_room/`, `workflows/`, `experiments/definitions/`, `docs/designs/current/…`; no `admin/server.py`, no `code_reviews/…`, no `experiments/specs` as an authoring location | PASS |
+| 4 | **Current imports** — `agentic_dynamics.measurement.perturb`, `agentic_dynamics.adapters.opencode`, `agentic_dynamics.control.routing`, `agentic_dynamics.experiment.{experiment_spec,compile_experiment}`, `agentic_dynamics.runtime.workflow_runner`, `agentic_dynamics.reporting.canonical_corpus`; zero `from instrument` / `import instrument` | PASS |
+| 5 | **Current commands** — `agentic-dynamics experiment/story/workflow/queue/analyze/data/registry/review/spec/validate/supervise` (from the CLI table in `cli.py`), incl. `agentic-dynamics analyze lab <name>` | PASS |
+| 6 | **Measured-signal vocabulary** — `confidence` [H] (`adapters/opencode.py:113`), `perturbation_strength` + `test_executed_success` (`knowledge/ledger_ingestion.py:180-181`), `answer`/`explanation` token split (`experiment/experiment_spec.py:83`); `signal_registry` documented | PASS |
+| 7 | **No SEMANTIC/MANIFOLD taxonomy** — operators presented via the three `PERTURBATION_CLASSES` (`specification_corruption` / `objective_mutation` / `process_perturbation`); grep of `agent_config/` for the retired terms is clean | PASS |
+| 8 | **No hard-coded module/line counts** — all `(NNNL)` / "NNN lines" counts removed from agents + skills; `file:line` provenance citations retained (the repo's citation convention) | PASS |
+| 9 | **Surfaces regenerated** — `python scripts/_gen_instructions.py` wrote 36 files (18 opencode + 18 claude); `validate_opencode`/`validate_claude` both OK; `tests/test_agent_config_render.py` 10 passed | PASS |
+| 10 | **Guards still green** — `tests/test_stale_path_guard.py` + `tests/test_script_classification.py` 4 passed | PASS |
+
+**s5_agent_context_rewrite result: 10/10 PASS.**
+
+**Deferred to s6 (logged for the guard sweep):** `agent_config/commands/run-exp.md` +
+`pipeline.md` still reference `code_reviews/2026-08-14_…` (stale design-doc path) and
+`run-exp.md` still claims `confidence` is "not yet instrumented" (now measured);
+`conventions.md` carries two hard-coded line counts (`1396 lines`, `330L`);
+`.opencode/tools/{supervisor,control_room,compile_experiment}.ts` reference `admin/server.py` and
+`from instrument.experiment_spec`. All are outside the s5 agents/skills scope.
+
+### s6_semantic_context_guards — semantic guard over the whole agent_config/** tree (review item 6)
+
+**Upgrade from path-family rejection to semantic checks.** The repair release's
+`test_stale_path_guard.py` rejected a fixed list of retired path strings in accepted docs. This
+phase extends that guard to `agent_config/**` *and* adds a second, semantic guard
+(`tests/test_agent_config_semantic.py`) that proves the active agent context refers only to
+things that exist — not merely that it avoids a retired-string denylist.
+
+The new guard's seven checks (one assertion each, full violation set on failure): (1) backticked
+repo paths resolve (full paths `src|scripts|apps|docs|…` and plane shorthand like
+`measurement/perturb.py`); (2) `from agentic_dynamics… import …` / `python -m …` resolve to a
+real module; (3) two-word `agentic-dynamics <verb> <noun>` commands exist in `cli._COMMANDS`;
+(4) `scripts/<name>.<ext>` exists; (5) the retired `instrument` package is absent
+(`from instrument`/`import instrument`/`instrument.<attr>`); (6) the retired SEMANTIC/MANIFOLD
+taxonomy and the retired `_results_summary.json` corpus appear only in retired/quarantine
+framing; (7) no hard-coded `(NNNL)` / `NNN lines` / `NNN scripts|files|modules|commands` /
+`NNN total` / `NNN active labs` counts.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Guard extended to the complete `agent_config/**` tree** — `test_stale_path_guard.py` gains `test_agent_config_uses_no_retired_paths` (no allowlist: the neutral source must carry zero retired path families) | PASS |
+| 2 | **Semantic guard added** — `tests/test_agent_config_semantic.py`, seven checks (paths / imports / CLI / scripts / retired-imports / retired-taxonomy+sources / counts), each an aggregated assertion | PASS |
+| 3 | **Wired into the suite** — both guards run under `pytest tests/`; full suite green | PASS |
+| 4 | **Every flagged file fixed** — `commands/{run-exp,pipeline,new-exp,lab}.md` (stale config enumeration + `confidence` "not yet instrumented" + `code_reviews/` + `_results_summary.json` + `19 active labs`); `conventions.md` (line counts, retired summary, flat `story.py`, version-tagged module list, `scripts/plan.py`); `rules.md` (retired summary in the Creative-scientist/Editor grounding); `mental-model.md` (linear core re-qualified to planes, `trajectory.py`/`recovery.py` gone, "former flat `src/agentic_dynamics/`" typo, module-count column + script/file/test counts removed); `skills/{instrument,run-workflow,lab-books,review}.md` (archived `finish_sweep.py`, `scripts/compile_experiment.py` negative-refs, `20 active lab books`, `5/3 scripts`); `agents/{data-analysis,instrument-dev}.md` | PASS |
+| 5 | **Stale `.ts` tools swept** (the s5 note's remaining items, outside `agent_config/**`) — `compile_experiment.ts` (`from instrument.experiment_spec` → `agentic_dynamics.experiment.*`, `experiments/specs/*.yaml` → the authoring dirs), `control_room.ts`/`supervisor.ts` (`admin/server.py` → `apps/control_room/server.py`, `src/instrument/supervisor.py` → `control/supervisor.py`), `batch.ts` (`experiments/configs/` + stale `34`/`13` counts) | PASS |
+| 6 | **Regenerated surfaces** — `_gen_instructions.py` wrote 36 files; opencode + claude schemas OK; generated twins carry the fixes (verified by grep) | PASS |
+| 7 | **Full suite green** — 1499 passed, 1 skipped | PASS |
+
+**s6_semantic_context_guards result: 7/7 PASS.**
+
+**Not covered (noted for later, outside the review's `agent_config/**` scope):** the semantic
+guard targets `agent_config/**` only. `.opencode/tools/*.ts` is a separate committed surface and
+is not yet auto-guarded (swept manually here); `scripts/batch_run.py:CONFIGS` still names
+`factorial_compound.yaml`, which no longer exists under `experiments/definitions/configs/` — a
+code-level stale config, not agent context, left for the next instrumentation pass.
+
+### s7_repro_split — split + actually exercise the reproduction pipeline (review item 7 / P1)
+
+**The split.** `scripts/reproduce.sh` now takes `core` (default, explicit) plus two opt-in flags.
+Core is deterministic: `analyze_worktrees.py --no-tests --no-sonar` (no per-worktree pytest venv
+→ no network; no SonarQube) and the manifest-derived canonical lab set (`reproduce_lab_scripts()`,
+8 contract-bearing labs). The two external-service labs are reachable only via flags —
+`--with-neo4j` appends `lab_basin_topology_neo4j.py` (Neo4j on :7687), `--with-sonar` re-enables
+SonarQube (`analyze_worktrees.py --no-tests`) and appends `lab_sonar_quality.py` (SonarQube on
+:9000). Both stay quarantined (output to `legacy_labs/`, unpublished).
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **`reproduce core` split** — deterministic, no external services, canonical registry only; `analyze_worktrees.py` runs `--no-tests --no-sonar` in core, `--no-tests` (SonarQube on) under `--with-sonar` | PASS |
+| 2 | **Neo4j basin lab is opt-in** — `--with-neo4j` appends `lab_basin_topology_neo4j.py`; it is absent from the core dry-run | PASS |
+| 3 | **`--with-sonar` opt-in** — re-enables SonarQube + appends `lab_sonar_quality.py` | PASS |
+| 4 | **Dockerfile fixed** — `COPY conventions/` (commit-analysis scoring, previously silently-falling-back), `COPY apps/` (data.js home + Control Room), `COPY experiments/data_manifest.json` (the canonical registry the labs read); entrypoint `reproduce.sh core`; documented the `apps/website/` + `experiments/results/` mounts for data.js/manifest persistence | PASS |
+| 5 | **Base-dependency bug surfaced + fixed** — the container core run failed: `control/pipeline_status.py` (and `queue_reinterleave.py`) import `redis` at module level, but `redis` was only in the `admin` extra, so `pip install -e .` (the image's install) could not import the `control` plane. `redis>=5.0` moved into base `dependencies`; `admin` extra is now `flask` only | PASS |
+| 6 | **CI runs the actual container core command** — a new `repro`-job step builds the image, runs `docker run ... agentic-dynamics` against the committed canonical fixture (data_manifest.json + results; no opencode.db/SonarQube/Neo4j), and asserts `apps/website/data.js` is produced | PASS |
+| 7 | **Guarded** — `test_lab_manifest.py`'s reproduce.sh check updated: quarantined labs may not appear in the core set; the only quarantined names permitted are the two opt-in labs (`OPT_IN_LABS`), wired to `--with-neo4j`/`--with-sonar`. Full suite green (1499 passed, 1 skipped) | PASS |
+
+**Container verification (executed locally, not just reasoned):** `docker build` succeeded; the
+core run completed with exit 0 against the committed corpus (64 finding + 225 story current rows),
+rebuilt `apps/website/data.js` (108,783 bytes), correctly rejected all 12 quarantined labs in the
+`[lab-gate]` log, and regenerated `data_manifest.json` (701 entities) with the opencode version
+stamp gracefully degraded to "unknown".
+
+**s7_repro_split result: 7/7 PASS.**
+
+### s8_lifecycle_backfill — honest workflow lifecycle (review item 8 / P2)
+
+**The bug.** `derive_status` marked a non-repeatable workflow with attempts-but-no-success as
+`running` forever. `running` was a *fallback* (runs exist, none `ok`) rather than a *claim about
+the present*; old workflows that failed or died without a verdict stayed `running` indefinitely.
+The pre-s1 index showed 4 such entries (`agentic_dynamics_rebrand`, `claude_background_sessions`,
+`control_room_portal`, `design_sessions` — all `latest_ok=False`, i.e. honest state `failed`).
+
+**The fix.** `running` now REQUIRES positive evidence of current execution — an *open* run
+(ledger with `started_at`, no `ended_at`) whose start is within `RUNNING_WINDOW` (24h). Historical
+attempts derive per the ledger: `completed` (any `ok=True`), `failed` (a definitive `ok=False`),
+`blocked` (runs exist but none resolved — no verdict, nothing in flight), `superseded`
+(`superseded_by`). The retired `active` state is gone: a repeatable spec is always `runnable`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Vocabulary** — `draft|runnable|running|failed|blocked|completed|superseded|tombstoned` added to `SPEC_STATUSES` (experiment_spec) + `STATUS_ORDER`/legend (spec_status); `active` removed from both | PASS |
+| 2 | **`running` requires current-execution evidence** — `RunSummary` gains `started_at` + `open`; `summarize_run` marks a ledger open when it has `started_at` and no `ended_at`; `derive_status(..., now=, running_window=)` returns `running` only for an open run within the window | PASS |
+| 3 | **Historical attempts derive honestly** — `ok=True`→`completed`, `ok=False`→`failed`, runs-but-no-verdict→`blocked`, superseded_by→`superseded`, never-run→`runnable` | PASS |
+| 4 | **Backfill** — the 4 historical `running` entries (all `latest_ok=False`) now derive `failed` under the corrected code; the committed index regenerated (the `active`→`runnable` vocabulary backfill: 11 specs), and a fresh checkout (no untracked run ledgers) honestly shows them `runnable`/never-run | PASS |
+| 5 | **Tests for every transition** — authored draft/tombstoned win; superseded; runnable (never-run + repeatable); running (open+recent); blocked (open+stale, and no-verdict); failed (ok=False, and failed-beats-blocked); completed (ok=True, never un-completed); plus the regression "a historical failed/blocked run never stays `running`" and the end-to-end failed-ledger→`failed` test | PASS |
+| 6 | **Full suite green** — 1504 passed, 1 skipped (+6: 5 lifecycle tests + 1 parametrized validator case) | PASS |
+
+**Backfill honesty note:** the literal 4 `running` rows came from *untracked* run ledgers
+(`experiments/results/workflows/` is gitignored by design), so this checkout cannot reproduce
+them. The backfill is realized in code — the corrected `derive_status` can never again emit a
+stale `running`, and a regression test pins "a failed ledger derives `failed`, not `running`".
+When a checkout *has* the ledgers, those 4 specs now correctly report `failed`.
+
+**s8_lifecycle_backfill result: 6/6 PASS.**
+
+### s9_control_room_di — invert the service locator (review P2)
+
+**The smell.** All five route modules did `from apps.control_room import server` and read
+`server._redis` / `server._design_sessions` / `server._DUCK` / `server._DEMO_MODE` … at request
+time — the composition root used as a service locator, with a circular conceptual dependency
+between the routes and the server (the tests only pass because they monkeypatch the server's
+private names).
+
+**The fix.** A new `ControlRoomServices` dataclass (`apps/control_room/services/context.py`)
+makes the dependencies explicit: the four service modules the review names (`telemetry`,
+`registry`, `supervisor`, `design_sessions`) plus `mutations`, the stable config, and *lazy*
+accessors for the server-owned factories (`redis()`, `design_manager()`, `opencode_client()`,
+`claude_agents()`, `claude_agent_workdirs()`) and the supervisor functions
+(`load_supervisor_flags()`, `authorize_supervisor_action()`, `emit_actuation_record()`) and the
+monkeypatched `data_manifest_path`. `server.py` builds one instance and passes it into
+`routes.register(app, services)`; each route module stores it and reads `services.redis()` etc.
+instead of importing `server`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **`ControlRoomServices` dataclass** — `telemetry`/`registry`/`supervisor`/`design_sessions`/`mutations` service modules + stable config + lazy server accessors | PASS |
+| 2 | **Passed into route registration** — `server.py` builds it via `build_services()` and calls `_routes.register(app, services)`; `routes.register` forwards it to all six submodules | PASS |
+| 3 | **Routes receive it, not `import server`** — all six route modules dropped `from apps.control_room import server`; handlers read `services.redis()` / `services.design_manager()` / `_services.max_design_prompt_chars` … (verified: zero `from apps.control_room import server` in `routes/`) | PASS |
+| 4 | **Behaviour-identical** — the lazy accessors delegate to `server.*` at call time, so `monkeypatch.setattr(server, "_redis", …)` / `DATA_MANIFEST_PATH` / `_emit_actuation_record` still win; the admin/control-room suite passes unchanged (123 tests) | PASS |
+| 5 | **Local change only** — 8 files under `apps/control_room/` (routes + server) + 1 new `services/context.py`; `services/` business logic and `clients/` untouched; full suite green (1505 passed, 1 skipped) | PASS |
+
+**s9_control_room_di result: 5/5 PASS.**
+
+### s10_hygiene_cap — CAP placeholders + hygiene (review P3)
+
+**The drift.** `ARCHITECTURE.md` §4 described seven CAP homes as "empty placeholders" that were
+absent on disk; README counts and the deploy path had drifted from the tree; `.scannerwork/` +
+`.sonar_lock` were tracked but never ignored; CI action/`ruff` versions were unpinned.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **CAP placeholders created** — the seven reserved homes of `ARCHITECTURE.md` §4 exist as empty modules (docstring + `# reserved for CAP I<n>`, nothing more): `control/facts.py` (I0), `control/reducers/__init__.py` (I1–I3), `control/context_compiler.py` (I4), `core/contracts.py` (I5), `control/rules.py` + `control/validator.py` + `control/decisions.py` (I6) — the doc is now true | PASS |
+| 2 | **`.scannerwork/` hygiene** — added to `.gitignore`; `.scannerwork/.sonar_lock` untracked (`git rm --cached`), still on disk | PASS |
+| 3 | **CI versions pinned** — `actions/checkout` → `@11bd719…` (v4.2.2), `actions/setup-python` → `@0b93645…` (v5.3.0), `anomalyco/opencode/github` → `@2859603…` (pinned HEAD), `ruff` → `==0.16.2`; the opencode-review prompt's stale `src/instrument/` + flat-module references repointed to `src/agentic_dynamics/<plane>/` | PASS |
+| 4 | **README counts fixed** — game reports 224→344, configs 37→36 (34→33 measurement), specs 77→79 (8→6 experiments, 69→73 workflows), lab books 19→20 (canonical+quarantined); dropped the drift-prone "60 modules"/"73 scripts" counts; removed the phantom `firebase/` structure line (deploy config is `apps/website/firebase.json`); the data-pipeline diagram no longer shows the retired `_results_summary.json` as a build input | PASS |
+| 5 | **Full suite green** — 1505 passed, 1 skipped (the empty placeholder modules pass the dependency-direction + data-flow guards; `README.md` (status: accepted) passes the stale-path guard) | PASS |
+
+**s10_hygiene_cap result: 5/5 PASS.**
+
+### s11_verification — release gate (coverage proof + invariant audit)
+
+**Coverage proof.** Every P0/P1/P2/P3 finding of `docs/review/semantic_integrity_review.md` maps
+to a release phase with a PASS: P0 → s1 (8/8) + s2 (9/9) + s3 (10/10) + s4 (9/9); P1 agent-context
+→ s5 (10/10) + s6 (7/7); P1 container → s7 (7/7); P2 lifecycle → s8 (6/6); P2 service-locator →
+s9 (5/5); P3 hygiene → s10 (5/5). The single P1/P2 neutral-intent-schema finding is **explicitly
+deferred with a pointer** (recorded in `scripts/_gen_instructions.py`'s module docstring and
+`docs/review/semantic_integrity_verification.md` §2), because it re-touches the renderers and is
+sequenced after the now-complete lab contract + context guards.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Coverage proof** — every P0/P1/P2/P3 finding → phase → PASS in the execution log; the P1/P2 neutral-intent schema explicitly deferred with a pointer | PASS |
+| 2 | **Full suite green** — `pytest tests/` → 1505 passed, 1 skipped | PASS |
+| 3 | **Every guard suite green** — all 13 guard files (incl. `test_agent_config_semantic.py` + `test_lab_contract.py` + `test_lab_outputs_canonical.py`) → 174 passed | PASS |
+| 4 | **Compile-gate all specs** — `load_spec` + `compile_spec` over all committed specs → 79/79 compile, 0 fail | PASS |
+| 5 | **CI-equivalent gates** — `agentic-dynamics --help` (exit 0); `reproduce.sh core --dry-run` (exit 0); `docker build` (success); container core run on the committed fixture (exit 0, `data.js` 108,783 bytes) | PASS |
+| 6 | **Invariant audit** — Redis isolation (framework queue on 6380, never 6379); Firebase dual-host (both projects in `.firebaserc`); CAP frozen-not-implemented (seven placeholders, no code); no `_results_summary.json` in any publication-eligible input | PASS |
+| 7 | **Verification artifact** — `docs/review/semantic_integrity_verification.md` written (status: accepted), PASS/FAIL per check + final verdict "PASS"; passes `test_doc_lifecycle.py` + `test_stale_path_guard.py` | PASS |
+
+**s11_verification result: 7/7 PASS.**
+
+**Release verdict: PASS** — the semantic-integrity release is complete (10 implementation phases
++ this gate, one explicit deferral).
+
 
 
 

@@ -15,9 +15,13 @@ and what users are told must fail here, not be masked by deriving both sides fro
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from agentic_dynamics import cli
+
+ROOT = Path(__file__).resolve().parent.parent
 
 #: Hand-authored (argv prefix, backing script, forwarded argv) for every documented leaf
 #: command. Sourced from ``cli._HELP`` + the CLI-surface tree, not from ``cli._COMMANDS``.
@@ -109,7 +113,8 @@ def _documented_leaf_commands() -> set[tuple[str, ...]]:
 
 
 @pytest.mark.parametrize(
-    ("argv", "expected_script", "expected_rest"), DOCUMENTED_RESOLUTIONS,
+    ("argv", "expected_script", "expected_rest"),
+    DOCUMENTED_RESOLUTIONS,
     ids=[" ".join(a) for a, _, _ in DOCUMENTED_RESOLUTIONS],
 )
 def test_documented_command_resolves(argv, expected_script, expected_rest) -> None:
@@ -151,10 +156,15 @@ def test_unknown_command_returns_none() -> None:
 
 
 def test_analyze_lab_is_dynamic() -> None:
-    """``analyze lab <name>`` is a dynamic leaf -> ``lab_<name>.py``."""
-    script, rest = cli._resolve(["analyze", "lab", "grit_matrix"])
-    assert script == "lab_grit_matrix.py"
+    """``analyze lab <name>`` is a dynamic leaf -> ``lab_<name>.py``.
+
+    Uses ``grit`` because it names a real, canonical lab (``scripts/lab_grit.py``); the
+    example used to be ``grit_matrix``, which s4 renamed out of existence.
+    """
+    script, rest = cli._resolve(["analyze", "lab", "grit"])
+    assert script == "lab_grit.py"
     assert rest == []
+    assert (ROOT / "scripts" / script).exists(), "the example must name a lab that exists"
 
 
 def test_registry_forwards_subcommand() -> None:

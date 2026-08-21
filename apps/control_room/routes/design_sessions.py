@@ -8,18 +8,20 @@ from __future__ import annotations
 
 from flask import Response, jsonify
 
-from apps.control_room import server
+from apps.control_room.services.context import ControlRoomServices
 from apps.control_room.services.mutations import (
     _design_error,
     _design_mutation_body,
     _idempotent_design_response,
 )
 
+#: The injected application context, bound by ``register()`` before any request is served.
+_services: ControlRoomServices | None = None
 
 def api_design_sessions() -> Response:
     """List only portal-owned design sessions and approved workdir labels."""
     try:
-        return jsonify(server._design_sessions().list_sessions())
+        return jsonify(_services.design_manager().list_sessions())
     except Exception as error:
         return _design_error(error)
 
@@ -30,13 +32,13 @@ def api_create_design_session() -> Response:
         return failure
     assert body is not None
     intent = body.get("intent", "")
-    if not isinstance(intent, str) or len(intent) > server.MAX_DESIGN_PROMPT_CHARS:
+    if not isinstance(intent, str) or len(intent) > _services.max_design_prompt_chars:
         return (
-            jsonify({"error": f"intent must be at most {server.MAX_DESIGN_PROMPT_CHARS} characters"}),
+            jsonify({"error": f"intent must be at most {_services.max_design_prompt_chars} characters"}),
             400,
         )
     def create():
-        session = server._design_sessions().create(
+        session = _services.design_manager().create(
             kind=body.get("kind", ""),
             intent=intent,
             model=body.get("model", "") if isinstance(body.get("model", ""), str) else "",
@@ -49,7 +51,7 @@ def api_create_design_session() -> Response:
 def api_design_session_spec(portal_id) -> Response:
     """Return the coherent draft, validation, matrix, save, and capability state."""
     try:
-        return jsonify(server._design_sessions().draft_state(portal_id))
+        return jsonify(_services.design_manager().draft_state(portal_id))
     except Exception as error:
         return _design_error(error)
 
@@ -60,25 +62,25 @@ def api_design_session_input(portal_id) -> Response:
         return failure
     assert body is not None
     prompt = body.get("prompt", "")
-    if not isinstance(prompt, str) or len(prompt) > server.MAX_DESIGN_PROMPT_CHARS:
+    if not isinstance(prompt, str) or len(prompt) > _services.max_design_prompt_chars:
         return (
-            jsonify({"error": f"prompt must be at most {server.MAX_DESIGN_PROMPT_CHARS} characters"}),
+            jsonify({"error": f"prompt must be at most {_services.max_design_prompt_chars} characters"}),
             400,
         )
     delivery = body.get("delivery", "queue")
-    if not isinstance(delivery, str) or delivery not in server.DESIGN_DELIVERY_MODES:
+    if not isinstance(delivery, str) or delivery not in _services.design_delivery_modes:
         # The server, not the browser, fixes the delivery-mode set (review F3):
         # an arbitrary body value can no longer silently upgrade a "Send" into
         # a "steer" — only the two server-known modes are ever forwarded.
         return (
-            jsonify({"error": f"delivery must be one of {list(server.DESIGN_DELIVERY_MODES)}"}),
+            jsonify({"error": f"delivery must be one of {list(_services.design_delivery_modes)}"}),
             400,
         )
     return _idempotent_design_response(
         f"input:{portal_id}",
         body,
         lambda: jsonify(
-            server._design_sessions().send_input(
+            _services.design_manager().send_input(
                 portal_id,
                 prompt=prompt,
                 delivery=delivery,
@@ -95,7 +97,7 @@ def api_design_session_interrupt(portal_id) -> Response:
     return _idempotent_design_response(
         f"interrupt:{portal_id}",
         _body,
-        lambda: jsonify(server._design_sessions().interrupt(portal_id)),
+        lambda: jsonify(_services.design_manager().interrupt(portal_id)),
     )
 
 def api_design_session_save(portal_id) -> Response:
@@ -107,7 +109,7 @@ def api_design_session_save(portal_id) -> Response:
     if "overwrite" in body and not isinstance(body["overwrite"], bool):
         return jsonify({"error": "overwrite must be a boolean"}), 400
     def save():
-        result = server._design_sessions().save(
+        result = _services.design_manager().save(
             portal_id,
             filename=body.get("filename", "") if isinstance(body.get("filename", ""), str) else "",
             overwrite=body.get("overwrite") is True,
@@ -135,7 +137,7 @@ def api_design_session_run(portal_id) -> Response:
         if not isinstance(value, int) or isinstance(value, bool):
             return jsonify({"error": f"{field} must be an integer"}), 400
     def run():
-        result = server._design_sessions().run_workflow(
+        result = _services.design_manager().run_workflow(
             portal_id,
             goal=body["goal"] if isinstance(body["goal"], str) else "",
             model=body["model"] if isinstance(body["model"], str) else "",
@@ -150,8 +152,10 @@ def api_design_session_run(portal_id) -> Response:
 
     return _idempotent_design_response(f"run:{portal_id}", body, run)
 
-def register(app):
-    """Register this module's routes on the Flask app (server.py composition root)."""
+def register(app, services: ControlRoomServices) -> None:
+    """Register this module's routes on the Flask app, receiving the application context."""
+    global _services
+    _services = services
     app.get("/api/design-sessions")(api_design_sessions)
     app.post("/api/design-sessions")(api_create_design_session)
     app.get("/api/design-sessions/<portal_id>/spec")(api_design_session_spec)

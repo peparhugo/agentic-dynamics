@@ -5,31 +5,36 @@ description: Post-hoc analysis of completed experiments — generating Game Repo
 
 # Analyze Skill — Full Analysis Pipeline Knowledge
 
-You are working with the post-hoc analysis pipeline for AI FinOps Dynamics experiments. This skill injects the full analysis knowledge.
+You are working with the post-hoc analysis pipeline for `agentic_dynamics` experiments. This skill
+injects the full analysis knowledge.
 
 ## Analysis Pipeline Flow
 
 ```
-/tmp/exp_* worktrees ──→ analyze_worktrees.py ──→ GameReport .md files
-                     │                            _results_summary.json
-                     ├──→ analyze_trajectories.py ──→ _trajectory_summary.json
+/tmp/exp_* worktrees ──▶ analyze_worktrees.py ──▶ GameReport .md files
+                     │
+                     ├──▶ analyze_trajectories.py ──▶ _trajectory_summary.json
                      │                               _trajectory_aggregate.json
-                     └──→ validate_session.py ──→ test pass/fail per worktree
+                     └──▶ validate_session.py ──▶ test pass/fail per worktree
 
-stories/*.json ──→ sync_data.py ──→ sessions.parquet, stories.parquet ──┐
-_results_summary.json  ────────────────────────────────────────────────┼──→ build_data.py ──→ apps/website/data.js
-_trajectory_aggregate.json ─────────────────────────────────────────────┤                              │
-inventory.json           ───────────────────────────────────────────────┘                              ▼
-                                                                                              firebase deploy → web.app
+stories/*.json ──▶ sync_data.py ──▶ sessions.parquet, stories.parquet ──┐
+canonical registry (data_manifest.json) + inventory.json                ├──▶ build_data.py ──▶ apps/website/data.js
+canonical corpus (story/review tables)                                  │                          │
+                                                                        ┘                          ▼
+                                                                                      firebase deploy → web.app
 ```
+
+The retired `experiments/results/_results_summary.json` is **not** a build input — `build_data.py`
+reads the canonical registry (`experiments/data_manifest.json`), the canonical corpus resolver
+(`agentic_dynamics.reporting.canonical_corpus`), the lab manifest, and `inventory.json`.
 
 ## Primary Entry Points
 
 ```bash
 # 1. Refresh inventory (always first):
-python scripts/inventory.py refresh
+agentic-dynamics data inventory refresh
 
-# 2. Analyze all worktrees → game reports + summary JSON:
+# 2. Analyze all worktrees → game reports:
 python scripts/analyze_worktrees.py
 python scripts/analyze_worktrees.py --no-tests              # Skip pytest (fast)
 python scripts/analyze_worktrees.py --worktree /tmp/exp_xyz # Single worktree
@@ -46,35 +51,36 @@ python scripts/validate_session.py --workdir /tmp/exp_xyz
 python scripts/sync_data.py
 
 # 6. Build website data:
-python scripts/build_data.py
+agentic-dynamics data build
 ```
 
-## analyze_worktrees.py (1398L) — The Big One
+## analyze_worktrees.py — the primary analysis script
 
-This is the primary analysis script. For each worktree it:
-1. Evaluates solution quality via `evaluate_solution()` → SolutionMetrics
-2. Measures basin escape via `measure_basin_escape()` → BasinMetrics
-3. Computes efficiency via `compute_efficiency()` → EfficiencyMetrics
-4. Classifies strategy via `classify_strategy()` → StrategyReport
-5. Runs SonarQube via `run_sonar_analysis()` → SonarMetrics
-6. Runs semantic validation: `analyze_markers()`, `analyze_ast()`
-7. Combines into `GameReport` and writes `.md` to `experiments/results/reports/`
+For each worktree it:
+1. Evaluates solution quality via `evaluate_solution()` → `SolutionMetrics`
+2. Measures basin escape via `measure_basin_escape()` → `BasinMetrics`
+3. Computes efficiency via `compute_efficiency()` → `EfficiencyMetrics`
+4. Classifies strategy via `classify_strategy()` → `StrategyReport`
+5. Runs SonarQube (optional, `--no-sonar` to skip)
+6. Runs semantic validation
+7. Combines into a `GameReport` and writes `.md` to `experiments/results/reports/`
 
 Output structure:
 ```
 experiments/results/
 ├── reports/exp_<id>.md          # Individual game report
 ├── reports/exp_<id>/            # Per-experiment artifacts
-├── _results_summary.json        # Aggregate results
 ├── _trajectory_summary.json     # Per-transcript metrics
 └── _trajectory_aggregate.json   # Per-model aggregates
 ```
 
-Key flags: `--no-tests` skips pytest (faster but less accurate), `--limit N` for sampling.
+Key flags: `--no-tests` skips pytest (faster but less accurate), `--limit N` for sampling,
+`--baseline PATH` for comparison, `--sonar-url/--sonar-user/--sonar-password/--sonar-timeout`,
+`--timeout INT` (test timeout seconds).
 
 ## Game Report Structure
 
-Each GameReport (dataclass in `game_report.py`, 319L) contains:
+Each `GameReport` (`agentic_dynamics.reporting.game_report`) contains:
 - Experiment metadata (id, model, task, operator, strength)
 - Reasoning dynamics (trajectory, tool calls, exploration vs recovery)
 - Solution quality (correctness, constraints, tests passed/failed)
@@ -84,25 +90,22 @@ Each GameReport (dataclass in `game_report.py`, 319L) contains:
 - Narrative analysis and recommendation
 - All metrics provenance-tagged: [M]easured, [C]omputed, [H]euristic, or e[X]ternal
 
-Generated by: `GameReport.to_markdown()` → readable Markdown with all sections.
+Generated by `GameReport.to_markdown()` → readable Markdown with all sections.
 
-## analyze_trajectories.py (435L)
+## analyze_trajectories.py
 
 Parses `session.jsonl` files from worktrees into structured metrics:
 - Step-level analysis: tool calls, thinking phases, latency
 - Segment classification (EXPLORATION/RECOVERY/STABLE)
 - Per-model trajectory comparison
 
-Produces:
-- `experiments/results/_trajectory_summary.json` — per-transcript data
-- `experiments/results/_trajectory_aggregate.json` — per-model comparisons
+Produces `experiments/results/_trajectory_summary.json` (per-transcript) and
+`experiments/results/_trajectory_aggregate.json` (per-model comparisons).
 
-## validate_session.py (99L)
+## validate_session.py
 
-Runs `pytest` on generated code in worktrees. Replaces heuristic correctness with actual test pass/fail.
-
-Confirmed flags (`scripts/validate_session.py:83-85`) — note **`--workdir`, not
-`--worktree`**:
+Runs `pytest` on generated code in worktrees. Replaces heuristic correctness with actual test
+pass/fail. Confirmed flags — note **`--workdir`, not `--worktree`**:
 
 ```bash
 python scripts/validate_session.py --workdir /tmp/exp_xyz
@@ -110,7 +113,7 @@ python scripts/validate_session.py --session-id <opencode-session-id>
 python scripts/validate_session.py --model deepseek   # filter by model (default: "all")
 ```
 
-## inventory.py (392L) — Data Registry CLI
+## inventory.py — Data Registry CLI
 
 ```bash
 python scripts/inventory.py refresh   # Rebuild inventory.json from opencode.db + worktrees
@@ -120,57 +123,28 @@ python scripts/inventory.py report    # Numbers for evidence page
 python scripts/inventory.py worktrees # List worktrees
 ```
 
-Reads: `opencode.db` (SQLite session store), worktrees, config YAMLs, result JSONs.
-Writes: `experiments/inventory.json`
+Reads: `opencode.db`, worktrees, config YAMLs, result JSONs. Writes: `experiments/inventory.json`.
 
 ## sync_data.py — Story Results → Parquet
 
-Run this **before** `build_data.py` when story results have changed (`AGENTS.md`'s Commands
-block: "story results -> parquet (before build_data)"). Confirmed modes (manual `sys.argv`
-parse in `main()`, `scripts/sync_data.py`):
+Run this **before** `build_data.py` when story results have changed. Modes:
 
 ```bash
 python scripts/sync_data.py                        # sync: write sessions.parquet + stories.parquet
 python scripts/sync_data.py --check                 # print row counts for both parquet files
-python scripts/sync_data.py --query "<duckdb SQL>"  # run SQL against both parquet files, print results
+python scripts/sync_data.py --query "<duckdb SQL>"  # run SQL against both parquet files
 ```
 
-`--check` requires `sessions.parquet` to already exist (prints "No parquet files. Run
-without --check first." and returns otherwise). `--query` needs at least one more `sys.argv`
-element after it — the query text is read as the *last* CLI argument
-(`sys.argv[-1]`), so pass the SQL as a single quoted final argument.
-
-## build_data.py (1188L) — Website Data Generator
+## build_data.py — Website Data Generator
 
 ```bash
 python scripts/build_data.py            # write apps/website/data.js
-python scripts/build_data.py --dry-run  # print the data instead of writing (confirmed scripts/build_data.py:1168)
+python scripts/build_data.py --dry-run  # print the data instead of writing
 ```
 
-Reads: inventory.json, _results_summary.json, _trajectory_aggregate.json.
-Writes: `apps/website/data.js` → `window.DYNAMICS_DATA` containing:
-- experiments[], models[], operators[], strategies[]
-- All metrics provenance-tagged [M]/[C]/[H]/[X]
-- Used by apps/website/app.js to render evidence page charts
-
-## Data Maintenance Scripts
-
-```bash
-# Copy generated code from /tmp/ to experiments/results/reports/:
-python scripts/backfill_artifacts.py
-
-# Run SonarQube docker analysis on worktrees:
-python scripts/backfill_sonar.py
-
-# Reconstruct TypeScript SSG worktrees from DB:
-python scripts/regen_typescript_ssg.py
-
-# Analyze only TypeScript SSG worktrees:
-python scripts/batch_analyze_ts_ssg.py
-
-# Extract recovery cost table:
-python scripts/recovery_cost_table.py
-```
+Reads the canonical registry (`experiments/data_manifest.json`), the canonical corpus resolver,
+the lab manifest, and `inventory.json`. Writes `apps/website/data.js` → `window.DYNAMICS_DATA`
+containing experiments/models/operators/strategies with provenance tags [M]/[C]/[H]/[P]/[X].
 
 ## Inspecting Results
 
@@ -186,14 +160,14 @@ python scripts/inventory.py worktrees  # Worktree listing
 ```bash
 # 1. Experiments create worktrees at /tmp/exp_* via scripts/run.py
 # 2. Refresh inventory:
-python scripts/inventory.py refresh
+agentic-dynamics data inventory refresh
 # 3. Analyze worktrees:
 python scripts/analyze_worktrees.py
 python scripts/analyze_trajectories.py
 # 4. Sync story results to parquet:
 python scripts/sync_data.py
 # 5. Build website data:
-python scripts/build_data.py
+agentic-dynamics data build
 # 6. Deploy (BOTH hosts):
 firebase deploy --only hosting
 firebase deploy --only hosting --project agentic-dynamics
@@ -201,51 +175,26 @@ firebase deploy --only hosting --project agentic-dynamics
 
 ## Measure / Compare / Writeup (written — spec-driven)
 
-The compiler (`compile_experiment.py`, written) reframes this pipeline as spec-driven phases:
-`validate → cells → execute → measure → compare → writeup → adapt`. Today's scripts map onto the
-future phases:
+The compiler (`agentic_dynamics.experiment.compile_experiment`, written) reframes this pipeline
+as spec-driven phases: `validate → cells → execute → measure → compare → writeup → adapt`.
+Today's scripts map onto the future phases:
 
 | Phase | Today | Proposed (spec-driven) |
 |---|---|---|
 | measure | `analyze_worktrees.py` + `analyze_trajectories.py` | `evaluate_rules` — measurement rules in `spec.rules` over the ledger |
-| compare | `lab_task_routing.py` / `routing.simulate_strategies` | `compare_arms` — regret/effect over `spec.comparison.arm_factor` |
-| writeup | `game_report.py` + lab-book templates | `writeup` — lab-book from `spec.question` + `spec.metrics` |
+| compare | `control.routing.simulate_strategies` | `compare_arms` — regret/effect over `spec.comparison.arm_factor` |
+| writeup | `reporting.game_report` + lab-book templates | `writeup` — lab-book from `spec.question` + `spec.metrics` |
 | adapt | — (manual) | `adapt` — tweak one factor, emit next grid (campaign loop) |
 
 The load-bearing rule applies: a control rule's `requires` must be produced by a measurement
-rule before the compiler admits it (see `conventions.md`). Design:
-`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
+rule before the compiler admits it. Design:
+`docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Common Gotchas
 
 - Always `inventory.py refresh` before analysis — stale inventory corrupts results.
-- _results_summary.json is the source for lab books and build_data.py — regenerate it.
-- apps/website/data.js is generated — never edit it directly.
-- Worktrees at /tmp/exp_* may be cleaned by OS reboot. Always backfill first.
+- `apps/website/data.js` is generated — never edit it directly.
+- Worktrees at `/tmp/exp_*` may be cleaned by OS reboot — always backfill first.
 - SonarQube requires Docker running (`docker-compose up -d sonarqube`).
-- The 5 DEPRECATED lab book scripts (`*_bge_m3`) have been superseded — use the non-DEPRECATED versions.
-- opencode.db path: usually `~/.local/share/opencode/opencode.db` or from env `OPENCODE_DB`.
-
-## Tool invocations (ported from `.opencode/tools/*.ts`)
-
-The opencode tools below shell to the scripts already documented in this skill. On the
-Claude Code side there's no tool wrapper — invoke the script directly via Bash, using the
-exact flags below (verified against each script's own `argparse`, not the tool's schema —
-the tool's own `args: {}` schema exposes none of `analyze_worktrees.py`'s real flags).
-
-- **`analyze_worktrees.ts`** → `scripts/analyze_worktrees.py`. Full confirmed flag set
-  (`scripts/analyze_worktrees.py:1031-1043`): `--worktree PATH`, `--limit INT`, `--dry-run`,
-  `--baseline PATH` (comparison baseline worktree), `--no-tests` (skip pytest), `--no-sonar`
-  (skip SonarQube), `--sonar-url URL` (default `http://localhost:9000`), `--sonar-user`
-  (default `admin`), `--sonar-password` (default `admin`), `--sonar-timeout INT` (default
-  `120`), `--tests` (run tests, default on already), `--timeout INT` (test timeout seconds,
-  default `120`).
-- **`analyze_trajectories.ts`** → `scripts/analyze_trajectories.py`. Flags match the tool
-  1:1: `--limit INT`, `--model STR`, `--dry-run`.
-- **`sync_data.ts`** → `scripts/sync_data.py` — see the "sync_data.py" section above
-  (sync / `--check` / `--query "<sql>"` modes).
-- **`build_data.ts`** → `scripts/build_data.py` — see the "build_data.py" section above
-  (plain run, or `--dry-run`).
-- **`validate_session.ts`** → `scripts/validate_session.py` — `--workdir`, `--session-id`,
-  `--model` (default `all`). **Not `--worktree`** — see the "validate_session.py" section
-  above.
+- The 8 DEPRECATED `*_bge_m3` lab scripts are retired — use `agentic_dynamics.measurement.semantic_validation`.
+- opencode.db path: `~/.local/share/opencode/opencode.db` or from env `OPENCODE_DB`.

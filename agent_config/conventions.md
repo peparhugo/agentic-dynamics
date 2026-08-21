@@ -45,27 +45,27 @@
 ## Project-Specific Gotchas
 
 - `__init__.py` exports 100+ symbols. Adding a new public class means updating `__all__`.
-- `scripts/analyze_worktrees.py` is 1396 lines — the biggest file. Be careful editing it.
+- `scripts/analyze_worktrees.py` is the largest analysis script. Be careful editing it.
 - `scripts/run.py` and `scripts/analyze_worktrees.py` share similar logic but are NOT unified.
   If you fix a bug in one, check the other.
 - Use `scripts/pipeline.py` (YAML-driven, `experiments/definitions/configs/plans.yaml`) for
-  orchestration work (`scripts/plan.py` was retired in Stage 1).
-- Lab books read `_results_summary.json` and `inventory.json` — always refresh these first.
+  orchestration work (the old standalone plan scripts were retired in Stage 1).
+- Publication labs read the canonical corpus (`agentic_dynamics.reporting.canonical_corpus`) —
+  refresh inventory and regenerate before running; never read the retired `_results_summary.json`.
 - `scripts/build_data.py` generates `apps/website/data.js` — don't edit that file directly.
 - DeepSeek pricing lives in `agentic_dynamics.measurement.efficiency:PROVIDER_PRICING["deepseek"]`.
   Claude pricing at `PROVIDER_PRICING["anthropic"]`.
 - `tests/conftest.py` has availability check fixtures — tests skip gracefully when infra is down.
-- `BUILTIN_STORIES` in story.py has 3 stories: task_manager_api, static_site_gen,
-  notification_service. Stories are also defined in configs as YAML.
-- v0.6-v0.9 modules (story, commit_analysis, review, entropy, codebase_graph,
-  mutation, language, lsp_diagnostics) are the newest layer. Older modules (perturb, basin,
-  solution, efficiency, strategy, game_report) are battle-tested core.
+- `BUILTIN_STORIES` (in `agentic_dynamics.runtime.story`) defines task_manager_api,
+  static_site_gen, notification_service. Stories are also defined in configs as YAML.
+- The `measurement`/`adapters`/`runtime` planes hold the experiment apparatus; `reporting` holds
+  game reports + reviews; `core` holds language/paths/streaming. See `ARCHITECTURE.md` §1.
 
 ## Testing
 
 - Run: `pytest tests/` from project root.
 - Most tests use pytest markers for optional deps (neo4j, ollama, chroma, sonar).
-- `test_story.py` is the largest (330L) — needs opencode available to pass.
+- `test_story.py` needs opencode available to pass (skips gracefully otherwise).
 - When adding a new module, add tests to `tests/` and update `__init__.py` exports.
 
 ## Session Discipline

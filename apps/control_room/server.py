@@ -4,8 +4,11 @@ Serves the admin dashboard and exposes live experiment telemetry over SSE. This 
 the *composition root* (refactor-repair Debt-1): the 28 routes live in ``routes/``, the business
 logic in ``services/``, the external-interface clients in ``clients/``, and the filesystem paths
 in ``paths.py``. This file keeps the shared context — configuration constants, the Redis /
-manager / client factories, the parsed-manifest cache, and the Flask ``app`` — and re-exports
-the names the tests monkeypatch (``_redis``, ``_design_sessions``, ``DATA_MANIFEST_PATH``, …) so
+manager / client factories, the parsed-manifest cache, and the Flask ``app`` — and builds the
+``ControlRoomServices`` application context (review P2) that it injects into route registration,
+so the routes receive their dependencies instead of importing this module as a service locator.
+It still re-exports the names the tests monkeypatch (``_redis``, ``_design_sessions``,
+``DATA_MANIFEST_PATH``, …): the injected services delegate back to those names at call time, so
 the existing test suite is behaviour-identical.
 
 Endpoints (28 routes across 5 API categories, plus the static shell):
@@ -190,15 +193,17 @@ def _claude_agent_workdirs() -> dict[str, Path]:
 # every name above is defined. The supervisor service functions are re-exported so the tests'
 # monkeypatch of ``server._emit_actuation_record`` / ``server._load_supervisor_flags`` /
 # ``server._authorize_supervisor_action`` resolves through this module's namespace; the routes
-# are then registered on ``app``.
+# are then registered on ``app`` with the explicit application context (review P2 — routes receive
+# ``ControlRoomServices`` rather than importing this module as a service locator).
 from apps.control_room import routes as _routes  # noqa: E402
+from apps.control_room.services.context import build_services  # noqa: E402
 from apps.control_room.services.supervisor import (  # noqa: E402,F401
     _authorize_supervisor_action,
     _emit_actuation_record,
     _load_supervisor_flags,
 )
 
-_routes.register(app)
+_routes.register(app, build_services())
 
 
 if __name__ == "__main__":

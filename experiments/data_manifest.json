@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-20T17:23:54.836033+00:00",
-  "opencode_version": "unknown",
-  "git_commit": "14108498",
+  "generated_at": "2026-08-21T00:47:50.139385+00:00",
+  "opencode_version": "1.18.15",
+  "git_commit": "a7e7f2b7",
   "files": {
     "inventory.json": {
       "sha256": "a2aa4974de23c094533ddb4c5d6d593c96a5208bb3bf80495782f4115058746c",
@@ -17,8 +17,8 @@
       "size_bytes": 1748
     },
     "data.js": {
-      "sha256": "24ee0c8c5e7294f0f6eca375db0fdb50b1bf1b92b0f80c42e80479a142f2604e",
-      "size_bytes": 174354
+      "sha256": "c91faa3c476ac77b3e1cbdc8b77113baa05e46718d47405c3c44fa597ce66be3",
+      "size_bytes": 108788
     }
   },
   "pipeline_steps": [

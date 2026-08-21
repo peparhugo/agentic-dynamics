@@ -3,29 +3,28 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-21T05:25:34.116548+00:00`  ·  79 spec(s)
-**Work remaining:** 19 runnable-now · 60 completed/retired
+Generated at: `2026-08-21T12:47:32.753034+00:00`  ·  79 spec(s)
+**Work remaining:** 18 open · 61 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
+| `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
+| `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
+| `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `queue_steer` | workflow | yes | runnable | 0.1 | — | 2026-08-15 19:32 | ok | deepseek/deepseek-v4-flash | $0.0330 | 1 |
+| `rag_bare_vs_augmented` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `registry_canonicalize` | workflow | yes | runnable | 0.1 | — | 2026-08-19 13:42 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |
 | `routing_kb_dispatch` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `routing_kb_experiment_design` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:28 | ok | openai/gpt-5.6-sol | $3.0669 | 7 |
+| `routing_kb_experiment_design_research` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:12 | ok | deepseek/deepseek-v4-pro | $0.2203 | 1 |
+| `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `agentic_dynamics_rebrand` | workflow | no | running | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
-| `claude_background_sessions` | workflow | no | running | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
-| `control_room_portal` | workflow | no | running | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
-| `design_sessions` | workflow | no | running | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
-| `auto_posthoc_wiring` | workflow | yes | active | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
-| `explanation_tax` | experiment | yes | active | 0.2 | — | — | — | — | — | 0 |
-| `labbook_refresh` | workflow | yes | active | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
-| `posthoc_pipeline` | workflow | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `process_perturbation_resample` | experiment | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `queue_steer` | workflow | yes | active | 0.1 | — | 2026-08-15 19:32 | ok | deepseek/deepseek-v4-flash | $0.0330 | 1 |
-| `rag_bare_vs_augmented` | experiment | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `registry_canonicalize` | workflow | yes | active | 0.1 | — | 2026-08-19 13:42 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |
-| `routing_kb_experiment_design` | experiment | yes | active | 0.1 | — | 2026-08-17 18:28 | ok | openai/gpt-5.6-sol | $3.0669 | 7 |
-| `routing_kb_experiment_design_research` | experiment | yes | active | 0.1 | — | 2026-08-17 18:12 | ok | deepseek/deepseek-v4-pro | $0.2203 | 1 |
-| `routing_regret_under_degradation` | experiment | yes | active | 0.2 | — | — | — | — | — | 0 |
-| `semantic_integrity_release` | experiment | yes | active | 0.1 | — | 2026-08-21 05:25 | ok | deepseek/deepseek-v4-pro | $1.6898 | 4 |
+| `agentic_dynamics_rebrand` | workflow | no | failed | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
+| `claude_background_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
+| `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
+| `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `context_abstraction_implement` | workflow | no | draft | 0.1 | — | 2026-08-20 00:56 | fail | anthropic/claude-opus-5 | $0.0000 | 2 |
 | `canonical_state_design` | workflow | no | completed | 0.1 | — | 2026-08-18 15:48 | fail | openai/gpt-5.6-sol | $0.0798 | 5 |
 | `canonical_state_finalize` | workflow | no | completed | 0.1 | — | 2026-08-18 20:38 | ok | anthropic/claude-fable-5 | $14.5891 | 1 |
@@ -78,6 +77,7 @@ Generated at: `2026-08-21T05:25:34.116548+00:00`  ·  79 spec(s)
 | `routing_follow_up` | workflow | no | completed | 0.1 | — | 2026-08-14 22:26 | ok | deepseek/deepseek-v4-pro | $0.2511 | 1 |
 | `routing_kb_more_itertools` | workflow | no | completed | 0.1 | — | 2026-08-17 18:38 | ok | deepseek/deepseek-v4-pro | $0.0337 | 1 |
 | `routing_kb_wiring` | workflow | no | completed | 0.1 | — | 2026-08-17 19:52 | ok | deepseek/deepseek-v4-pro | $1.3789 | 1 |
+| `semantic_integrity_release` | workflow | no | completed | 0.1 | — | 2026-08-21 05:25 | ok | deepseek/deepseek-v4-pro | $1.6898 | 4 |
 | `site_golden_circle` | workflow | no | completed | 0.1 | — | 2026-08-14 07:36 | ok | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `spec_lifecycle` | workflow | no | completed | 0.1 | — | 2026-08-19 22:53 | ok | deepseek/deepseek-v4-pro | $0.4710 | 2 |
 | `supervisor_control_room` | workflow | no | completed | 0.1 | — | 2026-08-14 16:09 | ok | openai/gpt-5.6-sol | $10.8221 | 2 |
@@ -92,14 +92,17 @@ Generated at: `2026-08-21T05:25:34.116548+00:00`  ·  79 spec(s)
 
 **Status** — authored in the spec YAML's `status:` when the operator asserted one,
 otherwise derived: `superseded` when the spec names a `superseded_by:`; for a
-non-repeatable workflow, `completed` when a run succeeded, `running` when runs exist
-but none succeeded, `runnable` when never run; else `active`.
+non-repeatable workflow, `completed` when any run succeeded, `failed` when a run
+recorded a definitive failure, `blocked` when runs exist but none resolved, `running`
+when a run is currently executing (an open, recent run), `runnable` when never run;
+else (a repeatable spec) `runnable`.
 
 | status | meaning |
 |---|---|
-| `runnable` | a non-repeatable workflow never run successfully — ready to run |
-| `running` | a non-repeatable workflow that has been run but not yet completed |
-| `active` | the current repeatable spec for its question — runnable now |
+| `runnable` | never run (a non-repeatable workflow), or a repeatable spec — ready to run |
+| `running` | a non-repeatable workflow currently executing — an open run within the window |
+| `failed` | a non-repeatable workflow whose run(s) recorded a definitive failure |
+| `blocked` | a non-repeatable workflow with runs that started but never resolved |
 | `draft` | authored, not yet run to completion; not yet a claim about anything |
 | `completed` | a non-repeatable workflow whose run succeeded (derived from the run ledgers) |
 | `superseded` | a later spec took over its question (see that spec's `supersedes` column) |

@@ -105,8 +105,9 @@ class _BufferedResult:
 class Neo4jClient:
     """Manage Neo4j graph population and queries."""
 
-    def __init__(self, uri: str = "bolt://localhost:7687", user: str = "neo4j",
-                 password: str = "password123"):  # local dev only — override via ENV for prod
+    def __init__(
+        self, uri: str = "bolt://localhost:7687", user: str = "neo4j", password: str = "password123"
+    ):  # local dev only — override via ENV for prod
         from neo4j import GraphDatabase
 
         self._driver = GraphDatabase.driver(uri, auth=(user, password))
@@ -202,7 +203,8 @@ class Neo4jClient:
 
         for model_id, stats in by_model.items():
             provider = model_id.split("/")[0] if "/" in model_id else "unknown"
-            self._run("""
+            self._run(
+                """
                 MERGE (m:Model {model_id: $model_id})
                 SET m.provider = $provider,
                     m.count = $count,
@@ -220,25 +222,27 @@ class Neo4jClient:
                     m.avg_bash_pct = $avg_bash_pct,
                     m.total_parse_errors = $parse_errors,
                     m.tool_call_distribution = $tool_dist
-            """, {
-                "model_id": model_id,
-                "provider": provider,
-                "count": stats.get("count", 0),
-                "avg_steps": stats.get("avg_steps", 0),
-                "avg_tokens": stats.get("avg_tokens_per_session", 0),
-                "avg_output": stats.get("avg_output_tokens", 0),
-                "avg_input": stats.get("avg_input_tokens", 0),
-                "avg_reasoning": stats.get("avg_reasoning_tokens", 0),
-                "avg_cache_read": stats.get("avg_cache_read", 0),
-                "avg_cache_write": stats.get("avg_cache_write", 0),
-                "avg_cost": stats.get("avg_cost_per_session", 0),
-                "avg_snapshots": stats.get("avg_git_snapshots", 0),
-                "avg_read_pct": stats.get("avg_read_pct", 0),
-                "avg_write_pct": stats.get("avg_write_pct", 0),
-                "avg_bash_pct": stats.get("avg_bash_pct", 0),
-                "parse_errors": stats.get("total_parse_errors", 0),
-                "tool_dist": json.dumps(stats.get("tool_call_distribution", {})),
-            })
+            """,
+                {
+                    "model_id": model_id,
+                    "provider": provider,
+                    "count": stats.get("count", 0),
+                    "avg_steps": stats.get("avg_steps", 0),
+                    "avg_tokens": stats.get("avg_tokens_per_session", 0),
+                    "avg_output": stats.get("avg_output_tokens", 0),
+                    "avg_input": stats.get("avg_input_tokens", 0),
+                    "avg_reasoning": stats.get("avg_reasoning_tokens", 0),
+                    "avg_cache_read": stats.get("avg_cache_read", 0),
+                    "avg_cache_write": stats.get("avg_cache_write", 0),
+                    "avg_cost": stats.get("avg_cost_per_session", 0),
+                    "avg_snapshots": stats.get("avg_git_snapshots", 0),
+                    "avg_read_pct": stats.get("avg_read_pct", 0),
+                    "avg_write_pct": stats.get("avg_write_pct", 0),
+                    "avg_bash_pct": stats.get("avg_bash_pct", 0),
+                    "parse_errors": stats.get("total_parse_errors", 0),
+                    "tool_dist": json.dumps(stats.get("tool_call_distribution", {})),
+                },
+            )
 
     def load_runs(self, summary_path: Path | None = None) -> None:
         if summary_path is None:
@@ -304,7 +308,8 @@ class Neo4jClient:
                 "quality_per_joule": entry.get("quality_per_joule", 0),
             }
 
-            self._run("""
+            self._run(
+                """
                 MERGE (r:ExperimentRun {worktree_name: $worktree_name})
                 SET r.experiment = $experiment,
                     r.model = $model,
@@ -347,12 +352,13 @@ class Neo4jClient:
                     r.comment_ratio = $comment_ratio,
                     r.correctness_per_dollar = $correctness_per_dollar,
                     r.quality_per_joule = $quality_per_joule
-            """, props)
+            """,
+                props,
+            )
 
     def link_runs(self) -> None:
         queries = [
-            "MATCH (r:ExperimentRun) MATCH (m:Model {model_id: r.model}) "
-            "MERGE (r)-[:RUN_ON]->(m)",
+            "MATCH (r:ExperimentRun) MATCH (m:Model {model_id: r.model}) MERGE (r)-[:RUN_ON]->(m)",
             "MATCH (r:ExperimentRun) WHERE r.experiment IS NOT NULL AND r.experiment <> '' "
             "MATCH (c:ExperimentConfig {name: r.experiment}) "
             "MERGE (r)-[:INSTANCE_OF]->(c)",
@@ -370,8 +376,15 @@ class Neo4jClient:
                 self._run(query)
 
     def load_basin_topology(self, basin_path: Path | None = None) -> None:
+        # lab_basin_topology.py is a QUARANTINED lab (it reads the retired
+        # _results_summary.json), so its artifact lives in experiments/results/legacy_labs/.
+        # This loader is itself part of the summary-derived graph path; the default is
+        # re-pointed rather than removed so the historical graph can still be rebuilt by
+        # hand. See experiments/results/legacy_labs/README.md.
         if basin_path is None:
-            basin_path = PROJECT_ROOT / "experiments" / "results" / "lab_basin_topology.json"
+            basin_path = (
+                PROJECT_ROOT / "experiments" / "results" / "legacy_labs" / "lab_basin_topology.json"
+            )
         if not basin_path.exists():
             print(f"Warning: {basin_path} not found, skipping basin topology loading")
             return
@@ -386,7 +399,8 @@ class Neo4jClient:
             if not model_id:
                 continue
 
-            self._run("""
+            self._run(
+                """
                 MERGE (bt:BasinTopology {model_id: $model_id})
                 SET bt.model_label = $label,
                     bt.total_sessions = $total_sessions,
@@ -396,17 +410,19 @@ class Neo4jClient:
                     bt.overall_escape = $overall_escape,
                     bt.overall_correctness = $overall_correctness,
                     bt.overall_cost = $overall_cost
-            """, {
-                "model_id": model_id,
-                "label": model_label,
-                "total_sessions": profile.get("total_sessions", 0),
-                "valid_sessions": profile.get("valid_sessions", 0),
-                "flail_count": profile.get("flail_count", 0),
-                "flail_rate": profile.get("flail_rate", 0),
-                "overall_escape": profile.get("overall_escape", 0),
-                "overall_correctness": profile.get("overall_correctness", 0),
-                "overall_cost": profile.get("overall_cost", 0),
-            })
+            """,
+                {
+                    "model_id": model_id,
+                    "label": model_label,
+                    "total_sessions": profile.get("total_sessions", 0),
+                    "valid_sessions": profile.get("valid_sessions", 0),
+                    "flail_count": profile.get("flail_count", 0),
+                    "flail_rate": profile.get("flail_rate", 0),
+                    "overall_escape": profile.get("overall_escape", 0),
+                    "overall_correctness": profile.get("overall_correctness", 0),
+                    "overall_cost": profile.get("overall_cost", 0),
+                },
+            )
 
             self._run(
                 "MATCH (m:Model {model_id: $model_id}) "
@@ -417,7 +433,8 @@ class Neo4jClient:
 
             for pclass, bp in profile.get("basin_profiles", {}).items():
                 profile_id = f"{model_id}_{pclass}"
-                self._run("""
+                self._run(
+                    """
                     MERGE (bp:BasinProfile {profile_id: $profile_id})
                     SET bp.perturbation_class = $pclass,
                         bp.n = $n,
@@ -434,24 +451,26 @@ class Neo4jClient:
                         bp.basin_volume = $basin_volume,
                         bp.basin_type = $basin_type,
                         bp.basin_description = $basin_desc
-                """, {
-                    "profile_id": profile_id,
-                    "pclass": pclass,
-                    "n": bp.get("n", 0),
-                    "escape": bp.get("escape", 0),
-                    "correctness": bp.get("correctness", 0),
-                    "cost": bp.get("cost", 0),
-                    "arch_div": bp.get("architecture_divergence", 0),
-                    "struct_div": bp.get("structure_divergence", 0),
-                    "novelty": bp.get("novelty", 0),
-                    "tokens": bp.get("tokens", 0),
-                    "loc": bp.get("loc", 0),
-                    "thinking_ratio": bp.get("thinking_ratio", 0),
-                    "recovery_mult": bp.get("recovery_multiplier", 0),
-                    "basin_volume": bp.get("basin_volume", 0),
-                    "basin_type": bp.get("basin_type", ""),
-                    "basin_desc": bp.get("basin_description", ""),
-                })
+                """,
+                    {
+                        "profile_id": profile_id,
+                        "pclass": pclass,
+                        "n": bp.get("n", 0),
+                        "escape": bp.get("escape", 0),
+                        "correctness": bp.get("correctness", 0),
+                        "cost": bp.get("cost", 0),
+                        "arch_div": bp.get("architecture_divergence", 0),
+                        "struct_div": bp.get("structure_divergence", 0),
+                        "novelty": bp.get("novelty", 0),
+                        "tokens": bp.get("tokens", 0),
+                        "loc": bp.get("loc", 0),
+                        "thinking_ratio": bp.get("thinking_ratio", 0),
+                        "recovery_mult": bp.get("recovery_multiplier", 0),
+                        "basin_volume": bp.get("basin_volume", 0),
+                        "basin_type": bp.get("basin_type", ""),
+                        "basin_desc": bp.get("basin_description", ""),
+                    },
+                )
 
                 self._run(
                     "MATCH (bt:BasinTopology {model_id: $model_id}) "
@@ -467,6 +486,7 @@ class Neo4jClient:
             return
 
         import yaml
+
         for config_file in config_dir.glob("*.yaml"):
             try:
                 with open(config_file) as f:
@@ -475,21 +495,24 @@ class Neo4jClient:
                 continue
 
             name = cfg.get("name", config_file.stem)
-            self._run("""
+            self._run(
+                """
                 MERGE (c:ExperimentConfig {name: $name})
                 SET c.task = $task,
                     c.model = $model,
                     c.constraints_count = $constraints_count,
                     c.operator_count = $operator_count,
                     c.standardized = $standardized
-            """, {
-                "name": name,
-                "task": cfg.get("task", "")[:500],
-                "model": cfg.get("model", ""),
-                "constraints_count": len(cfg.get("constraints", [])),
-                "operator_count": len(cfg.get("operators", [])),
-                "standardized": cfg.get("standardized", {}).get("enabled", False),
-            })
+            """,
+                {
+                    "name": name,
+                    "task": cfg.get("task", "")[:500],
+                    "model": cfg.get("model", ""),
+                    "constraints_count": len(cfg.get("constraints", [])),
+                    "operator_count": len(cfg.get("operators", [])),
+                    "standardized": cfg.get("standardized", {}).get("enabled", False),
+                },
+            )
 
     def build(self) -> dict[str, int]:
         counts: dict[str, int] = {}
@@ -527,8 +550,9 @@ class Neo4jClient:
 
         return counts
 
-    def build_step_graph(self, chroma_collection: str = "session_embeddings",
-                         max_steps: int = 0) -> dict[str, int]:
+    def build_step_graph(
+        self, chroma_collection: str = "session_embeddings", max_steps: int = 0
+    ) -> dict[str, int]:
         """Create Step nodes and relationships from session.jsonl files.
 
         Reads reasoning steps directly from session files using extract_session_steps,
@@ -576,21 +600,24 @@ class Neo4jClient:
                 # code hardcoded doc_id='' and never stored text, silently
                 # breaking the join. step_id stays the Neo4j-internal key.
                 doc_id = step_doc_id(sid, si)
-                self._run("""
+                self._run(
+                    """
                     MERGE (st:Step {step_id: $step_id})
                     SET st.session_id = $sid,
                         st.step_index = $step_index,
                         st.tool_after = $tool_after,
                         st.doc_id = $doc_id,
                         st.text = $text
-                """, {
-                    "step_id": step_id,
-                    "sid": sid,
-                    "step_index": si,
-                    "tool_after": step.get("tool_after", ""),
-                    "doc_id": doc_id,
-                    "text": step.get("text", ""),
-                })
+                """,
+                    {
+                        "step_id": step_id,
+                        "sid": sid,
+                        "step_index": si,
+                        "tool_after": step.get("tool_after", ""),
+                        "doc_id": doc_id,
+                        "text": step.get("text", ""),
+                    },
+                )
                 step_count += 1
 
                 self._run(
@@ -613,9 +640,7 @@ class Neo4jClient:
 
         return {"sessions": len(sessions), "steps": step_count, "relationships": rel_count}
 
-    def load_codebase_graph(
-        self, graph: CodebaseGraph, worktree_name: str
-    ) -> dict[str, int]:
+    def load_codebase_graph(self, graph: CodebaseGraph, worktree_name: str) -> dict[str, int]:
         """Persist an in-memory import graph as :CodeModule nodes and edges.
 
         Writes one :CodeModule per module, bidirectional ``IMPORTS`` /
@@ -817,7 +842,12 @@ class Neo4jClient:
         return list(visited.values())
 
     def find_exact(
-        self, label: str, property_name: str, value: Any, *, limit: int = 10,
+        self,
+        label: str,
+        property_name: str,
+        value: Any,
+        *,
+        limit: int = 10,
         commit: str | None = None,
     ) -> list[dict[str, Any]]:
         """Exact-property lookup on a node label (no hand-written Cypher).
@@ -863,10 +893,7 @@ class Neo4jClient:
         """
         _validate_identifier(index_name, "index")
         params: dict[str, Any] = {"index": index_name, "query": query, "limit": limit}
-        query_str = (
-            "CALL db.index.fulltext.queryNodes($index, $query) "
-            "YIELD node, score "
-        )
+        query_str = "CALL db.index.fulltext.queryNodes($index, $query) YIELD node, score "
         if commit:
             # Hard commit pre-filter on the lexical leg — mirrors the dense leg's
             # where filter and the fusion-time exclusion in freshness_multiplier.

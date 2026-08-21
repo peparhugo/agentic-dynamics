@@ -5,7 +5,7 @@ Computes how many sessions a model can sustain before exhausting
 a given budget, factoring in perturbation frequency and recovery costs.
 The "infinite game" framing: survival horizon = budget / effective_cost.
 
-Output: experiments/results/lab_survival_horizon.json
+Output: experiments/results/legacy_labs/lab_survival_horizon.json
 """
 
 import json
@@ -14,7 +14,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_survival_horizon.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_survival_horizon.json"
 
 from agentic_dynamics.core.constants import MODEL_LABELS
 

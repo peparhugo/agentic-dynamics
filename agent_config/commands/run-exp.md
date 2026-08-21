@@ -9,7 +9,9 @@ Run an experiment config through the full pipeline: perturb → invoke → evalu
 First, load the "instrument" skill if not already loaded. Then:
 
 1. If a config name is specified ($ARGUMENTS), use `experiments/definitions/configs/$ARGUMENTS.yaml`.
-   Available configs (34 total): baseline, url_shortener, task_manager, twitter_timeline, web_crawler, search_kv_store, mint_financial, social_graph, collaborative_editor, data_table, form_wizard, notification_system, autocomplete_search, typescript_ssg, typescript_ssg_claude, typescript_ssg_gpt5, typescript_ssg_gpt5mini, typescript_eventbus, typescript_multitenant_api, flask_maintenance, fastapi_maintenance, architecture_redesign, rust_git_store, rust_redis, rust_proxy, go_crawler, go_jobqueue, go_grpc_chat, comparative, constraint_detection, recovery_cost, iterative_build, factorial_compound, silent_mode_sweep.
+   Configs live at `experiments/definitions/configs/*.yaml` — list the directory to see what is
+   available (`baseline`, `task_manager`, `url_shortener`, and the `go_`/`rust_`/`typescript_`
+   language families are representative; `plans.yaml` is the pipeline plan, not an experiment config).
 
 2. If no config specified, list the available configs and ask which to run.
 
@@ -19,6 +21,7 @@ First, load the "instrument" skill if not already loaded. Then:
 
 Use `--model $2` if a second argument is provided (e.g. `/run-exp task_manager claude`).
 
-Spec direction: `compile_experiment.py` is written and can compile an `ExperimentSpec` from
-`experiments/definitions/*.yaml` + `workflows/**/*.yaml` into cells; policy is a factor level and its control rules require
-`confidence` (not yet instrumented). See `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
+Spec direction: `agentic_dynamics.experiment.compile_experiment` is written and can compile an
+`ExperimentSpec` from `experiments/definitions/*.yaml` + `workflows/**/*.yaml` into cells; policy
+is a factor level and its control rules consume measured information (`confidence` is now
+measured). See `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.

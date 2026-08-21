@@ -10,6 +10,7 @@ the whole committed corpus indexes without an exception.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -92,24 +93,42 @@ def repo(tmp_path: Path) -> Path:
     (specs / "gamma.yaml").write_text(_spec_yaml("gamma", version="1.0"))
 
     _write_run(
-        tmp_path, "alpha_v1", "20260810T090000Z",
-        spec_name="alpha_v1", model="deepseek/deepseek-v4-pro", ok=False,
-        total_cost_usd=0.5, git_sha="aaa1111",
-        started_at="2026-08-10T08:00:00+00:00", ended_at="2026-08-10T09:00:00+00:00",
+        tmp_path,
+        "alpha_v1",
+        "20260810T090000Z",
+        spec_name="alpha_v1",
+        model="deepseek/deepseek-v4-pro",
+        ok=False,
+        total_cost_usd=0.5,
+        git_sha="aaa1111",
+        started_at="2026-08-10T08:00:00+00:00",
+        ended_at="2026-08-10T09:00:00+00:00",
         phases=[{"phase": "scope", "status": "failed"}],
     )
     _write_run(
-        tmp_path, "alpha_v2", "20260812T120000Z",
-        spec_name="alpha_v2", model="anthropic/claude-opus-5", ok=True,
-        total_cost_usd=1.25, git_sha="bbb2222",
-        started_at="2026-08-12T11:00:00+00:00", ended_at="2026-08-12T12:00:00+00:00",
+        tmp_path,
+        "alpha_v2",
+        "20260812T120000Z",
+        spec_name="alpha_v2",
+        model="anthropic/claude-opus-5",
+        ok=True,
+        total_cost_usd=1.25,
+        git_sha="bbb2222",
+        started_at="2026-08-12T11:00:00+00:00",
+        ended_at="2026-08-12T12:00:00+00:00",
         phases=[{"phase": "scope", "status": "ok"}],
     )
     _write_run(
-        tmp_path, "alpha_v2", "20260818T153000Z",
-        spec_name="alpha_v2", model="anthropic/claude-opus-5", ok=True,
-        total_cost_usd=2.5, git_sha="ccc3333",
-        started_at="2026-08-18T14:00:00+00:00", ended_at="2026-08-18T15:30:00+00:00",
+        tmp_path,
+        "alpha_v2",
+        "20260818T153000Z",
+        spec_name="alpha_v2",
+        model="anthropic/claude-opus-5",
+        ok=True,
+        total_cost_usd=2.5,
+        git_sha="ccc3333",
+        started_at="2026-08-18T14:00:00+00:00",
+        ended_at="2026-08-18T15:30:00+00:00",
         phases=[{"phase": "scope", "status": "ok"}, {"phase": "verify", "status": "ok"}],
     )
     return tmp_path
@@ -158,9 +177,13 @@ def test_naive_timestamp_is_read_as_utc():
 
 def _spec(name: str, **kw: object) -> ExperimentSpec:
     return ExperimentSpec(
-        name=name, question="q", version="1",
-        workflow=Workflow("agent_task"), factors=[Factor("model", ["a"])],
-        design="factorial", **kw,
+        name=name,
+        question="q",
+        version="1",
+        workflow=Workflow("agent_task"),
+        factors=[Factor("model", ["a"])],
+        design="factorial",
+        **kw,
     )
 
 
@@ -175,16 +198,17 @@ def test_derive_status_falls_back_to_superseded():
     assert derive_status(_spec("s", superseded_by="other")) == "superseded"
 
 
-def test_derive_status_defaults_to_active():
-    # The shape of all 63 committed specs: no lifecycle keys at all.
-    assert derive_status(_spec("s")) == "active"
+def test_derive_status_defaults_to_runnable():
+    # The shape of all 63 committed specs: no lifecycle keys at all. A repeatable spec is
+    # always runnable (re-runnable by construction) — the old `active` vocabulary is gone.
+    assert derive_status(_spec("s")) == "runnable"
 
 
 def test_run_history_never_demotes_a_spec_to_draft(repo: Path):
     # "never run" and "draft" are different facts. `gamma` has zero runs and is still
-    # active; the table reports the absence through n_runs/last_run instead.
+    # runnable; the table reports the absence through n_runs/last_run instead.
     entry = _by_name(collect_entries(root=repo))["gamma"]
-    assert entry.status == "active"
+    assert entry.status == "runnable"
     assert entry.n_runs == 0
 
 
@@ -194,6 +218,22 @@ def test_run_history_never_demotes_a_spec_to_draft(repo: Path):
 def _run(ok: bool | None) -> RunSummary:
     """A minimal run summary with the given success flag."""
     return RunSummary(path="experiments/results/workflows/wf/run.json", timestamp="", ok=ok)
+
+
+def _open_run(started_at: str, *, ok: bool | None = None) -> RunSummary:
+    """A run that started but never wrote an ``ended_at`` — still in flight, or dead."""
+    return RunSummary(
+        path="experiments/results/workflows/wf/run.json",
+        timestamp=started_at,
+        ok=ok,
+        started_at=started_at,
+        open=True,
+    )
+
+
+#: A fixed "now" for the recency-window tests (review item 8) so the "running vs blocked"
+#: boundary is deterministic rather than dependent on the wall clock.
+_FIXED_NOW = datetime(2026, 8, 20, 12, 0, 0, tzinfo=timezone.utc)
 
 
 def _workflow(**kw: object) -> ExperimentSpec:
@@ -206,10 +246,35 @@ def test_nonrepeatable_workflow_never_run_is_runnable():
     assert derive_status(_workflow(), runs=[]) == "runnable"
 
 
-def test_nonrepeatable_workflow_with_only_failed_runs_is_running():
-    assert derive_status(_workflow(), runs=[_run(False)]) == "running"
-    # A run whose outcome is unrecorded (ok=None) is evidence of activity, not of success.
-    assert derive_status(_workflow(), runs=[_run(None)]) == "running"
+def test_nonrepeatable_workflow_with_only_failed_runs_is_failed():
+    # The P2 fix (review item 8): a definitive failure (ok=False) is `failed`, NOT a
+    # permanent `running`. "Attempts but no success" used to derive `running` forever.
+    assert derive_status(_workflow(), runs=[_run(False)]) == "failed"
+    # A run whose outcome is unrecorded (ok=None) is `blocked` — started, never resolved.
+    assert derive_status(_workflow(), runs=[_run(None)]) == "blocked"
+
+
+def test_historical_failed_or_blocked_run_never_stays_running():
+    # The regression pin: nothing that lacks current-execution evidence may derive `running`.
+    assert derive_status(_workflow(), runs=[_run(False)]) != "running"
+    assert derive_status(_workflow(), runs=[_run(None)]) != "running"
+
+
+def test_open_run_within_the_window_is_running():
+    # An open run (started_at, no ended_at) that is recent IS current execution.
+    run = _open_run("2026-08-20T11:00:00+00:00")
+    assert derive_status(_workflow(), runs=[run], now=_FIXED_NOW) == "running"
+
+
+def test_open_run_outside_the_window_is_blocked():
+    # An open run that is stale (started days ago, never resolved) is blocked, not running.
+    run = _open_run("2026-08-15T11:00:00+00:00")
+    assert derive_status(_workflow(), runs=[run], now=_FIXED_NOW) == "blocked"
+
+
+def test_a_definitive_failure_beats_an_unresolved_run():
+    # A mix of ok=False and ok=None yields `failed` (a verdict exists) over `blocked`.
+    assert derive_status(_workflow(), runs=[_run(False), _run(None)]) == "failed"
 
 
 def test_nonrepeatable_workflow_with_a_successful_run_is_completed():
@@ -226,13 +291,13 @@ def test_nonrepeatable_workflow_respects_authored_status_and_supersession():
     assert derive_status(_workflow(superseded_by="other"), runs=[_run(True)]) == "superseded"
 
 
-def test_repeatable_spec_never_derives_completed_from_runs():
-    # A repeatable spec (an experiment, or an idempotent operation) keeps the four
-    # measurement states; run history never folds a `completed`/`running`/`runnable`
-    # work-order state into its status column.
-    assert derive_status(_spec("exp"), runs=[_run(True)]) == "active"
-    assert derive_status(_spec("exp"), runs=[_run(False)]) == "active"
-    assert derive_status(_spec("exp", repeatable=True), runs=[_run(True)]) == "active"
+def test_repeatable_spec_never_derives_a_workflow_state_from_runs():
+    # A repeatable spec (an experiment, or an idempotent operation) is always `runnable`;
+    # run history never folds a `completed`/`running`/`failed`/`blocked` work-order state
+    # into its status column.
+    assert derive_status(_spec("exp"), runs=[_run(True)]) == "runnable"
+    assert derive_status(_spec("exp"), runs=[_run(False)]) == "runnable"
+    assert derive_status(_spec("exp", repeatable=True), runs=[_run(True)]) == "runnable"
 
 
 def test_nonrepeatable_workflow_derives_status_from_ledgers_in_the_index(tmp_path: Path):
@@ -240,16 +305,40 @@ def test_nonrepeatable_workflow_derives_status_from_ledgers_in_the_index(tmp_pat
     # from the run ledgers, not the YAML.
     specs = tmp_path / "workflows" / "repository"
     specs.mkdir(parents=True)
-    (specs / "ship.yaml").write_text(
-        _spec_yaml("ship", repeatable=False, artifact_kind="workflow")
-    )
+    (specs / "ship.yaml").write_text(_spec_yaml("ship", repeatable=False, artifact_kind="workflow"))
     _write_run(
-        tmp_path, "ship", "20260820T120000Z",
-        spec_name="ship", ok=True, ended_at="2026-08-20T12:00:00+00:00",
+        tmp_path,
+        "ship",
+        "20260820T120000Z",
+        spec_name="ship",
+        ok=True,
+        ended_at="2026-08-20T12:00:00+00:00",
     )
     entry = _by_name(collect_entries(root=tmp_path))["ship"]
     assert entry.status == "completed"
     assert entry.latest_ok is True
+    assert entry.n_runs == 1
+
+
+def test_nonrepeatable_workflow_with_a_failed_ledger_is_failed_not_running(tmp_path: Path):
+    # The P2 backfill (review item 8): a run ledger that recorded a definitive failure
+    # (ok=False with an ended_at) must derive `failed`, never a stale `running`. This is the
+    # exact regression that left old workflows stuck at `running` indefinitely.
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    (specs / "ship.yaml").write_text(_spec_yaml("ship", repeatable=False, artifact_kind="workflow"))
+    _write_run(
+        tmp_path,
+        "ship",
+        "20260820T120000Z",
+        spec_name="ship",
+        ok=False,
+        started_at="2026-08-20T11:00:00+00:00",
+        ended_at="2026-08-20T12:00:00+00:00",
+    )
+    entry = _by_name(collect_entries(root=tmp_path))["ship"]
+    assert entry.status == "failed"
+    assert entry.latest_ok is False
     assert entry.n_runs == 1
 
 
@@ -258,14 +347,12 @@ def test_summary_and_kind_columns_separate_runnable_from_completed(tmp_path: Pat
     # one-shot sorts out of the runnable-now view below it.
     specs = tmp_path / "workflows" / "repository"
     specs.mkdir(parents=True)
-    (specs / "todo.yaml").write_text(
-        _spec_yaml("todo", repeatable=False, artifact_kind="workflow")
-    )
+    (specs / "todo.yaml").write_text(_spec_yaml("todo", repeatable=False, artifact_kind="workflow"))
     (specs / "done.yaml").write_text(
         _spec_yaml("done", repeatable=False, artifact_kind="workflow", status="completed")
     )
     md = render_status_md(collect_entries(root=tmp_path), generated_at="2026-08-20T00:00:00+00:00")
-    assert "**Work remaining:** 1 runnable-now · 1 completed/retired" in md
+    assert "**Work remaining:** 1 open · 1 completed/retired" in md
     rows = _table_rows(md)
     assert [r.split("`")[1] for r in rows] == ["todo", "done"]
     # The identity columns are present and populated from the YAML.
@@ -346,7 +433,7 @@ def test_supersede_lineage_survives_into_the_entries(repo: Path):
     assert entries["alpha_v1"].status == "superseded"
     assert entries["alpha_v1"].superseded_by == "alpha_v2"
     assert entries["alpha_v2"].supersedes == ["alpha_v1"]
-    assert entries["alpha_v2"].status == "active"
+    assert entries["alpha_v2"].status == "runnable"
     # The chain is navigable in both directions from the index alone.
     assert entries[entries["alpha_v1"].superseded_by].name == "alpha_v2"
 
@@ -363,8 +450,12 @@ def test_measured_run_beats_the_yaml_seed(tmp_path: Path):
         )
     )
     _write_run(
-        tmp_path, "seeded", "20260820T101112Z",
-        spec_name="seeded", ok=True, ended_at="2026-08-20T10:11:12+00:00",
+        tmp_path,
+        "seeded",
+        "20260820T101112Z",
+        spec_name="seeded",
+        ok=True,
+        ended_at="2026-08-20T10:11:12+00:00",
     )
     entry = _by_name(collect_entries(root=tmp_path))["seeded"]
     assert parse_timestamp(entry.last_run_at) == parse_timestamp("2026-08-20T10:11:12+00:00")
@@ -412,7 +503,7 @@ def test_entries_sort_by_status_then_name(repo: Path):
 def test_sort_entries_puts_an_unknown_status_last():
     rows = [
         SpecStatusEntry(name="weird", version="1", status="mystery", spec_path="a.yaml"),
-        SpecStatusEntry(name="zzz", version="1", status="active", spec_path="z.yaml"),
+        SpecStatusEntry(name="zzz", version="1", status="runnable", spec_path="z.yaml"),
     ]
     assert [e.name for e in sort_entries(rows)] == ["zzz", "weird"]
 
@@ -429,9 +520,22 @@ def test_index_schema(repo: Path):
 
     entry = next(e for e in index["specs"] if e["name"] == "alpha_v2")
     assert set(entry) == {
-        "name", "version", "status", "spec_path", "artifact_kind", "repeatable",
-        "supersedes", "superseded_by", "completed_at", "last_run_at", "latest_ok",
-        "latest_model", "latest_cost_usd", "latest_git_sha", "results_pointer", "n_runs",
+        "name",
+        "version",
+        "status",
+        "spec_path",
+        "artifact_kind",
+        "repeatable",
+        "supersedes",
+        "superseded_by",
+        "completed_at",
+        "last_run_at",
+        "latest_ok",
+        "latest_model",
+        "latest_cost_usd",
+        "latest_git_sha",
+        "results_pointer",
+        "n_runs",
     }
     assert entry["spec_path"] == "experiments/definitions/alpha_v2.yaml"
 
@@ -452,7 +556,10 @@ def test_generated_at_is_present_and_parseable(repo: Path):
 
 def test_status_md_header_and_columns(repo: Path):
     md = render_status_md(collect_entries(root=repo), generated_at="2026-08-20T00:00:00+00:00")
-    assert "| name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |" in md
+    assert (
+        "| name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |"
+        in md
+    )
     assert "Generated at: `2026-08-20T00:00:00+00:00`" in md
     assert "4 spec(s)" in md
     assert "**Work remaining:**" in md
@@ -468,23 +575,23 @@ def test_status_md_one_row_per_spec_in_sorted_order(repo: Path):
 def test_status_md_renders_measured_values(repo: Path):
     md = render_status_md(collect_entries(root=repo))
     row = next(ln for ln in _table_rows(md) if ln.startswith("| `alpha_v2`"))
-    assert "| active |" in row
+    assert "| runnable |" in row
     assert "| 0.2 |" in row
-    assert "alpha_v1" in row                  # supersedes column
-    assert "2026-08-18 15:30" in row          # last_run, shortened
+    assert "alpha_v1" in row  # supersedes column
+    assert "2026-08-18 15:30" in row  # last_run, shortened
     assert "| ok |" in row
     assert "anthropic/claude-opus-5" in row
     assert "$2.5000" in row
-    assert row.rstrip().endswith("| 2 |")     # n_runs
+    assert row.rstrip().endswith("| 2 |")  # n_runs
 
 
 def test_status_md_distinguishes_a_failed_run_from_a_missing_one(repo: Path):
     md = render_status_md(collect_entries(root=repo))
     failed = next(ln for ln in _table_rows(md) if ln.startswith("| `alpha_v1`"))
     never = next(ln for ln in _table_rows(md) if ln.startswith("| `beta_draft`"))
-    assert "| fail |" in failed          # measured failure
+    assert "| fail |" in failed  # measured failure
     assert "| fail |" not in never
-    assert f"| {MISSING} |" in never     # no evidence — an em-dash, never a failure
+    assert f"| {MISSING} |" in never  # no evidence — an em-dash, never a failure
 
 
 def test_status_md_renders_missing_runs_as_em_dashes(repo: Path):

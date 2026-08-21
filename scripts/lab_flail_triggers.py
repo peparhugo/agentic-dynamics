@@ -4,7 +4,7 @@
 Analyzes narration failure patterns across models, perturbation classes,
 and task types. Identifies common triggers for flail behavior.
 
-Output: experiments/results/lab_flail_triggers.json
+Output: experiments/results/legacy_labs/lab_flail_triggers.json
 """
 
 import json
@@ -14,7 +14,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_PATH = ROOT / "experiments" / "results" / "_trajectory_summary.json"
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_flail_triggers.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_flail_triggers.json"
 
 from agentic_dynamics.core.constants import MODEL_LABELS, normalize_task
 

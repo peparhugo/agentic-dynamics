@@ -213,46 +213,217 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <div class="insight"><strong>Finding:</strong> Two clean behavioral regimes. DeepSeek and OpenAI are uniformly <strong style="color:var(--ac)">EXPLORATORY</strong> — 100% correctness, ~all constraints met, high novelty (0.82–0.91), and basin escape of 0.68–0.78: they leave the seed and find new solutions. Claude is <strong style="color:var(--am)">MIXED</strong> — conservative, exploratory, or wasteful depending on the story — with lower escape (0.44–0.48) and novelty (0.52–0.59), but ~3× higher code quality (0.13–0.17 vs 0.04–0.09) and the cleanest LSP output. The Claude correctness gap (0.55–0.58) is the subscription CLI's session-timeout limit, not a capability gap. And the <strong style="color:var(--cy)">EFFICIENT</strong> archetype is empty — no model is simultaneously cheap, reliable, clean, and basin-stable.</div>
 
-<div class="insight" style="border-left-color:var(--success)"><strong style="color:var(--success)">Cleanliness is decoupled from cost too:</strong> the cheapest model (Flash) has the most LSP errors (13.5/story) and the lowest code-quality score (0.035), while the next-cheapest (Luna) has the cleanest LSP (5.1). Claude Haiku ($1.59) scores 0.167 on code quality — ~5× Flash's. Paying more buys neither fewer diagnostics nor higher cleanliness; these signals move independently of price.</div>
+<!-- Figures injected from D.labs.quality_frontier (contract-bearing). This paragraph
+     previously carried transcribed numbers from a long-superseded run (13.5 LSP errors,
+     0.035/0.167 quality scores) that no lab output had matched for months. -->
+<div class="insight" style="border-left-color:var(--success)"><strong style="color:var(--success)">Cleanliness is decoupled from cost too:</strong> the cheapest model (<span id="qf-cheapest">—</span>) scores <span id="qf-cheapest-quality">—</span> on code quality, while the highest-scoring model (<span id="qf-best">—</span>, <span id="qf-best-quality">—</span>) costs <span id="qf-best-cost">—</span>. Quality does not rise with price across the corpus; the two signals move independently. <strong>LSP diagnostics are not reported</strong> (<span id="qf-lsp-note">—</span>): the language server never ran on these codebases, so a per-story error count would be an unmeasured zero rather than a clean bill of health.</div>
 </section>
 
 <!-- Longitudinal story evidence. -->
 <section class="sec alt">
 <h2 id="arc">The Five-Session Arc</h2>
-<p class="lead">The defining feature of the story instrument is the arc: each session commits onto the last, so the codebase — and the context the next session must read — grows. The Snowball Rule is measurable: <strong style="color:var(--am)">session cost roughly doubles from greenfield to cross-cutting</strong> ($0.16 → $0.34), tokens rise from 18.7K to 34.9K, and tests accumulate from 4.4 to 14.8 as the surface area to verify expands.</p>
+<p class="lead">The defining feature of the story instrument is the arc: each session commits onto the last, so the codebase — and the context the next session must read — grows. The Snowball Rule is measurable: <strong style="color:var(--am)">session cost roughly doubles from greenfield to cross-cutting</strong> (<span id="arc-snowball-claim">—</span>), and tests accumulate as the surface area to verify expands.</p>
 
+<!-- Rendered from D.labs.story_arc (contract-bearing). Previously hand-typed, which is how
+     it drifted: the transcribed figures were from a 156-story corpus while the lab had moved
+     on. A table that restates a measurement must read the measurement. -->
 <div class="tbl"><table>
 <thead><tr><th>Session</th><th>Task type</th><th>Avg cost</th><th>Avg tokens</th><th>Avg tests</th></tr></thead>
-<tbody>
-<tr><td class="mono">1</td><td>greenfield</td><td class="mono green">$0.16</td><td class="mono">18.7K</td><td class="mono">4.4</td></tr>
-<tr><td class="mono">2</td><td>feature</td><td class="mono green">$0.21</td><td class="mono">23.5K</td><td class="mono">8.4</td></tr>
-<tr><td class="mono">3</td><td>integration</td><td class="mono amber">$0.32</td><td class="mono">29.4K</td><td class="mono">10.6</td></tr>
-<tr><td class="mono">4</td><td>refactor</td><td class="mono amber">$0.29</td><td class="mono">30.0K</td><td class="mono">10.9</td></tr>
-<tr><td class="mono">5</td><td>cross-cutting</td><td class="mono red">$0.34</td><td class="mono">34.9K</td><td class="mono">14.8</td></tr>
-</tbody></table></div>
+<tbody id="arc-session-tbody"><tr><td colspan="5" class="mono">no canonical story-arc data</td></tr></tbody>
+</table></div>
 
 <div class="insight"><strong>Key insight:</strong> the N² term isn't an equation — it's the chained sessions. Every session grows the codebase, and every new line inflates the cost of the next one. This is why per-session cost is the wrong unit: the <em>marginal</em> cost of a change is a function of everything that came before it. A FinOps model that prices session 5 like session 1 systematically under-budgets maintenance work by ~2×.</div>
 
 <div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="snowballChart"></canvas></div>
-<p style="font-size:0.72rem;color:var(--t3);text-align:center">Avg cost per session across all 156 stories ([M] measured). Source: <code>D.labs.story_arc</code>.</p>
+<p style="font-size:0.72rem;color:var(--t3);text-align:center">Avg cost per session across <span id="arc-story-count">—</span> canonical stories ([M] measured). Source: <code>D.labs.story_arc</code>.</p>
 
 <h3 id="does-perturbing-the-seed-change-the-whole-arc" style="margin-top:2rem;color:var(--ac)">Does perturbing the seed change the whole arc?</h3>
+<!-- Rendered from D.labs.condition_effects (contract-bearing). -->
 <div class="tbl"><table>
 <thead><tr><th>Condition</th><th>Cells</th><th>Success</th><th>Cascade recovery</th><th>Avg cost</th></tr></thead>
-<tbody>
-<tr><td>clean</td><td class="mono">96</td><td class="mono green">91%</td><td class="mono">0%</td><td class="mono">$1.25</td></tr>
-<tr><td>bad_seed</td><td class="mono">40</td><td class="mono">88%</td><td class="mono">2%</td><td class="mono">$1.48</td></tr>
-<tr><td>early_degrade</td><td class="mono">85</td><td class="mono amber">85%</td><td class="mono amber">4%</td><td class="mono">$1.29</td></tr>
-</tbody></table></div>
-<div class="insight" style="border-left-color:var(--am)"><strong style="color:var(--am)">Condition effects are modest but monotonic:</strong> corrupting the session-1 spec (<code>early_degrade</code>) drops success to 85% and doubles the cascade rate — the degraded spec leaks, but ~85% of cells still recover to passing. A pre-degraded seed (<code>bad_seed</code>) costs the most ($1.48/story) but succeeds 88% of the time. Degradation raises cost and cascades slightly; it does not dominate the outcome.</div>
+<tbody id="condition-tbody"><tr><td colspan="5" class="mono">no canonical condition data</td></tr></tbody>
+</table></div>
+<div class="insight" style="border-left-color:var(--am)"><strong style="color:var(--am)">Condition effects are modest:</strong> corrupting the session-1 spec (<code>early_degrade</code>) lowers the success rate relative to <code>clean</code> — the degraded spec leaks — but most cells still recover to passing, and the cascade rate stays low in both arms. Degradation raises risk at the margin; it does not dominate the outcome. <strong>Note on arms:</strong> a cell labelled <code>bad_seed</code>/<code>early_degrade</code> that carries no instrumented test verdict received no actual perturbation (<code>docs/data_integrity_findings.md</code> treatment rule 1) and is counted as <code>clean</code>, so the arms above are the corrected ones, not the raw labels. The 77 tombstoned contaminated cells are excluded entirely.</div>
+</section>
+
+<!-- ==================== GRIT — the one formal definition ==================== -->
+<!-- Added in the semantic-integrity release (phase s4). Until now the site DEFINED
+     Grit formally and published nothing that computed it, while a correctness x escape
+     quadrant chart carried the name. There is now exactly one Grit, it is measured, and
+     it renders here from the contract-bearing D.labs.grit. -->
+<section class="sec">
+<h2 id="grit">Grit: outcome retention under perturbation</h2>
+<p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity</strong> — how much test-executed success survives when the specification degrades. One definition, used everywhere: <code>G(s) = P(test_executed_success | perturbation_strength = s)</code>. The verdict is the independent test runner's, never the agent's self-report, and a cell missing either field is excluded rather than imputed.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Perturbation strength</th><th>Cells</th><th>Test-executed successes</th><th>G(s)</th><th>95% CI</th></tr></thead>
+<tbody id="grit-strength-tbody"><tr><td colspan="5" class="mono">no canonical Grit data</td></tr></tbody>
+</table></div>
+<p style="font-size:0.72rem;color:var(--t3);text-align:center">Wilson score intervals. Source: <code>D.labs.grit</code> (<span id="grit-cells">—</span> canonical cells).</p>
+
+<div class="insight" style="border-left-color:var(--am)"><strong style="color:var(--am)">Read the design-controlled comparison, not the headline.</strong> The s=0.0 level is baseline-only and comes entirely from the single-task perturbation corpus, while s=0.5 mixes that corpus with story cells — comparing them directly confounds strength with corpus. Restricted to the perturbation corpus, where both levels came from the same design: <span id="grit-controlled">—</span>. <strong>The intervals overlap;</strong> at the one strength level the corpus contains, degradation did not measurably reduce test-executed success. Only two strength levels exist, so this is two points, not a dose-response curve.</div>
+
+<h3 id="grit-by-model" style="margin-top:2rem;color:var(--ac)">Grit by model (perturbed cells)</h3>
+<p class="lead" style="font-size:0.88rem">Per-model G(s) at the perturbed level. Baseline cells are 1&ndash;2 per model — far too few for a per-model baseline, so none is shown.</p>
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Cells</th><th>G(0.5)</th><th>95% CI</th></tr></thead>
+<tbody id="grit-model-tbody"><tr><td colspan="4" class="mono">no canonical Grit data</td></tr></tbody>
+</table></div>
+
+<h3 id="grit-by-class" style="margin-top:2rem;color:var(--ac)">Grit by perturbation class</h3>
+<div class="tbl"><table>
+<thead><tr><th>Perturbation class</th><th>Cells</th><th>G(0.5)</th><th>95% CI</th></tr></thead>
+<tbody id="grit-class-tbody"><tr><td colspan="4" class="mono">no canonical Grit data</td></tr></tbody>
+</table></div>
+<div class="insight"><strong>What varies is the <em>kind</em> of degradation, not its strength.</strong> The spread across perturbation classes is wider than the spread across strength levels — which is the more useful operational signal: it says a FinOps model should classify how a specification is wrong, not merely how wrong it is. Sample sizes are small (see the cell counts) and no multiple-comparison correction is applied; this is an observational corpus.</div>
 </section>
 
 <script>
+// ---------------------------------------------------------------------------
+// Grit — rendered entirely from D.labs.grit (contract-bearing). No figure in this
+// section is transcribed; if the lab is absent the placeholder rows stay.
+// ---------------------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', function () {
+  var grit = (window.DYNAMICS_DATA && window.DYNAMICS_DATA.labs && window.DYNAMICS_DATA.labs.grit) || null;
+  if (!grit) return;
+
+  // An under-powered row carries grit: null (insufficient_support) — render an em-dash
+  // rather than a proportion the sample cannot support.
+  var fmtG = function (v) { return v === null || v === undefined ? '—' : Number(v).toFixed(3); };
+  var fmtCI = function (r) {
+    return (r.ci95_lo === null || r.ci95_lo === undefined)
+      ? '—'
+      : '[' + Number(r.ci95_lo).toFixed(2) + ', ' + Number(r.ci95_hi).toFixed(2) + ']';
+  };
+
+  var fill = function (id, rows, cells) {
+    var body = document.getElementById(id);
+    if (!body || !rows || !rows.length) return;
+    body.innerHTML = rows.map(function (r) {
+      return '<tr>' + cells.map(function (c) { return c(r); }).join('') + '</tr>';
+    }).join('');
+  };
+
+  fill('grit-strength-tbody', grit.by_strength, [
+    function (r) { return '<td class="mono">' + r.strength + '</td>'; },
+    function (r) { return '<td class="mono">' + r.n + '</td>'; },
+    function (r) { return '<td class="mono">' + r.successes + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtG(r.grit) + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtCI(r) + '</td>'; }
+  ]);
+
+  fill('grit-model-tbody', grit.by_model_perturbed, [
+    function (r) { return '<td>' + r.model + '</td>'; },
+    function (r) { return '<td class="mono">' + r.n + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtG(r.grit) + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtCI(r) + '</td>'; }
+  ]);
+
+  fill('grit-class-tbody', grit.by_perturbation_class_perturbed, [
+    function (r) { return '<td>' + String(r.perturbation_class).replace(/_/g, ' ') + '</td>'; },
+    function (r) { return '<td class="mono">' + r.n + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtG(r.grit) + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtCI(r) + '</td>'; }
+  ]);
+
+  var cellsEl = document.getElementById('grit-cells');
+  if (cellsEl && grit.summary) cellsEl.textContent = String(grit.summary.cells);
+
+  var controlled = document.getElementById('grit-controlled');
+  var rows = grit.by_strength_finding_corpus || [];
+  if (controlled && rows.length === 2) {
+    controlled.textContent = rows.map(function (r) {
+      return 'G(' + r.strength + ') = ' + fmtG(r.grit) + ' ' + fmtCI(r) + ', n=' + r.n;
+    }).join(' vs ');
+  }
+});
+</script>
+
+<script>
+// ---------------------------------------------------------------------------
+// The Five-Session Arc — every figure in this section is rendered from the
+// contract-bearing lab JSONs in data.js (D.labs.story_arc, D.labs.condition_effects).
+// Nothing here is transcribed by hand: transcription is what let the section drift out
+// of step with the corpus (semantic-integrity release, review item 3). When a lab is
+// absent the placeholder row stays — an unmeasured value is never filled in.
+// ---------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', function () {
   var D = window.DYNAMICS_DATA;
+  var labs = (D && D.labs) || {};
+
+  var fmtUsd = function (v) { return '$' + Number(v || 0).toFixed(2); };
+  var fmtTok = function (v) { return (Number(v || 0) / 1000).toFixed(1) + 'K'; };
+  var fmtPct = function (v) { return v === null || v === undefined ? '—' : Math.round(v * 100) + '%'; };
+
+  // --- session table + the lead-paragraph snowball claim ---
+  var arcLab = labs.story_arc || {};
+  var sessions = arcLab.sessions || [];
+  var arcBody = document.getElementById('arc-session-tbody');
+  if (arcBody && sessions.length) {
+    // Cost colouring is relative to the arc's own range, not fixed thresholds, so it
+    // stays meaningful when the corpus changes.
+    var maxCost = Math.max.apply(null, sessions.map(function (s) { return s.avg_cost; }));
+    arcBody.innerHTML = sessions.map(function (s) {
+      var ratio = maxCost ? s.avg_cost / maxCost : 0;
+      var cls = ratio > 0.9 ? 'red' : (ratio > 0.7 ? 'amber' : 'green');
+      return '<tr><td class="mono">' + s.session_number + '</td>' +
+             '<td>' + String(s.task_type).replace(/_/g, '-') + '</td>' +
+             '<td class="mono ' + cls + '">' + fmtUsd(s.avg_cost) + '</td>' +
+             '<td class="mono">' + fmtTok(s.avg_tokens) + '</td>' +
+             '<td class="mono">' + Number(s.avg_tests || 0).toFixed(1) + '</td></tr>';
+    }).join('');
+  }
+
+  var claim = document.getElementById('arc-snowball-claim');
+  if (claim && sessions.length >= 2) {
+    claim.textContent = fmtUsd(sessions[0].avg_cost) + ' → ' + fmtUsd(sessions[sessions.length - 1].avg_cost);
+  }
+
+  var countEl = document.getElementById('arc-story-count');
+  if (countEl && arcLab.summary && arcLab.summary.stories) {
+    countEl.textContent = String(arcLab.summary.stories);
+  }
+
+  // --- quality-frontier claims (cheapest vs best-quality, and the LSP absence) ---
+  var qf = (labs.quality_frontier && labs.quality_frontier.models) || [];
+  if (qf.length) {
+    var set = function (id, text) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
+    // `models` is sorted by avg_cost ascending by the lab.
+    var cheapest = qf[0];
+    var best = qf.reduce(function (a, b) {
+      return b.code_quality_score > a.code_quality_score ? b : a;
+    }, qf[0]);
+    set('qf-cheapest', cheapest.model);
+    set('qf-cheapest-quality', Number(cheapest.code_quality_score).toFixed(3));
+    set('qf-best', best.model);
+    set('qf-best-quality', Number(best.code_quality_score).toFixed(3));
+    set('qf-best-cost', fmtUsd(best.avg_cost));
+    var lspCells = (labs.quality_frontier.summary || {}).lsp_available_cells || 0;
+    set('qf-lsp-note', lspCells
+      ? lspCells + ' cells with a language server'
+      : '0 of ' + ((labs.quality_frontier.summary || {}).analyses || 0) + ' analysed cells had one available');
+  }
+
+  // --- condition-effects table ---
+  var conditions = (labs.condition_effects && labs.condition_effects.conditions) || [];
+  var condBody = document.getElementById('condition-tbody');
+  if (condBody && conditions.length) {
+    condBody.innerHTML = conditions.map(function (c) {
+      var successCls = c.success_rate >= 0.95 ? 'green' : (c.success_rate >= 0.9 ? '' : 'amber');
+      return '<tr><td>' + c.condition + '</td>' +
+             '<td class="mono">' + c.cells + '</td>' +
+             '<td class="mono ' + successCls + '">' + fmtPct(c.success_rate) + '</td>' +
+             '<td class="mono">' + fmtPct(c.cascade_rate) + '</td>' +
+             '<td class="mono">' + fmtUsd(c.avg_cost) + '</td></tr>';
+    }).join('');
+  }
+
   var ctx = document.getElementById('snowballChart');
   if (!D || !ctx) return;
-  var arc = D.labs && D.labs.story_arc && D.labs.story_arc.sessions;
+  var arc = sessions;
   if (!arc || !arc.length) return;
   var labels = arc.map(function (s) { return 'S' + s.session_number + ' · ' + s.task_type; });
   var costs = arc.map(function (s) { return s.avg_cost; });
@@ -353,10 +524,14 @@ document.addEventListener('DOMContentLoaded', function () {
 <div class="insight"><strong>Key insight:</strong> DeepSeek's semantic grit (0.18 escape, 94% correctness at $0.016) stands out. When false signals are injected <em>within</em> the reasoning manifold — the harder test — both models perform similarly on correctness (94% vs 88%), but DeepSeek does it at <strong style="color:var(--ac)">69&times; lower cost</strong>. Claude's gap is not capability; it's pricing architecture. DeepSeek separates reasoning into a low-cost structured channel. Claude bills reasoning as output tokens at $15/Mtok.</div>
 
 <div class="grit-interactive">
-<p style="cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;padding:0.5rem 0">Interactive: Grit Matrix — explore all 201 individual sessions</p>
+<p style="cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;padding:0.5rem 0">Interactive: Correctness &times; Escape Quadrants — explore individual sessions</p>
 <p style="font-size:0.72rem;color:var(--t3);margin-top:0.3rem">Each bubble is one experiment session. Toggle models and perturbation classes below. Quadrant lines at escape=0.5 and correctness=80%. Hover for session details. Default: DeepSeek + Claude.</p>
 <div id="grit-model-filters" style="margin-bottom:0.5rem;display:flex;flex-wrap:wrap;gap:6px;justify-content:center"></div>
 <div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="gritMatrixChart"></canvas></div>
+<!-- Shown instead of the chart when data.js carries no canonical quadrant points (the
+     source lab is quarantined). Never replaced by illustrative numbers: an empty
+     measurement is reported as empty. -->
+<div id="grit-quarantine-note" class="insight" style="display:none;border-left-color:var(--am)"><strong>[P] Quarantined pending the canonical lab contract.</strong> These points came from <code>lab_correctness_escape_quadrants.py</code> (formerly <code>lab_grit_matrix.py</code>), which reads the retired <code>_results_summary.json</code> corpus, so it is not published. It was also renamed: a correctness&times;escape quadrant is not Grit. The formal metric is measured above &mdash; see <a href="#grit" style="color:var(--ac)">Grit: outcome retention under perturbation</a>. No substitute figures are shown here.</div>
 </div>
 
 <div class="insight" style="border-left-color:var(--cy);margin-top:1.5rem"><strong style="color:var(--cy)">Databricks and this instrument examine related operational concerns:</strong> On August 7, 2026, Databricks published their playbook for reducing AI coding costs at scale (Wendell et al., Aug 2026). Their four cost levers — shifting to efficient models, dynamic routing, progressive budgeting, and reducing token overhead — overlap with questions this Agentic Dynamics instrument can measure or test. They call the core concept the <strong>"Efficiency Frontier"</strong>: the set of models with the best price point for a given level of intelligence. Grit is a complementary stress-integrity measure. They surveyed companies. We stress-tested models with 10 perturbation operators across 227 historical experiments.</div>
@@ -1098,11 +1273,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }));
   })();
 
-  // --- Grit Matrix Scatter Chart ---
+  // --- Correctness x Escape Quadrant Scatter Chart (formerly 'Grit Matrix') ---
   (function () {
     var ctx = document.getElementById('gritMatrixChart');
     if (!ctx) return;
-    var gritData = (D && D.grit_matrix && D.grit_matrix.length) ? D.grit_matrix : null;
+    var gritData = (D && D.correctness_escape_quadrants && D.correctness_escape_quadrants.length)
+      ? D.correctness_escape_quadrants : null;
+
+    // No canonical points -> render the quarantine notice, not a chart. There is
+    // deliberately no illustrative fallback dataset here: publishing invented bubbles
+    // when the real lab is quarantined would be strictly worse than publishing nothing.
+    if (!gritData) {
+      var note = document.getElementById('grit-quarantine-note');
+      if (note) note.style.display = '';
+      var wrap = ctx.closest ? ctx.closest('.chart-wrap') : null;
+      if (wrap) wrap.style.display = 'none';
+      var filters = document.getElementById('grit-model-filters');
+      if (filters) filters.style.display = 'none';
+      return;
+    }
 
     var modelColors = {
       'DeepSeek v4 Pro':   'rgba(52,211,153,0.75)',
@@ -1115,15 +1304,11 @@ document.addEventListener('DOMContentLoaded', function () {
       'GPT-5-nano':        'rgba(239,68,68,0.85)'
     };
 
-    var makeFallback = function() {
-      return [
-        { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.25, correctness:0.92, cost:0.0158, perturbation_class:'semantic', task:'summary', strategy:'conservative' },
-        { model:'anthropic/claude-sonnet-5',  label:'Claude Sonnet 5',  escape:0.24, correctness:0.88, cost:1.0847, perturbation_class:'semantic', task:'summary', strategy:'conservative' },
-        { model:'openai/gpt-5.6',            label:'GPT-5.6',         escape:0.16, correctness:0.94, cost:0.4474, perturbation_class:'semantic', task:'summary', strategy:'efficient' }
-      ];
-    };
-
-    var allPoints = (gritData && gritData.length) ? gritData : makeFallback();
+    // Every point below comes from data.js. The former hard-coded fallback dataset was
+    // removed with the lab quarantine: it silently substituted three invented sessions
+    // whenever the real corpus was unavailable, which is the failure mode this release
+    // exists to eliminate. The `!gritData` guard above returns before we get here.
+    var allPoints = gritData;
 
     // Separate "no baseline" points (escape ≈ 0) from valid data
     var validPoints = [];

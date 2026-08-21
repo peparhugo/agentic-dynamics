@@ -5,7 +5,7 @@ Compares code quality and correctness across models grouped by
 dominant tool pattern (write-dominant, bash-dominant, balanced).
 Cross-references trajectory tool percentages with worktree quality metrics.
 
-Output: experiments/results/lab_tool_archetypes.json
+Output: experiments/results/legacy_labs/lab_tool_archetypes.json
 """
 
 import json
@@ -15,7 +15,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_AGG_PATH = ROOT / "experiments" / "results" / "_trajectory_aggregate.json"
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_tool_archetypes.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_tool_archetypes.json"
 
 from agentic_dynamics.core.constants import MODEL_LABELS
 

@@ -8,7 +8,7 @@ surface divergence patterns — not latent space geometry.
 Ref: Munshi et al., "Manifold of Failure: Behavioral Attraction
 Basins in Language Models," arXiv:2602.22291, 2026.
 
-Output: experiments/results/lab_basin_topology.json
+Output: experiments/results/legacy_labs/lab_basin_topology.json
 """
 
 import json
@@ -16,7 +16,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_basin_topology.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_basin_topology.json"
 
 from agentic_dynamics.core.constants import MODEL_LABELS
 

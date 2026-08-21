@@ -1,86 +1,99 @@
 {
   "experiment_id": "lab_cache_economics",
-  "generated_at": "2026-08-17T20:12:32.870170",
+  "generated_at": "2026-08-21T02:33:08.330358",
   "summary": {
-    "models": 7
+    "models": 7,
+    "stories": 215
   },
   "models": [
     {
       "model": "deepseek-v4-flash",
-      "cells": 22,
-      "avg_cost": 0.068,
-      "avg_cache_hit": 0.965,
-      "cache_reads": 150797952,
+      "cells": 31,
+      "avg_cost": 0.074,
+      "avg_cache_hit": 0.964,
+      "cache_reads": 224381696,
       "cache_writes": 0,
       "read_write_ratio": null,
-      "avg_context_per_cell": 7087028.0,
-      "avg_tokens_per_cell": 232576.0
+      "avg_context_per_cell": 7488299.0,
+      "avg_tokens_per_cell": 250180.0
     },
     {
       "model": "gpt-5.6-luna",
-      "cells": 24,
-      "avg_cost": 0.092,
-      "avg_cache_hit": 0.967,
-      "cache_reads": 31182624,
+      "cells": 34,
+      "avg_cost": 0.094,
+      "avg_cache_hit": 0.937,
+      "cache_reads": 44099872,
       "cache_writes": 2378880,
-      "read_write_ratio": 13.1,
-      "avg_context_per_cell": 1345394.0,
-      "avg_tokens_per_cell": 46118.0
+      "read_write_ratio": 18.5,
+      "avg_context_per_cell": 1386840.0,
+      "avg_tokens_per_cell": 89785.0
     },
     {
       "model": "deepseek-v4-pro",
-      "cells": 37,
-      "avg_cost": 0.159,
-      "avg_cache_hit": 0.793,
-      "cache_reads": 137745280,
+      "cells": 39,
+      "avg_cost": 0.162,
+      "avg_cache_hit": 0.801,
+      "cache_reads": 146609152,
       "cache_writes": 0,
       "read_write_ratio": null,
-      "avg_context_per_cell": 3912173.0,
-      "avg_tokens_per_cell": 189327.0
+      "avg_context_per_cell": 3952443.0,
+      "avg_tokens_per_cell": 193234.0
     },
     {
       "model": "gpt-5.6-terra",
-      "cells": 20,
-      "avg_cost": 1.015,
-      "avg_cache_hit": 0.821,
-      "cache_reads": 14951424,
+      "cells": 30,
+      "avg_cost": 1.044,
+      "avg_cache_hit": 0.832,
+      "cache_reads": 23958016,
       "cache_writes": 0,
       "read_write_ratio": null,
-      "avg_context_per_cell": 909571.0,
-      "avg_tokens_per_cell": 161999.0
+      "avg_context_per_cell": 957618.0,
+      "avg_tokens_per_cell": 159018.0
     },
     {
       "model": "claude-haiku-4-5",
-      "cells": 14,
-      "avg_cost": 1.537,
-      "avg_cache_hit": 0.989,
-      "cache_reads": 102433886,
-      "cache_writes": 2753242,
-      "read_write_ratio": 37.2,
-      "avg_context_per_cell": 7395028.0,
-      "avg_tokens_per_cell": 78322.0
+      "cells": 24,
+      "avg_cost": 1.631,
+      "avg_cache_hit": 0.824,
+      "cache_reads": 163588556,
+      "cache_writes": 3922476,
+      "read_write_ratio": 41.7,
+      "avg_context_per_cell": 6884097.0,
+      "avg_tokens_per_cell": 67907.0
     },
     {
       "model": "gpt-5.6-sol",
-      "cells": 23,
-      "avg_cost": 3.987,
-      "avg_cache_hit": 0.849,
-      "cache_reads": 34351104,
+      "cells": 30,
+      "avg_cost": 3.817,
+      "avg_cache_hit": 0.85,
+      "cache_reads": 43466752,
       "cache_writes": 0,
       "read_write_ratio": null,
-      "avg_context_per_cell": 1734671.0,
-      "avg_tokens_per_cell": 241145.0
+      "avg_context_per_cell": 1682070.0,
+      "avg_tokens_per_cell": 233178.0
     },
     {
       "model": "claude-sonnet-5",
-      "cells": 16,
-      "avg_cost": 4.776,
-      "avg_cache_hit": 0.986,
-      "cache_reads": 115254797,
-      "cache_writes": 3460787,
-      "read_write_ratio": 33.3,
-      "avg_context_per_cell": 7304535.0,
-      "avg_tokens_per_cell": 101110.0
+      "cells": 27,
+      "avg_cost": 5.169,
+      "avg_cache_hit": 0.84,
+      "cache_reads": 177814999,
+      "cache_writes": 5250530,
+      "read_write_ratio": 33.9,
+      "avg_context_per_cell": 6677761.0,
+      "avg_tokens_per_cell": 92021.0
     }
-  ]
+  ],
+  "lab_contract": {
+    "lab": "lab_cache_economics.py",
+    "input_dataset_id": "canonical_registry/story",
+    "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+    "registry_version": "data-manifest/1.0+701rows",
+    "metric_definition_version": "cache_economics/v1",
+    "data_integrity_policy": "docs/data_integrity_findings.md",
+    "requires_external_service": null,
+    "n_input_records": 215,
+    "contract_version": "lab-contract/v1",
+    "generated_at": "2026-08-21T00:33:08.330375+00:00"
+  }
 }

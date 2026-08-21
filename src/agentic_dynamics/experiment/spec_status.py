@@ -32,7 +32,7 @@ from __future__ import annotations
 import json
 import warnings
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -60,13 +60,26 @@ INDEX_SCHEMA_VERSION = "spec-status/v2"
 MISSING = "—"
 
 #: Row ordering for ``STATUS.md``: rank by status, then by name. Runnable-now specs come
-#: first because that is what an authoring agent is scanning for; completed one-shots and
-#: retired lineage sink to the bottom. Any status outside this tuple sorts after all of them
-#: (defensive: the validator already restricts the vocabulary, but the index must never
+#: first because that is what an authoring agent is scanning for; live runs and the two
+#: "needs attention" states (``failed``/``blocked``) sit just behind them; completed one-shots
+#: and retired lineage sink to the bottom. Any status outside this tuple sorts after all of
+#: them (defensive: the validator already restricts the vocabulary, but the index must never
 #: crash on a stray).
 STATUS_ORDER: tuple[str, ...] = (
-    "runnable", "running", "active", "draft", "completed", "superseded", "tombstoned"
+    "runnable",
+    "running",
+    "failed",
+    "blocked",
+    "draft",
+    "completed",
+    "superseded",
+    "tombstoned",
 )
+
+#: How recent an *open* run (a ledger with ``started_at`` but no ``ended_at``) must be to
+#: count as "currently running". Older than this, an open run is ``blocked`` — a run that
+#: started and never resolved must not masquerade as live forever (review item 8 / P2).
+RUNNING_WINDOW = timedelta(hours=24)
 
 #: Timestamp format of a run-ledger filename (``20260819T142530Z.json``) — the fallback
 #: when the ledger body carries no ``ended_at``/``started_at``.
@@ -135,6 +148,11 @@ class RunSummary:
     model: str | None = None
     cost_usd: float | None = None
     git_sha: str | None = None
+    # Current-execution evidence (review item 8): a ledger with ``started_at`` but no
+    # ``ended_at`` is *open* — it may still be in flight. ``started_at`` anchors the recency
+    # window that separates "running now" from "blocked (started, never resolved)".
+    started_at: str | None = None
+    open: bool = False
 
     @property
     def moment(self) -> datetime | None:
@@ -149,6 +167,8 @@ class RunSummary:
             "model": self.model,
             "cost_usd": self.cost_usd,
             "git_sha": self.git_sha,
+            "started_at": self.started_at,
+            "open": self.open,
         }
 
 
@@ -157,13 +177,13 @@ def summarize_run(path: Path, payload: dict[str, Any], *, root: Path) -> RunSumm
 
     The run's time is ``ended_at`` (when the run *finished* — the honest completion
     stamp), falling back to ``started_at``, then to the filename stem. Every one of those
-    can be absent in an older or truncated ledger, hence the ladder.
+    can be absent in an older or truncated ledger, hence the ladder. A ledger with a
+    ``started_at`` but no ``ended_at`` is marked ``open`` (review item 8) so the index can
+    tell "still running" from "started and never resolved".
     """
-    moment = (
-        parse_timestamp(payload.get("ended_at"))
-        or parse_timestamp(payload.get("started_at"))
-        or parse_timestamp(path.stem)
-    )
+    ended = parse_timestamp(payload.get("ended_at"))
+    started = parse_timestamp(payload.get("started_at"))
+    moment = ended or started or parse_timestamp(path.stem)
     cost = payload.get("total_cost_usd")
     return RunSummary(
         path=_relative_to(path, root),
@@ -172,6 +192,8 @@ def summarize_run(path: Path, payload: dict[str, Any], *, root: Path) -> RunSumm
         model=str(payload["model"]) if payload.get("model") else None,
         cost_usd=float(cost) if isinstance(cost, (int, float)) else None,
         git_sha=str(payload["git_sha"]) if payload.get("git_sha") else None,
+        started_at=_iso(started) if started else None,
+        open=(ended is None and started is not None),
     )
 
 
@@ -191,10 +213,16 @@ def load_runs(spec_name: str, *, results_dir: Path, root: Path) -> list[RunSumma
         try:
             payload = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError) as exc:
-            warnings.warn(f"spec_status: skipping unreadable run ledger {path}: {exc}", UserWarning, stacklevel=2)
+            warnings.warn(
+                f"spec_status: skipping unreadable run ledger {path}: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
             continue
         if not isinstance(payload, dict):
-            warnings.warn(f"spec_status: skipping non-object run ledger {path}", UserWarning, stacklevel=2)
+            warnings.warn(
+                f"spec_status: skipping non-object run ledger {path}", UserWarning, stacklevel=2
+            )
             continue
         runs.append(summarize_run(path, payload, root=root))
 
@@ -275,8 +303,36 @@ class SpecStatusEntry:
         )
 
 
-def derive_status(spec: ExperimentSpec, runs: list[RunSummary] | None = None) -> str:
-    """Resolve a spec's lifecycle status (refactor-repair P1-4 — per-kind semantics).
+def _is_currently_running(
+    runs: list[RunSummary],
+    *,
+    now: datetime | None = None,
+    window: timedelta = RUNNING_WINDOW,
+) -> bool:
+    """True when a run is *currently* executing — an open run whose start is recent.
+
+    "Open" = the ledger recorded a ``started_at`` but no ``ended_at`` (the run is still in
+    flight, or died without writing an end stamp). "Recent" = within ``window`` of ``now``,
+    so a run that started last week and never wrote an end stamp is *blocked*, not running.
+    """
+    now = now or _now()
+    for run in runs:
+        if not run.open:
+            continue
+        start = parse_timestamp(run.started_at) or run.moment
+        if start is not None and (now - start) <= window:
+            return True
+    return False
+
+
+def derive_status(
+    spec: ExperimentSpec,
+    runs: list[RunSummary] | None = None,
+    *,
+    now: datetime | None = None,
+    running_window: timedelta = RUNNING_WINDOW,
+) -> str:
+    """Resolve a spec's lifecycle status (review item 8 — current-execution evidence).
 
     The precedence is fixed by the spec-lifecycle design:
 
@@ -285,11 +341,17 @@ def derive_status(spec: ExperimentSpec, runs: list[RunSummary] | None = None) ->
     2. otherwise ``superseded`` when ``superseded_by`` is set — a spec that names its
        replacement has, by definition, been replaced;
     3. otherwise, **per-kind**:
-       * a *repeatable* spec (an experiment, or an idempotent operation) defaults to
-         ``active`` — its status is a measurement claim, not a one-shot lifecycle;
-       * a *non-repeatable* workflow derives its state from the run ledgers: ``completed``
-         when any run succeeded, ``running`` when runs exist but none succeeded, and
-         ``runnable`` when it has never been run.
+       * a *repeatable* spec (an experiment, or an idempotent operation) is always
+         ``runnable`` — it is re-runnable by construction;
+       * a *non-repeatable* workflow derives its state from the run ledgers: ``running``
+         when a run is *currently* executing (an open run within ``running_window``),
+         ``completed`` when any run succeeded, ``failed`` when a run recorded a definitive
+         failure and none is running, ``blocked`` when runs exist but none resolved (no
+         verdict and nothing in flight), and ``runnable`` when it has never been run.
+
+    ``running`` is the one state that REQUIRES positive evidence of current execution — a
+    historical failed or abandoned run never stays ``running`` indefinitely. This is the P2
+    fix: "attempts but no success" is ``failed``/``blocked``, not a permanent ``running``.
 
     Note what is deliberately *absent*: run history never demotes a *repeatable* spec to
     ``draft``. "Never run" and "draft" are different facts, and the table shows the first
@@ -301,12 +363,16 @@ def derive_status(spec: ExperimentSpec, runs: list[RunSummary] | None = None) ->
         return "superseded"
     if not spec.repeatable:
         runs = runs or []
-        if any(run.ok for run in runs):
-            return "completed"
-        if runs:
+        if _is_currently_running(runs, now=now, window=running_window):
             return "running"
+        if any(run.ok is True for run in runs):
+            return "completed"
+        if any(run.ok is False for run in runs):
+            return "failed"
+        if runs:
+            return "blocked"
         return "runnable"
-    return "active"
+    return "runnable"
 
 
 def build_entry(
@@ -344,9 +410,7 @@ def sort_entries(entries: list[SpecStatusEntry]) -> list[SpecStatusEntry]:
 
     def key(entry: SpecStatusEntry) -> tuple[int, str]:
         rank = (
-            STATUS_ORDER.index(entry.status)
-            if entry.status in STATUS_ORDER
-            else len(STATUS_ORDER)
+            STATUS_ORDER.index(entry.status) if entry.status in STATUS_ORDER else len(STATUS_ORDER)
         )
         return (rank, entry.name)
 
@@ -381,7 +445,9 @@ def collect_entries(*, root: Path | str = PROJECT_ROOT) -> list[SpecStatusEntry]
             spec = load_spec(spec_path)
         except Exception as exc:  # noqa: BLE001 — any load failure is a skip, never a crash
             warnings.warn(
-                f"spec_status: skipping unloadable spec {spec_path}: {exc}", UserWarning, stacklevel=2
+                f"spec_status: skipping unloadable spec {spec_path}: {exc}",
+                UserWarning,
+                stacklevel=2,
             )
             continue
         runs = load_runs(spec.name, results_dir=results_dir, root=root_path)
@@ -442,12 +508,13 @@ def _fmt_repeatable(value: bool | None) -> str:
     return "yes" if value else "no"
 
 
-#: The statuses an authoring agent treats as "work still to do" — this is the "runnable
-#: now" view the summary line counts.
-RUNNABLE_NOW_STATUSES = frozenset({"runnable", "running", "active", "draft"})
+#: The statuses an authoring agent treats as "still open" — work remaining, counted by the
+#: summary line. ``failed``/``blocked`` are open (they need a retry/unblock) but are not
+#: "runnable now"; the summary label below says "open", not "runnable-now", for that reason.
+OPEN_STATUSES = frozenset({"runnable", "running", "failed", "blocked", "draft"})
 
 #: The statuses that mean "finished" — completed one-shots and retired lineage sink out of
-#: the runnable-now view (refactor-repair P1-4 index).
+#: the open view (refactor-repair P1-4 index).
 DONE_STATUSES = frozenset({"completed", "superseded", "tombstoned"})
 
 
@@ -462,7 +529,7 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
     so an agent that opens only this file still knows how to read it.
     """
     stamp = generated_at or _iso(_now())
-    runnable_now = sum(1 for e in entries if e.status in RUNNABLE_NOW_STATUSES)
+    open_count = sum(1 for e in entries if e.status in OPEN_STATUSES)
     done = sum(1 for e in entries if e.status in DONE_STATUSES)
     lines: list[str] = [
         "# Spec status index",
@@ -471,7 +538,7 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
         "`scripts/run_workflow.py` also refreshes it at the end of every run.",
         "",
         f"Generated at: `{stamp}`  ·  {len(entries)} spec(s)",
-        f"**Work remaining:** {runnable_now} runnable-now · {done} completed/retired",
+        f"**Work remaining:** {open_count} open · {done} completed/retired",
         "",
         "| name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
@@ -504,14 +571,17 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
         "",
         "**Status** — authored in the spec YAML's `status:` when the operator asserted one,",
         "otherwise derived: `superseded` when the spec names a `superseded_by:`; for a",
-        "non-repeatable workflow, `completed` when a run succeeded, `running` when runs exist",
-        "but none succeeded, `runnable` when never run; else `active`.",
+        "non-repeatable workflow, `completed` when any run succeeded, `failed` when a run",
+        "recorded a definitive failure, `blocked` when runs exist but none resolved, `running`",
+        "when a run is currently executing (an open, recent run), `runnable` when never run;",
+        "else (a repeatable spec) `runnable`.",
         "",
         "| status | meaning |",
         "|---|---|",
-        "| `runnable` | a non-repeatable workflow never run successfully — ready to run |",
-        "| `running` | a non-repeatable workflow that has been run but not yet completed |",
-        "| `active` | the current repeatable spec for its question — runnable now |",
+        "| `runnable` | never run (a non-repeatable workflow), or a repeatable spec — ready to run |",
+        "| `running` | a non-repeatable workflow currently executing — an open run within the window |",
+        "| `failed` | a non-repeatable workflow whose run(s) recorded a definitive failure |",
+        "| `blocked` | a non-repeatable workflow with runs that started but never resolved |",
         "| `draft` | authored, not yet run to completion; not yet a claim about anything |",
         "| `completed` | a non-repeatable workflow whose run succeeded (derived from the "
         "run ledgers) |",

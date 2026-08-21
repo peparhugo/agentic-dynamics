@@ -56,3 +56,6 @@ INTERNAL.md
 _results_summary.json.bak
 _results_summary_sonar.json
 audit.md
+
+# SonarQube scanner workspace (transient analysis state; never provenance)
+.scannerwork/

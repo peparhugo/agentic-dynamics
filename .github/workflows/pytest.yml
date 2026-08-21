@@ -14,10 +14,10 @@ jobs:
         python-version: ["3.10"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -34,7 +34,7 @@ jobs:
 
       - name: Lint (ruff)
         run: |
-          pip install ruff
+          pip install ruff==0.16.2
           ruff check src/ tests/ scripts/
 
       - name: Run deterministic test suite (external-service tests excluded)
@@ -57,10 +57,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: "3.10"
 
@@ -75,8 +75,29 @@ jobs:
       - name: Gate — reproduction entrypoint dry-run (scripts/reproduce.sh --dry-run)
         run: bash scripts/reproduce.sh --dry-run
 
-      - name: Gate — clean image build (docker build .)
-        run: docker build .
+      - name: Gate — reproduce.sh core/opt-in split (review item 7, dry-run only)
+        run: |
+          # Core is deterministic + no external services: --no-tests --no-sonar.
+          bash scripts/reproduce.sh --dry-run | grep -q -- "--no-tests --no-sonar"
+          # The Neo4j / SonarQube labs are opt-in, not in the core set.
+          bash scripts/reproduce.sh --dry-run --with-neo4j | grep -q -- "lab_basin_topology_neo4j.py"
+          bash scripts/reproduce.sh --dry-run --with-sonar | grep -q -- "lab_sonar_quality.py"
+
+      - name: Gate — clean image build (docker build -t agentic-dynamics .)
+        run: docker build -t agentic-dynamics .
+
+      - name: Gate — container CORE run on the committed canonical fixture
+        run: |
+          # Run the image's ACTUAL default command (reproduce.sh core) against the
+          # committed canonical corpus (experiments/data_manifest.json + results),
+          # not merely build + dry-run. Core needs no opencode.db, SonarQube, or
+          # Neo4j (inventory/analyze warn-and-continue; labs read the registry).
+          # Mount a scratch dir as apps/website so the rebuilt data.js persists and
+          # is verifiable (the review item 7 data.js persistence fix).
+          mkdir -p /tmp/repro-out/website
+          docker run --rm -v /tmp/repro-out/website:/app/apps/website agentic-dynamics
+          test -s /tmp/repro-out/website/data.js
+          echo "CORE reproduce produced data.js ($(wc -c < /tmp/repro-out/website/data.js) bytes)"
 
   # Refactor-repair P1-2 (packaging): the CLI is checkout-only — it forwards to repo-level
   # scripts/ which a wheel does not ship. This job proves the wheel install is honest about
@@ -86,10 +107,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: "3.10"
 

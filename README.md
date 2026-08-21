@@ -77,7 +77,7 @@ Observed from the experiment corpus:
 | Metric | Description |
 |--------|-------------|
 | Cost-per-task variation | Token pricing, cache write policies, and provider economics stack into cost gaps |
-| Outcome retention under perturbation | Grit: `G(s) = P(test_executed_success \| perturbation_strength=s)` |
+| Outcome retention under perturbation | Grit: `G(s) = P(test_executed_success \| perturbation_strength=s)` — measured by `scripts/lab_grit.py`; this is the **only** meaning of Grit in the repo |
 | Recovery overhead | Output decomposition — tokens and cost burned returning to familiar patterns |
 
 Derived metrics: WOC ratio (first-pass success), cost per test-executed outcome, AI Value
@@ -90,12 +90,12 @@ Efficiency (durable outcome value / total cost).
 | Metric | Value |
 |--------|-------|
 | Story sessions | 1,097 (3,370 DB sessions total) |
-| Game reports | 224 |
+| Game reports | 344 |
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
-| Experiment configs | 37 (34 measurement + 3 grid/sweep) |
-| Experiment + workflow specs | 77 (8 experiments + 69 workflows) |
+| Experiment configs | 36 (33 measurement + 3 grid/sweep) |
+| Experiment + workflow specs | 79 (6 experiments + 73 workflows) |
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
-| Lab books | 19 active |
+| Lab books | 20 (8 canonical + 12 quarantined) |
 | Total measured spend | $288.69 |
 
 ---
@@ -103,7 +103,7 @@ Efficiency (durable outcome value / total cost).
 ## Repository Structure
 
 ```
-├── src/agentic_dynamics/    # the modular monorepo — 8 bounded planes (60 modules)
+├── src/agentic_dynamics/    # the modular monorepo — 8 bounded planes
 │   ├── core/                # foundation: language, paths, session vocabulary, streaming
 │   ├── experiment/          # ExperimentSpec + requires/produces gate + spec→DAG compiler
 │   ├── measurement/         # the measurement apparatus (perturb, solution, basin, entropy, …)
@@ -112,15 +112,14 @@ Efficiency (durable outcome value / total cost).
 │   ├── knowledge/           # identity/authority, retrieval, the nine ingestion producers, RAG
 │   ├── control/             # routing, supervisor, telemetry, queue steering
 │   └── reporting/           # game reports, review pool, analyzers
-├── scripts/                 # 73 scripts (37 CLI-backed commands, 19 lab books, 15 archived)
+├── scripts/                 # 72 command scripts (37 maintained, 20 lab books, 15 archived)
 ├── experiments/             # definitions/ (specs + configs), campaigns/, results/
 ├── workflows/               # repository/, operations/, research/, examples/
 ├── apps/                    # the applications (consume the system, contain no domain rules)
 │   ├── control_room/        # the Control Room portal (Flask + static dashboard)
 │   └── website/             # the public website source (provenance-tagged data pipeline)
 ├── agent_config/            # the single instruction source → generates .opencode/ + .claude/
-├── docs/                    # ARCHITECTURE.md (authority), designs, review records
-└── firebase/                # deploy config (firebase.json + .firebaserc, dual-host)
+└── docs/                    # ARCHITECTURE.md (authority), designs, review records
 ```
 
 ---
@@ -131,21 +130,15 @@ The website at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) 
 live data pipeline:
 
 ```
-opencode.db ──→ inventory.py refresh          ──→ inventory.json
-       │
-       ├──→ analyze_worktrees.py ──→ _results_summary.json ──┐
-       │         │                                            │
-/tmp/exp_* ──┘   ├──→ reports/*.md (game reports)            │
-                 └──→ reports/*/session.jsonl                │
-                                       │                     │
-                                       ↓                     ↓
-                           analyze_trajectories.py    sync_data.py (stories → parquet)
-                                       │                     │
-                                       ↓                     ↓
-                           _trajectory_aggregate.json  build_data.py
-                                                                │
-                                                                ↓
-                                                   apps/website/data.js
+opencode.db ──→ inventory.py refresh ──→ inventory.json
+
+/tmp/exp_* ──→ analyze_worktrees.py ──→ reports/*.md (game reports)
+              └──→ reports/*/session.jsonl ──→ analyze_trajectories.py ──→ _trajectory_aggregate.json
+
+stories/*.json ──→ sync_data.py ──→ sessions.parquet + stories.parquet
+
+canonical registry (data_manifest.json) + lab books + inventory.json
+              ──→ build_data.py ──→ apps/website/data.js
 ```
 
 All numbers on the website are live-generated. Every measurement is provenance-tagged: [M]
@@ -191,9 +184,9 @@ agentic-dynamics story run task_manager_api --model deepseek/deepseek-v4-pro --c
 agentic-dynamics workflow run experiments/definitions/<spec>.yaml --goal "…"
 agentic-dynamics queue enqueue --model deepseek/deepseek-v4-flash --missing-only
 agentic-dynamics queue worker && agentic-dynamics queue monitor
-agentic-dynamics analyze worktrees                 # → game reports + _results_summary.json
+agentic-dynamics analyze worktrees                 # → game reports
 agentic-dynamics data build                        # → apps/website/data.js
-agentic-dynamics analyze lab grit_matrix           # → lab output
+agentic-dynamics analyze lab grit                  # → G(s), the formal Grit metric
 agentic-dynamics spec status                       # → regenerated spec index
 ```
 

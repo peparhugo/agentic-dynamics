@@ -6,7 +6,7 @@ thinking (reasoning + narration) and the tool call + observation that follows.
 High coupling = the model thinks about what it actually does.
 Low coupling = narration and action are disconnected.
 
-Output: experiments/results/lab_coupling.json
+Output: experiments/results/legacy_labs/lab_coupling.json
 """
 
 import glob
@@ -22,7 +22,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 REPORTS_DIR = ROOT / "experiments" / "results" / "reports"
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_coupling.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_coupling.json"
 
 
 def serialize_tool_input(inp):

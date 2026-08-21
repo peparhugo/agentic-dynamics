@@ -1,15 +1,19 @@
 {
   "experiment_id": "lab_quality_frontier",
-  "generated_at": "2026-08-17T20:12:34.885574",
+  "generated_at": "2026-08-21T02:37:49.214020",
   "summary": {
-    "models": 7
+    "models": 7,
+    "stories": 215,
+    "analyses": 166,
+    "lsp_available_cells": 0
   },
   "models": [
     {
       "model": "deepseek-v4-flash",
       "cells": 22,
       "avg_cost": 0.068,
-      "lsp_errors_per_cell": 0.0,
+      "lsp_errors_per_cell": null,
+      "lsp_cells": 0,
       "code_quality_score": 0.037,
       "cyclomatic_complexity": 475.455,
       "novelty_score": 0.87
@@ -18,7 +22,8 @@
       "model": "gpt-5.6-luna",
       "cells": 24,
       "avg_cost": 0.092,
-      "lsp_errors_per_cell": 0.0,
+      "lsp_errors_per_cell": null,
+      "lsp_cells": 0,
       "code_quality_score": 0.087,
       "cyclomatic_complexity": 262.583,
       "novelty_score": 0.876
@@ -27,7 +32,8 @@
       "model": "deepseek-v4-pro",
       "cells": 37,
       "avg_cost": 0.159,
-      "lsp_errors_per_cell": 0.0,
+      "lsp_errors_per_cell": null,
+      "lsp_cells": 0,
       "code_quality_score": 0.045,
       "cyclomatic_complexity": 309.378,
       "novelty_score": 0.845
@@ -36,7 +42,8 @@
       "model": "gpt-5.6-terra",
       "cells": 20,
       "avg_cost": 1.015,
-      "lsp_errors_per_cell": 0.0,
+      "lsp_errors_per_cell": null,
+      "lsp_cells": 0,
       "code_quality_score": 0.088,
       "cyclomatic_complexity": 233.8,
       "novelty_score": 0.901
@@ -45,7 +52,8 @@
       "model": "claude-haiku-4-5",
       "cells": 14,
       "avg_cost": 1.537,
-      "lsp_errors_per_cell": 0.0,
+      "lsp_errors_per_cell": null,
+      "lsp_cells": 0,
       "code_quality_score": 0.037,
       "cyclomatic_complexity": 381.571,
       "novelty_score": 0.842
@@ -54,7 +62,8 @@
       "model": "gpt-5.6-sol",
       "cells": 23,
       "avg_cost": 3.987,
-      "lsp_errors_per_cell": 0.0,
+      "lsp_errors_per_cell": null,
+      "lsp_cells": 0,
       "code_quality_score": 0.054,
       "cyclomatic_complexity": 297.348,
       "novelty_score": 0.917
@@ -63,10 +72,23 @@
       "model": "claude-sonnet-5",
       "cells": 16,
       "avg_cost": 4.776,
-      "lsp_errors_per_cell": 0.0,
+      "lsp_errors_per_cell": null,
+      "lsp_cells": 0,
       "code_quality_score": 0.052,
       "cyclomatic_complexity": 375.375,
       "novelty_score": 0.789
     }
-  ]
+  ],
+  "lab_contract": {
+    "lab": "lab_quality_frontier.py",
+    "input_dataset_id": "canonical_registry/story+analysis",
+    "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+    "registry_version": "data-manifest/1.0+701rows",
+    "metric_definition_version": "quality_frontier/v1",
+    "data_integrity_policy": "docs/data_integrity_findings.md",
+    "requires_external_service": null,
+    "n_input_records": 381,
+    "contract_version": "lab-contract/v1",
+    "generated_at": "2026-08-21T00:37:49.214046+00:00"
+  }
 }

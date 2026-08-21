@@ -306,3 +306,74 @@ def test_missing_payload_resolves_to_nothing(tmp_path, monkeypatch):
     # The row is still counted as a current story, but yields no measurement payload.
     assert corpus.story_count == 1
     assert corpus.stories == []
+
+
+# ---------------------------------------------------------------------------
+# The publication gate (semantic-integrity release s1 + s2)
+# ---------------------------------------------------------------------------
+
+
+def _lab_gate_fixture(tmp_path, monkeypatch, *, contract_ok: bool):
+    """Point build_data at a synthetic manifest + one publication-eligible lab artifact.
+
+    Returns the identity the artifact was built against. When ``contract_ok`` is False the
+    artifact embeds a DIFFERENT registry's hash — the stale case build_data must reject.
+    """
+    from agentic_dynamics.reporting import canonical_corpus as cc
+    from agentic_dynamics.reporting.lab_contract import CONTRACT_KEY, build_contract
+
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_row(logical_locator="s1", source_uri="story:s1")])
+
+    # The corpus the artifact claims to have been built from.
+    claimed = manifest_path
+    if not contract_ok:
+        claimed = tmp_path / "older_manifest.json"
+        _write_manifest(claimed, [_row(logical_locator="OLD", source_uri="story:OLD")])
+
+    tables = cc.load_canonical_tables("story", manifest_path=claimed)
+    artifact = tmp_path / "lab_story_arc.json"
+    artifact.write_text(json.dumps({
+        "experiment_id": "lab_story_arc",
+        CONTRACT_KEY: build_contract("lab_story_arc.py", tables),
+    }))
+
+    # build_data resolves lab outputs relative to ROOT; point ROOT at tmp_path and make the
+    # manifest entry's `output` land on our artifact.
+    monkeypatch.setattr(build_data, "ROOT", tmp_path)
+    monkeypatch.setattr(build_data, "MANIFEST_PATH", manifest_path)
+
+    from agentic_dynamics.reporting import lab_manifest as lm
+
+    real = lm.load_lab_manifest()
+    entry = real.get("lab_story_arc.py")
+    assert entry is not None
+    only = lm.LabManifest(
+        schema_version=real.schema_version,
+        entries={"lab_story_arc.py": lm.LabEntry(**{
+            **{f.name: getattr(entry, f.name) for f in entry.__dataclass_fields__.values()},
+            "output": "lab_story_arc.json",
+        })},
+    )
+    monkeypatch.setattr(build_data, "load_lab_manifest", lambda: only)
+    return only
+
+
+def test_lab_gate_publishes_a_contract_valid_artifact(tmp_path, monkeypatch, capsys):
+    """A fresh, contract-bearing lab artifact reaches data.js."""
+    _lab_gate_fixture(tmp_path, monkeypatch, contract_ok=True)
+    labs = build_data._load_labs()
+    assert "story_arc" in labs
+    assert "rejected" not in capsys.readouterr().out
+
+
+def test_lab_gate_rejects_a_stale_manifest_lab_json(tmp_path, monkeypatch, capsys):
+    """A lab JSON whose embedded manifest hash is stale is refused — and logged by name."""
+    _lab_gate_fixture(tmp_path, monkeypatch, contract_ok=False)
+    labs = build_data._load_labs()
+
+    assert labs == {}, "a stale lab artifact must not be published"
+    out = capsys.readouterr().out
+    assert "[lab-gate] rejected" in out
+    assert "lab_story_arc.py" in out, "the rejection must name the lab"
+    assert "stale input_manifest_sha256" in out

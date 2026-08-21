@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Semantic-Integrity Review — external critique (2026-08-20)
 
 **Provenance [X]:** operator-provided external review of main at `35ef34310` (the merged

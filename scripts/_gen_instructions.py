@@ -23,6 +23,17 @@ renders each platform's REAL format through two independent renderers:
 meaning-equivalence + schema-validity checks.
 
 Deterministic by construction: no timestamps, no ordering, no environment dependence.
+
+**Deferred — the neutral-intent schema (semantic-integrity review P1/P2):** the canonical source
+is still predominantly OpenCode-shaped; the Claude renderer strips fields and the tests compare
+prose, not effective model/tool/permission behavior, so an omission can silently change an
+agent's actual capabilities. The deferred correction is a neutral intent schema (``role``,
+``capabilities``: read_repository/execute_tests/edit_code:confirm/spawn_subagents, ``model_class``)
+with each renderer mapping intent to its platform and *refusing* generation when an important
+capability cannot be represented. Sequenced after the lab contract and the context guards
+(release phases s2/s5/s6 — now complete) because it re-touches this module's renderers. Pointer:
+``docs/review/semantic_integrity_review.md`` § "P1/P2 — The agent configuration is target-specific
+but not yet semantically neutral".
 """
 
 from __future__ import annotations
@@ -56,17 +67,45 @@ OPENCODE_ONLY_AGENT_KEYS = frozenset({"mode", "permission", "temperature", "hidd
 OPENCODE_ONLY_COMMAND_KEYS = frozenset({"agent", "subtask"})
 
 #: Claude Code subagent frontmatter field set (required: ``name``, ``description``).
-CLAUDE_AGENT_KEYS = frozenset({
-    "name", "description", "tools", "disallowedTools", "model", "permissionMode",
-    "maxTurns", "skills", "mcpServers", "hooks", "memory", "background", "effort",
-    "isolation", "color", "initialPrompt",
-})
+CLAUDE_AGENT_KEYS = frozenset(
+    {
+        "name",
+        "description",
+        "tools",
+        "disallowedTools",
+        "model",
+        "permissionMode",
+        "maxTurns",
+        "skills",
+        "mcpServers",
+        "hooks",
+        "memory",
+        "background",
+        "effort",
+        "isolation",
+        "color",
+        "initialPrompt",
+    }
+)
 
 #: Claude Code command frontmatter shares the SKILL field set except ``name`` and ``paths``.
-CLAUDE_COMMAND_KEYS = frozenset({
-    "description", "when_to_use", "argument-hint", "arguments", "disable-model-invocation",
-    "user-invocable", "allowed-tools", "model", "effort", "context", "background", "hooks", "shell",
-})
+CLAUDE_COMMAND_KEYS = frozenset(
+    {
+        "description",
+        "when_to_use",
+        "argument-hint",
+        "arguments",
+        "disable-model-invocation",
+        "user-invocable",
+        "allowed-tools",
+        "model",
+        "effort",
+        "context",
+        "background",
+        "hooks",
+        "shell",
+    }
+)
 
 #: Matches a positional-arg token ``$N`` (``$1``, ``$2``, …) but not ``$ARGUMENTS`` (no digits).
 _POSITIONAL_ARG = re.compile(r"\$([1-9][0-9]*)")
@@ -93,7 +132,7 @@ def _split_frontmatter(text: str) -> tuple[list[str], str]:
     if end is None:
         raise ValueError("unterminated frontmatter block")
     fields = [line.rstrip("\n") for line in lines[1:end]]
-    body = "".join(lines[end + 1:])
+    body = "".join(lines[end + 1 :])
     return fields, body
 
 
@@ -104,7 +143,7 @@ def _scalar(fields: list[str], key: str) -> str | None:
         if line == prefix:
             return ""
         if line.startswith(prefix + " ") and not line.startswith(" "):
-            return line[len(prefix) + 1:]
+            return line[len(prefix) + 1 :]
     return None
 
 

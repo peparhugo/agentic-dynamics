@@ -45,6 +45,15 @@ from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
 
 from agentic_dynamics.control.routing import compute_routing  # noqa: E402
 from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS  # noqa: E402
+from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
+    current_manifest_identity,
+)
+from agentic_dynamics.reporting.lab_contract import validate_contract  # noqa: E402
+from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
+    load_lab_manifest,
+    publication_labs,
+    rejection_reason,
+)
 
 #: The registry ``source_type`` values the site consumes as measurement corpus.
 #: ``finding`` = the clean single-task perturbation cells (replacing the retired
@@ -57,6 +66,7 @@ CANONICAL_SOURCE_TYPES = frozenset({"story", "finding"})
 #: ``instrument.story_ingestion.NOOP_CONDITIONS`` — duplicated here (not imported)
 #: so build_data keeps a light import surface (no chroma/neo4j/retrieval stack).
 NOOP_CONDITIONS = frozenset({"early_degrade", "bad_seed"})
+
 
 def _fmt_usd(v):
     return round(v, 4)
@@ -126,7 +136,7 @@ def _resolve_file_uri(source_uri: str) -> Path | None:
     """
     if not source_uri or not source_uri.startswith("file://"):
         return None
-    return ROOT / source_uri[len("file://"):]
+    return ROOT / source_uri[len("file://") :]
 
 
 def _find_story_file(story_id: str) -> Path | None:
@@ -319,12 +329,15 @@ def load_canonical_corpus(manifest_path: Path | None = None) -> CanonicalCorpus:
         )
 
     current = [
-        r for r in rows
+        r
+        for r in rows
         if r.get("lifecycle_state") == "current" and r.get("source_type") in CANONICAL_SOURCE_TYPES
     ]
     tombstoned = [
-        r for r in rows
-        if r.get("lifecycle_state") == "tombstoned" and r.get("source_type") in CANONICAL_SOURCE_TYPES
+        r
+        for r in rows
+        if r.get("lifecycle_state") == "tombstoned"
+        and r.get("source_type") in CANONICAL_SOURCE_TYPES
     ]
 
     entries: list = []
@@ -351,9 +364,29 @@ def load_canonical_corpus(manifest_path: Path | None = None) -> CanonicalCorpus:
     )
 
 
-def _load_grit_matrix():
-    """Load lab_grit_matrix.json for the Grit bubble chart."""
-    grit_path = ROOT / "experiments" / "results" / "lab_grit_matrix.json"
+def _load_correctness_escape_quadrants():
+    """Load the correctness x escape bubble points — only if the lab is publishable.
+
+    Formerly ``_load_grit_matrix``. The lab behind it was renamed in phase s4
+    (``lab_grit_matrix.py`` -> ``lab_correctness_escape_quadrants.py``) because a
+    correctness x escape quadrant is NOT the formal Grit metric; ``Grit`` now means one
+    thing repo-wide and is published from ``lab_grit.py`` through ``_load_labs``.
+
+    The quadrant lab reads the RETIRED ``_results_summary.json``, so it stays quarantined
+    and this returns ``[]`` — logged by name, never silent, so a missing website section is
+    always traceable to a lab and a stated reason.
+    """
+    reason = rejection_reason("lab_correctness_escape_quadrants.py")
+    if reason is not None:
+        print(f"  [lab-gate] not published — {reason}")
+        return []
+
+    # Path comes from the manifest, not hard-coded: a quarantined lab's artifact lives in
+    # experiments/results/legacy_labs/, and only the manifest knows where a lab writes.
+    entry = load_lab_manifest().get("lab_correctness_escape_quadrants.py")
+    if entry is None or not entry.output:
+        return []
+    grit_path = ROOT / entry.output
     if not grit_path.exists():
         return []
     try:
@@ -419,7 +452,9 @@ def compute_model_data(entries):
         label = MODEL_LABELS.get(mid, mid)
         provider = get_provider(mid)
 
-        valid = [r for r in reports if not r.get("narration_failure") and r.get("correctness", 0) >= 0]
+        valid = [
+            r for r in reports if not r.get("narration_failure") and r.get("correctness", 0) >= 0
+        ]
         narrated = [r for r in reports if r.get("narration_failure")]
 
         avg_cost = _fmt_usd(sum(r.get("cost", 0) for r in valid) / max(len(valid), 1))
@@ -435,7 +470,9 @@ def compute_model_data(entries):
                 total_passed += tr["passed"]
         pass_rate_val = None
         if total_tests > 0:
-            pass_rate_val = f"{total_passed / total_tests:.0%} ({total_passed}/{total_tests}) [tests]"
+            pass_rate_val = (
+                f"{total_passed / total_tests:.0%} ({total_passed}/{total_tests}) [tests]"
+            )
 
         strategies = {"conservative": 0, "exploratory": 0, "wasteful": 0, "efficient": 0}
         for r in valid:
@@ -446,96 +483,137 @@ def compute_model_data(entries):
         avg_loc = round(sum(r.get("code_lines", 0) for r in valid) / max(len(valid), 1))
         avg_thinking = round(sum(r.get("thinking_ratio", 0) for r in valid) / max(len(valid), 1), 3)
         avg_escape = round(sum(r.get("escape", 0) for r in valid) / max(len(valid), 1), 2)
-        avg_arch_div = round(sum(r.get("architecture_divergence", 0) for r in valid) / max(len(valid), 1), 3)
-        avg_composite = round(sum(r.get("composite_score", 0) for r in valid) / max(len(valid), 1), 3)
+        avg_arch_div = round(
+            sum(r.get("architecture_divergence", 0) for r in valid) / max(len(valid), 1), 3
+        )
+        avg_composite = round(
+            sum(r.get("composite_score", 0) for r in valid) / max(len(valid), 1), 3
+        )
 
         avg_energy = round(sum(r.get("energy_total_j", 0) for r in valid) / max(len(valid), 1), 1)
         avg_energy_per_loc = round(avg_energy / max(avg_loc, 1), 2)
         correctness_per_dollar = round(
-            sum((r.get("correctness") or 0) / max(r.get("cost", 0), 1e-9) for r in valid) / max(len(valid), 1), 4
+            sum((r.get("correctness") or 0) / max(r.get("cost", 0), 1e-9) for r in valid)
+            / max(len(valid), 1),
+            4,
         )
-        avg_joules_per_loc = round(sum(r.get("quality_per_joule", 0) for r in valid) / max(len(valid), 1), 4)
+        avg_joules_per_loc = round(
+            sum(r.get("quality_per_joule", 0) for r in valid) / max(len(valid), 1), 4
+        )
 
-        avg_constraints_met = round(sum(r.get("constraints_met", 0) for r in valid) / max(len(valid), 1), 1)
-        avg_constraints_total = round(sum(r.get("constraints_total", 0) for r in valid) / max(len(valid), 1), 1)
+        avg_constraints_met = round(
+            sum(r.get("constraints_met", 0) for r in valid) / max(len(valid), 1), 1
+        )
+        avg_constraints_total = round(
+            sum(r.get("constraints_total", 0) for r in valid) / max(len(valid), 1), 1
+        )
 
         tokens_in = sum(r.get("tokens_input", 0) for r in valid)
         tokens_out = sum(r.get("tokens_output", 0) for r in valid)
         tokens_reason = sum(r.get("tokens_reasoning", 0) for r in valid)
         total_tok = tokens_in + tokens_out + tokens_reason
 
-        models.append({
-            "id": mid,
-            "label": label,
-            "provider": provider,
-            "reports": len(reports),
-            "reports_valid": len(valid),
-            "reports_narrated": len(narrated),
-            "n_reports": len(reports),
-            "n_valid": len(valid),
-            "n_narrated": len(narrated),
-            "avg_cost": avg_cost,
-            "total_cost": total_cost,
-            "cost_ci95": bootstrap_ci([r.get("cost", 0) for r in valid]) if len(valid) >= 5 else None,
-            "pass_rate": pass_rate_val,
-            "strategy_cons": strategies["conservative"],
-            "strategy_expl": strategies["exploratory"],
-            "strategy_waste": strategies["wasteful"],
-            "strategy_efficient": strategies["efficient"],
-            "avg_loc": avg_loc,
-            "avg_thinking_ratio": avg_thinking,
-            "avg_escape": avg_escape,
-            "avg_arch_divergence": avg_arch_div,
-            "avg_composite_score": avg_composite,
-            "avg_energy_j": avg_energy,
-            "avg_energy_j_per_loc": avg_energy_per_loc,
-            "correctness_per_dollar": correctness_per_dollar,
-            "avg_quality_per_joule": avg_joules_per_loc,
-            "avg_constraints_met": avg_constraints_met,
-            "avg_constraints_total": avg_constraints_total,
-            "tokens_total": total_tok,
-            "tokens_input": tokens_in,
-            "tokens_output": tokens_out,
-            "tokens_reasoning": tokens_reason,
-            # ── historical: no canonical replacement in the finding corpus → None ──
-            "avg_narration_penalty": None,
-            "avg_struct_divergence": None,
-            "avg_code_quality": None,
-            "avg_comment_ratio": None,
-            "narration_rate": None,
-            "ast_files": None,
-            "ast_functions": None,
-            "ast_classes": None,
-            "ast_type_hint_pct": None,
-            "ast_docstring_pct": None,
-            "cost_input": None,
-            "cost_output": None,
-            "cost_reasoning": None,
-            "cost_cache": None,
-            "tokens_cache_read": None,
-            "tokens_cache_write": None,
-            "_historical_fields": [
-                "avg_narration_penalty", "avg_struct_divergence", "avg_code_quality",
-                "avg_comment_ratio", "narration_rate", "ast_files", "ast_functions",
-                "ast_classes", "ast_type_hint_pct", "ast_docstring_pct",
-                "cost_input", "cost_output", "cost_reasoning", "cost_cache",
-                "tokens_cache_read", "tokens_cache_write",
-            ],
-            "_provenance": {
-                "reports": "M", "reports_valid": "M", "reports_narrated": "M",
-                "total_cost": "M", "tokens_input": "M", "tokens_output": "M",
-                "tokens_reasoning": "M", "tokens_total": "M",
-                "avg_cost": "C", "cost_ci95": "C", "avg_loc": "C",
-                "avg_thinking_ratio": "C", "avg_escape": "C",
-                "avg_arch_divergence": "C", "avg_composite_score": "C",
-                "avg_energy_j": "C", "avg_energy_j_per_loc": "C",
-                "avg_quality_per_joule": "C", "correctness_per_dollar": "C",
-                "avg_constraints_met": "C", "avg_constraints_total": "C",
-                "strategy_cons": "C", "strategy_expl": "C", "strategy_waste": "C",
-                "strategy_efficient": "C",
-                "pass_rate": "M" if total_tests > 0 else None,
-            },
-        })
+        models.append(
+            {
+                "id": mid,
+                "label": label,
+                "provider": provider,
+                "reports": len(reports),
+                "reports_valid": len(valid),
+                "reports_narrated": len(narrated),
+                "n_reports": len(reports),
+                "n_valid": len(valid),
+                "n_narrated": len(narrated),
+                "avg_cost": avg_cost,
+                "total_cost": total_cost,
+                "cost_ci95": bootstrap_ci([r.get("cost", 0) for r in valid])
+                if len(valid) >= 5
+                else None,
+                "pass_rate": pass_rate_val,
+                "strategy_cons": strategies["conservative"],
+                "strategy_expl": strategies["exploratory"],
+                "strategy_waste": strategies["wasteful"],
+                "strategy_efficient": strategies["efficient"],
+                "avg_loc": avg_loc,
+                "avg_thinking_ratio": avg_thinking,
+                "avg_escape": avg_escape,
+                "avg_arch_divergence": avg_arch_div,
+                "avg_composite_score": avg_composite,
+                "avg_energy_j": avg_energy,
+                "avg_energy_j_per_loc": avg_energy_per_loc,
+                "correctness_per_dollar": correctness_per_dollar,
+                "avg_quality_per_joule": avg_joules_per_loc,
+                "avg_constraints_met": avg_constraints_met,
+                "avg_constraints_total": avg_constraints_total,
+                "tokens_total": total_tok,
+                "tokens_input": tokens_in,
+                "tokens_output": tokens_out,
+                "tokens_reasoning": tokens_reason,
+                # ── historical: no canonical replacement in the finding corpus → None ──
+                "avg_narration_penalty": None,
+                "avg_struct_divergence": None,
+                "avg_code_quality": None,
+                "avg_comment_ratio": None,
+                "narration_rate": None,
+                "ast_files": None,
+                "ast_functions": None,
+                "ast_classes": None,
+                "ast_type_hint_pct": None,
+                "ast_docstring_pct": None,
+                "cost_input": None,
+                "cost_output": None,
+                "cost_reasoning": None,
+                "cost_cache": None,
+                "tokens_cache_read": None,
+                "tokens_cache_write": None,
+                "_historical_fields": [
+                    "avg_narration_penalty",
+                    "avg_struct_divergence",
+                    "avg_code_quality",
+                    "avg_comment_ratio",
+                    "narration_rate",
+                    "ast_files",
+                    "ast_functions",
+                    "ast_classes",
+                    "ast_type_hint_pct",
+                    "ast_docstring_pct",
+                    "cost_input",
+                    "cost_output",
+                    "cost_reasoning",
+                    "cost_cache",
+                    "tokens_cache_read",
+                    "tokens_cache_write",
+                ],
+                "_provenance": {
+                    "reports": "M",
+                    "reports_valid": "M",
+                    "reports_narrated": "M",
+                    "total_cost": "M",
+                    "tokens_input": "M",
+                    "tokens_output": "M",
+                    "tokens_reasoning": "M",
+                    "tokens_total": "M",
+                    "avg_cost": "C",
+                    "cost_ci95": "C",
+                    "avg_loc": "C",
+                    "avg_thinking_ratio": "C",
+                    "avg_escape": "C",
+                    "avg_arch_divergence": "C",
+                    "avg_composite_score": "C",
+                    "avg_energy_j": "C",
+                    "avg_energy_j_per_loc": "C",
+                    "avg_quality_per_joule": "C",
+                    "correctness_per_dollar": "C",
+                    "avg_constraints_met": "C",
+                    "avg_constraints_total": "C",
+                    "strategy_cons": "C",
+                    "strategy_expl": "C",
+                    "strategy_waste": "C",
+                    "strategy_efficient": "C",
+                    "pass_rate": "M" if total_tests > 0 else None,
+                },
+            }
+        )
 
     return models
 
@@ -568,7 +646,13 @@ def compute_charts(models):
 
 def compute_calculator(models):
     model_costs = [
-        {"n": m["label"], "c": m["avg_cost"], "p": float(str(m.get("pass_rate", "0")).split("%")[0]) / 100 if "%" in str(m.get("pass_rate", "")) else 0}
+        {
+            "n": m["label"],
+            "c": m["avg_cost"],
+            "p": float(str(m.get("pass_rate", "0")).split("%")[0]) / 100
+            if "%" in str(m.get("pass_rate", ""))
+            else 0,
+        }
         for m in models
     ]
 
@@ -576,10 +660,12 @@ def compute_calculator(models):
     esc_tiers = []
     for mc in model_costs[1:]:
         if cheapest > 0:
-            esc_tiers.append({
-                "m": f"DS→{mc['n'].replace('DeepSeek v4 Pro→','').split(' ')[-1] if 'DeepSeek' in model_costs[0]['n'] else mc['n']}",
-                "e": round(mc["c"] / cheapest, 1),
-            })
+            esc_tiers.append(
+                {
+                    "m": f"DS→{mc['n'].replace('DeepSeek v4 Pro→', '').split(' ')[-1] if 'DeepSeek' in model_costs[0]['n'] else mc['n']}",
+                    "e": round(mc["c"] / cheapest, 1),
+                }
+            )
     if cheapest > 0:
         esc_tiers.append({"m": "→Human ($5/job)", "e": round(5 / cheapest, 1)})
     else:
@@ -628,7 +714,9 @@ def compute_derived(models, inventory, report_count):
 
     if total_tests_sum > 0:
         tag = " [mixed]" if total_model_weight > 0 else " [tests]"
-        overall_pass_rate = f"{valid_tests / total_tests_sum:.1%} ({valid_tests}/{total_tests_sum}){tag}"
+        overall_pass_rate = (
+            f"{valid_tests / total_tests_sum:.1%} ({valid_tests}/{total_tests_sum}){tag}"
+        )
     elif total_model_weight > 0:
         avg_correctness = total_model_correctness / total_model_weight
         overall_pass_rate = f"{avg_correctness:.1%} [H]"
@@ -655,17 +743,23 @@ def compute_derived(models, inventory, report_count):
         "total_tests_passed": valid_tests,
         "total_tests_run": total_tests_sum,
         "total_cost_all_models": _fmt_usd(sum(m["total_cost"] for m in models)),
-        "total_cost_deepseek": _fmt_usd(sum(m["total_cost"] for m in models if "deepseek" in m["id"])),
+        "total_cost_deepseek": _fmt_usd(
+            sum(m["total_cost"] for m in models if "deepseek" in m["id"])
+        ),
         "total_cost_claude": _fmt_usd(sum(m["total_cost"] for m in models if "claude" in m["id"])),
         "total_narrated": total_narrated,
         "total_valid_reports": total_valid,
         "total_reports_analyzed": total_reports,
         "_provenance": {
-            "cost_gap": "C", "overall_pass_rate": "C",
-            "total_tests_passed": "M", "total_tests_run": "M",
-            "total_cost_all_models": "M", "total_cost_deepseek": "M",
+            "cost_gap": "C",
+            "overall_pass_rate": "C",
+            "total_tests_passed": "M",
+            "total_tests_run": "M",
+            "total_cost_all_models": "M",
+            "total_cost_deepseek": "M",
             "total_cost_claude": "M",
-            "total_narrated": "M", "total_valid_reports": "M",
+            "total_narrated": "M",
+            "total_valid_reports": "M",
             "total_reports_analyzed": "M",
         },
     }
@@ -711,11 +805,18 @@ def _load_review_data() -> dict:
             continue
         sid = d.get("story_id", "")
         reviewed = sid_to_model.get(sid, "?").split("/")[-1]
-        m = by_model.setdefault(reviewed, {
-            "model": reviewed, "stories": 0, "coherence": [],
-            "arch_fit": [], "convention": [], "bow": Counter(),
-            "issue_themes": Counter(),
-        })
+        m = by_model.setdefault(
+            reviewed,
+            {
+                "model": reviewed,
+                "stories": 0,
+                "coherence": [],
+                "arch_fit": [],
+                "convention": [],
+                "bow": Counter(),
+                "issue_themes": Counter(),
+            },
+        )
         sr = d.get("story_review")
         if sr:
             m["stories"] += 1
@@ -739,21 +840,28 @@ def _load_review_data() -> dict:
     for reviewed, m in by_model.items():
         total_bow = sum(m["bow"].values()) or 1
         label = _short_model_label(reviewed)
-        models.append({
-            "model": reviewed,
-            "label": label,
-            "stories": m["stories"],
-            "overall_coherence": round(statistics.mean(m["coherence"]), 3) if m["coherence"] else None,
-            "architectural_fit": round(statistics.mean(m["arch_fit"]), 3) if m["arch_fit"] else None,
-            "convention_adherence": round(statistics.mean(m["convention"]), 3) if m["convention"] else None,
-            "better_pct": round(m["bow"].get("better", 0) / total_bow * 100, 1),
-            "worse_pct": round(m["bow"].get("worse", 0) / total_bow * 100, 1),
-            "neutral_pct": round(m["bow"].get("neutral", 0) / total_bow * 100, 1),
-            "top_issues": [
-                {"theme": t, "count": c}
-                for t, c in m["issue_themes"].most_common(5)
-            ],
-        })
+        models.append(
+            {
+                "model": reviewed,
+                "label": label,
+                "stories": m["stories"],
+                "overall_coherence": round(statistics.mean(m["coherence"]), 3)
+                if m["coherence"]
+                else None,
+                "architectural_fit": round(statistics.mean(m["arch_fit"]), 3)
+                if m["arch_fit"]
+                else None,
+                "convention_adherence": round(statistics.mean(m["convention"]), 3)
+                if m["convention"]
+                else None,
+                "better_pct": round(m["bow"].get("better", 0) / total_bow * 100, 1),
+                "worse_pct": round(m["bow"].get("worse", 0) / total_bow * 100, 1),
+                "neutral_pct": round(m["bow"].get("neutral", 0) / total_bow * 100, 1),
+                "top_issues": [
+                    {"theme": t, "count": c} for t, c in m["issue_themes"].most_common(5)
+                ],
+            }
+        )
     models.sort(key=lambda x: x.get("overall_coherence") or 0, reverse=True)
 
     return {
@@ -813,21 +921,35 @@ def _load_analysis_data() -> dict:
         n_analysis += 1
         sid = d.get("story_id", "")
         reviewed = sid_to_model.get(sid, "?").split("/")[-1]
-        m = by_model.setdefault(reviewed, {
-            "model": reviewed, "commits": 0,
-            "lines_added": 0, "lines_removed": 0,
-            "functions_added": 0, "functions_removed": 0,
-            "classes_added": 0, "imports_added": 0,
-            "sonar_available": 0,
-            "sonar_bugs_delta": 0, "sonar_smells_delta": 0,
-            "sonar_complexity_delta": 0,
-            "convention_scores": [],
-            "deep_cells": 0, "lsp_available": 0, "lsp_errors": 0, "lsp_warnings": 0,
-            "solution_correctness": [], "solution_constraints": [],
-            "solution_quality": [], "solution_novelty": [], "solution_composite": [],
-            "basin_escape": [],
-            "strategies": Counter(),
-        })
+        m = by_model.setdefault(
+            reviewed,
+            {
+                "model": reviewed,
+                "commits": 0,
+                "lines_added": 0,
+                "lines_removed": 0,
+                "functions_added": 0,
+                "functions_removed": 0,
+                "classes_added": 0,
+                "imports_added": 0,
+                "sonar_available": 0,
+                "sonar_bugs_delta": 0,
+                "sonar_smells_delta": 0,
+                "sonar_complexity_delta": 0,
+                "convention_scores": [],
+                "deep_cells": 0,
+                "lsp_available": 0,
+                "lsp_errors": 0,
+                "lsp_warnings": 0,
+                "solution_correctness": [],
+                "solution_constraints": [],
+                "solution_quality": [],
+                "solution_novelty": [],
+                "solution_composite": [],
+                "basin_escape": [],
+                "strategies": Counter(),
+            },
+        )
         summary = d.get("summary", {})
         conv = summary.get("average_convention_score")
         if conv is not None:
@@ -875,32 +997,34 @@ def _load_analysis_data() -> dict:
     for reviewed, m in by_model.items():
         n = len(m["convention_scores"])
         cells = m["deep_cells"] or 1
-        models.append({
-            "model": reviewed,
-            "label": _short_model_label(reviewed),
-            "commits": m["commits"],
-            "lines_added": m["lines_added"],
-            "lines_removed": m["lines_removed"],
-            "functions_added": m["functions_added"],
-            "classes_added": m["classes_added"],
-            "imports_added": m["imports_added"],
-            "sonar_available": m["sonar_available"],
-            "sonar_bugs_delta": m["sonar_bugs_delta"],
-            "sonar_smells_delta": m["sonar_smells_delta"],
-            "sonar_complexity_delta": m["sonar_complexity_delta"],
-            "avg_convention": round(sum(m["convention_scores"]) / n, 3) if n else None,
-            "deep_cells": m["deep_cells"],
-            "lsp_available": m["lsp_available"],
-            "lsp_errors_per_cell": round(m["lsp_errors"] / cells, 1),
-            "lsp_warnings_per_cell": round(m["lsp_warnings"] / cells, 1),
-            "solution_correctness": _avg(m["solution_correctness"]),
-            "solution_constraints": _avg(m["solution_constraints"]),
-            "solution_quality": _avg(m["solution_quality"]),
-            "solution_novelty": _avg(m["solution_novelty"]),
-            "solution_composite": _avg(m["solution_composite"]),
-            "basin_escape": _avg(m["basin_escape"]),
-            "strategies": dict(m["strategies"]),
-        })
+        models.append(
+            {
+                "model": reviewed,
+                "label": _short_model_label(reviewed),
+                "commits": m["commits"],
+                "lines_added": m["lines_added"],
+                "lines_removed": m["lines_removed"],
+                "functions_added": m["functions_added"],
+                "classes_added": m["classes_added"],
+                "imports_added": m["imports_added"],
+                "sonar_available": m["sonar_available"],
+                "sonar_bugs_delta": m["sonar_bugs_delta"],
+                "sonar_smells_delta": m["sonar_smells_delta"],
+                "sonar_complexity_delta": m["sonar_complexity_delta"],
+                "avg_convention": round(sum(m["convention_scores"]) / n, 3) if n else None,
+                "deep_cells": m["deep_cells"],
+                "lsp_available": m["lsp_available"],
+                "lsp_errors_per_cell": round(m["lsp_errors"] / cells, 1),
+                "lsp_warnings_per_cell": round(m["lsp_warnings"] / cells, 1),
+                "solution_correctness": _avg(m["solution_correctness"]),
+                "solution_constraints": _avg(m["solution_constraints"]),
+                "solution_quality": _avg(m["solution_quality"]),
+                "solution_novelty": _avg(m["solution_novelty"]),
+                "solution_composite": _avg(m["solution_composite"]),
+                "basin_escape": _avg(m["basin_escape"]),
+                "strategies": dict(m["strategies"]),
+            }
+        )
     models.sort(key=lambda x: -(x["lines_added"]))
 
     return {
@@ -912,25 +1036,58 @@ def _load_analysis_data() -> dict:
 
 
 def _load_labs() -> dict:
-    """Load the story-era lab book outputs for the evidence page.
+    """Load the publication-eligible, contract-valid lab book outputs for the evidence page.
 
-    Each lab writes experiments/results/lab_<name>.json. Absent labs are skipped
-    so build_data never hard-fails on a missing analysis artifact.
+    Two gates, in order — eligibility (s1) then lineage (s2):
+
+    1. **Eligibility** — the lab set is derived from ``scripts/lab_manifest.json``, never
+       hand-listed here. This builder used to load lab JSONs with zero provenance checks,
+       so a lab reading the retired ``_results_summary.json`` could publish alongside
+       canonical registry metrics: the "split publication path" the review named. A lab
+       reaches ``data.js`` only when the manifest marks it ``publication_eligible`` *and*
+       names a ``website_key``.
+    2. **Lineage** — the artifact must carry a ``lab_contract`` block whose
+       ``input_manifest_sha256`` matches the identity of the CURRENT
+       ``data_manifest.json`` registry. Eligibility is a property of the lab; freshness is
+       a property of the file. A lab that was eligible yesterday produced stale numbers if
+       records have since been added, superseded, or tombstoned.
+
+    Every rejection is logged with the lab name and the reason — a website section may
+    disappear, but never silently. A missing artifact is still skipped quietly: a lab that
+    has not been run yet is a gap, not an integrity failure.
     """
-    lab_names = [
-        "verification_frontier", "story_arc", "condition_effects",
-        "verification_value", "cache_economics", "quality_frontier",
-    ]
-    labs = {}
-    results_dir = ROOT / "experiments" / "results"
-    for name in lab_names:
-        p = results_dir / f"lab_{name}.json"
-        if not p.exists():
+    manifest = load_lab_manifest()
+    labs: dict[str, dict] = {}
+
+    # Computed once: the identity every contract is compared against.
+    identity = current_manifest_identity(MANIFEST_PATH)
+
+    # --- gate 1: website_key -> LabEntry (quarantined already excluded) -----------------
+    for website_key, entry in sorted(publication_labs(manifest).items()):
+        if not entry.output:
+            continue  # stdout-only lab: no artifact to publish
+        artifact = ROOT / entry.output
+        if not artifact.exists():
             continue
         try:
-            labs[name] = json.loads(p.read_text())
+            payload = json.loads(artifact.read_text())
         except (json.JSONDecodeError, OSError):
+            print(f"  [lab-gate] rejected — {entry.script}: unreadable artifact {entry.output}")
             continue
+
+        # --- gate 2: the canonical lab contract -----------------------------------------
+        reason = validate_contract(payload, lab_script=entry.script, current=identity)
+        if reason is not None:
+            print(f"  [lab-gate] rejected — {reason}")
+            continue
+
+        labs[website_key] = payload
+
+    # --- log every exclusion, so a dropped section is traceable rather than silent ------
+    for entry in manifest:
+        if entry.quarantined:
+            print(f"  [lab-gate] not published — {entry.script}: quarantined")
+
     return labs
 
 
@@ -961,6 +1118,7 @@ def _load_story_data() -> dict:
         return {"_note": "Run scripts/sync_data.py first"}
 
     import duckdb
+
     conn = duckdb.connect()
 
     sessions_table = f"read_parquet('{sessions_path}')"
@@ -975,11 +1133,17 @@ def _load_story_data() -> dict:
                round(avg(total_duration), 0) as avg_duration_s
         FROM {stories_table} GROUP BY model ORDER BY total_cost
     """).fetchall():
-        models.append({
-            "model": row[0], "cells": row[1], "total_cost": row[2],
-            "avg_cost": row[3], "total_tokens": row[4],
-            "avg_cache_hit": row[5], "avg_duration_s": row[6],
-        })
+        models.append(
+            {
+                "model": row[0],
+                "cells": row[1],
+                "total_cost": row[2],
+                "avg_cost": row[3],
+                "total_tokens": row[4],
+                "avg_cache_hit": row[5],
+                "avg_duration_s": row[6],
+            }
+        )
 
     # Condition comparison
     conditions = []
@@ -990,11 +1154,17 @@ def _load_story_data() -> dict:
                cast(sum(case when not all_successful then 1 else 0 end) as int) as fail
         FROM {stories_table} GROUP BY condition ORDER BY condition
     """).fetchall():
-        conditions.append({
-            "condition": row[0], "cells": row[1], "variants": row[2],
-            "total_cost": row[3], "avg_cost": row[4],
-            "success": row[5], "fail": row[6],
-        })
+        conditions.append(
+            {
+                "condition": row[0],
+                "cells": row[1],
+                "variants": row[2],
+                "total_cost": row[3],
+                "avg_cost": row[4],
+                "success": row[5],
+                "fail": row[6],
+            }
+        )
 
     # Story type comparison
     stories = []
@@ -1006,14 +1176,21 @@ def _load_story_data() -> dict:
                round(avg(total_tokens * 1.0 / session_count), 0) as avg_tokens_per_session
         FROM {stories_table} GROUP BY story_name ORDER BY total_cost
     """).fetchall():
-        stories.append({
-            "story": row[0], "cells": row[1], "total_cost": row[2],
-            "avg_cost": row[3], "sessions": row[4],
-            "avg_duration_s": row[5], "avg_tokens_per_session": row[6],
-        })
+        stories.append(
+            {
+                "story": row[0],
+                "cells": row[1],
+                "total_cost": row[2],
+                "avg_cost": row[3],
+                "sessions": row[4],
+                "avg_duration_s": row[5],
+                "avg_tokens_per_session": row[6],
+            }
+        )
 
     # Per-session stats
-    session_stats = list(conn.execute(f"""
+    session_stats = list(
+        conn.execute(f"""
         SELECT count(*) as total, sum(cost_usd) as total_cost,
                sum(total_tokens) as total_tokens,
                sum(cache_read_tokens) as total_cache_reads,
@@ -1023,7 +1200,8 @@ def _load_story_data() -> dict:
                sum(case when exit_code = 0 then 1 else 0 end) as successful,
                sum(case when exit_code != 0 then 1 else 0 end) as failed
         FROM {sessions_table}
-    """).fetchone())
+    """).fetchone()
+    )
 
     # Tier comparison
     tiers = []
@@ -1033,11 +1211,16 @@ def _load_story_data() -> dict:
                round(avg(total_duration / session_count), 0) as avg_session_duration_s
         FROM {stories_table} GROUP BY tier, quality ORDER BY tier, quality
     """).fetchall():
-        tiers.append({
-            "tier": row[0], "quality": row[1], "cells": row[2],
-            "avg_cost": row[3], "avg_tokens_per_session": row[4],
-            "avg_session_duration_s": row[5],
-        })
+        tiers.append(
+            {
+                "tier": row[0],
+                "quality": row[1],
+                "cells": row[2],
+                "avg_cost": row[3],
+                "avg_tokens_per_session": row[4],
+                "avg_session_duration_s": row[5],
+            }
+        )
 
     conn.close()
 
@@ -1048,10 +1231,14 @@ def _load_story_data() -> dict:
         "stories": stories,
         "tiers": tiers,
         "sessions": {
-            "total": session_stats[0], "total_cost": session_stats[1],
-            "total_tokens": session_stats[2], "total_cache_reads": session_stats[3],
-            "cache_hit_rate": round(session_stats[4], 3), "duration_s": session_stats[5],
-            "successful": session_stats[6], "failed": session_stats[7],
+            "total": session_stats[0],
+            "total_cost": session_stats[1],
+            "total_tokens": session_stats[2],
+            "total_cache_reads": session_stats[3],
+            "cache_hit_rate": round(session_stats[4], 3),
+            "duration_s": session_stats[5],
+            "successful": session_stats[6],
+            "failed": session_stats[7],
         },
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -1070,10 +1257,7 @@ def _merge_story_strategy(story_models: list[dict], analysis_data: dict) -> None
     compute_story_models cannot source strategy (it lives in the deep-metrics
     analysis), so merge it here instead of fabricating zeros.
     """
-    strat_by_model = {
-        m["model"]: m.get("strategies", {})
-        for m in analysis_data.get("models", [])
-    }
+    strat_by_model = {m["model"]: m.get("strategies", {}) for m in analysis_data.get("models", [])}
     for sm in story_models:
         strat = strat_by_model.get(sm["id"].split("/")[-1], {})
         sm["strategy_cons"] = strat.get("conservative", 0)
@@ -1090,6 +1274,7 @@ def compute_story_models() -> list[dict]:
         return []
 
     import duckdb
+
     conn = duckdb.connect()
 
     # Real test pass/fail + token splits per model, from the session transcripts.
@@ -1103,8 +1288,10 @@ def compute_story_models() -> list[dict]:
             GROUP BY model
         """).fetchall():
             test_by_model[r[0]] = {
-                "passed": int(r[1] or 0), "run": int(r[2] or 0),
-                "prompt": int(r[3] or 0), "completion": int(r[4] or 0),
+                "passed": int(r[1] or 0),
+                "run": int(r[2] or 0),
+                "prompt": int(r[3] or 0),
+                "completion": int(r[4] or 0),
                 "reasoning": int(r[5] or 0),
             }
 
@@ -1130,46 +1317,55 @@ def compute_story_models() -> list[dict]:
         label = MODEL_LABELS.get(mid, mid)
         total_runs = row[1]
         unique_cells = row[2]
-        t = test_by_model.get(mid, {"passed": 0, "run": 0, "prompt": 0, "completion": 0, "reasoning": 0})
+        t = test_by_model.get(
+            mid, {"passed": 0, "run": 0, "prompt": 0, "completion": 0, "reasoning": 0}
+        )
         avg_loc = row[12]
         # Energy is a [C]omputed estimate from measured tokens (J per token).
         avg_energy_j = round(
             (t["prompt"] * 0.08 + t["completion"] * 0.23 + t["reasoning"] * 0.47)
-            / max(total_runs, 1), 1
+            / max(total_runs, 1),
+            1,
         )
-        models.append({
-            "id": mid,
-            "label": label,
-            "provider": get_provider(mid),
-            "cells": total_runs,
-            "unique_cells": unique_cells,
-            "re_runs": total_runs - unique_cells,
-            "sessions": row[3],
-            "total_cost": row[4],
-            "avg_cost": row[5],
-            "cost_cells": row[6],
-            "avg_cache_hit": row[7],
-            "avg_tests": row[8],
-            "avg_test_code_ratio": row[9],
-            "avg_tok_per_session": row[10],
-            "avg_duration_s": row[11],
-            "avg_code_lines": avg_loc,
-            "tests_total": row[13],
-            "tests_passed": t["passed"],
-            "tests_run": t["run"],
-            "pass_rate": _honest_pass_rate(t["passed"], t["run"]),
-            # keep legacy keys populated for existing charts
-            "avg_cost_per_session": round(row[5] / max(row[3] / max(total_runs, 1), 1), 6),
-            "avg_loc": avg_loc,
-            "avg_energy_j": avg_energy_j,
-            "avg_energy_j_per_loc": round(avg_energy_j / max(avg_loc, 1), 2),
-            # Not measured for the story corpus — do not fabricate zeros.
-            "narration_rate": None,
-            "avg_narration_penalty": None,
-            "strategy_cons": 0, "strategy_expl": 0,
-            "strategy_waste": 0, "strategy_efficient": 0,
-            "reports": total_runs, "reports_valid": total_runs, "reports_narrated": 0,
-        })
+        models.append(
+            {
+                "id": mid,
+                "label": label,
+                "provider": get_provider(mid),
+                "cells": total_runs,
+                "unique_cells": unique_cells,
+                "re_runs": total_runs - unique_cells,
+                "sessions": row[3],
+                "total_cost": row[4],
+                "avg_cost": row[5],
+                "cost_cells": row[6],
+                "avg_cache_hit": row[7],
+                "avg_tests": row[8],
+                "avg_test_code_ratio": row[9],
+                "avg_tok_per_session": row[10],
+                "avg_duration_s": row[11],
+                "avg_code_lines": avg_loc,
+                "tests_total": row[13],
+                "tests_passed": t["passed"],
+                "tests_run": t["run"],
+                "pass_rate": _honest_pass_rate(t["passed"], t["run"]),
+                # keep legacy keys populated for existing charts
+                "avg_cost_per_session": round(row[5] / max(row[3] / max(total_runs, 1), 1), 6),
+                "avg_loc": avg_loc,
+                "avg_energy_j": avg_energy_j,
+                "avg_energy_j_per_loc": round(avg_energy_j / max(avg_loc, 1), 2),
+                # Not measured for the story corpus — do not fabricate zeros.
+                "narration_rate": None,
+                "avg_narration_penalty": None,
+                "strategy_cons": 0,
+                "strategy_expl": 0,
+                "strategy_waste": 0,
+                "strategy_efficient": 0,
+                "reports": total_runs,
+                "reports_valid": total_runs,
+                "reports_narrated": 0,
+            }
+        )
 
     conn.close()
     return models
@@ -1179,7 +1375,9 @@ def build():
     print("Building data.js...")
 
     inventory = load_inventory()
-    print(f"  Loaded inventory: {inventory['counts']['db_sessions_experiments']} experiment sessions")
+    print(
+        f"  Loaded inventory: {inventory['counts']['db_sessions_experiments']} experiment sessions"
+    )
 
     corpus = load_canonical_corpus()
     entries = corpus.entries
@@ -1225,11 +1423,17 @@ def build():
             op_comparison[op]["models"][model_label] = {
                 "n": agg.get("n", agg.get("count", 0)),
                 "avg_cost": agg.get("cost_avg", 0),
-                "cost_ci95": [agg.get("cost_ci95_lo"), agg.get("cost_ci95_hi")] if agg.get("cost_ci95_lo") is not None else None,
+                "cost_ci95": [agg.get("cost_ci95_lo"), agg.get("cost_ci95_hi")]
+                if agg.get("cost_ci95_lo") is not None
+                else None,
                 "avg_escape": agg.get("escape_avg", 0),
-                "escape_ci95": [agg.get("escape_ci95_lo"), agg.get("escape_ci95_hi")] if agg.get("escape_ci95_lo") is not None else None,
+                "escape_ci95": [agg.get("escape_ci95_lo"), agg.get("escape_ci95_hi")]
+                if agg.get("escape_ci95_lo") is not None
+                else None,
                 "avg_correctness": agg.get("correctness_avg", 0),
-                "correctness_ci95": [agg.get("correctness_ci95_lo"), agg.get("correctness_ci95_hi")] if agg.get("correctness_ci95_lo") is not None else None,
+                "correctness_ci95": [agg.get("correctness_ci95_lo"), agg.get("correctness_ci95_hi")]
+                if agg.get("correctness_ci95_lo") is not None
+                else None,
                 "avg_thinking_ratio": agg.get("thinking_ratio_avg", 0),
                 "avg_energy_j": agg.get("energy_total_j_avg", 0),
                 "low_n": (agg.get("n", agg.get("count", 0)) < 5),
@@ -1246,8 +1450,15 @@ def build():
             pert_class_breakdown[pc] = {}
         model_label = MODEL_LABELS.get(mdl, mdl)
         if model_label not in pert_class_breakdown[pc]:
-            pert_class_breakdown[pc][model_label] = {"count": 0, "costs": [], "escapes": [],
-                "correctness": [], "thinking_ratios": [], "locs": [], "tokens": []}
+            pert_class_breakdown[pc][model_label] = {
+                "count": 0,
+                "costs": [],
+                "escapes": [],
+                "correctness": [],
+                "thinking_ratios": [],
+                "locs": [],
+                "tokens": [],
+            }
         pb = pert_class_breakdown[pc][model_label]
         pb["count"] += 1
         pb["costs"].append(e.get("cost", 0))
@@ -1280,11 +1491,19 @@ def build():
 
     # ── Energy ranking — per-model energy metrics ──
     energy_ranking = sorted(
-        [{"id": m["id"], "label": m["label"], "avg_energy_j": m["avg_energy_j"],
-          "avg_energy_j_per_loc": m["avg_energy_j_per_loc"],
-          "avg_cost": m["avg_cost"], "avg_loc": m["avg_loc"]}
-         for m in models if m["avg_energy_j"] > 0],
-        key=lambda x: x["avg_energy_j_per_loc"]
+        [
+            {
+                "id": m["id"],
+                "label": m["label"],
+                "avg_energy_j": m["avg_energy_j"],
+                "avg_energy_j_per_loc": m["avg_energy_j_per_loc"],
+                "avg_cost": m["avg_cost"],
+                "avg_loc": m["avg_loc"],
+            }
+            for m in models
+            if m["avg_energy_j"] > 0
+        ],
+        key=lambda x: x["avg_energy_j_per_loc"],
     )
 
     counts = inventory.get("counts", {})
@@ -1316,12 +1535,20 @@ def build():
             "canonical_findings": corpus.finding_count,
             "tombstoned_excluded": corpus.tombstoned_count,
             "_provenance": {
-                "worktrees_total": "M", "sessions_total": "M", "game_reports": "M",
-                "total_cost": "M", "architectures": "M", "variants": "M",
-                "stories_total": "C", "stories_unique": "C", "stories_re_runs": "C",
-                "story_sessions": "C", "story_total_cost": "C",
+                "worktrees_total": "M",
+                "sessions_total": "M",
+                "game_reports": "M",
+                "total_cost": "M",
+                "architectures": "M",
+                "variants": "M",
+                "stories_total": "C",
+                "stories_unique": "C",
+                "stories_re_runs": "C",
+                "story_sessions": "C",
+                "story_total_cost": "C",
                 "configs": "M",
-                "canonical_stories": "M", "canonical_findings": "M",
+                "canonical_stories": "M",
+                "canonical_findings": "M",
                 "tombstoned_excluded": "M",
             },
         },
@@ -1335,15 +1562,22 @@ def build():
         "energy_ranking": energy_ranking,
         "strategy_distribution": corpus.strategy_distribution,
         "routing": compute_routing(entries),
-        "grit_matrix": _load_grit_matrix(),
+        "correctness_escape_quadrants": _load_correctness_escape_quadrants(),
         "sonar": _compute_sonar(entries),
         "design_parameters": {
-            "beta": {"value": 0.001, "provenance": "design", "note": "Context inflation rate — calibrate to your codebase"},
+            "beta": {
+                "value": 0.001,
+                "provenance": "design",
+                "note": "Context inflation rate — calibrate to your codebase",
+            },
             "woc_healthy": {"value": 0.85, "provenance": "design"},
             "woc_critical": {"value": 0.70, "provenance": "design"},
             "strategy_thresholds": {
-                "correctness_min": 0.7, "escape_min": 0.5, "novelty_min": 0.4,
-                "efficient_cost_max": 0.003, "wasteful_correctness_max": 0.3,
+                "correctness_min": 0.7,
+                "escape_min": 0.5,
+                "novelty_min": 0.4,
+                "efficient_cost_max": 0.003,
+                "wasteful_correctness_max": 0.3,
                 "provenance": "design",
             },
             "composite_weights": {
@@ -1352,13 +1586,44 @@ def build():
             },
         },
         "external_sources": {
-            "epm_baseline": {"value": "1.6%/yr", "provenance": "X", "source": "IEA World Energy Outlook 2024"},
-            "epm_aggressive": {"value": "2.5%/yr", "provenance": "X", "source": "Aggressive scenario"},
-            "energy_per_token_prompt": {"value": 0.08, "unit": "J", "provenance": "X", "source": "TokenPowerBench (Niu et al., AAAI 2026)"},
-            "energy_per_token_output": {"value": 0.23, "unit": "J", "provenance": "X", "source": "TokenPowerBench (Niu et al., AAAI 2026)"},
-            "energy_per_token_reasoning": {"value": 0.47, "unit": "J", "provenance": "X", "source": "TokenPowerBench (Niu et al., AAAI 2026)"},
-            "energy_model_available": {"value": False, "provenance": "X", "note": "Claude/GPT architecture undisclosed — energy model disabled"},
-            "deepseek_active_params": {"value": "49e9", "provenance": "X", "note": "MoE V4 Pro, publicly disclosed (49B active)"},
+            "epm_baseline": {
+                "value": "1.6%/yr",
+                "provenance": "X",
+                "source": "IEA World Energy Outlook 2024",
+            },
+            "epm_aggressive": {
+                "value": "2.5%/yr",
+                "provenance": "X",
+                "source": "Aggressive scenario",
+            },
+            "energy_per_token_prompt": {
+                "value": 0.08,
+                "unit": "J",
+                "provenance": "X",
+                "source": "TokenPowerBench (Niu et al., AAAI 2026)",
+            },
+            "energy_per_token_output": {
+                "value": 0.23,
+                "unit": "J",
+                "provenance": "X",
+                "source": "TokenPowerBench (Niu et al., AAAI 2026)",
+            },
+            "energy_per_token_reasoning": {
+                "value": 0.47,
+                "unit": "J",
+                "provenance": "X",
+                "source": "TokenPowerBench (Niu et al., AAAI 2026)",
+            },
+            "energy_model_available": {
+                "value": False,
+                "provenance": "X",
+                "note": "Claude/GPT architecture undisclosed — energy model disabled",
+            },
+            "deepseek_active_params": {
+                "value": "49e9",
+                "provenance": "X",
+                "note": "MoE V4 Pro, publicly disclosed (49B active)",
+            },
         },
         "stories": _load_story_data(),
         "reviews": _load_review_data(),
@@ -1367,17 +1632,23 @@ def build():
     }
 
     import math
+
     # Strip NaN values (replace with null) and remove local paths
     def _clean_value(obj):
         if isinstance(obj, float) and math.isnan(obj):
             return None
         if isinstance(obj, dict):
-            return {k: _clean_value(v) for k, v in obj.items() if k not in ('source_inventory', 'source_registry', 'source_db')}
+            return {
+                k: _clean_value(v)
+                for k, v in obj.items()
+                if k not in ("source_inventory", "source_registry", "source_db")
+            }
         if isinstance(obj, list):
             return [_clean_value(v) for v in obj]
         if isinstance(obj, str):
-            return obj.replace(str(ROOT), '.').replace(str(Path.home()), '~')
+            return obj.replace(str(ROOT), ".").replace(str(Path.home()), "~")
         return obj
+
     clean_data = _clean_value(data)
 
     js = f"/* Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} by build_data.py */\n"
@@ -1389,6 +1660,7 @@ def build():
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="Build data.js for the Agentic Dynamics website")
     parser.add_argument("--dry-run", action="store_true", help="Print instead of writing")
     args = parser.parse_args()
