@@ -18,6 +18,10 @@ Usage:
 
 from __future__ import annotations
 
+import json
+import os
+from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +37,12 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables  # noqa: E402
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "experiments" / "data"
+
+#: The source-identity sidecar written alongside the parquet — records WHICH canonical
+#: source produced the tables, so ``--check`` can prove the parquet is current without
+#: re-deriving every row (public-truth review "smaller": a real parity check, not a row
+#: count that a stale file would also pass).
+SYNC_IDENTITY_PATH = DATA_DIR / "sync_identity.json"
 
 SESSION_SCHEMA = pa.schema(
     [
@@ -126,13 +136,12 @@ def _analysis_loc(analysis: list[dict]) -> dict[str, int]:
     return loc
 
 
-def sync() -> dict[str, int]:
-    """Sync the canonical story payloads to parquet. Returns row counts."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+def _build_rows(tables) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Flatten the canonical story payloads into ``(session_rows, story_rows)``.
 
-    from collections import Counter
-
-    tables = load_canonical_tables("story", "analysis")
+    Split out of :func:`sync` so ``--check`` can recompute the expected rows (and prove the
+    parquet matches the current resolver output) without writing anything.
+    """
     stories = tables.stories
 
     session_rows: list[dict[str, Any]] = []
@@ -236,15 +245,105 @@ def sync() -> dict[str, int]:
                 }
             )
 
-    if session_rows:
-        table = pa.Table.from_pylist(session_rows, schema=SESSION_SCHEMA)
-        pq.write_table(table, DATA_DIR / "sessions.parquet", compression="zstd")
+    return session_rows, story_rows
 
-    if story_rows:
-        table = pa.Table.from_pylist(story_rows, schema=STORY_SCHEMA)
-        pq.write_table(table, DATA_DIR / "stories.parquet", compression="zstd")
 
-    return {"sessions": len(session_rows), "stories": len(story_rows)}
+def _write_parquet_atomic(rows: list[dict[str, Any]], schema: pa.Schema, final_path: Path) -> None:
+    """Write a parquet table atomically — temp file + rename, never a partial write.
+
+    Writes an EMPTY (zero-row) table when ``rows`` is empty, so an empty canonical source
+    overwrites a stale parquet rather than leaving the older table in place (public-truth
+    review "smaller").
+    """
+    tmp_path = final_path.with_suffix(final_path.suffix + ".tmp")
+    table = pa.Table.from_pylist(rows, schema=schema)
+    pq.write_table(table, tmp_path, compression="zstd")
+    os.replace(tmp_path, final_path)
+
+
+def _write_identity_sidecar(tables, counts: dict[str, int]) -> None:
+    """Write the source-identity sidecar alongside the parquet (atomic, like the tables)."""
+    sidecar = {
+        "schema_version": "sync-identity/v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "registry_identity_sha256": tables.identity.registry_identity_sha256,
+        "resolved_input_sha256": tables.resolved_input_sha256,
+        "rows": counts,
+    }
+    tmp_path = SYNC_IDENTITY_PATH.with_suffix(".json.tmp")
+    tmp_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+    os.replace(tmp_path, SYNC_IDENTITY_PATH)
+
+
+def sync() -> dict[str, int]:
+    """Sync the canonical story payloads to parquet (atomic) + a source-identity sidecar.
+
+    Returns row counts.
+    """
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    tables = load_canonical_tables("story", "analysis")
+    session_rows, story_rows = _build_rows(tables)
+
+    _write_parquet_atomic(session_rows, SESSION_SCHEMA, DATA_DIR / "sessions.parquet")
+    _write_parquet_atomic(story_rows, STORY_SCHEMA, DATA_DIR / "stories.parquet")
+
+    counts = {"sessions": len(session_rows), "stories": len(story_rows)}
+    _write_identity_sidecar(tables, counts)
+    return counts
+
+
+def check() -> int:
+    """Real parity check: parquet rows + identities vs the current resolver output.
+
+    Returns exit code (0 = current, 1 = stale). A stale sync is detected when the sidecar's
+    registry/resolved-input identity differs from the resolver's, or when a parquet row count
+    differs from the freshly recomputed row count — not merely that a file exists.
+    """
+    tables = load_canonical_tables("story", "analysis")
+    session_rows, story_rows = _build_rows(tables)
+    expected = {"sessions": len(session_rows), "stories": len(story_rows)}
+
+    if not SYNC_IDENTITY_PATH.exists():
+        print("FAIL: no sync_identity.json sidecar — run sync first")
+        return 1
+    try:
+        sidecar = json.loads(SYNC_IDENTITY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        print("FAIL: sync_identity.json is unreadable — run sync first")
+        return 1
+
+    problems: list[str] = []
+    if sidecar.get("registry_identity_sha256") != tables.identity.registry_identity_sha256:
+        problems.append("registry identity mismatch — the parquet is stale")
+    if sidecar.get("resolved_input_sha256") != tables.resolved_input_sha256:
+        problems.append("resolved-input identity mismatch — the parquet is stale")
+
+    conn = duckdb.connect()
+    try:
+        for table, expected_n in expected.items():
+            path = DATA_DIR / f"{table}.parquet"
+            if not path.exists():
+                problems.append(f"{table}.parquet is missing")
+                continue
+            actual_n = conn.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
+            print(f"  {table}.parquet: {actual_n:,} rows (expected {expected_n:,})")
+            if actual_n != expected_n:
+                problems.append(f"{table}.parquet has {actual_n} rows, expected {expected_n}")
+            if sidecar.get("rows", {}).get(table) != actual_n:
+                problems.append(
+                    f"{table}.parquet rows {actual_n} != sidecar "
+                    f"{sidecar.get('rows', {}).get(table)}"
+                )
+    finally:
+        conn.close()
+
+    if problems:
+        print("FAIL:")
+        for p in problems:
+            print(f"  - {p}")
+        return 1
+    print("OK: parquet matches the current canonical source")
+    return 0
 
 
 def query(parquet_path: Path, sql: str) -> str:
@@ -259,16 +358,7 @@ def main() -> None:
     import sys
 
     if "--check" in sys.argv:
-        if not (DATA_DIR / "sessions.parquet").exists():
-            print("No parquet files. Run without --check first.")
-            return
-        conn = duckdb.connect()
-        for table in ["sessions", "stories"]:
-            path = DATA_DIR / f"{table}.parquet"
-            count = conn.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
-            print(f"  {table}.parquet: {count:,} rows")
-        conn.close()
-        return
+        sys.exit(check())
 
     if "--query" in sys.argv and len(sys.argv) > 2:
         sql = sys.argv[-1]

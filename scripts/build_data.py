@@ -21,7 +21,7 @@ import hashlib
 import json
 import os
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1491,6 +1491,41 @@ def generator_source_tree_identity() -> str:
     return h.hexdigest()
 
 
+#: The generated spec lifecycle index (``scripts/spec_status.py``) — the machine-readable
+#: source for the experiment-vs-workflow spec counts (public-truth review "smaller": the
+#: README displays 80 specs = 6 experiments + 74 workflows).
+SPEC_INDEX_PATH = ROOT / "experiments" / "specs" / "index.json"
+
+
+def _spec_counts() -> dict[str, int]:
+    """Count experiment vs workflow specs from the generated spec index.
+
+    A missing/unreadable index degrades to zeros — the figure is simply absent, never
+    fabricated — matching the resolver's file-fallback posture elsewhere.
+    """
+    try:
+        index = json.loads(SPEC_INDEX_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"experiment_specs": 0, "workflow_specs": 0}
+    n_experiment = n_workflow = 0
+    for spec in index.get("specs", []):
+        kind = spec.get("artifact_kind")
+        if kind == "experiment":
+            n_experiment += 1
+        elif kind == "workflow":
+            n_workflow += 1
+    return {"experiment_specs": n_experiment, "workflow_specs": n_workflow}
+
+
+def _lab_status_counts() -> dict[str, int]:
+    """Count canonical vs quarantined lab books from the lab manifest."""
+    counts = Counter(entry.lab_status for entry in load_lab_manifest())
+    return {
+        "lab_books_canonical": counts.get("canonical", 0),
+        "lab_books_quarantined": counts.get("quarantined", 0),
+    }
+
+
 def build():
     print("Building data.js...")
 
@@ -1644,6 +1679,14 @@ def build():
     counts = inventory.get("counts", {})
     inventory.get("costs", {})
 
+    # Headline figures the README "By the Numbers" block displays that are NOT part of the
+    # story corpus (public-truth review "smaller"): the provider count, the experiment-vs-
+    # workflow spec split, and the canonical-vs-quarantined lab split. All three are read
+    # from their canonical source (the models, the generated spec index, the lab manifest).
+    spec_counts = _spec_counts()
+    lab_counts = _lab_status_counts()
+    provider_count = len({m.get("provider") for m in models})
+
     data = {
         "_meta": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -1730,9 +1773,14 @@ def build():
             "db_sessions_total": counts.get("db_sessions_total", 0),
             "game_reports": report_count,
             "model_variants": len(models),
+            "providers": provider_count,
             "experiment_configs": counts.get("config_files", 0),
+            "experiment_specs": spec_counts["experiment_specs"],
+            "workflow_specs": spec_counts["workflow_specs"],
             "perturbation_operators": 10,
             "lab_books": len(load_lab_manifest()),
+            "lab_books_canonical": lab_counts["lab_books_canonical"],
+            "lab_books_quarantined": lab_counts["lab_books_quarantined"],
             "measured_spend_usd": round(sum(m.get("total_cost", 0) for m in models), 2),
             "_provenance": {
                 "story_sessions": "M",
@@ -1741,9 +1789,14 @@ def build():
                 "db_sessions_total": "M",
                 "game_reports": "M",
                 "model_variants": "M",
+                "providers": "M",
                 "experiment_configs": "M",
+                "experiment_specs": "M",
+                "workflow_specs": "M",
                 "perturbation_operators": "M",
                 "lab_books": "M",
+                "lab_books_canonical": "M",
+                "lab_books_quarantined": "M",
                 "measured_spend_usd": "M",
             },
         },

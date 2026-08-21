@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 21:18:21 UTC by build_data.py */
+/* Generated 2026-08-21 21:29:28 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T21:18:19.812667+00:00",
+    "generated_at": "2026-08-21T21:29:27.468916+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -62,7 +62,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "7541a05cc14e7ae9a43eaa64d272e0ff725b2c94e796265640db74c12755641e"
+    "generator_source_tree_identity": "9a460623a3472a8225288e5d5c1e8dc2be0234cd8d215dc3e4539d344bf9f88f"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -71,9 +71,14 @@ window.DYNAMICS_DATA = {
     "db_sessions_total": 3370,
     "game_reports": 344,
     "model_variants": 7,
+    "providers": 3,
     "experiment_configs": 35,
+    "experiment_specs": 6,
+    "workflow_specs": 74,
     "perturbation_operators": 10,
     "lab_books": 20,
+    "lab_books_canonical": 8,
+    "lab_books_quarantined": 12,
     "measured_spend_usd": 309.17,
     "_provenance": {
       "story_sessions": "M",
@@ -82,9 +87,14 @@ window.DYNAMICS_DATA = {
       "db_sessions_total": "M",
       "game_reports": "M",
       "model_variants": "M",
+      "providers": "M",
       "experiment_configs": "M",
+      "experiment_specs": "M",
+      "workflow_specs": "M",
       "perturbation_operators": "M",
       "lab_books": "M",
+      "lab_books_canonical": "M",
+      "lab_books_quarantined": "M",
       "measured_spend_usd": "M"
     }
   },
@@ -2241,7 +2251,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T21:18:19.910434+00:00"
+    "generated_at": "2026-08-21T21:29:27.565750+00:00"
   },
   "reviews": {
     "models": [
