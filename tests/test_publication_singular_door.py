@@ -138,23 +138,27 @@ def test_canonical_condition_split_has_no_bad_seed_arm():
 
 
 def test_data_js_story_conditions_match_the_canonical_split():
-    """The published ``data.js`` condition block agrees with the resolver.
+    """The published ``data.js`` condition block agrees with the resolver — exactly once.
 
     The contradiction the review found — ``data.js`` reporting ``bad_seed 41`` /
     ``early_degrade 91`` alongside the canonical ``clean 135 / early_degrade 80`` — is
-    only closed if the published block matches the resolver.
+    closed only if the published block is *exactly* the canonical split: two arms, each
+    appearing once, with no ``bad_seed``/``early_degrade-91`` arm surviving.
     """
     if not DATA_JS.exists():  # pragma: no cover - generated file, present in CI
         pytest.skip("apps/website/data.js not generated")
     text = DATA_JS.read_text(encoding="utf-8")
     payload = json.loads(text[text.index("{") : text.rindex("}") + 1])
 
-    conditions = {c["condition"]: c["cells"] for c in payload["stories"]["conditions"]}
-    assert conditions == CANONICAL_SPLIT, (
-        f"data.js stories.conditions {conditions} != canonical {CANONICAL_SPLIT} — "
-        f"the primary story path is still publishing legacy condition semantics"
+    arms = [(c["condition"], c["cells"]) for c in payload["stories"]["conditions"]]
+    counts = Counter(arms)
+    assert counts == {("clean", 135): 1, ("early_degrade", 80): 1}, (
+        f"data.js stories.conditions {dict(counts)} != the canonical split exactly once "
+        f"(clean 135 / early_degrade 80) — a duplicate or a legacy arm is present"
     )
-    assert "bad_seed" not in conditions
+    # Explicitly: no bad_seed-41 arm, no early_degrade-91 arm.
+    assert ("bad_seed", 41) not in counts
+    assert ("early_degrade", 91) not in counts
 
 
 def _data_js_payload() -> dict | None:

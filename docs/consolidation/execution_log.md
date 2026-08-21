@@ -1312,6 +1312,26 @@ release-gate verification — c7.
 
 Carried forward (later phases, not dropped): the full release-gate verification — c7.
 
+### c7_closure_verify — release gate (coverage proof + invariant audit)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Coverage proof** — every P0/P1/P2/smaller finding in `docs/review/canonical_publication_review.md` maps to a passing phase (P0→c1, P1-completeness→c2, P1-semantic→c3, P2-bytes→c3, P2-counts→c4, test-counts→c5, README→c6, Docker→c6); **zero orphans, zero deferrals** | PASS |
+| 2 | **Condition split asserted** — `data.js` carries `clean 135 / early_degrade 80` exactly once, no `bad_seed 41`, no `early_degrade 91`; `test_data_js_story_conditions_match_the_canonical_split` strengthened to assert exactly-once | PASS |
+| 3 | **Full suite green** — `pytest tests/`: **1538 passed, 1 skipped** | PASS |
+| 4 | **All guard suites green** — 15 guard files (the 13 canonical + `test_publication_singular_door.py` + `test_build_data.py`): **220 passed** | PASS |
+| 5 | **Compile-gate all specs** — `load_spec` + `compile_spec` over `experiments/definitions/*.yaml` + `workflows/**/*.yaml`: **80/80 compile, 0 fail** | PASS |
+| 6 | **Reproduce core dry-run + container core run** — `reproduce.sh core --dry-run` exit 0 (8 labs, `--no-tests --no-sonar`); `docker build` success; container CORE run produces `data.js` (116,193 bytes) AND a regenerated manifest (`generated_at` advanced, `files.data.js.sha256` matches) | PASS |
+| 7 | **Container defect fixed** — the image lacked `experiments/waivers/`, so the fail-closed gate aborted in-container; `Dockerfile` now `COPY`s `experiments/waivers/` | PASS |
+| 8 | **Invariant audit** — Redis 6380 isolation, Firebase dual-host, CAP frozen-not-implemented, no retired summary in publication input, lab lineage + fail-closed guards all PASS | PASS |
+| 9 | **Verification artifact** — `docs/review/canonical_publication_verification.md` written (status: accepted), PASS/FAIL per check + final verdict "PASS — semantic-integrity signoff: YES"; passes `test_doc_lifecycle.py` + `test_stale_path_guard.py` | PASS |
+
+**c7_closure_verify result: 9/9 PASS.**
+
+**Release verdict: PASS — semantic-integrity signoff: YES.** The canonical-publication closure
+(c1–c7) is complete: one canonical door (`load_canonical_tables`), one lineage to `data.js`.
+
+
 
 
 

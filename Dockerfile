@@ -47,12 +47,15 @@ RUN pip install --no-cache-dir -e .
 # conventions/ is required by commit analysis (measurement.commit_analysis loads
 # conventions/<lang>.yaml and silently falls back when absent); apps/ hosts the
 # website build (apps/website/data.js) and the Control Room portal; the committed
-# experiments/data_manifest.json is the canonical registry the labs read.
+# experiments/data_manifest.json is the canonical registry the labs read; the waivers
+# directory carries the reason-bearing exemptions for the 10 payload-less story rows that
+# build_data's fail-closed gate must find (canonical-publication closure, c2).
 COPY scripts/ scripts/
 COPY conventions/ conventions/
 COPY apps/ apps/
 COPY experiments/definitions/ experiments/definitions/
 COPY experiments/results/ experiments/results/
+COPY experiments/waivers/ experiments/waivers/
 COPY experiments/data_manifest.json experiments/data_manifest.json
 
 # Ensure output directories exist (website + artifact scratch roots)
