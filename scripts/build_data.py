@@ -1605,6 +1605,8 @@ def build():
         # ── "By the Numbers" table and the home-page hero are reconciled to THIS block.
         "public_statistics": {
             "story_sessions": sum(m.get("sessions", 0) for m in models),
+            "stories_total": sum(m.get("cells", 0) for m in models),
+            "story_total_cost": _fmt_usd(sum(m.get("total_cost", 0) for m in models)),
             "db_sessions_total": counts.get("db_sessions_total", 0),
             "game_reports": report_count,
             "model_variants": len(models),
@@ -1614,6 +1616,8 @@ def build():
             "measured_spend_usd": round(sum(m.get("total_cost", 0) for m in models), 2),
             "_provenance": {
                 "story_sessions": "M",
+                "stories_total": "C",
+                "story_total_cost": "C",
                 "db_sessions_total": "M",
                 "game_reports": "M",
                 "model_variants": "M",

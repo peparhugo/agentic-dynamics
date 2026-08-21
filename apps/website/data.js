@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 16:44:48 UTC by build_data.py */
+/* Generated 2026-08-21 20:01:33 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T16:44:47.503792+00:00",
+    "generated_at": "2026-08-21T20:01:32.337317+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -129,6 +129,8 @@ window.DYNAMICS_DATA = {
   },
   "public_statistics": {
     "story_sessions": 1067,
+    "stories_total": 215,
+    "story_total_cost": 309.1685,
     "db_sessions_total": 3370,
     "game_reports": 344,
     "model_variants": 7,
@@ -138,6 +140,8 @@ window.DYNAMICS_DATA = {
     "measured_spend_usd": 309.17,
     "_provenance": {
       "story_sessions": "M",
+      "stories_total": "C",
+      "story_total_cost": "C",
       "db_sessions_total": "M",
       "game_reports": "M",
       "model_variants": "M",
@@ -2208,7 +2212,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T16:44:47.508231+00:00"
+    "generated_at": "2026-08-21T20:01:32.344137+00:00"
   },
   "reviews": {
     "models": [
