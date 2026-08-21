@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # Public-Truth Closure Review — external critique (2026-08-21)
 
 **Provenance [X]:** operator-provided external review of main at `400673f84` (the merged

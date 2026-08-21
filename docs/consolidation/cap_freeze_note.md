@@ -50,3 +50,14 @@ nothing imports `control` except the reserved seam — consistent with "control 
 `context_abstraction_implement` is the one spec explicitly excluded from execution until S6
 completes; the stage order never schedules it, and S6's invariant audit asserts it is still
 PAUSED (not deleted, not superseded).
+
+## Extraction directive for CAP I5 (from the public-truth closure)
+
+`docs/review/public_truth_review.md`'s CAP readiness note, re-recorded here so the future CAP
+spec carries it: the generic contracts the public-truth closure hardened —
+`ManifestIdentity` / `ResolvedInputIdentity` (fact identity), `ResolutionIssue` /
+`ResolutionReport` (fact resolution state), the waiver policy (policy exception), the
+semantic lab contract (provenance chain), and record-scope accounting (scope) — are early
+forms of CAP contracts. When I0–I4 resumes, extract and generalize them into the reserved
+`core/contracts.py` home (I5); do not duplicate them, and leave publication-specific
+filesystem joins in `reporting/`.
