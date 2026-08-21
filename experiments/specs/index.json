@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-20T22:42:27.486351+00:00",
-  "n_specs": 78,
+  "generated_at": "2026-08-21T03:01:26.978674+00:00",
+  "n_specs": 79,
   "specs": [
     {
       "name": "routing_kb_dispatch",
@@ -308,6 +308,24 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0
+    },
+    {
+      "name": "semantic_integrity_release",
+      "version": "0.1",
+      "status": "active",
+      "spec_path": "workflows/repository/semantic_integrity_release.yaml",
+      "artifact_kind": "experiment",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-21T00:56:14.347462+00:00",
+      "latest_ok": false,
+      "latest_model": "anthropic/claude-opus-5",
+      "latest_cost_usd": 50.152024,
+      "latest_git_sha": "1102f5bf7",
+      "results_pointer": "experiments/results/workflows/semantic_integrity_release/20260821T005614Z.json",
+      "n_runs": 3
     },
     {
       "name": "context_abstraction_implement",
