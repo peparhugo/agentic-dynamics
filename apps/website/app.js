@@ -72,9 +72,13 @@
       'story_sessions': function() { return D.summary.story_sessions || D.summary.sessions_total; },
       'stories_total': function() { return D.summary.stories_total || 0; },
       'story_total_cost': function() { return fmtUSD(D.summary.story_total_cost || D.summary.total_cost); },
-      // Canonical-registry counts — the repointed source of truth for corpus size
-      // (current stories / clean single-task findings / contaminated tombstoned cells).
-      'canonical_stories': function() { return D.summary.canonical_stories; },
+      // Canonical-registry scoped counts (review P1) — the registry claim vs what
+      // actually resolved vs what was used. No single "canonical stories" number.
+      'registry_current_records': function() { return D.summary.registry_current_records; },
+      'resolved_measurement_payloads': function() { return D.summary.resolved_measurement_payloads; },
+      'eligible_records': function() { return D.summary.eligible_records; },
+      'records_used': function() { return D.summary.records_used; },
+      'unresolved_waivered': function() { return D.summary.unresolved_waivered; },
       'canonical_findings': function() { return D.summary.canonical_findings; },
       'tombstoned_excluded': function() { return D.summary.tombstoned_excluded; },
       'costgap': function() { return D.derived.cost_gap; },

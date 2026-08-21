@@ -44,10 +44,13 @@ from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
 from agentic_dynamics.control.routing import compute_routing  # noqa: E402
 from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS  # noqa: E402
 from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
+    DEFAULT_WAIVER_PATH,
     current_manifest_identity,
     load_canonical_tables,
+    load_waivers,
     read_manifest,
     registry_rows,
+    unwaivered_issues,
 )
 from agentic_dynamics.reporting.lab_contract import validate_contract  # noqa: E402
 from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
@@ -1310,6 +1313,48 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
     return models
 
 
+def _assert_resolution_complete(tables, waiver_path=None) -> list[dict]:
+    """Fail closed on unresolved current rows unless a reason-bearing waiver covers them.
+
+    Review P1: a current registry row whose payload cannot be resolved must not silently
+    drop out of the published dataset. It is either repaired or waived — and the waiver
+    must be explicit (a committed, reason-bearing entry). Returns the waivered issues as
+    plain dicts so :func:`build` can emit them into ``data.js`` (the waiver is *visible*,
+    not just permitted). Raises :class:`RuntimeError` naming every unwaivered row.
+    """
+    waivers = load_waivers(waiver_path)
+    unwaivered = unwaivered_issues(tables.resolution, waivers)
+    if unwaivered:
+        detail = "\n".join(
+            f"  - {i.table} {i.logical_locator!r} ({i.kind}) entity_id={i.entity_id}"
+            for i in unwaivered
+        )
+        raise RuntimeError(
+            "publication aborted: current registry rows could not be resolved to a "
+            "measurement payload and are not covered by a waiver:\n"
+            f"{detail}\n"
+            "Repair the payload, or add a reason-bearing entry to "
+            f"{DEFAULT_WAIVER_PATH.relative_to(ROOT)}."
+        )
+
+    # Waiver visibility: the waivered issues (matched to their reason) travel into data.js.
+    reason_by_key = {(w.table, w.logical_locator): w.reason for w in waivers}
+    waived = []
+    for i in tables.resolution.issues:
+        reason = reason_by_key.get((i.table, i.logical_locator))
+        if reason is not None:
+            waived.append(
+                {
+                    "table": i.table,
+                    "logical_locator": i.logical_locator,
+                    "entity_id": i.entity_id,
+                    "kind": i.kind,
+                    "reason": reason,
+                }
+            )
+    return waived
+
+
 def build():
     print("Building data.js...")
 
@@ -1325,11 +1370,20 @@ def build():
     tables = load_canonical_tables("story", "finding", "review", "analysis")
     corpus = load_canonical_corpus(tables=tables)
     entries = corpus.entries
+
+    # ── Fail closed on unresolved rows (review P1) ───────────────────────────
+    # A current registry row with no payload is a publication-blocking defect unless a
+    # committed, reason-bearing waiver covers it. The returned list is the waived rows,
+    # emitted below so the waiver is visible in data.js.
+    waivers = _assert_resolution_complete(tables)
+
     print(
         f"  Loaded canonical corpus: {corpus.finding_count} finding + "
         f"{corpus.story_count} story current records "
         f"({corpus.tombstoned_count} tombstoned excluded); {len(entries)} perturbation entries; "
-        f"{len(tables.reviews)} reviews + {len(tables.analysis)} analysis"
+        f"{len(tables.reviews)} reviews + {len(tables.analysis)} analysis; "
+        f"resolution {tables.resolution.resolved}/{tables.resolution.expected_current} "
+        f"({tables.resolution.unresolved} unresolved, {len(waivers)} waivered)"
     )
 
     report_count = count_game_reports()
@@ -1475,8 +1529,14 @@ def build():
             "story_sessions": sum(m.get("sessions", 0) for m in models),
             "story_total_cost": _fmt_usd(sum(m.get("total_cost", 0) for m in models)),
             "configs": counts.get("config_files", 0),
-            # Canonical-state counts (from the registry — the repointed source of truth).
-            "canonical_stories": corpus.story_count,
+            # ── Scoped counts (review P1) — the registry claim, what resolved, what was
+            # ── eligible, what was used. No more blanket "canonical stories": the 225-vs-215
+            # ── gap (the 10 payload-less, waived Claude stubs) is now explicit.
+            "registry_current_records": corpus.story_count,
+            "resolved_measurement_payloads": len(tables.stories),
+            "eligible_records": len(tables.stories),
+            "records_used": len(tables.stories),
+            "unresolved_waivered": len(waivers),
             "canonical_findings": corpus.finding_count,
             "tombstoned_excluded": corpus.tombstoned_count,
             "_provenance": {
@@ -1492,10 +1552,25 @@ def build():
                 "story_sessions": "C",
                 "story_total_cost": "C",
                 "configs": "M",
-                "canonical_stories": "M",
+                "registry_current_records": "M",
+                "resolved_measurement_payloads": "M",
+                "eligible_records": "C",
+                "records_used": "C",
+                "unresolved_waivered": "M",
                 "canonical_findings": "M",
                 "tombstoned_excluded": "M",
             },
+        },
+        # ── Resolution completeness (review P1) — the report + the waived rows, so the
+        # ── publication boundary and its exemptions are visible in the output itself.
+        "resolution_report": {
+            "expected_current": tables.resolution.expected_current,
+            "resolved": tables.resolution.resolved,
+            "missing": tables.resolution.missing,
+            "unreadable": tables.resolution.unreadable,
+            "ambiguous": tables.resolution.ambiguous,
+            "duplicate": tables.resolution.duplicate,
+            "waivers": waivers,
         },
         "models": models,
         "perturbation_models": perturbation_models,

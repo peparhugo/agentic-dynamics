@@ -1222,6 +1222,28 @@ entry (c3); honest record-count scopes `n_resolved`/`n_eligible`/`n_used`/`n_exc
 test-count scope renames (c5); README/site prose reconciliation (c6); the full release-gate
 verification (c7).
 
+### c2_resolution_fail_closed — resolution completeness + fail-closed publication (review P1)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **`ResolutionReport` added** — `canonical_corpus.ResolutionReport` carries exactly the six review fields (`expected_current`, `resolved`, `missing`, `unreadable`, `ambiguous`, `duplicate`) plus an `issues` list (one `ResolutionIssue` per unresolved row, with table/entity_id/logical_locator/source_uri/kind). Resolvers now return `(payloads, issues)`; `load_canonical_tables` aggregates them and attaches `tables.resolution` | PASS |
+| 2 | **Every failure kind is detected** — `missing` (no payload file / no matching run), `unreadable` (invalid JSON), `ambiguous` (multiple matching files/runs), `duplicate` (two current rows sharing a locator). Analysis is a best-effort derived join, not a row→payload obligation, so it contributes no fail-closed issues | PASS (unit-tested per kind) |
+| 3 | **Committed waiver artifact** — `experiments/waivers/unresolved_payloads.json` (schema `waiver/v1`) lists the 10 known payload-less story rows with entity_id + a reason-bearing rationale (cost-0 Claude stubs dropped in `994454f79`: claude CLI unavailable, cell never ran) | PASS (10/10 rows) |
+| 4 | **Publication fails closed** — `build_data._assert_resolution_complete` aborts with a `RuntimeError` naming every unresolved current row not covered by a waiver; `build()` runs it after resolving the four tables | PASS |
+| 5 | **The waiver is visible in the output** — `data.js` gains a `resolution_report` block (the six counts) plus the waived rows with their reasons, and `summary` gains the scoped counts `registry_current_records` (225) / `resolved_measurement_payloads` (215) / `eligible_records` (215) / `records_used` (215) / `unresolved_waivered` (10); the misleading `canonical_stories` key is gone | PASS |
+| 6 | **Site copy uses the scoped terms** — `evidence.html` + `app.js` report "current story rows" vs "resolved measurement payloads" (and the waived count) instead of a single "canonical stories" number | PASS |
+| 7 | **Tests** — missing payload without a waiver → `_assert_resolution_complete` raises; with a waiver → returns the waived row (visible); plus per-kind `ResolutionReport` unit tests and a real-corpus integration guard (10 missing, 10 waived) that fails closed on future drift | PASS (7 new tests) |
+| 8 | **data.js + manifest regenerated** — `build_data.py` rebuilds against the waived resolver; `generate_manifest.py` re-hashes `data.js` (registry array byte-identical, so lab-contract identity is unchanged) | PASS |
+| 9 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1413 passed, 106 deselected**; full `pytest tests/`: **1518 passed, 1 skipped** | PASS |
+
+**c2_resolution_fail_closed result: 9/9 PASS.**
+
+Carried forward (later phases, not dropped): semantic lab-contract validation against the manifest
+entry (`metric_definition_version` grit/v1 vs committed grit/v0) — c3; honest record-count scopes
+`n_resolved`/`n_eligible`/`n_used`/`n_excluded` — c4; the test-count scope renames — c5; README/site
+prose reconciliation — c6; the full release-gate verification — c7.
+
+
 
 
 
