@@ -645,7 +645,7 @@ def _index_ledger(tmp_path: Path, goal: str, phases: list[dict]) -> SpecStatusEn
         json.dumps({"spec_name": "control_room_portal", "goal": goal, "phases": phases})
     )
     return SpecStatusEntry(
-        name="control_room_portal", version="0.2", status="active",
+        name="control_room_portal", version="0.2", status="runnable",
         spec_path="workflows/repository/control_room_portal.yaml",
         last_run_at="2026-08-19T00:00:00+00:00", results_pointer=rel, n_runs=1,
     )
@@ -717,7 +717,7 @@ def test_index_fallback_degrades_to_empty_on_any_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: None)
     assert _completed_phases_from_index(spec, phase_names, "g") == set()
 
-    dangling = SpecStatusEntry(name="control_room_portal", version="0.2", status="active",
+    dangling = SpecStatusEntry(name="control_room_portal", version="0.2", status="runnable",
                                spec_path="x.yaml", results_pointer="does/not/exist.json")
     monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: dangling)
     assert _completed_phases_from_index(spec, phase_names, "g") == set()

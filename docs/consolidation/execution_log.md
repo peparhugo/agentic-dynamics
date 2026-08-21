@@ -1096,6 +1096,37 @@ stamp gracefully degraded to "unknown".
 
 **s7_repro_split result: 7/7 PASS.**
 
+### s8_lifecycle_backfill — honest workflow lifecycle (review item 8 / P2)
+
+**The bug.** `derive_status` marked a non-repeatable workflow with attempts-but-no-success as
+`running` forever. `running` was a *fallback* (runs exist, none `ok`) rather than a *claim about
+the present*; old workflows that failed or died without a verdict stayed `running` indefinitely.
+The pre-s1 index showed 4 such entries (`agentic_dynamics_rebrand`, `claude_background_sessions`,
+`control_room_portal`, `design_sessions` — all `latest_ok=False`, i.e. honest state `failed`).
+
+**The fix.** `running` now REQUIRES positive evidence of current execution — an *open* run
+(ledger with `started_at`, no `ended_at`) whose start is within `RUNNING_WINDOW` (24h). Historical
+attempts derive per the ledger: `completed` (any `ok=True`), `failed` (a definitive `ok=False`),
+`blocked` (runs exist but none resolved — no verdict, nothing in flight), `superseded`
+(`superseded_by`). The retired `active` state is gone: a repeatable spec is always `runnable`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Vocabulary** — `draft|runnable|running|failed|blocked|completed|superseded|tombstoned` added to `SPEC_STATUSES` (experiment_spec) + `STATUS_ORDER`/legend (spec_status); `active` removed from both | PASS |
+| 2 | **`running` requires current-execution evidence** — `RunSummary` gains `started_at` + `open`; `summarize_run` marks a ledger open when it has `started_at` and no `ended_at`; `derive_status(..., now=, running_window=)` returns `running` only for an open run within the window | PASS |
+| 3 | **Historical attempts derive honestly** — `ok=True`→`completed`, `ok=False`→`failed`, runs-but-no-verdict→`blocked`, superseded_by→`superseded`, never-run→`runnable` | PASS |
+| 4 | **Backfill** — the 4 historical `running` entries (all `latest_ok=False`) now derive `failed` under the corrected code; the committed index regenerated (the `active`→`runnable` vocabulary backfill: 11 specs), and a fresh checkout (no untracked run ledgers) honestly shows them `runnable`/never-run | PASS |
+| 5 | **Tests for every transition** — authored draft/tombstoned win; superseded; runnable (never-run + repeatable); running (open+recent); blocked (open+stale, and no-verdict); failed (ok=False, and failed-beats-blocked); completed (ok=True, never un-completed); plus the regression "a historical failed/blocked run never stays `running`" and the end-to-end failed-ledger→`failed` test | PASS |
+| 6 | **Full suite green** — 1504 passed, 1 skipped (+6: 5 lifecycle tests + 1 parametrized validator case) | PASS |
+
+**Backfill honesty note:** the literal 4 `running` rows came from *untracked* run ledgers
+(`experiments/results/workflows/` is gitignored by design), so this checkout cannot reproduce
+them. The backfill is realized in code — the corrected `derive_status` can never again emit a
+stale `running`, and a regression test pins "a failed ledger derives `failed`, not `running`".
+When a checkout *has* the ledgers, those 4 specs now correctly report `failed`.
+
+**s8_lifecycle_backfill result: 6/6 PASS.**
+
 
 
 

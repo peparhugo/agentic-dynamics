@@ -27,9 +27,7 @@ EVIDENCE_CLASSES = frozenset({"[M]", "[C]", "[H]", "[P]", "[X]"})
 METRIC_AGGS = frozenset({"mean", "distribution", "ratio"})
 METRIC_OVERS = frozenset({"outcome", "attempt", "job", "cell"})
 ADAPT_STRATEGIES = frozenset({"coordinate_descent", "manual"})
-ADAPT_SELECTIONS = frozenset(
-    {"highest_uncertainty", "highest_regret", "largest_effect"}
-)
+ADAPT_SELECTIONS = frozenset({"highest_uncertainty", "highest_regret", "largest_effect"})
 
 # ── Artifact identity (refactor-repair P1-3) ─────────────────────
 #
@@ -55,24 +53,27 @@ INTENTS = frozenset({"measure", "mutate"})
 # lives here — beside the other validated enums — so ``validate_spec`` stays the single
 # gate for it and the derived index imports this frozenset instead of re-listing it.
 #
-# Per-kind semantics (refactor-repair P1-4): a *repeatable* spec (an experiment, or an
-# idempotent operation) uses the four measurement states; a *non-repeatable* workflow uses
-# the six work-order states, where ``completed`` is DERIVED from a successful run ledger,
-# not authored:
+# Per-kind semantics (refactor-repair P1-4; review item 8): a *repeatable* spec (an
+# experiment, or an idempotent operation) is always ``runnable``; a *non-repeatable* workflow
+# derives the work-order states, where ``completed``/``failed``/``blocked``/``running`` are
+# DERIVED from the run ledgers (and ``running`` requires current-execution evidence), not
+# authored:
 #
 #   draft       — authored, never run to completion; not yet a claim about anything.
-#   active      — the current repeatable spec for its question; runnable now.
-#   runnable    — a non-repeatable workflow never run successfully; ready to run.
-#   running     — a non-repeatable workflow that has been run but not yet completed.
+#   runnable    — never run (a non-repeatable workflow), or a repeatable spec; ready to run.
+#   running     — a non-repeatable workflow currently executing (an open, recent run).
+#   failed      — a non-repeatable workflow whose run(s) recorded a definitive failure.
+#   blocked     — a non-repeatable workflow with runs that started but never resolved.
 #   completed   — a non-repeatable workflow whose run succeeded (derived from the ledgers).
 #   superseded  — a later spec took over its question (see ``superseded_by``).
 #   tombstoned  — retired; kept for lineage, never to be run again.
 SPEC_STATUSES = frozenset(
     {
         "draft",
-        "active",
         "runnable",
         "running",
+        "failed",
+        "blocked",
         "completed",
         "superseded",
         "tombstoned",
@@ -192,6 +193,7 @@ LEDGER_FIELDS: frozenset[str] = frozenset(
     }
 )
 
+
 def _as_name_list(value: Any) -> list[str]:
     """Normalize a spec-name field that may be a bare string, a list, or absent.
 
@@ -212,7 +214,6 @@ def _as_optional_str(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-
 
 
 # ── Core objects ────────────────────────────────────────────────
@@ -394,7 +395,9 @@ class AdaptSpec:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> AdaptSpec:
-        return cls(strategy=d.get("strategy", "manual"), selection=d.get("selection", "highest_regret"))
+        return cls(
+            strategy=d.get("strategy", "manual"), selection=d.get("selection", "highest_regret")
+        )
 
 
 @dataclass
@@ -515,7 +518,11 @@ class ExperimentSpec:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ExperimentSpec:
-        missing = [k for k in ("name", "question", "version", "workflow", "factors", "design") if k not in d]
+        missing = [
+            k
+            for k in ("name", "question", "version", "workflow", "factors", "design")
+            if k not in d
+        ]
         if missing:
             raise ValueError(f"ExperimentSpec missing required fields: {missing}")
 
@@ -592,7 +599,7 @@ def validate_rules(spec: ExperimentSpec) -> list[str]:
 
     for rule in spec.rules:
         if rule.name in seen:
-            errors.append(f'duplicate rule name {rule.name!r}')
+            errors.append(f"duplicate rule name {rule.name!r}")
         seen.add(rule.name)
         if rule.plane not in PLANES:
             errors.append(
@@ -601,7 +608,7 @@ def validate_rules(spec: ExperimentSpec) -> list[str]:
         if rule.evidence_class not in EVIDENCE_CLASSES:
             errors.append(
                 f'rule "{rule.name}": evidence_class {rule.evidence_class!r} '
-                f'is not one of {sorted(EVIDENCE_CLASSES)}'
+                f"is not one of {sorted(EVIDENCE_CLASSES)}"
             )
 
     available = set(LEDGER_FIELDS)
@@ -614,7 +621,7 @@ def validate_rules(spec: ExperimentSpec) -> list[str]:
             if req not in available:
                 errors.append(
                     f'rule "{rule.name}" requires {req!r} — not produced by the ledger '
-                    f'or any measurement rule in this spec. Instrument it first.'
+                    f"or any measurement rule in this spec. Instrument it first."
                 )
     return errors
 
@@ -624,7 +631,9 @@ def validate_spec(spec: ExperimentSpec) -> list[str]:
     errors: list[str] = []
 
     if spec.workflow.kind not in WORKFLOW_KINDS:
-        errors.append(f'workflow.kind {spec.workflow.kind!r} is not one of {sorted(WORKFLOW_KINDS)}')
+        errors.append(
+            f"workflow.kind {spec.workflow.kind!r} is not one of {sorted(WORKFLOW_KINDS)}"
+        )
     if spec.design != "factorial":
         errors.append(f'design {spec.design!r} unsupported — only "factorial" is defined')
 
@@ -639,31 +648,31 @@ def validate_spec(spec: ExperimentSpec) -> list[str]:
 
     if spec.comparison is not None and spec.comparison.arm_factor not in factor_names:
         errors.append(
-            f'comparison.arm_factor {spec.comparison.arm_factor!r} is not a declared factor '
-            f'({factor_names})'
+            f"comparison.arm_factor {spec.comparison.arm_factor!r} is not a declared factor "
+            f"({factor_names})"
         )
 
     for m in spec.metrics:
         if m.agg not in METRIC_AGGS:
             errors.append(f'metric "{m.name}": agg {m.agg!r} is not one of {sorted(METRIC_AGGS)}')
         if m.over not in METRIC_OVERS:
-            errors.append(f'metric "{m.name}": over {m.over!r} is not one of {sorted(METRIC_OVERS)}')
+            errors.append(
+                f'metric "{m.name}": over {m.over!r} is not one of {sorted(METRIC_OVERS)}'
+            )
 
     if spec.adapt.strategy not in ADAPT_STRATEGIES:
         errors.append(
-            f'adapt.strategy {spec.adapt.strategy!r} is not one of {sorted(ADAPT_STRATEGIES)}'
+            f"adapt.strategy {spec.adapt.strategy!r} is not one of {sorted(ADAPT_STRATEGIES)}"
         )
     if spec.adapt.selection not in ADAPT_SELECTIONS:
         errors.append(
-            f'adapt.selection {spec.adapt.selection!r} is not one of {sorted(ADAPT_SELECTIONS)}'
+            f"adapt.selection {spec.adapt.selection!r} is not one of {sorted(ADAPT_SELECTIONS)}"
         )
 
     # Lifecycle gate: "" means unset (the index derives it) — any other value must be one
     # of the four defined states, so a spec can never claim a status nothing understands.
     if spec.status and spec.status not in SPEC_STATUSES:
-        errors.append(
-            f"status {spec.status!r} is not one of {sorted(SPEC_STATUSES)}"
-        )
+        errors.append(f"status {spec.status!r} is not one of {sorted(SPEC_STATUSES)}")
     if spec.superseded_by is not None and spec.superseded_by == spec.name:
         errors.append(f"superseded_by {spec.superseded_by!r} points at the spec itself")
     if spec.name in spec.supersedes:
@@ -693,7 +702,7 @@ def validate_spec(spec: ExperimentSpec) -> list[str]:
             errors.append(
                 f'artifact_kind "experiment" but {" and ".join(reasons)} — an experiment '
                 f'measures, it does not modify the repository; declare artifact_kind "workflow" '
-                f'or set sandboxed: true'
+                f"or set sandboxed: true"
             )
 
     errors.extend(validate_rules(spec))

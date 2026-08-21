@@ -3,12 +3,13 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-21T00:08:38.129513+00:00`  ·  79 spec(s)
-**Work remaining:** 70 runnable-now · 9 completed/retired
+Generated at: `2026-08-21T04:23:16.531169+00:00`  ·  79 spec(s)
+**Work remaining:** 70 open · 9 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `agentic_dynamics_rebrand` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_design` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_finalize` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -28,6 +29,7 @@ Generated at: `2026-08-21T00:08:38.129513+00:00`  ·  79 spec(s)
 | `design_sessions` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `evidence_narrative` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `evidence_redesign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `fix_review_findings` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `framework_facelift` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `kb_event_typing` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -35,9 +37,14 @@ Generated at: `2026-08-21T00:08:38.129513+00:00`  ·  79 spec(s)
 | `kb_producer_factory` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_record_fidelity` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_write_path` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `labbook_refresh` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `measurement_bug_fixes` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `opencode_docs_refresh` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `perturbation_operators_fix` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `queue_steer` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `rag_bare_vs_augmented` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `rag_knowledge_base` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `rag_knowledge_base_build` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `rag_knowledge_base_reconcile` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -49,12 +56,16 @@ Generated at: `2026-08-21T00:08:38.129513+00:00`  ·  79 spec(s)
 | `rag_seam_split` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `refactor_master_plan` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `refactor_repair_release` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `registry_canonicalize` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `remediation_data_integrity` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `repo_review_fable` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_follow_up` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_dispatch` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `routing_kb_experiment_design` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `routing_kb_experiment_design_research` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_more_itertools` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_wiring` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `semantic_integrity_release` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `site_golden_circle` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -66,17 +77,6 @@ Generated at: `2026-08-21T00:08:38.129513+00:00`  ·  79 spec(s)
 | `website_repoint` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `website_rewrite` | workflow | no | runnable | 0.3 | — | — | — | — | — | 0 |
 | `workflow_step_routing` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
-| `auto_posthoc_wiring` | workflow | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `explanation_tax` | experiment | yes | active | 0.2 | — | — | — | — | — | 0 |
-| `labbook_refresh` | workflow | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `posthoc_pipeline` | workflow | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `process_perturbation_resample` | experiment | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `queue_steer` | workflow | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `rag_bare_vs_augmented` | experiment | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `registry_canonicalize` | workflow | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `routing_kb_experiment_design` | experiment | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `routing_kb_experiment_design_research` | experiment | yes | active | 0.1 | — | — | — | — | — | 0 |
-| `routing_regret_under_degradation` | experiment | yes | active | 0.2 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | draft | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_release` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_release_execute` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
@@ -92,14 +92,17 @@ Generated at: `2026-08-21T00:08:38.129513+00:00`  ·  79 spec(s)
 
 **Status** — authored in the spec YAML's `status:` when the operator asserted one,
 otherwise derived: `superseded` when the spec names a `superseded_by:`; for a
-non-repeatable workflow, `completed` when a run succeeded, `running` when runs exist
-but none succeeded, `runnable` when never run; else `active`.
+non-repeatable workflow, `completed` when any run succeeded, `failed` when a run
+recorded a definitive failure, `blocked` when runs exist but none resolved, `running`
+when a run is currently executing (an open, recent run), `runnable` when never run;
+else (a repeatable spec) `runnable`.
 
 | status | meaning |
 |---|---|
-| `runnable` | a non-repeatable workflow never run successfully — ready to run |
-| `running` | a non-repeatable workflow that has been run but not yet completed |
-| `active` | the current repeatable spec for its question — runnable now |
+| `runnable` | never run (a non-repeatable workflow), or a repeatable spec — ready to run |
+| `running` | a non-repeatable workflow currently executing — an open run within the window |
+| `failed` | a non-repeatable workflow whose run(s) recorded a definitive failure |
+| `blocked` | a non-repeatable workflow with runs that started but never resolved |
 | `draft` | authored, not yet run to completion; not yet a claim about anything |
 | `completed` | a non-repeatable workflow whose run succeeded (derived from the run ledgers) |
 | `superseded` | a later spec took over its question (see that spec's `supersedes` column) |

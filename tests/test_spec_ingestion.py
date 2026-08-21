@@ -64,7 +64,7 @@ def _entry(name: str = "alpha", **overrides) -> SpecStatusEntry:
     base = dict(
         name=name,
         version="0.2",
-        status="active",
+        status="runnable",
         spec_path=f"experiments/specs/{name}.yaml",
         supersedes=["alpha_v1"],
         superseded_by=None,
@@ -143,7 +143,7 @@ def test_entity_id_is_the_readable_spec_key():
 def test_entity_id_is_stable_across_lifecycle_changes():
     # The whole supersede chain hangs off this: the entity must not move when the lifecycle
     # does, or every version would look like a brand-new entity.
-    a = build_spec_record(_entry(status="active"), revision=REVISION)
+    a = build_spec_record(_entry(status="runnable"), revision=REVISION)
     b = build_spec_record(_entry(status="superseded", n_runs=9), revision="deadbeef")
     assert a.entity_id == b.entity_id
     assert a.knowledge_id != b.knowledge_id
@@ -164,7 +164,7 @@ def test_locator_and_source_uri():
 
 def test_structured_fields_carry_the_lifecycle():
     record = build_spec_record(_entry(), revision=REVISION)
-    assert record.subject_status == "active"                       # the derived status
+    assert record.subject_status == "runnable"                       # the derived status
     assert record.subject_id.endswith("20260818T153000Z.json")     # the run it derived from
     assert record.observed_at == "2026-08-18T15:30:00+00:00"       # last_run_at, not now
     assert record.symbols == ["alpha_v1"]                          # the supersedes lineage
@@ -193,7 +193,7 @@ def test_body_is_parseable_and_round_trips_every_lifecycle_field():
     parsed = parse_spec_text(spec_text(entry))
     assert parsed["name"] == "alpha"
     assert parsed["version"] == "0.2"
-    assert parsed["status"] == "active"
+    assert parsed["status"] == "runnable"
     assert parsed["supersedes"] == "alpha_v1"
     assert parsed["superseded_by"] == "-"          # absent renders as one fixed placeholder
     assert parsed["completed_at"] == "-"
@@ -256,7 +256,7 @@ def test_artifact_round_trips_through_the_shared_contract():
     assert restored.knowledge_id == record.knowledge_id
     assert restored.entity_id == record.entity_id
     assert restored.authority is Authority.POLICY
-    assert restored.subject_status == "active"
+    assert restored.subject_status == "runnable"
     assert restored.text == record.text
 
 
