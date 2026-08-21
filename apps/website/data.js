@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 21:50:38 UTC by build_data.py */
+/* Generated 2026-08-21 23:15:30 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T21:50:36.833236+00:00",
+    "generated_at": "2026-08-21T23:15:29.115615+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -62,7 +62,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "9a460623a3472a8225288e5d5c1e8dc2be0234cd8d215dc3e4539d344bf9f88f"
+    "generator_source_tree_identity": "0c9edfedaed9f05112fde1757d84d4a7601081ac4d0f9e7a02b37777f5a83663"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -2251,7 +2251,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T21:50:36.931142+00:00"
+    "generated_at": "2026-08-21T23:15:29.212050+00:00"
   },
   "reviews": {
     "models": [
@@ -3544,21 +3544,16 @@ window.DYNAMICS_DATA = {
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-21T23:18:19.025019",
+      "generated_at": "2026-08-22T01:14:49.318767",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
-        "cells": 106,
+        "cells": 105,
         "stories": 215,
-        "reviews": 242
+        "reviews": 242,
+        "review_without_current_story": 87,
+        "story_without_review": 60
       },
       "rows": [
-        {
-          "model": "?",
-          "tests": 0,
-          "reviews": 432,
-          "better_rate": 0.519,
-          "worse_rate": 0.074
-        },
         {
           "model": "claude-haiku-4-5",
           "tests": 0,
@@ -4301,20 +4296,20 @@ window.DYNAMICS_DATA = {
         "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
         "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
         "registry_version": "data-manifest/1.0+701rows",
-        "metric_definition_version": "verification_value/v1",
+        "metric_definition_version": "verification_value/v2",
         "n_resolved_records": 457,
-        "n_eligible_records": 457,
-        "n_used_records": 457,
-        "n_excluded_records": 0,
+        "n_eligible_records": 310,
+        "n_used_records": 310,
+        "n_excluded_records": 147,
         "n_unused_eligible_records": 0,
-        "review_without_current_story": 0,
-        "story_without_review": 0,
+        "review_without_current_story": 87,
+        "story_without_review": 60,
         "missing_required_field": 0,
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T21:18:19.025292+00:00"
+        "generated_at": "2026-08-21T23:14:49.319061+00:00"
       }
     }
   }

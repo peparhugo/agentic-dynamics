@@ -365,8 +365,8 @@
       "reads_retired_summary": false,
       "requires_external_service": null,
       "contract_status": "enforced",
-      "metric_definition_version": "verification_value/v1",
-      "rationale": "Consumes the canonical registry resolver only (story + review tables); reviews join to stories via their registry logical_locator, replacing the old filename heuristic. Contract-bearing."
+      "metric_definition_version": "verification_value/v2",
+      "rationale": "Consumes the canonical registry resolver only (story + review tables); reviews join to stories via their registry logical_locator, replacing the old filename heuristic. Contract-bearing. metric_definition_version bumped v1 -> v2 in m1 (measurement-contribution closure): the join now fails explicitly (review_without_current_story) and story_without_review is counted, so the published correlation contains only joined observations."
     }
   },
   "canonical_resolver": "src/agentic_dynamics/reporting/canonical_corpus.py",

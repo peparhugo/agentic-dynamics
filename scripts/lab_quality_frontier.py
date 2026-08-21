@@ -51,13 +51,17 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
-    # story_id -> (model, cost), from the current story rows only.
+    # story_id -> (model, cost), from the current story rows only. A story must carry a
+    # real model to be a usable join target; one without is dropped from the map so the
+    # join below (``sid not in cost_by_sid``) excludes it rather than emitting a
+    # placeholder ``model: "?"`` row (measurement-contribution closure, m1).
     cost_by_sid = {}
     for d in stories:
         sid = str(d.get("story_id") or "")
-        if len(sid) >= 8:
+        model = d.get("model")
+        if len(sid) >= 8 and model:
             summary = d.get("summary", {}) or {}
-            cost_by_sid[sid] = (d.get("model", "?"), summary.get("total_cost", 0) or 0)
+            cost_by_sid[sid] = (model, summary.get("total_cost", 0) or 0)
 
     by_model = defaultdict(
         lambda: {

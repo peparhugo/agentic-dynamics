@@ -701,7 +701,7 @@ def _load_review_data(reviews: list[dict], stories: list[dict]) -> dict:
     from collections import Counter
 
     sid_to_model = {
-        str(s.get("story_id") or ""): s.get("model", "?") for s in stories if s.get("story_id")
+        str(s.get("story_id") or ""): s.get("model") for s in stories if s.get("story_id")
     }
 
     by_model = {}
@@ -826,7 +826,7 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
     from collections import Counter
 
     sid_to_model = {
-        str(s.get("story_id") or ""): s.get("model", "?") for s in stories if s.get("story_id")
+        str(s.get("story_id") or ""): s.get("model") for s in stories if s.get("story_id")
     }
 
     by_model = {}
