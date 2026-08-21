@@ -1068,6 +1068,34 @@ is not yet auto-guarded (swept manually here); `scripts/batch_run.py:CONFIGS` st
 `factorial_compound.yaml`, which no longer exists under `experiments/definitions/configs/` — a
 code-level stale config, not agent context, left for the next instrumentation pass.
 
+### s7_repro_split — split + actually exercise the reproduction pipeline (review item 7 / P1)
+
+**The split.** `scripts/reproduce.sh` now takes `core` (default, explicit) plus two opt-in flags.
+Core is deterministic: `analyze_worktrees.py --no-tests --no-sonar` (no per-worktree pytest venv
+→ no network; no SonarQube) and the manifest-derived canonical lab set (`reproduce_lab_scripts()`,
+8 contract-bearing labs). The two external-service labs are reachable only via flags —
+`--with-neo4j` appends `lab_basin_topology_neo4j.py` (Neo4j on :7687), `--with-sonar` re-enables
+SonarQube (`analyze_worktrees.py --no-tests`) and appends `lab_sonar_quality.py` (SonarQube on
+:9000). Both stay quarantined (output to `legacy_labs/`, unpublished).
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **`reproduce core` split** — deterministic, no external services, canonical registry only; `analyze_worktrees.py` runs `--no-tests --no-sonar` in core, `--no-tests` (SonarQube on) under `--with-sonar` | PASS |
+| 2 | **Neo4j basin lab is opt-in** — `--with-neo4j` appends `lab_basin_topology_neo4j.py`; it is absent from the core dry-run | PASS |
+| 3 | **`--with-sonar` opt-in** — re-enables SonarQube + appends `lab_sonar_quality.py` | PASS |
+| 4 | **Dockerfile fixed** — `COPY conventions/` (commit-analysis scoring, previously silently-falling-back), `COPY apps/` (data.js home + Control Room), `COPY experiments/data_manifest.json` (the canonical registry the labs read); entrypoint `reproduce.sh core`; documented the `apps/website/` + `experiments/results/` mounts for data.js/manifest persistence | PASS |
+| 5 | **Base-dependency bug surfaced + fixed** — the container core run failed: `control/pipeline_status.py` (and `queue_reinterleave.py`) import `redis` at module level, but `redis` was only in the `admin` extra, so `pip install -e .` (the image's install) could not import the `control` plane. `redis>=5.0` moved into base `dependencies`; `admin` extra is now `flask` only | PASS |
+| 6 | **CI runs the actual container core command** — a new `repro`-job step builds the image, runs `docker run ... agentic-dynamics` against the committed canonical fixture (data_manifest.json + results; no opencode.db/SonarQube/Neo4j), and asserts `apps/website/data.js` is produced | PASS |
+| 7 | **Guarded** — `test_lab_manifest.py`'s reproduce.sh check updated: quarantined labs may not appear in the core set; the only quarantined names permitted are the two opt-in labs (`OPT_IN_LABS`), wired to `--with-neo4j`/`--with-sonar`. Full suite green (1499 passed, 1 skipped) | PASS |
+
+**Container verification (executed locally, not just reasoned):** `docker build` succeeded; the
+core run completed with exit 0 against the committed corpus (64 finding + 225 story current rows),
+rebuilt `apps/website/data.js` (108,783 bytes), correctly rejected all 12 quarantined labs in the
+`[lab-gate]` log, and regenerated `data_manifest.json` (701 entities) with the opencode version
+stamp gracefully degraded to "unknown".
+
+**s7_repro_split result: 7/7 PASS.**
+
 
 
 

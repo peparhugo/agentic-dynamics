@@ -48,7 +48,7 @@ python scripts/analyze_worktrees.py
 python scripts/inventory.py refresh
 python scripts/sync_data.py          # story results -> parquet (before build_data)
 python scripts/build_data.py
-python scripts/reproduce.sh --dry-run   # reproduction pipeline (rebuilds analysis + site data)
+python scripts/reproduce.sh [core] [--with-neo4j] [--with-sonar] [--dry-run]   # reproduction pipeline — core is deterministic; neo4j/sonar are opt-in
 python3 apps/control_room/server.py     # Control Room portal (FINOPS_PORT, default 8000)
 pytest tests/
 pytest tests/test_<module>.py -v

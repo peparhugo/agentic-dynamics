@@ -16,6 +16,7 @@ dependencies = [
     "tree-sitter-languages>=1.10",
     "duckdb>=1.0",
     "pyarrow>=14.0",
+    "redis>=5.0",
 ]
 
 [project.optional-dependencies]
@@ -27,7 +28,7 @@ all = [
 chromadb = ["chromadb>=0.4.0"]
 ollama = ["ollama>=0.3.0"]
 neo4j = ["neo4j>=5.20"]
-admin = ["flask>=3.0", "redis>=5.0"]
+admin = ["flask>=3.0"]
 
 # One entry point over the maintained scripts/ surface (rec 5): `agentic-dynamics` dispatches to
 # the backing scripts via `agentic_dynamics.cli`. Each subcommand is a thin adapter (rec 8).

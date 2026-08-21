@@ -38,6 +38,11 @@ MANIFEST_PATH = SCRIPTS_DIR / "lab_manifest.json"
 #: The retired corpus the quarantine exists to keep out of reproduction + publication.
 RETIRED_SUMMARY = "_results_summary.json"
 
+#: The two quarantined external-service labs that review item 7 moves behind reproduce.sh's
+#: ``--with-neo4j`` / ``--with-sonar`` opt-in flags (still quarantined, still unpublished — but
+#: reachable by hand). These are the only quarantined lab names ``reproduce.sh`` may contain.
+OPT_IN_LABS = frozenset({"lab_basin_topology_neo4j.py", "lab_sonar_quality.py"})
+
 #: Modules that read the retired summary on a lab's behalf. A lab importing one of these is
 #: transitively summary-derived even though its own source never names the file. Keyed by the
 #: import symbol that appears in lab source; the value is the evidence for the reader.
@@ -228,13 +233,19 @@ def test_summary_reading_labs_are_quarantined(script: str):
 
 
 def test_reproduce_sh_derives_its_lab_set_from_the_manifest():
-    """``reproduce.sh`` must not hard-code lab names again."""
+    """``reproduce.sh`` derives its CORE lab set from the manifest; the two external-service
+    labs are reachable only through their explicit opt-in flags (review item 7)."""
     src = (SCRIPTS_DIR / "reproduce.sh").read_text(encoding="utf-8")
     assert "reproduce_lab_scripts" in src, "reproduce.sh must query the manifest loader"
-    # The old failure mode: a literal array of lab scripts. Quarantined names must not appear.
+    # The old failure mode: a literal array of lab scripts. Quarantined names must not appear
+    # in the core set — the ONLY quarantined labs reproduce.sh may name are the two opt-in
+    # (external-service) labs, wired to their --with-* flag.
     for script, entry in _labs().items():
-        if entry["lab_status"] == "quarantined":
+        if entry["lab_status"] == "quarantined" and script not in OPT_IN_LABS:
             assert script not in src, f"reproduce.sh still names the quarantined lab {script}"
+    # The two opt-in labs must be wired to their flags (never part of the core list).
+    assert "--with-neo4j" in src and "--with-sonar" in src
+    assert "lab_basin_topology_neo4j.py" in src and "lab_sonar_quality.py" in src
 
 
 def test_build_data_gates_publication_on_the_manifest():
