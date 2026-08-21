@@ -4,6 +4,12 @@ Lab Book: Verification Value — does writing more tests predict reviewer outcom
 Joins per-story test counts to the second-model commit reviews and asks: do
 high-test stories produce fewer "worse" commits and more "better" commits?
 
+CANONICAL INPUT (semantic-integrity release, phase s2): publication-eligible, so both
+sides of the join come from the registry resolver — current ``story`` rows and current
+``review`` rows. The resolver stamps ``_story_id`` on each review from its registry row,
+which replaces the old "scan every review_*.json and guess from the filename" join. The
+output embeds a ``lab_contract`` block that ``build_data.py`` re-validates.
+
 Usage:
     python scripts/lab_verification_value.py
 
@@ -16,8 +22,18 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-RESULTS_DIR = Path("experiments/results/stories")
-REVIEWS_DIR = Path("experiments/results/reviews")
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
+
+from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
+from agentic_dynamics.reporting.lab_contract import attach_contract
+
+#: This script's name, as classified in scripts/lab_manifest.json — the contract key.
+LAB = "lab_verification_value.py"
+OUTPUT_PATH = Path("experiments/results/lab_verification_value.json")
 
 
 def _short_model(model: str) -> str:
@@ -36,17 +52,15 @@ def _test_count(d: dict) -> int:
     return peak
 
 
-def main():
-    # story_id -> (model, test_count)
+def compute(story_payloads: list[dict], reviews: list[dict]) -> dict:
+    """Join test thoroughness to reviewer outcomes over the canonical corpus.
+
+    Split out of :func:`main` so the analysis is testable without touching the registry.
+    """
+    # story_id -> (model, test_count), from the current story rows only.
     stories = {}
-    for f in sorted(RESULTS_DIR.glob("*.json")):
-        if "log" in f.name or "dvs" in f.name:
-            continue
-        try:
-            d = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        sid = d.get("story_id", "") or f.stem.split("_")[-1]
+    for d in story_payloads:
+        sid = str(d.get("story_id") or "")
         if len(sid) >= 8:
             stories[sid] = (_short_model(d.get("model", "?")), _test_count(d))
 
@@ -54,14 +68,10 @@ def main():
     buckets = defaultdict(lambda: {"better": 0, "worse": 0, "neutral": 0, "n": 0})
     by_model = defaultdict(lambda: {"better": 0, "worse": 0, "neutral": 0, "tests": []})
 
-    for f in sorted(REVIEWS_DIR.glob("review_*.json")):
-        if "_S" in f.stem or f.stem.endswith("_story"):
-            continue
-        try:
-            d = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        sid = d.get("story_id", "")
+    for d in reviews:
+        # `_story_id` comes from the review's registry row — an exact join, not a
+        # filename heuristic.
+        sid = str(d.get("_story_id") or d.get("story_id") or "")
         model, tests = stories.get(sid, ("?", 0))
         for cr in d.get("commit_reviews", []):
             outcome = cr.get("better_or_worse", "?")
@@ -76,13 +86,15 @@ def main():
     rows = []
     for (model, tests), b in sorted(buckets.items()):
         total = b["n"] or 1
-        rows.append({
-            "model": model,
-            "tests": tests,
-            "reviews": b["n"],
-            "better_rate": round(b["better"] / total, 3),
-            "worse_rate": round(b["worse"] / total, 3),
-        })
+        rows.append(
+            {
+                "model": model,
+                "tests": tests,
+                "reviews": b["n"],
+                "better_rate": round(b["better"] / total, 3),
+                "worse_rate": round(b["worse"] / total, 3),
+            }
+        )
     rows.sort(key=lambda x: (x["model"], x["tests"]))
 
     # Correlation: tests vs worse_rate across all story-cells with >=3 reviews.
@@ -97,23 +109,43 @@ def main():
         dy = sum((w - my) ** 2 for _, w in pts) ** 0.5
         corr = round(num / (dx * dy), 3) if dx and dy else None
 
-    output = {
+    return {
         "experiment_id": "lab_verification_value",
         "generated_at": datetime.now().isoformat(),
         "summary": {
             "correlation_tests_vs_worse_rate": corr,
             "cells": len(rows),
+            "stories": len(story_payloads),
+            "reviews": len(reviews),
         },
         "rows": rows,
     }
 
-    out = Path("experiments/results/lab_verification_value.json")
-    out.write_text(json.dumps(output, indent=2))
-    print(f"Saved: {out}")
-    for r in rows[:40]:
-        print(f"  {r['model']:20s} tests={r['tests']:4d} reviews={r['reviews']:3d} "
-              f"better={r['better_rate']:.0%} worse={r['worse_rate']:.0%}")
-    print(f"correlation(tests, worse_rate) = {corr}")
+
+def main():
+    tables = load_canonical_tables("story", "review")
+    output = compute(tables.stories, tables.reviews)
+    attach_contract(
+        output,
+        LAB,
+        tables,
+        n_input_records=len(tables.stories) + len(tables.reviews),
+    )
+
+    OUTPUT_PATH.write_text(json.dumps(output, indent=2))
+    print(f"Saved: {OUTPUT_PATH}")
+    print(
+        f"  canonical input: {len(tables.stories)} stories + {len(tables.reviews)} reviews "
+        f"({tables.identity.registry_version})"
+    )
+    for r in output["rows"][:40]:
+        print(
+            f"  {r['model']:20s} tests={r['tests']:4d} reviews={r['reviews']:3d} "
+            f"better={r['better_rate']:.0%} worse={r['worse_rate']:.0%}"
+        )
+    print(
+        f"correlation(tests, worse_rate) = {output['summary']['correlation_tests_vs_worse_rate']}"
+    )
 
 
 if __name__ == "__main__":

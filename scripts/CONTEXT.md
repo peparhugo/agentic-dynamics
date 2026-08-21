@@ -112,6 +112,23 @@ The quarantine is the semantic-integrity release's item 1
 does not publish it (rejections are logged by lab name). The file stays, and
 `agentic-dynamics analyze lab <name>` still runs it by hand.
 
+**The canonical lab contract (item 2).** A publication-eligible lab obeys two rules, enforced in
+code (`tests/test_lab_contract.py`):
+
+1. **One input door** — `agentic_dynamics.reporting.canonical_corpus.load_canonical_tables()`,
+   the registry resolver over `experiments/data_manifest.json`. Only `lifecycle_state ==
+   "current"` rows; the registry chooses the payload files, so tombstoned/superseded records and
+   stray directory contents cannot enter. No `_results_summary.json`, no `stories/*.json` glob.
+2. **Embedded lineage** — the output JSON carries a `lab_contract` block
+   (`agentic_dynamics.reporting.lab_contract`) with `input_dataset_id`,
+   `input_manifest_sha256`, `registry_version`, `metric_definition_version`,
+   `data_integrity_policy`, `requires_external_service`. `build_data.py` re-computes the current
+   registry identity and **rejects a stale artifact**, logging the lab name and the reason.
+
+The identity hash covers `schema_version` + the `registry` array — deliberately not the whole
+manifest file, because the manifest records `data.js`'s hash and publishing would otherwise
+invalidate the very labs it just published.
+
 | Script | Status | Question Answered | Key Output |
 |--------|--------|-------------------|------------|
 | `lab_cache_economics.py` | canonical | What is cache hits worth in dollars/rework? | Cache-hit economics from session transcripts |

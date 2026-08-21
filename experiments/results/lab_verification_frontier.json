@@ -1,79 +1,91 @@
 {
   "experiment_id": "lab_verification_frontier",
-  "generated_at": "2026-08-17T20:12:28.375355",
+  "generated_at": "2026-08-21T02:20:47.831932",
   "summary": {
     "models": 7,
+    "stories": 215,
     "cheapest": "deepseek-v4-flash",
     "most_verified": "claude-haiku-4-5",
     "pareto_frontier": [
       "deepseek-v4-flash",
-      "deepseek-v4-pro",
       "claude-haiku-4-5"
     ]
   },
   "models": [
     {
       "model": "deepseek-v4-flash",
-      "cells": 22,
-      "cost_cells": 22,
-      "avg_cost": 0.068,
-      "avg_tests": 36.364,
-      "total_cost": 1.4991,
-      "total_tests": 800
+      "cells": 31,
+      "cost_cells": 31,
+      "avg_cost": 0.074,
+      "avg_tests": 57.0,
+      "total_cost": 2.3083,
+      "total_tests": 1767
     },
     {
       "model": "gpt-5.6-luna",
-      "cells": 24,
-      "cost_cells": 24,
-      "avg_cost": 0.092,
-      "avg_tests": 10.0,
-      "total_cost": 2.2045,
-      "total_tests": 240
+      "cells": 34,
+      "cost_cells": 34,
+      "avg_cost": 0.094,
+      "avg_tests": 14.294,
+      "total_cost": 3.1806,
+      "total_tests": 486
     },
     {
       "model": "deepseek-v4-pro",
-      "cells": 37,
-      "cost_cells": 37,
-      "avg_cost": 0.159,
-      "avg_tests": 45.73,
-      "total_cost": 5.8756,
-      "total_tests": 1692
+      "cells": 39,
+      "cost_cells": 39,
+      "avg_cost": 0.162,
+      "avg_tests": 47.949,
+      "total_cost": 6.3144,
+      "total_tests": 1870
     },
     {
       "model": "gpt-5.6-terra",
-      "cells": 20,
-      "cost_cells": 20,
-      "avg_cost": 1.015,
-      "avg_tests": 9.75,
-      "total_cost": 20.3036,
-      "total_tests": 195
+      "cells": 30,
+      "cost_cells": 30,
+      "avg_cost": 1.044,
+      "avg_tests": 15.267,
+      "total_cost": 31.3298,
+      "total_tests": 458
     },
     {
       "model": "claude-haiku-4-5",
-      "cells": 14,
-      "cost_cells": 14,
-      "avg_cost": 1.537,
-      "avg_tests": 193.357,
-      "total_cost": 21.5168,
-      "total_tests": 2707
+      "cells": 24,
+      "cost_cells": 20,
+      "avg_cost": 1.631,
+      "avg_tests": 127.875,
+      "total_cost": 32.6168,
+      "total_tests": 3069
     },
     {
       "model": "gpt-5.6-sol",
-      "cells": 23,
-      "cost_cells": 23,
-      "avg_cost": 3.987,
-      "avg_tests": 11.957,
-      "total_cost": 91.6937,
-      "total_tests": 275
+      "cells": 30,
+      "cost_cells": 30,
+      "avg_cost": 3.817,
+      "avg_tests": 24.4,
+      "total_cost": 114.5238,
+      "total_tests": 732
     },
     {
       "model": "claude-sonnet-5",
-      "cells": 16,
-      "cost_cells": 16,
-      "avg_cost": 4.776,
-      "avg_tests": 153.188,
-      "total_cost": 76.4179,
-      "total_tests": 2451
+      "cells": 27,
+      "cost_cells": 23,
+      "avg_cost": 5.169,
+      "avg_tests": 117.148,
+      "total_cost": 118.8948,
+      "total_tests": 3163
     }
-  ]
+  ],
+  "lab_contract": {
+    "lab": "lab_verification_frontier.py",
+    "input_dataset_id": "canonical_registry/story",
+    "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+    "registry_version": "data-manifest/1.0+701rows",
+    "metric_definition_version": "verification_frontier/v1",
+    "data_integrity_policy": "docs/data_integrity_findings.md",
+    "requires_external_service": null,
+    "n_input_records": 215,
+    "contract_version": "lab-contract/v1",
+    "generated_at": "2026-08-21T00:20:47.831948+00:00"
+  }
 }

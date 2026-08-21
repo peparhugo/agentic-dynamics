@@ -29,13 +29,32 @@ directly or transitively, is `lab_status: quarantined` in `scripts/lab_manifest.
 the website. It still runs by hand — but its numbers are historical and must never be presented
 as current findings or written into `apps/website/`.
 
-The 7 canonical labs (live story corpus) are: `cache_economics`, `condition_effects`,
-`quality_frontier`, `story_arc`, `story_review`, `verification_frontier`, `verification_value`.
+The 7 canonical labs are: `cache_economics`, `condition_effects`, `quality_frontier`,
+`story_arc`, `story_review`, `verification_frontier`, `verification_value`.
 
 ```bash
 python3 -m agentic_dynamics.reporting.lab_manifest --reproduce     # the core set
 python3 -m agentic_dynamics.reporting.lab_manifest --quarantined   # the excluded set
 ```
+
+## The canonical lab contract (writing or editing a publication lab)
+
+A publication-eligible lab has exactly one input door and must declare its lineage:
+
+```python
+from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
+from agentic_dynamics.reporting.lab_contract import attach_contract
+
+tables = load_canonical_tables("story", "review")   # current registry rows only
+output = compute(tables.stories, tables.reviews)
+attach_contract(output, "lab_<name>.py", tables)    # embeds the 6 lineage fields
+```
+
+Never glob `experiments/results/{stories,reviews,analysis}/` in a publication lab — the registry
+chooses the files. `build_data.py` recomputes the registry identity and rejects any lab JSON
+whose embedded `input_manifest_sha256` is stale (logged by lab name), so a lab must be re-run
+after the corpus changes. `metric_definition_version` is declared in `scripts/lab_manifest.json`,
+not in the lab source.
 
 Source: `docs/review/semantic_integrity_review.md` P0. The lab descriptions below still describe
 the pre-quarantine world; the manifest is authoritative.

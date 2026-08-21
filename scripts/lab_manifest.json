@@ -1,7 +1,7 @@
 {
   "schema_version": "lab-manifest/v1",
   "_comment": [
-    "MACHINE-READABLE LAB CLASSIFICATION — the single source of truth for which lab books",
+    "MACHINE-READABLE LAB CLASSIFICATION \u2014 the single source of truth for which lab books",
     "run in the default reproduction pipeline and which may feed the website.",
     "",
     "Hand-maintained; guarded by tests/test_lab_manifest.py (every scripts/lab_*.py must appear",
@@ -9,23 +9,28 @@
     "Consumers: scripts/reproduce.sh (default lab set) and scripts/build_data.py (publication),",
     "both via the typed loader src/agentic_dynamics/reporting/lab_manifest.py.",
     "",
-    "Why this file exists: docs/review/semantic_integrity_review.md P0 — the lab pipeline",
+    "Why this file exists: docs/review/semantic_integrity_review.md P0 \u2014 the lab pipeline",
     "bypassed the canonical data-integrity boundary. _results_summary.json is RETIRED (144",
     "entries, replaced by the registry-backed canonical corpus in build_data.py), yet labs still",
     "read it and the website still published their output. This manifest is release item 1",
     "(quarantine): classify every lab, then remove the noncanonical ones from default",
-    "reproduction and from publication."
+    "reproduction and from publication.",
+    "",
+    "PHASE s2 (contract): every publication-eligible lab consumes ONLY the canonical registry",
+    "resolver (src/agentic_dynamics/reporting/canonical_corpus.py) and embeds a lab_contract block",
+    "(src/agentic_dynamics/reporting/lab_contract.py) carrying input_dataset_id,",
+    "input_manifest_sha256, registry_version, metric_definition_version, data_integrity_policy and",
+    "requires_external_service. build_data.py re-validates the manifest hash and refuses to publish",
+    "a stale artifact, logging the rejection with the lab name."
   ],
   "review_source": "docs/review/semantic_integrity_review.md",
-  "release_phase": "s1_lab_quarantine",
+  "release_phase": "s2_lab_contract",
   "data_integrity_policy": "docs/data_integrity_findings.md",
-
   "status_vocabulary": {
     "canonical": "Consumes only live, non-retired result records. Runs in the default reproduction pipeline and is eligible to feed the website (subject to the s2 lineage contract).",
     "historical": "Kept for provenance and still runnable by hand (`agentic-dynamics analyze lab <name>`), but its question or corpus belongs to a superseded measurement era. Not published.",
     "quarantined": "Consumes a RETIRED or otherwise noncanonical source (directly or transitively). The file is kept (historical record) but it is NOT run by reproduce.sh and its output is NOT published. Lifting a quarantine requires re-pointing the lab at a canonical source."
   },
-
   "field_semantics": {
     "lab_status": "canonical | historical | quarantined (see status_vocabulary).",
     "publication_eligible": "Hard gate: may this lab's output reach apps/website/data.js at all? quarantined => always false.",
@@ -35,16 +40,15 @@
     "input_sources": "Every dataset the lab reads, as repo-relative paths/globs (transitive sources noted in rationale).",
     "reads_retired_summary": "True when experiments/results/_results_summary.json is reached directly or transitively.",
     "requires_external_service": "External dependency that makes the lab non-deterministic/unavailable offline (neo4j | sonarqube | opencode_inference), else null.",
-    "contract_status": "s2 lineage contract state: 'pending' = the lab does not yet embed input_dataset_id / input_manifest_sha256 / registry_version / metric_definition_version; 'n/a' = quarantined, contract not applicable.",
-    "rationale": "Why this classification — the evidence, not the intent."
+    "contract_status": "s2 lineage contract state: 'enforced' = the lab consumes the canonical registry resolver and embeds a lab_contract block in its output; 'n/a' = quarantined, contract not applicable.",
+    "rationale": "Why this classification \u2014 the evidence, not the intent.",
+    "metric_definition_version": "Version of this lab's metric definitions, embedded in its output contract. Bump when a metric changes meaning (e.g. the s4 Grit resolution). Required for publication_eligible labs."
   },
-
   "retired_sources": [
     "experiments/results/_results_summary.json",
     "experiments/results/_trajectory_summary.json",
     "experiments/results/_trajectory_aggregate.json"
   ],
-
   "labs": {
     "lab_basin_topology.py": {
       "lab_status": "quarantined",
@@ -52,10 +56,13 @@
       "website_key": null,
       "reproduce_default": false,
       "output": "experiments/results/lab_basin_topology.json",
-      "input_sources": ["experiments/results/_results_summary.json"],
+      "input_sources": [
+        "experiments/results/_results_summary.json"
+      ],
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_basin_topology.py:18) and classifies basins over the retired SEMANTIC/MANIFOLD taxonomy."
     },
     "lab_basin_topology_neo4j.py": {
@@ -71,6 +78,7 @@
       "reads_retired_summary": true,
       "requires_external_service": "neo4j",
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Transitively summary-derived: the ExperimentRun nodes it queries are loaded from the retired summary (src/agentic_dynamics/knowledge/graph.py:245, Neo4jClient.load_runs), and it validates against the quarantined lab_basin_topology.json. Also requires a live Neo4j, which is why reproduce.sh:56-57 (unconditional inclusion) was flagged P1."
     },
     "lab_cache_economics.py": {
@@ -79,11 +87,14 @@
       "website_key": "cache_economics",
       "reproduce_default": true,
       "output": "experiments/results/lab_cache_economics.json",
-      "input_sources": ["experiments/results/stories/*.json"],
+      "input_sources": [
+        "registry:data_manifest.json#registry (story, current)"
+      ],
       "reads_retired_summary": false,
       "requires_external_service": null,
-      "contract_status": "pending",
-      "rationale": "Reads only the live story corpus. Not yet contract-bearing: it globs raw story results rather than resolving through the registry (s2)."
+      "contract_status": "enforced",
+      "metric_definition_version": "cache_economics/v1",
+      "rationale": "Consumes the canonical registry resolver only (reporting.canonical_corpus, story table). Contract-bearing: the output embeds input_dataset_id/input_manifest_sha256/registry_version/metric_definition_version/data_integrity_policy/requires_external_service."
     },
     "lab_claude_audit.py": {
       "lab_status": "quarantined",
@@ -98,6 +109,7 @@
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_claude_audit.py:16); the $47.54 audit is a claim about the retired corpus."
     },
     "lab_condition_effects.py": {
@@ -107,13 +119,14 @@
       "reproduce_default": true,
       "output": "experiments/results/lab_condition_effects.json",
       "input_sources": [
-        "experiments/results/stories/*.json",
-        "experiments/results/reviews/*.json"
+        "registry:data_manifest.json#registry (story, current)",
+        "registry:data_manifest.json#registry (review, current)"
       ],
       "reads_retired_summary": false,
       "requires_external_service": null,
-      "contract_status": "pending",
-      "rationale": "Reads only the live story + review corpora. The review flagged its unfiltered raw-story globbing — a contract (s2) problem, not a retired-source problem, so it is not quarantined."
+      "contract_status": "enforced",
+      "metric_definition_version": "condition_effects/v1",
+      "rationale": "Consumes the canonical registry resolver only (story + review tables). Conditions come from the resolver's no-op relabel, and the 77 tombstoned early_degrade cells are excluded \u2014 both load-bearing for a condition comparison. Contract-bearing."
     },
     "lab_correctness_premium.py": {
       "lab_status": "quarantined",
@@ -121,10 +134,13 @@
       "website_key": null,
       "reproduce_default": false,
       "output": "experiments/results/lab_correctness_premium.json",
-      "input_sources": ["experiments/results/_results_summary.json"],
+      "input_sources": [
+        "experiments/results/_results_summary.json"
+      ],
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_correctness_premium.py:16)."
     },
     "lab_flail_triggers.py": {
@@ -140,6 +156,7 @@
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_flail_triggers.py:15)."
     },
     "lab_grit_matrix.py": {
@@ -148,10 +165,13 @@
       "website_key": "grit_matrix",
       "reproduce_default": false,
       "output": "experiments/results/lab_grit_matrix.json",
-      "input_sources": ["experiments/results/_results_summary.json"],
+      "input_sources": [
+        "experiments/results/_results_summary.json"
+      ],
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_grit_matrix.py:15) and was the one lab published straight into data.js (build_data.py _load_grit_matrix). website_key stays recorded so build_data can LOG the rejection by name instead of silently dropping the section. Second defect, deferred to s4: it calls a correctness x escape quadrant 'high_grit', colliding with the README's formal G(s) = P(test_executed_success | perturbation_strength = s)."
     },
     "lab_opencode_meta_analysis.py": {
@@ -168,6 +188,7 @@
       "reads_retired_summary": true,
       "requires_external_service": "opencode_inference",
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Transitively summary-derived via opencode_analyzer._load_summary (src/agentic_dynamics/reporting/opencode_analyzer.py:23,26). It is also a meta-EXPERIMENT: it spends real inference and is nondeterministic, so it can never belong to a deterministic core reproduction."
     },
     "lab_quality_frontier.py": {
@@ -177,13 +198,14 @@
       "reproduce_default": true,
       "output": "experiments/results/lab_quality_frontier.json",
       "input_sources": [
-        "experiments/results/analysis/*.json",
-        "experiments/results/stories/*.json"
+        "registry:data_manifest.json#registry (story, current)",
+        "registry:data_manifest.json#registry (analysis joined on current story rows)"
       ],
       "reads_retired_summary": false,
       "requires_external_service": null,
-      "contract_status": "pending",
-      "rationale": "Reads only the live analysis + story corpora."
+      "contract_status": "enforced",
+      "metric_definition_version": "quality_frontier/v1",
+      "rationale": "Consumes the canonical registry resolver only. Analysis artifacts are not a registered source_type, but the resolver reads analysis_<story_id>.json only for CURRENT story rows \u2014 a registry-filtered join, not a directory glob. Contract-bearing."
     },
     "lab_sonar_quality.py": {
       "lab_status": "quarantined",
@@ -191,10 +213,13 @@
       "website_key": null,
       "reproduce_default": false,
       "output": null,
-      "input_sources": ["experiments/results/_results_summary.json"],
+      "input_sources": [
+        "experiments/results/_results_summary.json"
+      ],
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_sonar_quality.py:23) and depends on its sonar_* per-cell fields, which have no canonical replacement (build_data._compute_sonar already emits an explicit [P] historical marker for exactly this reason). Prints to stdout; writes no artifact."
     },
     "lab_story_arc.py": {
@@ -203,11 +228,14 @@
       "website_key": "story_arc",
       "reproduce_default": true,
       "output": "experiments/results/lab_story_arc.json",
-      "input_sources": ["experiments/results/stories/*.json"],
+      "input_sources": [
+        "registry:data_manifest.json#registry (story, current)"
+      ],
       "reads_retired_summary": false,
       "requires_external_service": null,
-      "contract_status": "pending",
-      "rationale": "Reads only the live story corpus. Cited on the evidence page (D.labs.story_arc)."
+      "contract_status": "enforced",
+      "metric_definition_version": "story_arc/v1",
+      "rationale": "Consumes the canonical registry resolver only (story table). Cited on the evidence page (D.labs.story_arc). Contract-bearing."
     },
     "lab_story_review.py": {
       "lab_status": "canonical",
@@ -215,11 +243,14 @@
       "website_key": null,
       "reproduce_default": true,
       "output": "experiments/results/lab_story_review.json",
-      "input_sources": ["experiments/results/stories/*.json"],
+      "input_sources": [
+        "registry:data_manifest.json#registry (story, current)"
+      ],
       "reads_retired_summary": false,
       "requires_external_service": null,
-      "contract_status": "pending",
-      "rationale": "Reads only the live story corpus via story.load_story_result. Eligible, but no site section consumes it today (website_key null), so build_data does not load it."
+      "contract_status": "enforced",
+      "metric_definition_version": "story_review/v1",
+      "rationale": "Consumes the canonical registry resolver only; the typed load_story_result loader runs on the paths the registry resolved (_source_path), never on a glob. Eligible, but no site section consumes it today (website_key null), so build_data does not load it. Contract-bearing."
     },
     "lab_survival_horizon.py": {
       "lab_status": "quarantined",
@@ -227,10 +258,13 @@
       "website_key": null,
       "reproduce_default": false,
       "output": "experiments/results/lab_survival_horizon.json",
-      "input_sources": ["experiments/results/_results_summary.json"],
+      "input_sources": [
+        "experiments/results/_results_summary.json"
+      ],
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_survival_horizon.py:16)."
     },
     "lab_task_routing.py": {
@@ -246,7 +280,8 @@
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
-      "rationale": "Reads the retired summary directly (scripts/lab_task_routing.py:15). Note: the website's routing section does NOT come from this lab — build_data derives it from agentic_dynamics.control.routing.compute_routing over the canonical corpus, so quarantining this lab does not remove a published section."
+      "metric_definition_version": "",
+      "rationale": "Reads the retired summary directly (scripts/lab_task_routing.py:15). Note: the website's routing section does NOT come from this lab \u2014 build_data derives it from agentic_dynamics.control.routing.compute_routing over the canonical corpus, so quarantining this lab does not remove a published section."
     },
     "lab_think_do_coupling.py": {
       "lab_status": "quarantined",
@@ -254,10 +289,13 @@
       "website_key": null,
       "reproduce_default": false,
       "output": "experiments/results/lab_coupling.json",
-      "input_sources": ["experiments/results/_results_summary.json"],
+      "input_sources": [
+        "experiments/results/_results_summary.json"
+      ],
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_think_do_coupling.py:23)."
     },
     "lab_tool_archetypes.py": {
@@ -273,6 +311,7 @@
       "reads_retired_summary": true,
       "requires_external_service": null,
       "contract_status": "n/a",
+      "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_tool_archetypes.py:16)."
     },
     "lab_verification_frontier.py": {
@@ -281,11 +320,14 @@
       "website_key": "verification_frontier",
       "reproduce_default": true,
       "output": "experiments/results/lab_verification_frontier.json",
-      "input_sources": ["experiments/results/stories/*.json"],
+      "input_sources": [
+        "registry:data_manifest.json#registry (story, current)"
+      ],
       "reads_retired_summary": false,
       "requires_external_service": null,
-      "contract_status": "pending",
-      "rationale": "Reads only the live story corpus."
+      "contract_status": "enforced",
+      "metric_definition_version": "verification_frontier/v1",
+      "rationale": "Consumes the canonical registry resolver only (story table). Contract-bearing."
     },
     "lab_verification_value.py": {
       "lab_status": "canonical",
@@ -294,13 +336,16 @@
       "reproduce_default": true,
       "output": "experiments/results/lab_verification_value.json",
       "input_sources": [
-        "experiments/results/stories/*.json",
-        "experiments/results/reviews/*.json"
+        "registry:data_manifest.json#registry (story, current)",
+        "registry:data_manifest.json#registry (review, current)"
       ],
       "reads_retired_summary": false,
       "requires_external_service": null,
-      "contract_status": "pending",
-      "rationale": "Reads only the live story + review corpora."
+      "contract_status": "enforced",
+      "metric_definition_version": "verification_value/v1",
+      "rationale": "Consumes the canonical registry resolver only (story + review tables); reviews join to stories via their registry logical_locator, replacing the old filename heuristic. Contract-bearing."
     }
-  }
+  },
+  "canonical_resolver": "src/agentic_dynamics/reporting/canonical_corpus.py",
+  "contract_module": "src/agentic_dynamics/reporting/lab_contract.py"
 }

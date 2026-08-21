@@ -1,14 +1,25 @@
 """
-Lab Book 14: Multi-Session Story Review — analyze 26 story results and produce
-condition comparison tables, review quotes, and cascade analysis.
+Lab Book 14: Multi-Session Story Review — condition comparison tables, cascade
+analysis, and cost summary over the canonical story corpus.
+
+CANONICAL INPUT (semantic-integrity release, phase s2): publication-eligible, so the
+input is the registry resolver only (``lifecycle_state == "current"`` story rows). The
+typed ``load_story_result`` loader is still used, but on the paths the REGISTRY resolved
+(``_source_path``) — never on a directory glob. Conditions come from the resolver's
+no-op relabel (``_canonical_condition``).
+
+The output embeds a ``lab_contract`` block that ``build_data.py`` re-validates.
 
 Usage:
     python scripts/lab_story_review.py
+
+Output:
+    experiments/results/lab_story_review.json
 """
 
 import json
-import sys
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 try:
@@ -17,26 +28,29 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
+from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
+from agentic_dynamics.reporting.lab_contract import attach_contract
 from agentic_dynamics.runtime.story import load_story_result
 
+#: This script's name, as classified in scripts/lab_manifest.json — the contract key.
+LAB = "lab_story_review.py"
+OUTPUT_PATH = Path("experiments/results/lab_story_review.json")
 
-def main():
-    results_dir = Path("experiments/results/stories")
-    result_files = sorted(results_dir.glob("*.json"))
-    result_files = [f for f in result_files if "log" not in f.name]
 
+def _collect_cells(story_payloads: list[dict]) -> list[dict]:
+    """Build the per-story cell rows from the canonical payloads.
+
+    Split out of :func:`main` so the analysis is testable without touching the registry.
+    """
     cells = []
 
-    for rf in result_files:
-        try:
-            d = json.loads(rf.read_text())
-        except (json.JSONDecodeError, OSError):
+    for d in story_payloads:
+        source_path = d.get("_source_path")
+        if not source_path:
             continue
-        if "model" not in d:
-            continue
-
-        story = load_story_result(rf)
-        cond = story.perturbation_condition or "clean"
+        story = load_story_result(Path(source_path))
+        # The resolver's relabelled condition, not the raw field.
+        cond = d.get("_canonical_condition") or "clean"
 
         # Test results
         correctness_values = []
@@ -66,8 +80,17 @@ def main():
             "total_cost": story.total_cost,
             "total_tokens": story.total_tokens,
             "worktree": story.worktree,
-            "result_file": str(rf),
+            "result_file": str(source_path),
         })
+
+    return cells
+
+
+def main():
+    tables = load_canonical_tables("story")
+    cells = _collect_cells(tables.stories)
+    print(f"canonical input: {len(tables.stories)} stories "
+          f"({tables.identity.registry_version})")
 
     # ── Table 1: Condition Comparison ──
     print("=" * 70)
@@ -149,25 +172,13 @@ def main():
         status = "recovered" if recovered else ("degraded" if degraded else "same")
         print(f"  {c['story'][:25]:25s} S1={s1:.2f} S5={s5:.2f} ({status})")
 
-    # ── Table 5: Belly-Button Problems ──
-    print()
-    print("=" * 70)
-    print("TABLE 5: Most Common Reviewer-Identified Problems")
-    print("=" * 70)
-
-    # Simulated — in reality these come from parsing review outputs
-    problems = [
-        ("Infrastructure coupling", "hard Redis/DB dependency, hard JWT re-encoding", 18),
-        ("Missing type hints", "function signatures without type annotations", 15),
-        ("Bare except blocks", "except Exception: pass swallowing all errors", 12),
-        ("Unbounded state", "caches never pruned, globals never cleaned", 10),
-        ("API contract changes", "breaking response format without versioning", 8),
-        ("O(n) inefficiency", "full table scans, redundant loops per request", 6),
-    ]
-    for name, _desc, count in problems:
-        pct = count * 100 // 26
-        bar = "█" * pct
-        print(f"  {name:25s}: {count:2d}/26 ({pct:2d}%) {bar}")
+    # ── Table 5 (REMOVED) ──
+    # A hard-coded "Most Common Reviewer-Identified Problems" table used to be printed
+    # here with the comment "Simulated — in reality these come from parsing review
+    # outputs", and percentages computed against a hard-coded n=26. Under the canonical
+    # lab contract a publication-eligible lab may not emit invented numbers, not even to
+    # stdout. Deriving the real distribution requires parsing review findings text; until
+    # that is measured, the signal is simply absent.
 
     # ── Cost Summary ──
     print()
@@ -187,7 +198,7 @@ def main():
     # ── JSON Output ──
     output = {
         "experiment_id": "lab_story_review",
-        "generated_at": __import__("datetime").datetime.now().isoformat(),
+        "generated_at": datetime.now().isoformat(),
         "summary": {
             "cells": len(cells),
             "sessions": total_sessions,
@@ -214,9 +225,9 @@ def main():
         "cells": cells,
     }
 
-    out_path = Path("experiments/results/lab_story_review.json")
-    out_path.write_text(json.dumps(output, indent=2))
-    print(f"\nSaved: {out_path}")
+    attach_contract(output, LAB, tables, n_input_records=len(tables.stories))
+    OUTPUT_PATH.write_text(json.dumps(output, indent=2))
+    print(f"\nSaved: {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":

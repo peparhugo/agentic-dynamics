@@ -70,6 +70,10 @@ class LabEntry:
     reads_retired_summary: bool = False
     requires_external_service: str | None = None
     contract_status: str = "pending"
+    #: Version of THIS lab's metric definitions, embedded in its output contract
+    #: (``reporting.lab_contract``). Authored here — one place — so a metric redefinition
+    #: (e.g. the s4 Grit resolution) is a single bump next to the classification.
+    metric_definition_version: str = ""
     rationale: str = ""
 
     @property
@@ -134,6 +138,7 @@ def _coerce(script: str, raw: dict[str, Any]) -> LabEntry:
         reads_retired_summary=bool(raw.get("reads_retired_summary", False)),
         requires_external_service=raw.get("requires_external_service"),
         contract_status=raw.get("contract_status", "pending"),
+        metric_definition_version=raw.get("metric_definition_version", ""),
         rationale=raw.get("rationale", ""),
     )
 
@@ -149,11 +154,26 @@ def _coerce(script: str, raw: dict[str, Any]) -> LabEntry:
         raise ValueError(
             f"{script}: reads the retired summary, so it cannot be lab_status=canonical"
         )
-    # 3. Reaching the website requires eligibility (defence in depth against a typo flipping
+    # 3. THE CONTRACT'S LOAD-BEARING RULE (review P0, phase s2): a lab that reads the retired
+    #    corpus can never be publication-eligible — independent of its lab_status, so no
+    #    future relabelling can smuggle the retired summary onto the website.
+    if entry.reads_retired_summary and entry.publication_eligible:
+        raise ValueError(
+            f"{script}: reads the retired _results_summary.json, so it cannot be "
+            f"publication_eligible — a publication lab consumes only the canonical "
+            f"registry resolver (reporting.canonical_corpus)"
+        )
+    # 4. Reaching the website requires eligibility (defence in depth against a typo flipping
     #    website_key on for a quarantined lab).
     if entry.website_key is not None and entry.quarantined and entry.published:
         raise ValueError(f"{script}: quarantined lab resolved as published")
-    # 4. Rationale is mandatory — a classification without evidence is an opinion.
+    # 5. A publication-eligible lab must declare the metric-definition version its output
+    #    contract embeds — an unnamed metric cannot be versioned, so it cannot be trusted.
+    if entry.publication_eligible and not entry.metric_definition_version.strip():
+        raise ValueError(
+            f"{script}: publication_eligible labs must declare a metric_definition_version"
+        )
+    # 6. Rationale is mandatory — a classification without evidence is an opinion.
     if not entry.rationale.strip():
         raise ValueError(f"{script}: a classification needs a rationale")
     return entry

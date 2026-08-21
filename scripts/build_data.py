@@ -45,6 +45,10 @@ from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
 
 from agentic_dynamics.control.routing import compute_routing  # noqa: E402
 from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS  # noqa: E402
+from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
+    current_manifest_identity,
+)
+from agentic_dynamics.reporting.lab_contract import validate_contract  # noqa: E402
 from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
     load_lab_manifest,
     publication_labs,
@@ -1027,23 +1031,33 @@ def _load_analysis_data() -> dict:
 
 
 def _load_labs() -> dict:
-    """Load the publication-eligible lab book outputs for the evidence page.
+    """Load the publication-eligible, contract-valid lab book outputs for the evidence page.
 
-    The lab set is **derived from scripts/lab_manifest.json**, not hand-listed here.
-    That is the fix for the review's P0 finding: this builder used to load lab JSONs
-    with zero provenance checks, so a lab reading the retired ``_results_summary.json``
-    could publish alongside canonical registry metrics — a split publication path where
-    the site mixes canonical and noncanonical findings. A lab now reaches ``data.js``
-    only when the manifest marks it ``publication_eligible`` *and* names a
-    ``website_key``; every quarantined lab is logged by name with its reason.
+    Two gates, in order — eligibility (s1) then lineage (s2):
 
-    A missing artifact is still skipped silently: a lab that has not been run yet is a
-    gap, not an integrity failure, and build_data must not hard-fail on it.
+    1. **Eligibility** — the lab set is derived from ``scripts/lab_manifest.json``, never
+       hand-listed here. This builder used to load lab JSONs with zero provenance checks,
+       so a lab reading the retired ``_results_summary.json`` could publish alongside
+       canonical registry metrics: the "split publication path" the review named. A lab
+       reaches ``data.js`` only when the manifest marks it ``publication_eligible`` *and*
+       names a ``website_key``.
+    2. **Lineage** — the artifact must carry a ``lab_contract`` block whose
+       ``input_manifest_sha256`` matches the identity of the CURRENT
+       ``data_manifest.json`` registry. Eligibility is a property of the lab; freshness is
+       a property of the file. A lab that was eligible yesterday produced stale numbers if
+       records have since been added, superseded, or tombstoned.
+
+    Every rejection is logged with the lab name and the reason — a website section may
+    disappear, but never silently. A missing artifact is still skipped quietly: a lab that
+    has not been run yet is a gap, not an integrity failure.
     """
     manifest = load_lab_manifest()
     labs: dict[str, dict] = {}
 
-    # --- the publication gate: website_key -> LabEntry (quarantined already excluded) ---
+    # Computed once: the identity every contract is compared against.
+    identity = current_manifest_identity(MANIFEST_PATH)
+
+    # --- gate 1: website_key -> LabEntry (quarantined already excluded) -----------------
     for website_key, entry in sorted(publication_labs(manifest).items()):
         if not entry.output:
             continue  # stdout-only lab: no artifact to publish
@@ -1051,11 +1065,20 @@ def _load_labs() -> dict:
         if not artifact.exists():
             continue
         try:
-            labs[website_key] = json.loads(artifact.read_text())
+            payload = json.loads(artifact.read_text())
         except (json.JSONDecodeError, OSError):
+            print(f"  [lab-gate] rejected — {entry.script}: unreadable artifact {entry.output}")
             continue
 
-    # --- log every exclusion, so a dropped section is traceable rather than silent ---
+        # --- gate 2: the canonical lab contract -----------------------------------------
+        reason = validate_contract(payload, lab_script=entry.script, current=identity)
+        if reason is not None:
+            print(f"  [lab-gate] rejected — {reason}")
+            continue
+
+        labs[website_key] = payload
+
+    # --- log every exclusion, so a dropped section is traceable rather than silent ------
     for entry in manifest:
         if entry.quarantined:
             print(f"  [lab-gate] not published — {entry.script}: quarantined")

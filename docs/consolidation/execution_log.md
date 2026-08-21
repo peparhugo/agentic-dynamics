@@ -930,6 +930,29 @@ G(s) = P(test_executed_success | perturbation_strength = s) is recorded in its m
 resolved in s4. The explicit `--with-neo4j` / `--with-sonar` reproduce split is s7; s1 only
 removed the Neo4j lab from the default set as a side effect of its quarantine.
 
+### s2_lab_contract — the canonical lab contract (review item 2 / P0)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Six lineage fields embedded** — every publication-eligible lab output JSON carries a `lab_contract` block with `input_dataset_id`, `input_manifest_sha256`, `registry_version`, `metric_definition_version`, `data_integrity_policy`, `requires_external_service` (+ `contract_version`, `lab`, `n_input_records`, `generated_at`). Producer/consumer live in one module (`src/agentic_dynamics/reporting/lab_contract.py`) so they cannot drift | PASS (7/7 labs) |
+| 2 | **One input door** — `src/agentic_dynamics/reporting/canonical_corpus.py` resolves `lifecycle_state == "current"` registry rows to payloads (`story`, `review`, and an `analysis` join filtered by current story rows). All 7 labs rewritten onto it; zero remaining `_results_summary.json` reads, zero `stories/*.json` / `reviews/*.json` / `analysis/*.json` globs in a publication lab (AST-guarded) | PASS |
+| 3 | **build_data rejects a stale artifact** — `_load_labs()` runs two gates (manifest eligibility, then `validate_contract` against the identity of the current `data_manifest.json`) and prints `[lab-gate] rejected — <lab>: stale input_manifest_sha256 (… != current …)`. An absent contract is treated exactly like a stale one | PASS |
+| 4 | **Test: a stale-manifest lab JSON is rejected** — `tests/test_lab_contract.py::test_stale_manifest_lab_json_is_rejected` (unit) and `tests/test_build_data.py::test_lab_gate_rejects_a_stale_manifest_lab_json` (through `_load_labs`, asserting the lab name appears in the log). Plus per-field parametrised rejection of an incomplete contract | PASS (2 named + 8 supporting) |
+| 5 | **Test: a summary-reading lab cannot be publication_eligible** — `tests/test_lab_contract.py::test_summary_reading_lab_cannot_be_publication_eligible`. Enforced at manifest **load time** (`ValueError`), not only in the test, so the impossible state cannot exist during a pipeline run — and independent of `lab_status`, so no relabelling can smuggle the retired corpus onto the site | PASS |
+| 6 | **Identity is non-circular** — the hash covers `schema_version` + the `registry` array, not the manifest file bytes. Hashing the file would be circular (it records `data.js`'s sha256, which publishing produces) and every publish would invalidate everything it just published. Verified: `generate_manifest.py` re-run leaves the identity unchanged and all contracts valid | PASS |
+| 7 | **Outputs regenerated + published** — all 7 labs re-run against the canonical registry (215 current stories / 242 reviews / 166 analyses of 701 registry rows); `data.js` rebuilt; `data_manifest.json` rehashed. Correction to the s1 note: the earlier "smaller corpus" reading was wrong — the −3507 lines there were the grit_matrix removal. The canonical corpus is *larger* than the committed build (156 → 215 stories, 772 → 1067 sessions), so this is a gain, not a loss | PASS |
+| 8 | **Two measurement errors fixed as a consequence** — `lab_condition_effects` now uses the resolver's no-op-relabelled condition and an exact registry review join (it previously counted every review with no story id toward every condition); `lab_story_review`'s hard-coded "Simulated" reviewer-problem table (percentages against a hard-coded n=26) is deleted — a contract-bearing lab may not print invented numbers | PASS |
+| 9 | Full suite green — `pytest tests/ -m "not external"`: **1365 passed** (+33: 31 contract tests, 2 build_data gate tests); `ruff` clean on the new modules; `reproduce.sh --dry-run` OK | PASS (1365 passed) |
+
+**s2_lab_contract result: 9/9 PASS.**
+
+Carried forward: `metric_definition_version` is declared once per lab in
+`scripts/lab_manifest.json` (all 7 at `<name>/v1`) — s4 bumps the Grit lab's there when it
+resolves the collision. `contract_status` moved `pending` → `enforced` for the 7. s3's remaining
+work is narrow: confirm no publication-eligible input carries the retired summary's lineage and
+that the site's lab sections draw only from contract-bearing JSONs (both now true by
+construction — s3 verifies rather than rebuilds).
+
 
 
 

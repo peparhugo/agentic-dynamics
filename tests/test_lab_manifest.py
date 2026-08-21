@@ -25,8 +25,8 @@ dependencies:
 
 from __future__ import annotations
 
+import ast
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -126,13 +126,75 @@ def test_at_least_one_lab_is_quarantined():
 # ---------------------------------------------------------------------------
 
 
+def _docstring_nodes(tree: ast.AST) -> set[int]:
+    """``id()`` of every docstring Constant node in the tree.
+
+    Needed because the scan below must distinguish *using* the retired corpus from
+    *documenting that we do not*: a contract-bearing lab's docstring legitimately says
+    "no ``_results_summary.json``", and a naive substring scan would quarantine it for
+    saying so.
+    """
+    out: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        body = getattr(node, "body", None)
+        if not body:
+            continue
+        first = body[0]
+        if (
+            isinstance(first, ast.Expr)
+            and isinstance(first.value, ast.Constant)
+            and isinstance(first.value.value, str)
+        ):
+            out.add(id(first.value))
+    return out
+
+
+def _imported_names(tree: ast.AST) -> set[str]:
+    """Every module path and bound name introduced by an import in this file."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(a.name for a in node.names)
+            names.update(a.asname for a in node.names if a.asname)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                names.add(node.module)
+            names.update(a.name for a in node.names)
+            names.update(a.asname for a in node.names if a.asname)
+    return names
+
+
 def _reaches_retired_summary(script: str) -> tuple[bool, str]:
-    """Does this lab reach ``_results_summary.json`` directly or transitively?"""
-    src = (SCRIPTS_DIR / script).read_text(encoding="utf-8")
-    if RETIRED_SUMMARY in src:
-        return True, f"{script} names {RETIRED_SUMMARY} directly"
+    """Does this lab reach ``_results_summary.json`` directly or transitively?
+
+    An **AST** scan, not a substring scan: only real string literals (excluding
+    docstrings) and real imports/identifiers count. Comments and prose can therefore
+    discuss the retired corpus without tripping the guard, while any actual use — a path
+    literal, or an import of a module known to read it — is caught.
+    """
+    tree = ast.parse((SCRIPTS_DIR / script).read_text(encoding="utf-8"), filename=script)
+    docstrings = _docstring_nodes(tree)
+
+    # 1. A non-docstring string literal naming the retired file = direct use.
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in docstrings
+            and RETIRED_SUMMARY in node.value
+        ):
+            return True, f"{script} names {RETIRED_SUMMARY} in a code literal"
+
+    # 2. Importing (or referencing) a module/class known to read it = transitive use.
+    imported = _imported_names(tree)
+    referenced = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)} | {
+        node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+    }
     for symbol, evidence in TRANSITIVE_SUMMARY_READERS.items():
-        if re.search(rf"\b{re.escape(symbol)}\b", src):
+        hit = any(symbol in name for name in imported) or symbol in referenced
+        if hit:
             return True, f"{script} uses {symbol} -> {evidence}"
     return False, ""
 

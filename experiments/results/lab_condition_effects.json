@@ -1,33 +1,43 @@
 {
   "experiment_id": "lab_condition_effects",
-  "generated_at": "2026-08-17T20:12:26.445186",
+  "generated_at": "2026-08-21T02:20:07.451094",
   "summary": {
-    "conditions": 3
+    "conditions": 2,
+    "stories": 215,
+    "reviews": 242
   },
   "conditions": [
     {
-      "condition": "bad_seed",
-      "cells": 37,
-      "success_rate": 0.946,
-      "cascade_rate": 0.027,
-      "avg_cost": 1.6016,
-      "total_cost": 59.2605
-    },
-    {
       "condition": "clean",
-      "cells": 87,
-      "success_rate": 0.977,
-      "cascade_rate": 0.0,
-      "avg_cost": 1.3773,
-      "total_cost": 119.8285
+      "cells": 135,
+      "success_rate": 0.97,
+      "cascade_rate": 0.015,
+      "avg_cost": 1.5429,
+      "total_cost": 208.2874,
+      "reviews": 134,
+      "worse_rate": 0.0
     },
     {
       "condition": "early_degrade",
-      "cells": 32,
-      "success_rate": 1.0,
-      "cascade_rate": 0.062,
-      "avg_cost": 1.2632,
-      "total_cost": 40.4222
+      "cells": 80,
+      "success_rate": 0.863,
+      "cascade_rate": 0.025,
+      "avg_cost": 1.261,
+      "total_cost": 100.8811,
+      "reviews": 21,
+      "worse_rate": 0.0
     }
-  ]
+  ],
+  "lab_contract": {
+    "lab": "lab_condition_effects.py",
+    "input_dataset_id": "canonical_registry/story+review",
+    "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+    "registry_version": "data-manifest/1.0+701rows",
+    "metric_definition_version": "condition_effects/v1",
+    "data_integrity_policy": "docs/data_integrity_findings.md",
+    "requires_external_service": null,
+    "n_input_records": 457,
+    "contract_version": "lab-contract/v1",
+    "generated_at": "2026-08-21T00:20:07.451115+00:00"
+  }
 }

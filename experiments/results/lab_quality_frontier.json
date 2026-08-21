@@ -1,8 +1,10 @@
 {
   "experiment_id": "lab_quality_frontier",
-  "generated_at": "2026-08-17T20:12:34.885574",
+  "generated_at": "2026-08-21T02:22:22.098544",
   "summary": {
-    "models": 7
+    "models": 7,
+    "stories": 215,
+    "analyses": 166
   },
   "models": [
     {
@@ -68,5 +70,17 @@
       "cyclomatic_complexity": 375.375,
       "novelty_score": 0.789
     }
-  ]
+  ],
+  "lab_contract": {
+    "lab": "lab_quality_frontier.py",
+    "input_dataset_id": "canonical_registry/story+analysis",
+    "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+    "registry_version": "data-manifest/1.0+701rows",
+    "metric_definition_version": "quality_frontier/v1",
+    "data_integrity_policy": "docs/data_integrity_findings.md",
+    "requires_external_service": null,
+    "n_input_records": 381,
+    "contract_version": "lab-contract/v1",
+    "generated_at": "2026-08-21T00:22:22.098565+00:00"
+  }
 }

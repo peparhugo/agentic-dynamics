@@ -1,22 +1,22 @@
-/* Generated 2026-08-19 23:04:57 UTC by build_data.py */
+/* Generated 2026-08-21 00:24:05 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-19T23:04:57.210415+00:00",
+    "generated_at": "2026-08-21T00:24:04.905592+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
     "worktrees_total": 205,
-    "sessions_total": 772,
+    "sessions_total": 1067,
     "game_reports": 344,
-    "total_cost": 219.5112,
+    "total_cost": 309.1685,
     "architectures": 3,
     "variants": 7,
-    "stories_total": 156,
-    "stories_unique": 141,
+    "stories_total": 215,
+    "stories_unique": 200,
     "stories_re_runs": 15,
-    "story_sessions": 772,
-    "story_total_cost": 219.5112,
+    "story_sessions": 1067,
+    "story_total_cost": 309.1685,
     "configs": 35,
     "canonical_stories": 225,
     "canonical_findings": 64,
@@ -44,66 +44,171 @@ window.DYNAMICS_DATA = {
       "id": "deepseek/deepseek-v4-flash",
       "label": "DeepSeek v4 Flash",
       "provider": "deepseek",
-      "cells": 22,
-      "unique_cells": 21,
+      "cells": 31,
+      "unique_cells": 30,
       "re_runs": 1,
-      "sessions": 110,
-      "total_cost": 1.499069,
-      "avg_cost": 0.06814,
-      "cost_cells": 22,
-      "avg_cache_hit": 0.965,
-      "avg_tests": 36.4,
-      "avg_test_code_ratio": 0.658,
-      "avg_tok_per_session": 46515.0,
-      "avg_duration_s": 1290.0,
-      "avg_code_lines": 2197.0,
-      "tests_total": 800,
-      "tests_passed": 2304,
-      "tests_run": 2306,
-      "pass_rate": "100% (2304/2306)",
-      "avg_cost_per_session": 0.013628,
-      "avg_loc": 2197.0,
-      "avg_energy_j": 52422.3,
-      "avg_energy_j_per_loc": 23.86,
+      "sessions": 155,
+      "total_cost": 2.308294,
+      "avg_cost": 0.074461,
+      "cost_cells": 31,
+      "avg_cache_hit": 0.964,
+      "avg_tests": 57.0,
+      "avg_test_code_ratio": 0.666,
+      "avg_tok_per_session": 50036.0,
+      "avg_duration_s": 1401.0,
+      "avg_code_lines": 2068.0,
+      "tests_total": 1767,
+      "tests_passed": 3290,
+      "tests_run": 3292,
+      "pass_rate": "100% (3290/3292)",
+      "avg_cost_per_session": 0.014892,
+      "avg_loc": 2068.0,
+      "avg_energy_j": 54395.2,
+      "avg_energy_j_per_loc": 26.3,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
       "strategy_expl": 22,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 22,
-      "reports_valid": 22,
+      "reports": 31,
+      "reports_valid": 31,
       "reports_narrated": 0
     },
     {
       "id": "openai/gpt-5.6-luna",
       "label": "GPT-5.6 Luna",
       "provider": "openai",
-      "cells": 24,
-      "unique_cells": 20,
+      "cells": 34,
+      "unique_cells": 30,
       "re_runs": 4,
-      "sessions": 120,
-      "total_cost": 2.204489,
-      "avg_cost": 0.091854,
-      "cost_cells": 24,
-      "avg_cache_hit": 0.967,
-      "avg_tests": 10.0,
-      "avg_test_code_ratio": 0.282,
-      "avg_tok_per_session": 9224.0,
-      "avg_duration_s": 553.0,
-      "avg_code_lines": 796.0,
-      "tests_total": 240,
-      "tests_passed": 618,
-      "tests_run": 618,
-      "pass_rate": "100% (618/618)",
-      "avg_cost_per_session": 0.018371,
-      "avg_loc": 796.0,
-      "avg_energy_j": 10515.7,
-      "avg_energy_j_per_loc": 13.21,
+      "sessions": 170,
+      "total_cost": 3.180633,
+      "avg_cost": 0.093548,
+      "cost_cells": 34,
+      "avg_cache_hit": 0.937,
+      "avg_tests": 14.3,
+      "avg_test_code_ratio": 0.275,
+      "avg_tok_per_session": 17957.0,
+      "avg_duration_s": 658.0,
+      "avg_code_lines": 937.0,
+      "tests_total": 486,
+      "tests_passed": 858,
+      "tests_run": 858,
+      "pass_rate": "100% (858/858)",
+      "avg_cost_per_session": 0.01871,
+      "avg_loc": 937.0,
+      "avg_energy_j": 14130.0,
+      "avg_energy_j_per_loc": 15.08,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
       "strategy_expl": 24,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 34,
+      "reports_valid": 34,
+      "reports_narrated": 0
+    },
+    {
+      "id": "deepseek/deepseek-v4-pro",
+      "label": "DeepSeek v4 Pro",
+      "provider": "deepseek",
+      "cells": 39,
+      "unique_cells": 30,
+      "re_runs": 9,
+      "sessions": 187,
+      "total_cost": 6.314403,
+      "avg_cost": 0.161908,
+      "cost_cells": 39,
+      "avg_cache_hit": 0.801,
+      "avg_tests": 47.9,
+      "avg_test_code_ratio": 0.798,
+      "avg_tok_per_session": 38647.0,
+      "avg_duration_s": 1766.0,
+      "avg_code_lines": 2219.0,
+      "tests_total": 1870,
+      "tests_passed": 3144,
+      "tests_run": 3145,
+      "pass_rate": "100% (3144/3145)",
+      "avg_cost_per_session": 0.033767,
+      "avg_loc": 2219.0,
+      "avg_energy_j": 39819.6,
+      "avg_energy_j_per_loc": 17.94,
+      "narration_rate": null,
+      "avg_narration_penalty": null,
+      "strategy_cons": 0,
+      "strategy_expl": 37,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 39,
+      "reports_valid": 39,
+      "reports_narrated": 0
+    },
+    {
+      "id": "openai/gpt-5.6-terra",
+      "label": "openai/gpt-5.6-terra",
+      "provider": "openai",
+      "cells": 30,
+      "unique_cells": 30,
+      "re_runs": 0,
+      "sessions": 150,
+      "total_cost": 31.329782,
+      "avg_cost": 1.044326,
+      "cost_cells": 30,
+      "avg_cache_hit": 0.832,
+      "avg_tests": 15.3,
+      "avg_test_code_ratio": 0.337,
+      "avg_tok_per_session": 31804.0,
+      "avg_duration_s": 785.0,
+      "avg_code_lines": 809.0,
+      "tests_total": 458,
+      "tests_passed": 1060,
+      "tests_run": 1060,
+      "pass_rate": "100% (1060/1060)",
+      "avg_cost_per_session": 0.208865,
+      "avg_loc": 809.0,
+      "avg_energy_j": 18681.4,
+      "avg_energy_j_per_loc": 23.09,
+      "narration_rate": null,
+      "avg_narration_penalty": null,
+      "strategy_cons": 0,
+      "strategy_expl": 20,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 30,
+      "reports_valid": 30,
+      "reports_narrated": 0
+    },
+    {
+      "id": "anthropic/claude-haiku-4-5",
+      "label": "anthropic/claude-haiku-4-5",
+      "provider": "anthropic",
+      "cells": 24,
+      "unique_cells": 24,
+      "re_runs": 0,
+      "sessions": 120,
+      "total_cost": 32.616808,
+      "avg_cost": 1.63084,
+      "cost_cells": 20,
+      "avg_cache_hit": 0.824,
+      "avg_tests": 127.9,
+      "avg_test_code_ratio": 1.221,
+      "avg_tok_per_session": 13581.0,
+      "avg_duration_s": 862.0,
+      "avg_code_lines": 1586.0,
+      "tests_total": 3069,
+      "tests_passed": 0,
+      "tests_run": 0,
+      "pass_rate": "unknown",
+      "avg_cost_per_session": 0.326168,
+      "avg_loc": 1586.0,
+      "avg_energy_j": 15438.9,
+      "avg_energy_j_per_loc": 9.73,
+      "narration_rate": null,
+      "avg_narration_penalty": null,
+      "strategy_cons": 2,
+      "strategy_expl": 12,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 24,
@@ -111,178 +216,73 @@ window.DYNAMICS_DATA = {
       "reports_narrated": 0
     },
     {
-      "id": "deepseek/deepseek-v4-pro",
-      "label": "DeepSeek v4 Pro",
-      "provider": "deepseek",
-      "cells": 37,
-      "unique_cells": 28,
-      "re_runs": 9,
-      "sessions": 177,
-      "total_cost": 5.875648,
-      "avg_cost": 0.158801,
-      "cost_cells": 37,
-      "avg_cache_hit": 0.793,
-      "avg_tests": 45.7,
-      "avg_test_code_ratio": 0.805,
-      "avg_tok_per_session": 37865.0,
-      "avg_duration_s": 1771.0,
-      "avg_code_lines": 2148.0,
-      "tests_total": 1692,
-      "tests_passed": 2966,
-      "tests_run": 2967,
-      "pass_rate": "100% (2966/2967)",
-      "avg_cost_per_session": 0.033196,
-      "avg_loc": 2148.0,
-      "avg_energy_j": 38925.4,
-      "avg_energy_j_per_loc": 18.12,
-      "narration_rate": null,
-      "avg_narration_penalty": null,
-      "strategy_cons": 0,
-      "strategy_expl": 37,
-      "strategy_waste": 0,
-      "strategy_efficient": 0,
-      "reports": 37,
-      "reports_valid": 37,
-      "reports_narrated": 0
-    },
-    {
-      "id": "openai/gpt-5.6-terra",
-      "label": "openai/gpt-5.6-terra",
-      "provider": "openai",
-      "cells": 20,
-      "unique_cells": 20,
-      "re_runs": 0,
-      "sessions": 100,
-      "total_cost": 20.303648,
-      "avg_cost": 1.015182,
-      "cost_cells": 20,
-      "avg_cache_hit": 0.821,
-      "avg_tests": 9.8,
-      "avg_test_code_ratio": 0.361,
-      "avg_tok_per_session": 32400.0,
-      "avg_duration_s": 731.0,
-      "avg_code_lines": 693.0,
-      "tests_total": 195,
-      "tests_passed": 770,
-      "tests_run": 770,
-      "pass_rate": "100% (770/770)",
-      "avg_cost_per_session": 0.203036,
-      "avg_loc": 693.0,
-      "avg_energy_j": 18629.5,
-      "avg_energy_j_per_loc": 26.88,
-      "narration_rate": null,
-      "avg_narration_penalty": null,
-      "strategy_cons": 0,
-      "strategy_expl": 20,
-      "strategy_waste": 0,
-      "strategy_efficient": 0,
-      "reports": 20,
-      "reports_valid": 20,
-      "reports_narrated": 0
-    },
-    {
-      "id": "anthropic/claude-haiku-4-5",
-      "label": "anthropic/claude-haiku-4-5",
-      "provider": "anthropic",
-      "cells": 14,
-      "unique_cells": 14,
-      "re_runs": 0,
-      "sessions": 70,
-      "total_cost": 21.516785,
-      "avg_cost": 1.536913,
-      "cost_cells": 14,
-      "avg_cache_hit": 0.989,
-      "avg_tests": 193.4,
-      "avg_test_code_ratio": 1.819,
-      "avg_tok_per_session": 15664.0,
-      "avg_duration_s": 1003.0,
-      "avg_code_lines": 2211.0,
-      "tests_total": 2707,
-      "tests_passed": 0,
-      "tests_run": 0,
-      "pass_rate": "unknown",
-      "avg_cost_per_session": 0.307383,
-      "avg_loc": 2211.0,
-      "avg_energy_j": 17820.5,
-      "avg_energy_j_per_loc": 8.06,
-      "narration_rate": null,
-      "avg_narration_penalty": null,
-      "strategy_cons": 2,
-      "strategy_expl": 12,
-      "strategy_waste": 0,
-      "strategy_efficient": 0,
-      "reports": 14,
-      "reports_valid": 14,
-      "reports_narrated": 0
-    },
-    {
       "id": "openai/gpt-5.6-sol",
       "label": "openai/gpt-5.6-sol",
       "provider": "openai",
-      "cells": 23,
-      "unique_cells": 23,
+      "cells": 30,
+      "unique_cells": 30,
       "re_runs": 0,
-      "sessions": 115,
-      "total_cost": 91.693651,
-      "avg_cost": 3.98668,
-      "cost_cells": 23,
-      "avg_cache_hit": 0.849,
-      "avg_tests": 12.0,
-      "avg_test_code_ratio": 0.402,
-      "avg_tok_per_session": 48229.0,
-      "avg_duration_s": 1233.0,
-      "avg_code_lines": 1255.0,
-      "tests_total": 275,
-      "tests_passed": 1289,
-      "tests_run": 1289,
-      "pass_rate": "100% (1289/1289)",
-      "avg_cost_per_session": 0.797336,
-      "avg_loc": 1255.0,
-      "avg_energy_j": 28959.4,
-      "avg_energy_j_per_loc": 23.08,
+      "sessions": 150,
+      "total_cost": 114.52382,
+      "avg_cost": 3.817461,
+      "cost_cells": 30,
+      "avg_cache_hit": 0.85,
+      "avg_tests": 24.4,
+      "avg_test_code_ratio": 0.447,
+      "avg_tok_per_session": 46636.0,
+      "avg_duration_s": 1146.0,
+      "avg_code_lines": 1399.0,
+      "tests_total": 732,
+      "tests_passed": 1953,
+      "tests_run": 1953,
+      "pass_rate": "100% (1953/1953)",
+      "avg_cost_per_session": 0.763492,
+      "avg_loc": 1399.0,
+      "avg_energy_j": 27822.1,
+      "avg_energy_j_per_loc": 19.89,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
       "strategy_expl": 23,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 23,
-      "reports_valid": 23,
+      "reports": 30,
+      "reports_valid": 30,
       "reports_narrated": 0
     },
     {
       "id": "anthropic/claude-sonnet-5",
       "label": "Claude Sonnet 5",
       "provider": "anthropic",
-      "cells": 16,
-      "unique_cells": 15,
+      "cells": 27,
+      "unique_cells": 26,
       "re_runs": 1,
-      "sessions": 80,
-      "total_cost": 76.417905,
-      "avg_cost": 4.776119,
-      "cost_cells": 16,
-      "avg_cache_hit": 0.986,
-      "avg_tests": 153.2,
-      "avg_test_code_ratio": 0.909,
-      "avg_tok_per_session": 20222.0,
-      "avg_duration_s": 1194.0,
-      "avg_code_lines": 2646.0,
-      "tests_total": 2451,
+      "sessions": 135,
+      "total_cost": 118.894751,
+      "avg_cost": 5.169337,
+      "cost_cells": 23,
+      "avg_cache_hit": 0.84,
+      "avg_tests": 117.1,
+      "avg_test_code_ratio": 0.695,
+      "avg_tok_per_session": 18404.0,
+      "avg_duration_s": 1062.0,
+      "avg_code_lines": 2010.0,
+      "tests_total": 3163,
       "tests_passed": 455,
       "tests_run": 455,
       "pass_rate": "100% (455/455)",
-      "avg_cost_per_session": 0.955224,
-      "avg_loc": 2646.0,
-      "avg_energy_j": 23185.1,
-      "avg_energy_j_per_loc": 8.76,
+      "avg_cost_per_session": 1.033867,
+      "avg_loc": 2010.0,
+      "avg_energy_j": 21095.0,
+      "avg_energy_j_per_loc": 10.5,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 2,
       "strategy_expl": 14,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 16,
-      "reports_valid": 16,
+      "reports": 27,
+      "reports_valid": 27,
       "reports_narrated": 0
     }
   ],
@@ -893,13 +893,13 @@ window.DYNAMICS_DATA = {
       "Claude Sonnet 5"
     ],
     "costData": [
-      0.06814,
-      0.091854,
-      0.158801,
-      1.015182,
-      1.536913,
-      3.98668,
-      4.776119
+      0.074461,
+      0.093548,
+      0.161908,
+      1.044326,
+      1.63084,
+      3.817461,
+      5.169337
     ],
     "narrData": [
       null,
@@ -911,68 +911,68 @@ window.DYNAMICS_DATA = {
       null
     ],
     "locData": [
-      2197.0,
-      796.0,
-      2148.0,
-      693.0,
-      2211.0,
-      1255.0,
-      2646.0
+      2068.0,
+      937.0,
+      2219.0,
+      809.0,
+      1586.0,
+      1399.0,
+      2010.0
     ],
     "costY": [
-      0.06814,
-      0.091854,
-      0.158801,
-      1.015182,
-      1.536913,
-      3.98668,
-      4.776119
+      0.074461,
+      0.093548,
+      0.161908,
+      1.044326,
+      1.63084,
+      3.817461,
+      5.169337
     ],
     "reports": [
-      22,
+      31,
+      34,
+      39,
+      30,
       24,
-      37,
-      20,
-      14,
-      23,
-      16
+      30,
+      27
     ]
   },
   "calculator": {
     "model_costs": [
       {
         "n": "DeepSeek v4 Flash",
-        "c": 0.06814,
+        "c": 0.074461,
         "p": 1.0
       },
       {
         "n": "GPT-5.6 Luna",
-        "c": 0.091854,
+        "c": 0.093548,
         "p": 1.0
       },
       {
         "n": "DeepSeek v4 Pro",
-        "c": 0.158801,
+        "c": 0.161908,
         "p": 1.0
       },
       {
         "n": "openai/gpt-5.6-terra",
-        "c": 1.015182,
+        "c": 1.044326,
         "p": 1.0
       },
       {
         "n": "anthropic/claude-haiku-4-5",
-        "c": 1.536913,
+        "c": 1.63084,
         "p": 0
       },
       {
         "n": "openai/gpt-5.6-sol",
-        "c": 3.98668,
+        "c": 3.817461,
         "p": 1.0
       },
       {
         "n": "Claude Sonnet 5",
-        "c": 4.776119,
+        "c": 5.169337,
         "p": 1.0
       }
     ],
@@ -983,44 +983,44 @@ window.DYNAMICS_DATA = {
       },
       {
         "m": "DS\u2192Pro",
-        "e": 2.3
+        "e": 2.2
       },
       {
         "m": "DS\u2192openai/gpt-5.6-terra",
-        "e": 14.9
+        "e": 14.0
       },
       {
         "m": "DS\u2192anthropic/claude-haiku-4-5",
-        "e": 22.6
+        "e": 21.9
       },
       {
         "m": "DS\u2192openai/gpt-5.6-sol",
-        "e": 58.5
+        "e": 51.3
       },
       {
         "m": "DS\u21925",
-        "e": 70.1
+        "e": 69.4
       },
       {
         "m": "\u2192Human ($5/job)",
-        "e": 73.4
+        "e": 67.1
       }
     ],
     "retry_rate_measured": 0.0,
     "woc_ratio": 1.0
   },
   "derived": {
-    "cost_gap": "23\u00d7",
-    "cost_gap_computation": "$1.536913 / $0.06814 = 22.6\u00d7",
-    "overall_pass_rate": "100.0% (8402/8405) [tests]",
-    "total_tests_passed": 8402,
-    "total_tests_run": 8405,
-    "total_cost_all_models": 219.5112,
-    "total_cost_deepseek": 7.3747,
-    "total_cost_claude": 97.9347,
+    "cost_gap": "22\u00d7",
+    "cost_gap_computation": "$1.63084 / $0.074461 = 21.9\u00d7",
+    "overall_pass_rate": "100.0% (10760/10763) [tests]",
+    "total_tests_passed": 10760,
+    "total_tests_run": 10763,
+    "total_cost_all_models": 309.1685,
+    "total_cost_deepseek": 8.6227,
+    "total_cost_claude": 151.5116,
     "total_narrated": 0,
-    "total_valid_reports": 156,
-    "total_reports_analyzed": 156,
+    "total_valid_reports": 215,
+    "total_reports_analyzed": 215,
     "_provenance": {
       "cost_gap": "C",
       "overall_pass_rate": "C",
@@ -1647,58 +1647,58 @@ window.DYNAMICS_DATA = {
     {
       "id": "anthropic/claude-haiku-4-5",
       "label": "anthropic/claude-haiku-4-5",
-      "avg_energy_j": 17820.5,
-      "avg_energy_j_per_loc": 8.06,
-      "avg_cost": 1.536913,
-      "avg_loc": 2211.0
+      "avg_energy_j": 15438.9,
+      "avg_energy_j_per_loc": 9.73,
+      "avg_cost": 1.63084,
+      "avg_loc": 1586.0
     },
     {
       "id": "anthropic/claude-sonnet-5",
       "label": "Claude Sonnet 5",
-      "avg_energy_j": 23185.1,
-      "avg_energy_j_per_loc": 8.76,
-      "avg_cost": 4.776119,
-      "avg_loc": 2646.0
+      "avg_energy_j": 21095.0,
+      "avg_energy_j_per_loc": 10.5,
+      "avg_cost": 5.169337,
+      "avg_loc": 2010.0
     },
     {
       "id": "openai/gpt-5.6-luna",
       "label": "GPT-5.6 Luna",
-      "avg_energy_j": 10515.7,
-      "avg_energy_j_per_loc": 13.21,
-      "avg_cost": 0.091854,
-      "avg_loc": 796.0
+      "avg_energy_j": 14130.0,
+      "avg_energy_j_per_loc": 15.08,
+      "avg_cost": 0.093548,
+      "avg_loc": 937.0
     },
     {
       "id": "deepseek/deepseek-v4-pro",
       "label": "DeepSeek v4 Pro",
-      "avg_energy_j": 38925.4,
-      "avg_energy_j_per_loc": 18.12,
-      "avg_cost": 0.158801,
-      "avg_loc": 2148.0
+      "avg_energy_j": 39819.6,
+      "avg_energy_j_per_loc": 17.94,
+      "avg_cost": 0.161908,
+      "avg_loc": 2219.0
     },
     {
       "id": "openai/gpt-5.6-sol",
       "label": "openai/gpt-5.6-sol",
-      "avg_energy_j": 28959.4,
-      "avg_energy_j_per_loc": 23.08,
-      "avg_cost": 3.98668,
-      "avg_loc": 1255.0
-    },
-    {
-      "id": "deepseek/deepseek-v4-flash",
-      "label": "DeepSeek v4 Flash",
-      "avg_energy_j": 52422.3,
-      "avg_energy_j_per_loc": 23.86,
-      "avg_cost": 0.06814,
-      "avg_loc": 2197.0
+      "avg_energy_j": 27822.1,
+      "avg_energy_j_per_loc": 19.89,
+      "avg_cost": 3.817461,
+      "avg_loc": 1399.0
     },
     {
       "id": "openai/gpt-5.6-terra",
       "label": "openai/gpt-5.6-terra",
-      "avg_energy_j": 18629.5,
-      "avg_energy_j_per_loc": 26.88,
-      "avg_cost": 1.015182,
-      "avg_loc": 693.0
+      "avg_energy_j": 18681.4,
+      "avg_energy_j_per_loc": 23.09,
+      "avg_cost": 1.044326,
+      "avg_loc": 809.0
+    },
+    {
+      "id": "deepseek/deepseek-v4-flash",
+      "label": "DeepSeek v4 Flash",
+      "avg_energy_j": 54395.2,
+      "avg_energy_j_per_loc": 26.3,
+      "avg_cost": 0.074461,
+      "avg_loc": 2068.0
     }
   ],
   "strategy_distribution": {
@@ -1938,66 +1938,66 @@ window.DYNAMICS_DATA = {
     "models": [
       {
         "model": "deepseek/deepseek-v4-flash",
-        "cells": 22,
-        "total_cost": 1.499069,
-        "avg_cost": 0.06814,
-        "total_tokens": 5116663,
-        "avg_cache_hit": 0.965,
-        "avg_duration_s": 1290.0
+        "cells": 31,
+        "total_cost": 2.308294,
+        "avg_cost": 0.074461,
+        "total_tokens": 7755588,
+        "avg_cache_hit": 0.964,
+        "avg_duration_s": 1401.0
       },
       {
         "model": "openai/gpt-5.6-luna",
-        "cells": 24,
-        "total_cost": 2.204489,
-        "avg_cost": 0.091854,
-        "total_tokens": 1106826,
-        "avg_cache_hit": 0.967,
-        "avg_duration_s": 553.0
+        "cells": 34,
+        "total_cost": 3.180633,
+        "avg_cost": 0.093548,
+        "total_tokens": 3052682,
+        "avg_cache_hit": 0.937,
+        "avg_duration_s": 658.0
       },
       {
         "model": "deepseek/deepseek-v4-pro",
-        "cells": 37,
-        "total_cost": 5.875648,
-        "avg_cost": 0.158801,
-        "total_tokens": 7005112,
-        "avg_cache_hit": 0.793,
-        "avg_duration_s": 1771.0
+        "cells": 39,
+        "total_cost": 6.314403,
+        "avg_cost": 0.161908,
+        "total_tokens": 7536137,
+        "avg_cache_hit": 0.801,
+        "avg_duration_s": 1766.0
       },
       {
         "model": "openai/gpt-5.6-terra",
-        "cells": 20,
-        "total_cost": 20.303648,
-        "avg_cost": 1.015182,
-        "total_tokens": 3239989,
-        "avg_cache_hit": 0.821,
-        "avg_duration_s": 731.0
+        "cells": 30,
+        "total_cost": 31.329782,
+        "avg_cost": 1.044326,
+        "total_tokens": 4770535,
+        "avg_cache_hit": 0.832,
+        "avg_duration_s": 785.0
       },
       {
         "model": "anthropic/claude-haiku-4-5",
-        "cells": 14,
-        "total_cost": 21.516785,
-        "avg_cost": 1.536913,
-        "total_tokens": 1096509,
-        "avg_cache_hit": 0.989,
-        "avg_duration_s": 1003.0
-      },
-      {
-        "model": "anthropic/claude-sonnet-5",
-        "cells": 16,
-        "total_cost": 76.417905,
-        "avg_cost": 4.776119,
-        "total_tokens": 1617762,
-        "avg_cache_hit": 0.986,
-        "avg_duration_s": 1194.0
+        "cells": 24,
+        "total_cost": 32.616808,
+        "avg_cost": 1.359034,
+        "total_tokens": 1629766,
+        "avg_cache_hit": 0.824,
+        "avg_duration_s": 862.0
       },
       {
         "model": "openai/gpt-5.6-sol",
-        "cells": 23,
-        "total_cost": 91.693651,
-        "avg_cost": 3.98668,
-        "total_tokens": 5546328,
-        "avg_cache_hit": 0.849,
-        "avg_duration_s": 1233.0
+        "cells": 30,
+        "total_cost": 114.52382,
+        "avg_cost": 3.817461,
+        "total_tokens": 6995342,
+        "avg_cache_hit": 0.85,
+        "avg_duration_s": 1146.0
+      },
+      {
+        "model": "anthropic/claude-sonnet-5",
+        "cells": 27,
+        "total_cost": 118.894751,
+        "avg_cost": 4.403509,
+        "total_tokens": 2484557,
+        "avg_cache_hit": 0.84,
+        "avg_duration_s": 1062.0
       }
     ],
     "conditions": [
@@ -2021,88 +2021,88 @@ window.DYNAMICS_DATA = {
       },
       {
         "condition": "early_degrade",
-        "cells": 32,
+        "cells": 91,
         "variants": 12,
-        "total_cost": 40.422222,
-        "avg_cost": 1.263194,
-        "success": 32,
-        "fail": 0
+        "total_cost": 130.079518,
+        "avg_cost": 1.429445,
+        "success": 80,
+        "fail": 11
       }
     ],
     "stories": [
       {
         "story": "task_manager_api",
-        "cells": 60,
-        "total_cost": 62.889575,
-        "avg_cost": 1.04816,
-        "sessions": 298,
-        "avg_duration_s": 896.0,
-        "avg_tokens_per_session": 22589.0
+        "cells": 77,
+        "total_cost": 87.323185,
+        "avg_cost": 1.134067,
+        "sessions": 383,
+        "avg_duration_s": 876.0,
+        "avg_tokens_per_session": 23893.0
       },
       {
         "story": "notification_service",
-        "cells": 50,
-        "total_cost": 75.742204,
-        "avg_cost": 1.514844,
-        "sessions": 248,
-        "avg_duration_s": 1258.0,
-        "avg_tokens_per_session": 33237.0
+        "cells": 73,
+        "total_cost": 95.940785,
+        "avg_cost": 1.314257,
+        "sessions": 363,
+        "avg_duration_s": 1143.0,
+        "avg_tokens_per_session": 32065.0
       },
       {
         "story": "static_site_gen",
-        "cells": 46,
-        "total_cost": 80.879416,
-        "avg_cost": 1.758248,
-        "sessions": 226,
-        "avg_duration_s": 1449.0,
-        "avg_tokens_per_session": 41928.0
+        "cells": 65,
+        "total_cost": 125.904521,
+        "avg_cost": 1.936993,
+        "sessions": 321,
+        "avg_duration_s": 1401.0,
+        "avg_tokens_per_session": 40992.0
       }
     ],
     "tiers": [
       {
         "tier": "tier1_minimal",
         "quality": "bad",
-        "cells": 30,
-        "avg_cost": 1.317823,
-        "avg_tokens_per_session": 33501.0,
-        "avg_session_duration_s": 253.0
+        "cells": 43,
+        "avg_cost": 1.477277,
+        "avg_tokens_per_session": 32400.0,
+        "avg_session_duration_s": 234.0
       },
       {
         "tier": "tier1_minimal",
         "quality": "good",
-        "cells": 56,
-        "avg_cost": 1.466017,
-        "avg_tokens_per_session": 30338.0,
-        "avg_session_duration_s": 243.0
+        "cells": 70,
+        "avg_cost": 1.507429,
+        "avg_tokens_per_session": 31413.0,
+        "avg_session_duration_s": 238.0
       },
       {
         "tier": "tier2_small",
         "quality": "bad",
-        "cells": 25,
-        "avg_cost": 1.125309,
-        "avg_tokens_per_session": 30805.0,
-        "avg_session_duration_s": 240.0
+        "cells": 41,
+        "avg_cost": 1.229579,
+        "avg_tokens_per_session": 30951.0,
+        "avg_session_duration_s": 220.0
       },
       {
         "tier": "tier2_small",
         "quality": "good",
-        "cells": 45,
-        "avg_cost": 1.54993,
-        "avg_tokens_per_session": 32706.0,
-        "avg_session_duration_s": 226.0
+        "cells": 61,
+        "avg_cost": 1.470702,
+        "avg_tokens_per_session": 32521.0,
+        "avg_session_duration_s": 219.0
       }
     ],
     "sessions": {
-      "total": 772,
-      "total_cost": 219.51119483000002,
-      "total_tokens": 24297099,
-      "total_cache_reads": 586717067,
+      "total": 1067,
+      "total_cost": 309.1684907100002,
+      "total_tokens": 33518193,
+      "total_cache_reads": 823919043,
       "cache_hit_rate": 0.977,
-      "duration_s": 183334.276113817,
-      "successful": 758,
-      "failed": 14
+      "duration_s": 241966.7735237789,
+      "successful": 1007,
+      "failed": 60
     },
-    "generated_at": "2026-08-19T23:04:57.245062+00:00"
+    "generated_at": "2026-08-21T00:24:04.938740+00:00"
   },
   "reviews": {
     "models": [
@@ -2610,243 +2610,460 @@ window.DYNAMICS_DATA = {
     "sonar_commits_available": 98
   },
   "labs": {
-    "verification_frontier": {
-      "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-17T20:12:28.375355",
+    "cache_economics": {
+      "experiment_id": "lab_cache_economics",
+      "generated_at": "2026-08-21T02:19:37.329053",
       "summary": {
         "models": 7,
+        "stories": 215
+      },
+      "models": [
+        {
+          "model": "deepseek-v4-flash",
+          "cells": 31,
+          "avg_cost": 0.074,
+          "avg_cache_hit": 0.964,
+          "cache_reads": 224381696,
+          "cache_writes": 0,
+          "read_write_ratio": null,
+          "avg_context_per_cell": 7488299.0,
+          "avg_tokens_per_cell": 250180.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "cells": 34,
+          "avg_cost": 0.094,
+          "avg_cache_hit": 0.937,
+          "cache_reads": 44099872,
+          "cache_writes": 2378880,
+          "read_write_ratio": 18.5,
+          "avg_context_per_cell": 1386840.0,
+          "avg_tokens_per_cell": 89785.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "cells": 39,
+          "avg_cost": 0.162,
+          "avg_cache_hit": 0.801,
+          "cache_reads": 146609152,
+          "cache_writes": 0,
+          "read_write_ratio": null,
+          "avg_context_per_cell": 3952443.0,
+          "avg_tokens_per_cell": 193234.0
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "cells": 30,
+          "avg_cost": 1.044,
+          "avg_cache_hit": 0.832,
+          "cache_reads": 23958016,
+          "cache_writes": 0,
+          "read_write_ratio": null,
+          "avg_context_per_cell": 957618.0,
+          "avg_tokens_per_cell": 159018.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "cells": 24,
+          "avg_cost": 1.631,
+          "avg_cache_hit": 0.824,
+          "cache_reads": 163588556,
+          "cache_writes": 3922476,
+          "read_write_ratio": 41.7,
+          "avg_context_per_cell": 6884097.0,
+          "avg_tokens_per_cell": 67907.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "cells": 30,
+          "avg_cost": 3.817,
+          "avg_cache_hit": 0.85,
+          "cache_reads": 43466752,
+          "cache_writes": 0,
+          "read_write_ratio": null,
+          "avg_context_per_cell": 1682070.0,
+          "avg_tokens_per_cell": 233178.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "cells": 27,
+          "avg_cost": 5.169,
+          "avg_cache_hit": 0.84,
+          "cache_reads": 177814999,
+          "cache_writes": 5250530,
+          "read_write_ratio": 33.9,
+          "avg_context_per_cell": 6677761.0,
+          "avg_tokens_per_cell": 92021.0
+        }
+      ],
+      "lab_contract": {
+        "lab": "lab_cache_economics.py",
+        "input_dataset_id": "canonical_registry/story",
+        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_version": "data-manifest/1.0+701rows",
+        "metric_definition_version": "cache_economics/v1",
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": null,
+        "n_input_records": 215,
+        "contract_version": "lab-contract/v1",
+        "generated_at": "2026-08-21T00:19:37.329071+00:00"
+      }
+    },
+    "condition_effects": {
+      "experiment_id": "lab_condition_effects",
+      "generated_at": "2026-08-21T02:20:07.451094",
+      "summary": {
+        "conditions": 2,
+        "stories": 215,
+        "reviews": 242
+      },
+      "conditions": [
+        {
+          "condition": "clean",
+          "cells": 135,
+          "success_rate": 0.97,
+          "cascade_rate": 0.015,
+          "avg_cost": 1.5429,
+          "total_cost": 208.2874,
+          "reviews": 134,
+          "worse_rate": 0.0
+        },
+        {
+          "condition": "early_degrade",
+          "cells": 80,
+          "success_rate": 0.863,
+          "cascade_rate": 0.025,
+          "avg_cost": 1.261,
+          "total_cost": 100.8811,
+          "reviews": 21,
+          "worse_rate": 0.0
+        }
+      ],
+      "lab_contract": {
+        "lab": "lab_condition_effects.py",
+        "input_dataset_id": "canonical_registry/story+review",
+        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_version": "data-manifest/1.0+701rows",
+        "metric_definition_version": "condition_effects/v1",
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": null,
+        "n_input_records": 457,
+        "contract_version": "lab-contract/v1",
+        "generated_at": "2026-08-21T00:20:07.451115+00:00"
+      }
+    },
+    "quality_frontier": {
+      "experiment_id": "lab_quality_frontier",
+      "generated_at": "2026-08-21T02:22:22.098544",
+      "summary": {
+        "models": 7,
+        "stories": 215,
+        "analyses": 166
+      },
+      "models": [
+        {
+          "model": "deepseek-v4-flash",
+          "cells": 22,
+          "avg_cost": 0.068,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.037,
+          "cyclomatic_complexity": 475.455,
+          "novelty_score": 0.87
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "cells": 24,
+          "avg_cost": 0.092,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.087,
+          "cyclomatic_complexity": 262.583,
+          "novelty_score": 0.876
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "cells": 37,
+          "avg_cost": 0.159,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.045,
+          "cyclomatic_complexity": 309.378,
+          "novelty_score": 0.845
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "cells": 20,
+          "avg_cost": 1.015,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.088,
+          "cyclomatic_complexity": 233.8,
+          "novelty_score": 0.901
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "cells": 14,
+          "avg_cost": 1.537,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.037,
+          "cyclomatic_complexity": 381.571,
+          "novelty_score": 0.842
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "cells": 23,
+          "avg_cost": 3.987,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.054,
+          "cyclomatic_complexity": 297.348,
+          "novelty_score": 0.917
+        },
+        {
+          "model": "claude-sonnet-5",
+          "cells": 16,
+          "avg_cost": 4.776,
+          "lsp_errors_per_cell": 0.0,
+          "code_quality_score": 0.052,
+          "cyclomatic_complexity": 375.375,
+          "novelty_score": 0.789
+        }
+      ],
+      "lab_contract": {
+        "lab": "lab_quality_frontier.py",
+        "input_dataset_id": "canonical_registry/story+analysis",
+        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_version": "data-manifest/1.0+701rows",
+        "metric_definition_version": "quality_frontier/v1",
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": null,
+        "n_input_records": 381,
+        "contract_version": "lab-contract/v1",
+        "generated_at": "2026-08-21T00:22:22.098565+00:00"
+      }
+    },
+    "story_arc": {
+      "experiment_id": "lab_story_arc",
+      "generated_at": "2026-08-21T02:18:53.476741",
+      "summary": {
+        "snowball_factor": 2.26,
+        "session1_cost": 0.1668,
+        "session5_cost": 0.3773,
+        "stories": 215
+      },
+      "sessions": [
+        {
+          "session_number": 1,
+          "task_type": "greenfield",
+          "n": 215,
+          "avg_cost": 0.1668,
+          "avg_tokens": 21663.0,
+          "avg_tests": 4.5
+        },
+        {
+          "session_number": 2,
+          "task_type": "feature",
+          "n": 215,
+          "avg_cost": 0.232,
+          "avg_tokens": 28432.0,
+          "avg_tests": 8.6
+        },
+        {
+          "session_number": 3,
+          "task_type": "integration",
+          "n": 215,
+          "avg_cost": 0.3363,
+          "avg_tokens": 34852.0,
+          "avg_tests": 11.5
+        },
+        {
+          "session_number": 4,
+          "task_type": "refactor",
+          "n": 211,
+          "avg_cost": 0.339,
+          "avg_tokens": 35257.0,
+          "avg_tests": 11.0
+        },
+        {
+          "session_number": 5,
+          "task_type": "cross_cutting",
+          "n": 211,
+          "avg_cost": 0.3773,
+          "avg_tokens": 40655.0,
+          "avg_tests": 14.9
+        }
+      ],
+      "by_condition": {
+        "clean_s1": 0.1772,
+        "clean_s2": 0.2418,
+        "clean_s3": 0.3892,
+        "clean_s4": 0.3522,
+        "clean_s5": 0.4048,
+        "early_degrade_s1": 0.1492,
+        "early_degrade_s2": 0.2155,
+        "early_degrade_s3": 0.2468,
+        "early_degrade_s4": 0.3173,
+        "early_degrade_s5": 0.3321
+      },
+      "by_model": {
+        "claude-haiku-4-5": {
+          "1": 0.1851,
+          "2": 0.2663,
+          "3": 0.2609,
+          "4": 0.2557,
+          "5": 0.3911
+        },
+        "claude-sonnet-5": {
+          "1": 0.452,
+          "2": 0.6493,
+          "3": 1.075,
+          "4": 0.9413,
+          "5": 1.2859
+        },
+        "deepseek-v4-flash": {
+          "1": 0.0061,
+          "2": 0.0109,
+          "3": 0.0187,
+          "4": 0.0148,
+          "5": 0.024
+        },
+        "deepseek-v4-pro": {
+          "1": 0.0189,
+          "2": 0.0245,
+          "3": 0.0477,
+          "4": 0.0311,
+          "5": 0.0478
+        },
+        "gpt-5.6-luna": {
+          "1": 0.0136,
+          "2": 0.017,
+          "3": 0.019,
+          "4": 0.0213,
+          "5": 0.0226
+        },
+        "gpt-5.6-sol": {
+          "1": 0.4558,
+          "2": 0.6406,
+          "3": 0.9032,
+          "4": 1.0115,
+          "5": 0.8064
+        },
+        "gpt-5.6-terra": {
+          "1": 0.1381,
+          "2": 0.1625,
+          "3": 0.2276,
+          "4": 0.2454,
+          "5": 0.2708
+        }
+      },
+      "lab_contract": {
+        "lab": "lab_story_arc.py",
+        "input_dataset_id": "canonical_registry/story",
+        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_version": "data-manifest/1.0+701rows",
+        "metric_definition_version": "story_arc/v1",
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": null,
+        "n_input_records": 215,
+        "contract_version": "lab-contract/v1",
+        "generated_at": "2026-08-21T00:18:53.476829+00:00"
+      }
+    },
+    "verification_frontier": {
+      "experiment_id": "lab_verification_frontier",
+      "generated_at": "2026-08-21T02:20:47.831932",
+      "summary": {
+        "models": 7,
+        "stories": 215,
         "cheapest": "deepseek-v4-flash",
         "most_verified": "claude-haiku-4-5",
         "pareto_frontier": [
           "deepseek-v4-flash",
-          "deepseek-v4-pro",
           "claude-haiku-4-5"
         ]
       },
       "models": [
         {
           "model": "deepseek-v4-flash",
-          "cells": 22,
-          "cost_cells": 22,
-          "avg_cost": 0.068,
-          "avg_tests": 36.364,
-          "total_cost": 1.4991,
-          "total_tests": 800
+          "cells": 31,
+          "cost_cells": 31,
+          "avg_cost": 0.074,
+          "avg_tests": 57.0,
+          "total_cost": 2.3083,
+          "total_tests": 1767
         },
         {
           "model": "gpt-5.6-luna",
-          "cells": 24,
-          "cost_cells": 24,
-          "avg_cost": 0.092,
-          "avg_tests": 10.0,
-          "total_cost": 2.2045,
-          "total_tests": 240
+          "cells": 34,
+          "cost_cells": 34,
+          "avg_cost": 0.094,
+          "avg_tests": 14.294,
+          "total_cost": 3.1806,
+          "total_tests": 486
         },
         {
           "model": "deepseek-v4-pro",
-          "cells": 37,
-          "cost_cells": 37,
-          "avg_cost": 0.159,
-          "avg_tests": 45.73,
-          "total_cost": 5.8756,
-          "total_tests": 1692
+          "cells": 39,
+          "cost_cells": 39,
+          "avg_cost": 0.162,
+          "avg_tests": 47.949,
+          "total_cost": 6.3144,
+          "total_tests": 1870
         },
         {
           "model": "gpt-5.6-terra",
-          "cells": 20,
-          "cost_cells": 20,
-          "avg_cost": 1.015,
-          "avg_tests": 9.75,
-          "total_cost": 20.3036,
-          "total_tests": 195
+          "cells": 30,
+          "cost_cells": 30,
+          "avg_cost": 1.044,
+          "avg_tests": 15.267,
+          "total_cost": 31.3298,
+          "total_tests": 458
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 14,
-          "cost_cells": 14,
-          "avg_cost": 1.537,
-          "avg_tests": 193.357,
-          "total_cost": 21.5168,
-          "total_tests": 2707
+          "cells": 24,
+          "cost_cells": 20,
+          "avg_cost": 1.631,
+          "avg_tests": 127.875,
+          "total_cost": 32.6168,
+          "total_tests": 3069
         },
         {
           "model": "gpt-5.6-sol",
-          "cells": 23,
-          "cost_cells": 23,
-          "avg_cost": 3.987,
-          "avg_tests": 11.957,
-          "total_cost": 91.6937,
-          "total_tests": 275
+          "cells": 30,
+          "cost_cells": 30,
+          "avg_cost": 3.817,
+          "avg_tests": 24.4,
+          "total_cost": 114.5238,
+          "total_tests": 732
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 16,
-          "cost_cells": 16,
-          "avg_cost": 4.776,
-          "avg_tests": 153.188,
-          "total_cost": 76.4179,
-          "total_tests": 2451
-        }
-      ]
-    },
-    "story_arc": {
-      "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-17T20:12:24.596009",
-      "summary": {
-        "snowball_factor": 2.38,
-        "session1_cost": 0.1597,
-        "session5_cost": 0.3795
-      },
-      "sessions": [
-        {
-          "session_number": 1,
-          "task_type": "greenfield",
-          "n": 156,
-          "avg_cost": 0.1597,
-          "avg_tokens": 21775.0,
-          "avg_tests": 4.8
-        },
-        {
-          "session_number": 2,
-          "task_type": "feature",
-          "n": 156,
-          "avg_cost": 0.2181,
-          "avg_tokens": 28341.0,
-          "avg_tests": 9.2
-        },
-        {
-          "session_number": 3,
-          "task_type": "integration",
-          "n": 156,
-          "avg_cost": 0.3527,
-          "avg_tokens": 35572.0,
-          "avg_tests": 12.2
-        },
-        {
-          "session_number": 4,
-          "task_type": "refactor",
-          "n": 152,
-          "avg_cost": 0.315,
-          "avg_tokens": 35173.0,
-          "avg_tests": 12.2
-        },
-        {
-          "session_number": 5,
-          "task_type": "cross_cutting",
-          "n": 152,
-          "avg_cost": 0.3795,
-          "avg_tokens": 41751.0,
-          "avg_tests": 16.2
+          "cells": 27,
+          "cost_cells": 23,
+          "avg_cost": 5.169,
+          "avg_tests": 117.148,
+          "total_cost": 118.8948,
+          "total_tests": 3163
         }
       ],
-      "by_condition": {
-        "bad_seed_s1": 0.2085,
-        "bad_seed_s2": 0.2658,
-        "bad_seed_s3": 0.4077,
-        "bad_seed_s4": 0.3175,
-        "bad_seed_s5": 0.4022,
-        "clean_s1": 0.151,
-        "clean_s2": 0.2172,
-        "clean_s3": 0.3532,
-        "clean_s4": 0.2986,
-        "clean_s5": 0.3889,
-        "early_degrade_s1": 0.127,
-        "early_degrade_s2": 0.1652,
-        "early_degrade_s3": 0.2875,
-        "early_degrade_s4": 0.3547,
-        "early_degrade_s5": 0.3288
-      },
-      "by_model": {
-        "claude-haiku-4-5": {
-          "1": 0.1948,
-          "2": 0.2571,
-          "3": 0.332,
-          "4": 0.242,
-          "5": 0.5111
-        },
-        "claude-sonnet-5": {
-          "1": 0.461,
-          "2": 0.669,
-          "3": 1.335,
-          "4": 0.8211,
-          "5": 1.4901
-        },
-        "deepseek-v4-flash": {
-          "1": 0.0058,
-          "2": 0.0099,
-          "3": 0.0154,
-          "4": 0.014,
-          "5": 0.0231
-        },
-        "deepseek-v4-pro": {
-          "1": 0.0187,
-          "2": 0.0241,
-          "3": 0.0449,
-          "4": 0.0311,
-          "5": 0.0486
-        },
-        "gpt-5.6-luna": {
-          "1": 0.0129,
-          "2": 0.0173,
-          "3": 0.0185,
-          "4": 0.021,
-          "5": 0.0221
-        },
-        "gpt-5.6-sol": {
-          "1": 0.4785,
-          "2": 0.6551,
-          "3": 0.9675,
-          "4": 1.0774,
-          "5": 0.8082
-        },
-        "gpt-5.6-terra": {
-          "1": 0.1337,
-          "2": 0.1564,
-          "3": 0.2156,
-          "4": 0.2367,
-          "5": 0.2728
-        }
+      "lab_contract": {
+        "lab": "lab_verification_frontier.py",
+        "input_dataset_id": "canonical_registry/story",
+        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_version": "data-manifest/1.0+701rows",
+        "metric_definition_version": "verification_frontier/v1",
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": null,
+        "n_input_records": 215,
+        "contract_version": "lab-contract/v1",
+        "generated_at": "2026-08-21T00:20:47.831948+00:00"
       }
-    },
-    "condition_effects": {
-      "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-17T20:12:26.445186",
-      "summary": {
-        "conditions": 3
-      },
-      "conditions": [
-        {
-          "condition": "bad_seed",
-          "cells": 37,
-          "success_rate": 0.946,
-          "cascade_rate": 0.027,
-          "avg_cost": 1.6016,
-          "total_cost": 59.2605
-        },
-        {
-          "condition": "clean",
-          "cells": 87,
-          "success_rate": 0.977,
-          "cascade_rate": 0.0,
-          "avg_cost": 1.3773,
-          "total_cost": 119.8285
-        },
-        {
-          "condition": "early_degrade",
-          "cells": 32,
-          "success_rate": 1.0,
-          "cascade_rate": 0.062,
-          "avg_cost": 1.2632,
-          "total_cost": 40.4222
-        }
-      ]
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-17T20:12:30.613926",
+      "generated_at": "2026-08-21T02:21:25.060427",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
-        "cells": 106
+        "cells": 106,
+        "stories": 215,
+        "reviews": 242
       },
       "rows": [
         {
@@ -3591,165 +3808,19 @@ window.DYNAMICS_DATA = {
           "better_rate": 0.7,
           "worse_rate": 0.3
         }
-      ]
-    },
-    "cache_economics": {
-      "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-17T20:12:32.870170",
-      "summary": {
-        "models": 7
-      },
-      "models": [
-        {
-          "model": "deepseek-v4-flash",
-          "cells": 22,
-          "avg_cost": 0.068,
-          "avg_cache_hit": 0.965,
-          "cache_reads": 150797952,
-          "cache_writes": 0,
-          "read_write_ratio": null,
-          "avg_context_per_cell": 7087028.0,
-          "avg_tokens_per_cell": 232576.0
-        },
-        {
-          "model": "gpt-5.6-luna",
-          "cells": 24,
-          "avg_cost": 0.092,
-          "avg_cache_hit": 0.967,
-          "cache_reads": 31182624,
-          "cache_writes": 2378880,
-          "read_write_ratio": 13.1,
-          "avg_context_per_cell": 1345394.0,
-          "avg_tokens_per_cell": 46118.0
-        },
-        {
-          "model": "deepseek-v4-pro",
-          "cells": 37,
-          "avg_cost": 0.159,
-          "avg_cache_hit": 0.793,
-          "cache_reads": 137745280,
-          "cache_writes": 0,
-          "read_write_ratio": null,
-          "avg_context_per_cell": 3912173.0,
-          "avg_tokens_per_cell": 189327.0
-        },
-        {
-          "model": "gpt-5.6-terra",
-          "cells": 20,
-          "avg_cost": 1.015,
-          "avg_cache_hit": 0.821,
-          "cache_reads": 14951424,
-          "cache_writes": 0,
-          "read_write_ratio": null,
-          "avg_context_per_cell": 909571.0,
-          "avg_tokens_per_cell": 161999.0
-        },
-        {
-          "model": "claude-haiku-4-5",
-          "cells": 14,
-          "avg_cost": 1.537,
-          "avg_cache_hit": 0.989,
-          "cache_reads": 102433886,
-          "cache_writes": 2753242,
-          "read_write_ratio": 37.2,
-          "avg_context_per_cell": 7395028.0,
-          "avg_tokens_per_cell": 78322.0
-        },
-        {
-          "model": "gpt-5.6-sol",
-          "cells": 23,
-          "avg_cost": 3.987,
-          "avg_cache_hit": 0.849,
-          "cache_reads": 34351104,
-          "cache_writes": 0,
-          "read_write_ratio": null,
-          "avg_context_per_cell": 1734671.0,
-          "avg_tokens_per_cell": 241145.0
-        },
-        {
-          "model": "claude-sonnet-5",
-          "cells": 16,
-          "avg_cost": 4.776,
-          "avg_cache_hit": 0.986,
-          "cache_reads": 115254797,
-          "cache_writes": 3460787,
-          "read_write_ratio": 33.3,
-          "avg_context_per_cell": 7304535.0,
-          "avg_tokens_per_cell": 101110.0
-        }
-      ]
-    },
-    "quality_frontier": {
-      "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-17T20:12:34.885574",
-      "summary": {
-        "models": 7
-      },
-      "models": [
-        {
-          "model": "deepseek-v4-flash",
-          "cells": 22,
-          "avg_cost": 0.068,
-          "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.037,
-          "cyclomatic_complexity": 475.455,
-          "novelty_score": 0.87
-        },
-        {
-          "model": "gpt-5.6-luna",
-          "cells": 24,
-          "avg_cost": 0.092,
-          "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.087,
-          "cyclomatic_complexity": 262.583,
-          "novelty_score": 0.876
-        },
-        {
-          "model": "deepseek-v4-pro",
-          "cells": 37,
-          "avg_cost": 0.159,
-          "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.045,
-          "cyclomatic_complexity": 309.378,
-          "novelty_score": 0.845
-        },
-        {
-          "model": "gpt-5.6-terra",
-          "cells": 20,
-          "avg_cost": 1.015,
-          "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.088,
-          "cyclomatic_complexity": 233.8,
-          "novelty_score": 0.901
-        },
-        {
-          "model": "claude-haiku-4-5",
-          "cells": 14,
-          "avg_cost": 1.537,
-          "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.037,
-          "cyclomatic_complexity": 381.571,
-          "novelty_score": 0.842
-        },
-        {
-          "model": "gpt-5.6-sol",
-          "cells": 23,
-          "avg_cost": 3.987,
-          "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.054,
-          "cyclomatic_complexity": 297.348,
-          "novelty_score": 0.917
-        },
-        {
-          "model": "claude-sonnet-5",
-          "cells": 16,
-          "avg_cost": 4.776,
-          "lsp_errors_per_cell": 0.0,
-          "code_quality_score": 0.052,
-          "cyclomatic_complexity": 375.375,
-          "novelty_score": 0.789
-        }
-      ]
+      ],
+      "lab_contract": {
+        "lab": "lab_verification_value.py",
+        "input_dataset_id": "canonical_registry/story+review",
+        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_version": "data-manifest/1.0+701rows",
+        "metric_definition_version": "verification_value/v1",
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": null,
+        "n_input_records": 457,
+        "contract_version": "lab-contract/v1",
+        "generated_at": "2026-08-21T00:21:25.060471+00:00"
+      }
     }
   }
 };

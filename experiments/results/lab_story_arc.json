@@ -1,119 +1,127 @@
 {
   "experiment_id": "lab_story_arc",
-  "generated_at": "2026-08-17T20:12:24.596009",
+  "generated_at": "2026-08-21T02:18:53.476741",
   "summary": {
-    "snowball_factor": 2.38,
-    "session1_cost": 0.1597,
-    "session5_cost": 0.3795
+    "snowball_factor": 2.26,
+    "session1_cost": 0.1668,
+    "session5_cost": 0.3773,
+    "stories": 215
   },
   "sessions": [
     {
       "session_number": 1,
       "task_type": "greenfield",
-      "n": 156,
-      "avg_cost": 0.1597,
-      "avg_tokens": 21775.0,
-      "avg_tests": 4.8
+      "n": 215,
+      "avg_cost": 0.1668,
+      "avg_tokens": 21663.0,
+      "avg_tests": 4.5
     },
     {
       "session_number": 2,
       "task_type": "feature",
-      "n": 156,
-      "avg_cost": 0.2181,
-      "avg_tokens": 28341.0,
-      "avg_tests": 9.2
+      "n": 215,
+      "avg_cost": 0.232,
+      "avg_tokens": 28432.0,
+      "avg_tests": 8.6
     },
     {
       "session_number": 3,
       "task_type": "integration",
-      "n": 156,
-      "avg_cost": 0.3527,
-      "avg_tokens": 35572.0,
-      "avg_tests": 12.2
+      "n": 215,
+      "avg_cost": 0.3363,
+      "avg_tokens": 34852.0,
+      "avg_tests": 11.5
     },
     {
       "session_number": 4,
       "task_type": "refactor",
-      "n": 152,
-      "avg_cost": 0.315,
-      "avg_tokens": 35173.0,
-      "avg_tests": 12.2
+      "n": 211,
+      "avg_cost": 0.339,
+      "avg_tokens": 35257.0,
+      "avg_tests": 11.0
     },
     {
       "session_number": 5,
       "task_type": "cross_cutting",
-      "n": 152,
-      "avg_cost": 0.3795,
-      "avg_tokens": 41751.0,
-      "avg_tests": 16.2
+      "n": 211,
+      "avg_cost": 0.3773,
+      "avg_tokens": 40655.0,
+      "avg_tests": 14.9
     }
   ],
   "by_condition": {
-    "bad_seed_s1": 0.2085,
-    "bad_seed_s2": 0.2658,
-    "bad_seed_s3": 0.4077,
-    "bad_seed_s4": 0.3175,
-    "bad_seed_s5": 0.4022,
-    "clean_s1": 0.151,
-    "clean_s2": 0.2172,
-    "clean_s3": 0.3532,
-    "clean_s4": 0.2986,
-    "clean_s5": 0.3889,
-    "early_degrade_s1": 0.127,
-    "early_degrade_s2": 0.1652,
-    "early_degrade_s3": 0.2875,
-    "early_degrade_s4": 0.3547,
-    "early_degrade_s5": 0.3288
+    "clean_s1": 0.1772,
+    "clean_s2": 0.2418,
+    "clean_s3": 0.3892,
+    "clean_s4": 0.3522,
+    "clean_s5": 0.4048,
+    "early_degrade_s1": 0.1492,
+    "early_degrade_s2": 0.2155,
+    "early_degrade_s3": 0.2468,
+    "early_degrade_s4": 0.3173,
+    "early_degrade_s5": 0.3321
   },
   "by_model": {
     "claude-haiku-4-5": {
-      "1": 0.1948,
-      "2": 0.2571,
-      "3": 0.332,
-      "4": 0.242,
-      "5": 0.5111
+      "1": 0.1851,
+      "2": 0.2663,
+      "3": 0.2609,
+      "4": 0.2557,
+      "5": 0.3911
     },
     "claude-sonnet-5": {
-      "1": 0.461,
-      "2": 0.669,
-      "3": 1.335,
-      "4": 0.8211,
-      "5": 1.4901
+      "1": 0.452,
+      "2": 0.6493,
+      "3": 1.075,
+      "4": 0.9413,
+      "5": 1.2859
     },
     "deepseek-v4-flash": {
-      "1": 0.0058,
-      "2": 0.0099,
-      "3": 0.0154,
-      "4": 0.014,
-      "5": 0.0231
+      "1": 0.0061,
+      "2": 0.0109,
+      "3": 0.0187,
+      "4": 0.0148,
+      "5": 0.024
     },
     "deepseek-v4-pro": {
-      "1": 0.0187,
-      "2": 0.0241,
-      "3": 0.0449,
+      "1": 0.0189,
+      "2": 0.0245,
+      "3": 0.0477,
       "4": 0.0311,
-      "5": 0.0486
+      "5": 0.0478
     },
     "gpt-5.6-luna": {
-      "1": 0.0129,
-      "2": 0.0173,
-      "3": 0.0185,
-      "4": 0.021,
-      "5": 0.0221
+      "1": 0.0136,
+      "2": 0.017,
+      "3": 0.019,
+      "4": 0.0213,
+      "5": 0.0226
     },
     "gpt-5.6-sol": {
-      "1": 0.4785,
-      "2": 0.6551,
-      "3": 0.9675,
-      "4": 1.0774,
-      "5": 0.8082
+      "1": 0.4558,
+      "2": 0.6406,
+      "3": 0.9032,
+      "4": 1.0115,
+      "5": 0.8064
     },
     "gpt-5.6-terra": {
-      "1": 0.1337,
-      "2": 0.1564,
-      "3": 0.2156,
-      "4": 0.2367,
-      "5": 0.2728
+      "1": 0.1381,
+      "2": 0.1625,
+      "3": 0.2276,
+      "4": 0.2454,
+      "5": 0.2708
     }
+  },
+  "lab_contract": {
+    "lab": "lab_story_arc.py",
+    "input_dataset_id": "canonical_registry/story",
+    "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+    "registry_version": "data-manifest/1.0+701rows",
+    "metric_definition_version": "story_arc/v1",
+    "data_integrity_policy": "docs/data_integrity_findings.md",
+    "requires_external_service": null,
+    "n_input_records": 215,
+    "contract_version": "lab-contract/v1",
+    "generated_at": "2026-08-21T00:18:53.476829+00:00"
   }
 }
