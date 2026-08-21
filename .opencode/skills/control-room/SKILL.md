@@ -1,6 +1,6 @@
 ---
 name: control-room
-description: Read-only GET queries against a running admin/server.py Control Room portal (matrix/status/flags/routing/design-sessions/claude-agents) and a one-shot supervisor assessment pass via supervise.py. Use when asked to check the Control Room, inspect supervisor flags, view the experiment matrix/routing recommendations, or run a supervisor pass — never to steer, interrupt, or otherwise control a running session.
+description: Read-only GET queries against a running apps/control_room/server.py Control Room portal (matrix/status/flags/routing/design-sessions/claude-agents) and a one-shot supervisor assessment pass via supervise.py. Use when asked to check the Control Room, inspect supervisor flags, view the experiment matrix/routing recommendations, or run a supervisor pass — never to steer, interrupt, or otherwise control a running session.
 disable-model-invocation: false
 user-invocable: false
 argument-hint: ""
@@ -9,29 +9,32 @@ argument-hint: ""
 # Control Room Skill — Read-Only Observation Only
 
 **Boundary, stated up front because it is the entire reason this skill exists as written:**
-this skill is a **flag-only, observe-never-steer** rail onto `admin/server.py`'s Control
-Room portal and `scripts/supervise.py`. It exposes GET-only reads. **Never** issue a POST to
-any of `admin/server.py`'s control routes (`/api/flags/<id>/steer`,
-`/api/flags/<id>/interrupt`, `/api/design-sessions/<id>/interrupt`, or the
-`/api/claude-agents` create/stop/respawn/rm/steer routes) — those are the human-operator
-control surface, and exposing them as an agent-callable action would let a session steer or
-interrupt itself or a peer session through the one channel the architecture deliberately
-keeps flag-only. See `docs/supervisor_design.md` for the full design.
+this skill is a **flag-only, observe-never-steer** rail onto the Control Room portal
+(`apps/control_room/server.py`) and `scripts/supervise.py`. It exposes GET-only reads. **Never**
+issue a POST to any control route (`/api/flags/<id>/steer`, `/api/flags/<id>/interrupt`,
+`/api/design-sessions/<id>/interrupt`, or the `/api/claude-agents` create/stop/respawn/rm/steer
+routes) — those are the human-operator control surface, and exposing them as an agent-callable
+action would let a session steer or interrupt itself or a peer session through the one channel
+the architecture deliberately keeps flag-only. See `docs/designs/current/supervisor_design.md`
+for the full design.
 
-## `admin/server.py` — GET endpoints
+## `apps/control_room/server.py` — GET endpoints
 
-Port: `admin/server.py:1365`, `int(os.environ.get("FINOPS_PORT", "8000"))`. Requires the
-portal already running (`python admin/server.py`) — this skill does not start it.
+Port: `int(os.environ.get("FINOPS_PORT", "8000"))`. Requires the portal already running
+(`python3 apps/control_room/server.py`) — this skill does not start it.
 
-6 confirmed `@app.get(...)` routes:
+Routes are registered from `apps/control_room/routes/` (`telemetry.py`, `flags.py`,
+`registry.py`, `design_sessions.py`, `claude_agents.py`, `index.py`). The plain-JSON GET
+endpoints you may read:
 
 ```
-admin/server.py:738  GET /api/matrix           — experiment cell status matrix
-admin/server.py:779  GET /api/status           — SSE stream (see hazard note below)
-admin/server.py:805  GET /api/flags            — supervisor flags
-admin/server.py:860  GET /api/routing          — routing recommendations
-admin/server.py:903  GET /api/design-sessions  — design session state
-admin/server.py:1094 GET /api/claude-agents    — Claude background session state
+GET /api/matrix           — experiment cell status matrix        (routes/telemetry.py)
+GET /api/routing          — routing recommendations              (routes/telemetry.py)
+GET /api/flags            — supervisor flags                     (routes/flags.py)
+GET /api/registry         — knowledge registry                   (routes/registry.py)
+GET /api/registry/<id>    — registry lineage                     (routes/registry.py)
+GET /api/design-sessions  — design session state                 (routes/design_sessions.py)
+GET /api/claude-agents    — Claude background session state      (routes/claude_agents.py)
 ```
 
 Primary example — lead with `/api/matrix`, not `/api/status`:
@@ -46,11 +49,10 @@ curl -s "http://127.0.0.1:${FINOPS_PORT:-8000}/api/claude-agents"
 
 ### `/api/status` is a hazard — do not bare-`curl` it
 
-`/api/status` (`admin/server.py:779-802`) is a Flask **SSE endpoint**: its generator loop
-does `while True: ... yield ": ping\n\n"` and never terminates on its own — only a client
-disconnect stops it. A plain `curl -s`/`fetch()`+`.text()` blocks waiting for a connection
-close that never comes, i.e. it hangs the calling process. If `/api/status` must be read,
-use a bounded read instead:
+`/api/status` (`routes/telemetry.py`) is a Flask **SSE endpoint**: its generator loop
+`while True: ... yield ": ping\n\n"` never terminates on its own — only a client disconnect
+stops it. A plain `curl -s`/`fetch()`+`.text()` blocks waiting for a connection close that never
+comes. If `/api/status` must be read, use a bounded read:
 
 ```bash
 curl -s --max-time 5 "http://127.0.0.1:${FINOPS_PORT:-8000}/api/status"
@@ -60,38 +62,31 @@ or a real SSE client. Never default an example or a script to a bare GET on this
 
 ## `scripts/supervise.py` — one-shot assessment pass
 
-Confirmed flags, `scripts/supervise.py:348-350`:
-
-```
---once            flag — run one assessment pass and exit
---location PATH   default: str(ROOT) — repo location for the monitor session
-```
-
 ```bash
 python3 scripts/supervise.py --once --location "$(pwd)"
 ```
 
-Same observe-only boundary applies here, restated from `supervisor.ts`'s own header comment:
-`src/agentic_dynamics/supervisor.py` deliberately has **no OpenCode client dependency** "so
-observation can't become control" — never add a mode, flag, or follow-up action here that
-lets an agent steer or interrupt a session.
+Flags: `--once` (run one assessment pass and exit), `--location PATH` (repo location for the
+monitor session, default cwd). Same observe-only boundary applies here, restated from the module
+docstring: `agentic_dynamics.control.supervisor` deliberately has **no OpenCode client
+dependency** — "observation metadata only … prevents flag persistence and stream indexing from
+crossing the observation-to-control boundary." Never add a mode, flag, or follow-up action here
+that lets an agent steer or interrupt a session.
 
 ### Prerequisite: a running opencode server
 
-`supervise.py` instantiates `OpenCodeClient(BASE_URL)` where
-`BASE_URL = os.environ.get("OPENCODE_BASE_URL", "http://127.0.0.1:4096")`
-(`scripts/supervise.py:34`) to create its flash monitor session — this is independent of
-whether the *caller* is Claude Code or opencode. Running `supervise.py` cold, with no
-opencode server listening on port 4096 (or `$OPENCODE_BASE_URL`), fails with a connection
-error, not a helpful message. Check for a running opencode server (or set
-`OPENCODE_BASE_URL`) before running this.
+`supervise.py` creates its flash monitor session through an opencode client at
+`OPENCODE_BASE_URL` (default `http://127.0.0.1:4096`) — this is independent of whether the
+*caller* is Claude Code or opencode. Running `supervise.py` cold, with no opencode server
+listening on port 4096 (or `$OPENCODE_BASE_URL`), fails with a connection error, not a helpful
+message. Check for a running opencode server (or set `OPENCODE_BASE_URL`) before running this.
 
 ## Common gotchas
 
-- Every route in this skill is GET-only. If a task seems to require steering a session
-  (pausing it, injecting a flag response, stopping a Claude background agent), that is out
-  of scope for this skill — say so rather than reaching for the POST routes.
-- `/api/status` hangs a bare `curl`/`fetch` — always bound it or skip it in favor of the
-  5 plain-JSON endpoints.
+- Every route in this skill is GET-only. If a task seems to require steering a session (pausing
+  it, injecting a flag response, stopping a Claude background agent), that is out of scope for
+  this skill — say so rather than reaching for the POST routes.
+- `/api/status` hangs a bare `curl`/`fetch` — always bound it or skip it in favor of the plain-JSON
+  endpoints.
 - `supervise.py` needs an opencode server on port 4096 (or `$OPENCODE_BASE_URL`) even when
   invoked from Claude Code, since it talks to opencode's API to create its monitor session.

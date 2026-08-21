@@ -1000,6 +1000,38 @@ nothing computing it. Only doing both yields the required "ONE meaning afterward
 
 **s4_grit_resolution result: 9/9 PASS.**
 
+### s5_agent_context_rewrite — rewrite specialist agent context around the eight planes (review item 5 / P1)
+
+**Scope.** The three subagents under `agent_config/agents/` and the seven skills under
+`agent_config/skills/` were rewritten against the current tree. Two skills (`queue`, `review`)
+already referenced only `scripts/` + the Redis plane + the CLI and carried no stale markers — they
+were re-verified and left unchanged rather than rewritten for noise. `agent_config/commands/`,
+`conventions.md`, `mental-model.md`, `rules.md`, and `.opencode/tools/*.ts` are out of scope here
+(commands/tools sweep belongs to s6's semantic-guard extension, which covers the full
+`agent_config/**` tree).
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Every agent rewritten around the eight planes** — `data-analysis` (reporting plane + canonical corpus), `instrument-dev` (measurement/adapters/runtime plane map, `PERTURBATION_CLASSES`, signal registry), `pipeline-ops` (canonical registry + `agentic-dynamics` CLI) | PASS |
+| 2 | **Every skill rewritten around the eight planes** — `instrument`, `analyze`, `lab-books`, `control-room`, `run-workflow` rewritten; `queue` + `review` verified clean (no stale refs) | PASS |
+| 3 | **Current paths** — `src/agentic_dynamics/<plane>/`, `apps/control_room/`, `workflows/`, `experiments/definitions/`, `docs/designs/current/…`; no `admin/server.py`, no `code_reviews/…`, no `experiments/specs` as an authoring location | PASS |
+| 4 | **Current imports** — `agentic_dynamics.measurement.perturb`, `agentic_dynamics.adapters.opencode`, `agentic_dynamics.control.routing`, `agentic_dynamics.experiment.{experiment_spec,compile_experiment}`, `agentic_dynamics.runtime.workflow_runner`, `agentic_dynamics.reporting.canonical_corpus`; zero `from instrument` / `import instrument` | PASS |
+| 5 | **Current commands** — `agentic-dynamics experiment/story/workflow/queue/analyze/data/registry/review/spec/validate/supervise` (from the CLI table in `cli.py`), incl. `agentic-dynamics analyze lab <name>` | PASS |
+| 6 | **Measured-signal vocabulary** — `confidence` [H] (`adapters/opencode.py:113`), `perturbation_strength` + `test_executed_success` (`knowledge/ledger_ingestion.py:180-181`), `answer`/`explanation` token split (`experiment/experiment_spec.py:83`); `signal_registry` documented | PASS |
+| 7 | **No SEMANTIC/MANIFOLD taxonomy** — operators presented via the three `PERTURBATION_CLASSES` (`specification_corruption` / `objective_mutation` / `process_perturbation`); grep of `agent_config/` for the retired terms is clean | PASS |
+| 8 | **No hard-coded module/line counts** — all `(NNNL)` / "NNN lines" counts removed from agents + skills; `file:line` provenance citations retained (the repo's citation convention) | PASS |
+| 9 | **Surfaces regenerated** — `python scripts/_gen_instructions.py` wrote 36 files (18 opencode + 18 claude); `validate_opencode`/`validate_claude` both OK; `tests/test_agent_config_render.py` 10 passed | PASS |
+| 10 | **Guards still green** — `tests/test_stale_path_guard.py` + `tests/test_script_classification.py` 4 passed | PASS |
+
+**s5_agent_context_rewrite result: 10/10 PASS.**
+
+**Deferred to s6 (logged for the guard sweep):** `agent_config/commands/run-exp.md` +
+`pipeline.md` still reference `code_reviews/2026-08-14_…` (stale design-doc path) and
+`run-exp.md` still claims `confidence` is "not yet instrumented" (now measured);
+`conventions.md` carries two hard-coded line counts (`1396 lines`, `330L`);
+`.opencode/tools/{supervisor,control_room,compile_experiment}.ts` reference `admin/server.py` and
+`from instrument.experiment_spec`. All are outside the s5 agents/skills scope.
+
 
 
 
