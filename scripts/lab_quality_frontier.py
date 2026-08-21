@@ -126,10 +126,15 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
 def main():
     tables = load_canonical_tables("story", "analysis")
     output = compute(tables.stories, tables.analysis)
+    # Record scope (public-truth review P1): the metric consumes every current story and
+    # every analysis the registry resolved for them — declared explicitly, not via a
+    # permissive default.
     attach_contract(
         output,
         LAB,
         tables,
+        n_eligible_records=len(tables.stories) + len(tables.analysis),
+        n_used_records=len(tables.stories) + len(tables.analysis),
     )
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))

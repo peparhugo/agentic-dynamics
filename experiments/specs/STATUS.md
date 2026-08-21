@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-21T22:03:19.875150+00:00`  ·  80 spec(s)
-**Work remaining:** 18 open · 62 completed/retired
+Generated at: `2026-08-21T22:35:01.173508+00:00`  ·  81 spec(s)
+**Work remaining:** 19 open · 62 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -13,6 +13,7 @@ Generated at: `2026-08-21T22:03:19.875150+00:00`  ·  80 spec(s)
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
 | `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `public_truth_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-21 22:03 | ok | deepseek/deepseek-v4-pro | $2.0485 | 1 |
 | `queue_steer` | workflow | yes | runnable | 0.1 | — | 2026-08-15 19:32 | ok | deepseek/deepseek-v4-flash | $0.0330 | 1 |
 | `rag_bare_vs_augmented` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `registry_canonicalize` | workflow | yes | runnable | 0.1 | — | 2026-08-19 13:42 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |

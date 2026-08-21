@@ -337,9 +337,13 @@ def _lab_gate_fixture(tmp_path, monkeypatch, *, contract_ok: bool):
 
     tables = cc.load_canonical_tables("story", manifest_path=claimed)
     artifact = tmp_path / "lab_story_arc.json"
+    # build_contract requires explicit eligibility/usage counts (public-truth P1 removed the
+    # permissive defaults); this synthetic slice resolves to no story payloads, so 0/0.
     artifact.write_text(json.dumps({
         "experiment_id": "lab_story_arc",
-        CONTRACT_KEY: build_contract("lab_story_arc.py", tables),
+        CONTRACT_KEY: build_contract(
+            "lab_story_arc.py", tables, n_eligible_records=0, n_used_records=0
+        ),
     }))
 
     # build_data resolves lab outputs relative to ROOT; point ROOT at tmp_path and make the
@@ -464,12 +468,12 @@ def test_fail_closed_on_unwaivered_missing_row(tmp_path, monkeypatch):
     monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
-    with pytest.raises(RuntimeError, match="not covered by a waiver"):
+    with pytest.raises(RuntimeError, match="not covered by a valid waiver"):
         build_data._assert_resolution_complete(tables, waiver_path=tmp_path / "absent.json")
 
 
 def test_fail_closed_passes_with_waiver_and_waiver_visible(tmp_path, monkeypatch):
-    """A missing payload with a reason-bearing waiver builds, and the waiver is returned."""
+    """A missing payload with a hard-bound waiver builds, and the waiver is returned."""
     stories_dir = tmp_path / "stories"
     stories_dir.mkdir()
     manifest_path = tmp_path / "data_manifest.json"
@@ -479,28 +483,279 @@ def test_fail_closed_passes_with_waiver_and_waiver_visible(tmp_path, monkeypatch
     tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
     waiver_path = tmp_path / "waivers.json"
     waiver_path.write_text(json.dumps({
-        "schema_version": "waiver/v1",
+        "schema_version": "waiver/v2",
         "waivers": [
-            {"table": "story", "logical_locator": "orphan", "entity_id": None,
-             "reason": "known payload-less stub"},
+            {
+                "table": "story",
+                "logical_locator": "orphan",
+                "issue_kind": "missing",
+                "entity_id": None,
+                "knowledge_id": None,
+                "source_uri": "story:orphan",
+                "reason": "known payload-less stub",
+                "review_by": "operator",
+                "expiry": "2999-01-01T00:00:00+00:00",
+            },
         ],
     }))
 
     waived = build_data._assert_resolution_complete(tables, waiver_path=waiver_path)
     assert len(waived) == 1
     assert waived[0]["logical_locator"] == "orphan"
+    assert waived[0]["kind"] == "missing"
     assert waived[0]["reason"] == "known payload-less stub"
 
 
-def test_real_corpus_resolution_is_waivered():
-    """The committed corpus resolves once the 10 payload-less rows are waived.
+def test_real_corpus_resolution_is_tombstoned():
+    """The committed corpus resolves with zero unresolved rows — the ten payload-less
+    stories are tombstoned (never waived), so publication needs no waiver at all.
 
-    An integration guard: if a new payload-less current row appears without a matching
-    waiver, this raises — publication fails closed against drift, not just in fixtures.
+    An integration guard: if a new payload-less *current* row appears (without a tombstone
+    or a valid waiver), ``_assert_resolution_complete`` raises — publication fails closed
+    against drift, not just in fixtures.
     """
     if not cc.current_manifest_identity().registry_identity_sha256:  # pragma: no cover
         pytest.skip("no data_manifest.json registry in this checkout")
     tables = cc.load_canonical_tables("story", "finding", "review")
+    assert tables.resolution.missing == 0
+    assert tables.resolution.unresolved == 0
+    assert tables.resolution.complete
     waived = build_data._assert_resolution_complete(tables)
-    assert tables.resolution.missing == 10
-    assert len(waived) == 10
+    assert waived == []
+
+
+def test_tombstoned_row_creates_no_unresolved_issue(tmp_path, monkeypatch):
+    """A tombstoned registry row is excluded outright — no payload, no issue (P1)."""
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()  # empty — no payload for the tombstoned row
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [
+        _row(logical_locator="retracted", source_uri="story:retracted",
+             lifecycle_state="tombstoned", reason="no usable measurement payload"),
+    ])
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    assert tables.stories == []
+    assert tables.resolution.expected_current == 0
+    assert tables.resolution.missing == 0
+    assert tables.resolution.complete
+
+
+def test_validate_waivers_rejects_stale_duplicate_and_unmatched():
+    """``validate_waivers`` drops expired, duplicated, and dead waivers (P1)."""
+    from agentic_dynamics.reporting.canonical_corpus import (
+        ResolutionIssue,
+        ResolutionReport,
+        Waiver,
+        validate_waivers,
+    )
+
+    issue = ResolutionIssue(
+        table="story", entity_id="e1", logical_locator="abc", source_uri="story:abc",
+        kind="missing",
+    )
+    report = ResolutionReport.from_issues(expected_current=1, resolved=0, issues=[issue])
+
+    def waiver(logical_locator, kind, expiry, review_by="operator"):
+        return Waiver(
+            table="story", logical_locator=logical_locator, issue_kind=kind,
+            entity_id="e1", knowledge_id=None, source_uri=f"story:{logical_locator}",
+            reason="r", review_by=review_by, expiry=expiry,
+        )
+
+    stale = waiver("abc", "missing", "2000-01-01T00:00:00+00:00")
+    duplicate = [waiver("abc", "missing", "2999-01-01T00:00:00+00:00"),
+                 waiver("abc", "missing", "2999-01-01T00:00:00+00:00")]
+    unmatched = waiver("zzz", "missing", "2999-01-01T00:00:00+00:00")
+    good = waiver("abc", "missing", "2999-01-01T00:00:00+00:00")
+
+    valid, rejected = validate_waivers(report, [stale])
+    assert valid == [] and any("stale" in r for r in rejected)
+
+    valid, rejected = validate_waivers(report, duplicate)
+    assert len(valid) == 1 and any("duplicate" in r for r in rejected)
+
+    valid, rejected = validate_waivers(report, [unmatched])
+    assert valid == [] and any("unmatched" in r for r in rejected)
+
+    valid, rejected = validate_waivers(report, [good])
+    assert len(valid) == 1 and rejected == []
+
+
+def test_waiver_issue_kind_narrows_the_match():
+    """A waiver for one issue kind does not cover a different kind at the same locator (P1)."""
+    from agentic_dynamics.reporting.canonical_corpus import (
+        ResolutionIssue,
+        ResolutionReport,
+        Waiver,
+        unwaivered_issues,
+    )
+
+    # A "missing" issue at locator "abc", but the waiver excuses an "unreadable" defect.
+    issue = ResolutionIssue(
+        table="story", entity_id="e1", logical_locator="abc", source_uri="story:abc",
+        kind="missing",
+    )
+    report = ResolutionReport.from_issues(expected_current=1, resolved=0, issues=[issue])
+    mismatched = Waiver(
+        table="story", logical_locator="abc", issue_kind="unreadable",
+        entity_id="e1", knowledge_id=None, source_uri="story:abc",
+        reason="r", review_by="operator", expiry="2999-01-01T00:00:00+00:00",
+    )
+
+    still_unwaivered = unwaivered_issues(report, [mismatched])
+    assert len(still_unwaivered) == 1
+# ---------------------------------------------------------------------------
+# Null-not-zero (LSP) + one cost denominator (public-truth closure, phase p2)
+# ---------------------------------------------------------------------------
+
+
+def _resolved_story_cell(model, story_name, *, cost, session_count=5, story_id=None):
+    """A resolved-story-shaped payload for ``compute_story_models`` / ``_load_story_data``.
+
+    ``cost is None`` models the review's P1 case: a cell whose cost was never captured
+    (its payload has no ``total_cost``). ``_captured_cost_stats`` must exclude it from
+    the average rather than fold it in as ``0``.
+    """
+    summary = {"session_count": session_count}
+    if cost is not None:
+        summary["total_cost"] = cost
+    return {
+        "story_id": story_id,
+        "model": model,
+        "story_name": story_name,
+        "codebase_path": "experiments/codebases/python/tier1/good",
+        "_canonical_condition": "clean",
+        "summary": summary,
+    }
+
+
+def _analysis_cell(story_id, *, lsp_available, lsp_errors=0):
+    """A minimal analysis payload with one deep cell whose LSP ran (or not)."""
+    return {
+        "_story_id": story_id,
+        "commits": [],
+        "summary": {},
+        "deep": {
+            "lsp": {"available": lsp_available, "errors": lsp_errors, "warnings": 0},
+            "solution": {
+                "correctness_score": 1.0,
+                "constraint_score": 1.0,
+                "code_quality_score": 0.5,
+                "novelty_score": 0.5,
+                "composite_score": 0.7,
+            },
+            "basin": {"escape_score": 0.3},
+            "strategy": {"strategy": "exploratory"},
+        },
+    }
+
+
+def test_analysis_lsp_is_null_when_language_server_never_ran():
+    """An unmeasured LSP signal is ``null``, never an averaged-in zero (P0/P1)."""
+    stories = [{"story_id": "s1", "model": "deepseek/deepseek-v4-pro"}]
+    data = build_data._load_analysis_data([_analysis_cell("s1", lsp_available=False)], stories)
+    m = data["models"][0]
+    assert m["lsp_errors_per_cell"]["value"] is None
+    assert m["lsp_errors_per_cell"]["n_available"] == 0
+    assert m["lsp_errors_per_cell"]["n_total"] == 1
+    assert m["lsp_errors_per_cell"]["coverage"] == 0.0
+
+
+def test_analysis_lsp_averages_over_available_cells_only():
+    """Only cells where the language server ran enter the LSP average (P0/P1)."""
+    stories = [
+        {"story_id": "s1", "model": "deepseek/deepseek-v4-pro"},
+        {"story_id": "s2", "model": "deepseek/deepseek-v4-pro"},
+        {"story_id": "s3", "model": "deepseek/deepseek-v4-pro"},
+    ]
+    analysis = [
+        _analysis_cell("s1", lsp_available=True, lsp_errors=5),
+        _analysis_cell("s2", lsp_available=True, lsp_errors=3),
+        _analysis_cell("s3", lsp_available=False, lsp_errors=999),  # must be ignored
+    ]
+    data = build_data._load_analysis_data(analysis, stories)
+    m = data["models"][0]
+    assert m["lsp_errors_per_cell"]["value"] == 4.0
+    assert m["lsp_errors_per_cell"]["n_available"] == 2
+    assert m["lsp_errors_per_cell"]["n_total"] == 3
+    assert m["lsp_errors_per_cell"]["coverage"] == round(2 / 3, 4)
+
+
+def test_story_model_sections_agree_on_avg_cost():
+    """The two model sections never disagree on the same model's average cost (P1).
+
+    A cell with no captured cost must not dilute the average: both ``compute_story_models``
+    (top-level ``models``) and ``_load_story_data`` (``stories.models``) average over the
+    captured-cost cells only, so the two views of the same model return the same number.
+    """
+    mid = "anthropic/claude-haiku-4-5"
+    stories = [
+        _resolved_story_cell(mid, "task_manager_api", cost=2.0, story_id="a1"),
+        _resolved_story_cell(mid, "task_manager_api", cost=4.0, story_id="a2"),
+        _resolved_story_cell(mid, "task_manager_api", cost=None, story_id="a3"),
+    ]
+    top = {m["id"]: m for m in build_data.compute_story_models(stories)}
+    nested = {m["model"]: m for m in build_data._load_story_data(stories)["models"]}
+
+    # Captured average = (2 + 4) / 2, not (2 + 4 + 0) / 3.
+    assert top[mid]["avg_cost"] == 3.0
+    assert nested[mid]["avg_cost"] == 3.0
+    assert top[mid]["avg_cost"] == nested[mid]["avg_cost"]
+    # The four shared denominator fields are published on both views.
+    assert nested[mid]["cost_captured_cells"] == 2
+    assert nested[mid]["total_cells"] == 3
+    assert nested[mid]["cost_coverage"] == round(2 / 3, 4)
+    assert top[mid]["avg_captured_cost"] == nested[mid]["avg_captured_cost"]
+
+
+def test_real_data_js_model_sections_agree_on_avg_cost():
+    """Integration: the generated data.js model sections agree on every model's avg_cost."""
+    import json
+
+    data_js = Path(__file__).resolve().parent.parent / "apps" / "website" / "data.js"
+    if not data_js.exists():  # pragma: no cover - generated file, present in CI
+        pytest.skip("apps/website/data.js not generated")
+    text = data_js.read_text(encoding="utf-8")
+    payload = json.loads(text[text.index("{") : text.rindex("}") + 1])
+
+    top = {m["id"]: m.get("avg_cost") for m in payload["models"]}
+    nested = {m["model"]: m.get("avg_cost") for m in payload["stories"]["models"]}
+    disagreements = [
+        f"{mid}: top={top[mid]!r} nested={nested[mid]!r}"
+        for mid in top
+        if mid in nested and top[mid] != nested[mid]
+    ]
+    assert not disagreements, "model sections disagree on avg_cost:\n" + "\n".join(disagreements)
+
+
+def test_data_js_publication_contract_present_and_verifies():
+    """The generated data.js carries a global publication contract that verifies (P1/P2)."""
+    import json
+
+    data_js = Path(__file__).resolve().parent.parent / "apps" / "website" / "data.js"
+    if not data_js.exists():  # pragma: no cover - generated file, present in CI
+        pytest.skip("apps/website/data.js not generated")
+    text = data_js.read_text(encoding="utf-8")
+    payload = json.loads(text[text.index("{") : text.rindex("}") + 1])
+
+    contract = payload.get("publication_contract")
+    assert contract is not None, "data.js has no publication_contract"
+    for field in (
+        "registry_identity",
+        "resolved_input_identity",
+        "data_integrity_policy_version",
+        "normalization_version",
+        "waiver_digest",
+        "generator_source_tree_identity",
+    ):
+        assert contract.get(field), f"publication_contract missing {field}"
+
+    # The contract verifies against the resolver and the waiver artifact.
+    assert contract["registry_identity"] == cc.current_manifest_identity().registry_identity_sha256
+    everything = cc.load_canonical_tables(*cc.TABLES)
+    assert contract["resolved_input_identity"] == everything.resolved_input_sha256
+    assert contract["waiver_digest"] == cc.waiver_set_digest()
+    assert contract["normalization_version"] == cc.NORMALIZATION_VERSION
+    assert contract["data_integrity_policy_version"] == cc.DATA_INTEGRITY_POLICY_VERSION

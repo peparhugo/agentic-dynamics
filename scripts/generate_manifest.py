@@ -249,19 +249,33 @@ def main():
     }
 
     files_to_hash = {
-        "inventory.json": PROJECT_ROOT / "experiments" / "inventory.json",
-        "_results_summary.json": RESULTS_DIR / "_results_summary.json",
-        "_trajectory_aggregate.json": RESULTS_DIR / "_trajectory_aggregate.json",
-        "data.js": PROJECT_ROOT / "apps" / "website" / "data.js",
+        # The file classification (public-truth review "smaller"): inputs to build_data,
+        # its published output, and retired artifacts that are no longer first-class
+        # entries. ``_results_summary.json`` is HISTORICAL — hashed for audit only, never
+        # treated as a current input (docs/data_integrity_findings.md rule 4).
+        "canonical_inputs": {
+            "inventory.json": PROJECT_ROOT / "experiments" / "inventory.json",
+            "_trajectory_aggregate.json": RESULTS_DIR / "_trajectory_aggregate.json",
+        },
+        "canonical_outputs": {
+            "data.js": PROJECT_ROOT / "apps" / "website" / "data.js",
+        },
+        "historical_artifacts": {
+            "_results_summary.json": RESULTS_DIR / "_results_summary.json",
+        },
     }
-    for name, path in files_to_hash.items():
-        if path.exists():
-            manifest["files"][name] = {
-                "sha256": sha256(path),
-                "size_bytes": path.stat().st_size,
-            }
-        else:
-            manifest["files"][name] = None
+    manifest["files"] = {}
+    for class_name, files in files_to_hash.items():
+        bucket = {}
+        for name, path in files.items():
+            if path.exists():
+                bucket[name] = {
+                    "sha256": sha256(path),
+                    "size_bytes": path.stat().st_size,
+                }
+            else:
+                bucket[name] = None
+        manifest["files"][class_name] = bucket
 
     # canonical-state round 2, plan step 15: the compacted registry array — additive
     # only. `manifest["files"]` above is otherwise byte-for-byte unchanged (design §11's
@@ -275,11 +289,16 @@ def main():
     print(f"Written {output_path}")
     print(f"  opencode: {manifest['opencode_version']}")
     print(f"  commit:   {manifest['git_commit']}")
-    for name, info in manifest["files"].items():
-        if info:
-            print(f"  {name}: {info['size_bytes']:,} bytes, sha256={info['sha256'][:12]}...")
-        else:
-            print(f"  {name}: MISSING")
+    for class_name, bucket in manifest["files"].items():
+        print(f"  {class_name}:")
+        for name, info in bucket.items():
+            if info:
+                print(
+                    f"    {name}: {info['size_bytes']:,} bytes, "
+                    f"sha256={info['sha256'][:12]}..."
+                )
+            else:
+                print(f"    {name}: MISSING")
     print(f"  registry: {len(manifest['registry'])} entities (compacted from {REGISTRY_INDEX_PATH.name})")
 
 if __name__ == "__main__":

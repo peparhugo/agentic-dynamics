@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-21T22:03:19.875150+00:00",
-  "n_specs": 80,
+  "generated_at": "2026-08-21T22:35:01.173508+00:00",
+  "n_specs": 81,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -92,6 +92,24 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0
+    },
+    {
+      "name": "public_truth_closure",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/public_truth_closure.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-21T22:03:19.665801+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 2.048454,
+      "latest_git_sha": "174e5c290",
+      "results_pointer": "experiments/results/workflows/public_truth_closure/20260821T220319Z.json",
+      "n_runs": 1
     },
     {
       "name": "queue_steer",

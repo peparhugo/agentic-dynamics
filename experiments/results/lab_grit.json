@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_grit",
-  "generated_at": "2026-08-21T18:18:09.060357",
+  "generated_at": "2026-08-21T23:18:17.132049",
   "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
   "summary": {
     "cells": 144,
@@ -15,7 +15,7 @@
     "controlled_delta_grit": 0.0037,
     "excluded": 135,
     "exclusions": {
-      "missing_strength_and_verdict": 135
+      "missing_required_field": 135
     }
   },
   "by_strength": [
@@ -253,20 +253,22 @@
   "lab_contract": {
     "lab": "lab_grit.py",
     "input_dataset_id": "canonical_registry/finding+story",
-    "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
-    "resolved_input_sha256": "518839ba4aaa2be6fdd07e1ace9712dbf90838573471a8cd8caf5ab52c4d6681",
+    "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+    "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
     "registry_version": "data-manifest/1.0+701rows",
     "metric_definition_version": "grit/v1",
     "n_resolved_records": 279,
     "n_eligible_records": 144,
     "n_used_records": 144,
     "n_excluded_records": 135,
+    "n_unused_eligible_records": 0,
+    "review_without_current_story": 0,
+    "story_without_review": 0,
+    "missing_required_field": 135,
+    "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "exclusions": {
-      "missing_strength_and_verdict": 135
-    },
-    "contract_version": "lab-contract/v3",
-    "generated_at": "2026-08-21T16:18:09.060636+00:00"
+    "contract_version": "lab-contract/v4",
+    "generated_at": "2026-08-21T21:18:17.132314+00:00"
   }
 }

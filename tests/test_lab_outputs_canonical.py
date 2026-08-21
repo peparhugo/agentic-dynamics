@@ -31,7 +31,11 @@ from pathlib import Path
 import pytest
 
 from agentic_dynamics.reporting import canonical_corpus as cc
-from agentic_dynamics.reporting.lab_contract import CONTRACT_KEY, validate_contract
+from agentic_dynamics.reporting.lab_contract import (
+    CONTRACT_KEY,
+    EXCLUSION_REASONS,
+    validate_contract,
+)
 from agentic_dynamics.reporting.lab_manifest import load_lab_manifest, publication_labs
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -178,18 +182,44 @@ def test_published_artifacts_match_the_current_registry():
             f"{lab}: contract claims {contract['n_resolved_records']} resolved records but "
             f"the current registry resolves {expected} for '{slice_name}' — re-run the lab"
         )
-        # The scope must be self-consistent and honest (review P2).
+        # The scope must be self-consistent and honest (review P2; tightened in P1).
         assert (
             contract["n_eligible_records"] + contract["n_excluded_records"]
             == contract["n_resolved_records"]
         ), f"{lab}: eligible + excluded != resolved"
-        assert contract["n_used_records"] <= contract["n_eligible_records"], (
-            f"{lab}: used {contract['n_used_records']} > eligible {contract['n_eligible_records']}"
+        assert (
+            contract["n_used_records"] + contract["n_unused_eligible_records"]
+            == contract["n_eligible_records"]
+        ), f"{lab}: used + unused_eligible != eligible"
+        reason_total = sum(contract[r] for r in EXCLUSION_REASONS)
+        assert reason_total == contract["n_excluded_records"], (
+            f"{lab}: exclusion reasons sum to {reason_total}, not {contract['n_excluded_records']}"
         )
-        assert sum(contract["exclusions"].values()) == contract["n_excluded_records"], (
-            f"{lab}: exclusions {contract['exclusions']} do not sum to "
-            f"{contract['n_excluded_records']}"
-        )
+
+
+def test_condition_effects_contract_reconciles_with_output():
+    """The contract's record scope matches what the output actually consumed (review P1).
+
+    ``lab_condition_effects`` resolves 215 stories + 242 reviews, but its rows consume only
+    the 155 reviews whose story is still current. The contract must say so — ``n_used`` must
+    equal ``stories + joined_reviews``, not "everything resolved", and the per-condition rows
+    must actually carry those joined reviews.
+    """
+    path = RESULTS_DIR / "lab_condition_effects.json"
+    if not path.exists():  # pragma: no cover
+        pytest.skip("lab_condition_effects not run")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    contract = payload[CONTRACT_KEY]
+    summary = payload["summary"]
+
+    assert contract["n_resolved_records"] == summary["stories"] + summary["reviews"]
+    assert contract["n_used_records"] == summary["stories"] + summary["joined_reviews"], (
+        f"declared n_used={contract['n_used_records']} != "
+        f"stories({summary['stories']}) + joined_reviews({summary['joined_reviews']})"
+    )
+    assert contract["review_without_current_story"] == summary["reviews_without_current_story"]
+    # The per-condition rows actually carry the joined reviews the contract claims.
+    assert sum(c["reviews"] for c in payload["conditions"]) == summary["joined_reviews"]
 
 
 # ---------------------------------------------------------------------------

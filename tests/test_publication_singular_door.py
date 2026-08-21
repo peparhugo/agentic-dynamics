@@ -170,12 +170,13 @@ def _data_js_payload() -> dict | None:
 
 
 def test_readme_figures_match_public_statistics():
-    """README headline figures must equal the canonical ``public_statistics`` block.
+    """Every README "By the Numbers" figure mirrors ``public_statistics`` — wholesale.
 
-    The review's "smaller" issue: README said 1,097 sessions / 36 configs / $288.69 while
-    the committed dataset said 1,067 / 35 / $309.17. ``data.js`` now carries a
-    ``public_statistics`` block (the single source of truth); README.md's "By the Numbers"
-    table and hero line must mirror it, and the stale figures must not survive.
+    The review's "smaller" issue: the guard checked only three corrected figures while the
+    README table also displayed a provider count, spec counts, and a lab split that were not
+    in ``public_statistics``. The block is now reconstructed line-by-line from the canonical
+    block, so any figure — present or future — that drifts fails here, and the stale figures
+    must not survive anywhere.
     """
     payload = _data_js_payload()
     if payload is None:  # pragma: no cover
@@ -183,13 +184,24 @@ def test_readme_figures_match_public_statistics():
     ps = payload.get("public_statistics", {})
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert f"{ps['story_sessions']:,} story sessions" in readme
-    assert f"| Story sessions | {ps['story_sessions']:,} " in readme
-    assert f"${ps['measured_spend_usd']:,.2f}" in readme
-    assert f"| Experiment configs | {ps['experiment_configs']} |" in readme
-    assert f"| Total measured spend | ${ps['measured_spend_usd']:,.2f} |" in readme
+    # Reconstruct each table row exactly as the README renders it. A new headline figure
+    # added to the table without a matching public_statistics key (or vice-versa) is a drift.
+    expected_lines = [
+        f"| Story sessions | {ps['story_sessions']:,} ({ps['db_sessions_total']:,} DB sessions total) |",
+        f"| Game reports | {ps['game_reports']} |",
+        f"| Model variants | {ps['model_variants']} ({ps['providers']} providers: DeepSeek, Anthropic, OpenAI) |",
+        f"| Experiment configs | {ps['experiment_configs']} |",
+        f"| Experiment + workflow specs | {ps['experiment_specs'] + ps['workflow_specs']} "
+        f"({ps['experiment_specs']} experiments + {ps['workflow_specs']} workflows) |",
+        f"| Perturbation operators | {ps['perturbation_operators']} "
+        "(specification corruption, objective mutation, process perturbation) |",
+        f"| Lab books | {ps['lab_books']} ({ps['lab_books_canonical']} canonical + "
+        f"{ps['lab_books_quarantined']} quarantined) |",
+        f"| Total measured spend | ${ps['measured_spend_usd']:,.2f} |",
+    ]
+    for line in expected_lines:
+        assert line in readme, f"README 'By the Numbers' drifted: {line!r}"
 
     # The stale figures must not survive anywhere.
-    assert "1,097 story sessions" not in readme
-    assert "$288.69" not in readme
-    assert "36 (33 measurement + 3 grid/sweep)" not in readme
+    for stale in ("1,097 story sessions", "$288.69", "36 (33 measurement + 3 grid/sweep)"):
+        assert stale not in readme, f"stale figure returned: {stale}"

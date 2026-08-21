@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 16:44:48 UTC by build_data.py */
+/* Generated 2026-08-21 21:50:38 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T16:44:47.503792+00:00",
+    "generated_at": "2026-08-21T21:50:36.833236+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -18,13 +18,13 @@ window.DYNAMICS_DATA = {
     "story_sessions": 1067,
     "story_total_cost": 309.1685,
     "configs": 35,
-    "registry_current_records": 225,
+    "registry_current_records": 215,
     "resolved_measurement_payloads": 215,
     "eligible_records": 215,
     "records_used": 215,
-    "unresolved_waivered": 10,
+    "unresolved_waivered": 0,
     "canonical_findings": 64,
-    "tombstoned_excluded": 77,
+    "tombstoned_excluded": 87,
     "_provenance": {
       "worktrees_total": "M",
       "sessions_total": "M",
@@ -48,102 +48,53 @@ window.DYNAMICS_DATA = {
     }
   },
   "resolution_report": {
-    "expected_current": 531,
+    "expected_current": 521,
     "resolved": 521,
-    "missing": 10,
+    "missing": 0,
     "unreadable": 0,
     "ambiguous": 0,
     "duplicate": 0,
-    "waivers": [
-      {
-        "table": "story",
-        "logical_locator": "5b87673f0d7a",
-        "entity_id": "0db496afe0bb29fca6090a43385a3e98e83209c387205fea3cb2144d96bb6f82",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "5be412dd5b87",
-        "entity_id": "1685dafdadfc5b8c577eac34c2497976c9bfff8e109d495276faecc6330b43be",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "5d7640124ed4",
-        "entity_id": "35230d9da6d444f48dd963ef8306bd5532298022c07fc977092f22e02c14130f",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "6bc71fa28f35",
-        "entity_id": "37679fe003cab12e4e9a4ded2bae75a218577770ae87d7558748f2a7445a581e",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "4e7abddc43f1",
-        "entity_id": "4fcea64d301b7094e2ed6f48c9e6bb9858b2437201dbd9e40413fae107ffd670",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "4f80a9ea38aa",
-        "entity_id": "57b397cf8a61996066ded79743f15f2d56b8ee7b3797bddb1fc7ab73aa8219b0",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "5196e779c1ca",
-        "entity_id": "5a1734eacc30df76c52c1871d553db125f49a7d552b98f74ce97ba13bab75335",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "7005f70e2fd6",
-        "entity_id": "61e6e3cc61958913e77ba73961096aa4d3128d566019111dc2047370e2975010",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "890584be7186",
-        "entity_id": "647f3536a7bb16e17da1aa818f9389172fe762e70086be5fce35af4061d89193",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "98507441e613",
-        "entity_id": "aa5b8de3eb51f9c8bddb4ae2d7b0dc874588d29898b5b078d3e363d197cbb408",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      }
-    ]
+    "waivers": []
+  },
+  "publication_contract": {
+    "registry_identity": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+    "resolved_input_identity": "077f95acc9fdb7e40a132aa89c5c27c4d48eba4ba3582dc2028234723ecf7534",
+    "data_integrity_policy_version": "data-integrity/v1",
+    "normalization_version": "canonical-projection/v2",
+    "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "generator_source_tree_identity": "9a460623a3472a8225288e5d5c1e8dc2be0234cd8d215dc3e4539d344bf9f88f"
   },
   "public_statistics": {
     "story_sessions": 1067,
+    "stories_total": 215,
+    "story_total_cost": 309.1685,
     "db_sessions_total": 3370,
     "game_reports": 344,
     "model_variants": 7,
+    "providers": 3,
     "experiment_configs": 35,
+    "experiment_specs": 6,
+    "workflow_specs": 75,
     "perturbation_operators": 10,
     "lab_books": 20,
+    "lab_books_canonical": 8,
+    "lab_books_quarantined": 12,
     "measured_spend_usd": 309.17,
     "_provenance": {
       "story_sessions": "M",
+      "stories_total": "C",
+      "story_total_cost": "C",
       "db_sessions_total": "M",
       "game_reports": "M",
       "model_variants": "M",
+      "providers": "M",
       "experiment_configs": "M",
+      "experiment_specs": "M",
+      "workflow_specs": "M",
       "perturbation_operators": "M",
       "lab_books": "M",
+      "lab_books_canonical": "M",
+      "lab_books_quarantined": "M",
       "measured_spend_usd": "M"
     }
   },
@@ -159,6 +110,10 @@ window.DYNAMICS_DATA = {
       "total_cost": 2.308294,
       "avg_cost": 0.074461,
       "cost_cells": 31,
+      "avg_captured_cost": 0.074461,
+      "cost_captured_cells": 31,
+      "total_cells": 31,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.964,
       "avg_tests": 52.4,
       "avg_test_code_ratio": 0.666,
@@ -195,6 +150,10 @@ window.DYNAMICS_DATA = {
       "total_cost": 3.180633,
       "avg_cost": 0.093548,
       "cost_cells": 34,
+      "avg_captured_cost": 0.093548,
+      "cost_captured_cells": 34,
+      "total_cells": 34,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.937,
       "avg_tests": 14.3,
       "avg_test_code_ratio": 0.275,
@@ -231,6 +190,10 @@ window.DYNAMICS_DATA = {
       "total_cost": 6.314403,
       "avg_cost": 0.161908,
       "cost_cells": 39,
+      "avg_captured_cost": 0.161908,
+      "cost_captured_cells": 39,
+      "total_cells": 39,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.801,
       "avg_tests": 44.6,
       "avg_test_code_ratio": 0.798,
@@ -267,6 +230,10 @@ window.DYNAMICS_DATA = {
       "total_cost": 31.329782,
       "avg_cost": 1.044326,
       "cost_cells": 30,
+      "avg_captured_cost": 1.044326,
+      "cost_captured_cells": 30,
+      "total_cells": 30,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.832,
       "avg_tests": 15.3,
       "avg_test_code_ratio": 0.337,
@@ -303,6 +270,10 @@ window.DYNAMICS_DATA = {
       "total_cost": 32.616808,
       "avg_cost": 1.63084,
       "cost_cells": 20,
+      "avg_captured_cost": 1.63084,
+      "cost_captured_cells": 20,
+      "total_cells": 24,
+      "cost_coverage": 0.8333,
       "avg_cache_hit": 0.824,
       "avg_tests": 127.9,
       "avg_test_code_ratio": 1.221,
@@ -339,6 +310,10 @@ window.DYNAMICS_DATA = {
       "total_cost": 114.52382,
       "avg_cost": 3.817461,
       "cost_cells": 30,
+      "avg_captured_cost": 3.817461,
+      "cost_captured_cells": 30,
+      "total_cells": 30,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.85,
       "avg_tests": 23.6,
       "avg_test_code_ratio": 0.447,
@@ -375,6 +350,10 @@ window.DYNAMICS_DATA = {
       "total_cost": 118.894751,
       "avg_cost": 5.169337,
       "cost_cells": 23,
+      "avg_captured_cost": 5.169337,
+      "cost_captured_cells": 23,
+      "total_cells": 27,
+      "cost_coverage": 0.8519,
       "avg_cache_hit": 0.84,
       "avg_tests": 117.1,
       "avg_test_code_ratio": 0.695,
@@ -2056,6 +2035,10 @@ window.DYNAMICS_DATA = {
         "cells": 31,
         "total_cost": 2.308294,
         "avg_cost": 0.074461,
+        "avg_captured_cost": 0.074461,
+        "cost_captured_cells": 31,
+        "total_cells": 31,
+        "cost_coverage": 1.0,
         "total_tokens": 7755588,
         "avg_cache_hit": 0.964,
         "avg_duration_s": 1401.0
@@ -2065,6 +2048,10 @@ window.DYNAMICS_DATA = {
         "cells": 34,
         "total_cost": 3.180633,
         "avg_cost": 0.093548,
+        "avg_captured_cost": 0.093548,
+        "cost_captured_cells": 34,
+        "total_cells": 34,
+        "cost_coverage": 1.0,
         "total_tokens": 3052682,
         "avg_cache_hit": 0.937,
         "avg_duration_s": 658.0
@@ -2074,6 +2061,10 @@ window.DYNAMICS_DATA = {
         "cells": 39,
         "total_cost": 6.314403,
         "avg_cost": 0.161908,
+        "avg_captured_cost": 0.161908,
+        "cost_captured_cells": 39,
+        "total_cells": 39,
+        "cost_coverage": 1.0,
         "total_tokens": 7536137,
         "avg_cache_hit": 0.801,
         "avg_duration_s": 1766.0
@@ -2083,6 +2074,10 @@ window.DYNAMICS_DATA = {
         "cells": 30,
         "total_cost": 31.329782,
         "avg_cost": 1.044326,
+        "avg_captured_cost": 1.044326,
+        "cost_captured_cells": 30,
+        "total_cells": 30,
+        "cost_coverage": 1.0,
         "total_tokens": 4770535,
         "avg_cache_hit": 0.832,
         "avg_duration_s": 785.0
@@ -2091,7 +2086,11 @@ window.DYNAMICS_DATA = {
         "model": "anthropic/claude-haiku-4-5",
         "cells": 24,
         "total_cost": 32.616808,
-        "avg_cost": 1.359034,
+        "avg_cost": 1.63084,
+        "avg_captured_cost": 1.63084,
+        "cost_captured_cells": 20,
+        "total_cells": 24,
+        "cost_coverage": 0.8333,
         "total_tokens": 1629766,
         "avg_cache_hit": 0.824,
         "avg_duration_s": 862.0
@@ -2101,6 +2100,10 @@ window.DYNAMICS_DATA = {
         "cells": 30,
         "total_cost": 114.52382,
         "avg_cost": 3.817461,
+        "avg_captured_cost": 3.817461,
+        "cost_captured_cells": 30,
+        "total_cells": 30,
+        "cost_coverage": 1.0,
         "total_tokens": 6995342,
         "avg_cache_hit": 0.85,
         "avg_duration_s": 1146.0
@@ -2109,7 +2112,11 @@ window.DYNAMICS_DATA = {
         "model": "anthropic/claude-sonnet-5",
         "cells": 27,
         "total_cost": 118.894751,
-        "avg_cost": 4.403509,
+        "avg_cost": 5.169337,
+        "avg_captured_cost": 5.169337,
+        "cost_captured_cells": 23,
+        "total_cells": 27,
+        "cost_coverage": 0.8519,
         "total_tokens": 2484557,
         "avg_cache_hit": 0.84,
         "avg_duration_s": 1062.0
@@ -2122,6 +2129,10 @@ window.DYNAMICS_DATA = {
         "variants": 12,
         "total_cost": 208.287391,
         "avg_cost": 1.54287,
+        "avg_captured_cost": 1.54287,
+        "cost_captured_cells": 135,
+        "total_cells": 135,
+        "cost_coverage": 1.0,
         "success": 131,
         "fail": 4
       },
@@ -2130,7 +2141,11 @@ window.DYNAMICS_DATA = {
         "cells": 80,
         "variants": 12,
         "total_cost": 100.8811,
-        "avg_cost": 1.261014,
+        "avg_cost": 1.401126,
+        "avg_captured_cost": 1.401126,
+        "cost_captured_cells": 72,
+        "total_cells": 80,
+        "cost_coverage": 0.9,
         "success": 69,
         "fail": 11
       }
@@ -2141,6 +2156,10 @@ window.DYNAMICS_DATA = {
         "cells": 77,
         "total_cost": 87.323185,
         "avg_cost": 1.134067,
+        "avg_captured_cost": 1.134067,
+        "cost_captured_cells": 77,
+        "total_cells": 77,
+        "cost_coverage": 1.0,
         "sessions": 383,
         "avg_duration_s": 876.0,
         "avg_tokens_per_session": 23893.0
@@ -2149,7 +2168,11 @@ window.DYNAMICS_DATA = {
         "story": "notification_service",
         "cells": 73,
         "total_cost": 95.940785,
-        "avg_cost": 1.314257,
+        "avg_cost": 1.453648,
+        "avg_captured_cost": 1.453648,
+        "cost_captured_cells": 66,
+        "total_cells": 73,
+        "cost_coverage": 0.9041,
         "sessions": 363,
         "avg_duration_s": 1143.0,
         "avg_tokens_per_session": 32065.0
@@ -2158,7 +2181,11 @@ window.DYNAMICS_DATA = {
         "story": "static_site_gen",
         "cells": 65,
         "total_cost": 125.904521,
-        "avg_cost": 1.936993,
+        "avg_cost": 1.967258,
+        "avg_captured_cost": 1.967258,
+        "cost_captured_cells": 64,
+        "total_cells": 65,
+        "cost_coverage": 0.9846,
         "sessions": 321,
         "avg_duration_s": 1401.0,
         "avg_tokens_per_session": 40992.0
@@ -2169,7 +2196,11 @@ window.DYNAMICS_DATA = {
         "tier": "tier1_minimal",
         "quality": "bad",
         "cells": 43,
-        "avg_cost": 1.477277,
+        "avg_cost": 1.549339,
+        "avg_captured_cost": 1.549339,
+        "cost_captured_cells": 41,
+        "total_cells": 43,
+        "cost_coverage": 0.9535,
         "avg_tokens_per_session": 32400.0,
         "avg_session_duration_s": 234.0
       },
@@ -2177,7 +2208,11 @@ window.DYNAMICS_DATA = {
         "tier": "tier1_minimal",
         "quality": "good",
         "cells": 70,
-        "avg_cost": 1.507429,
+        "avg_cost": 1.551765,
+        "avg_captured_cost": 1.551765,
+        "cost_captured_cells": 68,
+        "total_cells": 70,
+        "cost_coverage": 0.9714,
         "avg_tokens_per_session": 31413.0,
         "avg_session_duration_s": 238.0
       },
@@ -2185,7 +2220,11 @@ window.DYNAMICS_DATA = {
         "tier": "tier2_small",
         "quality": "bad",
         "cells": 41,
-        "avg_cost": 1.229579,
+        "avg_cost": 1.292634,
+        "avg_captured_cost": 1.292634,
+        "cost_captured_cells": 39,
+        "total_cells": 41,
+        "cost_coverage": 0.9512,
         "avg_tokens_per_session": 30951.0,
         "avg_session_duration_s": 220.0
       },
@@ -2193,7 +2232,11 @@ window.DYNAMICS_DATA = {
         "tier": "tier2_small",
         "quality": "good",
         "cells": 61,
-        "avg_cost": 1.470702,
+        "avg_cost": 1.520556,
+        "avg_captured_cost": 1.520556,
+        "cost_captured_cells": 59,
+        "total_cells": 61,
+        "cost_coverage": 0.9672,
         "avg_tokens_per_session": 32521.0,
         "avg_session_duration_s": 219.0
       }
@@ -2208,7 +2251,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T16:44:47.508231+00:00"
+    "generated_at": "2026-08-21T21:50:36.931142+00:00"
   },
   "reviews": {
     "models": [
@@ -2466,8 +2509,18 @@ window.DYNAMICS_DATA = {
         "avg_convention": 0.712,
         "deep_cells": 37,
         "lsp_available": 0,
-        "lsp_errors_per_cell": 0.0,
-        "lsp_warnings_per_cell": 0.0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 37,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 37,
+          "coverage": 0.0
+        },
         "solution_correctness": 1.0,
         "solution_constraints": 1.0,
         "solution_quality": 0.045,
@@ -2494,8 +2547,18 @@ window.DYNAMICS_DATA = {
         "avg_convention": 0.686,
         "deep_cells": 22,
         "lsp_available": 0,
-        "lsp_errors_per_cell": 0.0,
-        "lsp_warnings_per_cell": 0.0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 22,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 22,
+          "coverage": 0.0
+        },
         "solution_correctness": 1.0,
         "solution_constraints": 1.0,
         "solution_quality": 0.037,
@@ -2522,8 +2585,18 @@ window.DYNAMICS_DATA = {
         "avg_convention": 0.674,
         "deep_cells": 23,
         "lsp_available": 0,
-        "lsp_errors_per_cell": 0.0,
-        "lsp_warnings_per_cell": 0.0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 23,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 23,
+          "coverage": 0.0
+        },
         "solution_correctness": 1.0,
         "solution_constraints": 1.0,
         "solution_quality": 0.054,
@@ -2550,8 +2623,18 @@ window.DYNAMICS_DATA = {
         "avg_convention": 0.732,
         "deep_cells": 16,
         "lsp_available": 0,
-        "lsp_errors_per_cell": 0.0,
-        "lsp_warnings_per_cell": 0.0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 16,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 16,
+          "coverage": 0.0
+        },
         "solution_correctness": 0.875,
         "solution_constraints": 0.958,
         "solution_quality": 0.052,
@@ -2579,8 +2662,18 @@ window.DYNAMICS_DATA = {
         "avg_convention": 0.754,
         "deep_cells": 14,
         "lsp_available": 0,
-        "lsp_errors_per_cell": 0.0,
-        "lsp_warnings_per_cell": 0.0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 14,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 14,
+          "coverage": 0.0
+        },
         "solution_correctness": 0.857,
         "solution_constraints": 0.976,
         "solution_quality": 0.037,
@@ -2608,8 +2701,18 @@ window.DYNAMICS_DATA = {
         "avg_convention": 0.693,
         "deep_cells": 24,
         "lsp_available": 0,
-        "lsp_errors_per_cell": 0.0,
-        "lsp_warnings_per_cell": 0.0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 24,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 24,
+          "coverage": 0.0
+        },
         "solution_correctness": 1.0,
         "solution_constraints": 0.986,
         "solution_quality": 0.087,
@@ -2636,8 +2739,18 @@ window.DYNAMICS_DATA = {
         "avg_convention": 0.695,
         "deep_cells": 20,
         "lsp_available": 0,
-        "lsp_errors_per_cell": 0.0,
-        "lsp_warnings_per_cell": 0.0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 20,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 20,
+          "coverage": 0.0
+        },
         "solution_correctness": 1.0,
         "solution_constraints": 0.983,
         "solution_quality": 0.088,
@@ -2656,7 +2769,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-21T18:18:08.124545",
+      "generated_at": "2026-08-21T23:18:16.219936",
       "summary": {
         "models": 7,
         "stories": 215
@@ -2743,28 +2856,34 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_cache_economics.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
-        "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "cache_economics/v1",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:08.124791+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T21:18:16.220187+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-21T18:18:08.524409",
+      "generated_at": "2026-08-21T23:18:16.596009",
       "summary": {
         "conditions": 2,
         "stories": 215,
-        "reviews": 242
+        "reviews": 242,
+        "joined_reviews": 155,
+        "reviews_without_current_story": 87
       },
       "conditions": [
         {
@@ -2791,24 +2910,28 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_condition_effects.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
-        "resolved_input_sha256": "bfdbbad00673d09f074cd6931d0f1c6d2c41c39396a7b62d5e6b9b9cd303038d",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "condition_effects/v1",
         "n_resolved_records": 457,
-        "n_eligible_records": 457,
-        "n_used_records": 457,
-        "n_excluded_records": 0,
+        "n_eligible_records": 370,
+        "n_used_records": 370,
+        "n_excluded_records": 87,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 87,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:08.524693+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T21:18:16.596264+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-21T18:18:09.060357",
+      "generated_at": "2026-08-21T23:18:17.132049",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 144,
@@ -2823,7 +2946,7 @@ window.DYNAMICS_DATA = {
         "controlled_delta_grit": 0.0037,
         "excluded": 135,
         "exclusions": {
-          "missing_strength_and_verdict": 135
+          "missing_required_field": 135
         }
       },
       "by_strength": [
@@ -3061,30 +3184,32 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_grit.py",
         "input_dataset_id": "canonical_registry/finding+story",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
-        "resolved_input_sha256": "518839ba4aaa2be6fdd07e1ace9712dbf90838573471a8cd8caf5ab52c4d6681",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "grit/v1",
         "n_resolved_records": 279,
         "n_eligible_records": 144,
         "n_used_records": 144,
         "n_excluded_records": 135,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 135,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {
-          "missing_strength_and_verdict": 135
-        },
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:09.060636+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T21:18:17.132314+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-21T18:18:09.488452",
+      "generated_at": "2026-08-21T23:18:17.543603",
       "summary": {
         "models": 7,
         "stories": 215,
-        "analyses": 166,
+        "analyses": 156,
         "lsp_available_cells": 0
       },
       "models": [
@@ -3162,24 +3287,28 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_quality_frontier.py",
         "input_dataset_id": "canonical_registry/story+analysis",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
-        "resolved_input_sha256": "5819547a8b163fb2bc8a412f396ed700517ae2481d5c264f137a5cc82e2f90be",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "resolved_input_sha256": "58e642e6b38d847304d7f3dc8e649f53fd1126cb2222ed86c52393c0bd9c7c8f",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "quality_frontier/v1",
-        "n_resolved_records": 381,
-        "n_eligible_records": 381,
-        "n_used_records": 381,
+        "n_resolved_records": 371,
+        "n_eligible_records": 371,
+        "n_used_records": 371,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:09.488714+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T21:18:17.543873+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-21T18:18:09.867633",
+      "generated_at": "2026-08-21T23:18:17.916347",
       "summary": {
         "snowball_factor": 2.26,
         "session1_cost": 0.1668,
@@ -3294,24 +3423,28 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_story_arc.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
-        "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "story_arc/v1",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:09.867958+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T21:18:17.916678+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-21T18:18:10.618511",
+      "generated_at": "2026-08-21T23:18:18.648952",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3390,24 +3523,28 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_frontier.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
-        "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "verification_frontier/v1",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:10.618758+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T21:18:18.649199+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-21T18:18:11.005269",
+      "generated_at": "2026-08-21T23:18:19.025019",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
         "cells": 106,
@@ -4161,19 +4298,23 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_value.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
-        "resolved_input_sha256": "bfdbbad00673d09f074cd6931d0f1c6d2c41c39396a7b62d5e6b9b9cd303038d",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "verification_value/v1",
         "n_resolved_records": 457,
         "n_eligible_records": 457,
         "n_used_records": 457,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:11.005531+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T21:18:19.025292+00:00"
       }
     }
   }

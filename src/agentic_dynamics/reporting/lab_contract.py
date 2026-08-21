@@ -20,7 +20,7 @@ The contract is a single ``lab_contract`` block embedded in the lab's output JSO
 .. code-block:: json
 
     "lab_contract": {
-      "contract_version": "lab-contract/v2",
+      "contract_version": "lab-contract/v4",
       "lab": "lab_story_arc.py",
       "input_dataset_id": "canonical_registry/story",
       "registry_identity_sha256": "…64 hex…",
@@ -29,7 +29,15 @@ The contract is a single ``lab_contract`` block embedded in the lab's output JSO
       "metric_definition_version": "story_arc/v1",
       "data_integrity_policy": "docs/data_integrity_findings.md",
       "requires_external_service": null,
-      "n_input_records": 215,
+      "n_resolved_records": 215,
+      "n_eligible_records": 215,
+      "n_used_records": 215,
+      "n_excluded_records": 0,
+      "n_unused_eligible_records": 0,
+      "review_without_current_story": 0,
+      "story_without_review": 0,
+      "missing_required_field": 0,
+      "outside_analysis_population": 0,
       "generated_at": "…"
     }
 
@@ -75,7 +83,7 @@ Design notes
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -87,18 +95,33 @@ from .canonical_corpus import (
 from .lab_manifest import LabEntry, load_lab_manifest
 
 #: Version of the contract schema itself. Bumped to v2 when ``input_manifest_sha256`` was
-#: renamed to ``registry_identity_sha256`` and ``resolved_input_sha256`` was added (P2), and
-#: to v3 when ``n_input_records`` was replaced by the honest four-way record-count scope
-#: (``n_resolved``/``n_eligible``/``n_used``/``n_excluded`` + ``exclusions``) — review P2.
-CONTRACT_VERSION = "lab-contract/v3"
+#: renamed to ``registry_identity_sha256`` and ``resolved_input_sha256`` was added (P2); to
+#: v3 when ``n_input_records`` was replaced by the four-way record-count scope; and to v4
+#: when the permissive ``eligible=resolved``/``used=eligible`` defaults were removed, the
+#: eligible→used gap became explicit (``n_unused_eligible_records``), and the free-form
+#: ``exclusions`` dict became the four named exclusion-reason counts — public-truth review
+#: P1, phase p3.
+CONTRACT_VERSION = "lab-contract/v4"
 
 #: The key under which the contract is embedded in a lab's output JSON.
 CONTRACT_KEY = "lab_contract"
 
-#: The fields the review requires, verbatim (with the P2 rename/addition and the c4
-#: record-count scopes applied). The guard tests assert exactly this set is present and
-#: non-empty (``requires_external_service`` may legitimately be ``null``; ``exclusions`` may
-#: legitimately be ``{}``).
+#: The exclusion reasons a lab may declare (public-truth review P1, phase p3). The four
+#: counts must sum to ``n_excluded_records`` — a lab cannot drop a record without saying
+#: which of these four reasons dropped it. This is the *complete* vocabulary, so any lab
+#: with a new reason must extend this tuple (and the reconciliation tests) rather than
+#: smuggle a reason through a free-form dict.
+EXCLUSION_REASONS = (
+    "review_without_current_story",
+    "story_without_review",
+    "missing_required_field",
+    "outside_analysis_population",
+)
+
+#: The fields the review requires, verbatim (with the P2 rename/addition and the p3
+#: record-scope fields applied). The guard tests assert exactly this set is present and
+#: non-empty (``requires_external_service`` may legitimately be ``null``; the four reason
+#: counts may legitimately be ``0``).
 REQUIRED_FIELDS = (
     "input_dataset_id",
     "registry_identity_sha256",
@@ -111,7 +134,8 @@ REQUIRED_FIELDS = (
     "n_eligible_records",
     "n_used_records",
     "n_excluded_records",
-    "exclusions",
+    "n_unused_eligible_records",
+    *EXCLUSION_REASONS,
 )
 
 #: The authoritative data-integrity policy every publication-eligible lab declares it
@@ -132,12 +156,13 @@ _TABLES = ("story", "finding", "review", "analysis")
 class LabContract:
     """The lineage block embedded in a publication-eligible lab's output JSON.
 
-    The four record-count fields (review P2, phase c4) replace the single
-    ``n_input_records``: ``n_resolved_records`` is what the resolver produced,
-    ``n_eligible_records`` is the subset that qualifies for the metric,
-    ``n_used_records`` is the subset the computation actually consumed, and
-    ``n_excluded_records`` is the resolved-minus-eligible gap, itemised by ``exclusions``
-    (reason -> count).
+    The five record-count fields (review P2, phase c4; extended in p3) replace the single
+    ``n_input_records`` and close the "declared used but actually used less" gap:
+    ``n_resolved_records`` is what the resolver produced, ``n_eligible_records`` the subset
+    that qualifies for the metric, ``n_used_records`` the subset the computation actually
+    consumed, ``n_excluded_records`` the resolved-minus-eligible gap, and
+    ``n_unused_eligible_records`` the eligible-but-not-consumed gap. The four exclusion
+    reason counts (:data:`EXCLUSION_REASONS`) itemise *why* records were excluded.
     """
 
     lab: str
@@ -150,9 +175,13 @@ class LabContract:
     n_eligible_records: int
     n_used_records: int
     n_excluded_records: int
+    n_unused_eligible_records: int
+    review_without_current_story: int = 0
+    story_without_review: int = 0
+    missing_required_field: int = 0
+    outside_analysis_population: int = 0
     data_integrity_policy: str = DATA_INTEGRITY_POLICY
     requires_external_service: str | None = None
-    exclusions: dict = field(default_factory=dict)
     contract_version: str = CONTRACT_VERSION
     generated_at: str = ""
 
@@ -218,7 +247,11 @@ def build_contract(
     n_eligible_records: int | None = None,
     n_used_records: int | None = None,
     n_excluded_records: int | None = None,
-    exclusions: dict | None = None,
+    n_unused_eligible_records: int | None = None,
+    review_without_current_story: int = 0,
+    story_without_review: int = 0,
+    missing_required_field: int = 0,
+    outside_analysis_population: int = 0,
     now: datetime | None = None,
 ) -> dict:
     """Producer side: build the contract block for ``lab_script``'s output.
@@ -228,11 +261,12 @@ def build_contract(
     rather than re-read, so the embedded values always describe the corpus the numbers came
     from, even if the manifest changes mid-run.
 
-    The record-count scope (review P2): ``n_resolved_records`` defaults to what the resolver
-    produced for this slice; ``n_eligible_records`` defaults to "everything resolved is
-    eligible"; ``n_used_records`` defaults to "everything eligible is used";
-    ``n_excluded_records`` defaults to ``resolved - eligible``. A lab with real exclusions
-    (e.g. Grit drops cells missing ``perturbation_strength``) passes them explicitly.
+    The record-count scope (review P2, tightened in public-truth P1/p3): ``n_resolved_records``
+    defaults to what the resolver produced for this slice; ``n_eligible_records`` and
+    ``n_used_records`` are **required** — the permissive "everything resolved is eligible is
+    used" defaults are removed, so a lab that drops records must say how many and why. The
+    excluded/unused gaps are derived (``resolved - eligible`` / ``eligible - used``) but may
+    be overridden; the four exclusion-reason counts itemise ``n_excluded_records``.
     """
     entry = _lab_entry(lab_script)
     stamp = (now or datetime.now(timezone.utc)).isoformat()
@@ -240,9 +274,27 @@ def build_contract(
     resolved = int(
         n_resolved_records if n_resolved_records is not None else _resolved_count(tables)
     )
-    eligible = int(n_eligible_records if n_eligible_records is not None else resolved)
-    used = int(n_used_records if n_used_records is not None else eligible)
+
+    # ── permissive defaults removed (public-truth review P1, phase p3) ────────────────
+    # A lab must declare its eligibility and usage scope. "Everything resolved is eligible
+    # is used" was exactly the defect the review found (condition_effects declared
+    # 457/457/457/0 while its rows consumed only 215 stories + 155 reviews).
+    if n_eligible_records is None:
+        raise ValueError(
+            f"{lab_script}: n_eligible_records is required — declare the eligible subset "
+            f"(the permissive eligible=resolved default was removed)"
+        )
+    if n_used_records is None:
+        raise ValueError(
+            f"{lab_script}: n_used_records is required — declare the consumed subset "
+            f"(the permissive used=eligible default was removed)"
+        )
+    eligible = int(n_eligible_records)
+    used = int(n_used_records)
     excluded = int(n_excluded_records if n_excluded_records is not None else (resolved - eligible))
+    unused = int(
+        n_unused_eligible_records if n_unused_eligible_records is not None else (eligible - used)
+    )
 
     return LabContract(
         lab=lab_script,
@@ -255,9 +307,13 @@ def build_contract(
         n_eligible_records=eligible,
         n_used_records=used,
         n_excluded_records=excluded,
+        n_unused_eligible_records=unused,
+        review_without_current_story=int(review_without_current_story),
+        story_without_review=int(story_without_review),
+        missing_required_field=int(missing_required_field),
+        outside_analysis_population=int(outside_analysis_population),
         data_integrity_policy=DATA_INTEGRITY_POLICY,
         requires_external_service=entry.requires_external_service,
-        exclusions=dict(exclusions or {}),
         generated_at=stamp,
     ).to_dict()
 
@@ -271,7 +327,11 @@ def attach_contract(
     n_eligible_records: int | None = None,
     n_used_records: int | None = None,
     n_excluded_records: int | None = None,
-    exclusions: dict | None = None,
+    n_unused_eligible_records: int | None = None,
+    review_without_current_story: int = 0,
+    story_without_review: int = 0,
+    missing_required_field: int = 0,
+    outside_analysis_population: int = 0,
 ) -> dict:
     """Embed the contract into a lab's output payload and return it (for chaining)."""
     payload[CONTRACT_KEY] = build_contract(
@@ -281,7 +341,11 @@ def attach_contract(
         n_eligible_records=n_eligible_records,
         n_used_records=n_used_records,
         n_excluded_records=n_excluded_records,
-        exclusions=exclusions,
+        n_unused_eligible_records=n_unused_eligible_records,
+        review_without_current_story=review_without_current_story,
+        story_without_review=story_without_review,
+        missing_required_field=missing_required_field,
+        outside_analysis_population=outside_analysis_population,
     )
     return payload
 
@@ -388,25 +452,25 @@ def validate_contract(
                 f"— the payload content drifted; re-run the lab"
             )
 
-    # ── record-count scope is self-consistent (review P2, phase c4) ──────────────────────
-    # resolved = eligible + excluded, used ≤ eligible, and the exclusions breakdown must
-    # account for every excluded record — a contract that sums wrong is exactly the
-    # "n_input_records doesn't mean records used" defect the review named.
+    # ── record-count scope is self-consistent (review P2, phase c4; tightened in p3) ─────
+    # resolved = eligible + excluded; eligible = used + unused_eligible; and the four
+    # exclusion-reason counts must itemise every excluded record. A contract that sums
+    # wrong, or that hides an eligible-but-unused gap, is exactly the "declared used but
+    # actually used less" defect the review named.
     resolved = block.get("n_resolved_records", 0)
     eligible = block.get("n_eligible_records", 0)
     used = block.get("n_used_records", 0)
     excluded = block.get("n_excluded_records", 0)
-    exclusions = block.get("exclusions") or {}
+    unused = block.get("n_unused_eligible_records", 0)
     try:
-        resolved_i, eligible_i, used_i, excluded_i = (
+        resolved_i, eligible_i, used_i, excluded_i, unused_i = (
             int(resolved),
             int(eligible),
             int(used),
             int(excluded),
+            int(unused),
         )
-        exclusion_total = sum(
-            int(v) for v in (exclusions.values() if isinstance(exclusions, dict) else [])
-        )
+        reason_counts = {reason: int(block.get(reason, 0) or 0) for reason in EXCLUSION_REASONS}
     except (TypeError, ValueError):
         return f"{manifest_entry.script}: contract record-count fields must be integers"
     if eligible_i + excluded_i != resolved_i:
@@ -414,14 +478,15 @@ def validate_contract(
             f"{manifest_entry.script}: record counts inconsistent — "
             f"n_eligible ({eligible_i}) + n_excluded ({excluded_i}) != n_resolved ({resolved_i})"
         )
-    if used_i > eligible_i:
+    if used_i + unused_i != eligible_i:
         return (
             f"{manifest_entry.script}: record counts inconsistent — "
-            f"n_used ({used_i}) > n_eligible ({eligible_i})"
+            f"n_used ({used_i}) + n_unused_eligible ({unused_i}) != n_eligible ({eligible_i})"
         )
-    if exclusion_total != excluded_i:
+    reason_total = sum(reason_counts.values())
+    if reason_total != excluded_i:
         return (
-            f"{manifest_entry.script}: exclusions breakdown sums to {exclusion_total}, "
+            f"{manifest_entry.script}: exclusion reasons sum to {reason_total}, "
             f"but n_excluded_records is {excluded_i}"
         )
 

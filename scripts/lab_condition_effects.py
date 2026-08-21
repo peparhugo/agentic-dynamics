@@ -115,6 +115,10 @@ def compute(stories: list[dict], reviews: list[dict]) -> dict:
         )
     conditions.sort(key=lambda x: x["condition"])
 
+    # Record scope (public-truth review P1): the metric consumes every current story and
+    # only the reviews whose story is still current. The rest are declared, not silently
+    # assumed away — the permissive "everything resolved is used" default hid them.
+    joined_reviews = sum(c["reviews"] for c in conditions)
     return {
         "experiment_id": "lab_condition_effects",
         "generated_at": datetime.now().isoformat(),
@@ -122,6 +126,8 @@ def compute(stories: list[dict], reviews: list[dict]) -> dict:
             "conditions": len(conditions),
             "stories": len(stories),
             "reviews": len(reviews),
+            "joined_reviews": joined_reviews,
+            "reviews_without_current_story": len(reviews) - joined_reviews,
         },
         "conditions": conditions,
     }
@@ -130,10 +136,20 @@ def compute(stories: list[dict], reviews: list[dict]) -> dict:
 def main():
     tables = load_canonical_tables("story", "review")
     output = compute(tables.stories, tables.reviews)
+
+    # Record scope (public-truth review P1): 215 stories + 242 reviews resolve, but only
+    # 155 reviews join a current story — the 87 others are excluded as
+    # ``review_without_current_story`` and declared explicitly in the contract.
+    n_resolved = len(tables.stories) + len(tables.reviews)
+    n_used = len(tables.stories) + output["summary"]["joined_reviews"]
     attach_contract(
         output,
         LAB,
         tables,
+        n_resolved_records=n_resolved,
+        n_eligible_records=n_used,
+        n_used_records=n_used,
+        review_without_current_story=output["summary"]["reviews_without_current_story"],
     )
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))

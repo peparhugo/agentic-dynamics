@@ -225,7 +225,15 @@ def main():
         "cells": cells,
     }
 
-    attach_contract(output, LAB, tables)
+    # Record scope (public-truth review P1): every current story is consumed, so
+    # eligible == used == resolved — declared explicitly, not via a permissive default.
+    attach_contract(
+        output,
+        LAB,
+        tables,
+        n_eligible_records=len(tables.stories),
+        n_used_records=len(tables.stories),
+    )
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"\nSaved: {OUTPUT_PATH}")
 

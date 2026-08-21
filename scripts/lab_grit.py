@@ -115,12 +115,14 @@ def _rate_row(label_key: str, label: str | float, successes: int, n: int, **extr
 
 
 def _exclusion_reason(has_strength: bool, has_verdict: bool) -> str:
-    """Name the reason a cell was excluded from the metric (for the exclusions breakdown)."""
-    if not has_strength and not has_verdict:
-        return "missing_strength_and_verdict"
-    if not has_strength:
-        return "missing_strength"
-    return "missing_verdict"
+    """The canonical reason a cell was excluded from the metric.
+
+    Both ``perturbation_strength`` and ``test_executed_success`` are required; missing
+    either (or both) is one canonical reason — ``missing_required_field`` — the public-truth
+    review's P1 vocabulary (the finer strength-vs-verdict split was informational only and
+    is folded here so the contract uses exactly the four named reasons).
+    """
+    return "missing_required_field"
 
 
 def collect_cells(findings: list[dict], stories: list[dict]) -> tuple[list[dict], dict[str, int]]:
@@ -304,7 +306,7 @@ def main():
         n_eligible_records=summary["cells"],
         n_used_records=summary["cells"],
         n_excluded_records=n_resolved - summary["cells"],
-        exclusions=summary["exclusions"],
+        missing_required_field=summary["excluded"],
     )
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))

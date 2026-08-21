@@ -11,6 +11,14 @@ question: >-
   verify. No CAP implementation (the review's extraction directive is a note for the future CAP
   spec, recorded in the context). Public-output consistency becomes enforced, not curated.
 version: "0.1"
+# Artifact identity (refactor-repair P1-3): a source-modifying work order (each phase edits
+# src/, scripts/, tests/ and apps/website/), so it is a *workflow*, not an experiment.
+# One-shot repository development, hence non-repeatable.
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
 workflow:
   kind: agent_task
   params:

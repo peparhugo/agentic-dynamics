@@ -298,17 +298,28 @@ def test_main_adds_registry_without_disturbing_the_files_block(tmp_path, monkeyp
     monkeypatch.setattr(gm, "REGISTRY_INDEX_PATH", results_dir / "registry_index.jsonl")
     _write_jsonl(results_dir / "registry_index.jsonl", [_row(knowledge_id="kid_only")])
 
-    # None of the four files_to_hash sources exist in this isolated tree — main() must
+    # None of the files_to_hash sources exist in this isolated tree — main() must
     # still complete and mark each as MISSING (unchanged pre-existing behavior).
     gm.main()
 
     manifest = json.loads((project_root / "experiments" / "data_manifest.json").read_text())
 
-    # files{} shape is byte-for-byte unchanged: same 4 keys, MISSING (None) when absent.
+    # files{} is now classified (public-truth review "smaller") into three buckets — the
+    # retired summary is HISTORICAL, never a first-class current entry. Each entry is
+    # MISSING (None) when absent.
     assert set(manifest["files"].keys()) == {
-        "inventory.json", "_results_summary.json", "_trajectory_aggregate.json", "data.js",
+        "canonical_inputs", "canonical_outputs", "historical_artifacts",
     }
-    assert all(v is None for v in manifest["files"].values())
+    assert set(manifest["files"]["canonical_inputs"].keys()) == {
+        "inventory.json", "_trajectory_aggregate.json",
+    }
+    assert set(manifest["files"]["canonical_outputs"].keys()) == {"data.js"}
+    assert set(manifest["files"]["historical_artifacts"].keys()) == {"_results_summary.json"}
+    assert all(
+        v is None
+        for bucket in manifest["files"].values()
+        for v in bucket.values()
+    )
 
     # registry{} is additive and reflects the compacted index.
     assert len(manifest["registry"]) == 1

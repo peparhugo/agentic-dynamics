@@ -17,10 +17,11 @@ Usage:
     python scripts/build_data.py --dry-run    # Print what would be written
 """
 
+import hashlib
 import json
 import os
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,13 +45,17 @@ from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
 from agentic_dynamics.control.routing import compute_routing  # noqa: E402
 from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS  # noqa: E402
 from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
+    DATA_INTEGRITY_POLICY_VERSION,
     DEFAULT_WAIVER_PATH,
+    NORMALIZATION_VERSION,
     current_manifest_identity,
     load_canonical_tables,
     load_waivers,
     read_manifest,
     registry_rows,
     unwaivered_issues,
+    validate_waivers,
+    waiver_set_digest,
 )
 from agentic_dynamics.reporting.lab_contract import expected_tables, validate_contract  # noqa: E402
 from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
@@ -793,6 +798,23 @@ def _classify_issue(text: str) -> str:
     return "other"
 
 
+def _optional_measurement(value, n_available: int, n_total: int) -> dict:
+    """One publication shape for an optional measurement (public-truth P0/P1).
+
+    An optional signal (e.g. LSP diagnostics) is not available on every cell. Publishing
+    it as a bare average over all cells turns *not measured* into *measured as zero*.
+    Instead every optional measurement carries ``value`` (the average over the cells that
+    actually measured it, ``None`` when none did) plus the availability accounting, so a
+    reader can tell "0 errors" from "no diagnostics tool ran".
+    """
+    return {
+        "value": value,
+        "n_available": n_available,
+        "n_total": n_total,
+        "coverage": round(n_available / n_total, 4) if n_total else 0.0,
+    }
+
+
 def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
     """Aggregate AST + SonarQube + convention data from canonical analysis payloads.
 
@@ -874,10 +896,12 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
         if deep:
             m["deep_cells"] += 1
             lsp = deep.get("lsp", {})
+            # Zero-as-missing guard: an unavailable language server contributes no
+            # error/warning count, so "not measured" can never dilute the average to 0.
             if lsp.get("available"):
                 m["lsp_available"] += 1
-            m["lsp_errors"] += lsp.get("errors", 0) or 0
-            m["lsp_warnings"] += lsp.get("warnings", 0) or 0
+                m["lsp_errors"] += lsp.get("errors", 0) or 0
+                m["lsp_warnings"] += lsp.get("warnings", 0) or 0
             sol = deep.get("solution", {})
             m["solution_correctness"].append(sol.get("correctness_score", 0) or 0)
             m["solution_constraints"].append(sol.get("constraint_score", 0) or 0)
@@ -894,7 +918,6 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
     models = []
     for reviewed, m in by_model.items():
         n = len(m["convention_scores"])
-        cells = m["deep_cells"] or 1
         models.append(
             {
                 "model": reviewed,
@@ -912,8 +935,18 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
                 "avg_convention": round(sum(m["convention_scores"]) / n, 3) if n else None,
                 "deep_cells": m["deep_cells"],
                 "lsp_available": m["lsp_available"],
-                "lsp_errors_per_cell": round(m["lsp_errors"] / cells, 1),
-                "lsp_warnings_per_cell": round(m["lsp_warnings"] / cells, 1),
+                "lsp_errors_per_cell": _optional_measurement(
+                    round(m["lsp_errors"] / m["lsp_available"], 1) if m["lsp_available"] else None,
+                    m["lsp_available"],
+                    m["deep_cells"],
+                ),
+                "lsp_warnings_per_cell": _optional_measurement(
+                    round(m["lsp_warnings"] / m["lsp_available"], 1)
+                    if m["lsp_available"]
+                    else None,
+                    m["lsp_available"],
+                    m["deep_cells"],
+                ),
                 "solution_correctness": _avg(m["solution_correctness"]),
                 "solution_constraints": _avg(m["solution_constraints"]),
                 "solution_quality": _avg(m["solution_quality"]),
@@ -1107,12 +1140,17 @@ def _load_story_data(stories: list[dict]) -> dict:
     models = []
     for mid, rows in sorted(by_model.items(), key=lambda kv: sum(c["total_cost"] for c in kv[1])):
         n = len(rows)
+        cost_stats = _captured_cost_stats(rows)
         models.append(
             {
                 "model": mid,
                 "cells": n,
                 "total_cost": round(sum(c["total_cost"] for c in rows), 6),
-                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "total_tokens": sum(c["total_tokens"] for c in rows),
                 "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / n, 3),
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
@@ -1128,13 +1166,18 @@ def _load_story_data(stories: list[dict]) -> dict:
         rows = by_condition[cond]
         n = len(rows)
         variants = len({(c["story_name"], c["tier"], c["quality"]) for c in rows})
+        cost_stats = _captured_cost_stats(rows)
         conditions.append(
             {
                 "condition": cond,
                 "cells": n,
                 "variants": variants,
                 "total_cost": round(sum(c["total_cost"] for c in rows), 6),
-                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "success": sum(1 for c in rows if c["all_successful"]),
                 "fail": sum(1 for c in rows if not c["all_successful"]),
             }
@@ -1147,12 +1190,17 @@ def _load_story_data(stories: list[dict]) -> dict:
     stories_out = []
     for name, rows in sorted(by_story.items(), key=lambda kv: sum(c["total_cost"] for c in kv[1])):
         n = len(rows)
+        cost_stats = _captured_cost_stats(rows)
         stories_out.append(
             {
                 "story": name,
                 "cells": n,
                 "total_cost": round(sum(c["total_cost"] for c in rows), 6),
-                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "sessions": sum(c["session_count"] for c in rows),
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
                 "avg_tokens_per_session": round(
@@ -1168,12 +1216,17 @@ def _load_story_data(stories: list[dict]) -> dict:
     tiers = []
     for (tier, quality), rows in sorted(by_tier.items()):
         n = len(rows)
+        cost_stats = _captured_cost_stats(rows)
         tiers.append(
             {
                 "tier": tier,
                 "quality": quality,
                 "cells": n,
-                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "avg_tokens_per_session": round(
                     sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / n, 0
                 ),
@@ -1233,6 +1286,25 @@ def _merge_story_strategy(story_models: list[dict], analysis_data: dict) -> None
         sm["strategy_efficient"] = strat.get("efficient", 0)
 
 
+def _captured_cost_stats(rows: list[dict]) -> dict:
+    """One cost-denominator policy: average captured costs only, never missing-as-zero.
+
+    A cell whose cost was not captured must not enter the average as ``0`` — that would
+    lower the same model's average in one view and not another (public-truth review P1).
+    Every aggregation over cost therefore publishes the same four fields, so two views of
+    the same model can never disagree on its average cost.
+    """
+    costs = [c["total_cost"] for c in rows if c.get("total_cost", 0) > 0]
+    captured = len(costs)
+    total = len(rows)
+    return {
+        "total_cells": total,
+        "cost_captured_cells": captured,
+        "avg_captured_cost": round(sum(costs) / captured, 6) if captured else None,
+        "cost_coverage": round(captured / total, 4) if total else 0.0,
+    }
+
+
 def _captured_cost_key(rows: list[dict]) -> float:
     """Ordering key: mean captured cost (inf when nothing captured), matching the old
     ``ORDER BY avg_cost`` (NULLs last)."""
@@ -1273,9 +1345,9 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
         unique_cells = len(cell_keys)
         t = test_by_model[mid]
         sessions_sum = sum(c["session_count"] for c in rows)
-        cost_values = [c["total_cost"] for c in rows if c["total_cost"] > 0]
-        cost_cells = len(cost_values)
-        avg_cost = round(sum(cost_values) / cost_cells, 6) if cost_values else None
+        cost_stats = _captured_cost_stats(rows)
+        cost_cells = cost_stats["cost_captured_cells"]
+        avg_cost = cost_stats["avg_captured_cost"]
         avg_code_lines = round(sum(c["code_lines"] for c in rows) / total_runs, 0)
         # Energy is a [C]omputed estimate from measured tokens (J per token).
         avg_energy_j = round(
@@ -1295,6 +1367,10 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
                 "total_cost": round(sum(c["total_cost"] for c in rows), 6),
                 "avg_cost": avg_cost,
                 "cost_cells": cost_cells,
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "cost_captured_cells": cost_stats["cost_captured_cells"],
+                "total_cells": cost_stats["total_cells"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / total_runs, 3),
                 "avg_tests": round(sum(c["test_count"] for c in rows) / total_runs, 1),
                 "avg_test_code_ratio": round(
@@ -1342,34 +1418,41 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
 
 
 def _assert_resolution_complete(tables, waiver_path=None) -> list[dict]:
-    """Fail closed on unresolved current rows unless a reason-bearing waiver covers them.
+    """Fail closed on unresolved current rows unless a valid, hard-bound waiver covers them.
 
-    Review P1: a current registry row whose payload cannot be resolved must not silently
-    drop out of the published dataset. It is either repaired or waived — and the waiver
-    must be explicit (a committed, reason-bearing entry). Returns the waivered issues as
-    plain dicts so :func:`build` can emit them into ``data.js`` (the waiver is *visible*,
-    not just permitted). Raises :class:`RuntimeError` naming every unwaivered row.
+    Review P1 (tightened in public-truth P1/p4): a current registry row whose payload cannot
+    be resolved must not silently drop out of the published dataset. It is repaired,
+    tombstoned, or covered by a hard-bound waiver — and the waiver is validated first, so a
+    stale/duplicate/unmatched waiver is a publication-blocking defect, not a silent no-op.
+    Returns the waivered issues as plain dicts so :func:`build` can emit them into ``data.js``
+    (the waiver is *visible*, not just permitted). Raises :class:`RuntimeError` naming every
+    rejected waiver and every unwaivered row.
     """
     waivers = load_waivers(waiver_path)
-    unwaivered = unwaivered_issues(tables.resolution, waivers)
+    valid_waivers, rejected = validate_waivers(tables.resolution, waivers)
+    unwaivered = unwaivered_issues(tables.resolution, valid_waivers)
+
+    problems = list(rejected)
     if unwaivered:
         detail = "\n".join(
             f"  - {i.table} {i.logical_locator!r} ({i.kind}) entity_id={i.entity_id}"
             for i in unwaivered
         )
-        raise RuntimeError(
+        problems.append(
             "publication aborted: current registry rows could not be resolved to a "
-            "measurement payload and are not covered by a waiver:\n"
+            "measurement payload and are not covered by a valid waiver:\n"
             f"{detail}\n"
-            "Repair the payload, or add a reason-bearing entry to "
+            "Repair the payload, tombstone the row, or add a hard-bound waiver entry to "
             f"{DEFAULT_WAIVER_PATH.relative_to(ROOT)}."
         )
+    if problems:
+        raise RuntimeError("waiver/resolution failures:\n" + "\n".join(problems))
 
     # Waiver visibility: the waivered issues (matched to their reason) travel into data.js.
-    reason_by_key = {(w.table, w.logical_locator): w.reason for w in waivers}
+    reason_by_key = {w.key: w.reason for w in valid_waivers}
     waived = []
     for i in tables.resolution.issues:
-        reason = reason_by_key.get((i.table, i.logical_locator))
+        reason = reason_by_key.get((i.table, i.logical_locator, i.kind))
         if reason is not None:
             waived.append(
                 {
@@ -1381,6 +1464,66 @@ def _assert_resolution_complete(tables, waiver_path=None) -> list[dict]:
                 }
             )
     return waived
+
+
+#: The source files whose code produces ``data.js`` — the *generator source tree*
+#: (public-truth review P1/P2). Their contents are hashed so the publication contract
+#: records *which code* produced the numbers, not just *which data*: a generator change
+#: (a new reducer, a projection change) is visible even when the input is unchanged.
+GENERATOR_SOURCES = (
+    ROOT / "scripts" / "build_data.py",
+    ROOT / "src" / "agentic_dynamics" / "reporting" / "canonical_corpus.py",
+    ROOT / "src" / "agentic_dynamics" / "reporting" / "lab_contract.py",
+    ROOT / "src" / "agentic_dynamics" / "reporting" / "lab_manifest.py",
+)
+
+
+def generator_source_tree_identity() -> str:
+    """``sha256`` over the generator source files (name + bytes, in a fixed order).
+
+    Deterministic and environment-independent: only the source file *contents* enter the
+    digest, never their absolute paths.
+    """
+    h = hashlib.sha256()
+    for path in GENERATOR_SOURCES:
+        h.update(path.name.encode("utf-8"))
+        h.update(path.read_bytes())
+    return h.hexdigest()
+
+
+#: The generated spec lifecycle index (``scripts/spec_status.py``) — the machine-readable
+#: source for the experiment-vs-workflow spec counts (public-truth review "smaller": the
+#: README displays 80 specs = 6 experiments + 74 workflows).
+SPEC_INDEX_PATH = ROOT / "experiments" / "specs" / "index.json"
+
+
+def _spec_counts() -> dict[str, int]:
+    """Count experiment vs workflow specs from the generated spec index.
+
+    A missing/unreadable index degrades to zeros — the figure is simply absent, never
+    fabricated — matching the resolver's file-fallback posture elsewhere.
+    """
+    try:
+        index = json.loads(SPEC_INDEX_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"experiment_specs": 0, "workflow_specs": 0}
+    n_experiment = n_workflow = 0
+    for spec in index.get("specs", []):
+        kind = spec.get("artifact_kind")
+        if kind == "experiment":
+            n_experiment += 1
+        elif kind == "workflow":
+            n_workflow += 1
+    return {"experiment_specs": n_experiment, "workflow_specs": n_workflow}
+
+
+def _lab_status_counts() -> dict[str, int]:
+    """Count canonical vs quarantined lab books from the lab manifest."""
+    counts = Counter(entry.lab_status for entry in load_lab_manifest())
+    return {
+        "lab_books_canonical": counts.get("canonical", 0),
+        "lab_books_quarantined": counts.get("quarantined", 0),
+    }
 
 
 def build():
@@ -1536,6 +1679,14 @@ def build():
     counts = inventory.get("counts", {})
     inventory.get("costs", {})
 
+    # Headline figures the README "By the Numbers" block displays that are NOT part of the
+    # story corpus (public-truth review "smaller"): the provider count, the experiment-vs-
+    # workflow spec split, and the canonical-vs-quarantined lab split. All three are read
+    # from their canonical source (the models, the generated spec index, the lab manifest).
+    spec_counts = _spec_counts()
+    lab_counts = _lab_status_counts()
+    provider_count = len({m.get("provider") for m in models})
+
     data = {
         "_meta": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -1600,26 +1751,52 @@ def build():
             "duplicate": tables.resolution.duplicate,
             "waivers": waivers,
         },
+        # ── Global publication contract (public-truth review P1/P2) — the six identities
+        # ── that attest to *what* produced this dataset and *how*. They are the dataset's
+        # ── lineage: which registry selection, which resolved payloads, which policy/normal-
+        # ── ization versions, which waiver set, and which generator source tree.
+        "publication_contract": {
+            "registry_identity": tables.identity.registry_identity_sha256,
+            "resolved_input_identity": tables.resolved_input_sha256,
+            "data_integrity_policy_version": DATA_INTEGRITY_POLICY_VERSION,
+            "normalization_version": NORMALIZATION_VERSION,
+            "waiver_digest": waiver_set_digest(),
+            "generator_source_tree_identity": generator_source_tree_identity(),
+        },
         # ── Public statistics (review "smaller"): the ONE artifact README prose cites, so a
         # ── headline figure can never drift from the published dataset again. README.md's
         # ── "By the Numbers" table and the home-page hero are reconciled to THIS block.
         "public_statistics": {
             "story_sessions": sum(m.get("sessions", 0) for m in models),
+            "stories_total": sum(m.get("cells", 0) for m in models),
+            "story_total_cost": _fmt_usd(sum(m.get("total_cost", 0) for m in models)),
             "db_sessions_total": counts.get("db_sessions_total", 0),
             "game_reports": report_count,
             "model_variants": len(models),
+            "providers": provider_count,
             "experiment_configs": counts.get("config_files", 0),
+            "experiment_specs": spec_counts["experiment_specs"],
+            "workflow_specs": spec_counts["workflow_specs"],
             "perturbation_operators": 10,
             "lab_books": len(load_lab_manifest()),
+            "lab_books_canonical": lab_counts["lab_books_canonical"],
+            "lab_books_quarantined": lab_counts["lab_books_quarantined"],
             "measured_spend_usd": round(sum(m.get("total_cost", 0) for m in models), 2),
             "_provenance": {
                 "story_sessions": "M",
+                "stories_total": "C",
+                "story_total_cost": "C",
                 "db_sessions_total": "M",
                 "game_reports": "M",
                 "model_variants": "M",
+                "providers": "M",
                 "experiment_configs": "M",
+                "experiment_specs": "M",
+                "workflow_specs": "M",
                 "perturbation_operators": "M",
                 "lab_books": "M",
+                "lab_books_canonical": "M",
+                "lab_books_quarantined": "M",
                 "measured_spend_usd": "M",
             },
         },
