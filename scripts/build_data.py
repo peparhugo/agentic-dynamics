@@ -1600,6 +1600,29 @@ def build():
             "duplicate": tables.resolution.duplicate,
             "waivers": waivers,
         },
+        # ── Public statistics (review "smaller"): the ONE artifact README prose cites, so a
+        # ── headline figure can never drift from the published dataset again. README.md's
+        # ── "By the Numbers" table and the home-page hero are reconciled to THIS block.
+        "public_statistics": {
+            "story_sessions": sum(m.get("sessions", 0) for m in models),
+            "db_sessions_total": counts.get("db_sessions_total", 0),
+            "game_reports": report_count,
+            "model_variants": len(models),
+            "experiment_configs": counts.get("config_files", 0),
+            "perturbation_operators": 10,
+            "lab_books": len(load_lab_manifest()),
+            "measured_spend_usd": round(sum(m.get("total_cost", 0) for m in models), 2),
+            "_provenance": {
+                "story_sessions": "M",
+                "db_sessions_total": "M",
+                "game_reports": "M",
+                "model_variants": "M",
+                "experiment_configs": "M",
+                "perturbation_operators": "M",
+                "lab_books": "M",
+                "measured_spend_usd": "M",
+            },
+        },
         "models": models,
         "perturbation_models": perturbation_models,
         "charts": charts,

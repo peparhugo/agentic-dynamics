@@ -155,3 +155,37 @@ def test_data_js_story_conditions_match_the_canonical_split():
         f"the primary story path is still publishing legacy condition semantics"
     )
     assert "bad_seed" not in conditions
+
+
+def _data_js_payload() -> dict | None:
+    """Parse ``window.DYNAMICS_DATA`` out of the generated ``data.js``."""
+    if not DATA_JS.exists():  # pragma: no cover - generated file, present in CI
+        return None
+    text = DATA_JS.read_text(encoding="utf-8")
+    return json.loads(text[text.index("{") : text.rindex("}") + 1])
+
+
+def test_readme_figures_match_public_statistics():
+    """README headline figures must equal the canonical ``public_statistics`` block.
+
+    The review's "smaller" issue: README said 1,097 sessions / 36 configs / $288.69 while
+    the committed dataset said 1,067 / 35 / $309.17. ``data.js`` now carries a
+    ``public_statistics`` block (the single source of truth); README.md's "By the Numbers"
+    table and hero line must mirror it, and the stale figures must not survive.
+    """
+    payload = _data_js_payload()
+    if payload is None:  # pragma: no cover
+        pytest.skip("apps/website/data.js not generated")
+    ps = payload.get("public_statistics", {})
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert f"{ps['story_sessions']:,} story sessions" in readme
+    assert f"| Story sessions | {ps['story_sessions']:,} " in readme
+    assert f"${ps['measured_spend_usd']:,.2f}" in readme
+    assert f"| Experiment configs | {ps['experiment_configs']} |" in readme
+    assert f"| Total measured spend | ${ps['measured_spend_usd']:,.2f} |" in readme
+
+    # The stale figures must not survive anywhere.
+    assert "1,097 story sessions" not in readme
+    assert "$288.69" not in readme
+    assert "36 (33 measurement + 3 grid/sweep)" not in readme

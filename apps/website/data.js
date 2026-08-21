@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 16:31:58 UTC by build_data.py */
+/* Generated 2026-08-21 16:44:48 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T16:31:56.858928+00:00",
+    "generated_at": "2026-08-21T16:44:47.503792+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -126,6 +126,26 @@ window.DYNAMICS_DATA = {
         "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
       }
     ]
+  },
+  "public_statistics": {
+    "story_sessions": 1067,
+    "db_sessions_total": 3370,
+    "game_reports": 344,
+    "model_variants": 7,
+    "experiment_configs": 35,
+    "perturbation_operators": 10,
+    "lab_books": 20,
+    "measured_spend_usd": 309.17,
+    "_provenance": {
+      "story_sessions": "M",
+      "db_sessions_total": "M",
+      "game_reports": "M",
+      "model_variants": "M",
+      "experiment_configs": "M",
+      "perturbation_operators": "M",
+      "lab_books": "M",
+      "measured_spend_usd": "M"
+    }
   },
   "models": [
     {
@@ -2188,7 +2208,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T16:31:56.863426+00:00"
+    "generated_at": "2026-08-21T16:44:47.508231+00:00"
   },
   "reviews": {
     "models": [

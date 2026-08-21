@@ -26,7 +26,7 @@ not a single tool. The perturbation instrument is **one** of the six.
 > **AI agents don't have a price — they have dynamics.** Cost, reliability, and debt are
 > properties of how the agent behaves under change, and we measured them.
 
-1,097 story sessions, 10 perturbation operators, 7 model variants across 3 providers. $288.69
+1,067 story sessions, 10 perturbation operators, 7 model variants across 3 providers. $309.17
 measured spend.
 
 ---
@@ -89,14 +89,20 @@ Efficiency (durable outcome value / total cost).
 
 | Metric | Value |
 |--------|-------|
-| Story sessions | 1,097 (3,370 DB sessions total) |
+| Story sessions | 1,067 (3,370 DB sessions total) |
 | Game reports | 344 |
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
-| Experiment configs | 36 (33 measurement + 3 grid/sweep) |
-| Experiment + workflow specs | 79 (6 experiments + 73 workflows) |
+| Experiment configs | 35 |
+| Experiment + workflow specs | 80 (6 experiments + 74 workflows) |
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
 | Lab books | 20 (8 canonical + 12 quarantined) |
-| Total measured spend | $288.69 |
+| Total measured spend | $309.17 |
+
+These figures are the canonical public dataset: they mirror the `public_statistics`
+block of `apps/website/data.js` (story sessions = canonical resolved story corpus; spend =
+the story corpus's total measured cost). The DB session total (3,370) is the broader raw
+session count from the opencode database, reported separately from the 1,067 canonical
+story sessions.
 
 ---
 
@@ -263,7 +269,7 @@ case study, not an endorsement.
   author = {Hugo Pepar},
   year   = {2026},
   url    = {https://ai-finops-rulebook.web.app},
-  note   = {1,097 story sessions, 7 models, 10 perturbation operators.}
+  note   = {1,067 story sessions, 7 models, 10 perturbation operators.}
 }
 ```
 

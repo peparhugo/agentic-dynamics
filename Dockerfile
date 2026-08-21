@@ -8,14 +8,18 @@
 #     -v ~/.local/share/opencode/opencode.db:/root/.local/share/opencode/opencode.db \
 #     -v $(pwd)/experiments/results:/app/experiments/results \
 #     -v $(pwd)/apps/website:/app/apps/website \
+#     -v $(pwd)/experiments/data_manifest.json:/app/experiments/data_manifest.json \
 #     -e FINOPS_WORKTREE_ROOT=/app/experiments/results/artifacts \
 #     agentic-dynamics
 #
-# Persistence: the CORE run rewrites two outputs — apps/website/data.js and
-# experiments/data_manifest.json (+ experiments/results/lab_*.json). Mount BOTH
-# directories (as above) to keep them; without the mounts they live only in the
-# container's writable layer and vanish with `--rm`. apps/website/ is mounted for
-# data.js specifically (the review item 7 persistence fix).
+# Persistence: the CORE run rewrites several outputs — apps/website/data.js,
+# experiments/data_manifest.json, experiments/inventory.json, experiments/data/*.parquet,
+# and experiments/results/lab_*.json. Mount the two directories (results/, apps/website/)
+# AND the manifest file (experiments/data_manifest.json, a single file OUTSIDE the results/
+# mount) to keep them; without the mounts they live only in the container's writable layer
+# and vanish with `--rm`. inventory.json and data/*.parquet are deterministic recomputes
+# (steps 1-2) and are deliberately not persisted — the manifest is the load-bearing output
+# because the lab-contract identity hashes the registry it embeds.
 #
 # Opt-in external-service labs (append the flag to the entrypoint; the entrypoint
 # is `reproduce.sh core`, so appended args follow it):
@@ -60,8 +64,10 @@ ENV FINOPS_WORKTREE_ROOT=/app/experiments/results/artifacts
 # Volume mount points for external dependencies
 # - /usr/local/bin/opencode: the opencode CLI binary (manifest version stamp)
 # - /root/.local/share/opencode/opencode.db: session cost data (warned if absent)
-# - /app/experiments/results: lab outputs + regenerated data_manifest.json persistence
+# - /app/experiments/results: lab outputs persistence (lab_*.json + game reports)
 # - /app/apps/website: the rebuilt data.js persistence
+# - /app/experiments/data_manifest.json: the regenerated manifest (single file — a separate
+#   mount because it lives OUTSIDE /app/experiments/results)
 
 # Default entrypoint runs the CORE reproduction pipeline (deterministic — no external
 # services, canonical registry only). Append --with-neo4j / --with-sonar to opt in.

@@ -1296,6 +1296,23 @@ reconciliation — c6; the full release-gate verification — c7.
 Carried forward (later phases, not dropped): README/site prose reconciliation — c6; the full
 release-gate verification — c7.
 
+### c6_readme_site_reconcile — reconcile README + site prose + Docker persistence (review "smaller")
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **One public-statistics artifact** — `data.js` gains a `public_statistics` block (story_sessions 1,067 / db_sessions_total 3,370 / game_reports 344 / model_variants 7 / experiment_configs 35 / perturbation_operators 10 / lab_books 20 / measured_spend_usd 309.17) — the single source README prose cites | PASS |
+| 2 | **README reconciled** — hero line, "By the Numbers" table (1,067 sessions / 35 configs / $309.17 spend / 80 specs = 6 experiments + 74 workflows), and the BibTeX note all updated; a scope note states the figures mirror `data.js`'s `public_statistics` and distinguishes the 1,067 canonical story sessions from the 3,370 raw DB sessions | PASS |
+| 3 | **Home-page prose bound to the canonical split** — `index.html` Finding 4 no longer claims a `bad_seed` arm or "$1.48/story / 88%"; it reports `early_degrade` 86% vs `clean` 97% and the 1.5% → 2.5% cascade, with the relabel note | PASS |
+| 4 | **Docker persistence fixed** — the `docker run` example mounts `experiments/data_manifest.json` (a single file OUTSIDE the results/ mount), and the persistence comment + mount-point list accurately describe what persists (the manifest is load-bearing: the lab-contract identity hashes its registry) | PASS |
+| 5 | **CI verifies manifest survival** — the container CORE gate now mounts the manifest and asserts its `generated_at` differs from the committed one (i.e. it was actually regenerated inside the container, not just present) | PASS |
+| 6 | **Guard test** — `test_readme_figures_match_public_statistics` asserts README's headline figures equal the `public_statistics` block and that the stale `1,097` / `$288.69` / `36 (33+3)` strings never return | PASS |
+| 7 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1433 passed, 106 deselected**; full `pytest tests/`: **1538 passed, 1 skipped** | PASS |
+
+**c6_readme_site_reconcile result: 7/7 PASS.**
+
+Carried forward (later phases, not dropped): the full release-gate verification — c7.
+
+
 
 
 
