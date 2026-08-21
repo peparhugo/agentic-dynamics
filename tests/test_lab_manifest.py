@@ -273,8 +273,9 @@ def test_loader_agrees_with_the_raw_manifest():
 def test_published_data_js_carries_no_quarantined_lab_output():
     """End of the chain: the committed ``data.js`` must not still publish a quarantined lab.
 
-    ``grit_matrix`` is the one quarantined lab that had a top-level website key; the guard is
-    written generically so any future quarantined lab with a ``website_key`` is covered too.
+    ``correctness_escape_quadrants`` (formerly ``grit_matrix``) is the one quarantined lab
+    with a top-level website key; the guard is written generically so any future quarantined
+    lab with a ``website_key`` is covered too.
     """
     data_js = ROOT / "apps" / "website" / "data.js"
     if not data_js.exists():  # pragma: no cover - data.js is generated, may be absent

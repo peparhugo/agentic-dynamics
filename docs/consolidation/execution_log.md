@@ -975,6 +975,31 @@ criterion 6 — a section cannot be said to "draw from contract-bearing JSONs" w
 hand-typed transcription of an older run, and an output cannot be called canonical while it
 publishes an unmeasured zero as a measurement. Both are recorded here rather than deferred.
 
+### s4_grit_resolution — one meaning of Grit (review item 4)
+
+**The decision, and the data behind it.** The review offered (a) rename the quadrant lab or
+(b) implement the formal `G(s) = P(test_executed_success | perturbation_strength = s)`, and
+asked for "the option the data supports". The metric needs both fields on the same cell; the
+canonical registry yields **144 such cells** (64 `finding` + 80 `story`), enough for G(s), a
+per-model ranking and a per-class breakdown — so **(b) is supported and was implemented**.
+(a) was done as well, because (b) alone leaves a script named `lab_grit_matrix.py` emitting a
+`high_grit` key, and (a) alone leaves the README/site publishing a formal definition with
+nothing computing it. Only doing both yields the required "ONE meaning afterward".
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **The formal metric is implemented** — `scripts/lab_grit.py`: canonical, publication-eligible, contract-bearing, in the core reproduce set. Reports G(s) per strength with Wilson intervals (deterministic — no bootstrap RNG), per model, per perturbation class, per operator | PASS |
+| 2 | **A `finding` table added to the resolver** — `canonical_corpus.resolve_findings()` joins current `finding` rows to their runs; that corpus is the one carrying `perturbation_strength`/`operator`, so the metric is computable at all. `CanonicalTables.rows(table)` added so callers stop re-deriving the name→attribute map | PASS |
+| 3 | **The quadrant lab renamed** — `lab_grit_matrix.py` → `lab_correctness_escape_quadrants.py`; quadrant key `high_grit` → `robust`; `experiment_id`, output artifact, data.js key (`grit_matrix` → `correctness_escape_quadrants`), website section title and the quarantine notice all follow. It stays quarantined (retired-summary input) | PASS |
+| 4 | **`metric_definition_version` bumped and the decision documented in the manifest** — quadrant lab `→ correctness_escape_quadrants/v2` with the rename rationale recorded in its entry; new `lab_grit.py` at `grit/v1` | PASS |
+| 5 | **README + website use ONE meaning** — README's definition is now labelled the only one and points at the implementing lab; the glossary says so explicitly; a new canonical **Grit** section on the evidence page renders G(s) from `D.labs.grit`; the archived quadrant chart links to it and states that a quadrant is not Grit | PASS |
+| 6 | **No second meaning survives in the tree** — `high_grit` appears in zero code strings, emitted JSONs, or site files (docstrings explaining the rename are exempt, and tested to be the only exemption); `lab_grit_matrix.py` no longer exists; the CLI example in README and `test_cli_resolution` now name `grit`, a lab that exists | PASS |
+| 7 | **The result is reported honestly** — G(0.0)=0.700 [0.40, 0.89] n=10 vs G(0.5)=0.704 [0.57, 0.81] n=54 within the design-controlled finding corpus: Δ=+0.004, intervals overlapping. At the one strength level the corpus contains, degradation did not measurably reduce test-executed success. The wider signal is across *classes* (process perturbation 0.577 vs specification corruption 0.857, n=26/14). The artifact carries five caveats — two strength levels only, mixed corpora at s=0.5, exclusion-not-imputation, `insufficient_support` below 5 cells, no multiple-comparison correction | PASS |
+| 8 | **Guarded** — `tests/test_lab_contract.py` gains 6 tests: the formal lab is canonical and in the core set; the quadrant lab uses no grit-named metric; `high_grit` is gone everywhere; README/glossary/lab state the same definition; the artifact reports its definition and caveats; every published rate has an interval or is flagged unsupported | PASS |
+| 9 | Full suite green — **1386 passed** (+9); `ruff` clean; `reproduce --dry-run` runs 8 core labs; `evidence.html` inline JS parses | PASS |
+
+**s4_grit_resolution result: 9/9 PASS.**
+
 
 
 

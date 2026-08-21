@@ -25,12 +25,16 @@ Lab books read from these files in `experiments/results/`:
 
 `experiments/results/_results_summary.json` is a **retired** corpus. Every lab that reaches it,
 directly or transitively, is `lab_status: quarantined` in `scripts/lab_manifest.json`
-(12 of the 19): it is **not** run by `scripts/reproduce.sh` and its output is **not** published to
+(12 of the 20): it is **not** run by `scripts/reproduce.sh` and its output is **not** published to
 the website. It still runs by hand — but its numbers are historical and must never be presented
 as current findings or written into `apps/website/`.
 
-The 7 canonical labs are: `cache_economics`, `condition_effects`, `quality_frontier`,
+The 8 canonical labs are: `cache_economics`, `condition_effects`, `grit`, `quality_frontier`,
 `story_arc`, `story_review`, `verification_frontier`, `verification_value`.
+
+**Grit has exactly one meaning:** `G(s) = P(test_executed_success | perturbation_strength = s)`,
+implemented by `scripts/lab_grit.py`. Never use the word for the correctness x escape quadrants
+(`lab_correctness_escape_quadrants.py`, quarantined).
 
 ```bash
 python3 -m agentic_dynamics.reporting.lab_manifest --reproduce     # the core set
@@ -75,10 +79,10 @@ the pre-quarantine world; the manifest is authoritative.
 
 ### Behavioral Analysis
 
-**3. lab_grit_matrix.py** (204L) — "Correctness × escape × cost visualization"
+**3. lab_correctness_escape_quadrants.py** — "Correctness × escape × cost visualization" (renamed from lab_grit_matrix.py in s4; quarantined)
 - 2D bubble chart data: x=escape, y=correctness, size=cost
 - Per-model, per-perturbation class breakdown
-- Output: `experiments/results/legacy_labs/lab_grit_matrix.json`
+- Output: `experiments/results/legacy_labs/lab_correctness_escape_quadrants.json`
 
 **4. lab_flail_triggers.py** (183L) — "What makes a model flail?"
 - Failure patterns by model, perturbation class, task type
@@ -175,8 +179,8 @@ Stage 1 — superseded by `agentic_dynamics.measurement.semantic_validation` (no
 
 ```bash
 # Standard pattern:
-python scripts/lab_grit_matrix.py         # Run the analysis
-cat experiments/results/legacy_labs/lab_grit_matrix.json | python -m json.tool | head -50  # Inspect
+python scripts/lab_grit.py                # Run the formal Grit metric
+cat experiments/results/lab_grit.json | python -m json.tool | head -50  # Inspect
 
 # All labs follow the same pattern:
 python scripts/lab_<name>.py
@@ -198,7 +202,8 @@ These are the "experiment plan" documents — lab scripts are the implementation
 
 ```
 lab_claude_audit.py        → _results_summary.json, inventory.json
-lab_grit_matrix.py         → _results_summary.json, inventory.json
+lab_correctness_escape_quadrants.py → _results_summary.json (QUARANTINED)
+lab_grit.py                → canonical registry resolver (finding + story)
 lab_correctness_premium.py → _results_summary.json
 lab_flail_triggers.py      → _results_summary.json, _trajectory_aggregate.json
 lab_tool_archetypes.py     → _trajectory_aggregate.json

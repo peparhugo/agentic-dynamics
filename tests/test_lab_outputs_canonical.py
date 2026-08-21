@@ -156,12 +156,10 @@ def test_published_artifacts_match_the_current_registry():
     if not identity.input_manifest_sha256:  # pragma: no cover - manifest present in CI
         pytest.skip("no data_manifest.json registry in this checkout")
 
-    manifest = cc.read_manifest()
-    resolved = {
-        "story": len(cc.resolve_stories(manifest)),
-        "review": len(cc.resolve_reviews(manifest)),
-        "analysis": len(cc.resolve_analysis(manifest)),
-    }
+    # Derived from the resolver's own table registry, so a newly added table (s4 added
+    # ``finding`` for the Grit lab) is covered automatically instead of KeyError-ing here.
+    everything = cc.load_canonical_tables(*cc.TABLES)
+    resolved = {name: len(everything.rows(name)) for name in cc.TABLES}
 
     for lab, _path, payload in _published_artifacts():
         contract = payload[CONTRACT_KEY]
@@ -227,14 +225,22 @@ def test_every_published_lab_section_carries_its_contract_into_data_js():
         )
 
 
-def test_quarantined_grit_section_publishes_nothing():
-    """The one quarantined lab with a top-level website key stays empty."""
+def test_quarantined_quadrant_section_publishes_nothing():
+    """The one quarantined lab with a top-level website key stays empty.
+
+    Renamed in s4 with its lab: ``grit_matrix`` -> ``correctness_escape_quadrants``. The old
+    key must be gone entirely, or the site could read a stale section that nothing maintains.
+    """
     payload = _data_js_payload()
     if payload is None:  # pragma: no cover
         pytest.skip("apps/website/data.js not generated")
-    assert payload.get("grit_matrix") == [], (
-        "grit_matrix is quarantined (lab_grit_matrix.py reads the retired summary) and must "
-        "publish no points"
+    assert "grit_matrix" not in payload, (
+        "the retired data.js key 'grit_matrix' is back — s4 renamed it to "
+        "'correctness_escape_quadrants'"
+    )
+    assert payload.get("correctness_escape_quadrants") == [], (
+        "correctness_escape_quadrants is quarantined (its lab reads the retired summary) and "
+        "must publish no points"
     )
 
 

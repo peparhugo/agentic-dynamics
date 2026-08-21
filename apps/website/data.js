@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 00:38:17 UTC by build_data.py */
+/* Generated 2026-08-21 00:47:50 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T00:38:17.268294+00:00",
+    "generated_at": "2026-08-21T00:47:49.936902+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -1857,7 +1857,7 @@ window.DYNAMICS_DATA = {
       "escalate": 1
     }
   },
-  "grit_matrix": [],
+  "correctness_escape_quadrants": [],
   "sonar": {
     "models": {},
     "_historical": true,
@@ -2102,7 +2102,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T00:38:17.298745+00:00"
+    "generated_at": "2026-08-21T00:47:49.967351+00:00"
   },
   "reviews": {
     "models": [
@@ -2750,6 +2750,267 @@ window.DYNAMICS_DATA = {
         "n_input_records": 457,
         "contract_version": "lab-contract/v1",
         "generated_at": "2026-08-21T00:33:08.689382+00:00"
+      }
+    },
+    "grit": {
+      "experiment_id": "lab_grit",
+      "generated_at": "2026-08-21T02:45:37.146743",
+      "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
+      "summary": {
+        "cells": 144,
+        "successes": 108,
+        "grit_overall": 0.75,
+        "strength_levels": [
+          0.0,
+          0.5
+        ],
+        "findings": 64,
+        "stories": 215,
+        "controlled_delta_grit": 0.0037
+      },
+      "by_strength": [
+        {
+          "strength": 0.0,
+          "n": 10,
+          "successes": 7,
+          "grit": 0.7,
+          "ci95_lo": 0.3968,
+          "ci95_hi": 0.8922,
+          "insufficient_support": false,
+          "sources": {
+            "finding": 10,
+            "story": 0
+          }
+        },
+        {
+          "strength": 0.5,
+          "n": 134,
+          "successes": 101,
+          "grit": 0.7537,
+          "ci95_lo": 0.6744,
+          "ci95_hi": 0.8189,
+          "insufficient_support": false,
+          "sources": {
+            "finding": 54,
+            "story": 80
+          }
+        }
+      ],
+      "by_strength_finding_corpus": [
+        {
+          "strength": 0.0,
+          "n": 10,
+          "successes": 7,
+          "grit": 0.7,
+          "ci95_lo": 0.3968,
+          "ci95_hi": 0.8922,
+          "insufficient_support": false
+        },
+        {
+          "strength": 0.5,
+          "n": 54,
+          "successes": 38,
+          "grit": 0.7037,
+          "ci95_lo": 0.5717,
+          "ci95_hi": 0.8086,
+          "insufficient_support": false
+        }
+      ],
+      "by_model_perturbed": [
+        {
+          "model": "deepseek-v4-flash",
+          "n": 15,
+          "successes": 13,
+          "grit": 0.8667,
+          "ci95_lo": 0.6212,
+          "ci95_hi": 0.9626,
+          "insufficient_support": false
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "n": 28,
+          "successes": 24,
+          "grit": 0.8571,
+          "ci95_lo": 0.6851,
+          "ci95_hi": 0.943,
+          "insufficient_support": false
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "n": 18,
+          "successes": 14,
+          "grit": 0.7778,
+          "ci95_lo": 0.5478,
+          "ci95_hi": 0.91,
+          "insufficient_support": false
+        },
+        {
+          "model": "claude-sonnet-5",
+          "n": 22,
+          "successes": 16,
+          "grit": 0.7273,
+          "ci95_lo": 0.5185,
+          "ci95_hi": 0.8685,
+          "insufficient_support": false
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "n": 17,
+          "successes": 12,
+          "grit": 0.7059,
+          "ci95_lo": 0.4687,
+          "ci95_hi": 0.8672,
+          "insufficient_support": false
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "n": 16,
+          "successes": 11,
+          "grit": 0.6875,
+          "ci95_lo": 0.444,
+          "ci95_hi": 0.8584,
+          "insufficient_support": false
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "n": 18,
+          "successes": 11,
+          "grit": 0.6111,
+          "ci95_lo": 0.3862,
+          "ci95_hi": 0.797,
+          "insufficient_support": false
+        }
+      ],
+      "by_perturbation_class_perturbed": [
+        {
+          "perturbation_class": "objective_mutation",
+          "n": 14,
+          "successes": 11,
+          "grit": 0.7857,
+          "ci95_lo": 0.5241,
+          "ci95_hi": 0.9243,
+          "insufficient_support": false
+        },
+        {
+          "perturbation_class": "process_perturbation",
+          "n": 26,
+          "successes": 15,
+          "grit": 0.5769,
+          "ci95_lo": 0.3895,
+          "ci95_hi": 0.7446,
+          "insufficient_support": false
+        },
+        {
+          "perturbation_class": "specification_corruption",
+          "n": 14,
+          "successes": 12,
+          "grit": 0.8571,
+          "ci95_lo": 0.6006,
+          "ci95_hi": 0.9599,
+          "insufficient_support": false
+        },
+        {
+          "perturbation_class": "story:early_degrade",
+          "n": 80,
+          "successes": 63,
+          "grit": 0.7875,
+          "ci95_lo": 0.6858,
+          "ci95_hi": 0.8629,
+          "insufficient_support": false
+        }
+      ],
+      "by_operator_perturbed": [
+        {
+          "operator": "force_abandonment",
+          "n": 3,
+          "successes": 1,
+          "grit": null,
+          "ci95_lo": null,
+          "ci95_hi": null,
+          "insufficient_support": true
+        },
+        {
+          "operator": "inject_alien_vocab",
+          "n": 10,
+          "successes": 5,
+          "grit": 0.5,
+          "ci95_lo": 0.2366,
+          "ci95_hi": 0.7634,
+          "insufficient_support": false
+        },
+        {
+          "operator": "inject_competing_goal",
+          "n": 7,
+          "successes": 5,
+          "grit": 0.7143,
+          "ci95_lo": 0.3589,
+          "ci95_hi": 0.9178,
+          "insufficient_support": false
+        },
+        {
+          "operator": "inject_phantom_success",
+          "n": 7,
+          "successes": 6,
+          "grit": 0.8571,
+          "ci95_lo": 0.4869,
+          "ci95_hi": 0.9743,
+          "insufficient_support": false
+        },
+        {
+          "operator": "invert_constraint",
+          "n": 7,
+          "successes": 6,
+          "grit": 0.8571,
+          "ci95_lo": 0.4869,
+          "ci95_hi": 0.9743,
+          "insufficient_support": false
+        },
+        {
+          "operator": "remove_critical_constraint",
+          "n": 7,
+          "successes": 6,
+          "grit": 0.8571,
+          "ci95_lo": 0.4869,
+          "ci95_hi": 0.9743,
+          "insufficient_support": false
+        },
+        {
+          "operator": "reverse_causality",
+          "n": 3,
+          "successes": 3,
+          "grit": null,
+          "ci95_lo": null,
+          "ci95_hi": null,
+          "insufficient_support": true
+        },
+        {
+          "operator": "shift_framing",
+          "n": 10,
+          "successes": 6,
+          "grit": 0.6,
+          "ci95_lo": 0.3127,
+          "ci95_hi": 0.8318,
+          "insufficient_support": false
+        }
+      ],
+      "caveats": [
+        "Only two perturbation strengths exist in the canonical corpus (0.0 and 0.5); G(s) is two points, not a dose-response curve.",
+        "The s=0.0 level is baseline-only and comes entirely from the finding corpus, while s=0.5 mixes finding and story cells \u2014 read 'by_strength_finding_corpus' for the design-controlled comparison.",
+        "A cell missing perturbation_strength or test_executed_success is excluded, never imputed; test_executed_success is the independent runner's verdict, never the agent's self-report.",
+        "Rows with fewer than 5 cells report grit=null (insufficient_support) rather than an under-powered proportion.",
+        "Observational corpus: no multiple-comparison correction across models, operators, or classes; differences are not claimed to be causal."
+      ],
+      "lab_contract": {
+        "lab": "lab_grit.py",
+        "input_dataset_id": "canonical_registry/finding+story",
+        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_version": "data-manifest/1.0+701rows",
+        "metric_definition_version": "grit/v0",
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": null,
+        "n_input_records": 279,
+        "contract_version": "lab-contract/v1",
+        "generated_at": "2026-08-21T00:45:37.146770+00:00"
       }
     },
     "quality_frontier": {

@@ -21,10 +21,16 @@
     "(src/agentic_dynamics/reporting/lab_contract.py) carrying input_dataset_id,",
     "input_manifest_sha256, registry_version, metric_definition_version, data_integrity_policy and",
     "requires_external_service. build_data.py re-validates the manifest hash and refuses to publish",
-    "a stale artifact, logging the rejection with the lab name."
+    "a stale artifact, logging the rejection with the lab name.",
+    "",
+    "PHASE s4 (Grit collision): 'Grit' now has exactly ONE meaning repo-wide \u2014",
+    "G(s) = P(test_executed_success | perturbation_strength = s), implemented by lab_grit.py.",
+    "The quadrant analysis that used to carry the name was renamed",
+    "lab_grit_matrix.py -> lab_correctness_escape_quadrants.py (quadrant 'high_grit' -> 'robust',",
+    "metric_definition_version v1 -> v2) and stays quarantined."
   ],
   "review_source": "docs/review/semantic_integrity_review.md",
-  "release_phase": "s3_rebuild_outputs",
+  "release_phase": "s4_grit_resolution",
   "data_integrity_policy": "docs/data_integrity_findings.md",
   "status_vocabulary": {
     "canonical": "Consumes only live, non-retired result records. Runs in the default reproduction pipeline and is eligible to feed the website (subject to the s2 lineage contract).",
@@ -128,6 +134,22 @@
       "metric_definition_version": "condition_effects/v1",
       "rationale": "Consumes the canonical registry resolver only (story + review tables). Conditions come from the resolver's no-op relabel, and the 77 tombstoned early_degrade cells are excluded \u2014 both load-bearing for a condition comparison. Contract-bearing."
     },
+    "lab_correctness_escape_quadrants.py": {
+      "lab_status": "quarantined",
+      "publication_eligible": false,
+      "website_key": "correctness_escape_quadrants",
+      "reproduce_default": false,
+      "output": "experiments/results/legacy_labs/lab_correctness_escape_quadrants.json",
+      "input_sources": [
+        "experiments/results/_results_summary.json"
+      ],
+      "reads_retired_summary": true,
+      "requires_external_service": null,
+      "contract_status": "n/a",
+      "metric_definition_version": "correctness_escape_quadrants/v2",
+      "rationale": "Reads the retired summary directly, so it stays quarantined. RENAMED in phase s4 from lab_grit_matrix.py: it classified correctness x escape quadrants and called one 'high_grit', colliding with the ONE formal definition of Grit (G(s) = P(test_executed_success | perturbation_strength = s)) that the README, the glossary and the website state. The quadrant is now 'robust'; the formal metric has its own canonical implementation in lab_grit.py. metric_definition_version bumped v1 -> v2 to record the rename \u2014 the quantity is unchanged, only its name.",
+      "supersedes_name": "lab_grit_matrix.py"
+    },
     "lab_correctness_premium.py": {
       "lab_status": "quarantined",
       "publication_eligible": false,
@@ -159,20 +181,21 @@
       "metric_definition_version": "",
       "rationale": "Reads the retired summary directly (scripts/lab_flail_triggers.py:15)."
     },
-    "lab_grit_matrix.py": {
-      "lab_status": "quarantined",
-      "publication_eligible": false,
-      "website_key": "grit_matrix",
-      "reproduce_default": false,
-      "output": "experiments/results/legacy_labs/lab_grit_matrix.json",
+    "lab_grit.py": {
+      "lab_status": "canonical",
+      "publication_eligible": true,
+      "website_key": "grit",
+      "reproduce_default": true,
+      "output": "experiments/results/lab_grit.json",
       "input_sources": [
-        "experiments/results/_results_summary.json"
+        "registry:data_manifest.json#registry (finding, current)",
+        "registry:data_manifest.json#registry (story, current)"
       ],
-      "reads_retired_summary": true,
+      "reads_retired_summary": false,
       "requires_external_service": null,
-      "contract_status": "n/a",
-      "metric_definition_version": "",
-      "rationale": "Reads the retired summary directly (scripts/lab_grit_matrix.py:15) and was the one lab published straight into data.js (build_data.py _load_grit_matrix). website_key stays recorded so build_data can LOG the rejection by name instead of silently dropping the section. Second defect, deferred to s4: it calls a correctness x escape quadrant 'high_grit', colliding with the README's formal G(s) = P(test_executed_success | perturbation_strength = s)."
+      "contract_status": "enforced",
+      "metric_definition_version": "grit/v1",
+      "rationale": "THE formal Grit metric, G(s) = P(test_executed_success | perturbation_strength = s) \u2014 the definition the README, the glossary and the website already state. Added in phase s4 (review item 4) because the definition was published with no implementation behind it while a quadrant chart carried the name. Consumes the canonical registry resolver (finding + story tables); 144 canonical cells carry both required fields. Contract-bearing."
     },
     "lab_opencode_meta_analysis.py": {
       "lab_status": "quarantined",

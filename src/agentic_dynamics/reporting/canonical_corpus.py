@@ -74,7 +74,16 @@ ANALYSIS_DIR = RESULTS_DIR / "analysis"
 NOOP_CONDITIONS = frozenset({"early_degrade", "bad_seed"})
 
 #: The table names a lab may request. Each maps to one resolver below.
-TABLES = ("story", "review", "analysis")
+TABLES = ("story", "review", "analysis", "finding")
+
+#: table name -> the :class:`CanonicalTables` attribute holding its rows. Declared once so
+#: callers never re-derive it (and so adding a table is a single-place change).
+TABLE_ATTRIBUTES = {
+    "story": "stories",
+    "review": "reviews",
+    "analysis": "analysis",
+    "finding": "findings",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -299,10 +308,62 @@ def resolve_analysis(manifest: dict) -> list[dict]:
     return out
 
 
+def _resolve_file_uri(source_uri: str) -> Path | None:
+    """Resolve a ``file://`` registry ``source_uri`` to a repo-relative path.
+
+    ``finding`` rows carry ``file://experiments/results/…`` URIs (the
+    ``knowledge_ingestion.SOURCE_URI`` contract). Any other scheme (``story:``,
+    ``review:``) belongs to a different resolver, so this returns ``None``.
+    """
+    if not source_uri or not source_uri.startswith("file://"):
+        return None
+    return PROJECT_ROOT / source_uri[len("file://") :]
+
+
+def resolve_findings(manifest: dict) -> list[dict]:
+    """Every current ``finding`` run — the single-task perturbation cells.
+
+    A ``finding`` row points at an aggregate results file via ``source_uri`` and names the
+    one cell inside it via ``logical_locator`` (== ``basename(run["workdir"])``). This is
+    the corpus that carries ``perturbation_strength`` and ``operator``, which is what makes
+    the formal Grit metric computable at all.
+
+    Each returned run gains ``_registry`` provenance and ``_experiment`` (the parent file's
+    experiment name). Structurally parallel to ``build_data._resolve_finding_entry``, minus
+    that function's mapping into the retired summary's *field vocabulary* — labs want the
+    measured fields under their real names.
+    """
+    out: list[dict] = []
+    for row in current_rows(manifest, "finding"):
+        path = _resolve_file_uri(str(row.get("source_uri") or ""))
+        locator = str(row.get("logical_locator") or "")
+        if path is None or not path.exists() or not locator:
+            continue
+        payload = _read_json(path)
+        if payload is None:
+            continue
+        for run in payload.get("runs") or []:
+            workdir = str(run.get("workdir") or "")
+            if workdir.rsplit("/", 1)[-1] != locator:
+                continue
+            run = dict(run)  # never mutate the shared payload
+            run["_experiment"] = payload.get("experiment", "")
+            run["_registry"] = {
+                "entity_id": row.get("entity_id"),
+                "knowledge_id": row.get("knowledge_id"),
+                "source_uri": row.get("source_uri"),
+                "lifecycle_state": row.get("lifecycle_state"),
+            }
+            out.append(run)
+            break
+    return out
+
+
 _RESOLVERS = {
     "story": resolve_stories,
     "review": resolve_reviews,
     "analysis": resolve_analysis,
+    "finding": resolve_findings,
 }
 
 
@@ -324,6 +385,7 @@ class CanonicalTables:
     stories: list[dict] = field(default_factory=list)
     reviews: list[dict] = field(default_factory=list)
     analysis: list[dict] = field(default_factory=list)
+    findings: list[dict] = field(default_factory=list)
 
     @property
     def input_dataset_id(self) -> str:
@@ -335,11 +397,23 @@ class CanonicalTables:
     @property
     def is_empty(self) -> bool:
         """True when nothing resolved — the caller should say so rather than publish zeros."""
-        return not (self.stories or self.reviews or self.analysis)
+        return not (self.stories or self.reviews or self.analysis or self.findings)
 
     def stories_by_id(self) -> dict[str, dict]:
         """``story_id -> payload`` for join-style labs."""
         return {str(s.get("story_id") or ""): s for s in self.stories if s.get("story_id")}
+
+    def rows(self, table: str) -> list[dict]:
+        """Rows of one table by its *table name* (``"story"``, ``"finding"``, …).
+
+        Saves every caller from re-deriving the name→attribute mapping
+        (``"story" -> .stories``, ``"analysis" -> .analysis``), which is the kind of
+        duplicated lookup that silently rots when a table is added.
+        """
+        attr = TABLE_ATTRIBUTES.get(table)
+        if attr is None:
+            raise ValueError(f"unknown canonical table {table!r}; known: {list(TABLE_ATTRIBUTES)}")
+        return getattr(self, attr)
 
 
 def load_canonical_tables(
@@ -371,4 +445,5 @@ def load_canonical_tables(
         stories=resolved.get("story", []),
         reviews=resolved.get("review", []),
         analysis=resolved.get("analysis", []),
+        findings=resolved.get("finding", []),
     )

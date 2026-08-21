@@ -1,10 +1,28 @@
 #!/usr/bin/env python3
-"""Lab Book 2: The Grit Matrix — Correctness × Escape × Cost
+"""Lab Book 2: Correctness x Escape Quadrants — where models cluster
 
 Builds a 2D bubble chart dataset showing where models cluster in the
 correctness-escape space. Each point = one experiment entry. Bubble size = cost.
 
-Output: experiments/results/legacy_labs/lab_grit_matrix.json
+RENAMED IN THE SEMANTIC-INTEGRITY RELEASE (phase s4, review item 4)
+--------------------------------------------------------------------
+This file was ``lab_grit_matrix.py`` and called its top-left quadrant ``high_grit``,
+which collided with the ONE formal definition of Grit that the README, the glossary and
+the website state:
+
+    G(s) = P(test_executed_success | perturbation_strength = s)
+
+A correctness x escape quadrant is not that quantity — it is a different measurement
+wearing the same name, and a reader could not tell which one a "Grit" figure referred to.
+The formal metric now has its own implementation (``scripts/lab_grit.py``, canonical and
+contract-bearing); this analysis keeps its chart and loses the word. The quadrant formerly
+called ``high_grit`` is now ``robust`` (high correctness, low escape).
+
+This lab remains QUARANTINED: its input is the retired ``_results_summary.json``, so it
+is not run by ``reproduce.sh`` and its output is not published. It writes into
+``experiments/results/legacy_labs/`` — see that directory's README.
+
+Output: experiments/results/legacy_labs/lab_correctness_escape_quadrants.json
 """
 
 import json
@@ -13,11 +31,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
-#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
-#: _results_summary.json, so its output must never sit beside the contract-bearing
-#: results. It writes into experiments/results/legacy_labs/ — see that directory's
-#: README. Running this by hand is still supported; publishing it is not.
-OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_grit_matrix.json"
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_correctness_escape_quadrants.json"
 
 from agentic_dynamics.core.constants import MODEL_LABELS
 
@@ -65,11 +79,11 @@ def compute():
     mid_correctness = sorted(correctnesses)[len(correctnesses) // 2] if correctnesses else 0.5
 
     # Assign quadrants
-    quadrants = {"high_grit": [], "explorative": [], "conservative_fail": [], "wasteful": []}
+    quadrants = {"robust": [], "explorative": [], "conservative_fail": [], "wasteful": []}
     for p in points:
         if p["correctness"] >= mid_correctness and p["escape"] <= mid_escape:
-            p["quadrant"] = "high_grit"
-            quadrants["high_grit"].append(p)
+            p["quadrant"] = "robust"
+            quadrants["robust"].append(p)
         elif p["correctness"] >= mid_correctness and p["escape"] > mid_escape:
             p["quadrant"] = "explorative"
             quadrants["explorative"].append(p)
@@ -81,7 +95,7 @@ def compute():
             quadrants["wasteful"].append(p)
 
     # Per-model quadrant distribution
-    model_quadrants = defaultdict(lambda: {"high_grit": 0, "explorative": 0, "conservative_fail": 0, "wasteful": 0, "total": 0})
+    model_quadrants = defaultdict(lambda: {"robust": 0, "explorative": 0, "conservative_fail": 0, "wasteful": 0, "total": 0})
     for p in points:
         q = p["quadrant"]
         model_quadrants[p["label"]][q] += 1
@@ -92,7 +106,7 @@ def compute():
     for label, counts in model_quadrants.items():
         t = counts["total"]
         model_quadrant_pct[label] = {
-            "high_grit_pct": round(counts["high_grit"] / t * 100, 1) if t else 0,
+            "robust_pct": round(counts["robust"] / t * 100, 1) if t else 0,
             "explorative_pct": round(counts["explorative"] / t * 100, 1) if t else 0,
             "conservative_fail_pct": round(counts["conservative_fail"] / t * 100, 1) if t else 0,
             "wasteful_pct": round(counts["wasteful"] / t * 100, 1) if t else 0,
@@ -106,7 +120,7 @@ def compute():
 
     output = {
         "_meta": {
-            "experiment_id": "lab_grit_matrix",
+            "experiment_id": "lab_correctness_escape_quadrants",
             "total_points": len(points),
             "models": len(model_quadrants),
             "quadrant_boundaries": {
@@ -114,7 +128,7 @@ def compute():
                 "correctness_median": round(mid_correctness, 2),
             },
             "quadrant_labels": {
-                "high_grit": "High correctness, low escape (ideal)",
+                "robust": "High correctness, low escape (stays near the seed and still passes)",
                 "explorative": "High correctness, high escape (explores but succeeds)",
                 "conservative_fail": "Low correctness, low escape (didn't try)",
                 "wasteful": "Low correctness, high escape (tried and failed)",
@@ -173,7 +187,7 @@ def main():
     data = compute()
     m = data["_meta"]
 
-    print("=== LAB BOOK 2: THE GRIT MATRIX ===\n")
+    print("=== LAB BOOK 2: CORRECTNESS x ESCAPE QUADRANTS ===\n")
     print(f"Total points: {m['total_points']} across {m['models']} models")
     print(f"Quadrant boundaries: escape={m['quadrant_boundaries']['escape_median']}, correctness={m['quadrant_boundaries']['correctness_median']}\n")
 
@@ -183,10 +197,10 @@ def main():
         print(f"  {q}: {count} entries — {label}")
 
     print("\nPER-MODEL QUADRANT PERCENTAGES:")
-    print(f"{'Model':<22} {'High Grit':>10} {'Explorative':>12} {'Consv Fail':>12} {'Wasteful':>10}")
+    print(f"{'Model':<22} {'Robust':>10} {'Explorative':>12} {'Consv Fail':>12} {'Wasteful':>10}")
     print("-" * 70)
     for label, pct in sorted(data["model_quadrant_percentages"].items()):
-        print(f"{label:<22} {pct['high_grit_pct']:>9.1f}% {pct['explorative_pct']:>11.1f}% {pct['conservative_fail_pct']:>11.1f}% {pct['wasteful_pct']:>9.1f}%")
+        print(f"{label:<22} {pct['robust_pct']:>9.1f}% {pct['explorative_pct']:>11.1f}% {pct['conservative_fail_pct']:>11.1f}% {pct['wasteful_pct']:>9.1f}%")
 
     print("\nPERTURBATION CLASS QUADRANTS:")
     for pc, counts in data["perturbation_class_quadrants"].items():

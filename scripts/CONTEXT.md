@@ -7,7 +7,7 @@ lives under `scripts/archive/`; the other buckets live at the top of `scripts/`.
 
 <!-- scripts-classification: start -->
 maintained: run.py sweep_parallel.py sweep_silent_mode.py batch_run.py remaining_batch.py multi_phase.py run_story.py batch_stories.py run_workflow.py enqueue.py worker.py monitor.py reinterleave_queue.py enqueue_analysis.py analysis_worker.py analyze_worktrees.py analyze_trajectories.py analyze_stories.py build_data.py sync_data.py generate_manifest.py inventory.py kb_produce.py kb_produce_sources.py kb_worker.py registry.py review_all.py review_stories.py trigger_reviews.py enqueue_reviews.py finalize_reviews.py spec_status.py pipeline.py validate_session.py verify_tests.py supervise.py claude_agents_supervisor.py
-historical: lab_basin_topology.py lab_basin_topology_neo4j.py lab_cache_economics.py lab_claude_audit.py lab_condition_effects.py lab_correctness_premium.py lab_flail_triggers.py lab_grit_matrix.py lab_opencode_meta_analysis.py lab_quality_frontier.py lab_sonar_quality.py lab_story_arc.py lab_story_review.py lab_survival_horizon.py lab_task_routing.py lab_think_do_coupling.py lab_tool_archetypes.py lab_verification_frontier.py lab_verification_value.py
+historical: lab_grit.py lab_basin_topology.py lab_basin_topology_neo4j.py lab_cache_economics.py lab_claude_audit.py lab_condition_effects.py lab_correctness_premium.py lab_flail_triggers.py lab_correctness_escape_quadrants.py lab_opencode_meta_analysis.py lab_quality_frontier.py lab_sonar_quality.py lab_story_arc.py lab_story_review.py lab_survival_horizon.py lab_task_routing.py lab_think_do_coupling.py lab_tool_archetypes.py lab_verification_frontier.py lab_verification_value.py
 one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_transcripts.py backfill_deep_metrics.py batch_analyze_ts_ssg.py finish_sweep.py regen_typescript_ssg.py backfill_sonar.py backfill_costs.py compute_sonar_deltas.py embed_sessions.py recovery_cost_table.py rescore_conventions.py recover_stories.py kb_produce_registry.py
 <!-- scripts-classification: end -->
 
@@ -97,7 +97,7 @@ one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_trans
 | `supervise.py` | 378 | Supervises running opencode sessions via a dedicated flash monitor session — flag-only, never steers. CLI for `agentic_dynamics/control/supervisor.py`'s Redis contracts. |
 | `claude_agents_supervisor.py` | 260 | Supervises `claude --bg` background sessions — roster + owned-session relay only, structurally parallel to `supervise.py` but simpler. |
 
-## Lab Books (19 scripts — 7 core, 12 quarantined — + 8 deprecated)
+## Lab Books (20 scripts — 8 core, 12 quarantined — + 8 deprecated)
 
 **Classification: `scripts/lab_manifest.json`** (schema `lab-manifest/v1`), parsed by the typed
 loader `agentic_dynamics.reporting.lab_manifest` and guarded by `tests/test_lab_manifest.py`.
@@ -132,6 +132,7 @@ invalidate the very labs it just published.
 | Script | Status | Question Answered | Key Output |
 |--------|--------|-------------------|------------|
 | `lab_cache_economics.py` | canonical | What is cache hits worth in dollars/rework? | Cache-hit economics from session transcripts |
+| `lab_grit.py` | canonical | **Grit** — how much test-executed success survives perturbation? | `G(s) = P(test_executed_success \| perturbation_strength = s)` per strength, model, class |
 | `lab_condition_effects.py` | canonical | Do perturbation conditions move outcome metrics? | CLEAN/BAD_SEED/EARLY/LATE_DEGRADE comparison |
 | `lab_quality_frontier.py` | canonical | Where is the quality-per-cost frontier? | Pareto frontier across correctness/cost/maintainability |
 | `lab_story_arc.py` | canonical | How does a story's quality/cost arc evolve? | Per-session trajectory over the 5-session story |
@@ -143,7 +144,7 @@ invalidate the very labs it just published.
 | `lab_claude_audit.py` | quarantined | Where did Claude's $47.54 go? | Per-task cost/correctness/LOC/narration penalty |
 | `lab_correctness_premium.py` | quarantined | Does Claude's premium buy anything? | Head-to-head correctness on 13 overlapping task types |
 | `lab_flail_triggers.py` | quarantined | What makes a model flail? | Failure patterns by model, perturbation class, task type |
-| `lab_grit_matrix.py` | quarantined | What does correctness × escape × cost look like? | 2D bubble chart data (also collides with the formal Grit metric — s4) |
+| `lab_correctness_escape_quadrants.py` | quarantined | What does correctness × escape × cost look like? | 2D bubble chart data (renamed from `lab_correctness_escape_quadrants.py` in s4; quadrant `high_grit` → `robust`) |
 | `lab_opencode_meta_analysis.py` | quarantined | What patterns in opencode experiments? | Meta-analysis (also spends live inference) |
 | `lab_sonar_quality.py` | quarantined | What code quality signals exist? | Sonar-based code quality analysis (stdout only) |
 | `lab_survival_horizon.py` | quarantined | How many sessions before bankruptcy? | Sessions-to-exhaustion per model, per budget |

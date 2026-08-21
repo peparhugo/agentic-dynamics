@@ -246,6 +246,99 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="insight" style="border-left-color:var(--am)"><strong style="color:var(--am)">Condition effects are modest:</strong> corrupting the session-1 spec (<code>early_degrade</code>) lowers the success rate relative to <code>clean</code> — the degraded spec leaks — but most cells still recover to passing, and the cascade rate stays low in both arms. Degradation raises risk at the margin; it does not dominate the outcome. <strong>Note on arms:</strong> a cell labelled <code>bad_seed</code>/<code>early_degrade</code> that carries no instrumented test verdict received no actual perturbation (<code>docs/data_integrity_findings.md</code> treatment rule 1) and is counted as <code>clean</code>, so the arms above are the corrected ones, not the raw labels. The 77 tombstoned contaminated cells are excluded entirely.</div>
 </section>
 
+<!-- ==================== GRIT — the one formal definition ==================== -->
+<!-- Added in the semantic-integrity release (phase s4). Until now the site DEFINED
+     Grit formally and published nothing that computed it, while a correctness x escape
+     quadrant chart carried the name. There is now exactly one Grit, it is measured, and
+     it renders here from the contract-bearing D.labs.grit. -->
+<section class="sec">
+<h2 id="grit">Grit: outcome retention under perturbation</h2>
+<p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity</strong> — how much test-executed success survives when the specification degrades. One definition, used everywhere: <code>G(s) = P(test_executed_success | perturbation_strength = s)</code>. The verdict is the independent test runner's, never the agent's self-report, and a cell missing either field is excluded rather than imputed.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Perturbation strength</th><th>Cells</th><th>Test-executed successes</th><th>G(s)</th><th>95% CI</th></tr></thead>
+<tbody id="grit-strength-tbody"><tr><td colspan="5" class="mono">no canonical Grit data</td></tr></tbody>
+</table></div>
+<p style="font-size:0.72rem;color:var(--t3);text-align:center">Wilson score intervals. Source: <code>D.labs.grit</code> (<span id="grit-cells">—</span> canonical cells).</p>
+
+<div class="insight" style="border-left-color:var(--am)"><strong style="color:var(--am)">Read the design-controlled comparison, not the headline.</strong> The s=0.0 level is baseline-only and comes entirely from the single-task perturbation corpus, while s=0.5 mixes that corpus with story cells — comparing them directly confounds strength with corpus. Restricted to the perturbation corpus, where both levels came from the same design: <span id="grit-controlled">—</span>. <strong>The intervals overlap;</strong> at the one strength level the corpus contains, degradation did not measurably reduce test-executed success. Only two strength levels exist, so this is two points, not a dose-response curve.</div>
+
+<h3 id="grit-by-model" style="margin-top:2rem;color:var(--ac)">Grit by model (perturbed cells)</h3>
+<p class="lead" style="font-size:0.88rem">Per-model G(s) at the perturbed level. Baseline cells are 1&ndash;2 per model — far too few for a per-model baseline, so none is shown.</p>
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Cells</th><th>G(0.5)</th><th>95% CI</th></tr></thead>
+<tbody id="grit-model-tbody"><tr><td colspan="4" class="mono">no canonical Grit data</td></tr></tbody>
+</table></div>
+
+<h3 id="grit-by-class" style="margin-top:2rem;color:var(--ac)">Grit by perturbation class</h3>
+<div class="tbl"><table>
+<thead><tr><th>Perturbation class</th><th>Cells</th><th>G(0.5)</th><th>95% CI</th></tr></thead>
+<tbody id="grit-class-tbody"><tr><td colspan="4" class="mono">no canonical Grit data</td></tr></tbody>
+</table></div>
+<div class="insight"><strong>What varies is the <em>kind</em> of degradation, not its strength.</strong> The spread across perturbation classes is wider than the spread across strength levels — which is the more useful operational signal: it says a FinOps model should classify how a specification is wrong, not merely how wrong it is. Sample sizes are small (see the cell counts) and no multiple-comparison correction is applied; this is an observational corpus.</div>
+</section>
+
+<script>
+// ---------------------------------------------------------------------------
+// Grit — rendered entirely from D.labs.grit (contract-bearing). No figure in this
+// section is transcribed; if the lab is absent the placeholder rows stay.
+// ---------------------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', function () {
+  var grit = (window.DYNAMICS_DATA && window.DYNAMICS_DATA.labs && window.DYNAMICS_DATA.labs.grit) || null;
+  if (!grit) return;
+
+  // An under-powered row carries grit: null (insufficient_support) — render an em-dash
+  // rather than a proportion the sample cannot support.
+  var fmtG = function (v) { return v === null || v === undefined ? '—' : Number(v).toFixed(3); };
+  var fmtCI = function (r) {
+    return (r.ci95_lo === null || r.ci95_lo === undefined)
+      ? '—'
+      : '[' + Number(r.ci95_lo).toFixed(2) + ', ' + Number(r.ci95_hi).toFixed(2) + ']';
+  };
+
+  var fill = function (id, rows, cells) {
+    var body = document.getElementById(id);
+    if (!body || !rows || !rows.length) return;
+    body.innerHTML = rows.map(function (r) {
+      return '<tr>' + cells.map(function (c) { return c(r); }).join('') + '</tr>';
+    }).join('');
+  };
+
+  fill('grit-strength-tbody', grit.by_strength, [
+    function (r) { return '<td class="mono">' + r.strength + '</td>'; },
+    function (r) { return '<td class="mono">' + r.n + '</td>'; },
+    function (r) { return '<td class="mono">' + r.successes + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtG(r.grit) + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtCI(r) + '</td>'; }
+  ]);
+
+  fill('grit-model-tbody', grit.by_model_perturbed, [
+    function (r) { return '<td>' + r.model + '</td>'; },
+    function (r) { return '<td class="mono">' + r.n + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtG(r.grit) + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtCI(r) + '</td>'; }
+  ]);
+
+  fill('grit-class-tbody', grit.by_perturbation_class_perturbed, [
+    function (r) { return '<td>' + String(r.perturbation_class).replace(/_/g, ' ') + '</td>'; },
+    function (r) { return '<td class="mono">' + r.n + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtG(r.grit) + '</td>'; },
+    function (r) { return '<td class="mono">' + fmtCI(r) + '</td>'; }
+  ]);
+
+  var cellsEl = document.getElementById('grit-cells');
+  if (cellsEl && grit.summary) cellsEl.textContent = String(grit.summary.cells);
+
+  var controlled = document.getElementById('grit-controlled');
+  var rows = grit.by_strength_finding_corpus || [];
+  if (controlled && rows.length === 2) {
+    controlled.textContent = rows.map(function (r) {
+      return 'G(' + r.strength + ') = ' + fmtG(r.grit) + ' ' + fmtCI(r) + ', n=' + r.n;
+    }).join(' vs ');
+  }
+});
+</script>
+
 <script>
 // ---------------------------------------------------------------------------
 // The Five-Session Arc — every figure in this section is rendered from the
@@ -431,14 +524,14 @@ document.addEventListener('DOMContentLoaded', function () {
 <div class="insight"><strong>Key insight:</strong> DeepSeek's semantic grit (0.18 escape, 94% correctness at $0.016) stands out. When false signals are injected <em>within</em> the reasoning manifold — the harder test — both models perform similarly on correctness (94% vs 88%), but DeepSeek does it at <strong style="color:var(--ac)">69&times; lower cost</strong>. Claude's gap is not capability; it's pricing architecture. DeepSeek separates reasoning into a low-cost structured channel. Claude bills reasoning as output tokens at $15/Mtok.</div>
 
 <div class="grit-interactive">
-<p style="cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;padding:0.5rem 0">Interactive: Grit Matrix — explore individual sessions</p>
+<p style="cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;padding:0.5rem 0">Interactive: Correctness &times; Escape Quadrants — explore individual sessions</p>
 <p style="font-size:0.72rem;color:var(--t3);margin-top:0.3rem">Each bubble is one experiment session. Toggle models and perturbation classes below. Quadrant lines at escape=0.5 and correctness=80%. Hover for session details. Default: DeepSeek + Claude.</p>
 <div id="grit-model-filters" style="margin-bottom:0.5rem;display:flex;flex-wrap:wrap;gap:6px;justify-content:center"></div>
 <div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="gritMatrixChart"></canvas></div>
-<!-- Shown instead of the chart when data.js carries no canonical grit points (the
+<!-- Shown instead of the chart when data.js carries no canonical quadrant points (the
      source lab is quarantined). Never replaced by illustrative numbers: an empty
      measurement is reported as empty. -->
-<div id="grit-quarantine-note" class="insight" style="display:none;border-left-color:var(--am)"><strong>[P] Quarantined pending the canonical lab contract.</strong> These points came from <code>lab_grit_matrix.py</code>, which reads the retired <code>_results_summary.json</code> corpus. The semantic-integrity review removed it from publication until the lab is rebuilt on canonical registry records and the Grit naming collision is resolved. No substitute figures are shown.</div>
+<div id="grit-quarantine-note" class="insight" style="display:none;border-left-color:var(--am)"><strong>[P] Quarantined pending the canonical lab contract.</strong> These points came from <code>lab_correctness_escape_quadrants.py</code> (formerly <code>lab_grit_matrix.py</code>), which reads the retired <code>_results_summary.json</code> corpus, so it is not published. It was also renamed: a correctness&times;escape quadrant is not Grit. The formal metric is measured above &mdash; see <a href="#grit" style="color:var(--ac)">Grit: outcome retention under perturbation</a>. No substitute figures are shown here.</div>
 </div>
 
 <div class="insight" style="border-left-color:var(--cy);margin-top:1.5rem"><strong style="color:var(--cy)">Databricks and this instrument examine related operational concerns:</strong> On August 7, 2026, Databricks published their playbook for reducing AI coding costs at scale (Wendell et al., Aug 2026). Their four cost levers — shifting to efficient models, dynamic routing, progressive budgeting, and reducing token overhead — overlap with questions this Agentic Dynamics instrument can measure or test. They call the core concept the <strong>"Efficiency Frontier"</strong>: the set of models with the best price point for a given level of intelligence. Grit is a complementary stress-integrity measure. They surveyed companies. We stress-tested models with 10 perturbation operators across 227 historical experiments.</div>
@@ -1180,11 +1273,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }));
   })();
 
-  // --- Grit Matrix Scatter Chart ---
+  // --- Correctness x Escape Quadrant Scatter Chart (formerly 'Grit Matrix') ---
   (function () {
     var ctx = document.getElementById('gritMatrixChart');
     if (!ctx) return;
-    var gritData = (D && D.grit_matrix && D.grit_matrix.length) ? D.grit_matrix : null;
+    var gritData = (D && D.correctness_escape_quadrants && D.correctness_escape_quadrants.length)
+      ? D.correctness_escape_quadrants : null;
 
     // No canonical points -> render the quarantine notice, not a chart. There is
     // deliberately no illustrative fallback dataset here: publishing invented bubbles

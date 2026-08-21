@@ -391,3 +391,150 @@ def test_published_lab_artifacts_carry_a_valid_contract():
         checked += 1
 
     assert checked, "no publication-eligible lab artifacts found to validate"
+
+
+# ---------------------------------------------------------------------------
+# 6. Grit has exactly one meaning (semantic-integrity release, phase s4)
+# ---------------------------------------------------------------------------
+
+#: The one definition, as stated in README.md, the glossary, and scripts/lab_grit.py.
+GRIT_DEFINITION = "G(s) = P(test_executed_success | perturbation_strength = s)"
+
+#: Files that may mention the *history* of the collision (they explain the rename) — a
+#: historical explanation is not a second meaning.
+_COLLISION_HISTORY_ALLOWED = {
+    "scripts/lab_correctness_escape_quadrants.py",
+    "scripts/lab_manifest.json",
+    "scripts/CONTEXT.md",
+    "tests/test_lab_contract.py",
+    "tests/test_lab_manifest.py",
+    "tests/test_lab_outputs_canonical.py",
+}
+
+
+def test_the_formal_grit_lab_exists_and_is_canonical():
+    """The definition the README publishes now has an implementation behind it."""
+    entry = load_lab_manifest().get("lab_grit.py")
+    assert entry is not None, "lab_grit.py must be classified"
+    assert entry.lab_status == "canonical"
+    assert entry.publication_eligible and entry.website_key == "grit"
+    assert entry.reproduce_default, "the formal metric belongs in the core reproduction set"
+    assert entry.metric_definition_version == "grit/v1"
+
+
+def test_the_quadrant_lab_no_longer_claims_the_name():
+    """``lab_grit_matrix.py`` is gone; its successor does not use 'grit' as a metric name."""
+    assert not (SCRIPTS_DIR / "lab_grit_matrix.py").exists(), "the colliding name must be retired"
+    quad = SCRIPTS_DIR / "lab_correctness_escape_quadrants.py"
+    assert quad.exists()
+
+    tree = ast.parse(quad.read_text(encoding="utf-8"), filename=quad.name)
+    docstrings = _docstring_ids(tree)
+    offenders = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
+        and "grit" in node.value.lower()
+    ]
+    assert not offenders, (
+        f"the quadrant lab still uses 'grit' in code/output strings: {offenders} "
+        f"(the docstring may explain the rename; the metric may not carry the name)"
+    )
+
+
+def test_no_high_grit_key_survives_anywhere():
+    """The colliding quadrant key ``high_grit`` is gone from live code and artifacts.
+
+    Docstrings and comments are exempt: the rename has to be *explainable*, and a sentence
+    saying "the quadrant formerly called ``high_grit`` is now ``robust``" is documentation,
+    not a second meaning. What must not survive is the key itself — in code, in emitted
+    JSON, or on the site.
+    """
+    hits: list[str] = []
+
+    for path in list(ROOT.glob("scripts/*.py")) + list(ROOT.glob("src/agentic_dynamics/**/*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=path.name)
+        docstrings = _docstring_ids(tree)
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and id(node) not in docstrings
+                and "high_grit" in node.value
+            ):
+                hits.append(str(path.relative_to(ROOT)))
+                break
+
+    for pattern in ("apps/website/*.html", "apps/website/*.js", "experiments/results/**/*.json"):
+        for path in ROOT.glob(pattern):
+            if path.name == "lab_manifest.json":
+                continue  # records the rename decision in prose
+            try:
+                if "high_grit" in path.read_text(encoding="utf-8"):
+                    hits.append(str(path.relative_to(ROOT)))
+            except (OSError, UnicodeDecodeError):  # pragma: no cover - binary/unreadable
+                continue
+
+    assert not hits, f"the retired quadrant key 'high_grit' still appears in {sorted(set(hits))}"
+
+
+def test_readme_glossary_and_lab_state_the_same_definition():
+    """One definition, three places — README, the site glossary, and the lab itself."""
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    glossary = (ROOT / "apps" / "website" / "glossary.html").read_text(encoding="utf-8")
+    lab = (SCRIPTS_DIR / "lab_grit.py").read_text(encoding="utf-8")
+
+    # README/lab use the exact spelling; the glossary renders it in HTML with &nbsp;.
+    assert (
+        "P(test_executed_success \\| perturbation_strength=s)" in readme
+        or "P(test_executed_success | perturbation_strength=s)" in readme
+    )
+    assert GRIT_DEFINITION in lab
+    assert "P(test-executed&nbsp;success | perturbation&nbsp;strength=s)" in glossary
+
+
+def test_grit_output_reports_the_definition_and_its_caveats():
+    """The artifact carries its own definition and states its limits.
+
+    A two-point G(s) presented without the "only two strength levels" and "the levels come
+    from different corpora" caveats would be a stronger claim than the data supports.
+    """
+    path = ROOT / "experiments" / "results" / "lab_grit.json"
+    if not path.exists():  # pragma: no cover
+        pytest.skip("lab_grit not run")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert payload["metric_definition"] == GRIT_DEFINITION
+    assert payload["by_strength"], "no strength levels computed"
+    assert payload["by_strength_finding_corpus"], "the design-controlled comparison is missing"
+    caveats = " ".join(payload["caveats"]).lower()
+    assert "two" in caveats and "strength" in caveats
+    assert "corpus" in caveats
+    # Every reported rate either has a value with an interval, or is explicitly unsupported.
+    for section in ("by_strength", "by_model_perturbed", "by_perturbation_class_perturbed"):
+        for row in payload[section]:
+            if row["grit"] is None:
+                assert row["insufficient_support"] is True
+            else:
+                assert row["ci95_lo"] is not None and row["ci95_hi"] is not None
+
+
+def _docstring_ids(tree: ast.AST) -> set[int]:
+    """``id()`` of every docstring Constant (so prose can discuss what code may not do)."""
+    out: set[int] = set()
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if (
+            isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+            and body
+        ):
+            first = body[0]
+            if (
+                isinstance(first, ast.Expr)
+                and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)
+            ):
+                out.add(id(first.value))
+    return out

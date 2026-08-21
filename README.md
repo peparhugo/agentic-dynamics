@@ -77,7 +77,7 @@ Observed from the experiment corpus:
 | Metric | Description |
 |--------|-------------|
 | Cost-per-task variation | Token pricing, cache write policies, and provider economics stack into cost gaps |
-| Outcome retention under perturbation | Grit: `G(s) = P(test_executed_success \| perturbation_strength=s)` |
+| Outcome retention under perturbation | Grit: `G(s) = P(test_executed_success \| perturbation_strength=s)` — measured by `scripts/lab_grit.py`; this is the **only** meaning of Grit in the repo |
 | Recovery overhead | Output decomposition — tokens and cost burned returning to familiar patterns |
 
 Derived metrics: WOC ratio (first-pass success), cost per test-executed outcome, AI Value
@@ -193,7 +193,7 @@ agentic-dynamics queue enqueue --model deepseek/deepseek-v4-flash --missing-only
 agentic-dynamics queue worker && agentic-dynamics queue monitor
 agentic-dynamics analyze worktrees                 # → game reports + _results_summary.json
 agentic-dynamics data build                        # → apps/website/data.js
-agentic-dynamics analyze lab grit_matrix           # → lab output
+agentic-dynamics analyze lab grit                  # → G(s), the formal Grit metric
 agentic-dynamics spec status                       # → regenerated spec index
 ```
 

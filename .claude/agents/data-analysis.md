@@ -27,7 +27,7 @@ inventory.json             ──┘
 
 ### 19 Active Lab Books (scripts/lab_*.py)
 - Cost/quality: lab_claude_audit, lab_correctness_premium, lab_quality_frontier, lab_cache_economics, lab_verification_frontier, lab_verification_value
-- Behavioral: lab_grit_matrix, lab_flail_triggers, lab_tool_archetypes, lab_condition_effects
+- Behavioral: lab_grit (the formal G(s)), lab_correctness_escape_quadrants, lab_flail_triggers, lab_tool_archetypes, lab_condition_effects
 - Strategy/topology: lab_task_routing, lab_basin_topology, lab_basin_topology_neo4j, lab_survival_horizon
 - Advanced/meta: lab_sonar_quality, lab_think_do_coupling, lab_story_review, lab_story_arc, lab_opencode_meta_analysis
 - DEPRECATED: 15 archived one-time migrations in `scripts/archive/` — ignore these

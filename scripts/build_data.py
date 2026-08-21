@@ -364,26 +364,26 @@ def load_canonical_corpus(manifest_path: Path | None = None) -> CanonicalCorpus:
     )
 
 
-def _load_grit_matrix():
-    """Load the Grit bubble-chart points — if, and only if, the lab is publishable.
+def _load_correctness_escape_quadrants():
+    """Load the correctness x escape bubble points — only if the lab is publishable.
 
-    ``lab_grit_matrix.py`` reads the RETIRED ``_results_summary.json``, so the
-    semantic-integrity review (P0) quarantines it: its points may not be published.
-    The rejection is *logged by name*, never silent — a website section that
-    disappears must be traceable to a lab and a stated reason.
+    Formerly ``_load_grit_matrix``. The lab behind it was renamed in phase s4
+    (``lab_grit_matrix.py`` -> ``lab_correctness_escape_quadrants.py``) because a
+    correctness x escape quadrant is NOT the formal Grit metric; ``Grit`` now means one
+    thing repo-wide and is published from ``lab_grit.py`` through ``_load_labs``.
 
-    Returns ``[]`` when the lab is quarantined or its artifact is missing. The
-    evidence page treats an empty list as "no canonical data" and renders the
-    quarantine notice instead of a chart.
+    The quadrant lab reads the RETIRED ``_results_summary.json``, so it stays quarantined
+    and this returns ``[]`` — logged by name, never silent, so a missing website section is
+    always traceable to a lab and a stated reason.
     """
-    reason = rejection_reason("lab_grit_matrix.py")
+    reason = rejection_reason("lab_correctness_escape_quadrants.py")
     if reason is not None:
         print(f"  [lab-gate] not published — {reason}")
         return []
 
     # Path comes from the manifest, not hard-coded: a quarantined lab's artifact lives in
     # experiments/results/legacy_labs/, and only the manifest knows where a lab writes.
-    entry = load_lab_manifest().get("lab_grit_matrix.py")
+    entry = load_lab_manifest().get("lab_correctness_escape_quadrants.py")
     if entry is None or not entry.output:
         return []
     grit_path = ROOT / entry.output
@@ -1562,7 +1562,7 @@ def build():
         "energy_ranking": energy_ranking,
         "strategy_distribution": corpus.strategy_distribution,
         "routing": compute_routing(entries),
-        "grit_matrix": _load_grit_matrix(),
+        "correctness_escape_quadrants": _load_correctness_escape_quadrants(),
         "sonar": _compute_sonar(entries),
         "design_parameters": {
             "beta": {
