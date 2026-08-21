@@ -1,0 +1,156 @@
+name: measurement_contribution_closure
+question: >-
+  Execute the measurement-contribution closure (docs/review/measurement_contribution_review.md —
+  external review of main at 931eeb873, claims re-verified) in batched stages with DeepSeek Pro,
+  written as INVARIANT CLOSURE, not instance fixes: every phase states the invariant, the exact
+  target shape, an exhaustive hunt for every occurrence of the pattern class, and a guard that
+  makes the class unrepresentable. The lab contracts become derived-from-computation
+  (ContributionReport), zero-as-missing is eliminated as a class across every canonical producer,
+  tombstones get terminal temporal semantics, static fallbacks are proven equal to generated
+  statistics, source/parity identities are complete, and a dedicated ADVERSARIAL HUNT phase runs
+  before the release gate — cross-comparing every canonical output against every other. Then the
+  release gate verifies and signs off.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      review: >-
+        READ docs/review/measurement_contribution_review.md FIRST — the authoritative input; every
+        claim carries file:line verification marks. P0: lab_verification_value.py:75
+        stories.get(sid, ("?", 0)) — the published artifact contains model-"?" rows (432
+        unmatched-review observations) driving a −0.154 correlation while the contract says
+        457/457/457/0. P1: lab_condition_effects.py:86,109 averages missing-cost-as-zero over all
+        cells ($1.261 vs canonical $1.401); same class in lab_story_review / lab_story_arc /
+        lab_cache_economics. P1: contracts are hand-authored and unproven against computation
+        (lab_quality_frontier declares 371 used while only 156 analyses drive results). P1:
+        evidence.html:95 static fallback says 225/215/10-waived/77 while data says 215/215/0/87;
+        "Every token, dollar, cache hit, and test is measured" prose is false under incomplete
+        coverage. P2: build_data.py:906,912 still coerces correctness_score/escape_score or 0.
+        P2: registry_index.jsonl entity 37679fe003ca has versions ['current','tombstoned'] — the
+        predecessor stays open. P2: generator_source_tree_identity hashes only 4 files; no
+        metric_source_sha256 per lab; sync --check lacks row-content hashes. P3: only the test
+        job is required on main.
+      prompt_contract: >-
+        PROMPT-STYLE CONTRACT (the lesson applied): every FIX phase must (1) state the invariant
+        the fix establishes; (2) give the exact shape of any new primitive (dataclass fields);
+        (3) hunt EXHAUSTIVELY for every occurrence of the pattern class across ALL eight canonical
+        labs + build_data + sync_data + canonical_corpus (grep the class, not the file); (4) fix
+        every occurrence; (5) add a guard test that makes the class unrepresentable (mutation-style);
+        (6) LOG every instance found and fixed by name; if any instance of the class remains, the
+        phase FAILS — deferral is not an option inside a closure phase.
+      current_state: >-
+        Public-truth closure merged at 931eeb873: singular canonical door, semantic projection +
+        global publication contract, LSP null-not-zero in the primary path, cost-coverage in the
+        primary path, explicit record scopes (contract v4), the ten invalid rows tombstoned
+        (215/215/0/87), static narrative swept, main protected (test job required). The lab layer
+        still contains the review's remaining classes (join fallback, missing-cost-as-zero,
+        hand-authored contracts, predecessor-open tombstones, incomplete identities).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) CLASS CLOSURE, not
+        instance surgery: a guard test must make each fixed class unrepresentable; the phase logs
+        every instance found and fixed; any remaining instance FAILS the phase. (3) Contracts are
+        DERIVED from computation (ContributionReport attached by compute()) — never hand-authored
+        after the fact. (4) Zero-as-missing is forbidden in every canonical producer: unavailable
+        → null + coverage. (5) Data integrity: tombstones carry terminal semantics; contaminated
+        (77) and no-measurement (10) retractions are distinct provenance classes. (6) Invariants
+        survive: Redis 6380/6379, dual Firebase, CAP frozen. (7) The adversarial hunt phase (m5)
+        is MANDATORY: it must cross-compare every canonical output pair that answers the same
+        question and either reconcile or fail. (8) PASS/FAIL checkpoint log; resumable via
+        --resume.
+      read_first: >-
+        docs/review/measurement_contribution_review.md,
+        src/agentic_dynamics/reporting/{canonical_corpus,lab_contract,lab_manifest}.py,
+        scripts/lab_*.py (all eight canonical), scripts/{build_data,sync_data,generate_manifest}.py,
+        experiments/results/registry_index.jsonl, apps/website/*.html
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/measurement-closure); each phase commits [workflow] <phase>. Continuous run;
+        resumable with --resume.
+    phases:
+      - name: m1_verification_value_v2
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: no published row may carry an unjoined observation — a review whose story is not a current, resolved story must be EXCLUDED and counted, never assigned a placeholder identity.
+          FIX: scripts/lab_verification_value.py — the join fails explicitly: `review_without_current_story += 1; continue` (never `stories.get(sid, ("?", 0))`). Also count `story_without_review` (current stories with no usable review). The contract's n_* counts must equal the joined populations (this phase hand-sets them accurately because the ContributionReport primitive lands in m3). Bump metric_definition_version verification_value/v1 -> verification_value/v2. Regenerate the artifact + data.js.
+          HUNT: grep ALL eight canonical labs + build_data for the same class — any `get(..., ("? ", 0))`, `get(..., (0, 0))`, placeholder-model, or fallback-tuple pattern in a join. Fix every occurrence.
+          GUARD: test asserting no output row has model "?"; every review contributing to a published correlation has a joined current story; contract counts reconcile with the join.
+          LOG: every instance found and fixed by name; PASS/FAIL; commit.
+      - name: m2_coverage_primitive
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: an unavailable measurement is null with zero coverage — NEVER numeric zero — and a published average never treats missing cost as $0. One shared primitive, every producer.
+          SHAPE: `@dataclass(frozen=True) class MeasurementCoverage: value: float | None; n_available: int; n_total: int; coverage: float`. Cost presence must be explicit (`cost_captured`), not inferred from `cost > 0`; every published cost average carries avg_captured_cost / total_captured_cost / cost_captured_records / total_records / cost_coverage.
+          FIX: create the shared primitive in reporting/; apply it to ALL eight canonical labs (condition_effects, story_review, story_arc, cache_economics, quality_frontier, verification_frontier, verification_value, grit) AND build_data's solution/basin/optional fields (correctness_score, code_quality_score, escape_score at :906/:912 and their class).
+          HUNT: grep the class — every `or 0`, `get(..., 0)`, `sum(costs)/len(all_cells)`, `if cost: append`, missing→0 coercion in canonical producers. Fix EVERY occurrence; list them all.
+          GUARD: a test that greps canonical producers for the zero-coercion class and fails on any occurrence; a test that a lab with n_available==0 publishes value null.
+          LOG: instances found+fixed; PASS/FAIL; commit.
+      - name: m3_contribution_report
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: a lab's contract is DERIVED from its computation — the computation returns its own contribution report and the contract attaches it. Hand-authored counts after the fact are forbidden.
+          SHAPE: `@dataclass(frozen=True) class ContributionReport: resolved: int; eligible: int; used: int; excluded: int; unused_eligible: int; exclusion_reasons: dict[str, int]; used_record_ids: tuple[str, ...]`. Pattern: `result, contribution = compute(...); attach_contract(result, contribution)`.
+          FIX: implement in reporting/lab_contract.py; refactor ALL eight canonical labs to return ContributionReport and attach it. Fix the concrete overstatements found so far (quality_frontier's 59 unused stories -> outside_analysis_population; verification_value's unmatched reviews -> review_without_current_story).
+          GUARD: for every canonical lab, a test recomputes the join and asserts contract populations equal the actual contributing populations (not just arithmetic consistency).
+          LOG: per-lab contribution reconciliation table; PASS/FAIL; commit.
+      - name: m4_temporal_identities
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: a terminal tombstone closes every earlier open version of its entity; static HTML fallbacks exactly equal generated statistics; every lab artifact carries its source identity; the sync sidecar carries content hashes.
+          FIX: (a) compaction enforces terminal tombstone semantics — when an entity has a terminal tombstone, all earlier open versions become superseded with valid_to = tombstone.valid_from (or the tombstone explicitly supersedes the prior knowledge_id). Fix entity 37679fe003ca and any peer. (b) Split tombstoned_excluded into contaminated_tombstones 77 / no_measurement_tombstones 10 / tombstones_total 87 and use those categories in data.js + evidence.html prose (the phrase "(contaminated, excluded)" must not describe retractions). (c) The static-fallback guard: parse every data-stat fallback, meta/OG text, and static corpus claim in apps/website/*.html and assert exact equality with data.js public_statistics (fail on any drift); fix "Every token, dollar, cache hit, and test is measured" -> coverage-honest wording. (d) Every lab contract gains metric_source_sha256 + metric_definition_version; the global generator_source_tree_identity covers all direct computation dependencies (a generated dependency manifest, not a hand tuple). (e) sync_data sidecar gains sessions_rows_sha256 / stories_rows_sha256 / sync_transform_sha256 / schema_sha256; --check recomputes and compares them.
+          GUARD: tests for tombstone terminal semantics, fallback equality, and sidecar hash comparison.
+          LOG: PASS/FAIL per sub-item; commit.
+      - name: m5_adversarial_hunt
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: you are the ADVERSARIAL AUDITOR, not the fixer's advocate. Your job is to find what is still wrong and either fix it (with guards) or fail the phase.
+          HUNT, cross-surface, systematically:
+          1. For every QUESTION two canonical outputs both answer (model cost, condition cost, story cost, pass/test counts, condition splits, correlation inputs), diff them numerically — any disagreement in value or denominator policy is a finding. Reconcile until zero disagreements.
+          2. For every canonical lab, recompute the join your contract claims and diff against the artifact — declared != contributed is a finding.
+          3. Grep the pattern classes fresh: zero-coercion (`or 0`, `get(..., 0)`), placeholder identities ("?", fallback tuples), missing→0 in every producer.
+          4. Static text vs public_statistics: parse every page again and diff.
+          5. Cross-check data.js's publication contract against the current manifest identity + waiver digest + normalization version.
+          6. Check every retired-figure class from all prior reviews once more.
+          Every finding: fix it (guard where a class is involved) or log a reason-bearing FAIL. A clean hunt must state each check and its evidence.
+          LOG: one line per check with result; PASS/FAIL; commit.
+      - name: m6_closure_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: release gate — coverage proof vs docs/review/measurement_contribution_review.md (every P0/P1/P2/P3 finding -> a phase -> PASS; zero orphans). Re-run: full suite, all guard suites (incl. the new class guards), compile-gate all specs, reproduce core dry-run + container core run, invariant audit (Redis, Firebase, CAP frozen). Branch protection: with gh authenticated, require the test AND repro AND packaging jobs on main (or one gate job depending on all three); else document exact steps. Write docs/review/measurement_contribution_verification.md with PASS/FAIL per check and the final verdict (canonical metric correctness + public semantic consistency signoff).
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: contributions_closed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [join_explicit, coverage_universal, contracts_derived, temporal_terminal, hunt_clean]
+metrics:
+  - {name: join_explicit, agg: mean, over: cell}
+  - {name: coverage_universal, agg: mean, over: cell}
+  - {name: contracts_derived, agg: mean, over: cell}
+  - {name: temporal_terminal, agg: mean, over: cell}
+  - {name: hunt_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, m1_verification_value_v2, m2_coverage_primitive, m3_contribution_report,
+             m4_temporal_identities, m5_adversarial_hunt, m6_closure_verify]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
