@@ -728,3 +728,34 @@ def test_real_data_js_model_sections_agree_on_avg_cost():
         if mid in nested and top[mid] != nested[mid]
     ]
     assert not disagreements, "model sections disagree on avg_cost:\n" + "\n".join(disagreements)
+
+
+def test_data_js_publication_contract_present_and_verifies():
+    """The generated data.js carries a global publication contract that verifies (P1/P2)."""
+    import json
+
+    data_js = Path(__file__).resolve().parent.parent / "apps" / "website" / "data.js"
+    if not data_js.exists():  # pragma: no cover - generated file, present in CI
+        pytest.skip("apps/website/data.js not generated")
+    text = data_js.read_text(encoding="utf-8")
+    payload = json.loads(text[text.index("{") : text.rindex("}") + 1])
+
+    contract = payload.get("publication_contract")
+    assert contract is not None, "data.js has no publication_contract"
+    for field in (
+        "registry_identity",
+        "resolved_input_identity",
+        "data_integrity_policy_version",
+        "normalization_version",
+        "waiver_digest",
+        "generator_source_tree_identity",
+    ):
+        assert contract.get(field), f"publication_contract missing {field}"
+
+    # The contract verifies against the resolver and the waiver artifact.
+    assert contract["registry_identity"] == cc.current_manifest_identity().registry_identity_sha256
+    everything = cc.load_canonical_tables(*cc.TABLES)
+    assert contract["resolved_input_identity"] == everything.resolved_input_sha256
+    assert contract["waiver_digest"] == cc.waiver_set_digest()
+    assert contract["normalization_version"] == cc.NORMALIZATION_VERSION
+    assert contract["data_integrity_policy_version"] == cc.DATA_INTEGRITY_POLICY_VERSION

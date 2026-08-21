@@ -180,31 +180,58 @@ def current_manifest_identity(manifest_path: Path | None = None) -> ManifestIden
     return manifest_identity(manifest_path=manifest_path)
 
 
-def _payload_content(payload: dict) -> dict:
-    """The *measurement* content of a resolved payload — resolver provenance removed.
+#: The data-integrity policy version (public-truth review P1/P2). Bumped when the treatment
+#: rules in ``docs/data_integrity_findings.md`` change (e.g. the no-op condition relabel), so
+#: a policy change is visible in the publication contract even when the measured bytes do not.
+DATA_INTEGRITY_POLICY_VERSION = "data-integrity/v1"
 
-    The resolver stamps each payload with underscore-prefixed provenance keys
-    (``_canonical_condition``, ``_source_path``, ``_registry``, ``_story_id``,
-    ``_experiment``). Those are derived from the registry/join, not from the payload file's
-    own bytes — and ``_source_path`` is an absolute path that would make a content hash
-    environment-dependent. The payload-content digest (review P2) therefore covers only the
-    non-underscore keys, which are exactly the measured fields that a payload-file edit
-    would change.
+#: The normalization/reducer policy version (public-truth review P1/P2). Bumped when the
+#: canonical projection of a resolved payload changes meaning — the no-op condition relabel,
+#: or the set of measured values analyses consume. Folded into ``resolved_input_identity`` so
+#: a normalization-policy change moves the hash even when every payload byte is identical.
+NORMALIZATION_VERSION = "canonical-projection/v2"
+
+#: Resolver provenance/join keys that are NOT measured content and must not enter the content
+#: projection. Excluded by name — deliberately, not by a blanket "underscore = private" rule —
+#: so a *future* derived semantic field (like ``_canonical_condition``) is included unless it
+#: is added here. ``_source_path`` is an absolute path (environment-dependent); ``_registry``
+#: is the provenance block already folded into the resolved identity; ``_story_id`` is the
+#: review/analysis join key; ``_experiment`` is the finding's parent-file provenance.
+_PROVENANCE_KEYS = frozenset({"_source_path", "_registry", "_story_id", "_experiment"})
+
+
+def _payload_projection(payload: dict) -> dict:
+    """The canonical semantic projection of a resolved payload (public-truth P1/P2).
+
+    Includes the measured values analyses consume (everything that is NOT named in
+    :data:`_PROVENANCE_KEYS`) **and** the derived semantic field ``_canonical_condition`` —
+    the no-op relabel, exactly the field a normalization-policy change mutates. The pre-p5
+    filter ("everything except underscore keys") dropped ``_canonical_condition``, so a
+    normalization change left ``resolved_input_sha256`` unchanged while the effective
+    analysis population changed; this projection closes that gap.
     """
-    return {k: v for k, v in payload.items() if not str(k).startswith("_")}
+    return {k: v for k, v in payload.items() if k not in _PROVENANCE_KEYS}
 
 
-def resolved_input_identity(tables: CanonicalTables) -> str:
-    """``sha256`` over the stable sorted ``(table, entity_id, knowledge_id, payload_digest)``
-    sequence (review P2) — attests to the exact payload *content*, not just the selection.
+def resolved_input_identity(tables: CanonicalTables, *, waiver_digest: str | None = None) -> str:
+    """``sha256`` over the canonical semantic projection (public-truth review P1/P2).
 
-    The registry-identity hash says *which* records a lab consumed; it cannot tell that a
-    payload file's bytes changed underneath a stable registry. This digest covers each
-    resolved payload's measured content (provenance keys excluded), keyed by its canonical
-    identity, sorted so the hash is order-independent. ``build_contract`` embeds it as
-    ``resolved_input_sha256``; ``validate_contract`` recomputes it the same way and rejects
-    a drift.
+    The projection is deliberately defined, not "everything except underscore keys". It
+    folds in three kinds of thing:
+
+    * per resolved payload, keyed by its resolved identity ``(table, entity_id,
+      knowledge_id)``: the content digest of :func:`_payload_projection` — the measured
+      values **plus** the canonical condition;
+    * the normalization/reducer policy version (:data:`NORMALIZATION_VERSION`);
+    * the waiver-set digest (:func:`waiver_set_digest`).
+
+    So the hash moves when (a) a payload's measured bytes change, (b) the no-op relabel
+    reclassifies a cell (``_canonical_condition``), (c) the normalization policy is bumped,
+    or (d) the waiver set changes — but NOT when only environment-dependent provenance
+    (``_source_path``) changes. ``build_contract`` embeds it as ``resolved_input_sha256``;
+    ``validate_contract`` recomputes it the same way and rejects a drift.
     """
+    digest = waiver_digest if waiver_digest is not None else waiver_set_digest()
     rows: list[tuple] = []
     for table in tables.tables:
         attr = TABLE_ATTRIBUTES.get(table)
@@ -212,7 +239,9 @@ def resolved_input_identity(tables: CanonicalTables) -> str:
             continue
         for payload in getattr(tables, attr):
             reg = payload.get("_registry") or {}
-            content_digest = hashlib.sha256(_canonical_json(_payload_content(payload))).hexdigest()
+            content_digest = hashlib.sha256(
+                _canonical_json(_payload_projection(payload))
+            ).hexdigest()
             rows.append(
                 (
                     table,
@@ -222,7 +251,12 @@ def resolved_input_identity(tables: CanonicalTables) -> str:
                 )
             )
     rows.sort()
-    return hashlib.sha256(_canonical_json(rows)).hexdigest()
+    projection = {
+        "normalization_version": NORMALIZATION_VERSION,
+        "waiver_digest": digest,
+        "payloads": rows,
+    }
+    return hashlib.sha256(_canonical_json(projection)).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -385,6 +419,33 @@ def load_waivers(path: Path | None = None) -> list[Waiver]:
             )
         )
     return waivers
+
+
+def waiver_set_digest(waivers: list[Waiver] | None = None) -> str:
+    """``sha256`` of the canonical waiver set (public-truth review P1/P2).
+
+    A waiver-set change must move ``resolved_input_identity``: the effective analysis
+    population changes with the waiver set even when every payload is byte-identical. The
+    digest covers each hard-bound waiver's full identity in canonical sorted order, so an
+    edit to a reason, a reviewer, an expiry, or the set itself all change it.
+    """
+    waivers = load_waivers() if waivers is None else waivers
+    rows = [
+        (
+            w.table,
+            w.logical_locator,
+            w.issue_kind,
+            w.entity_id,
+            w.knowledge_id,
+            w.source_uri,
+            w.reason,
+            w.review_by,
+            w.expiry,
+        )
+        for w in waivers
+    ]
+    rows.sort()
+    return hashlib.sha256(_canonical_json(rows)).hexdigest()
 
 
 def _waiver_key(table: str, logical_locator: str, issue_kind: str) -> tuple[str, str, str]:

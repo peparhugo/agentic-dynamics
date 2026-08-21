@@ -17,6 +17,7 @@ Usage:
     python scripts/build_data.py --dry-run    # Print what would be written
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -44,7 +45,9 @@ from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
 from agentic_dynamics.control.routing import compute_routing  # noqa: E402
 from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS  # noqa: E402
 from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
+    DATA_INTEGRITY_POLICY_VERSION,
     DEFAULT_WAIVER_PATH,
+    NORMALIZATION_VERSION,
     current_manifest_identity,
     load_canonical_tables,
     load_waivers,
@@ -52,6 +55,7 @@ from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
     registry_rows,
     unwaivered_issues,
     validate_waivers,
+    waiver_set_digest,
 )
 from agentic_dynamics.reporting.lab_contract import expected_tables, validate_contract  # noqa: E402
 from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
@@ -1462,6 +1466,31 @@ def _assert_resolution_complete(tables, waiver_path=None) -> list[dict]:
     return waived
 
 
+#: The source files whose code produces ``data.js`` — the *generator source tree*
+#: (public-truth review P1/P2). Their contents are hashed so the publication contract
+#: records *which code* produced the numbers, not just *which data*: a generator change
+#: (a new reducer, a projection change) is visible even when the input is unchanged.
+GENERATOR_SOURCES = (
+    ROOT / "scripts" / "build_data.py",
+    ROOT / "src" / "agentic_dynamics" / "reporting" / "canonical_corpus.py",
+    ROOT / "src" / "agentic_dynamics" / "reporting" / "lab_contract.py",
+    ROOT / "src" / "agentic_dynamics" / "reporting" / "lab_manifest.py",
+)
+
+
+def generator_source_tree_identity() -> str:
+    """``sha256`` over the generator source files (name + bytes, in a fixed order).
+
+    Deterministic and environment-independent: only the source file *contents* enter the
+    digest, never their absolute paths.
+    """
+    h = hashlib.sha256()
+    for path in GENERATOR_SOURCES:
+        h.update(path.name.encode("utf-8"))
+        h.update(path.read_bytes())
+    return h.hexdigest()
+
+
 def build():
     print("Building data.js...")
 
@@ -1678,6 +1707,18 @@ def build():
             "ambiguous": tables.resolution.ambiguous,
             "duplicate": tables.resolution.duplicate,
             "waivers": waivers,
+        },
+        # ── Global publication contract (public-truth review P1/P2) — the six identities
+        # ── that attest to *what* produced this dataset and *how*. They are the dataset's
+        # ── lineage: which registry selection, which resolved payloads, which policy/normal-
+        # ── ization versions, which waiver set, and which generator source tree.
+        "publication_contract": {
+            "registry_identity": tables.identity.registry_identity_sha256,
+            "resolved_input_identity": tables.resolved_input_sha256,
+            "data_integrity_policy_version": DATA_INTEGRITY_POLICY_VERSION,
+            "normalization_version": NORMALIZATION_VERSION,
+            "waiver_digest": waiver_set_digest(),
+            "generator_source_tree_identity": generator_source_tree_identity(),
         },
         # ── Public statistics (review "smaller"): the ONE artifact README prose cites, so a
         # ── headline figure can never drift from the published dataset again. README.md's

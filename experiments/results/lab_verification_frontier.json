@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_verification_frontier",
-  "generated_at": "2026-08-21T23:04:29.940076",
+  "generated_at": "2026-08-21T23:18:18.648952",
   "summary": {
     "models": 7,
     "stories": 215,
@@ -80,7 +80,7 @@
     "lab": "lab_verification_frontier.py",
     "input_dataset_id": "canonical_registry/story",
     "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
-    "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
+    "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
     "registry_version": "data-manifest/1.0+701rows",
     "metric_definition_version": "verification_frontier/v1",
     "n_resolved_records": 215,
@@ -95,6 +95,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v4",
-    "generated_at": "2026-08-21T21:04:29.940320+00:00"
+    "generated_at": "2026-08-21T21:18:18.649199+00:00"
   }
 }

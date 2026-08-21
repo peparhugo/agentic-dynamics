@@ -753,3 +753,71 @@ def _docstring_ids(tree: ast.AST) -> set[int]:
             ):
                 out.add(id(first.value))
     return out
+
+
+def test_resolved_input_identity_tracks_canonical_condition(tmp_path, monkeypatch):
+    """A normalization-policy change (the no-op relabel) moves the hash (P1/P2).
+
+    ``_canonical_condition`` is a derived semantic field: the pre-p5 projection excluded
+    it (it is underscore-prefixed), so a relabel reclassification left the hash unchanged.
+    The projection now includes it, so changing the relabel changes the hash.
+    """
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    payload_path = stories_dir / "note_service_aaa.json"
+    manifest_path = tmp_path / "data_manifest.json"
+    manifest_path.write_text(json.dumps(_fake_manifest([_row("aaa")])))
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    # A pre-fix no-op: early_degrade with no instrumented verdict → relabeled clean.
+    payload_path.write_text(json.dumps({
+        "story_id": "aaa", "model": "m", "summary": {"total_cost": 1.0},
+        "perturbation_condition": "early_degrade", "test_executed_success": None,
+    }))
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    assert tables.stories[0]["_canonical_condition"] == "clean"
+    before = tables.resolved_input_sha256
+
+    # The relabel reclassifies the cell (as if the normalization policy changed).
+    tables.stories[0]["_canonical_condition"] = "early_degrade"
+    assert tables.resolved_input_sha256 != before
+
+
+def test_resolved_input_identity_moves_with_the_waiver_set(tmp_path, monkeypatch):
+    """A waiver-set change moves the hash even with byte-identical payloads (P1/P2)."""
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    payload_path = stories_dir / "note_service_aaa.json"
+    manifest_path = tmp_path / "data_manifest.json"
+    manifest_path.write_text(json.dumps(_fake_manifest([_row("aaa")])))
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+    payload_path.write_text(
+        json.dumps({"story_id": "aaa", "model": "m", "summary": {"total_cost": 1.0}})
+    )
+
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    before = tables.resolved_input_sha256  # empty waiver set
+
+    one_waiver = cc.Waiver(
+        table="story", logical_locator="aaa", issue_kind="missing",
+        entity_id=None, knowledge_id=None, source_uri="story:aaa",
+        reason="r", review_by="operator", expiry="2999-01-01T00:00:00+00:00",
+    )
+    monkeypatch.setattr(cc, "load_waivers", lambda *a, **k: [one_waiver])
+    after = tables.resolved_input_sha256
+    assert after != before
+
+
+def test_waiver_set_digest_is_a_function_of_the_waivers():
+    """The waiver-set digest is a pure function of the canonical waiver list (P1/P2)."""
+    empty = cc.waiver_set_digest([])
+    one = cc.waiver_set_digest([
+        cc.Waiver(
+            table="story", logical_locator="aaa", issue_kind="missing",
+            entity_id="e", knowledge_id="k", source_uri="story:aaa",
+            reason="r", review_by="operator", expiry="2999-01-01T00:00:00+00:00",
+        )
+    ])
+    assert empty != one
+    # Deterministic: same list → same digest.
+    assert cc.waiver_set_digest([]) == empty
