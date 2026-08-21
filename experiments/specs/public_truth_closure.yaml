@@ -1,0 +1,141 @@
+name: public_truth_closure
+question: >-
+  Execute the public-truth closure patch (docs/review/public_truth_review.md — external review of
+  main at 400673f84, claims re-verified) in small incremental stages with DeepSeek Pro: sweep the
+  static public narrative so every published figure and treatment description derives from the
+  canonical public_statistics, replace zero-as-missing in the primary analysis and cost
+  aggregation (null + coverage, one denominator policy), make lab record scopes explicit and
+  contribution-aware, tombstone the ten invalid current records with hard-bound waivers, extend
+  the resolved-input hash to a canonical semantic projection and give data.js a global publication
+  contract, finish the README single-source + sync_data parity + manifest classification, and
+  verify. No CAP implementation (the review's extraction directive is a note for the future CAP
+  spec, recorded in the context). Public-output consistency becomes enforced, not curated.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      review: >-
+        READ docs/review/public_truth_review.md FIRST — the authoritative input. P0 static
+        narrative contradiction (evidence.html/index.html meta+OG tags, h1 'What 772 Agentic
+        Sessions Reveal', prose $219.5112, footer 156/772, stale 88.7% 1572/1772 claim, bad_seed
+        as live arm). P0/P1 analysis publishes unavailable LSP as 0.0 (every analysis.models row
+        lsp_available 0 / lsp_errors_per_cell 0.0) while evidence page claims live LSP. P1 two
+        cost denominators (haiku stories.models $1.359/24 vs top-level $1.631/20 captured). P1
+        record-scope defaults (condition_effects 457/457/457/0 while only 155 reviews joined).
+        P1 waivers broad-keyed; ten current rows should be tombstoned. P1/P2 hash excludes
+        _canonical_condition (canonical_corpus.py:186-191). Smaller: README By-the-Numbers not
+        fully from public_statistics; sync_data --check superficial + no atomic replace; manifest
+        mixes historical artifacts; main unprotected.
+      cap_note: >-
+        DO NOT implement CAP here. But record (in this spec's produced docs and in the future CAP
+        spec's context) the review's extraction directive: ManifestIdentity, ResolvedInputIdentity,
+        ResolutionIssue, ResolutionReport, waiver policy, semantic contract, record-scope
+        accounting are early forms of canonical-fact identity / fact resolution state / provenance
+        chain / scope / unknown-conflict status / policy exception — CAP I0-I4 must generalize
+        these into core/contracts.py and the control boundary rather than duplicate them.
+      current_state: >-
+        Canonical-publication closure merged at 400673f84: singular canonical door (clean 135 /
+        early_degrade 80, zero bad_seed in data.js), fail-closed resolution (225/215/10 waivered),
+        semantic lab contracts + dual hashes, scoped record counts, scoped test-count fields,
+        reconciled README headline figures + home Finding 4, container core run verified. The
+        static public surface (metadata, OG tags, headlines, prose, footers) was only partially
+        swept. CAP frozen with reserved homes. main unprotected on GitHub.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) Zero-as-missing is
+        forbidden in publication: an unmeasured optional signal publishes null + coverage, never
+        0.0; cost averages share ONE denominator policy everywhere. (3) Data integrity: the
+        relabel/tombstone policy is absolute; the ten invalid current story rows get canonical
+        tombstone/retraction events (never deleted silently); waivers are temporary, hard-bound
+        (table, locator, issue_kind, entity_id, knowledge_id, source_uri, reason, review_by,
+        expiry) and rejected when stale/duplicate/unmatched. (4) The publication contract is
+        global: data.js carries registry identity, resolved-input identity, policy version,
+        normalization version, waiver digest, generator source-tree identity. (5) Guards may only
+        strengthen; the static-narrative guard must scan apps/website/*.html for retired figures
+        and retired live-treatment terms. (6) Invariants survive: Redis 6380/6379, dual Firebase,
+        CAP frozen. (7) Branch protection is an operator action: if gh is authenticated, enable
+        required status checks; otherwise document the exact steps in the verification doc.
+        (8) PASS/FAIL checkpoint log; resumable via --resume.
+      read_first: >-
+        docs/review/public_truth_review.md, apps/website/*.html, scripts/build_data.py,
+        src/agentic_dynamics/reporting/{canonical_corpus,lab_contract,lab_manifest}.py,
+        experiments/waivers/unresolved_payloads.json, scripts/{generate_manifest,sync_data}.py,
+        README.md
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/public-truth); each phase commits [workflow] <phase>. Continuous run; resumable
+        with --resume.
+    phases:
+      - name: p1_static_narrative
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          FIX: P0 — sweep EVERY static public statement in apps/website/*.html that contradicts the canonical dataset: page metadata, OG/social tags, headlines ('What 772 Agentic Sessions Reveal'), prose ($219.5112, 156 stories, 772 sessions, 88.7% 1572/1772), footers, and any bad_seed-as-live-arm treatment description. Retired figures are replaced by generated public_statistics values or scoped labels; retired treatment arms are described historically or removed. Add tests/test_static_narrative_guard.py scanning all .html for the retired figure set (156/772/219.51/1,097/288.69/1572|1772/88.7%) and retired live-treatment terms (bad_seed presented as an active arm) — with a narrow historical-framing allowlist. Regenerate data.js only if its public_statistics block needs extension for the figures the pages cite.
+          LOG: PASS/FAIL; commit.
+      - name: p2_null_not_zero
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          FIX: P0/P1 + P1 denominators — the primary analysis aggregation publishes {value, n_available, n_total, coverage} per optional measurement; averages use available values only; n_available==0 -> value null. Fix the LSP fields (and any other value-or-0 default) so data.js shows lsp_errors_per_cell: null where no language server ran; the evidence page drops live-LSP/cleanest-LSP claims until coverage>0 (or states coverage=0 explicitly). Unify cost denominators: every model section publishes avg_captured_cost / cost_captured_cells / total_cells / cost_coverage; no section averages over missing-cost-as-zero. Tests: n_available=0 -> null; two sections never disagree on the same model's average cost.
+          LOG: PASS/FAIL; commit.
+      - name: p3_record_scopes
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P1 — remove the permissive record-scope defaults (eligible=resolved, used=eligible). Every publication-eligible lab declares explicit n_resolved_records / n_eligible_records / n_used_records / n_excluded_records / n_unused_eligible_records + reason counts (review_without_current_story, story_without_review, missing_required_field, outside_analysis_population). Fix lab_condition_effects: its rows use 215 stories + 155 joined reviews — the contract must say so. Update lab_contract validation + tests so they reconcile counts against actual contribution counts in the output, not just verify arithmetic.
+          LOG: PASS/FAIL; commit.
+      - name: p4_tombstones_waivers
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P1 — append canonical tombstone/retraction events for the ten invalid current story rows (lifecycle_state tombstoned, reason: no usable measurement payload — never silently deleted), and harden the waiver mechanism: bind each waiver to table, logical_locator, issue_kind, entity_id, knowledge_id, source_uri, reason, review_by, expiry; reject stale/duplicate/unmatched waivers at validation time. Keep the fail-closed path (an unresolved current row without tombstone AND without waiver still aborts publication). Update the resolution tests to cover tombstone-driven resolution.
+          LOG: PASS/FAIL; commit.
+      - name: p5_hash_semantics
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: P1/P2 — extend resolved_input_sha256 to a canonical semantic projection: canonical condition, resolved identity, the measured values analyses consume, normalization/reducer version, waiver-set digest (deliberately defined, not 'all private keys'). data.js gains a global publication contract: registry_identity, resolved_input_identity, data_integrity_policy_version, normalization_version, waiver_digest, generator_source_tree_identity. Tests: changing _canonical_condition or the waiver set changes the hash; changing an unrelated payload field changes it too; the global contract is present and verifies.
+          LOG: PASS/FAIL; commit.
+      - name: p6_manifest_sync_readme
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: smaller — extend public_statistics to cover EVERY headline figure the README By-the-Numbers block displays (provider count, spec counts, operators, etc.) and make the README block generated/guarded wholesale (not just the three corrected figures). sync_data --check becomes a real parity check (rows + identities vs the current resolver output) and writes outputs atomically with a source-identity sidecar (an empty canonical source never leaves stale Parquet in place). generate_manifest.py classifies files as canonical_inputs / canonical_outputs / historical_artifacts (the retired summary is historical, not a first-class current entry).
+          LOG: PASS/FAIL; commit.
+      - name: p7_truth_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: release gate — coverage proof vs docs/review/public_truth_review.md (every P0/P1/P2/smaller finding -> a phase -> PASS; zero orphans; the CAP extraction directive recorded for the future CAP spec). Full suite green; all guard suites green (incl. the new static-narrative guard); compile-gate all specs; reproduce core dry-run + container core run produce data.js; invariant audit (Redis, Firebase, CAP frozen). Branch protection: if 'gh' is authenticated, enable required status checks on main's test job; otherwise document exact steps. Write docs/review/public_truth_verification.md with PASS/FAIL per check and the final verdict (public semantic consistency signoff).
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: public_truth_closed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [narrative_canonical, null_not_zero, scopes_explicit, waivers_tombstoned, contract_global]
+metrics:
+  - {name: narrative_canonical, agg: mean, over: cell}
+  - {name: null_not_zero, agg: mean, over: cell}
+  - {name: scopes_explicit, agg: mean, over: cell}
+  - {name: waivers_tombstoned, agg: mean, over: cell}
+  - {name: contract_global, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, p1_static_narrative, p2_null_not_zero, p3_record_scopes,
+             p4_tombstones_waivers, p5_hash_semantics, p6_manifest_sync_readme, p7_truth_verify]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
