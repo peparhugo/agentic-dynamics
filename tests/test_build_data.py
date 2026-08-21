@@ -6,9 +6,9 @@ with ``source_type in {story, finding}``, join measurement payloads) and the two
 rules the site must obey: tombstoned records are excluded, and a no-op story condition
 is relabeled ``clean``. A missing manifest degrades to an empty corpus with a warning.
 
-Every test builds a fixture manifest in ``tmp_path`` and monkeypatches
-``build_data.MANIFEST_PATH``/``build_data.STORIES_DIR``/``build_data.ROOT`` — never the
-real ``experiments/data_manifest.json``.
+Every test builds a fixture manifest in ``tmp_path`` and monkeypatches the resolver's
+paths (``cc.STORIES_DIR``/``cc.PROJECT_ROOT``) — never the real
+``experiments/data_manifest.json``.
 """
 
 from __future__ import annotations
@@ -22,6 +22,8 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import build_data  # noqa: E402
+
+from agentic_dynamics.reporting import canonical_corpus as cc  # noqa: E402
 
 
 def _row(**overrides) -> dict:
@@ -106,7 +108,7 @@ def test_tombstoned_story_records_are_excluded(tmp_path, monkeypatch):
              logical_locator="bad", source_uri="story:bad",
              lifecycle_state="tombstoned", reason="contaminated: ran as clean (P0-7)"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -140,7 +142,7 @@ def test_tombstoned_finding_records_are_excluded(tmp_path, monkeypatch):
              source_uri="file://experiments/results/task_manager_deepseek-v4-pro.json",
              lifecycle_state="tombstoned", reason="contaminated"),
     ])
-    monkeypatch.setattr(build_data, "ROOT", tmp_path)
+    monkeypatch.setattr(cc, "PROJECT_ROOT", tmp_path)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -165,7 +167,7 @@ def test_noop_story_condition_is_relabeled_clean(tmp_path, monkeypatch):
     _write_manifest(manifest_path, [
         _row(logical_locator="noop", source_uri="story:noop"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -184,7 +186,7 @@ def test_instrumented_story_keeps_its_condition(tmp_path, monkeypatch):
     _write_manifest(manifest_path, [
         _row(logical_locator="real", source_uri="story:real"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -202,7 +204,7 @@ def test_genuinely_clean_story_is_untouched(tmp_path, monkeypatch):
     _write_manifest(manifest_path, [
         _row(logical_locator="clean", source_uri="story:clean"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
     assert corpus.stories[0]["_canonical_condition"] == "clean"
@@ -241,7 +243,7 @@ def test_finding_row_joins_to_its_run(tmp_path, monkeypatch):
              logical_locator="exp_jgikdggu",
              source_uri="file://experiments/results/task_manager_deepseek-v4-pro.json"),
     ])
-    monkeypatch.setattr(build_data, "ROOT", tmp_path)
+    monkeypatch.setattr(cc, "PROJECT_ROOT", tmp_path)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -299,7 +301,7 @@ def test_missing_payload_resolves_to_nothing(tmp_path, monkeypatch):
     _write_manifest(manifest_path, [
         _row(logical_locator="orphan", source_uri="story:orphan"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 

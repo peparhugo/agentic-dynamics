@@ -204,6 +204,13 @@ def effective_story_condition(payload: dict) -> str:
     condition = str(payload.get("perturbation_condition") or "")
     if condition in NOOP_CONDITIONS and not isinstance(payload.get("test_executed_success"), bool):
         return "clean"
+    # An absent/empty label (the pre-fix cells whose filenames never carried a
+    # condition) is also "no perturbation applied" — fold it into ``clean`` so every
+    # ``_canonical_condition`` is a real, publication-legal condition name rather than an
+    # empty string that a consumer would have to re-normalize (``lab_condition_effects.py``
+    # previously had to do ``or "clean"`` itself, which is how the split silently drifted).
+    if not condition:
+        return "clean"
     return condition
 
 

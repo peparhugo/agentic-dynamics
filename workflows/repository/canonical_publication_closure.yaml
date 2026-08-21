@@ -10,6 +10,15 @@ question: >-
   with the canonical dataset, and verify. No CAP implementation. The publication boundary becomes
   truly singular: one canonical door, one lineage to data.js.
 version: "0.1"
+# Artifact identity (refactor-repair P1-3): a source-modifying work order (each phase edits
+# src/, scripts/, tests/ and apps/website/), so it is a *workflow*, not an experiment.
+# One-shot repository development, hence non-repeatable.
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

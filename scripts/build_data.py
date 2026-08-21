@@ -24,6 +24,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 try:
@@ -34,12 +35,9 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 INVENTORY_PATH = ROOT / "experiments" / "inventory.json"
 MANIFEST_PATH = ROOT / "experiments" / "data_manifest.json"
 RESULTS_DIR = ROOT / "experiments" / "results"
-STORIES_DIR = RESULTS_DIR / "stories"
 REPORTS_DIR = RESULTS_DIR / "reports"
 DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 OUTPUT_PATH = ROOT / "apps" / "website" / "data.js"
-
-DATA_DIR = ROOT / "experiments" / "data"
 
 from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
 
@@ -47,6 +45,9 @@ from agentic_dynamics.control.routing import compute_routing  # noqa: E402
 from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS  # noqa: E402
 from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
     current_manifest_identity,
+    load_canonical_tables,
+    read_manifest,
+    registry_rows,
 )
 from agentic_dynamics.reporting.lab_contract import validate_contract  # noqa: E402
 from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
@@ -57,15 +58,9 @@ from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
 
 #: The registry ``source_type`` values the site consumes as measurement corpus.
 #: ``finding`` = the clean single-task perturbation cells (replacing the retired
-#: summary); ``story`` = the multi-session story cells. ``review``/``meta_session``
-#: and the other source types are not build_data inputs today.
+#: summary); ``story`` = the multi-session story cells. Resolved once, through the
+#: canonical resolver (``load_canonical_tables``) — the single publication door.
 CANONICAL_SOURCE_TYPES = frozenset({"story", "finding"})
-
-#: The perturbation-condition labels that were no-ops in the pre-fix corpus
-#: (``docs/data_integrity_findings.md`` treatment rule 1). Mirrors
-#: ``instrument.story_ingestion.NOOP_CONDITIONS`` — duplicated here (not imported)
-#: so build_data keeps a light import surface (no chroma/neo4j/retrieval stack).
-NOOP_CONDITIONS = frozenset({"early_degrade", "bad_seed"})
 
 
 def _fmt_usd(v):
@@ -109,71 +104,6 @@ class CanonicalCorpus:
     story_count: int = 0
     finding_count: int = 0
     tombstoned_count: int = 0
-
-
-def _effective_story_condition(payload: dict) -> str:
-    """Return a story's condition with the no-op relabel rule applied.
-
-    ``docs/data_integrity_findings.md`` treatment rule 1 (mirrored from
-    ``instrument.story_ingestion._effective_condition``): a story whose
-    ``perturbation_condition`` is ``early_degrade``/``bad_seed`` AND which lacks an
-    instrumented verdict (``test_executed_success`` is not a bool — the pre-fix cells
-    never ran the independent test runner) is a no-op, relabeled ``clean``. Its cost +
-    code-quality measurements remain valid; only the perturbation label is corrected.
-    """
-    condition = str(payload.get("perturbation_condition") or "")
-    if condition in NOOP_CONDITIONS and not isinstance(payload.get("test_executed_success"), bool):
-        return "clean"
-    return condition
-
-
-def _resolve_file_uri(source_uri: str) -> Path | None:
-    """Resolve a ``file://`` registry ``source_uri`` to a repo-root-relative path.
-
-    Registry ``finding`` rows carry ``file://experiments/results/…`` URIs (the
-    ``knowledge_ingestion.SOURCE_URI`` contract). Returns ``None`` for any non-file
-    URI (e.g. ``story:<id>``) so the caller can fall back to the story resolver.
-    """
-    if not source_uri or not source_uri.startswith("file://"):
-        return None
-    return ROOT / source_uri[len("file://") :]
-
-
-def _find_story_file(story_id: str) -> Path | None:
-    """Find the ``stories/*.json`` payload for a story id (the filename's last segment).
-
-    Story result filenames end in ``_<story_id>.json`` (``story.save_story_result``);
-    the registry's ``logical_locator`` for a ``story`` row *is* that ``story_id``. The
-    payload's own ``story_id`` field equals it, so this glob is the file→payload join.
-    """
-    if not story_id:
-        return None
-    matches = sorted(STORIES_DIR.glob(f"*_{story_id}.json"))
-    return matches[0] if matches else None
-
-
-def _resolve_story_payload(row: dict) -> dict | None:
-    """Join one current ``story`` registry row to its payload, relabeling the condition.
-
-    Returns the payload dict with a ``_canonical_condition`` key (the no-op-relabeled
-    condition) and a minimal ``_registry`` provenance stub. Returns ``None`` when the
-    payload file is missing or unreadable — a row whose measurement file can no longer
-    be found contributes nothing rather than a fabricated zero.
-    """
-    story_id = str(row.get("logical_locator") or "")
-    path = _find_story_file(story_id)
-    if path is None:
-        return None
-    try:
-        payload = json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
-        return None
-    payload["_canonical_condition"] = _effective_story_condition(payload)
-    payload["_registry"] = {
-        "source_uri": row.get("source_uri"),
-        "lifecycle_state": row.get("lifecycle_state"),
-    }
-    return payload
 
 
 def _finding_entry_from_run(experiment: str, run: dict, locator: str) -> dict:
@@ -231,27 +161,19 @@ def _finding_entry_from_run(experiment: str, run: dict, locator: str) -> dict:
     }
 
 
-def _resolve_finding_entry(row: dict) -> dict | None:
-    """Join one current ``finding`` registry row to its run inside the payload file.
+def _finding_entry_from_resolved(run: dict) -> dict:
+    """Map one resolver-flattened ``finding`` run into a summary-shaped entry dict.
 
-    The registry row points at the aggregate file via ``source_uri`` and names the
-    specific cell via ``logical_locator`` (== ``basename(run["workdir"])``). Returns the
-    mapped entry, or ``None`` when the file/run cannot be resolved.
+    ``canonical_corpus.resolve_findings`` already joined each current registry row to its
+    run and stamped ``_experiment`` + ``_registry`` onto a copy. This translates that
+    resolved run into the retired summary's field vocabulary (via
+    :func:`_finding_entry_from_run`), deriving the worktree locator from the run's own
+    ``workdir`` rather than re-walking the payload file.
     """
-    path = _resolve_file_uri(row.get("source_uri") or "")
-    locator = str(row.get("logical_locator") or "")
-    if path is None or not path.exists() or not locator:
-        return None
-    try:
-        payload = json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
-        return None
-    experiment = payload.get("experiment", "")
-    for run in payload.get("runs") or []:
-        workdir = str(run.get("workdir") or "")
-        if workdir.rsplit("/", 1)[-1] == locator:
-            return _finding_entry_from_run(experiment, run, locator)
-    return None
+    experiment = str(run.get("_experiment") or "")
+    workdir = str(run.get("workdir") or "")
+    locator = workdir.rsplit("/", 1)[-1]
+    return _finding_entry_from_run(experiment, run, locator)
 
 
 def _compute_by_operator_model(entries: list) -> dict:
@@ -303,24 +225,26 @@ def _compute_strategy_distribution(entries: list) -> dict:
     return dict(dist)
 
 
-def load_canonical_corpus(manifest_path: Path | None = None) -> CanonicalCorpus:
-    """Load the canonical measurement corpus from the registry + its payload files.
+def load_canonical_corpus(
+    manifest_path: Path | None = None,
+    tables: Any = None,
+) -> CanonicalCorpus:
+    """Load the canonical measurement corpus through the registry resolver.
 
-    This is the registry-backed replacement for the retired summary loader. Reads the
-    manifest's ``registry`` array (via
-    ``scripts.registry.load_registry``), keeps only ``lifecycle_state == "current"`` rows
-    with ``source_type in {story, finding}``, and joins each row to its measurement
-    payload. Tombstoned rows (the 77 contaminated ``early_degrade`` cells) are counted
-    for reporting but never contribute a measurement. A missing/unreadable manifest
-    degrades to an empty corpus with a warning — never a hard failure (mirroring
-    ``registry.load_registry``'s file-fallback posture).
+    This is the single publication door: ``canonical_corpus.load_canonical_tables``
+    resolves the current ``story``/``finding`` rows (lifecycle-aware, condition-corrected)
+    and ``build_data`` maps the finding runs into the summary-shaped entry vocabulary its
+    aggregators speak. Tombstoned rows are counted for reporting but never contribute a
+    measurement. A missing/unreadable manifest degrades to an empty corpus with a warning
+    — never a hard failure (mirroring the resolver's file-fallback posture).
+
+    ``tables`` is the already-resolved :class:`CanonicalTables` when :func:`build` has
+    resolved the full four-table input itself — pass it to avoid a second resolution pass.
     """
-    # Local import keeps the module import surface light (registry.py is a sibling
-    # script; it has no chroma/neo4j/redis dependency).
-    from registry import load_registry  # noqa: E402
-
     path = Path(manifest_path) if manifest_path is not None else MANIFEST_PATH
-    rows = load_registry(path)
+    if tables is None:
+        tables = load_canonical_tables("story", "finding", manifest_path=path)
+    rows = registry_rows(read_manifest(path))
     if not rows:
         print(
             f"WARNING: canonical registry empty or missing at {path} — "
@@ -328,39 +252,30 @@ def load_canonical_corpus(manifest_path: Path | None = None) -> CanonicalCorpus:
             file=sys.stderr,
         )
 
-    current = [
-        r
-        for r in rows
-        if r.get("lifecycle_state") == "current" and r.get("source_type") in CANONICAL_SOURCE_TYPES
-    ]
-    tombstoned = [
-        r
-        for r in rows
-        if r.get("lifecycle_state") == "tombstoned"
-        and r.get("source_type") in CANONICAL_SOURCE_TYPES
-    ]
-
-    entries: list = []
-    stories: list = []
-    for r in current:
-        source_type = r.get("source_type")
-        if source_type == "finding":
-            entry = _resolve_finding_entry(r)
-            if entry is not None:
-                entries.append(entry)
-        elif source_type == "story":
-            payload = _resolve_story_payload(r)
-            if payload is not None:
-                stories.append(payload)
+    entries = [_finding_entry_from_resolved(run) for run in tables.findings]
+    stories = tables.stories
 
     return CanonicalCorpus(
         entries=entries,
         stories=stories,
         by_operator_model=_compute_by_operator_model(entries),
         strategy_distribution=_compute_strategy_distribution(entries),
-        story_count=sum(1 for r in current if r.get("source_type") == "story"),
-        finding_count=sum(1 for r in current if r.get("source_type") == "finding"),
-        tombstoned_count=len(tombstoned),
+        story_count=sum(
+            1
+            for r in rows
+            if r.get("lifecycle_state") == "current" and r.get("source_type") == "story"
+        ),
+        finding_count=sum(
+            1
+            for r in rows
+            if r.get("lifecycle_state") == "current" and r.get("source_type") == "finding"
+        ),
+        tombstoned_count=sum(
+            1
+            for r in rows
+            if r.get("lifecycle_state") == "tombstoned"
+            and r.get("source_type") in CANONICAL_SOURCE_TYPES
+        ),
     )
 
 
@@ -765,46 +680,32 @@ def compute_derived(models, inventory, report_count):
     }
 
 
-def _load_review_data() -> dict:
-    """Aggregate the review-agent corpus into per-model quality metrics.
+def _load_review_data(reviews: list[dict], stories: list[dict]) -> dict:
+    """Aggregate the canonical review corpus into per-model quality metrics.
 
-    The review agent (DeepSeek Flash) reviews every commit and every story.
-    Returns per-reviewed-model: coherence, architectural_fit, convention
-    adherence, better/worse distribution, and top compounding-issue themes.
+    Consumes the resolver's ``tables.reviews`` (already filtered to current review rows
+    and stamped with ``_story_id``) and ``tables.stories`` (for the story→reviewed-model
+    join). A review whose story is not in the current story set (tombstoned or
+    payload-less) contributes nothing — it is a review of a cell the registry no longer
+    publishes, not a current measurement.
     """
     import statistics
     from collections import Counter
 
-    reviews_dir = ROOT / "experiments" / "results" / "reviews"
-    stories_dir = ROOT / "experiments" / "results" / "stories"
-
-    sid_to_model = {}
-    for f in stories_dir.glob("*.json"):
-        if "dvs" in f.name or "log" in f.name:
-            continue
-        try:
-            d = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        sid = f.stem.split("_")[-1]
-        if len(sid) >= 8:
-            sid_to_model[sid] = d.get("model", "?")
+    sid_to_model = {
+        str(s.get("story_id") or ""): s.get("model", "?") for s in stories if s.get("story_id")
+    }
 
     by_model = {}
     total_commit_reviews = 0
     total_story_reviews = 0
 
-    for f in reviews_dir.glob("review_*.json"):
-        # Skip per-session files (review_{id}_S{n}.json) and story files
-        # (review_{id}_story.json) — only aggregate review_{id}.json counts.
-        if "_S" in f.stem or f.stem.endswith("_story"):
+    for r in reviews:
+        sid = str(r.get("_story_id") or r.get("story_id") or "")
+        reviewed_model = sid_to_model.get(sid)
+        if reviewed_model is None:
             continue
-        try:
-            d = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        sid = d.get("story_id", "")
-        reviewed = sid_to_model.get(sid, "?").split("/")[-1]
+        reviewed = reviewed_model.split("/")[-1]
         m = by_model.setdefault(
             reviewed,
             {
@@ -817,7 +718,7 @@ def _load_review_data() -> dict:
                 "issue_themes": Counter(),
             },
         )
-        sr = d.get("story_review")
+        sr = r.get("story_review")
         if sr:
             m["stories"] += 1
             total_story_reviews += 1
@@ -826,7 +727,7 @@ def _load_review_data() -> dict:
                 m["coherence"].append(coh)
             for issue in sr.get("compounding_issues", []):
                 m["issue_themes"][_classify_issue(issue)] += 1
-        for cr in d.get("commit_reviews", []):
+        for cr in r.get("commit_reviews", []):
             total_commit_reviews += 1
             af = cr.get("architectural_fit")
             ca = cr.get("convention_adherence")
@@ -889,38 +790,32 @@ def _classify_issue(text: str) -> str:
     return "other"
 
 
-def _load_analysis_data() -> dict:
-    """Aggregate AST + SonarQube + convention data from analysis files."""
+def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
+    """Aggregate AST + SonarQube + convention data from canonical analysis payloads.
+
+    Consumes the resolver's ``tables.analysis`` (already filtered to the current story
+    registry and stamped with ``_story_id``) plus ``tables.stories`` for the
+    story→reviewed-model join. An analysis payload whose story is not current contributes
+    nothing, mirroring the review path.
+    """
     from collections import Counter
 
-    analysis_dir = ROOT / "experiments" / "results" / "analysis"
-    stories_dir = ROOT / "experiments" / "results" / "stories"
-
-    sid_to_model = {}
-    for f in stories_dir.glob("*.json"):
-        if "dvs" in f.name or "log" in f.name:
-            continue
-        try:
-            d = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        sid = f.stem.split("_")[-1]
-        if len(sid) >= 8:
-            sid_to_model[sid] = d.get("model", "?")
+    sid_to_model = {
+        str(s.get("story_id") or ""): s.get("model", "?") for s in stories if s.get("story_id")
+    }
 
     by_model = {}
     n_analysis = 0
     n_sonar_available = 0
     n_commits = 0
 
-    for f in analysis_dir.glob("*.json"):
-        try:
-            d = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
+    for d in analysis:
+        sid = str(d.get("_story_id") or d.get("story_id") or "")
+        reviewed_model = sid_to_model.get(sid)
+        if reviewed_model is None:
             continue
+        reviewed = reviewed_model.split("/")[-1]
         n_analysis += 1
-        sid = d.get("story_id", "")
-        reviewed = sid_to_model.get(sid, "?").split("/")[-1]
         m = by_model.setdefault(
             reviewed,
             {
@@ -1109,136 +1004,185 @@ def _short_model_label(model_id: str) -> str:
     return model_id
 
 
-def _load_story_data() -> dict:
-    """Load story pipeline data from parquet for the website."""
-    sessions_path = DATA_DIR / "sessions.parquet"
-    stories_path = DATA_DIR / "stories.parquet"
+def _extract_tier_quality(codebase_path: str) -> tuple[str, str]:
+    """Split a story ``codebase_path`` into its ``(tier, quality)`` trailing segments.
 
-    if not sessions_path.exists() or not stories_path.exists():
-        return {"_note": "Run scripts/sync_data.py first"}
+    ``experiments/codebases/<lang>/<tier>/<quality>`` -> ``("<tier>", "<quality>")``.
+    """
+    parts = Path(codebase_path).parts
+    if len(parts) >= 2:
+        return parts[-2], parts[-1]
+    return "", ""
 
-    import duckdb
 
-    conn = duckdb.connect()
+def _story_pipeline_rows(stories: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Flatten canonical story payloads into ``(cell_rows, session_rows)``.
 
-    sessions_table = f"read_parquet('{sessions_path}')"
-    stories_table = f"read_parquet('{stories_path}')"
+    The in-memory equivalent of the retired parquet tables. The condition a cell carries
+    is ``_canonical_condition`` — the resolver's no-op relabel — so every aggregation
+    built from these rows matches the canonical lab split instead of the raw labels.
+    """
+    cells: list[dict] = []
+    sessions: list[dict] = []
+    for d in stories:
+        summary = d.get("summary", {}) or {}
+        model = d.get("model", "")
+        story_name = d.get("story_name", "")
+        tier, quality = _extract_tier_quality(d.get("codebase_path", ""))
+        condition = d.get("_canonical_condition") or "clean"
+        session_count = summary.get("session_count", len(d.get("sessions", []))) or 0
+        cells.append(
+            {
+                "story_name": story_name,
+                "model": model,
+                "tier": tier,
+                "quality": quality,
+                "condition": condition,
+                "session_count": session_count,
+                "total_tokens": summary.get("total_tokens", 0) or 0,
+                "total_cost": summary.get("total_cost", 0.0) or 0.0,
+                "cache_hit_rate": summary.get("cache_hit_rate", 0.0) or 0.0,
+                "total_duration": summary.get("total_duration", 0.0) or 0.0,
+                "all_successful": bool(summary.get("all_successful", False)),
+                "test_count": summary.get("test_count", 0) or 0,
+                "code_lines": summary.get("code_lines", 0) or 0,
+                "test_code_ratio": summary.get("test_code_ratio", 0.0) or 0.0,
+            }
+        )
+        for s in d.get("sessions", []):
+            a = s.get("agentic", {}) or {}
+            sessions.append(
+                {
+                    "model": model,
+                    "tests_passed": a.get("tests_passed", 0) or 0,
+                    "tests_total": a.get("tests_total", 0) or 0,
+                    "prompt_tokens": a.get("prompt_tokens", 0) or 0,
+                    "completion_tokens": a.get("completion_tokens", 0) or 0,
+                    "reasoning_tokens": a.get("reasoning_tokens", 0) or 0,
+                    "total_tokens": a.get("total_tokens", 0) or 0,
+                    "cache_read_tokens": a.get("cache_read_tokens", 0) or 0,
+                    "cost_usd": s.get("cost_usd", 0.0) or 0.0,
+                    "duration_s": s.get("duration_s", 0.0) or 0.0,
+                    "exit_code": s.get("exit_code", 0) or 0,
+                }
+            )
+    return cells, sessions
 
-    # Per-model aggregates
+
+def _load_story_data(stories: list[dict]) -> dict:
+    """Aggregate the canonical story payloads into the website's story section.
+
+    Consumes ``tables.stories`` directly — no parquet, no raw-dir glob — so the condition
+    split carries the resolver's relabel (no ``bad_seed``/``early_degrade`` no-op arms).
+    """
+    cells, sessions = _story_pipeline_rows(stories)
+
+    # Per-model aggregates (ordered by total cost, as before).
+    by_model: dict[str, list] = defaultdict(list)
+    for c in cells:
+        by_model[c["model"]].append(c)
     models = []
-    for row in conn.execute(f"""
-        SELECT model, count(*) as cells, round(sum(total_cost), 6) as total_cost,
-               round(avg(total_cost), 6) as avg_cost, sum(total_tokens) as total_tokens,
-               round(avg(cache_hit_rate), 3) as avg_cache_hit,
-               round(avg(total_duration), 0) as avg_duration_s
-        FROM {stories_table} GROUP BY model ORDER BY total_cost
-    """).fetchall():
+    for mid, rows in sorted(by_model.items(), key=lambda kv: sum(c["total_cost"] for c in kv[1])):
+        n = len(rows)
         models.append(
             {
-                "model": row[0],
-                "cells": row[1],
-                "total_cost": row[2],
-                "avg_cost": row[3],
-                "total_tokens": row[4],
-                "avg_cache_hit": row[5],
-                "avg_duration_s": row[6],
+                "model": mid,
+                "cells": n,
+                "total_cost": round(sum(c["total_cost"] for c in rows), 6),
+                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "total_tokens": sum(c["total_tokens"] for c in rows),
+                "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / n, 3),
+                "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
             }
         )
 
-    # Condition comparison
+    # Condition comparison (the canonical split — clean vs early_degrade only).
+    by_condition: dict[str, list] = defaultdict(list)
+    for c in cells:
+        by_condition[c["condition"]].append(c)
     conditions = []
-    for row in conn.execute(f"""
-        SELECT condition, count(*) as cells, count(distinct story_name||tier||quality) as variants,
-               round(sum(total_cost), 6) as total_cost, round(avg(total_cost), 6) as avg_cost,
-               cast(sum(case when all_successful then 1 else 0 end) as int) as success,
-               cast(sum(case when not all_successful then 1 else 0 end) as int) as fail
-        FROM {stories_table} GROUP BY condition ORDER BY condition
-    """).fetchall():
+    for cond in sorted(by_condition):
+        rows = by_condition[cond]
+        n = len(rows)
+        variants = len({(c["story_name"], c["tier"], c["quality"]) for c in rows})
         conditions.append(
             {
-                "condition": row[0],
-                "cells": row[1],
-                "variants": row[2],
-                "total_cost": row[3],
-                "avg_cost": row[4],
-                "success": row[5],
-                "fail": row[6],
+                "condition": cond,
+                "cells": n,
+                "variants": variants,
+                "total_cost": round(sum(c["total_cost"] for c in rows), 6),
+                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "success": sum(1 for c in rows if c["all_successful"]),
+                "fail": sum(1 for c in rows if not c["all_successful"]),
             }
         )
 
-    # Story type comparison
-    stories = []
-    for row in conn.execute(f"""
-        SELECT story_name, count(*) as cells,
-               round(sum(total_cost), 6) as total_cost, round(avg(total_cost), 6) as avg_cost,
-               sum(session_count) as sessions,
-               round(avg(total_duration), 0) as avg_duration_s,
-               round(avg(total_tokens * 1.0 / session_count), 0) as avg_tokens_per_session
-        FROM {stories_table} GROUP BY story_name ORDER BY total_cost
-    """).fetchall():
-        stories.append(
+    # Story type comparison.
+    by_story: dict[str, list] = defaultdict(list)
+    for c in cells:
+        by_story[c["story_name"]].append(c)
+    stories_out = []
+    for name, rows in sorted(by_story.items(), key=lambda kv: sum(c["total_cost"] for c in kv[1])):
+        n = len(rows)
+        stories_out.append(
             {
-                "story": row[0],
-                "cells": row[1],
-                "total_cost": row[2],
-                "avg_cost": row[3],
-                "sessions": row[4],
-                "avg_duration_s": row[5],
-                "avg_tokens_per_session": row[6],
+                "story": name,
+                "cells": n,
+                "total_cost": round(sum(c["total_cost"] for c in rows), 6),
+                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "sessions": sum(c["session_count"] for c in rows),
+                "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
+                "avg_tokens_per_session": round(
+                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / n, 0
+                ),
             }
         )
 
-    # Per-session stats
-    session_stats = list(
-        conn.execute(f"""
-        SELECT count(*) as total, sum(cost_usd) as total_cost,
-               sum(total_tokens) as total_tokens,
-               sum(cache_read_tokens) as total_cache_reads,
-               coalesce(sum(cache_read_tokens) * 1.0 / nullif(sum(cache_read_tokens) + sum(prompt_tokens), 0), 0)
-                   as cache_hit_rate,
-               sum(duration_s) as duration_s,
-               sum(case when exit_code = 0 then 1 else 0 end) as successful,
-               sum(case when exit_code != 0 then 1 else 0 end) as failed
-        FROM {sessions_table}
-    """).fetchone()
-    )
-
-    # Tier comparison
+    # Tier comparison.
+    by_tier: dict[tuple, list] = defaultdict(list)
+    for c in cells:
+        by_tier[(c["tier"], c["quality"])].append(c)
     tiers = []
-    for row in conn.execute(f"""
-        SELECT tier, quality, count(*) as cells, round(avg(total_cost), 6) as avg_cost,
-               round(avg(total_tokens * 1.0 / session_count), 0) as avg_tokens_per_session,
-               round(avg(total_duration / session_count), 0) as avg_session_duration_s
-        FROM {stories_table} GROUP BY tier, quality ORDER BY tier, quality
-    """).fetchall():
+    for (tier, quality), rows in sorted(by_tier.items()):
+        n = len(rows)
         tiers.append(
             {
-                "tier": row[0],
-                "quality": row[1],
-                "cells": row[2],
-                "avg_cost": row[3],
-                "avg_tokens_per_session": row[4],
-                "avg_session_duration_s": row[5],
+                "tier": tier,
+                "quality": quality,
+                "cells": n,
+                "avg_cost": round(sum(c["total_cost"] for c in rows) / n, 6),
+                "avg_tokens_per_session": round(
+                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / n, 0
+                ),
+                "avg_session_duration_s": round(
+                    sum(c["total_duration"] / max(c["session_count"], 1) for c in rows) / n, 0
+                ),
             }
         )
 
-    conn.close()
+    # Per-session stats.
+    total_cost = sum(s["cost_usd"] for s in sessions)
+    total_tokens = sum(s["total_tokens"] for s in sessions)
+    total_cache_reads = sum(s["cache_read_tokens"] for s in sessions)
+    total_prompt = sum(s["prompt_tokens"] for s in sessions)
+    denom = total_cache_reads + total_prompt
+    cache_hit_rate = (total_cache_reads / denom) if denom else 0.0
 
     return {
         "_provenance": "[M] token counts from session.jsonl; cost from opencode DB verified",
         "models": models,
         "conditions": conditions,
-        "stories": stories,
+        "stories": stories_out,
         "tiers": tiers,
         "sessions": {
-            "total": session_stats[0],
-            "total_cost": session_stats[1],
-            "total_tokens": session_stats[2],
-            "total_cache_reads": session_stats[3],
-            "cache_hit_rate": round(session_stats[4], 3),
-            "duration_s": session_stats[5],
-            "successful": session_stats[6],
-            "failed": session_stats[7],
+            "total": len(sessions),
+            "total_cost": total_cost,
+            "total_tokens": total_tokens,
+            "total_cache_reads": total_cache_reads,
+            "cache_hit_rate": round(cache_hit_rate, 3),
+            "duration_s": sum(s["duration_s"] for s in sessions),
+            "successful": sum(1 for s in sessions if s["exit_code"] == 0),
+            "failed": sum(1 for s in sessions if s["exit_code"] != 0),
         },
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -1266,61 +1210,50 @@ def _merge_story_strategy(story_models: list[dict], analysis_data: dict) -> None
         sm["strategy_efficient"] = strat.get("efficient", 0)
 
 
-def compute_story_models() -> list[dict]:
-    """Build the model comparison from stories.parquet (source of truth)."""
-    stories_path = DATA_DIR / "stories.parquet"
-    sessions_path = DATA_DIR / "sessions.parquet"
-    if not stories_path.exists():
-        return []
+def _captured_cost_key(rows: list[dict]) -> float:
+    """Ordering key: mean captured cost (inf when nothing captured), matching the old
+    ``ORDER BY avg_cost`` (NULLs last)."""
+    costs = [c["total_cost"] for c in rows if c["total_cost"] > 0]
+    return sum(costs) / len(costs) if costs else float("inf")
 
-    import duckdb
 
-    conn = duckdb.connect()
+def compute_story_models(stories: list[dict]) -> list[dict]:
+    """Build the model comparison from the canonical story payloads (source of truth).
+
+    Consumes ``tables.stories`` directly — no parquet — so the per-model story metrics
+    and the condition split share the resolver's relabel with the labs.
+    """
+    cells, sessions = _story_pipeline_rows(stories)
 
     # Real test pass/fail + token splits per model, from the session transcripts.
-    test_by_model = {}
-    if sessions_path.exists():
-        for r in conn.execute(f"""
-            SELECT model, sum(tests_passed) as passed, sum(tests_total) as run,
-                   sum(prompt_tokens) as prompt, sum(completion_tokens) as completion,
-                   sum(reasoning_tokens) as reasoning
-            FROM read_parquet('{sessions_path}')
-            GROUP BY model
-        """).fetchall():
-            test_by_model[r[0]] = {
-                "passed": int(r[1] or 0),
-                "run": int(r[2] or 0),
-                "prompt": int(r[3] or 0),
-                "completion": int(r[4] or 0),
-                "reasoning": int(r[5] or 0),
-            }
+    test_by_model: dict[str, dict] = defaultdict(
+        lambda: {"passed": 0, "run": 0, "prompt": 0, "completion": 0, "reasoning": 0}
+    )
+    for s in sessions:
+        t = test_by_model[s["model"]]
+        t["passed"] += s["tests_passed"]
+        t["run"] += s["tests_total"]
+        t["prompt"] += s["prompt_tokens"]
+        t["completion"] += s["completion_tokens"]
+        t["reasoning"] += s["reasoning_tokens"]
+
+    by_model: dict[str, list] = defaultdict(list)
+    for c in cells:
+        by_model[c["model"]].append(c)
 
     models = []
-    for row in conn.execute(f"""
-        SELECT model, count(*) as total_runs,
-               count(distinct cell_key) as unique_cells,
-               sum(session_count) as sessions,
-               round(sum(total_cost), 6) as total_cost,
-               round(avg(total_cost) FILTER (WHERE cost_captured), 6) as avg_cost,
-               sum(case when cost_captured then 1 else 0 end) as cost_cells,
-               round(avg(cache_hit_rate), 3) as avg_cache_hit,
-               round(avg(test_count), 1) as avg_tests,
-               round(avg(test_code_ratio), 3) as avg_test_code_ratio,
-               round(avg(total_tokens * 1.0 / session_count), 0) as avg_tok_per_session,
-               round(avg(total_duration), 0) as avg_duration_s,
-               round(avg(code_lines), 0) as avg_code_lines,
-               sum(test_count) as total_tests
-          FROM read_parquet('{stories_path}')
-          GROUP BY model ORDER BY avg_cost
-    """).fetchall():
-        mid = row[0]
-        label = MODEL_LABELS.get(mid, mid)
-        total_runs = row[1]
-        unique_cells = row[2]
-        t = test_by_model.get(
-            mid, {"passed": 0, "run": 0, "prompt": 0, "completion": 0, "reasoning": 0}
-        )
-        avg_loc = row[12]
+    for mid, rows in sorted(by_model.items(), key=lambda kv: _captured_cost_key(kv[1])):
+        total_runs = len(rows)
+        cell_keys = {
+            f"{c['story_name']}|{mid}|{c['tier']}|{c['quality']}|{c['condition']}" for c in rows
+        }
+        unique_cells = len(cell_keys)
+        t = test_by_model[mid]
+        sessions_sum = sum(c["session_count"] for c in rows)
+        cost_values = [c["total_cost"] for c in rows if c["total_cost"] > 0]
+        cost_cells = len(cost_values)
+        avg_cost = round(sum(cost_values) / cost_cells, 6) if cost_values else None
+        avg_code_lines = round(sum(c["code_lines"] for c in rows) / total_runs, 0)
         # Energy is a [C]omputed estimate from measured tokens (J per token).
         avg_energy_j = round(
             (t["prompt"] * 0.08 + t["completion"] * 0.23 + t["reasoning"] * 0.47)
@@ -1330,30 +1263,37 @@ def compute_story_models() -> list[dict]:
         models.append(
             {
                 "id": mid,
-                "label": label,
+                "label": MODEL_LABELS.get(mid, mid),
                 "provider": get_provider(mid),
                 "cells": total_runs,
                 "unique_cells": unique_cells,
                 "re_runs": total_runs - unique_cells,
-                "sessions": row[3],
-                "total_cost": row[4],
-                "avg_cost": row[5],
-                "cost_cells": row[6],
-                "avg_cache_hit": row[7],
-                "avg_tests": row[8],
-                "avg_test_code_ratio": row[9],
-                "avg_tok_per_session": row[10],
-                "avg_duration_s": row[11],
-                "avg_code_lines": avg_loc,
-                "tests_total": row[13],
+                "sessions": sessions_sum,
+                "total_cost": round(sum(c["total_cost"] for c in rows), 6),
+                "avg_cost": avg_cost,
+                "cost_cells": cost_cells,
+                "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / total_runs, 3),
+                "avg_tests": round(sum(c["test_count"] for c in rows) / total_runs, 1),
+                "avg_test_code_ratio": round(
+                    sum(c["test_code_ratio"] for c in rows) / total_runs, 3
+                ),
+                "avg_tok_per_session": round(
+                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / total_runs,
+                    0,
+                ),
+                "avg_duration_s": round(sum(c["total_duration"] for c in rows) / total_runs, 0),
+                "avg_code_lines": avg_code_lines,
+                "tests_total": sum(c["test_count"] for c in rows),
                 "tests_passed": t["passed"],
                 "tests_run": t["run"],
                 "pass_rate": _honest_pass_rate(t["passed"], t["run"]),
                 # keep legacy keys populated for existing charts
-                "avg_cost_per_session": round(row[5] / max(row[3] / max(total_runs, 1), 1), 6),
-                "avg_loc": avg_loc,
+                "avg_cost_per_session": round(
+                    (avg_cost or 0) / max(sessions_sum / max(total_runs, 1), 1), 6
+                ),
+                "avg_loc": avg_code_lines,
                 "avg_energy_j": avg_energy_j,
-                "avg_energy_j_per_loc": round(avg_energy_j / max(avg_loc, 1), 2),
+                "avg_energy_j_per_loc": round(avg_energy_j / max(avg_code_lines, 1), 2),
                 # Not measured for the story corpus — do not fabricate zeros.
                 "narration_rate": None,
                 "avg_narration_penalty": None,
@@ -1367,7 +1307,6 @@ def compute_story_models() -> list[dict]:
             }
         )
 
-    conn.close()
     return models
 
 
@@ -1379,12 +1318,18 @@ def build():
         f"  Loaded inventory: {inventory['counts']['db_sessions_experiments']} experiment sessions"
     )
 
-    corpus = load_canonical_corpus()
+    # ── The single publication door ──────────────────────────────────────────
+    # One complete canonical input: story + finding + review + analysis resolved
+    # together, so every section below (models, story pipeline, reviews, analysis)
+    # shares the resolver's lifecycle filter and condition relabel.
+    tables = load_canonical_tables("story", "finding", "review", "analysis")
+    corpus = load_canonical_corpus(tables=tables)
     entries = corpus.entries
     print(
         f"  Loaded canonical corpus: {corpus.finding_count} finding + "
         f"{corpus.story_count} story current records "
-        f"({corpus.tombstoned_count} tombstoned excluded); {len(entries)} perturbation entries"
+        f"({corpus.tombstoned_count} tombstoned excluded); {len(entries)} perturbation entries; "
+        f"{len(tables.reviews)} reviews + {len(tables.analysis)} analysis"
     )
 
     report_count = count_game_reports()
@@ -1396,12 +1341,12 @@ def build():
 
     # Story pipeline models are the source of truth for cross-model comparison.
     # The perturbation models are preserved under a separate key — never discarded.
-    story_models = compute_story_models()
-    analysis_data = _load_analysis_data()
+    story_models = compute_story_models(tables.stories)
+    analysis_data = _load_analysis_data(tables.analysis, tables.stories)
     if story_models:
         _merge_story_strategy(story_models, analysis_data)
         models = story_models
-        print(f"  Story models: {len(models)} (from stories.parquet)")
+        print(f"  Story models: {len(models)} (from the canonical story table)")
 
     charts = compute_charts(models)
     calculator = compute_calculator(models)
@@ -1625,8 +1570,8 @@ def build():
                 "note": "MoE V4 Pro, publicly disclosed (49B active)",
             },
         },
-        "stories": _load_story_data(),
-        "reviews": _load_review_data(),
+        "stories": _load_story_data(tables.stories),
+        "reviews": _load_review_data(tables.reviews, tables.stories),
         "analysis": analysis_data,
         "labs": _load_labs(),
     }

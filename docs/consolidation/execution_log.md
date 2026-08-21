@@ -1196,8 +1196,31 @@ sequenced after the now-complete lab contract + context guards.
 **Release verdict: PASS** — the semantic-integrity release is complete (10 implementation phases
 + this gate, one explicit deferral).
 
+## Canonical publication closure
 
+Input: `docs/review/canonical_publication_review.md` (external review of main at `ec66947d5`).
+Spec: `workflows/repository/canonical_publication_closure.yaml`.
 
+### c1_canonical_tables — route the primary publication path through CanonicalTables (review P0)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **One complete canonical input** — `build_data.py` resolves `load_canonical_tables("story","finding","review","analysis")` once and every section consumes that `tables` object; `load_canonical_corpus` maps the resolver's flattened `finding` runs into the summary-shaped entry vocabulary | PASS |
+| 2 | **`sync_data.py` stops globbing the raw stories dir** — it now iterates `load_canonical_tables("story","analysis")` (registry-selected payloads) and writes the resolver's `_canonical_condition` into `stories.parquet`/`sessions.parquet`; the analysis LOC fallback comes from `tables.analysis`, not a glob | PASS |
+| 3 | **Consumers read the canonical tables, not parquet/globs** — `compute_story_models(stories)` and `_load_story_data(stories)` aggregate `tables.stories` in memory (duckdb/parquet dependency removed); `_load_review_data(reviews, stories)` and `_load_analysis_data(analysis, stories)` join via the resolver-stamped `_story_id` and skip reviews/analysis whose story is not current | PASS |
+| 4 | **The condition split matches the relabel policy** — `data.js` `stories.conditions` is exactly `clean 135 / early_degrade 80`; no `bad_seed 41`, no `early_degrade 91`, no empty label (the resolver now folds absent labels into `clean`, matching `lab_condition_effects`'s `or "clean"`) | PASS |
+| 5 | **Guard test added** — `tests/test_publication_singular_door.py`: AST guard rejecting any public-data producer (`build_data.py`, `sync_data.py`) that constructs its own path into `experiments/results/{stories,reviews,analysis}` outside the resolver, plus functional asserts on the canonical split and on `data.js` agreement | PASS |
+| 6 | **Parquet + data.js regenerated** — `sync_data.py` → 1067 sessions / 215 stories; `build_data.py` → `data.js` with the canonical split (7 story models, 155 current-story reviews, 156 analyses) | PASS |
+| 7 | **Setup-commit leftovers resolved (green tests)** — `canonical_publication_review.md` gained `status: accepted`; `canonical_publication_closure.yaml` re-homed `experiments/specs/` → `workflows/repository/` with `artifact_kind: workflow` metadata, spec index regenerated (80 specs) | PASS |
+| 8 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1406 passed, 106 deselected**; full `pytest tests/`: **1511 passed, 1 skipped** (one `external`-marked Ollama test flakes intermittently across full runs — unrelated to this phase) | PASS |
+
+**c1_canonical_tables result: 8/8 PASS.**
+
+Carried forward (later phases, not dropped): resolution completeness + fail-closed semantics on
+the 10 payload-less current story rows (c2); semantic lab-contract validation against the manifest
+entry (c3); honest record-count scopes `n_resolved`/`n_eligible`/`n_used`/`n_excluded` (c4); the
+test-count scope renames (c5); README/site prose reconciliation (c6); the full release-gate
+verification (c7).
 
 
 
