@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-21T03:01:26.978674+00:00",
+  "generated_at": "2026-08-21T05:25:34.116548+00:00",
   "n_specs": 79,
   "specs": [
     {
@@ -319,13 +319,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-21T00:56:14.347462+00:00",
-      "latest_ok": false,
-      "latest_model": "anthropic/claude-opus-5",
-      "latest_cost_usd": 50.152024,
-      "latest_git_sha": "1102f5bf7",
-      "results_pointer": "experiments/results/workflows/semantic_integrity_release/20260821T005614Z.json",
-      "n_runs": 3
+      "last_run_at": "2026-08-21T05:25:33.936281+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 1.689773,
+      "latest_git_sha": "7b9e3fad4",
+      "results_pointer": "experiments/results/workflows/semantic_integrity_release/20260821T052534Z.json",
+      "n_runs": 4
     },
     {
       "name": "context_abstraction_implement",
