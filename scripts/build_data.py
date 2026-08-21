@@ -1306,10 +1306,18 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
                 ),
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / total_runs, 0),
                 "avg_code_lines": avg_code_lines,
-                "tests_total": sum(c["test_count"] for c in rows),
-                "tests_passed": t["passed"],
-                "tests_run": t["run"],
+                # ── Test-count scope (review "smaller"): two DIFFERENT quantities, no longer
+                # ── conflated under one name. `final_tests_discovered` is the story-level peak
+                # ── (how many tests the final codebase has); `test_executions_*` is summed
+                # ── across every session execution (each session re-runs the suite).
+                "final_tests_discovered": sum(c["test_count"] for c in rows),
+                "test_executions_passed": t["passed"],
+                "test_executions_run": t["run"],
                 "pass_rate": _honest_pass_rate(t["passed"], t["run"]),
+                "pass_rate_scope": (
+                    "weighted over repeated session-level test executions (each session "
+                    "re-runs the suite; the count is summed across sessions)"
+                ),
                 # keep legacy keys populated for existing charts
                 "avg_cost_per_session": round(
                     (avg_cost or 0) / max(sessions_sum / max(total_runs, 1), 1), 6

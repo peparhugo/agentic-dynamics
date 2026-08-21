@@ -1751,7 +1751,7 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '<div class="mstat"><div class="mv '+gritColor+'">'+gritRate+'%</div><div class="ml">Narration Rate' + provBadge('narration_rate') + '</div><div class="ms">Failure rate under perturbation (lower = better grit)</div></div>';
     html += '<div class="mstat"><div class="mv amber">'+(thinking*100).toFixed(1)+'%</div><div class="ml">Explanation Tax &epsilon;' + provBadge('avg_thinking_ratio') + '</div><div class="ms">Thinking ratio to output</div></div>';
     html += '<div class="mstat"><div class="mv">'+loc+'</div><div class="ml">LOC / Session' + provBadge('avg_loc') + '</div><div class="ms">Avg lines of code generated</div></div>';
-    html += '<div class="mstat"><div class="mv '+passColor+'">'+passRate+'</div><div class="ml">Correctness' + provBadge('pass_rate') + '</div><div class="ms">Test pass rate</div></div>';
+    html += '<div class="mstat"><div class="mv '+passColor+'">'+passRate+'</div><div class="ml">Correctness' + provBadge('pass_rate') + '</div><div class="ms">Test pass rate, weighted over repeated session-level executions</div></div>';
     html += '</div>';
 
     html += '<div class="pan"><div>';

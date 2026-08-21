@@ -1281,6 +1281,22 @@ prose reconciliation — c6; the full release-gate verification — c7.
 Carried forward (later phases, not dropped): the test-count scope renames — c5; README/site prose
 reconciliation — c6; the full release-gate verification — c7.
 
+### c5_test_scope_names — distinct test-count scopes (review "smaller")
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Conflated fields renamed** — the model-card no longer publishes `tests_total` / `tests_passed` / `tests_run`; it now carries `final_tests_discovered` (story-level peak test count), `test_executions_passed` / `test_executions_run` (summed across session executions), and the old names are gone | PASS |
+| 2 | **Pass rate labelled** — the model-card carries `pass_rate_scope` ("weighted over repeated session-level test executions…"), and `evidence.html`'s model-card caption states it explicitly instead of a bare "Test pass rate" | PASS |
+| 3 | **Source-of-truth guard** — `tests/test_data_integrity.py` gains `test_story_model_test_counts_use_distinct_scope_names` (asserts the new keys exist in `build_data.py`), and the P0-1 comment is updated to the new names | PASS |
+| 4 | **data.js regenerated** — model cards now show e.g. `final_tests_discovered 1623` vs `test_executions_passed 3290 / test_executions_run 3292` under distinct names; manifest re-hashed | PASS |
+| 5 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1432 passed, 106 deselected**; full `pytest tests/`: **1537 passed, 1 skipped** | PASS |
+
+**c5_test_scope_names result: 5/5 PASS.**
+
+Carried forward (later phases, not dropped): README/site prose reconciliation — c6; the full
+release-gate verification — c7.
+
+
 
 
 

@@ -20,11 +20,23 @@ def test_no_duplicate_pricing_in_constants():
 
 
 def test_no_fabricated_pass_rate_in_build_data():
-    # P0-1: compute_story_models must never set tests_passed == tests_total
+    # P0-1: compute_story_models must never set test_executions_passed ==
+    # test_executions_run (nor the old conflated tests_passed == tests_total)
     # or hardcode a 100% pass rate.
     src = _read("scripts/build_data.py")
     assert "all stories passed" not in src
     assert 'pass_rate": f"100%' not in src
+
+
+def test_story_model_test_counts_use_distinct_scope_names():
+    # smaller (c5): the model-card must distinguish the story-level peak test count from
+    # the summed session-execution counts, and label the pass rate's weighting — never the
+    # conflated tests_total / tests_passed / tests_run triple.
+    src = _read("scripts/build_data.py")
+    assert '"final_tests_discovered"' in src
+    assert '"test_executions_passed"' in src
+    assert '"test_executions_run"' in src
+    assert '"pass_rate_scope"' in src
 
 
 def test_basin_cost_fallback_uses_get_pricing():
