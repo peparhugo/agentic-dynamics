@@ -4,7 +4,7 @@
 Builds a 2D bubble chart dataset showing where models cluster in the
 correctness-escape space. Each point = one experiment entry. Bubble size = cost.
 
-Output: experiments/results/lab_grit_matrix.json
+Output: experiments/results/legacy_labs/lab_grit_matrix.json
 """
 
 import json
@@ -13,7 +13,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_grit_matrix.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_grit_matrix.json"
 
 from agentic_dynamics.core.constants import MODEL_LABELS
 

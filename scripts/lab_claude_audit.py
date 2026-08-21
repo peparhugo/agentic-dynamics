@@ -5,7 +5,7 @@ Cross-model comparison on overlapping task types. Computes per-task
 cost, correctness, LOC, and narration penalty for DeepSeek vs Claude.
 Produces cost breakdown by token type and 'Claude wins' flags.
 
-Output: experiments/results/lab_claude_audit.json
+Output: experiments/results/legacy_labs/lab_claude_audit.json
 """
 
 import json
@@ -15,7 +15,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_PATH = ROOT / "experiments" / "results" / "_trajectory_aggregate.json"
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_claude_audit.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_claude_audit.json"
 
 from agentic_dynamics.core.constants import normalize_task
 

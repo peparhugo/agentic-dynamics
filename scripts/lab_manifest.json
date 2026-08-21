@@ -24,7 +24,7 @@
     "a stale artifact, logging the rejection with the lab name."
   ],
   "review_source": "docs/review/semantic_integrity_review.md",
-  "release_phase": "s2_lab_contract",
+  "release_phase": "s3_rebuild_outputs",
   "data_integrity_policy": "docs/data_integrity_findings.md",
   "status_vocabulary": {
     "canonical": "Consumes only live, non-retired result records. Runs in the default reproduction pipeline and is eligible to feed the website (subject to the s2 lineage contract).",
@@ -36,7 +36,7 @@
     "publication_eligible": "Hard gate: may this lab's output reach apps/website/data.js at all? quarantined => always false.",
     "website_key": "The data.js key this lab feeds, or null when the site consumes nothing from it. build_data.py loads a lab only when publication_eligible AND website_key is set.",
     "reproduce_default": "Is this lab in scripts/reproduce.sh's default (core) lab set? quarantined => always false.",
-    "output": "Artifact the lab writes under experiments/results/, or null when it only prints to stdout.",
+    "output": "Artifact the lab writes under experiments/results/, or null when it only prints to stdout. Quarantined labs write into experiments/results/legacy_labs/ so the canonical results directory holds only contract-bearing outputs (see that directory's README).",
     "input_sources": "Every dataset the lab reads, as repo-relative paths/globs (transitive sources noted in rationale).",
     "reads_retired_summary": "True when experiments/results/_results_summary.json is reached directly or transitively.",
     "requires_external_service": "External dependency that makes the lab non-deterministic/unavailable offline (neo4j | sonarqube | opencode_inference), else null.",
@@ -55,7 +55,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_basin_topology.json",
+      "output": "experiments/results/legacy_labs/lab_basin_topology.json",
       "input_sources": [
         "experiments/results/_results_summary.json"
       ],
@@ -70,7 +70,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_basin_topology_neo4j.json",
+      "output": "experiments/results/legacy_labs/lab_basin_topology_neo4j.json",
       "input_sources": [
         "neo4j://ExperimentRun graph",
         "experiments/results/lab_basin_topology.json"
@@ -101,7 +101,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_claude_audit.json",
+      "output": "experiments/results/legacy_labs/lab_claude_audit.json",
       "input_sources": [
         "experiments/results/_results_summary.json",
         "experiments/results/_trajectory_aggregate.json"
@@ -133,7 +133,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_correctness_premium.json",
+      "output": "experiments/results/legacy_labs/lab_correctness_premium.json",
       "input_sources": [
         "experiments/results/_results_summary.json"
       ],
@@ -148,7 +148,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_flail_triggers.json",
+      "output": "experiments/results/legacy_labs/lab_flail_triggers.json",
       "input_sources": [
         "experiments/results/_results_summary.json",
         "experiments/results/_trajectory_summary.json"
@@ -164,7 +164,7 @@
       "publication_eligible": false,
       "website_key": "grit_matrix",
       "reproduce_default": false,
-      "output": "experiments/results/lab_grit_matrix.json",
+      "output": "experiments/results/legacy_labs/lab_grit_matrix.json",
       "input_sources": [
         "experiments/results/_results_summary.json"
       ],
@@ -179,7 +179,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_opencode_meta_analysis.json",
+      "output": "experiments/results/legacy_labs/lab_opencode_meta_analysis.json",
       "input_sources": [
         "experiments/results/_results_summary.json",
         "experiments/results/reports/<worktree>/session.jsonl",
@@ -257,7 +257,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_survival_horizon.json",
+      "output": "experiments/results/legacy_labs/lab_survival_horizon.json",
       "input_sources": [
         "experiments/results/_results_summary.json"
       ],
@@ -272,7 +272,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_task_routing.json",
+      "output": "experiments/results/legacy_labs/lab_task_routing.json",
       "input_sources": [
         "experiments/results/_results_summary.json",
         "experiments/results/_trajectory_aggregate.json"
@@ -288,7 +288,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_coupling.json",
+      "output": "experiments/results/legacy_labs/lab_coupling.json",
       "input_sources": [
         "experiments/results/_results_summary.json"
       ],
@@ -303,7 +303,7 @@
       "publication_eligible": false,
       "website_key": null,
       "reproduce_default": false,
-      "output": "experiments/results/lab_tool_archetypes.json",
+      "output": "experiments/results/legacy_labs/lab_tool_archetypes.json",
       "input_sources": [
         "experiments/results/_results_summary.json",
         "experiments/results/_trajectory_aggregate.json"

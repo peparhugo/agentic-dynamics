@@ -381,7 +381,12 @@ def _load_grit_matrix():
         print(f"  [lab-gate] not published — {reason}")
         return []
 
-    grit_path = ROOT / "experiments" / "results" / "lab_grit_matrix.json"
+    # Path comes from the manifest, not hard-coded: a quarantined lab's artifact lives in
+    # experiments/results/legacy_labs/, and only the manifest knows where a lab writes.
+    entry = load_lab_manifest().get("lab_grit_matrix.py")
+    if entry is None or not entry.output:
+        return []
+    grit_path = ROOT / entry.output
     if not grit_path.exists():
         return []
     try:

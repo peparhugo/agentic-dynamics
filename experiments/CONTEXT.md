@@ -106,13 +106,18 @@ Each YAML defines: task description, constraints, perturbation operators, streng
 
 | File | Description |
 |------|-------------|
-| `_results_summary.json` | Aggregate results (consumed by lab scripts + build_data.py) |
+| `_results_summary.json` | **RETIRED** (`docs/data_integrity_findings.md` rule 4). Not a build input and not a lab input; every lab that still reads it is quarantined. |
 | `_trajectory_summary.json` | Per-transcript trajectory metrics |
 | `_trajectory_aggregate.json` | Per-model comparable trajectory aggregates |
 | `typescript_ssg_*.json` | Per-model SSG results (deepseek, claude, gpt5) |
-| `lab_*.json` | Lab book analysis outputs (26 files) |
+| `lab_*.json` | **Contract-bearing** lab outputs only (7) — each carries a `lab_contract` block whose `input_manifest_sha256` matches the current registry. Guarded by `tests/test_lab_outputs_canonical.py`. |
+| `legacy_labs/` | Lab outputs with non-canonical lineage (19): 11 quarantined + 8 retired-script artifacts. Nothing reads or publishes them — see that directory's README. |
 | `README.md` | Dataset access instructions (inventory CLI) |
 | `reports/` | **224+ game reports** — per-experiment Markdown + artifact directories |
+
+The canonical corpus a lab may read is the registry in `data_manifest.json`, resolved by
+`agentic_dynamics.reporting.canonical_corpus` (current rows only). See `scripts/CONTEXT.md`
+§ Lab Books for the contract.
 
 ## `experiments/lab_books/` — 20 Experiment Plans
 

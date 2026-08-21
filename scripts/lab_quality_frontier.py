@@ -80,19 +80,27 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
         b = by_model[_short_model(model)]
         if cost > 0:
             b["costs"].append(cost)
-        b["lsp_errors"].append(lsp.get("errors", 0) or 0)
+        # LSP: count a cell ONLY when the language server actually ran. Every analysis
+        # payload carries `errors: 0` by default, so averaging the raw field publishes a
+        # fabricated zero — "no diagnostics" when the truth is "no diagnostics tool".
+        # (`docs/data_integrity_findings.md`: an unmeasured value is null, never 0.)
+        if lsp.get("available"):
+            b["lsp_errors"].append(lsp.get("errors", 0) or 0)
         b["quality"].append(sol.get("code_quality_score", 0) or 0)
         b["cyclomatic"].append(sol.get("cyclomatic_complexity", 0) or 0)
         b["novelty"].append(sol.get("novelty_score", 0) or 0)
 
     models = []
     for m, v in by_model.items():
+        lsp_cells = len(v["lsp_errors"])
         models.append(
             {
                 "model": m,
                 "cells": len(v["costs"]),
                 "avg_cost": _avg(v["costs"]),
-                "lsp_errors_per_cell": _avg(v["lsp_errors"]),
+                # None (renders as an em-dash) when the LSP never ran for this model.
+                "lsp_errors_per_cell": _avg(v["lsp_errors"]) if lsp_cells else None,
+                "lsp_cells": lsp_cells,
                 "code_quality_score": _avg(v["quality"]),
                 "cyclomatic_complexity": _avg(v["cyclomatic"]),
                 "novelty_score": _avg(v["novelty"]),
@@ -107,6 +115,9 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
             "models": len(models),
             "stories": len(stories),
             "analyses": len(analyses),
+            # How many analysed cells actually had a language server run. Zero here means
+            # every lsp_errors_per_cell is null — the signal is absent, not clean.
+            "lsp_available_cells": sum(m["lsp_cells"] for m in models),
         },
         "models": models,
     }
@@ -129,8 +140,9 @@ def main():
         f"({tables.identity.registry_version})"
     )
     for m in output["models"]:
+        lsp = "—" if m["lsp_errors_per_cell"] is None else f"{m['lsp_errors_per_cell']:.1f}"
         print(
-            f"  {m['model']:20s} cost=${m['avg_cost']:>7.3f} lsp_err={m['lsp_errors_per_cell']:>5.1f} "
+            f"  {m['model']:20s} cost=${m['avg_cost']:>7.3f} lsp_err={lsp:>5s} "
             f"quality={m['code_quality_score']:>6.3f} cyclomatic={m['cyclomatic_complexity']:>7.1f}"
         )
 

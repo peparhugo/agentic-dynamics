@@ -5,7 +5,7 @@ Head-to-head correctness comparison on 13 overlapping task types.
 Null hypothesis: Claude achieves higher correctness than DeepSeek
 on at least 3 of the 13 overlapping task types.
 
-Output: experiments/results/lab_correctness_premium.json
+Output: experiments/results/legacy_labs/lab_correctness_premium.json
 """
 
 import json
@@ -14,7 +14,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_correctness_premium.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_correctness_premium.json"
 
 from agentic_dynamics.core.constants import normalize_task
 

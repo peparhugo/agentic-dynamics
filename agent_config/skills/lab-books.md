@@ -66,46 +66,46 @@ the pre-quarantine world; the manifest is authoritative.
 **1. lab_claude_audit.py** (216L) — "Where did Claude's $47.54 go?"
 - Per-task cost, correctness, LOC, narration penalty breakdown
 - Compares Claude vs DeepSeek on overlapping tasks
-- Output: `experiments/results/lab_claude_audit.json`
+- Output: `experiments/results/legacy_labs/lab_claude_audit.json`
 
 **2. lab_correctness_premium.py** (202L) — "Does Claude's premium buy anything?"
 - Head-to-head correctness on 13 overlapping task types
 - Controls for perturbation class and strength
-- Output: `experiments/results/lab_correctness_premium.json`
+- Output: `experiments/results/legacy_labs/lab_correctness_premium.json`
 
 ### Behavioral Analysis
 
 **3. lab_grit_matrix.py** (204L) — "Correctness × escape × cost visualization"
 - 2D bubble chart data: x=escape, y=correctness, size=cost
 - Per-model, per-perturbation class breakdown
-- Output: `experiments/results/lab_grit_matrix.json`
+- Output: `experiments/results/legacy_labs/lab_grit_matrix.json`
 
 **4. lab_flail_triggers.py** (183L) — "What makes a model flail?"
 - Failure patterns by model, perturbation class, task type
 - Identifies conditions where models fall into recovery loops
-- Output: `experiments/results/lab_flail_triggers.json`
+- Output: `experiments/results/legacy_labs/lab_flail_triggers.json`
 
 **5. lab_tool_archetypes.py** (146L) — "Does tool choice predict code quality?"
 - Write-dominant vs bash-dominant vs balanced tool usage patterns
 - Correlates tool-call distributions with solution quality
-- Output: `experiments/results/lab_tool_archetypes.json`
+- Output: `experiments/results/legacy_labs/lab_tool_archetypes.json`
 
 ### Strategy & Topology
 
 **6. lab_task_routing.py** (235L) — "Optimal model-per-task routing"
 - Simulates 3 routing strategies across 30 task types
 - Cost-optimal, quality-optimal, and blended routing
-- Output: `experiments/results/lab_task_routing.json`
+- Output: `experiments/results/legacy_labs/lab_task_routing.json`
 
 **7. lab_basin_topology.py** (209L) — "Attractor basin topology per model"
 - Classifies each model's basin shape: shallow/broad, deep/narrow, multi-modal, flat
 - Uses basin escape scores + trajectory distances
-- Output: `experiments/results/lab_basin_topology.json`
+- Output: `experiments/results/legacy_labs/lab_basin_topology.json`
 
 **8. lab_survival_horizon.py** (195L) — "Sessions-to-bankruptcy"
 - "Infinite game" framing: how many sessions before fixed budget exhausted?
 - Per model, per budget level
-- Output: `experiments/results/lab_survival_horizon.json`
+- Output: `experiments/results/legacy_labs/lab_survival_horizon.json`
 
 ### Advanced Analysis
 
@@ -129,14 +129,14 @@ the pre-quarantine world; the manifest is authoritative.
 **12. lab_basin_topology_neo4j.py** (193L) — "Basin topology via Neo4j"
 - Graph-based attractor basin classification
 - Requires Docker: `docker-compose -f infrastructure/docker-compose.yml up -d neo4j`
-- Output: `experiments/results/lab_basin_topology_neo4j.json`
+- Output: `experiments/results/legacy_labs/lab_basin_topology_neo4j.json`
 
 ## Meta-Analysis
 
 **13. lab_opencode_meta_analysis.py** (178L) — "Patterns in opencode experiments"
 - Meta-analysis of experiment structure and outcomes
 - Analyzes experiment design itself as data
-- Output: `experiments/results/lab_opencode_meta_analysis.json`
+- Output: `experiments/results/legacy_labs/lab_opencode_meta_analysis.json`
 
 ## Newer Labs (story-era + frontier)
 
@@ -176,7 +176,7 @@ Stage 1 — superseded by `agentic_dynamics.measurement.semantic_validation` (no
 ```bash
 # Standard pattern:
 python scripts/lab_grit_matrix.py         # Run the analysis
-cat experiments/results/lab_grit_matrix.json | python -m json.tool | head -50  # Inspect
+cat experiments/results/legacy_labs/lab_grit_matrix.json | python -m json.tool | head -50  # Inspect
 
 # All labs follow the same pattern:
 python scripts/lab_<name>.py

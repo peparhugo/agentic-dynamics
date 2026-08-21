@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_verification_frontier",
-  "generated_at": "2026-08-21T02:20:47.831932",
+  "generated_at": "2026-08-21T02:33:10.082440",
   "summary": {
     "models": 7,
     "stories": 215,
@@ -86,6 +86,6 @@
     "requires_external_service": null,
     "n_input_records": 215,
     "contract_version": "lab-contract/v1",
-    "generated_at": "2026-08-21T00:20:47.831948+00:00"
+    "generated_at": "2026-08-21T00:33:10.082457+00:00"
   }
 }

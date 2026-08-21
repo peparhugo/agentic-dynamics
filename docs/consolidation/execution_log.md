@@ -953,6 +953,28 @@ work is narrow: confirm no publication-eligible input carries the retired summar
 that the site's lab sections draw only from contract-bearing JSONs (both now true by
 construction — s3 verifies rather than rebuilds).
 
+### s3_rebuild_outputs — regenerate + verify canonical lineage (review item 3)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Every publication-eligible lab regenerated from canonical records only** — the 7 core labs deleted and re-run from the manifest-derived set against the current registry (215 stories / 242 reviews / 166 analyses of 701 rows) | PASS (7/7) |
+| 2 | **Regeneration is deterministic** — each lab run twice; all 7 outputs byte-identical modulo `generated_at`. "Rebuilt from current canonical records" is therefore a reproducible claim, not a one-off | PASS (0 of 7 drifted) |
+| 3 | **data.js rebuilt; manifest rehashed** — and the registry identity is unchanged across the rebuild (`fbc90be56974`), re-confirming the non-circular hash design from s2 | PASS |
+| 4 | **Zero lab outputs carry the retired summary's lineage** — made structurally true rather than asserted: `experiments/results/lab_*.json` now holds *only* the 7 contract-bearing outputs. The 19 others (11 quarantined + 8 orphans from the `*_DEPRECATED_bge_m3` scripts deleted in Stage 1) moved to `experiments/results/legacy_labs/` with a README. Nothing deleted; git history intact | PASS (7 live / 19 legacy) |
+| 5 | **A quarantined lab cannot re-pollute the canonical directory** — all 11 quarantined scripts now write into `legacy_labs/`; the manifest's `output` paths match; `knowledge/graph.py`'s basin loader and `build_data._load_grit_matrix` re-pointed (the latter now reads the path from the manifest rather than hard-coding it) | PASS |
+| 6 | **The site's lab sections draw only from contract-bearing JSONs** — every `D.labs.<key>` the HTML reads is published and eligible; every published section carries its `lab_contract` into `data.js`; `grit_matrix` publishes `[]` | PASS |
+| 7 | **Two hand-transcribed site sections converted to rendered ones** — the five-session-arc table and the condition-effects table were hard-typed HTML that had drifted from the corpus (arc figures from a 156-story run; a `bad_seed` arm that the no-op relabel had dissolved). Both tbodies now render from `D.labs.story_arc` / `D.labs.condition_effects`, as do the snowball claim and story count. Transcription is how the section drifted; it cannot drift again | PASS |
+| 8 | **A fabricated zero found and removed** — `lab_quality_frontier` averaged `deep.lsp.errors` across all cells, but every analysis payload carries `{"available": false, "errors": 0}`: the language server never ran. The lab published "0.0 LSP errors per story", which the site rendered as *clean code* when the truth is *no diagnostics tool*. Now only `available` cells count and the metric is `null` otherwise (`lsp_available_cells: 0` of 166); the site says so explicitly. The stale prose it replaced ("13.5/story", "0.167 code quality", "cleanest LSP (5.1)") matched no lab output at any point in this release | PASS |
+| 9 | **Verification is permanent** — `tests/test_lab_outputs_canonical.py` (12 tests): live dir holds only publication outputs; quarantined labs write to `legacy_labs/` (manifest *and* source); no live output lacks a registry-resolver contract; each artifact's `n_input_records` equals what the resolver returns today (so a lab left behind fails); site keys are eligible + present; contracts survive into `data.js`; the removed transcriptions cannot return | PASS |
+| 10 | Full suite green — `pytest tests/ -m "not external"`: **1377 passed** (+12); `ruff` clean on the touched files; `reproduce.sh --dry-run` OK; `evidence.html` inline JS parses (`node --check`) | PASS (1377 passed) |
+
+**s3_rebuild_outputs result: 10/10 PASS.**
+
+Note on scope: criteria 7 and 8 were not in the phase brief. They surfaced while verifying
+criterion 6 — a section cannot be said to "draw from contract-bearing JSONs" while it is a
+hand-typed transcription of an older run, and an output cannot be called canonical while it
+publishes an unmeasured zero as a measurement. Both are recorded here rather than deferred.
+
 
 
 

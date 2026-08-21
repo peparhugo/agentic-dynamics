@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_cache_economics",
-  "generated_at": "2026-08-21T02:19:37.329053",
+  "generated_at": "2026-08-21T02:33:08.330358",
   "summary": {
     "models": 7,
     "stories": 215
@@ -94,6 +94,6 @@
     "requires_external_service": null,
     "n_input_records": 215,
     "contract_version": "lab-contract/v1",
-    "generated_at": "2026-08-21T00:19:37.329071+00:00"
+    "generated_at": "2026-08-21T00:33:08.330375+00:00"
   }
 }

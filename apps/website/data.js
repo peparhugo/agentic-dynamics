@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 00:24:05 UTC by build_data.py */
+/* Generated 2026-08-21 00:38:17 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T00:24:04.905592+00:00",
+    "generated_at": "2026-08-21T00:38:17.268294+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -2102,7 +2102,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T00:24:04.938740+00:00"
+    "generated_at": "2026-08-21T00:38:17.298745+00:00"
   },
   "reviews": {
     "models": [
@@ -2612,7 +2612,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-21T02:19:37.329053",
+      "generated_at": "2026-08-21T02:33:08.330358",
       "summary": {
         "models": 7,
         "stories": 215
@@ -2706,12 +2706,12 @@ window.DYNAMICS_DATA = {
         "requires_external_service": null,
         "n_input_records": 215,
         "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:19:37.329071+00:00"
+        "generated_at": "2026-08-21T00:33:08.330375+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-21T02:20:07.451094",
+      "generated_at": "2026-08-21T02:33:08.689359",
       "summary": {
         "conditions": 2,
         "stories": 215,
@@ -2749,23 +2749,25 @@ window.DYNAMICS_DATA = {
         "requires_external_service": null,
         "n_input_records": 457,
         "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:20:07.451115+00:00"
+        "generated_at": "2026-08-21T00:33:08.689382+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-21T02:22:22.098544",
+      "generated_at": "2026-08-21T02:37:49.214020",
       "summary": {
         "models": 7,
         "stories": 215,
-        "analyses": 166
+        "analyses": 166,
+        "lsp_available_cells": 0
       },
       "models": [
         {
           "model": "deepseek-v4-flash",
           "cells": 22,
           "avg_cost": 0.068,
-          "lsp_errors_per_cell": 0.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
           "code_quality_score": 0.037,
           "cyclomatic_complexity": 475.455,
           "novelty_score": 0.87
@@ -2774,7 +2776,8 @@ window.DYNAMICS_DATA = {
           "model": "gpt-5.6-luna",
           "cells": 24,
           "avg_cost": 0.092,
-          "lsp_errors_per_cell": 0.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
           "code_quality_score": 0.087,
           "cyclomatic_complexity": 262.583,
           "novelty_score": 0.876
@@ -2783,7 +2786,8 @@ window.DYNAMICS_DATA = {
           "model": "deepseek-v4-pro",
           "cells": 37,
           "avg_cost": 0.159,
-          "lsp_errors_per_cell": 0.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
           "code_quality_score": 0.045,
           "cyclomatic_complexity": 309.378,
           "novelty_score": 0.845
@@ -2792,7 +2796,8 @@ window.DYNAMICS_DATA = {
           "model": "gpt-5.6-terra",
           "cells": 20,
           "avg_cost": 1.015,
-          "lsp_errors_per_cell": 0.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
           "code_quality_score": 0.088,
           "cyclomatic_complexity": 233.8,
           "novelty_score": 0.901
@@ -2801,7 +2806,8 @@ window.DYNAMICS_DATA = {
           "model": "claude-haiku-4-5",
           "cells": 14,
           "avg_cost": 1.537,
-          "lsp_errors_per_cell": 0.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
           "code_quality_score": 0.037,
           "cyclomatic_complexity": 381.571,
           "novelty_score": 0.842
@@ -2810,7 +2816,8 @@ window.DYNAMICS_DATA = {
           "model": "gpt-5.6-sol",
           "cells": 23,
           "avg_cost": 3.987,
-          "lsp_errors_per_cell": 0.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
           "code_quality_score": 0.054,
           "cyclomatic_complexity": 297.348,
           "novelty_score": 0.917
@@ -2819,7 +2826,8 @@ window.DYNAMICS_DATA = {
           "model": "claude-sonnet-5",
           "cells": 16,
           "avg_cost": 4.776,
-          "lsp_errors_per_cell": 0.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
           "code_quality_score": 0.052,
           "cyclomatic_complexity": 375.375,
           "novelty_score": 0.789
@@ -2835,12 +2843,12 @@ window.DYNAMICS_DATA = {
         "requires_external_service": null,
         "n_input_records": 381,
         "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:22:22.098565+00:00"
+        "generated_at": "2026-08-21T00:37:49.214046+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-21T02:18:53.476741",
+      "generated_at": "2026-08-21T02:33:09.384866",
       "summary": {
         "snowball_factor": 2.26,
         "session1_cost": 0.1668,
@@ -2962,12 +2970,12 @@ window.DYNAMICS_DATA = {
         "requires_external_service": null,
         "n_input_records": 215,
         "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:18:53.476829+00:00"
+        "generated_at": "2026-08-21T00:33:09.384957+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-21T02:20:47.831932",
+      "generated_at": "2026-08-21T02:33:10.082440",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3053,12 +3061,12 @@ window.DYNAMICS_DATA = {
         "requires_external_service": null,
         "n_input_records": 215,
         "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:20:47.831948+00:00"
+        "generated_at": "2026-08-21T00:33:10.082457+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-21T02:21:25.060427",
+      "generated_at": "2026-08-21T02:33:10.449758",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
         "cells": 106,
@@ -3819,7 +3827,7 @@ window.DYNAMICS_DATA = {
         "requires_external_service": null,
         "n_input_records": 457,
         "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:21:25.060471+00:00"
+        "generated_at": "2026-08-21T00:33:10.449784+00:00"
       }
     }
   }

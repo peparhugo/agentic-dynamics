@@ -5,7 +5,7 @@ Re-implements basin topology analysis using Neo4j Cypher queries.
 Validates against the original JSON-based results, then runs graph-native
 cross-cutting queries impossible with Python filtering alone.
 
-Output: experiments/results/lab_basin_topology_neo4j.json
+Output: experiments/results/legacy_labs/lab_basin_topology_neo4j.json
 """
 
 import json
@@ -21,8 +21,12 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 from agentic_dynamics.knowledge.graph import Neo4jClient
 
-ORIGINAL_PATH = ROOT / "experiments" / "results" / "lab_basin_topology.json"
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_basin_topology_neo4j.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+ORIGINAL_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_basin_topology.json"
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_basin_topology_neo4j.json"
 
 
 MODEL_LABELS = {

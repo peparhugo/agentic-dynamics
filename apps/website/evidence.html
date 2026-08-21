@@ -213,46 +213,124 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <div class="insight"><strong>Finding:</strong> Two clean behavioral regimes. DeepSeek and OpenAI are uniformly <strong style="color:var(--ac)">EXPLORATORY</strong> — 100% correctness, ~all constraints met, high novelty (0.82–0.91), and basin escape of 0.68–0.78: they leave the seed and find new solutions. Claude is <strong style="color:var(--am)">MIXED</strong> — conservative, exploratory, or wasteful depending on the story — with lower escape (0.44–0.48) and novelty (0.52–0.59), but ~3× higher code quality (0.13–0.17 vs 0.04–0.09) and the cleanest LSP output. The Claude correctness gap (0.55–0.58) is the subscription CLI's session-timeout limit, not a capability gap. And the <strong style="color:var(--cy)">EFFICIENT</strong> archetype is empty — no model is simultaneously cheap, reliable, clean, and basin-stable.</div>
 
-<div class="insight" style="border-left-color:var(--success)"><strong style="color:var(--success)">Cleanliness is decoupled from cost too:</strong> the cheapest model (Flash) has the most LSP errors (13.5/story) and the lowest code-quality score (0.035), while the next-cheapest (Luna) has the cleanest LSP (5.1). Claude Haiku ($1.59) scores 0.167 on code quality — ~5× Flash's. Paying more buys neither fewer diagnostics nor higher cleanliness; these signals move independently of price.</div>
+<!-- Figures injected from D.labs.quality_frontier (contract-bearing). This paragraph
+     previously carried transcribed numbers from a long-superseded run (13.5 LSP errors,
+     0.035/0.167 quality scores) that no lab output had matched for months. -->
+<div class="insight" style="border-left-color:var(--success)"><strong style="color:var(--success)">Cleanliness is decoupled from cost too:</strong> the cheapest model (<span id="qf-cheapest">—</span>) scores <span id="qf-cheapest-quality">—</span> on code quality, while the highest-scoring model (<span id="qf-best">—</span>, <span id="qf-best-quality">—</span>) costs <span id="qf-best-cost">—</span>. Quality does not rise with price across the corpus; the two signals move independently. <strong>LSP diagnostics are not reported</strong> (<span id="qf-lsp-note">—</span>): the language server never ran on these codebases, so a per-story error count would be an unmeasured zero rather than a clean bill of health.</div>
 </section>
 
 <!-- Longitudinal story evidence. -->
 <section class="sec alt">
 <h2 id="arc">The Five-Session Arc</h2>
-<p class="lead">The defining feature of the story instrument is the arc: each session commits onto the last, so the codebase — and the context the next session must read — grows. The Snowball Rule is measurable: <strong style="color:var(--am)">session cost roughly doubles from greenfield to cross-cutting</strong> ($0.16 → $0.34), tokens rise from 18.7K to 34.9K, and tests accumulate from 4.4 to 14.8 as the surface area to verify expands.</p>
+<p class="lead">The defining feature of the story instrument is the arc: each session commits onto the last, so the codebase — and the context the next session must read — grows. The Snowball Rule is measurable: <strong style="color:var(--am)">session cost roughly doubles from greenfield to cross-cutting</strong> (<span id="arc-snowball-claim">—</span>), and tests accumulate as the surface area to verify expands.</p>
 
+<!-- Rendered from D.labs.story_arc (contract-bearing). Previously hand-typed, which is how
+     it drifted: the transcribed figures were from a 156-story corpus while the lab had moved
+     on. A table that restates a measurement must read the measurement. -->
 <div class="tbl"><table>
 <thead><tr><th>Session</th><th>Task type</th><th>Avg cost</th><th>Avg tokens</th><th>Avg tests</th></tr></thead>
-<tbody>
-<tr><td class="mono">1</td><td>greenfield</td><td class="mono green">$0.16</td><td class="mono">18.7K</td><td class="mono">4.4</td></tr>
-<tr><td class="mono">2</td><td>feature</td><td class="mono green">$0.21</td><td class="mono">23.5K</td><td class="mono">8.4</td></tr>
-<tr><td class="mono">3</td><td>integration</td><td class="mono amber">$0.32</td><td class="mono">29.4K</td><td class="mono">10.6</td></tr>
-<tr><td class="mono">4</td><td>refactor</td><td class="mono amber">$0.29</td><td class="mono">30.0K</td><td class="mono">10.9</td></tr>
-<tr><td class="mono">5</td><td>cross-cutting</td><td class="mono red">$0.34</td><td class="mono">34.9K</td><td class="mono">14.8</td></tr>
-</tbody></table></div>
+<tbody id="arc-session-tbody"><tr><td colspan="5" class="mono">no canonical story-arc data</td></tr></tbody>
+</table></div>
 
 <div class="insight"><strong>Key insight:</strong> the N² term isn't an equation — it's the chained sessions. Every session grows the codebase, and every new line inflates the cost of the next one. This is why per-session cost is the wrong unit: the <em>marginal</em> cost of a change is a function of everything that came before it. A FinOps model that prices session 5 like session 1 systematically under-budgets maintenance work by ~2×.</div>
 
 <div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="snowballChart"></canvas></div>
-<p style="font-size:0.72rem;color:var(--t3);text-align:center">Avg cost per session across all 156 stories ([M] measured). Source: <code>D.labs.story_arc</code>.</p>
+<p style="font-size:0.72rem;color:var(--t3);text-align:center">Avg cost per session across <span id="arc-story-count">—</span> canonical stories ([M] measured). Source: <code>D.labs.story_arc</code>.</p>
 
 <h3 id="does-perturbing-the-seed-change-the-whole-arc" style="margin-top:2rem;color:var(--ac)">Does perturbing the seed change the whole arc?</h3>
+<!-- Rendered from D.labs.condition_effects (contract-bearing). -->
 <div class="tbl"><table>
 <thead><tr><th>Condition</th><th>Cells</th><th>Success</th><th>Cascade recovery</th><th>Avg cost</th></tr></thead>
-<tbody>
-<tr><td>clean</td><td class="mono">96</td><td class="mono green">91%</td><td class="mono">0%</td><td class="mono">$1.25</td></tr>
-<tr><td>bad_seed</td><td class="mono">40</td><td class="mono">88%</td><td class="mono">2%</td><td class="mono">$1.48</td></tr>
-<tr><td>early_degrade</td><td class="mono">85</td><td class="mono amber">85%</td><td class="mono amber">4%</td><td class="mono">$1.29</td></tr>
-</tbody></table></div>
-<div class="insight" style="border-left-color:var(--am)"><strong style="color:var(--am)">Condition effects are modest but monotonic:</strong> corrupting the session-1 spec (<code>early_degrade</code>) drops success to 85% and doubles the cascade rate — the degraded spec leaks, but ~85% of cells still recover to passing. A pre-degraded seed (<code>bad_seed</code>) costs the most ($1.48/story) but succeeds 88% of the time. Degradation raises cost and cascades slightly; it does not dominate the outcome.</div>
+<tbody id="condition-tbody"><tr><td colspan="5" class="mono">no canonical condition data</td></tr></tbody>
+</table></div>
+<div class="insight" style="border-left-color:var(--am)"><strong style="color:var(--am)">Condition effects are modest:</strong> corrupting the session-1 spec (<code>early_degrade</code>) lowers the success rate relative to <code>clean</code> — the degraded spec leaks — but most cells still recover to passing, and the cascade rate stays low in both arms. Degradation raises risk at the margin; it does not dominate the outcome. <strong>Note on arms:</strong> a cell labelled <code>bad_seed</code>/<code>early_degrade</code> that carries no instrumented test verdict received no actual perturbation (<code>docs/data_integrity_findings.md</code> treatment rule 1) and is counted as <code>clean</code>, so the arms above are the corrected ones, not the raw labels. The 77 tombstoned contaminated cells are excluded entirely.</div>
 </section>
 
 <script>
+// ---------------------------------------------------------------------------
+// The Five-Session Arc — every figure in this section is rendered from the
+// contract-bearing lab JSONs in data.js (D.labs.story_arc, D.labs.condition_effects).
+// Nothing here is transcribed by hand: transcription is what let the section drift out
+// of step with the corpus (semantic-integrity release, review item 3). When a lab is
+// absent the placeholder row stays — an unmeasured value is never filled in.
+// ---------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', function () {
   var D = window.DYNAMICS_DATA;
+  var labs = (D && D.labs) || {};
+
+  var fmtUsd = function (v) { return '$' + Number(v || 0).toFixed(2); };
+  var fmtTok = function (v) { return (Number(v || 0) / 1000).toFixed(1) + 'K'; };
+  var fmtPct = function (v) { return v === null || v === undefined ? '—' : Math.round(v * 100) + '%'; };
+
+  // --- session table + the lead-paragraph snowball claim ---
+  var arcLab = labs.story_arc || {};
+  var sessions = arcLab.sessions || [];
+  var arcBody = document.getElementById('arc-session-tbody');
+  if (arcBody && sessions.length) {
+    // Cost colouring is relative to the arc's own range, not fixed thresholds, so it
+    // stays meaningful when the corpus changes.
+    var maxCost = Math.max.apply(null, sessions.map(function (s) { return s.avg_cost; }));
+    arcBody.innerHTML = sessions.map(function (s) {
+      var ratio = maxCost ? s.avg_cost / maxCost : 0;
+      var cls = ratio > 0.9 ? 'red' : (ratio > 0.7 ? 'amber' : 'green');
+      return '<tr><td class="mono">' + s.session_number + '</td>' +
+             '<td>' + String(s.task_type).replace(/_/g, '-') + '</td>' +
+             '<td class="mono ' + cls + '">' + fmtUsd(s.avg_cost) + '</td>' +
+             '<td class="mono">' + fmtTok(s.avg_tokens) + '</td>' +
+             '<td class="mono">' + Number(s.avg_tests || 0).toFixed(1) + '</td></tr>';
+    }).join('');
+  }
+
+  var claim = document.getElementById('arc-snowball-claim');
+  if (claim && sessions.length >= 2) {
+    claim.textContent = fmtUsd(sessions[0].avg_cost) + ' → ' + fmtUsd(sessions[sessions.length - 1].avg_cost);
+  }
+
+  var countEl = document.getElementById('arc-story-count');
+  if (countEl && arcLab.summary && arcLab.summary.stories) {
+    countEl.textContent = String(arcLab.summary.stories);
+  }
+
+  // --- quality-frontier claims (cheapest vs best-quality, and the LSP absence) ---
+  var qf = (labs.quality_frontier && labs.quality_frontier.models) || [];
+  if (qf.length) {
+    var set = function (id, text) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
+    // `models` is sorted by avg_cost ascending by the lab.
+    var cheapest = qf[0];
+    var best = qf.reduce(function (a, b) {
+      return b.code_quality_score > a.code_quality_score ? b : a;
+    }, qf[0]);
+    set('qf-cheapest', cheapest.model);
+    set('qf-cheapest-quality', Number(cheapest.code_quality_score).toFixed(3));
+    set('qf-best', best.model);
+    set('qf-best-quality', Number(best.code_quality_score).toFixed(3));
+    set('qf-best-cost', fmtUsd(best.avg_cost));
+    var lspCells = (labs.quality_frontier.summary || {}).lsp_available_cells || 0;
+    set('qf-lsp-note', lspCells
+      ? lspCells + ' cells with a language server'
+      : '0 of ' + ((labs.quality_frontier.summary || {}).analyses || 0) + ' analysed cells had one available');
+  }
+
+  // --- condition-effects table ---
+  var conditions = (labs.condition_effects && labs.condition_effects.conditions) || [];
+  var condBody = document.getElementById('condition-tbody');
+  if (condBody && conditions.length) {
+    condBody.innerHTML = conditions.map(function (c) {
+      var successCls = c.success_rate >= 0.95 ? 'green' : (c.success_rate >= 0.9 ? '' : 'amber');
+      return '<tr><td>' + c.condition + '</td>' +
+             '<td class="mono">' + c.cells + '</td>' +
+             '<td class="mono ' + successCls + '">' + fmtPct(c.success_rate) + '</td>' +
+             '<td class="mono">' + fmtPct(c.cascade_rate) + '</td>' +
+             '<td class="mono">' + fmtUsd(c.avg_cost) + '</td></tr>';
+    }).join('');
+  }
+
   var ctx = document.getElementById('snowballChart');
   if (!D || !ctx) return;
-  var arc = D.labs && D.labs.story_arc && D.labs.story_arc.sessions;
+  var arc = sessions;
   if (!arc || !arc.length) return;
   var labels = arc.map(function (s) { return 'S' + s.session_number + ' · ' + s.task_type; });
   var costs = arc.map(function (s) { return s.avg_cost; });

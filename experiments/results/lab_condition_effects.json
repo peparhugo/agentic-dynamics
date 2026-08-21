@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_condition_effects",
-  "generated_at": "2026-08-21T02:20:07.451094",
+  "generated_at": "2026-08-21T02:33:08.689359",
   "summary": {
     "conditions": 2,
     "stories": 215,
@@ -38,6 +38,6 @@
     "requires_external_service": null,
     "n_input_records": 457,
     "contract_version": "lab-contract/v1",
-    "generated_at": "2026-08-21T00:20:07.451115+00:00"
+    "generated_at": "2026-08-21T00:33:08.689382+00:00"
   }
 }

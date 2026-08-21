@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_story_arc",
-  "generated_at": "2026-08-21T02:18:53.476741",
+  "generated_at": "2026-08-21T02:33:09.384866",
   "summary": {
     "snowball_factor": 2.26,
     "session1_cost": 0.1668,
@@ -122,6 +122,6 @@
     "requires_external_service": null,
     "n_input_records": 215,
     "contract_version": "lab-contract/v1",
-    "generated_at": "2026-08-21T00:18:53.476829+00:00"
+    "generated_at": "2026-08-21T00:33:09.384957+00:00"
   }
 }

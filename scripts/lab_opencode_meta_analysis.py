@@ -5,7 +5,7 @@ Orchestrates analysis sessions where deepseek-v4-flash (via opencode harness)
 reads experiment data and produces qualitative analysis. Each analysis session
 is recorded, costed, and traceable — a meta-experiment.
 
-Output: experiments/results/lab_opencode_meta_analysis.json
+Output: experiments/results/legacy_labs/lab_opencode_meta_analysis.json
 """
 
 import json
@@ -22,7 +22,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 from agentic_dynamics.reporting.opencode_analyzer import OpencodeAnalyzer, _load_summary
 
-OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_opencode_meta_analysis.json"
+#: Quarantined lab (scripts/lab_manifest.json): its input is the RETIRED
+#: _results_summary.json, so its output must never sit beside the contract-bearing
+#: results. It writes into experiments/results/legacy_labs/ — see that directory's
+#: README. Running this by hand is still supported; publishing it is not.
+OUTPUT_PATH = ROOT / "experiments" / "results" / "legacy_labs" / "lab_opencode_meta_analysis.json"
 
 ANALYSIS_TASKS = [
     {
