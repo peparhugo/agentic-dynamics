@@ -13,12 +13,12 @@ jobs:
       issues: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: anomalyco/opencode/github@latest
+      - uses: anomalyco/opencode/github@2859603cbb5e346d1c32519cb3f5ee58b0d78455  # pinned (HEAD at pin time)
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         with:
@@ -27,7 +27,8 @@ jobs:
             Review this PR for the following:
 
             1. **Measurement correctness** — does any change affect the measurement pipeline
-               (perturb.py, opencode.py, solution.py, basin.py, efficiency.py, strategy.py)?
+               (measurement/perturb.py, adapters/opencode.py, measurement/solution.py,
+               measurement/basin.py, measurement/efficiency.py, measurement/strategy.py)?
                Flag anything that could introduce bias or break apples-to-apples comparison.
 
             2. **Conventions** — check against conventions/python.yaml and conventions/typescript.yaml.
@@ -35,20 +36,22 @@ jobs:
                public signatures. See AGENTS.md conventions section.
 
             3. **Module boundaries** — verify new code uses correct module imports according to
-               the architecture in .opencode/instructions/mental-model.md. language.py is foundation
-               (no internal deps), core measurement chain is standalone.
+               the architecture in .opencode/instructions/mental-model.md. core/language.py is
+               foundation (no internal deps); the measurement chain is standalone; control must
+               not import knowledge.retrieval or knowledge.prompt_constructor.
 
-            4. **Exports** — all new public symbols must be re-exported from src/instrument/__init__.py
-               with entries in __all__.
+            4. **Exports** — all new public symbols must be re-exported from the owning plane's
+               __init__.py (src/agentic_dynamics/<plane>/__init__.py) with entries in __all__.
 
-            5. **Test coverage** — new modules or functions in src/instrument/ should have
+            5. **Test coverage** — new modules or functions in src/agentic_dynamics/ should have
                corresponding tests in tests/. New scripts should be importable.
 
-            6. **Deprecation awareness** — do not use deprecated modules: experiment.py, adapter.py,
-               lab_book.py. Use opencode.py and run_opencode_agentic() instead.
+            6. **Deprecation awareness** — do not use the retired modules (experiment.py,
+               adapter.py, lab_book.py, or the old instrument package). Use
+               agentic_dynamics.adapters.opencode.run_opencode_agentic().
 
             7. **PROVIDER_PRICING** — never hardcode model prices. Use the PROVIDER_PRICING dict
-               from efficiency.py.
+               from agentic_dynamics.measurement.efficiency.
 
             Focus on issues that affect experimental validity. Be specific about file paths and
             line numbers. Suggest concrete fixes.

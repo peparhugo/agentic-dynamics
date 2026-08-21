@@ -1155,6 +1155,22 @@ instead of importing `server`.
 
 **s9_control_room_di result: 5/5 PASS.**
 
+### s10_hygiene_cap — CAP placeholders + hygiene (review P3)
+
+**The drift.** `ARCHITECTURE.md` §4 described seven CAP homes as "empty placeholders" that were
+absent on disk; README counts and the deploy path had drifted from the tree; `.scannerwork/` +
+`.sonar_lock` were tracked but never ignored; CI action/`ruff` versions were unpinned.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **CAP placeholders created** — the seven reserved homes of `ARCHITECTURE.md` §4 exist as empty modules (docstring + `# reserved for CAP I<n>`, nothing more): `control/facts.py` (I0), `control/reducers/__init__.py` (I1–I3), `control/context_compiler.py` (I4), `core/contracts.py` (I5), `control/rules.py` + `control/validator.py` + `control/decisions.py` (I6) — the doc is now true | PASS |
+| 2 | **`.scannerwork/` hygiene** — added to `.gitignore`; `.scannerwork/.sonar_lock` untracked (`git rm --cached`), still on disk | PASS |
+| 3 | **CI versions pinned** — `actions/checkout` → `@11bd719…` (v4.2.2), `actions/setup-python` → `@0b93645…` (v5.3.0), `anomalyco/opencode/github` → `@2859603…` (pinned HEAD), `ruff` → `==0.16.2`; the opencode-review prompt's stale `src/instrument/` + flat-module references repointed to `src/agentic_dynamics/<plane>/` | PASS |
+| 4 | **README counts fixed** — game reports 224→344, configs 37→36 (34→33 measurement), specs 77→79 (8→6 experiments, 69→73 workflows), lab books 19→20 (canonical+quarantined); dropped the drift-prone "60 modules"/"73 scripts" counts; removed the phantom `firebase/` structure line (deploy config is `apps/website/firebase.json`); the data-pipeline diagram no longer shows the retired `_results_summary.json` as a build input | PASS |
+| 5 | **Full suite green** — 1505 passed, 1 skipped (the empty placeholder modules pass the dependency-direction + data-flow guards; `README.md` (status: accepted) passes the stale-path guard) | PASS |
+
+**s10_hygiene_cap result: 5/5 PASS.**
+
 
 
 
