@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from flask import Response, jsonify, request
 
-from apps.control_room import server
+from apps.control_room.services.context import ControlRoomServices
 from apps.control_room.services.mutations import _design_mutation_body, _idempotent_design_response
 
+#: The injected application context, bound by ``register()`` before any request is served.
+_services: ControlRoomServices | None = None
 
 def api_flags() -> Response:
     """Return newest retained supervisor assessments with exact review metadata."""
@@ -19,7 +21,7 @@ def api_flags() -> Response:
     except ValueError:
         requested_limit = 50
     limit = min(100, max(1, requested_limit))
-    envelope, status = server._load_supervisor_flags(limit)
+    envelope, status = _services.load_supervisor_flags(limit)
     return jsonify(envelope), status
 
 def api_supervisor_steer(session_id: str) -> Response:
@@ -34,16 +36,16 @@ def api_supervisor_steer(session_id: str) -> Response:
         return jsonify({"error": "cell_id is required"}), 400
     if not isinstance(prompt, str) or not prompt.strip():
         return jsonify({"error": "nonblank prompt is required"}), 400
-    if len(prompt) > server.MAX_DESIGN_PROMPT_CHARS:
-        return jsonify({"error": f"prompt must be at most {server.MAX_DESIGN_PROMPT_CHARS} characters"}), 400
+    if len(prompt) > _services.max_design_prompt_chars:
+        return jsonify({"error": f"prompt must be at most {_services.max_design_prompt_chars} characters"}), 400
 
     def steer() -> tuple[Response, int] | Response:
         """Recheck ownership immediately before the OpenCode side effect."""
-        _flag, denied = server._authorize_supervisor_action(session_id, cell_id)
+        _flag, denied = _services.authorize_supervisor_action(session_id, cell_id)
         if denied:
             return denied
-        server._opencode_client().send_input(session_id, prompt.strip(), delivery="steer")
-        server._emit_actuation_record(
+        _services.opencode_client().send_input(session_id, prompt.strip(), delivery="steer")
+        _services.emit_actuation_record(
             _flag,
             actuation_kind="steer",
             target_cell_id=cell_id,
@@ -68,11 +70,11 @@ def api_supervisor_interrupt(session_id: str) -> Response:
 
     def interrupt() -> tuple[Response, int] | Response:
         """Recheck ownership immediately before the irreversible request."""
-        _flag, denied = server._authorize_supervisor_action(session_id, cell_id)
+        _flag, denied = _services.authorize_supervisor_action(session_id, cell_id)
         if denied:
             return denied
-        server._opencode_client().interrupt(session_id)
-        server._emit_actuation_record(
+        _services.opencode_client().interrupt(session_id)
+        _services.emit_actuation_record(
             _flag,
             actuation_kind="interrupt",
             target_cell_id=cell_id,
@@ -81,8 +83,10 @@ def api_supervisor_interrupt(session_id: str) -> Response:
 
     return _idempotent_design_response(f"supervisor-interrupt:{session_id}", body, interrupt)
 
-def register(app):
-    """Register this module's routes on the Flask app (server.py composition root)."""
+def register(app, services: ControlRoomServices) -> None:
+    """Register this module's routes on the Flask app, receiving the application context."""
+    global _services
+    _services = services
     app.get("/api/flags")(api_flags)
     app.post("/api/flags/<session_id>/steer")(api_supervisor_steer)
     app.post("/api/flags/<session_id>/interrupt")(api_supervisor_interrupt)

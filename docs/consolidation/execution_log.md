@@ -1127,6 +1127,34 @@ When a checkout *has* the ledgers, those 4 specs now correctly report `failed`.
 
 **s8_lifecycle_backfill result: 6/6 PASS.**
 
+### s9_control_room_di — invert the service locator (review P2)
+
+**The smell.** All five route modules did `from apps.control_room import server` and read
+`server._redis` / `server._design_sessions` / `server._DUCK` / `server._DEMO_MODE` … at request
+time — the composition root used as a service locator, with a circular conceptual dependency
+between the routes and the server (the tests only pass because they monkeypatch the server's
+private names).
+
+**The fix.** A new `ControlRoomServices` dataclass (`apps/control_room/services/context.py`)
+makes the dependencies explicit: the four service modules the review names (`telemetry`,
+`registry`, `supervisor`, `design_sessions`) plus `mutations`, the stable config, and *lazy*
+accessors for the server-owned factories (`redis()`, `design_manager()`, `opencode_client()`,
+`claude_agents()`, `claude_agent_workdirs()`) and the supervisor functions
+(`load_supervisor_flags()`, `authorize_supervisor_action()`, `emit_actuation_record()`) and the
+monkeypatched `data_manifest_path`. `server.py` builds one instance and passes it into
+`routes.register(app, services)`; each route module stores it and reads `services.redis()` etc.
+instead of importing `server`.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **`ControlRoomServices` dataclass** — `telemetry`/`registry`/`supervisor`/`design_sessions`/`mutations` service modules + stable config + lazy server accessors | PASS |
+| 2 | **Passed into route registration** — `server.py` builds it via `build_services()` and calls `_routes.register(app, services)`; `routes.register` forwards it to all six submodules | PASS |
+| 3 | **Routes receive it, not `import server`** — all six route modules dropped `from apps.control_room import server`; handlers read `services.redis()` / `services.design_manager()` / `_services.max_design_prompt_chars` … (verified: zero `from apps.control_room import server` in `routes/`) | PASS |
+| 4 | **Behaviour-identical** — the lazy accessors delegate to `server.*` at call time, so `monkeypatch.setattr(server, "_redis", …)` / `DATA_MANIFEST_PATH` / `_emit_actuation_record` still win; the admin/control-room suite passes unchanged (123 tests) | PASS |
+| 5 | **Local change only** — 8 files under `apps/control_room/` (routes + server) + 1 new `services/context.py`; `services/` business logic and `clients/` untouched; full suite green (1505 passed, 1 skipped) | PASS |
+
+**s9_control_room_di result: 5/5 PASS.**
+
 
 
 

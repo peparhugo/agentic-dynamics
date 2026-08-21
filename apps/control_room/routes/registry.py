@@ -1,7 +1,7 @@
 """Manifest-registry routes (table + lineage).
 
 Extracted from ``server.py`` (refactor-repair Debt-1). Pure file reads over the cached compacted
-registry; ``server.DATA_MANIFEST_PATH`` is read through ``server.*`` so the tests' monkeypatch
+registry; ``_services.data_manifest_path`` is read through ``server.*`` so the tests' monkeypatch
 keeps working.
 """
 from __future__ import annotations
@@ -10,10 +10,12 @@ from typing import Any
 
 from flask import Response, jsonify, request
 
-from apps.control_room import server
+from apps.control_room.services.context import ControlRoomServices
 from apps.control_room.services.registry import _load_registry_cached
 from scripts import registry as registry_cli
 
+#: The injected application context, bound by ``register()`` before any request is served.
+_services: ControlRoomServices | None = None
 
 def api_registry() -> Response:
     """Filterable table over the manifest's registry array — GET only, read-only by
@@ -30,7 +32,7 @@ def api_registry() -> Response:
     argparse's dash-to-underscore convention already applied since these are query
     string keys, not flags).
     """
-    rows = _load_registry_cached(server.DATA_MANIFEST_PATH)
+    rows = _load_registry_cached(_services.data_manifest_path)
 
     record_type = request.args.get("record_type")
     if record_type:
@@ -61,7 +63,7 @@ def api_registry_lineage(entity_id) -> Response:
     heavier dependency than this read-only surface needs for the one-hop view it exists
     to serve.
     """
-    rows = _load_registry_cached(server.DATA_MANIFEST_PATH)
+    rows = _load_registry_cached(_services.data_manifest_path)
     matches = [r for r in rows if r.get("entity_id") == entity_id]
     if not matches:
         return jsonify({"error": "not_found", "entity_id": entity_id}), 404
@@ -84,7 +86,9 @@ def api_registry_lineage(entity_id) -> Response:
         response["causes_record"] = causes_matches[0] if causes_matches else None
     return jsonify(response)
 
-def register(app):
-    """Register this module's routes on the Flask app (server.py composition root)."""
+def register(app, services: ControlRoomServices) -> None:
+    """Register this module's routes on the Flask app, receiving the application context."""
+    global _services
+    _services = services
     app.get("/api/registry")(api_registry)
     app.get("/api/registry/<entity_id>")(api_registry_lineage)
