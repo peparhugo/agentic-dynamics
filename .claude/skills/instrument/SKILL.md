@@ -168,7 +168,6 @@ from agentic_dynamics.measurement.efficiency import PROVIDER_PRICING
 python scripts/batch_run.py          # parallel batch on DeepSeek
 python scripts/sweep_parallel.py     # 4 models × 2 modes × 2 ops
 python scripts/sweep_silent_mode.py  # Explanation Tax decomposition
-python scripts/finish_sweep.py       # incomplete sweep cells
 
 # Redis queue (story experiments) — see the `queue` skill:
 agentic-dynamics queue enqueue
@@ -211,7 +210,7 @@ agentic-dynamics queue monitor
 
 - Don't confuse `run_opencode_agentic()` (real LLM call) with `evaluate_solution()` (static analysis).
 - `PROVIDER_PRICING` is the source of truth for cost calculations.
-- Retired: `experiment.py`, `adapter.py`, `lab_book.py`, `src/instrument/` — use
+- Retired: `experiment.py`, `adapter.py`, `lab_book.py`, and the old `instrument` package — use
   `agentic_dynamics.adapters.opencode`.
 - Worktrees at `/tmp/exp_*` persist between sessions; clean with `rm -rf /tmp/exp_*`.
 - Silent mode suppresses the model's reasoning text — measured for the Explanation Tax.

@@ -48,13 +48,15 @@ ALLOWLIST: dict[str, frozenset[str]] = {
     # src/instrument/", "src/instrument/ no longer exists") — historical, not a current path.
     "ARCHITECTURE.md": frozenset({"src/instrument/"}),
     # --- directories of historical records (critiques, release logs, research) ---
-    "docs/review/": _ALL,                # external/internal critiques of the pre-refactor tree
-    "docs/consolidation/": _ALL,         # S0–S6 release records (describe the move itself)
+    "docs/review/": _ALL,  # external/internal critiques of the pre-refactor tree
+    "docs/consolidation/": _ALL,  # S0–S6 release records (describe the move itself)
     "docs/control_room_ui/": frozenset({"src/instrument/", "admin/server.py"}),
     "docs/context_abstraction/": frozenset({"src/instrument/"}),
     "docs/spec_lifecycle/": frozenset({"src/instrument/"}),
     # --- rebrand + website archaeology (firebase/public/ → apps/website/, src/instrument/) ---
-    "docs/agentic_dynamics_arxiv_draft.md": frozenset({"src/instrument/", "firebase/public/", "code_reviews/2026-08-14"}),
+    "docs/agentic_dynamics_arxiv_draft.md": frozenset(
+        {"src/instrument/", "firebase/public/", "code_reviews/2026-08-14"}
+    ),
     "docs/agentic_dynamics_rebrand_plan.md": frozenset({"src/instrument/", "firebase/public/"}),
     "docs/agentic_dynamics_rebrand_verify.md": frozenset({"firebase/public/"}),
     "docs/architecture_visual.md": frozenset({"firebase/public/"}),
@@ -62,24 +64,38 @@ ALLOWLIST: dict[str, frozenset[str]] = {
     "docs/fixplan.md": frozenset({"src/instrument/", "admin/server.py", "firebase/public/"}),
     "docs/narrative.md": frozenset({"firebase/public/"}),
     "docs/redesign.md": frozenset({"firebase/public/"}),
-    "docs/remediation_plan.md": frozenset({"src/instrument/", "experiments/configs/", "firebase/public/"}),
+    "docs/remediation_plan.md": frozenset(
+        {"src/instrument/", "experiments/configs/", "firebase/public/"}
+    ),
     "docs/remediation_verify.md": frozenset({"src/instrument/", "firebase/public/"}),
     "docs/verify_evidence.md": frozenset({"firebase/public/"}),
     "docs/verify_evidence_redesign.md": frozenset({"firebase/public/"}),
     "docs/verify_framework.md": frozenset({"firebase/public/"}),
     # --- opencode docs refresh + Claude Code port (document the admin/server.py mapping) ---
     "docs/opencode_docs_challenge.md": frozenset({"src/instrument/"}),
-    "docs/opencode_docs_scope.md": frozenset({"src/instrument/", "experiments/configs/", "admin/server.py", "code_reviews/2026-08-14"}),
-    "docs/opencode_docs_spec.md": frozenset({"src/instrument/", "experiments/configs/", "admin/server.py", "code_reviews/2026-08-14"}),
+    "docs/opencode_docs_scope.md": frozenset(
+        {"src/instrument/", "experiments/configs/", "admin/server.py", "code_reviews/2026-08-14"}
+    ),
+    "docs/opencode_docs_spec.md": frozenset(
+        {"src/instrument/", "experiments/configs/", "admin/server.py", "code_reviews/2026-08-14"}
+    ),
     "docs/claude_code_port.md": frozenset({"admin/server.py"}),
-    "docs/claude_tools_to_skills_scope.md": frozenset({"src/instrument/", "experiments/configs/", "admin/server.py"}),
-    "docs/claude_tools_to_skills_verify.md": frozenset({"src/instrument/", "experiments/configs/", "admin/server.py"}),
+    "docs/claude_tools_to_skills_scope.md": frozenset(
+        {"src/instrument/", "experiments/configs/", "admin/server.py"}
+    ),
+    "docs/claude_tools_to_skills_verify.md": frozenset(
+        {"src/instrument/", "experiments/configs/", "admin/server.py"}
+    ),
     # --- routing design/survey/verify (predate the package rename + Control Room move) ---
-    "docs/routing_design.md": frozenset({"src/instrument/", "admin/server.py", "code_reviews/2026-08-14"}),
+    "docs/routing_design.md": frozenset(
+        {"src/instrument/", "admin/server.py", "code_reviews/2026-08-14"}
+    ),
     "docs/routing_follow_up_verify.md": frozenset({"src/instrument/"}),
     "docs/routing_next_steps.md": frozenset({"src/instrument/"}),
     "docs/routing_signal_store_notes.md": frozenset({"src/instrument/"}),
-    "docs/routing_survey.md": frozenset({"src/instrument/", "admin/server.py", "firebase/public/", "code_reviews/2026-08-14"}),
+    "docs/routing_survey.md": frozenset(
+        {"src/instrument/", "admin/server.py", "firebase/public/", "code_reviews/2026-08-14"}
+    ),
     "docs/routing_verify.md": frozenset({"src/instrument/"}),
     # --- spec/scope/challenge/verify (pre-refactor design + verification) ---
     "docs/challenge.md": frozenset({"src/instrument/", "admin/server.py"}),
@@ -122,6 +138,17 @@ def _scan_targets() -> list[Path]:
     return sorted(targets)
 
 
+def _agent_config_targets() -> list[Path]:
+    """Every file under the neutral ``agent_config/`` source (agents, skills, commands, rules…).
+
+    These are the *active* agent-context files the renderers project into ``.opencode/`` +
+    ``.claude/`` — executable context for the systems that modify the repo, so a retired-path
+    mention here is the highest-severity staleness (review item 6: "extend the stale-path guard
+    to the complete ``agent_config/**`` tree").
+    """
+    return sorted((ROOT / "agent_config").rglob("*.md"))
+
+
 def _is_allowed(rel: str, family: str) -> bool:
     """True when ``rel`` (or a directory prefix of it) explicitly allows ``family``."""
     for prefix, allowed in ALLOWLIST.items():
@@ -140,10 +167,34 @@ def test_accepted_docs_use_no_retired_paths():
         text = path.read_text(encoding="utf-8")
         for family in RETIRED_PATH_FAMILIES:
             if family in text and not _is_allowed(rel, family):
-                violations.append(f"{rel}: {family!r} (retired — repoint or add an allowlist entry)")
-    assert not violations, (
-        "accepted/current docs referencing retired paths:\n"
-        + "\n".join(sorted(violations))
+                violations.append(
+                    f"{rel}: {family!r} (retired — repoint or add an allowlist entry)"
+                )
+    assert not violations, "accepted/current docs referencing retired paths:\n" + "\n".join(
+        sorted(violations)
+    )
+
+
+def test_agent_config_uses_no_retired_paths():
+    """No ``agent_config/**`` file names a retired path family.
+
+    Unlike the accepted-docs check above, there is **no** allowlist here: the neutral
+    agent-context source must never carry a retired path, even in historical framing — the
+    semantic guard (``test_agent_config_semantic.py``) independently proves every *referenced*
+    path resolves, and this check proves every retired *family* is absent entirely.
+    """
+    violations: list[str] = []
+    for path in _agent_config_targets():
+        rel = str(path.relative_to(ROOT))
+        text = path.read_text(encoding="utf-8")
+        for family in RETIRED_PATH_FAMILIES:
+            if family in text:
+                violations.append(f"{rel}: {family!r} (retired — repoint to the current path)")
+    assert not violations, "agent_config files referencing retired paths:\n" + "\n".join(
+        sorted(violations)
+    )
+    assert not violations, "accepted/current docs referencing retired paths:\n" + "\n".join(
+        sorted(violations)
     )
 
 

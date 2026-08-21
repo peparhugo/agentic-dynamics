@@ -110,7 +110,7 @@ token split). Query with `get()`, `is_measured()`, `measured_signals()`, `reserv
 ## Conventions
 
 - Snake_case functions, PascalCase classes, type hints on public signatures.
-- Retired: `experiment.py`, `adapter.py`, `lab_book.py`, `src/instrument/` — use
+- Retired: `experiment.py`, `adapter.py`, `lab_book.py`, and the old `instrument` package — use
   `agentic_dynamics.adapters.opencode.run_opencode_agentic()`.
 - `PROVIDER_PRICING` (in `measurement.efficiency`) is the single source of truth for cost — never hardcode.
 - Spec authoring: measurement rules produce information; control rules consume it.

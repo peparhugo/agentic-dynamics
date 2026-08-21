@@ -9,8 +9,8 @@ import sys, json
 from pathlib import Path
 
 sys.path.insert(0, "src")
-from instrument.experiment_spec import load_spec, validate_rules
-from instrument.compile_experiment import compile_spec, SpecError
+from agentic_dynamics.experiment.experiment_spec import load_spec, validate_rules
+from agentic_dynamics.experiment.compile_experiment import compile_spec, SpecError
 
 spec_path, mode = sys.argv[1], sys.argv[2]
 spec = load_spec(Path(spec_path))
@@ -36,9 +36,9 @@ else:
 
 export default tool({
   description:
-    "Validate or compile an ExperimentSpec YAML (src/instrument/compile_experiment.py — written, no standalone CLI). validate runs the requires/produces gate only; compile also builds the phase DAG.",
+    "Validate or compile an ExperimentSpec YAML (src/agentic_dynamics/experiment/compile_experiment.py — written, no standalone CLI). validate runs the requires/produces gate only; compile also builds the phase DAG.",
   args: {
-    spec: tool.schema.string().describe("Path to an experiments/specs/*.yaml file"),
+    spec: tool.schema.string().describe("Path to an ExperimentSpec YAML (experiments/definitions/*.yaml or workflows/**/*.yaml)"),
     mode: tool.schema.enum(["validate", "compile"]).optional().default("validate"),
   },
   async execute(args, ctx) {

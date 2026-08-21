@@ -26,8 +26,8 @@ story directly; this skill runs the spec/compiler layer that will eventually gen
 ## `compile_experiment.py` — no CLI, inline snippet only
 
 `src/agentic_dynamics/experiment/compile_experiment.py` has no `argparse`/`__main__` — it's a
-pure library, and no `scripts/*.py` wraps it. There is no `python scripts/compile_experiment.py`
-to run. API:
+pure library, and no `scripts/*.py` wraps it. There is no standalone script wrapper to run.
+API:
 
 ```
 agentic_dynamics.experiment.experiment_spec.load_spec(path) -> ExperimentSpec
@@ -125,8 +125,8 @@ not a hard prerequisite the script itself checks for.
 
 ## Common gotchas
 
-- `compile_experiment.py`'s inline snippet is not a script — do not invent a
-  `scripts/compile_experiment.py` file; it doesn't exist.
+- `compile_experiment.py`'s inline snippet is not a script — do not invent a script wrapper for
+  it; none exists.
 - Don't add `--config` to `run_workflow.py` — its spec argument is `--spec`, not shared naming
   with `run.py`'s positional config.
 - A spec whose control-rule `requires` aren't yet produced by a measurement rule in the ledger

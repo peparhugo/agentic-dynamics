@@ -43,7 +43,7 @@ summary.
 - `scripts/build_data.py` — canonical registry + manifest → data.js
 - `scripts/validate_session.py` — pytest on generated code (`--workdir`, not `--worktree`)
 
-## Lab books (20 active + 8 deprecated)
+## Lab books (canonical + quarantined + deprecated — `scripts/lab_manifest.json` is authoritative)
 
 Classification lives in `scripts/lab_manifest.json` (schema `lab-manifest/v1`), parsed by
 `agentic_dynamics.reporting.lab_manifest` and guarded by `tests/test_lab_manifest.py`. The axis

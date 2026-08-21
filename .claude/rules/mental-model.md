@@ -18,40 +18,43 @@ that chain. Design of the spec/compiler: `docs/designs/current/2026-08-14_experi
 ```
 
 Today (code that exists), the execution chain is still the linear core, which the
-compiler will generalize (see reuse map below):
+compiler will generalize (see reuse map below). Module names are plane-qualified below
+(`measurement.perturb` = `src/agentic_dynamics/measurement/perturb.py`, etc.):
 
 ```
-perturb.py → backends.py → opencode.py / claude_adapter.py → [LLM] → trajectory.py
-                        ↓
-solution.py + basin.py + efficiency.py + recovery.py → strategy.py → game_report.py
+measurement.perturb.perturb_prompt → adapters.backends / adapters.opencode / adapters.claude_adapter
+  → [LLM] → AgenticResult (trajectory captured in session.jsonl, parsed by scripts/analyze_trajectories.py)
+      → measurement.solution + measurement.basin + measurement.efficiency
+        + measurement.recovery_cost + measurement.strategy → reporting.game_report
 
-story.py ── mutation.py, commit_analysis.py, review.py, entropy.py, codebase_graph.py, lsp_diagnostics.py
-routing.py ── recommend model per task type from experiment results
-live.py ──── Redis pub/sub telemetry (feeds admin portal)
+runtime.story ── measurement.mutation, measurement.commit_analysis, reporting.review,
+                 measurement.entropy, measurement.codebase_graph, measurement.lsp_diagnostics
+control.routing ── recommend model per task type from experiment results
+control.live ──── Redis pub/sub telemetry (feeds the Control Room portal)
 ```
 
 ```
-supervisor.py ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/designs/current/supervisor_design.md)
-workflow_runner.py ── executes an agent_task workflow's phases inside a git worktree, committing + ledgering each
-test_runner.py ── independent pytest/jest/go-test/cargo-test runner; sole source of truth for test_executed_success
+control.supervisor ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/designs/current/supervisor_design.md)
+runtime.workflow_runner ── executes an agent_task workflow's phases inside a git worktree, committing + ledgering each
+runtime.test_runner ── independent pytest/jest/go-test/cargo-test runner; sole source of truth for test_executed_success
 ```
 
 ## Package planes (Stage 1 — the modular monorepo)
 
-The former flat `src/agentic_dynamics/` package is re-homed as `src/agentic_dynamics/` with eight
+The former flat `instrument` package is re-homed as `src/agentic_dynamics/` with eight
 bounded planes (`ARCHITECTURE.md` §1; the dependency direction is enforced by
 `tests/test_dependency_direction.py`):
 
-| Plane | Ownership | Modules |
-|---|---|---|
-| `core` | foundation — language, paths, session vocabulary, streaming, constants | 5 |
-| `experiment` | the platform — `ExperimentSpec`, the `requires`/`produces` gate, spec→DAG, spec-lifecycle index | 3 |
-| `measurement` | the measurement apparatus — perturb/mutation/solution/basin/efficiency/… + static analysis | 15 |
-| `runtime` | execution runtime — workflow_runner, test_runner, story, posthoc | 4 |
-| `adapters` | model backends — opencode, claude_adapter, backends | 3 |
-| `knowledge` | knowledge + augmentation — identity/authority, retrieval, prompt-construction, ingestion producers | 16 |
-| `control` | emerging control — routing, signal store, supervisor, telemetry, queue steering, observation/actuation | 9 |
-| `reporting` | research output — game_report, review, analyzers | 4 |
+| Plane | Ownership |
+|---|---|
+| `core` | foundation — language, paths, session vocabulary, streaming, constants |
+| `experiment` | the platform — `ExperimentSpec`, the `requires`/`produces` gate, spec→DAG, spec-lifecycle index |
+| `measurement` | the measurement apparatus — perturb/mutation/solution/basin/efficiency/… + static analysis |
+| `runtime` | execution runtime — workflow_runner, test_runner, story, posthoc |
+| `adapters` | model backends — opencode, claude_adapter, backends |
+| `knowledge` | knowledge + augmentation — identity/authority, retrieval, prompt-construction, ingestion producers |
+| `control` | emerging control — routing, signal store, supervisor, telemetry, queue steering, observation/actuation |
+| `reporting` | research output — game_report, review, analyzers |
 
 Tier map: `core` (0) ← `experiment/measurement/runtime/adapters/knowledge/reporting` (1) ←
 `control` (2) ← `apps` (3). The only tier-1→tier-2 edges are the pinned adapter telemetry seam
@@ -359,13 +362,13 @@ AttemptRecord: attempt_id, job_id, parent_attempt_id, attempt_number, retry_reas
 
 ## Script map
 
-73 scripts (37 maintained commands + 19 active lab books + 15 archived one-time
-migrations + a `_bootstrap.py` helper), each in exactly one bucket of `scripts/CONTEXT.md`'s
-classification manifest (maintained / historical / one-time — machine-parsed by
-`tests/test_script_classification.py`, keep the markers intact).
+Every command script is classified in exactly one bucket of `scripts/CONTEXT.md`'s manifest
+(maintained / historical lab books / one-time — machine-parsed by
+`tests/test_script_classification.py`, keep the markers intact). The authoritative counts and the
+per-script table live in that file, not here.
 
-One entry point: `agentic-dynamics` (Stage 3) — every maintained command maps to a subcommand;
-the 15 one-time migrations live under `scripts/archive/`.
+One entry point: `agentic-dynamics` (Stage 3) — every maintained command maps to a subcommand; the
+one-time migrations live under `scripts/archive/`.
 
 Primary maintained commands: run.py, run_story.py, run_workflow.py, pipeline.py,
 inventory.py, build_data.py, sync_data.py, analyze_worktrees.py, analyze_trajectories.py,
@@ -379,30 +382,12 @@ list: scripts/CONTEXT.md.
 
 ## Test files
 
-71 files total (`ls tests/test_*.py | wc -l`), by module family:
-
-```
-Core pipeline: test_pipeline.py, test_story.py, test_opencode_events.py,
-test_mutation.py, test_embeddings.py, test_commit_analysis.py, test_lsp.py,
-test_claude_adapter.py, test_review_agent.py, test_pricing.py,
-test_correctness_lineage.py, test_language.py, test_opencode_analyzer.py, test_graph.py,
-test_entropy.py, test_codebase_graph.py, test_ollama_analyzer.py, test_live.py,
-test_perturb.py, test_data_integrity.py, test_routing.py, test_strategy.py,
-test_streaming.py, test_backends.py
-
-Admin/supervisor (6): test_admin_claude_agents.py, test_admin_claude_agents_frontend.py,
-test_admin_design_sessions.py, test_admin_frontend.py, test_admin_server.py,
-test_admin_supervisor.py
-
-Claude-agents (2): test_claude_agents_client.py, test_claude_agents_supervisor.py
-
-Spec/compiler + workflow (4): test_compile_experiment.py, test_experiment_spec.py,
-test_workflow_runner.py, test_supervise.py
-
-Consolidation guards (6): test_doc_lifecycle.py, test_dependency_direction.py,
-test_data_flow.py, test_experiment_workflow_classification.py, test_script_classification.py,
-test_kb_produce_registry.py
-```
+Tests live under `tests/test_*.py`, one per module family (the authoritative list is the `tests/`
+directory itself). Notable guard families: the consolidation guards (`test_dependency_direction.py`,
+`test_data_flow.py`, `test_doc_lifecycle.py`, `test_script_classification.py`,
+`test_experiment_workflow_classification.py`, `test_kb_produce_registry.py`), the
+spec/compiler + workflow tests (`test_compile_experiment.py`, `test_experiment_spec.py`,
+`test_workflow_runner.py`, `test_supervise.py`), and the admin/supervisor + claude-agents suites.
 
 ## CLI surface (Stage 3 — one entry point)
 

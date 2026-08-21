@@ -1,6 +1,6 @@
 ---
 name: review
-description: Run the commit/story review pipeline across 5 scripts (review_all.py, review_stories.py, trigger_reviews.py, enqueue_reviews.py, finalize_reviews.py) with 3 different invocation shapes (sync ThreadPoolExecutor, backgrounded Redis workers, plain run). Use when asked to review experiment commits/stories, trigger review workers, or finalize per-session review files into aggregates.
+description: Run the commit/story review pipeline (review_all.py, review_stories.py, trigger_reviews.py, enqueue_reviews.py, finalize_reviews.py) across sync ThreadPoolExecutor, backgrounded Redis workers, and plain-run shapes. Use when asked to review experiment commits/stories, trigger review workers, or finalize per-session review files into aggregates.
 disable-model-invocation: false
 user-invocable: false
 argument-hint: ""
@@ -8,7 +8,7 @@ argument-hint: ""
 
 # Review Skill — Commit/Story Review Pipeline
 
-5 scripts, 3 distinct invocation shapes. Pick the path that matches the situation:
+Pick the path that matches the situation:
 
 - **No Redis / small batch → `review_all.py`** (synchronous, `ThreadPoolExecutor`, blocks
   until done).
@@ -110,5 +110,5 @@ trigger_reviews.py  (wraps the enqueue step + runs review_all.py) → finalize_r
   `finalize_reviews.py`.
 - `review_all.py`/`review_stories.py` don't touch Redis at all — don't mix them with the
   Redis-backed `enqueue_reviews.py`/`trigger_reviews.py` path in the same run.
-- Always `--dry-run` first on any of the 3 scripts that support it before a real run
+- Always `--dry-run` first on any script that supports it before a real run
   against unfamiliar data.

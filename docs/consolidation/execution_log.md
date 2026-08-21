@@ -1032,6 +1032,42 @@ were re-verified and left unchanged rather than rewritten for noise. `agent_conf
 `.opencode/tools/{supervisor,control_room,compile_experiment}.ts` reference `admin/server.py` and
 `from instrument.experiment_spec`. All are outside the s5 agents/skills scope.
 
+### s6_semantic_context_guards — semantic guard over the whole agent_config/** tree (review item 6)
+
+**Upgrade from path-family rejection to semantic checks.** The repair release's
+`test_stale_path_guard.py` rejected a fixed list of retired path strings in accepted docs. This
+phase extends that guard to `agent_config/**` *and* adds a second, semantic guard
+(`tests/test_agent_config_semantic.py`) that proves the active agent context refers only to
+things that exist — not merely that it avoids a retired-string denylist.
+
+The new guard's seven checks (one assertion each, full violation set on failure): (1) backticked
+repo paths resolve (full paths `src|scripts|apps|docs|…` and plane shorthand like
+`measurement/perturb.py`); (2) `from agentic_dynamics… import …` / `python -m …` resolve to a
+real module; (3) two-word `agentic-dynamics <verb> <noun>` commands exist in `cli._COMMANDS`;
+(4) `scripts/<name>.<ext>` exists; (5) the retired `instrument` package is absent
+(`from instrument`/`import instrument`/`instrument.<attr>`); (6) the retired SEMANTIC/MANIFOLD
+taxonomy and the retired `_results_summary.json` corpus appear only in retired/quarantine
+framing; (7) no hard-coded `(NNNL)` / `NNN lines` / `NNN scripts|files|modules|commands` /
+`NNN total` / `NNN active labs` counts.
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Guard extended to the complete `agent_config/**` tree** — `test_stale_path_guard.py` gains `test_agent_config_uses_no_retired_paths` (no allowlist: the neutral source must carry zero retired path families) | PASS |
+| 2 | **Semantic guard added** — `tests/test_agent_config_semantic.py`, seven checks (paths / imports / CLI / scripts / retired-imports / retired-taxonomy+sources / counts), each an aggregated assertion | PASS |
+| 3 | **Wired into the suite** — both guards run under `pytest tests/`; full suite green | PASS |
+| 4 | **Every flagged file fixed** — `commands/{run-exp,pipeline,new-exp,lab}.md` (stale config enumeration + `confidence` "not yet instrumented" + `code_reviews/` + `_results_summary.json` + `19 active labs`); `conventions.md` (line counts, retired summary, flat `story.py`, version-tagged module list, `scripts/plan.py`); `rules.md` (retired summary in the Creative-scientist/Editor grounding); `mental-model.md` (linear core re-qualified to planes, `trajectory.py`/`recovery.py` gone, "former flat `src/agentic_dynamics/`" typo, module-count column + script/file/test counts removed); `skills/{instrument,run-workflow,lab-books,review}.md` (archived `finish_sweep.py`, `scripts/compile_experiment.py` negative-refs, `20 active lab books`, `5/3 scripts`); `agents/{data-analysis,instrument-dev}.md` | PASS |
+| 5 | **Stale `.ts` tools swept** (the s5 note's remaining items, outside `agent_config/**`) — `compile_experiment.ts` (`from instrument.experiment_spec` → `agentic_dynamics.experiment.*`, `experiments/specs/*.yaml` → the authoring dirs), `control_room.ts`/`supervisor.ts` (`admin/server.py` → `apps/control_room/server.py`, `src/instrument/supervisor.py` → `control/supervisor.py`), `batch.ts` (`experiments/configs/` + stale `34`/`13` counts) | PASS |
+| 6 | **Regenerated surfaces** — `_gen_instructions.py` wrote 36 files; opencode + claude schemas OK; generated twins carry the fixes (verified by grep) | PASS |
+| 7 | **Full suite green** — 1499 passed, 1 skipped | PASS |
+
+**s6_semantic_context_guards result: 7/7 PASS.**
+
+**Not covered (noted for later, outside the review's `agent_config/**` scope):** the semantic
+guard targets `agent_config/**` only. `.opencode/tools/*.ts` is a separate committed surface and
+is not yet auto-guarded (swept manually here); `scripts/batch_run.py:CONFIGS` still names
+`factorial_compound.yaml`, which no longer exists under `experiments/definitions/configs/` — a
+code-level stale config, not agent context, left for the next instrumentation pass.
+
 
 
 

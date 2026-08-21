@@ -1,10 +1,10 @@
 import { tool } from "@opencode-ai/plugin"
 
 // SECURITY CONSTRAINT (do not weaken): this tool exposes only the --once flag-and-observe
-// path of scripts/supervise.py. src/instrument/supervisor.py deliberately has no OpenCode
-// client dependency "so observation can't become control" — never add a mode, flag, or
+// path of scripts/supervise.py. src/agentic_dynamics/control/supervisor.py deliberately has no
+// OpenCode client dependency "so observation can't become control" — never add a mode, flag, or
 // follow-up tool here that lets an agent steer or interrupt a session. That capability
-// exists only at admin/server.py's human-operated POST /api/flags/<id>/steer and
+// exists only at apps/control_room/server.py's human-operated POST /api/flags/<id>/steer and
 // /interrupt routes, which control_room.ts also must not wrap.
 export default tool({
   description:

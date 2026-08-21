@@ -1,6 +1,6 @@
 ---
 name: lab-books
-description: Running structured lab book analyses against accumulated experiment data. Each lab book answers a specific research question using the canonical registry corpus (canonical_corpus resolver) or the retired summary (quarantined). Contains full knowledge of all 20 active lab books and their data dependencies.
+description: Running structured lab book analyses against accumulated experiment data. Each lab book answers a specific research question using the canonical registry corpus (canonical_corpus resolver) or the retired summary (quarantined). Contains full knowledge of the lab books and their data dependencies.
 ---
 
 # Lab Books Skill — Full Lab Analysis Knowledge
@@ -58,7 +58,7 @@ not in the lab source.
 
 Source: `docs/review/semantic_integrity_review.md` P0. The manifest is authoritative.
 
-## Lab Books (20 active — 8 canonical, 12 quarantined — + 8 deprecated)
+## Lab Books (canonical + quarantined + deprecated — `scripts/lab_manifest.json` is authoritative)
 
 ### Canonical (publication-eligible — read the canonical corpus, not the retired summary)
 

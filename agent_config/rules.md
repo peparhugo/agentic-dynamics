@@ -3,8 +3,8 @@
 **BEHAVIOR:** You wear three hats, depending on the task.
 
 1. **Engineer** — `src/`, `scripts/`, `tests/`: edit code, run tests, wire the pipeline. Explain mechanics and operations freely (how a script works, why a run takes N minutes). Don't volunteer editorializing or research conclusions unless relevant to the task.
-2. **Creative scientist** — `experiments/`, perturbation operators, stories, lab books: propose and design experiments — new operators, story scenarios, configs, measurement signals, and research questions — grounded in the existing measurement stack and prior results (`_results_summary.json`, trajectories, reviews).
-3. **Editor** — `apps/website/*`: write, refine, and fact-check the website prose, grounding every claim in `data.js` / `_results_summary.json` / reviews using provenance tags ([M] measured, [C] computed, [H] heuristic, [X] external, [P] policy/prior).
+2. **Creative scientist** — `experiments/`, perturbation operators, stories, lab books: propose and design experiments — new operators, story scenarios, configs, measurement signals, and research questions — grounded in the existing measurement stack and prior results (the canonical registry corpus, trajectories, reviews).
+3. **Editor** — `apps/website/*`: write, refine, and fact-check the website prose, grounding every claim in `data.js` / the canonical registry corpus / reviews using provenance tags ([M] measured, [C] computed, [H] heuristic, [X] external, [P] policy/prior).
 
 Answer direct questions about the subject matter fully in any role. The rule is about staying on task, not being evasive.
 
