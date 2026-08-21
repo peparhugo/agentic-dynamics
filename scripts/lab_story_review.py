@@ -225,7 +225,7 @@ def main():
         "cells": cells,
     }
 
-    attach_contract(output, LAB, tables, n_input_records=len(tables.stories))
+    attach_contract(output, LAB, tables)
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"\nSaved: {OUTPUT_PATH}")
 

@@ -75,7 +75,7 @@ Design notes
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -87,15 +87,18 @@ from .canonical_corpus import (
 from .lab_manifest import LabEntry, load_lab_manifest
 
 #: Version of the contract schema itself. Bumped to v2 when ``input_manifest_sha256`` was
-#: renamed to ``registry_identity_sha256`` and ``resolved_input_sha256`` was added (P2).
-CONTRACT_VERSION = "lab-contract/v2"
+#: renamed to ``registry_identity_sha256`` and ``resolved_input_sha256`` was added (P2), and
+#: to v3 when ``n_input_records`` was replaced by the honest four-way record-count scope
+#: (``n_resolved``/``n_eligible``/``n_used``/``n_excluded`` + ``exclusions``) — review P2.
+CONTRACT_VERSION = "lab-contract/v3"
 
 #: The key under which the contract is embedded in a lab's output JSON.
 CONTRACT_KEY = "lab_contract"
 
-#: The fields the review requires, verbatim (with the P2 rename + addition applied). The
-#: guard tests assert exactly this set is present and non-empty
-#: (``requires_external_service`` may legitimately be ``null``).
+#: The fields the review requires, verbatim (with the P2 rename/addition and the c4
+#: record-count scopes applied). The guard tests assert exactly this set is present and
+#: non-empty (``requires_external_service`` may legitimately be ``null``; ``exclusions`` may
+#: legitimately be ``{}``).
 REQUIRED_FIELDS = (
     "input_dataset_id",
     "registry_identity_sha256",
@@ -104,6 +107,11 @@ REQUIRED_FIELDS = (
     "metric_definition_version",
     "data_integrity_policy",
     "requires_external_service",
+    "n_resolved_records",
+    "n_eligible_records",
+    "n_used_records",
+    "n_excluded_records",
+    "exclusions",
 )
 
 #: The authoritative data-integrity policy every publication-eligible lab declares it
@@ -122,7 +130,15 @@ _TABLES = ("story", "finding", "review", "analysis")
 
 @dataclass(frozen=True)
 class LabContract:
-    """The lineage block embedded in a publication-eligible lab's output JSON."""
+    """The lineage block embedded in a publication-eligible lab's output JSON.
+
+    The four record-count fields (review P2, phase c4) replace the single
+    ``n_input_records``: ``n_resolved_records`` is what the resolver produced,
+    ``n_eligible_records`` is the subset that qualifies for the metric,
+    ``n_used_records`` is the subset the computation actually consumed, and
+    ``n_excluded_records`` is the resolved-minus-eligible gap, itemised by ``exclusions``
+    (reason -> count).
+    """
 
     lab: str
     input_dataset_id: str
@@ -130,9 +146,13 @@ class LabContract:
     resolved_input_sha256: str
     registry_version: str
     metric_definition_version: str
+    n_resolved_records: int
+    n_eligible_records: int
+    n_used_records: int
+    n_excluded_records: int
     data_integrity_policy: str = DATA_INTEGRITY_POLICY
     requires_external_service: str | None = None
-    n_input_records: int = 0
+    exclusions: dict = field(default_factory=dict)
     contract_version: str = CONTRACT_VERSION
     generated_at: str = ""
 
@@ -181,11 +201,24 @@ def _lab_entry(lab_script: str) -> LabEntry:
     return entry
 
 
+def _resolved_count(tables: CanonicalTables) -> int:
+    """The number of payloads the resolver produced for THIS lab's table slice.
+
+    The default ``n_resolved_records`` — what the resolver handed the lab, summed over the
+    tables the lab actually requested (not the whole four-table corpus).
+    """
+    return sum(len(tables.rows(t)) for t in tables.tables)
+
+
 def build_contract(
     lab_script: str,
     tables: CanonicalTables,
     *,
-    n_input_records: int | None = None,
+    n_resolved_records: int | None = None,
+    n_eligible_records: int | None = None,
+    n_used_records: int | None = None,
+    n_excluded_records: int | None = None,
+    exclusions: dict | None = None,
     now: datetime | None = None,
 ) -> dict:
     """Producer side: build the contract block for ``lab_script``'s output.
@@ -195,14 +228,21 @@ def build_contract(
     rather than re-read, so the embedded values always describe the corpus the numbers came
     from, even if the manifest changes mid-run.
 
-    ``n_input_records`` defaults to the total resolved rows; a lab that measures over a
-    narrower slice should pass its own count so the contract reports what it truly used.
+    The record-count scope (review P2): ``n_resolved_records`` defaults to what the resolver
+    produced for this slice; ``n_eligible_records`` defaults to "everything resolved is
+    eligible"; ``n_used_records`` defaults to "everything eligible is used";
+    ``n_excluded_records`` defaults to ``resolved - eligible``. A lab with real exclusions
+    (e.g. Grit drops cells missing ``perturbation_strength``) passes them explicitly.
     """
     entry = _lab_entry(lab_script)
     stamp = (now or datetime.now(timezone.utc)).isoformat()
-    total = n_input_records
-    if total is None:
-        total = len(tables.stories) + len(tables.reviews) + len(tables.analysis)
+
+    resolved = int(
+        n_resolved_records if n_resolved_records is not None else _resolved_count(tables)
+    )
+    eligible = int(n_eligible_records if n_eligible_records is not None else resolved)
+    used = int(n_used_records if n_used_records is not None else eligible)
+    excluded = int(n_excluded_records if n_excluded_records is not None else (resolved - eligible))
 
     return LabContract(
         lab=lab_script,
@@ -211,9 +251,13 @@ def build_contract(
         resolved_input_sha256=tables.resolved_input_sha256,
         registry_version=tables.identity.registry_version,
         metric_definition_version=entry.metric_definition_version,
+        n_resolved_records=resolved,
+        n_eligible_records=eligible,
+        n_used_records=used,
+        n_excluded_records=excluded,
         data_integrity_policy=DATA_INTEGRITY_POLICY,
         requires_external_service=entry.requires_external_service,
-        n_input_records=int(total),
+        exclusions=dict(exclusions or {}),
         generated_at=stamp,
     ).to_dict()
 
@@ -223,10 +267,22 @@ def attach_contract(
     lab_script: str,
     tables: CanonicalTables,
     *,
-    n_input_records: int | None = None,
+    n_resolved_records: int | None = None,
+    n_eligible_records: int | None = None,
+    n_used_records: int | None = None,
+    n_excluded_records: int | None = None,
+    exclusions: dict | None = None,
 ) -> dict:
     """Embed the contract into a lab's output payload and return it (for chaining)."""
-    payload[CONTRACT_KEY] = build_contract(lab_script, tables, n_input_records=n_input_records)
+    payload[CONTRACT_KEY] = build_contract(
+        lab_script,
+        tables,
+        n_resolved_records=n_resolved_records,
+        n_eligible_records=n_eligible_records,
+        n_used_records=n_used_records,
+        n_excluded_records=n_excluded_records,
+        exclusions=exclusions,
+    )
     return payload
 
 
@@ -270,11 +326,16 @@ def validate_contract(
         return f"{manifest_entry.script}: contract is missing required field(s) {missing}"
 
     # `requires_external_service` is legitimately null; every other identity field must
-    # carry a real value. An empty hash is what a lab emits when it found no manifest.
+    # carry a real value. An empty *string* hash/version is what a lab emits when it found
+    # no manifest; a numeric count of ``0`` (``n_excluded_records`` for a no-exclusion lab)
+    # and an empty ``exclusions`` dict are both real values, not absences.
     for field_name in REQUIRED_FIELDS:
         if field_name == "requires_external_service":
             continue
-        if not str(block.get(field_name) or "").strip():
+        value = block.get(field_name)
+        if value is None:
+            return f"{manifest_entry.script}: contract field '{field_name}' is empty"
+        if isinstance(value, str) and not value.strip():
             return f"{manifest_entry.script}: contract field '{field_name}' is empty"
 
     # ── semantic identity: exact equality on every manifest-authored / constant field ──
@@ -326,5 +387,42 @@ def validate_contract(
                 f"({embedded_content[:12]}… != expected {expected_resolved_input_sha256[:12]}…) "
                 f"— the payload content drifted; re-run the lab"
             )
+
+    # ── record-count scope is self-consistent (review P2, phase c4) ──────────────────────
+    # resolved = eligible + excluded, used ≤ eligible, and the exclusions breakdown must
+    # account for every excluded record — a contract that sums wrong is exactly the
+    # "n_input_records doesn't mean records used" defect the review named.
+    resolved = block.get("n_resolved_records", 0)
+    eligible = block.get("n_eligible_records", 0)
+    used = block.get("n_used_records", 0)
+    excluded = block.get("n_excluded_records", 0)
+    exclusions = block.get("exclusions") or {}
+    try:
+        resolved_i, eligible_i, used_i, excluded_i = (
+            int(resolved),
+            int(eligible),
+            int(used),
+            int(excluded),
+        )
+        exclusion_total = sum(
+            int(v) for v in (exclusions.values() if isinstance(exclusions, dict) else [])
+        )
+    except (TypeError, ValueError):
+        return f"{manifest_entry.script}: contract record-count fields must be integers"
+    if eligible_i + excluded_i != resolved_i:
+        return (
+            f"{manifest_entry.script}: record counts inconsistent — "
+            f"n_eligible ({eligible_i}) + n_excluded ({excluded_i}) != n_resolved ({resolved_i})"
+        )
+    if used_i > eligible_i:
+        return (
+            f"{manifest_entry.script}: record counts inconsistent — "
+            f"n_used ({used_i}) > n_eligible ({eligible_i})"
+        )
+    if exclusion_total != excluded_i:
+        return (
+            f"{manifest_entry.script}: exclusions breakdown sums to {exclusion_total}, "
+            f"but n_excluded_records is {excluded_i}"
+        )
 
     return None

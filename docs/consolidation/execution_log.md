@@ -1263,6 +1263,25 @@ Carried forward (later phases, not dropped): honest record-count scopes
 `n_resolved`/`n_eligible`/`n_used`/`n_excluded` — c4; the test-count scope renames — c5; README/site
 prose reconciliation — c6; the full release-gate verification — c7.
 
+### c4_record_scopes — honest record counts (review P2)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Schema replaced** — `n_input_records` is gone; `LabContract` now carries `n_resolved_records` / `n_eligible_records` / `n_used_records` / `n_excluded_records` + an `exclusions` breakdown (reason → count), all in `REQUIRED_FIELDS`; `contract_version` → `lab-contract/v3` | PASS |
+| 2 | **Sensible defaults** — `build_contract` derives `n_resolved_records` from the lab's own resolved slice (`_resolved_count`), and defaults `eligible = used = resolved` / `excluded = resolved − eligible` so a no-exclusion lab needs no extra args | PASS |
+| 3 | **Grit reports the real gap** — `collect_cells` now returns an exclusions tally; `lab_grit` contracts `n_resolved 279 / n_eligible 144 / n_used 144 / n_excluded 135` with `exclusions {missing_strength_and_verdict: 135}`, and the same breakdown lands in its `summary` (not just the contract) | PASS |
+| 4 | **Consistency enforced** — `validate_contract` rejects any contract whose `eligible + excluded ≠ resolved`, `used > eligible`, or `exclusions` do not sum to `n_excluded_records` (and `0` counts are no longer treated as "empty" values) | PASS |
+| 5 | **Every lab emitter updated** — all 8 canonical labs call `attach_contract` with the new field set (grit passes counts explicitly; the other 7 rely on the defaults) | PASS (8/8) |
+| 6 | **Guard tests updated** — `test_published_artifacts_match_the_current_registry` checks `n_resolved_records == registry resolution`, the self-consistency invariant, and that `exclusions` sum correctly; new `test_inconsistent_record_counts_are_rejected` mutation test proves a broken count is rejected | PASS |
+| 7 | **Outputs regenerated** — all 8 lab artifacts + `data.js` rebuilt at `lab-contract/v3` with honest counts; manifest re-hashed (registry byte-identical) | PASS |
+| 8 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1431 passed, 106 deselected**; full `pytest tests/`: **1536 passed, 1 skipped** | PASS |
+
+**c4_record_scopes result: 8/8 PASS.**
+
+Carried forward (later phases, not dropped): the test-count scope renames — c5; README/site prose
+reconciliation — c6; the full release-gate verification — c7.
+
+
 
 
 

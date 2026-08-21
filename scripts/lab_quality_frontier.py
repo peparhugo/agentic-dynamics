@@ -130,7 +130,6 @@ def main():
         output,
         LAB,
         tables,
-        n_input_records=len(tables.stories) + len(tables.analysis),
     )
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))

@@ -148,9 +148,11 @@ def test_no_live_lab_output_carries_retired_summary_lineage():
 def test_published_artifacts_match_the_current_registry():
     """ "Regenerated from current canonical records" is verified, not asserted.
 
-    Each artifact's contract must validate against today's manifest identity, and its
-    ``n_input_records`` must equal what the resolver returns now. A lab re-run before the
-    corpus changed passes; one left behind fails.
+    Each artifact's contract must validate against today's manifest identity, its
+    ``n_resolved_records`` must equal what the resolver returns now, and the record-count
+    scope must be self-consistent (``resolved = eligible + excluded`` with the exclusions
+    breakdown accounting for every excluded record). A lab re-run before the corpus changed
+    passes; one left behind fails.
     """
     identity = cc.current_manifest_identity()
     if not identity.registry_identity_sha256:  # pragma: no cover - manifest present in CI
@@ -172,9 +174,21 @@ def test_published_artifacts_match_the_current_registry():
         # input_dataset_id is "canonical_registry/story+review" — recompute its size.
         slice_name = contract["input_dataset_id"].split("/", 1)[1]
         expected = sum(resolved[t] for t in slice_name.split("+"))
-        assert contract["n_input_records"] == expected, (
-            f"{lab}: contract claims {contract['n_input_records']} input records but the "
-            f"current registry resolves {expected} for '{slice_name}' — re-run the lab"
+        assert contract["n_resolved_records"] == expected, (
+            f"{lab}: contract claims {contract['n_resolved_records']} resolved records but "
+            f"the current registry resolves {expected} for '{slice_name}' — re-run the lab"
+        )
+        # The scope must be self-consistent and honest (review P2).
+        assert (
+            contract["n_eligible_records"] + contract["n_excluded_records"]
+            == contract["n_resolved_records"]
+        ), f"{lab}: eligible + excluded != resolved"
+        assert contract["n_used_records"] <= contract["n_eligible_records"], (
+            f"{lab}: used {contract['n_used_records']} > eligible {contract['n_eligible_records']}"
+        )
+        assert sum(contract["exclusions"].values()) == contract["n_excluded_records"], (
+            f"{lab}: exclusions {contract['exclusions']} do not sum to "
+            f"{contract['n_excluded_records']}"
         )
 
 

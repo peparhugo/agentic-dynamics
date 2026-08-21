@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_quality_frontier",
-  "generated_at": "2026-08-21T17:57:42.637417",
+  "generated_at": "2026-08-21T18:18:09.488452",
   "summary": {
     "models": 7,
     "stories": 215,
@@ -86,10 +86,14 @@
     "resolved_input_sha256": "5819547a8b163fb2bc8a412f396ed700517ae2481d5c264f137a5cc82e2f90be",
     "registry_version": "data-manifest/1.0+701rows",
     "metric_definition_version": "quality_frontier/v1",
+    "n_resolved_records": 381,
+    "n_eligible_records": 381,
+    "n_used_records": 381,
+    "n_excluded_records": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "n_input_records": 381,
-    "contract_version": "lab-contract/v2",
-    "generated_at": "2026-08-21T15:57:42.637665+00:00"
+    "exclusions": {},
+    "contract_version": "lab-contract/v3",
+    "generated_at": "2026-08-21T16:18:09.488714+00:00"
   }
 }

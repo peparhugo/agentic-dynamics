@@ -118,7 +118,7 @@ def compute(stories: list[dict]) -> dict:
 def main():
     tables = load_canonical_tables("story")
     output = compute(tables.stories)
-    attach_contract(output, LAB, tables, n_input_records=len(tables.stories))
+    attach_contract(output, LAB, tables)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     frontier = output["summary"]["pareto_frontier"]

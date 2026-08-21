@@ -305,6 +305,11 @@ def test_absent_registry_rejects_everything(tmp_path, manifest_entry):
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": None,
         "contract_version": CONTRACT_VERSION,
+        "n_resolved_records": 1,
+        "n_eligible_records": 1,
+        "n_used_records": 1,
+        "n_excluded_records": 0,
+        "exclusions": {},
     }
     reason = validate_contract(
         {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=empty
@@ -355,6 +360,29 @@ def test_build_contract_requires_a_classified_lab(tables_factory):
     tables = tables_factory([_row("aaaaaaaaaaaa")])
     with pytest.raises(ValueError, match="not classified"):
         build_contract("lab_does_not_exist.py", tables)
+
+
+#: Record-count mutations that break the self-consistency invariant (review P2, c4) —
+#: each must be rejected by the record-count consistency check.
+RECORD_COUNT_MUTATIONS = (
+    ("n_excluded_records", lambda c: c["n_resolved_records"] - c["n_eligible_records"] + 1),
+    ("n_used_records", lambda c: c["n_eligible_records"] + 1),
+)
+
+
+@pytest.mark.parametrize("field,mutator", RECORD_COUNT_MUTATIONS)
+def test_inconsistent_record_counts_are_rejected(tables_factory, manifest_entry, field, mutator):
+    """A contract whose record counts do not sum is rejected (the ``n_input_records``
+    defect the review named: a count that does not mean what it says)."""
+    tables = tables_factory([_row("aaaaaaaaaaaa")])
+    contract = build_contract("lab_story_arc.py", tables)
+    contract[field] = mutator(contract)
+
+    reason = validate_contract(
+        {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=tables.identity
+    )
+    assert reason is not None
+    assert "record counts inconsistent" in reason
 
 
 # ---------------------------------------------------------------------------
