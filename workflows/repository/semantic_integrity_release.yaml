@@ -11,6 +11,18 @@ question: >-
   The load-bearing rule extends to the publication boundary: every derived finding the website
   publishes must carry provable canonical lineage.
 version: "0.1"
+# Artifact identity (refactor-repair P1-3 backfill convention): this release orchestration is a
+# one-shot repo-development workflow that mutates the checkout, not a measurement experiment —
+# hence workflows/repository/, not experiments/specs/. Re-homed during phase s1 because
+# tests/test_experiment_workflow_classification.py requires experiments/specs/ to hold only the
+# generated STATUS.md/index.json. Resume with the new path:
+#   python scripts/run_workflow.py --spec workflows/repository/semantic_integrity_release.yaml --resume
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:

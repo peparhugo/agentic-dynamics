@@ -16,12 +16,31 @@ python scripts/analyze_trajectories.py       # Regenerate trajectory aggregates
 ```
 
 Lab books read from these files in `experiments/results/`:
-- `_results_summary.json` — per-experiment solution + efficiency + strategy metrics
+- `_results_summary.json` — **RETIRED** (see the quarantine below) per-experiment solution + efficiency + strategy metrics
 - `_trajectory_summary.json` — per-transcript step-level data
 - `_trajectory_aggregate.json` — per-model trajectory aggregates
 - `inventory.json` — experiment registry
 
-## Active Lab Books (19 non-deprecated)
+## QUARANTINE — check `scripts/lab_manifest.json` before running or citing a lab
+
+`experiments/results/_results_summary.json` is a **retired** corpus. Every lab that reaches it,
+directly or transitively, is `lab_status: quarantined` in `scripts/lab_manifest.json`
+(12 of the 19): it is **not** run by `scripts/reproduce.sh` and its output is **not** published to
+the website. It still runs by hand — but its numbers are historical and must never be presented
+as current findings or written into `apps/website/`.
+
+The 7 canonical labs (live story corpus) are: `cache_economics`, `condition_effects`,
+`quality_frontier`, `story_arc`, `story_review`, `verification_frontier`, `verification_value`.
+
+```bash
+python3 -m agentic_dynamics.reporting.lab_manifest --reproduce     # the core set
+python3 -m agentic_dynamics.reporting.lab_manifest --quarantined   # the excluded set
+```
+
+Source: `docs/review/semantic_integrity_review.md` P0. The lab descriptions below still describe
+the pre-quarantine world; the manifest is authoritative.
+
+## Lab Books (19 total — 7 canonical, 12 quarantined)
 
 ### Cost & Pricing Analysis
 

@@ -15,7 +15,12 @@ set -euo pipefail
 #   2. sync_data.py               — story results -> sessions.parquet/stories.parquet
 #   3. analyze_worktrees.py       — per-experiment Game Report markdown
 #   4. analyze_trajectories.py    — per-transcript trajectory summaries
-#   5. lab books (19 active)      — per-question analyses -> experiments/results/lab_*.json
+#   5. lab books (the CORE set)   — per-question analyses -> experiments/results/lab_*.json
+#                                   The set is NOT hard-coded here: it is read from
+#                                   scripts/lab_manifest.json (reproduce_default: true).
+#                                   Quarantined labs — those that read the retired
+#                                   _results_summary.json, directly or transitively — are
+#                                   excluded by construction (semantic-integrity review P0).
 #   6. build_data.py              — apps/website/data.js (the website corpus)
 #   7. generate_manifest.py       — experiments/data_manifest.json (hashes the outputs above)
 #
@@ -49,30 +54,34 @@ esac
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-# The 19 active lab books (scripts/CONTEXT.md `historical:` line, kept in sync here).
-# The retired *_DEPRECATED_bge_m3 scripts (lab_reasoning_divergence, lab_semantic_clusters,
-# lab_cross_model_reasoning, ...) are intentionally absent — they no longer exist.
-LAB_BOOKS=(
-  lab_basin_topology.py
-  lab_basin_topology_neo4j.py
-  lab_cache_economics.py
-  lab_claude_audit.py
-  lab_condition_effects.py
-  lab_correctness_premium.py
-  lab_flail_triggers.py
-  lab_grit_matrix.py
-  lab_opencode_meta_analysis.py
-  lab_quality_frontier.py
-  lab_sonar_quality.py
-  lab_story_arc.py
-  lab_story_review.py
-  lab_survival_horizon.py
-  lab_task_routing.py
-  lab_think_do_coupling.py
-  lab_tool_archetypes.py
-  lab_verification_frontier.py
-  lab_verification_value.py
-)
+# ---------------------------------------------------------------------------
+# The core lab set — derived, never hand-listed.
+#
+# It used to be a hard-coded array of all 19 labs, which is exactly how the
+# noncanonical ones stayed in the default reproduction: two lists (this one and
+# build_data's) drifting away from each other with nothing checking either.
+# Both now read scripts/lab_manifest.json through the single parser in
+# agentic_dynamics.reporting.lab_manifest, so "what reproduce runs" and "what the
+# website publishes" cannot disagree with the classification.
+#
+# PYTHONPATH is pinned to THIS checkout's src/ so an editable install of another
+# checkout can never answer the question for us.
+# ---------------------------------------------------------------------------
+LAB_QUERY='from agentic_dynamics.reporting.lab_manifest import reproduce_lab_scripts
+print("\n".join(reproduce_lab_scripts()))'
+
+if ! LAB_LIST="$(PYTHONPATH="$PROJECT_ROOT/src" python3 -c "$LAB_QUERY")"; then
+  echo "ERROR: could not read the core lab set from scripts/lab_manifest.json" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC2206  # word splitting on newlines is the intent here
+LAB_BOOKS=($LAB_LIST)
+
+if [[ "${#LAB_BOOKS[@]}" -eq 0 ]]; then
+  echo "ERROR: scripts/lab_manifest.json yielded an empty core lab set" >&2
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # run_step <description> <command...>
@@ -117,7 +126,7 @@ run_step "Step 3/7: Analyze worktrees (game reports)" \
 run_step "Step 4/7: Analyze trajectories" \
   python3 scripts/analyze_trajectories.py
 
-echo "--- Step 5/7: Run lab book analyses (${#LAB_BOOKS[@]}) ---"
+echo "--- Step 5/7: Run lab book analyses (${#LAB_BOOKS[@]} core, from scripts/lab_manifest.json) ---"
 for lab in "${LAB_BOOKS[@]}"; do
   if [[ "$DRY_RUN" -eq 1 ]]; then
     printf '[dry-run] python3 scripts/%s\n' "$lab"

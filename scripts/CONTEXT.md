@@ -97,29 +97,42 @@ one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_trans
 | `supervise.py` | 378 | Supervises running opencode sessions via a dedicated flash monitor session — flag-only, never steers. CLI for `agentic_dynamics/control/supervisor.py`'s Redis contracts. |
 | `claude_agents_supervisor.py` | 260 | Supervises `claude --bg` background sessions — roster + owned-session relay only, structurally parallel to `supervise.py` but simpler. |
 
-## Lab Books (19 active scripts + 8 deprecated)
+## Lab Books (19 scripts — 7 core, 12 quarantined — + 8 deprecated)
 
-| Script | Question Answered | Key Output |
-|--------|-------------------|------------|
-| `lab_claude_audit.py` | Where did Claude's $47.54 go? | Per-task cost/correctness/LOC/narration penalty |
-| `lab_grit_matrix.py` | What does correctness × escape × cost look like? | 2D bubble chart data (bubble size = cost) |
-| `lab_correctness_premium.py` | Does Claude's premium buy anything? | Head-to-head correctness on 13 overlapping task types |
-| `lab_flail_triggers.py` | What makes a model flail? | Failure patterns by model, perturbation class, task type |
-| `lab_tool_archetypes.py` | Does tool choice predict code quality? | Write-dominant vs bash-dominant vs balanced patterns |
-| `lab_task_routing.py` | What's the optimal model-per-task routing? | 3 routing strategies simulated across 30 task types |
-| `lab_basin_topology.py` | What is each model's attractor basin topology? | Shallow/broad, deep/narrow, multi-modal, flat classifications |
-| `lab_survival_horizon.py` | How many sessions before bankruptcy? | Sessions-to-exhaustion per model, per budget |
-| `lab_condition_effects.py` | Do perturbation conditions move outcome metrics? | CLEAN/BAD_SEED/EARLY/LATE_DEGRADE comparison |
-| `lab_cache_economics.py` | What is cache hits worth in dollars/rework? | Cache-hit economics from session transcripts |
-| `lab_story_arc.py` | How does a story's quality/cost arc evolve? | Per-session trajectory over the 5-session story |
-| `lab_quality_frontier.py` | Where is the quality-per-cost frontier? | Pareto frontier across correctness/cost/maintainability |
-| `lab_verification_frontier.py` | What verification depth buys what correctness? | Verification-effort vs verified-outcome frontier |
-| `lab_verification_value.py` | Is independent verification worth its cost? | Agent-authored vs independent-evaluator delta |
-| `lab_basin_topology_neo4j.py` | What is basin topology via Neo4j? | Graph-based attractor basin classification |
-| `lab_opencode_meta_analysis.py` | What patterns in opencode experiments? | Meta-analysis of experiment structure + outcomes |
-| `lab_sonar_quality.py` | What code quality signals exist? | Sonar-based code quality analysis |
-| `lab_think_do_coupling.py` | How coupled are thinking and doing? | Think/do phase dynamics from trajectory data |
-| `lab_story_review.py` | What review patterns emerge across stories? | Per-story review aggregation |
+**Classification: `scripts/lab_manifest.json`** (schema `lab-manifest/v1`), parsed by the typed
+loader `agentic_dynamics.reporting.lab_manifest` and guarded by `tests/test_lab_manifest.py`.
+Every lab carries `lab_status: canonical | historical | quarantined` + `publication_eligible`.
+Note the axis: this is *not* the `historical:` bucket of the script-classification manifest above
+(which says "a lab book, not a maintained command") — it says *which corpus a lab reads*.
+
+The quarantine is the semantic-integrity release's item 1
+(`docs/review/semantic_integrity_review.md` P0): a lab that reaches the **retired**
+`experiments/results/_results_summary.json`, directly or transitively, is quarantined —
+`reproduce.sh` does not run it (its default set is derived from the manifest) and `build_data.py`
+does not publish it (rejections are logged by lab name). The file stays, and
+`agentic-dynamics analyze lab <name>` still runs it by hand.
+
+| Script | Status | Question Answered | Key Output |
+|--------|--------|-------------------|------------|
+| `lab_cache_economics.py` | canonical | What is cache hits worth in dollars/rework? | Cache-hit economics from session transcripts |
+| `lab_condition_effects.py` | canonical | Do perturbation conditions move outcome metrics? | CLEAN/BAD_SEED/EARLY/LATE_DEGRADE comparison |
+| `lab_quality_frontier.py` | canonical | Where is the quality-per-cost frontier? | Pareto frontier across correctness/cost/maintainability |
+| `lab_story_arc.py` | canonical | How does a story's quality/cost arc evolve? | Per-session trajectory over the 5-session story |
+| `lab_story_review.py` | canonical | What review patterns emerge across stories? | Per-story review aggregation |
+| `lab_verification_frontier.py` | canonical | What verification depth buys what correctness? | Verification-effort vs verified-outcome frontier |
+| `lab_verification_value.py` | canonical | Is independent verification worth its cost? | Agent-authored vs independent-evaluator delta |
+| `lab_basin_topology.py` | quarantined | What is each model's attractor basin topology? | Shallow/broad, deep/narrow, multi-modal, flat classifications |
+| `lab_basin_topology_neo4j.py` | quarantined | What is basin topology via Neo4j? | Graph-based attractor basin classification (Neo4j nodes are summary-loaded) |
+| `lab_claude_audit.py` | quarantined | Where did Claude's $47.54 go? | Per-task cost/correctness/LOC/narration penalty |
+| `lab_correctness_premium.py` | quarantined | Does Claude's premium buy anything? | Head-to-head correctness on 13 overlapping task types |
+| `lab_flail_triggers.py` | quarantined | What makes a model flail? | Failure patterns by model, perturbation class, task type |
+| `lab_grit_matrix.py` | quarantined | What does correctness × escape × cost look like? | 2D bubble chart data (also collides with the formal Grit metric — s4) |
+| `lab_opencode_meta_analysis.py` | quarantined | What patterns in opencode experiments? | Meta-analysis (also spends live inference) |
+| `lab_sonar_quality.py` | quarantined | What code quality signals exist? | Sonar-based code quality analysis (stdout only) |
+| `lab_survival_horizon.py` | quarantined | How many sessions before bankruptcy? | Sessions-to-exhaustion per model, per budget |
+| `lab_task_routing.py` | quarantined | What's the optimal model-per-task routing? | 3 routing strategies simulated across 30 task types |
+| `lab_think_do_coupling.py` | quarantined | How coupled are thinking and doing? | Think/do phase dynamics from trajectory data |
+| `lab_tool_archetypes.py` | quarantined | Does tool choice predict code quality? | Write-dominant vs bash-dominant vs balanced patterns |
 
 Deprecated (`*_DEPRECATED_bge_m3`, 8 scripts): drift_trajectories, reasoning_volatility,
 cross_model_reasoning, divergence_cascades, cluster_stability, recovery_curves,

@@ -900,6 +900,36 @@ from the ledgers on the next regeneration in an environment that has them.
 
 **RELEASE VERDICT: the refactor-repair release is COMPLETE — all 17 phases green.**
 
+## Semantic-integrity release
+
+Input: `docs/review/semantic_integrity_review.md` (external, operator-provided review of main at
+`35ef34310`). Spec: `workflows/repository/semantic_integrity_release.yaml`.
+
+### s1_lab_quarantine — quarantine the legacy labs (review item 1 / P0)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Every lab classified** — all 19 `scripts/lab_*.py` carry `lab_status` (canonical/historical/quarantined) + `publication_eligible` in the machine-readable `scripts/lab_manifest.json` (schema `lab-manifest/v1`), each with input sources, external-service dependency, contract status, and an evidence-based rationale. Result: **7 canonical, 12 quarantined, 0 historical, 0 unclassified** | PASS |
+| 2 | **Quarantined labs out of reproduction** — `scripts/reproduce.sh`'s hard-coded 19-lab array is deleted; the set is now derived from the manifest via `reproduce_lab_scripts()` (PYTHONPATH pinned to this checkout's `src/`). `bash scripts/reproduce.sh --dry-run` now runs 7 core labs and names none of the 12 quarantined ones. The unconditional Neo4j lab (review P1, `reproduce.sh:56-57`) drops out as a consequence — its `ExperimentRun` nodes are summary-loaded (`knowledge/graph.py:245`) | PASS (7/7 core, 12/12 excluded) |
+| 3 | **Quarantined labs out of publication** — `build_data.py`'s hand-kept `lab_names` list is deleted; `_load_labs()` loads only manifest entries that are `publication_eligible` *and* name a `website_key`, and `_load_grit_matrix()` consults `rejection_reason()`. Every exclusion is logged by lab name (`[lab-gate] not published — <script>: quarantined`), never silent | PASS |
+| 4 | **The published artifact matches the gate** — `apps/website/data.js`'s `grit_matrix` (201 points from the quarantined `lab_grit_matrix.py`) is emptied; `labs` still carries exactly the 6 canonical keys. A full `build_data.py` rebuild was deliberately NOT committed: this environment's corpus is smaller than the committed one, so a rebuild would have deleted unrelated measurements. That regeneration belongs to s3 (rebuild outputs) in a complete environment | PASS (surgical removal, 2816 lines) |
+| 5 | **No fabricated substitute** — `evidence.html`'s `makeFallback()` (3 hard-coded invented sessions rendered whenever `grit_matrix` was empty) is removed. With no canonical points the page hides the chart and shows an explicit `[P]` quarantine notice. Publishing invented bubbles in place of a quarantined lab would have been strictly worse than publishing nothing | PASS |
+| 6 | **Guard test added** — `tests/test_lab_manifest.py` (46 tests): coverage with zero orphans, status vocabulary, quarantine-is-absolute, consumers-driven-by-manifest, loader-vs-JSON agreement, and a **source scan** asserting any lab reaching `_results_summary.json` — directly or through the two known transitive readers (`opencode_analyzer._load_summary`, `Neo4jClient.load_runs`) — is quarantined. Written as a scan, not a fixed list, so a *future* lab reintroducing the retired corpus fails here instead of quietly publishing. Load-time invariants are additionally enforced in `agentic_dynamics.reporting.lab_manifest` so a malformed manifest fails the pipeline, not just the suite | PASS |
+| 7 | **A quarantined lab keeps its file** — no lab script deleted; `agentic-dynamics analyze lab <name>` still runs any of them by hand. Only the automatic paths (reproduce, publication) are closed | PASS |
+| 8 | Full suite green — `pytest tests/ -m "not external"`: **1332 passed**. Two leftovers from the spec-authoring commit `579eed3f1` were resolved here (exactly as the previous release's gate did): `semantic_integrity_review.md` gained `status: accepted`; `semantic_integrity_release.yaml` re-homed `experiments/specs/` → `workflows/repository/` with `artifact_kind: workflow` metadata (**resume with the new path**), index regenerated (79 specs) | PASS (1332 passed) |
+
+**s1_lab_quarantine result: 8/8 PASS.**
+
+Deliberately deferred (named here so the later phases inherit them, not to be silently dropped):
+the 7 canonical labs all glob raw `experiments/results/stories/*.json` rather than resolving
+through the registry, so each carries `contract_status: "pending"` — s2 adds the lineage block
+(`input_dataset_id`, `input_manifest_sha256`, `registry_version`, `metric_definition_version`,
+`data_integrity_policy`, `requires_external_service`) and the manifest-hash rejection.
+`lab_grit_matrix.py`'s naming collision with the README's formal
+G(s) = P(test_executed_success | perturbation_strength = s) is recorded in its manifest entry and
+resolved in s4. The explicit `--with-neo4j` / `--with-sonar` reproduce split is s7; s1 only
+removed the Neo4j lab from the default set as a side effect of its quarantine.
+
 
 
 
