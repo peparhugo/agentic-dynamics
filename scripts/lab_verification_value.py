@@ -125,10 +125,15 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> dict:
 def main():
     tables = load_canonical_tables("story", "review")
     output = compute(tables.stories, tables.reviews)
+    # Record scope (public-truth review P1): the metric consumes every current story and
+    # every current review (both sides of the join) — declared explicitly, not via a
+    # permissive default.
     attach_contract(
         output,
         LAB,
         tables,
+        n_eligible_records=len(tables.stories) + len(tables.reviews),
+        n_used_records=len(tables.stories) + len(tables.reviews),
     )
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))

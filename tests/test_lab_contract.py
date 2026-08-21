@@ -88,9 +88,25 @@ def manifest_entry() -> LabEntry:
     return entry
 
 
+def _build(tables: cc.CanonicalTables, *, n_eligible: int = 0, n_used: int = 0, **kwargs) -> dict:
+    """Build a ``lab_story_arc.py`` contract with explicit record counts.
+
+    ``build_contract`` requires ``n_eligible_records``/``n_used_records`` explicitly
+    (public-truth P1 removed the permissive defaults); the synthetic fixtures resolve to an
+    empty story slice, so both default to 0 unless a test overrides them.
+    """
+    return build_contract(
+        "lab_story_arc.py",
+        tables,
+        n_eligible_records=n_eligible,
+        n_used_records=n_used,
+        **kwargs,
+    )
+
+
 def _contract_payload(tables: cc.CanonicalTables, *, entry: LabEntry | None = None) -> dict:
     """A payload carrying a freshly built contract for ``lab_story_arc.py``."""
-    return {CONTRACT_KEY: build_contract("lab_story_arc.py", tables)}
+    return {CONTRACT_KEY: _build(tables)}
 
 
 # ---------------------------------------------------------------------------
@@ -98,10 +114,11 @@ def _contract_payload(tables: cc.CanonicalTables, *, entry: LabEntry | None = No
 # ---------------------------------------------------------------------------
 
 
-def test_contract_carries_exactly_the_seven_required_fields(tables_factory):
-    """The review's field list (with the P2 rename + addition), verbatim, on a fresh contract."""
+def test_contract_carries_all_required_fields(tables_factory):
+    """Every required field (with the P2 rename/addition and the p3 record-scope fields),
+    verbatim, on a fresh contract."""
     tables = tables_factory([_row("aaaaaaaaaaaa")])
-    contract = build_contract("lab_story_arc.py", tables)
+    contract = _build(tables)
 
     for field_name in REQUIRED_FIELDS:
         assert field_name in contract, f"contract is missing {field_name}"
@@ -113,16 +130,19 @@ def test_contract_carries_exactly_the_seven_required_fields(tables_factory):
     # Both identities are embedded (P2): the selection hash and the content hash.
     assert len(contract["registry_identity_sha256"]) == 64
     assert len(contract["resolved_input_sha256"]) == 64
+    # The record-scope fields default to an honest "nothing resolved" for the empty slice.
+    assert contract["n_resolved_records"] == 0
+    assert contract["n_unused_eligible_records"] == 0
 
 
 def test_contract_identity_tracks_the_manifest_it_was_built_from(tables_factory):
     """Two different registries must produce two different identities."""
-    a = build_contract("lab_story_arc.py", tables_factory([_row("aaaaaaaaaaaa")]))
-    b = build_contract("lab_story_arc.py", tables_factory([_row("bbbbbbbbbbbb")]))
+    a = _build(tables_factory([_row("aaaaaaaaaaaa")]))
+    b = _build(tables_factory([_row("bbbbbbbbbbbb")]))
     assert a["registry_identity_sha256"] != b["registry_identity_sha256"]
 
     # …and the same registry the same identity (the hash is a pure function of content).
-    c = build_contract("lab_story_arc.py", tables_factory([_row("aaaaaaaaaaaa")]))
+    c = _build(tables_factory([_row("aaaaaaaaaaaa")]))
     assert a["registry_identity_sha256"] == c["registry_identity_sha256"]
 
 
@@ -223,7 +243,7 @@ def test_stale_manifest_lab_json_is_rejected(tables_factory, manifest_entry):
 
     payload = {
         "experiment_id": "lab_story_arc",
-        CONTRACT_KEY: build_contract("lab_story_arc.py", old),
+        CONTRACT_KEY: _build(old),
     }
 
     reason = validate_contract(
@@ -253,7 +273,7 @@ def test_missing_contract_is_rejected(tables_factory, manifest_entry):
 def test_incomplete_contract_is_rejected(tables_factory, manifest_entry, missing):
     """Dropping any one required field is a rejection, field by field."""
     tables = tables_factory([_row("aaaaaaaaaaaa")])
-    contract = build_contract("lab_story_arc.py", tables)
+    contract = _build(tables)
     contract.pop(missing)
     reason = validate_contract(
         {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=tables.identity
@@ -264,7 +284,7 @@ def test_incomplete_contract_is_rejected(tables_factory, manifest_entry, missing
 def test_empty_identity_field_is_rejected(tables_factory, manifest_entry):
     """An empty (rather than absent) identity value must not slip through."""
     tables = tables_factory([_row("aaaaaaaaaaaa")])
-    contract = build_contract("lab_story_arc.py", tables)
+    contract = _build(tables)
     contract["registry_version"] = "  "
     reason = validate_contract(
         {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=tables.identity
@@ -275,7 +295,7 @@ def test_empty_identity_field_is_rejected(tables_factory, manifest_entry):
 def test_null_requires_external_service_is_allowed(tables_factory, manifest_entry):
     """``requires_external_service: null`` is the correct value, not a missing one."""
     tables = tables_factory([_row("aaaaaaaaaaaa")])
-    contract = build_contract("lab_story_arc.py", tables)
+    contract = _build(tables)
     assert contract["requires_external_service"] is None
     assert (
         validate_contract(
@@ -309,7 +329,11 @@ def test_absent_registry_rejects_everything(tmp_path, manifest_entry):
         "n_eligible_records": 1,
         "n_used_records": 1,
         "n_excluded_records": 0,
-        "exclusions": {},
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
     }
     reason = validate_contract(
         {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=empty
@@ -344,7 +368,7 @@ def test_semantic_field_mismatch_is_rejected(tables_factory, manifest_entry, fie
     because its *hash* matched while its metric version did not).
     """
     tables = tables_factory([_row("aaaaaaaaaaaa")])
-    contract = build_contract("lab_story_arc.py", tables)
+    contract = _build(tables)
     assert contract[field] != wrong, "the mutation value must actually differ"
 
     contract[field] = wrong
@@ -362,11 +386,13 @@ def test_build_contract_requires_a_classified_lab(tables_factory):
         build_contract("lab_does_not_exist.py", tables)
 
 
-#: Record-count mutations that break the self-consistency invariant (review P2, c4) —
-#: each must be rejected by the record-count consistency check.
+#: Record-count mutations that break the self-consistency invariant (review P2, c4;
+#: extended in public-truth P1/p3) — each must be rejected by the consistency check.
+#: (The exclusion-reason sum has its own message, covered by a dedicated test below.)
 RECORD_COUNT_MUTATIONS = (
     ("n_excluded_records", lambda c: c["n_resolved_records"] - c["n_eligible_records"] + 1),
     ("n_used_records", lambda c: c["n_eligible_records"] + 1),
+    ("n_unused_eligible_records", lambda c: c["n_eligible_records"] - c["n_used_records"] + 1),
 )
 
 
@@ -375,7 +401,7 @@ def test_inconsistent_record_counts_are_rejected(tables_factory, manifest_entry,
     """A contract whose record counts do not sum is rejected (the ``n_input_records``
     defect the review named: a count that does not mean what it says)."""
     tables = tables_factory([_row("aaaaaaaaaaaa")])
-    contract = build_contract("lab_story_arc.py", tables)
+    contract = _build(tables)
     contract[field] = mutator(contract)
 
     reason = validate_contract(
@@ -383,6 +409,28 @@ def test_inconsistent_record_counts_are_rejected(tables_factory, manifest_entry,
     )
     assert reason is not None
     assert "record counts inconsistent" in reason
+
+
+def test_reason_counts_must_sum_to_excluded(tables_factory, manifest_entry):
+    """An exclusion-reason breakdown that does not itemise ``n_excluded_records`` is
+    rejected — a lab cannot drop records without saying which named reason dropped them."""
+    tables = tables_factory([_row("aaaaaaaaaaaa")])
+    # One resolved record, one excluded — but no reason count accounts for it.
+    contract = _build(tables, n_resolved_records=1, n_eligible=0, n_used=0)
+    reason = validate_contract(
+        {CONTRACT_KEY: contract}, manifest_entry=manifest_entry, current_identity=tables.identity
+    )
+    assert reason is not None
+    assert "exclusion reasons sum" in reason
+
+
+def test_build_contract_requires_explicit_eligibility_and_usage(tables_factory):
+    """The permissive ``eligible=resolved``/``used=eligible`` defaults are gone (P1)."""
+    tables = tables_factory([_row("aaaaaaaaaaaa")])
+    with pytest.raises(ValueError, match="n_eligible_records is required"):
+        build_contract("lab_story_arc.py", tables, n_used_records=0)
+    with pytest.raises(ValueError, match="n_used_records is required"):
+        build_contract("lab_story_arc.py", tables, n_eligible_records=0)
 
 
 # ---------------------------------------------------------------------------

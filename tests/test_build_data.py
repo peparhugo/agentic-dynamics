@@ -337,9 +337,13 @@ def _lab_gate_fixture(tmp_path, monkeypatch, *, contract_ok: bool):
 
     tables = cc.load_canonical_tables("story", manifest_path=claimed)
     artifact = tmp_path / "lab_story_arc.json"
+    # build_contract requires explicit eligibility/usage counts (public-truth P1 removed the
+    # permissive defaults); this synthetic slice resolves to no story payloads, so 0/0.
     artifact.write_text(json.dumps({
         "experiment_id": "lab_story_arc",
-        CONTRACT_KEY: build_contract("lab_story_arc.py", tables),
+        CONTRACT_KEY: build_contract(
+            "lab_story_arc.py", tables, n_eligible_records=0, n_used_records=0
+        ),
     }))
 
     # build_data resolves lab outputs relative to ROOT; point ROOT at tmp_path and make the

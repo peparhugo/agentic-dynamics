@@ -118,7 +118,15 @@ def compute(stories: list[dict]) -> dict:
 def main():
     tables = load_canonical_tables("story")
     output = compute(tables.stories)
-    attach_contract(output, LAB, tables)
+    # Record scope (public-truth review P1): every current story is consumed, so
+    # eligible == used == resolved — declared explicitly, not via a permissive default.
+    attach_contract(
+        output,
+        LAB,
+        tables,
+        n_eligible_records=len(tables.stories),
+        n_used_records=len(tables.stories),
+    )
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     frontier = output["summary"]["pareto_frontier"]

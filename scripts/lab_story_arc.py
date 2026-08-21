@@ -137,7 +137,15 @@ def main():
     tables = load_canonical_tables("story")
     output = compute(tables.stories)
     # The contract records WHICH corpus produced these numbers; build_data re-checks it.
-    attach_contract(output, LAB, tables)
+    # Record scope (public-truth review P1): every current story is consumed, so
+    # eligible == used == resolved — declared explicitly, not via a permissive default.
+    attach_contract(
+        output,
+        LAB,
+        tables,
+        n_eligible_records=len(tables.stories),
+        n_used_records=len(tables.stories),
+    )
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")

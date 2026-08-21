@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 20:20:04 UTC by build_data.py */
+/* Generated 2026-08-21 20:48:37 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T20:20:03.260255+00:00",
+    "generated_at": "2026-08-21T20:48:36.482587+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -2304,7 +2304,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T20:20:03.265841+00:00"
+    "generated_at": "2026-08-21T20:48:36.487702+00:00"
   },
   "reviews": {
     "models": [
@@ -2822,7 +2822,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-21T18:18:08.124545",
+      "generated_at": "2026-08-21T22:44:39.240880",
       "summary": {
         "models": 7,
         "stories": 215
@@ -2917,20 +2917,26 @@ window.DYNAMICS_DATA = {
         "n_eligible_records": 215,
         "n_used_records": 215,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:08.124791+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T20:44:39.241144+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-21T18:18:08.524409",
+      "generated_at": "2026-08-21T22:44:39.622813",
       "summary": {
         "conditions": 2,
         "stories": 215,
-        "reviews": 242
+        "reviews": 242,
+        "joined_reviews": 155,
+        "reviews_without_current_story": 87
       },
       "conditions": [
         {
@@ -2962,19 +2968,23 @@ window.DYNAMICS_DATA = {
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "condition_effects/v1",
         "n_resolved_records": 457,
-        "n_eligible_records": 457,
-        "n_used_records": 457,
-        "n_excluded_records": 0,
+        "n_eligible_records": 370,
+        "n_used_records": 370,
+        "n_excluded_records": 87,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 87,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:08.524693+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T20:44:39.623105+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-21T18:18:09.060357",
+      "generated_at": "2026-08-21T22:44:40.157944",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 144,
@@ -2989,7 +2999,7 @@ window.DYNAMICS_DATA = {
         "controlled_delta_grit": 0.0037,
         "excluded": 135,
         "exclusions": {
-          "missing_strength_and_verdict": 135
+          "missing_required_field": 135
         }
       },
       "by_strength": [
@@ -3235,18 +3245,20 @@ window.DYNAMICS_DATA = {
         "n_eligible_records": 144,
         "n_used_records": 144,
         "n_excluded_records": 135,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 135,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {
-          "missing_strength_and_verdict": 135
-        },
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:09.060636+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T20:44:40.158199+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-21T18:18:09.488452",
+      "generated_at": "2026-08-21T22:44:40.570000",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3336,16 +3348,20 @@ window.DYNAMICS_DATA = {
         "n_eligible_records": 381,
         "n_used_records": 381,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:09.488714+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T20:44:40.570250+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-21T18:18:09.867633",
+      "generated_at": "2026-08-21T22:44:40.947147",
       "summary": {
         "snowball_factor": 2.26,
         "session1_cost": 0.1668,
@@ -3468,16 +3484,20 @@ window.DYNAMICS_DATA = {
         "n_eligible_records": 215,
         "n_used_records": 215,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:09.867958+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T20:44:40.947468+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-21T18:18:10.618511",
+      "generated_at": "2026-08-21T22:44:41.694905",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3564,16 +3584,20 @@ window.DYNAMICS_DATA = {
         "n_eligible_records": 215,
         "n_used_records": 215,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:10.618758+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T20:44:41.695151+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-21T18:18:11.005269",
+      "generated_at": "2026-08-21T22:44:42.072963",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
         "cells": 106,
@@ -4335,11 +4359,15 @@ window.DYNAMICS_DATA = {
         "n_eligible_records": 457,
         "n_used_records": 457,
         "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "exclusions": {},
-        "contract_version": "lab-contract/v3",
-        "generated_at": "2026-08-21T16:18:11.005531+00:00"
+        "contract_version": "lab-contract/v4",
+        "generated_at": "2026-08-21T20:44:42.073225+00:00"
       }
     }
   }
