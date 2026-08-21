@@ -92,7 +92,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="evidence-receipt"><span>Models</span><strong data-stat="variants">7</strong></div>
 <div class="evidence-receipt" title="[C] Computed: sum of story session costs"><span>Total cost</span><strong>$<span data-stat="story_total_cost">219.51</span></strong><small>[C] Computed: sum of story session costs</small></div>
 </div>
-<p class="fn"><strong>Canonical registry:</strong> <span data-stat="canonical_stories">225</span> current stories &middot; <span data-stat="canonical_findings">64</span> clean single-task findings &middot; <span data-stat="tombstoned_excluded">77</span> tombstoned (contaminated, excluded). These are the registry-backed corpus counts the site now reports.</p>
+<p class="fn"><strong>Canonical registry:</strong> <span data-stat="registry_current_records">225</span> current story rows &middot; <span data-stat="resolved_measurement_payloads">215</span> resolved measurement payloads (<span data-stat="unresolved_waivered">10</span> waived payload-less rows) &middot; <span data-stat="canonical_findings">64</span> clean single-task findings &middot; <span data-stat="tombstoned_excluded">77</span> tombstoned (contaminated, excluded). The registry claim and what actually resolved are reported separately, never merged into a single &ldquo;canonical stories&rdquo; count.</p>
 <p class="fn"><strong>Provenance:</strong> Numbers are tagged by provenance: [M] measured &middot; [C] computed &middot; [H] heuristic &middot; [X] external.</p>
 </section>
 
@@ -1751,7 +1751,7 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '<div class="mstat"><div class="mv '+gritColor+'">'+gritRate+'%</div><div class="ml">Narration Rate' + provBadge('narration_rate') + '</div><div class="ms">Failure rate under perturbation (lower = better grit)</div></div>';
     html += '<div class="mstat"><div class="mv amber">'+(thinking*100).toFixed(1)+'%</div><div class="ml">Explanation Tax &epsilon;' + provBadge('avg_thinking_ratio') + '</div><div class="ms">Thinking ratio to output</div></div>';
     html += '<div class="mstat"><div class="mv">'+loc+'</div><div class="ml">LOC / Session' + provBadge('avg_loc') + '</div><div class="ms">Avg lines of code generated</div></div>';
-    html += '<div class="mstat"><div class="mv '+passColor+'">'+passRate+'</div><div class="ml">Correctness' + provBadge('pass_rate') + '</div><div class="ms">Test pass rate</div></div>';
+    html += '<div class="mstat"><div class="mv '+passColor+'">'+passRate+'</div><div class="ml">Correctness' + provBadge('pass_rate') + '</div><div class="ms">Test pass rate, weighted over repeated session-level executions</div></div>';
     html += '</div>';
 
     html += '<div class="pan"><div>';

@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-21T17:06:39.728069+00:00",
-  "n_specs": 79,
+  "generated_at": "2026-08-21T17:53:24.368908+00:00",
+  "n_specs": 80,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -326,6 +326,24 @@
       "latest_git_sha": "bf05f1c82",
       "results_pointer": "experiments/results/workflows/context_abstraction_implement/20260820T005643Z.json",
       "n_runs": 2
+    },
+    {
+      "name": "canonical_publication_closure",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/canonical_publication_closure.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-21T17:06:39.550614+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 1.447518,
+      "latest_git_sha": "86ef9a34c",
+      "results_pointer": "experiments/results/workflows/canonical_publication_closure/20260821T170639Z.json",
+      "n_runs": 1
     },
     {
       "name": "canonical_state_design",

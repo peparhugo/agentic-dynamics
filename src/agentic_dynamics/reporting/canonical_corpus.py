@@ -31,20 +31,23 @@ The rules it implements
 4. **The no-op condition relabel** (``docs/data_integrity_findings.md`` treatment rule 1)
    is applied once, here, so no lab re-implements it.
 5. **Identity is computed, not asserted**: :func:`manifest_identity` produces the
-   ``input_manifest_sha256`` / ``registry_version`` a lab embeds in its output and
-   ``build_data.py`` re-checks at publication time (see ``lab_contract``).
+   ``registry_identity_sha256`` / ``registry_version`` a lab embeds in its output and
+   ``build_data.py`` re-checks at publication time (see ``lab_contract``), and
+   :func:`resolved_input_identity` attests to the exact payload *content*.
 
-Why the identity hash is a *projection* of the manifest, not the file's sha256
------------------------------------------------------------------------------
+Why the registry-identity hash is a *projection* of the manifest, not the file's sha256
+----------------------------------------------------------------------------------
 Hashing ``data_manifest.json`` whole would be circular: the manifest records the sha256
 of ``apps/website/data.js``, which is produced *by publishing the labs*, and it carries a
 fresh ``generated_at`` on every run. A lab's embedded hash would be invalidated by the
 very act of publishing it — every subsequent build would reject every lab.
 
-So the hash covers the manifest's **canonical-state identity**: ``schema_version`` plus
-the full ``registry`` array. That is precisely the input a lab consumed. It changes when
-records are added, superseded, or tombstoned (the lab genuinely is stale) and does not
-change when the pipeline re-stamps a timestamp or re-hashes its own output.
+So the registry-identity hash covers the manifest's **canonical-state identity**:
+``schema_version`` plus the full ``registry`` array. That is precisely the *selection* a
+lab consumed. It changes when records are added, superseded, or tombstoned (the lab
+genuinely is stale) and does not change when the pipeline re-stamps a timestamp or
+re-hashes its own output. It does **not** attest to payload *bytes* — that is what the
+separate ``resolved_input_sha256`` (review P2) is for.
 """
 
 from __future__ import annotations
@@ -85,6 +88,12 @@ TABLE_ATTRIBUTES = {
     "finding": "findings",
 }
 
+#: table name -> the registry ``source_type`` whose current rows *obligate* a payload.
+#: ``analysis`` is absent: it is a derived join over story rows, not a registered source
+#: type, so a missing analysis is not an unresolved row. This is the set the
+#: :class:`ResolutionReport` counts ``expected_current``/``resolved`` over.
+TABLE_SOURCE_TYPES = {"story": "story", "review": "review", "finding": "finding"}
+
 
 # ---------------------------------------------------------------------------
 # Identity
@@ -95,13 +104,14 @@ TABLE_ATTRIBUTES = {
 class ManifestIdentity:
     """Who the input dataset *is* — the lineage a lab embeds and build_data re-checks.
 
-    ``input_manifest_sha256`` is the projection hash described in the module docstring;
-    ``registry_version`` is a human-readable version string combining the manifest schema
-    version with the canonical row count, so a mismatch is legible in a log line without
-    diffing hashes.
+    ``registry_identity_sha256`` is the projection hash described in the module docstring
+    (``schema_version`` + the ``registry`` array — the registry identity, not the manifest
+    file's bytes and not the payload bytes); ``registry_version`` is a human-readable
+    version string combining the manifest schema version with the canonical row count, so a
+    mismatch is legible in a log line without diffing hashes.
     """
 
-    input_manifest_sha256: str
+    registry_identity_sha256: str
     registry_version: str
     n_rows: int
     n_current: int
@@ -113,7 +123,7 @@ class ManifestIdentity:
         Deliberately NOT a plausible-looking hash: a lab built without a manifest must be
         rejected at publication, and an obviously-empty identity makes that unambiguous.
         """
-        return cls(input_manifest_sha256="", registry_version="absent", n_rows=0, n_current=0)
+        return cls(registry_identity_sha256="", registry_version="absent", n_rows=0, n_current=0)
 
 
 def _canonical_json(obj: Any) -> bytes:
@@ -157,7 +167,7 @@ def manifest_identity(
     ).hexdigest()
     n_current = sum(1 for r in rows if r.get("lifecycle_state") == "current")
     return ManifestIdentity(
-        input_manifest_sha256=digest,
+        registry_identity_sha256=digest,
         registry_version=f"data-manifest/{schema_version}+{len(rows)}rows",
         n_rows=len(rows),
         n_current=n_current,
@@ -167,6 +177,212 @@ def manifest_identity(
 def current_manifest_identity(manifest_path: Path | None = None) -> ManifestIdentity:
     """Identity of the manifest on disk right now — build_data's side of the comparison."""
     return manifest_identity(manifest_path=manifest_path)
+
+
+def _payload_content(payload: dict) -> dict:
+    """The *measurement* content of a resolved payload — resolver provenance removed.
+
+    The resolver stamps each payload with underscore-prefixed provenance keys
+    (``_canonical_condition``, ``_source_path``, ``_registry``, ``_story_id``,
+    ``_experiment``). Those are derived from the registry/join, not from the payload file's
+    own bytes — and ``_source_path`` is an absolute path that would make a content hash
+    environment-dependent. The payload-content digest (review P2) therefore covers only the
+    non-underscore keys, which are exactly the measured fields that a payload-file edit
+    would change.
+    """
+    return {k: v for k, v in payload.items() if not str(k).startswith("_")}
+
+
+def resolved_input_identity(tables: CanonicalTables) -> str:
+    """``sha256`` over the stable sorted ``(table, entity_id, knowledge_id, payload_digest)``
+    sequence (review P2) — attests to the exact payload *content*, not just the selection.
+
+    The registry-identity hash says *which* records a lab consumed; it cannot tell that a
+    payload file's bytes changed underneath a stable registry. This digest covers each
+    resolved payload's measured content (provenance keys excluded), keyed by its canonical
+    identity, sorted so the hash is order-independent. ``build_contract`` embeds it as
+    ``resolved_input_sha256``; ``validate_contract`` recomputes it the same way and rejects
+    a drift.
+    """
+    rows: list[tuple] = []
+    for table in tables.tables:
+        attr = TABLE_ATTRIBUTES.get(table)
+        if attr is None:
+            continue
+        for payload in getattr(tables, attr):
+            reg = payload.get("_registry") or {}
+            content_digest = hashlib.sha256(_canonical_json(_payload_content(payload))).hexdigest()
+            rows.append(
+                (
+                    table,
+                    str(reg.get("entity_id") or ""),
+                    str(reg.get("knowledge_id") or ""),
+                    content_digest,
+                )
+            )
+    rows.sort()
+    return hashlib.sha256(_canonical_json(rows)).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Resolution completeness (review P1)
+# ---------------------------------------------------------------------------
+
+#: The committed waiver artifact — the reason-bearing exemptions for current registry rows
+#: that cannot resolve to a payload (the 10 known payload-less story rows).
+DEFAULT_WAIVER_PATH = PROJECT_ROOT / "experiments" / "waivers" / "unresolved_payloads.json"
+
+#: The reasons a current row can fail to resolve. ``duplicate`` is a registry-level defect
+#: (two current rows share a logical locator); the rest are payload-join failures.
+UNRESOLVED_KINDS = ("missing", "unreadable", "ambiguous", "duplicate")
+
+
+@dataclass(frozen=True)
+class ResolutionIssue:
+    """One current registry row that did not resolve to a measurement payload.
+
+    ``kind`` is one of :data:`UNRESOLVED_KINDS`:
+
+    * ``missing`` — no payload file exists for the row (or, for a ``finding``, the row's
+      named run is absent from its aggregate file);
+    * ``unreadable`` — the payload file exists but is not valid JSON;
+    * ``ambiguous`` — more than one payload file matches the row's locator;
+    * ``duplicate`` — two current rows share a logical locator (the duplicate is dropped).
+
+    A row with a ``missing``/``unreadable``/``ambiguous`` payload must be either fixed or
+    waived before publication; a ``duplicate`` is a manifest defect to repair.
+    """
+
+    table: str
+    entity_id: str | None
+    logical_locator: str
+    source_uri: str | None
+    kind: str
+
+
+@dataclass(frozen=True)
+class ResolutionReport:
+    """How completely the current registry resolved to measurement payloads.
+
+    The six fields are exactly the review's P1 vocabulary:
+    ``expected_current`` (current rows), ``resolved`` (payloads produced), and the four
+    failure kinds. ``issues`` carries one :class:`ResolutionIssue` per unresolved row so a
+    caller can fail closed, and can match each issue against a reason-bearing waiver.
+    """
+
+    expected_current: int = 0
+    resolved: int = 0
+    missing: int = 0
+    unreadable: int = 0
+    ambiguous: int = 0
+    duplicate: int = 0
+    issues: tuple[ResolutionIssue, ...] = ()
+
+    @property
+    def unresolved(self) -> int:
+        """Every unresolved row, regardless of kind."""
+        return self.missing + self.unreadable + self.ambiguous + self.duplicate
+
+    @property
+    def complete(self) -> bool:
+        """True when every expected current row produced a payload."""
+        return self.unresolved == 0
+
+    def by_kind(self, kind: str) -> list[ResolutionIssue]:
+        """The issues of one failure kind, in resolution order."""
+        return [i for i in self.issues if i.kind == kind]
+
+    @classmethod
+    def from_issues(
+        cls, expected_current: int, resolved: int, issues: list[ResolutionIssue]
+    ) -> ResolutionReport:
+        """Build a report from its raw ingredients (tallies the four failure kinds)."""
+        from collections import Counter
+
+        kinds = Counter(i.kind for i in issues)
+        return cls(
+            expected_current=expected_current,
+            resolved=resolved,
+            missing=kinds.get("missing", 0),
+            unreadable=kinds.get("unreadable", 0),
+            ambiguous=kinds.get("ambiguous", 0),
+            duplicate=kinds.get("duplicate", 0),
+            issues=tuple(issues),
+        )
+
+    @classmethod
+    def empty(cls) -> ResolutionReport:
+        """The report of "no manifest" — an explicit absence, like :meth:`ManifestIdentity.empty`."""
+        return cls()
+
+
+@dataclass(frozen=True)
+class Waiver:
+    """One reason-bearing exemption for an unresolved current row.
+
+    ``logical_locator`` + ``entity_id`` together name the row; ``reason`` must be non-empty
+    (a reason-less waiver is indistinguishable from "we did not look").
+    """
+
+    table: str
+    logical_locator: str
+    entity_id: str | None
+    reason: str
+
+
+def load_waivers(path: Path | None = None) -> list[Waiver]:
+    """Load the committed waiver artifact, degrading to ``[]`` when absent/unreadable.
+
+    The same file-fallback posture as :func:`read_manifest`: a missing waiver file is a
+    *state* (no exemptions claimed), not a crash — the caller's fail-closed check then
+    rejects every unresolved row, which is the safe default.
+    """
+    waiver_path = path or DEFAULT_WAIVER_PATH
+    if not waiver_path.exists():
+        return []
+    try:
+        raw = json.loads(waiver_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    waivers = []
+    for entry in raw.get("waivers") or []:
+        reason = str(entry.get("reason") or "").strip()
+        if not reason:
+            continue  # a reason-less waiver is not a waiver
+        waivers.append(
+            Waiver(
+                table=str(entry.get("table") or ""),
+                logical_locator=str(entry.get("logical_locator") or ""),
+                entity_id=entry.get("entity_id"),
+                reason=reason,
+            )
+        )
+    return waivers
+
+
+def _waiver_key(table: str, logical_locator: str, entity_id: str | None) -> tuple[str, str]:
+    """The row identity a waiver is matched on: ``(table, logical_locator)``.
+
+    ``logical_locator`` is unique within a table (it *is* the story id for ``story``), so
+    the pair is a stable key. ``entity_id`` is carried on the waiver for auditability but is
+    not part of the match — the registry regenerates ids on some ingestions and a waiver
+    keyed on the id would silently stop matching after a re-ingest.
+    """
+    return (table, logical_locator)
+
+
+def unwaivered_issues(report: ResolutionReport, waivers: list[Waiver]) -> list[ResolutionIssue]:
+    """The unresolved rows *not* covered by a waiver — the fail-closed trigger.
+
+    A waiver covers an issue when its ``(table, logical_locator)`` matches. Everything else
+    — missing, unreadable, ambiguous, duplicate — is a publication-blocking defect.
+    """
+    waived = {_waiver_key(w.table, w.logical_locator, w.entity_id) for w in waivers}
+    return [
+        i
+        for i in report.issues
+        if _waiver_key(i.table, i.logical_locator, i.entity_id) not in waived
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +420,13 @@ def effective_story_condition(payload: dict) -> str:
     condition = str(payload.get("perturbation_condition") or "")
     if condition in NOOP_CONDITIONS and not isinstance(payload.get("test_executed_success"), bool):
         return "clean"
+    # An absent/empty label (the pre-fix cells whose filenames never carried a
+    # condition) is also "no perturbation applied" — fold it into ``clean`` so every
+    # ``_canonical_condition`` is a real, publication-legal condition name rather than an
+    # empty string that a consumer would have to re-normalize (``lab_condition_effects.py``
+    # previously had to do ``or "clean"`` itself, which is how the split silently drifted).
+    if not condition:
+        return "clean"
     return condition
 
 
@@ -215,24 +438,54 @@ def _read_json(path: Path) -> dict | None:
         return None
 
 
-def _story_path(story_id: str) -> Path | None:
-    """Locate a story payload from its id.
+def _story_paths(story_id: str) -> list[Path]:
+    """Locate a story payload from its id (top-level only — never remediation subdirs).
 
     Story result filenames end in ``_<story_id>.json`` (``story.save_story_result``), and a
-    ``story`` registry row's ``logical_locator`` *is* that id. The lookup is scoped to
-    ``STORIES_DIR``'s top level, so remediation subdirectories
-    (``stories/_remediation_contaminated/``) can never be picked up.
+    ``story`` registry row's ``logical_locator`` *is* that id. Scoped to ``STORIES_DIR``'s
+    top level, so remediation subdirectories (``stories/_remediation_contaminated/``) can
+    never be picked up. Returns *all* matches so the caller can flag an ambiguous join.
     """
     if not story_id:
-        return None
-    matches = sorted(p for p in STORIES_DIR.glob(f"*_{story_id}.json") if p.is_file())
-    return matches[0] if matches else None
+        return []
+    return sorted(p for p in STORIES_DIR.glob(f"*_{story_id}.json") if p.is_file())
 
 
-def resolve_stories(manifest: dict) -> list[dict]:
+def _issue(table: str, row: dict, kind: str, *, story_id: str | None = None) -> ResolutionIssue:
+    """Build a :class:`ResolutionIssue` from a registry row (locator defaults to the row's)."""
+    return ResolutionIssue(
+        table=table,
+        entity_id=row.get("entity_id"),
+        logical_locator=str(story_id if story_id is not None else row.get("logical_locator") or ""),
+        source_uri=row.get("source_uri"),
+        kind=kind,
+    )
+
+
+def _duplicate_issues(rows: list[dict], table: str) -> list[ResolutionIssue]:
+    """A ``duplicate`` issue for every current row that shares its locator with another.
+
+    Two current rows naming the same logical locator is a manifest defect (one of them is
+    stale and should have been superseded/tombstoned, not left current). The resolver still
+    joins both — this only *flags* the defect so publication can fail closed on it.
+    """
+    seen: set[str] = set()
+    issues: list[ResolutionIssue] = []
+    for row in rows:
+        loc = str(row.get("logical_locator") or "")
+        if not loc:
+            continue  # an empty locator is a "missing" failure, not a duplicate
+        if loc in seen:
+            issues.append(_issue(table, row, "duplicate"))
+        else:
+            seen.add(loc)
+    return issues
+
+
+def resolve_stories(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]:
     """Every current ``story`` payload, condition-corrected and provenance-stamped.
 
-    Each payload gains two underscore-prefixed keys so downstream labs never have to
+    Each payload gains three underscore-prefixed keys so downstream labs never have to
     re-derive provenance:
 
     * ``_canonical_condition`` — the relabelled condition (use this, not the raw field)
@@ -240,18 +493,27 @@ def resolve_stories(manifest: dict) -> list[dict]:
     * ``_source_path`` — the resolved payload path, for a lab that needs the typed
       ``runtime.story.load_story_result`` loader rather than the raw dict. It is a
       *resolved* path (the registry chose it), so using it is still canonical.
+
+    Returns ``(payloads, issues)`` — an issue for every current row whose payload is
+    missing, unreadable, or ambiguous (see :class:`ResolutionReport`).
     """
     out: list[dict] = []
+    issues: list[ResolutionIssue] = []
     for row in current_rows(manifest, "story"):
         story_id = str(row.get("logical_locator") or "")
-        path = _story_path(story_id)
-        if path is None:
+        matches = _story_paths(story_id)
+        if not story_id or not matches:
+            issues.append(_issue("story", row, "missing", story_id=story_id))
             continue
-        payload = _read_json(path)
+        if len(matches) > 1:
+            issues.append(_issue("story", row, "ambiguous", story_id=story_id))
+            continue
+        payload = _read_json(matches[0])
         if payload is None:
+            issues.append(_issue("story", row, "unreadable", story_id=story_id))
             continue
         payload["_canonical_condition"] = effective_story_condition(payload)
-        payload["_source_path"] = str(path)
+        payload["_source_path"] = str(matches[0])
         payload["_registry"] = {
             "entity_id": row.get("entity_id"),
             "knowledge_id": row.get("knowledge_id"),
@@ -260,31 +522,43 @@ def resolve_stories(manifest: dict) -> list[dict]:
         }
         payload.setdefault("story_id", story_id)
         out.append(payload)
-    return out
+    return out, issues
 
 
-def resolve_reviews(manifest: dict) -> list[dict]:
+def resolve_reviews(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]:
     """Every current ``review`` payload.
 
     A ``review`` row's ``logical_locator`` is the story id, and the reviewer writes
     ``reviews/review_<story_id>.json`` (``scripts/finalize_reviews.py``). The payload gains
     ``_story_id`` so a lab can join reviews to stories without re-parsing file names.
+
+    Returns ``(payloads, issues)`` — a current review row whose file is absent or unreadable
+    is an unresolved row.
     """
     out: list[dict] = []
+    issues: list[ResolutionIssue] = []
     for row in current_rows(manifest, "review"):
         story_id = str(row.get("logical_locator") or "")
         path = REVIEWS_DIR / f"review_{story_id}.json"
         if not path.exists():
+            issues.append(_issue("review", row, "missing"))
             continue
         payload = _read_json(path)
         if payload is None:
+            issues.append(_issue("review", row, "unreadable"))
             continue
         payload["_story_id"] = story_id
+        payload["_registry"] = {
+            "entity_id": row.get("entity_id"),
+            "knowledge_id": row.get("knowledge_id"),
+            "source_uri": row.get("source_uri"),
+            "lifecycle_state": row.get("lifecycle_state"),
+        }
         out.append(payload)
-    return out
+    return out, issues
 
 
-def resolve_analysis(manifest: dict) -> list[dict]:
+def resolve_analysis(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]:
     """Post-hoc analysis payloads for the current stories only.
 
     Analysis artifacts (``analysis/analysis_<story_id>.json``, written by
@@ -293,6 +567,10 @@ def resolve_analysis(manifest: dict) -> list[dict]:
     registry decides which ones exist**: an analysis whose story is tombstoned or
     unregistered is never read. That is the difference between a registry-filtered join
     and the ``glob("*.json")`` this module replaces.
+
+    Returns ``(payloads, [])`` — analysis is a best-effort *join*, not a 1:1 row→payload
+    obligation: a current story that was never analyzed is not an unresolved row, so this
+    resolver contributes no fail-closed issues.
     """
     out: list[dict] = []
     for row in current_rows(manifest, "story"):
@@ -304,8 +582,17 @@ def resolve_analysis(manifest: dict) -> list[dict]:
         if payload is None:
             continue
         payload["_story_id"] = story_id
+        # Analysis is derived from a story, so its canonical entity is the story row it
+        # joins onto — the provenance that ``resolved_input_identity`` folds into the
+        # payload-content hash.
+        payload["_registry"] = {
+            "entity_id": row.get("entity_id"),
+            "knowledge_id": row.get("knowledge_id"),
+            "source_uri": row.get("source_uri"),
+            "lifecycle_state": row.get("lifecycle_state"),
+        }
         out.append(payload)
-    return out
+    return out, []
 
 
 def _resolve_file_uri(source_uri: str) -> Path | None:
@@ -320,7 +607,7 @@ def _resolve_file_uri(source_uri: str) -> Path | None:
     return PROJECT_ROOT / source_uri[len("file://") :]
 
 
-def resolve_findings(manifest: dict) -> list[dict]:
+def resolve_findings(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]:
     """Every current ``finding`` run — the single-task perturbation cells.
 
     A ``finding`` row points at an aggregate results file via ``source_uri`` and names the
@@ -329,34 +616,49 @@ def resolve_findings(manifest: dict) -> list[dict]:
     the formal Grit metric computable at all.
 
     Each returned run gains ``_registry`` provenance and ``_experiment`` (the parent file's
-    experiment name). Structurally parallel to ``build_data._resolve_finding_entry``, minus
-    that function's mapping into the retired summary's *field vocabulary* — labs want the
-    measured fields under their real names.
+    experiment name). Structurally parallel to ``build_data._finding_entry_from_resolved``,
+    minus that function's mapping into the retired summary's *field vocabulary* — labs want
+    the measured fields under their real names.
+
+    Returns ``(payloads, issues)`` — a current row whose file is absent/unreadable, or whose
+    named run is missing/ambiguous inside the file, is an unresolved row.
     """
     out: list[dict] = []
+    issues: list[ResolutionIssue] = []
     for row in current_rows(manifest, "finding"):
         path = _resolve_file_uri(str(row.get("source_uri") or ""))
         locator = str(row.get("logical_locator") or "")
-        if path is None or not path.exists() or not locator:
+        if path is None or not locator:
+            issues.append(_issue("finding", row, "missing"))
+            continue
+        if not path.exists():
+            issues.append(_issue("finding", row, "missing"))
             continue
         payload = _read_json(path)
         if payload is None:
+            issues.append(_issue("finding", row, "unreadable"))
             continue
-        for run in payload.get("runs") or []:
-            workdir = str(run.get("workdir") or "")
-            if workdir.rsplit("/", 1)[-1] != locator:
-                continue
-            run = dict(run)  # never mutate the shared payload
-            run["_experiment"] = payload.get("experiment", "")
-            run["_registry"] = {
-                "entity_id": row.get("entity_id"),
-                "knowledge_id": row.get("knowledge_id"),
-                "source_uri": row.get("source_uri"),
-                "lifecycle_state": row.get("lifecycle_state"),
-            }
-            out.append(run)
-            break
-    return out
+        matches = [
+            run
+            for run in payload.get("runs") or []
+            if str(run.get("workdir") or "").rsplit("/", 1)[-1] == locator
+        ]
+        if len(matches) > 1:
+            issues.append(_issue("finding", row, "ambiguous"))
+            continue
+        if not matches:
+            issues.append(_issue("finding", row, "missing"))
+            continue
+        run = dict(matches[0])  # never mutate the shared payload
+        run["_experiment"] = payload.get("experiment", "")
+        run["_registry"] = {
+            "entity_id": row.get("entity_id"),
+            "knowledge_id": row.get("knowledge_id"),
+            "source_uri": row.get("source_uri"),
+            "lifecycle_state": row.get("lifecycle_state"),
+        }
+        out.append(run)
+    return out, issues
 
 
 _RESOLVERS = {
@@ -378,6 +680,8 @@ class CanonicalTables:
 
     ``tables`` records which tables were requested; it becomes part of the
     ``input_dataset_id`` so two labs reading different slices are distinguishable.
+    ``resolution`` is the completeness report (review P1) — the evidence a publication
+    path uses to fail closed on unresolved current rows.
     """
 
     identity: ManifestIdentity
@@ -386,6 +690,7 @@ class CanonicalTables:
     reviews: list[dict] = field(default_factory=list)
     analysis: list[dict] = field(default_factory=list)
     findings: list[dict] = field(default_factory=list)
+    resolution: ResolutionReport = field(default_factory=ResolutionReport)
 
     @property
     def input_dataset_id(self) -> str:
@@ -393,6 +698,11 @@ class CanonicalTables:
         return (
             f"canonical_registry/{'+'.join(self.tables)}" if self.tables else "canonical_registry"
         )
+
+    @property
+    def resolved_input_sha256(self) -> str:
+        """The payload-content identity (review P2) — see :func:`resolved_input_identity`."""
+        return resolved_input_identity(self)
 
     @property
     def is_empty(self) -> bool:
@@ -437,13 +747,31 @@ def load_canonical_tables(
 
     manifest = read_manifest(manifest_path)
     identity = manifest_identity(manifest)
-    resolved = {name: _RESOLVERS[name](manifest) for name in requested}
+
+    payloads: dict[str, list[dict]] = {}
+    report_issues: list[ResolutionIssue] = []
+    expected_current = 0
+    resolved_count = 0
+    for name in requested:
+        out, issues = _RESOLVERS[name](manifest)
+        payloads[name] = out
+        source_type = TABLE_SOURCE_TYPES.get(name)
+        if source_type is None:
+            continue  # analysis — a derived join, not a row→payload obligation
+        report_issues.extend(issues)
+        rows = current_rows(manifest, source_type)
+        expected_current += len(rows)
+        resolved_count += len(out)
+        report_issues.extend(_duplicate_issues(rows, name))
+
+    resolution = ResolutionReport.from_issues(expected_current, resolved_count, report_issues)
 
     return CanonicalTables(
         identity=identity,
         tables=requested,
-        stories=resolved.get("story", []),
-        reviews=resolved.get("review", []),
-        analysis=resolved.get("analysis", []),
-        findings=resolved.get("finding", []),
+        stories=payloads.get("story", []),
+        reviews=payloads.get("review", []),
+        analysis=payloads.get("analysis", []),
+        findings=payloads.get("finding", []),
+        resolution=resolution,
     )

@@ -110,7 +110,7 @@ def main():
     tables = load_canonical_tables("story")
     output = compute(tables.stories)
     # The contract records WHICH corpus produced these numbers; build_data re-checks it.
-    attach_contract(output, LAB, tables, n_input_records=len(tables.stories))
+    attach_contract(output, LAB, tables)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")

@@ -1,19 +1,23 @@
-"""sync_data.py — Normalize all story results into Parquet for clean querying.
+"""sync_data.py — Normalize canonical story results into Parquet for clean querying.
 
-Reads every stories/*.json, flattens sessions into one row per session,
-writes two tables to experiments/data/:
+Reads the **registry-selected** story payloads (never a raw ``stories/*.json`` glob) via
+``agentic_dynamics.reporting.canonical_corpus``, flattens sessions into one row per
+session, writes two tables to experiments/data/:
 
   sessions.parquet  — one row per session (cost, tokens, cache, correctness, model)
   stories.parquet   — one row per story cell (aggregated totals)
 
+The condition a cell carries is ``_canonical_condition`` — the resolver's no-op relabel
+(``early_degrade``/``bad_seed`` no-ops and absent labels count as ``clean``), so the
+parquet agrees with the canonical lab corpus instead of contradicting it.
+
 Usage:
-  python3 scripts/sync_data.py          # sync all results
+  python3 scripts/sync_data.py          # sync all canonical results
   python3 scripts/sync_data.py --check  # verify parquet vs source
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -21,69 +25,79 @@ import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-RESULTS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "stories"
+try:
+    import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402,F401
+
+from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables  # noqa: E402
+
 DATA_DIR = Path(__file__).resolve().parent.parent / "experiments" / "data"
 
-SESSION_SCHEMA = pa.schema([
-    pa.field("session_id", pa.string()),
-    pa.field("story_name", pa.string()),
-    pa.field("tier", pa.string()),
-    pa.field("quality", pa.string()),
-    pa.field("condition", pa.string()),
-    pa.field("session_number", pa.int32()),
-    pa.field("task_type", pa.string()),
-    pa.field("model", pa.string()),
-    pa.field("prompt_tokens", pa.int64()),
-    pa.field("completion_tokens", pa.int64()),
-    pa.field("reasoning_tokens", pa.int64()),
-    pa.field("total_tokens", pa.int64()),
-    pa.field("cache_read_tokens", pa.int64()),
-    pa.field("cache_write_tokens", pa.int64()),
-    pa.field("context_tokens", pa.int64()),
-    pa.field("cache_hit_rate", pa.float64()),
-    pa.field("cost_usd", pa.float64()),
-    pa.field("duration_s", pa.float64()),
-    pa.field("exit_code", pa.int32()),
-    pa.field("tool_calls", pa.int32()),
-    pa.field("depth", pa.int32()),
-    pa.field("retries", pa.int32()),
-    pa.field("tests_passed", pa.int32()),
-    pa.field("tests_total", pa.int32()),
-    pa.field("files_changed", pa.int32()),
-    pa.field("error", pa.string()),
-    pa.field("continuation_used", pa.bool_()),
-    pa.field("worktree", pa.string()),
-    pa.field("started_at", pa.string()),
-    pa.field("test_count", pa.int32()),
-    pa.field("test_lines", pa.int32()),
-    pa.field("code_lines", pa.int32()),
-])
+SESSION_SCHEMA = pa.schema(
+    [
+        pa.field("session_id", pa.string()),
+        pa.field("story_name", pa.string()),
+        pa.field("tier", pa.string()),
+        pa.field("quality", pa.string()),
+        pa.field("condition", pa.string()),
+        pa.field("session_number", pa.int32()),
+        pa.field("task_type", pa.string()),
+        pa.field("model", pa.string()),
+        pa.field("prompt_tokens", pa.int64()),
+        pa.field("completion_tokens", pa.int64()),
+        pa.field("reasoning_tokens", pa.int64()),
+        pa.field("total_tokens", pa.int64()),
+        pa.field("cache_read_tokens", pa.int64()),
+        pa.field("cache_write_tokens", pa.int64()),
+        pa.field("context_tokens", pa.int64()),
+        pa.field("cache_hit_rate", pa.float64()),
+        pa.field("cost_usd", pa.float64()),
+        pa.field("duration_s", pa.float64()),
+        pa.field("exit_code", pa.int32()),
+        pa.field("tool_calls", pa.int32()),
+        pa.field("depth", pa.int32()),
+        pa.field("retries", pa.int32()),
+        pa.field("tests_passed", pa.int32()),
+        pa.field("tests_total", pa.int32()),
+        pa.field("files_changed", pa.int32()),
+        pa.field("error", pa.string()),
+        pa.field("continuation_used", pa.bool_()),
+        pa.field("worktree", pa.string()),
+        pa.field("started_at", pa.string()),
+        pa.field("test_count", pa.int32()),
+        pa.field("test_lines", pa.int32()),
+        pa.field("code_lines", pa.int32()),
+    ]
+)
 
-STORY_SCHEMA = pa.schema([
-    pa.field("story_name", pa.string()),
-    pa.field("tier", pa.string()),
-    pa.field("quality", pa.string()),
-    pa.field("condition", pa.string()),
-    pa.field("model", pa.string()),
-    pa.field("cell_key", pa.string()),
-    pa.field("repetition", pa.int32()),
-    pa.field("session_count", pa.int32()),
-    pa.field("total_tokens", pa.int64()),
-    pa.field("total_cache_reads", pa.int64()),
-    pa.field("total_cache_writes", pa.int64()),
-    pa.field("total_context_tokens", pa.int64()),
-    pa.field("cache_hit_rate", pa.float64()),
-    pa.field("total_cost", pa.float64()),
-    pa.field("cost_captured", pa.bool_()),
-    pa.field("total_duration", pa.float64()),
-    pa.field("all_successful", pa.bool_()),
-    pa.field("cascade_recovery", pa.bool_()),
-    pa.field("worktree", pa.string()),
-    pa.field("test_count", pa.int32()),
-    pa.field("test_lines", pa.int32()),
-    pa.field("code_lines", pa.int32()),
-    pa.field("test_code_ratio", pa.float64()),
-])
+STORY_SCHEMA = pa.schema(
+    [
+        pa.field("story_name", pa.string()),
+        pa.field("tier", pa.string()),
+        pa.field("quality", pa.string()),
+        pa.field("condition", pa.string()),
+        pa.field("model", pa.string()),
+        pa.field("cell_key", pa.string()),
+        pa.field("repetition", pa.int32()),
+        pa.field("session_count", pa.int32()),
+        pa.field("total_tokens", pa.int64()),
+        pa.field("total_cache_reads", pa.int64()),
+        pa.field("total_cache_writes", pa.int64()),
+        pa.field("total_context_tokens", pa.int64()),
+        pa.field("cache_hit_rate", pa.float64()),
+        pa.field("total_cost", pa.float64()),
+        pa.field("cost_captured", pa.bool_()),
+        pa.field("total_duration", pa.float64()),
+        pa.field("all_successful", pa.bool_()),
+        pa.field("cascade_recovery", pa.bool_()),
+        pa.field("worktree", pa.string()),
+        pa.field("test_count", pa.int32()),
+        pa.field("test_lines", pa.int32()),
+        pa.field("code_lines", pa.int32()),
+        pa.field("test_code_ratio", pa.float64()),
+    ]
+)
 
 
 def _extract_tier_quality(codebase_path: str) -> tuple[str, str]:
@@ -93,32 +107,19 @@ def _extract_tier_quality(codebase_path: str) -> tuple[str, str]:
     return "", ""
 
 
-def _extract_condition(d: dict, filename: str) -> str:
-    cond = d.get("perturbation_condition", "")
-    if cond:
-        return cond
-    for candidate in ["bad_seed", "early_degrade", "clean"]:
-        if candidate in filename:
-            return candidate
-    return ""
+def _analysis_loc(analysis: list[dict]) -> dict[str, int]:
+    """Map story_id -> final lines_of_code from the canonical analysis payloads.
 
-
-def _load_analysis_loc() -> dict[str, int]:
-    """Map story_id -> final lines_of_code from analysis/*.json deep.solution.
-
-    The summary.code_lines field is populated by _count_tests(worktree), which
-    returns 0 once the /tmp worktree is cleaned. The analysis files persist
-    deep.solution.lines_of_code for every story, so it is the reliable fallback.
+    The summary.code_lines field is populated by _count_tests(worktree), which returns 0
+    once the /tmp worktree is cleaned. The analysis payloads persist
+    deep.solution.lines_of_code for every story, so it is the reliable fallback. The
+    resolver already filtered these to the current story registry, so this map is
+    canonical by construction — no raw ``analysis/*.json`` glob.
     """
-    analysis_dir = Path(__file__).resolve().parent.parent / "experiments" / "results" / "analysis"
     loc: dict[str, int] = {}
-    for f in analysis_dir.glob("*.json"):
-        try:
-            d = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        sid = d.get("story_id", "") or f.stem.replace("analysis_", "")
-        sol = (d.get("deep", {}) or {}).get("solution", {}) or {}
+    for a in analysis:
+        sid = str(a.get("_story_id") or a.get("story_id") or "")
+        sol = (a.get("deep", {}) or {}).get("solution", {}) or {}
         n = sol.get("lines_of_code", 0)
         if sid and n:
             loc[sid] = int(n)
@@ -126,30 +127,25 @@ def _load_analysis_loc() -> dict[str, int]:
 
 
 def sync() -> dict[str, int]:
-    """Sync all story results to parquet. Returns row counts."""
+    """Sync the canonical story payloads to parquet. Returns row counts."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     from collections import Counter
+
+    tables = load_canonical_tables("story", "analysis")
+    stories = tables.stories
 
     session_rows: list[dict[str, Any]] = []
     story_rows: list[dict[str, Any]] = []
 
     cell_counts: Counter[str] = Counter()
-    analysis_loc = _load_analysis_loc()
+    analysis_loc = _analysis_loc(tables.analysis)
 
-    for f in sorted(RESULTS_DIR.glob("*.json")):
-        if "dvs" in f.name or "log" in f.name:
-            continue
-
-        try:
-            d = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-
+    for d in stories:
         story_name = d.get("story_name", "")
         model = d.get("model", "")
         tier, quality = _extract_tier_quality(d.get("codebase_path", ""))
-        condition = _extract_condition(d, f.name)
+        condition = d.get("_canonical_condition") or "clean"
         summary = d.get("summary", {})
         worktree = d.get("worktree", "")
         story_id = d.get("story_id", "")
@@ -159,83 +155,86 @@ def sync() -> dict[str, int]:
         # use the peak across sessions as the floor for "tests written".
         sessions = d.get("sessions", [])
         agentic_test_floor = max(
-            [(s.get("agentic", {}) or {}).get("tests_total", 0) or 0 for s in sessions]
-            + [0]
+            [(s.get("agentic", {}) or {}).get("tests_total", 0) or 0 for s in sessions] + [0]
         )
         recovered_tests = summary.get("test_count", 0) or agentic_test_floor
         recovered_loc = summary.get("code_lines", 0) or analysis_loc.get(story_id, 0)
         story_cost = summary.get("total_cost", 0) or 0
         cost_captured = story_cost > 0
 
-        # Cell identity: story × model × tier × quality × condition.
-        # Re-runs of the same cell share cell_key but get an increasing
-        # repetition index (0 = first run, 1 = re-run, ...).
+        # Cell identity: story × model × tier × quality × canonical condition.
+        # Re-runs of the same cell share cell_key but get an increasing repetition
+        # index (0 = first run, 1 = re-run, ...).
         cell_key = f"{story_name}|{model}|{tier}|{quality}|{condition}"
         repetition = cell_counts[cell_key]
         cell_counts[cell_key] += 1
 
-        story_rows.append({
-            "story_name": story_name,
-            "tier": tier,
-            "quality": quality,
-            "condition": condition,
-            "model": model,
-            "cell_key": cell_key,
-            "repetition": repetition,
-            "session_count": summary.get("session_count", len(d.get("sessions", []))),
-            "total_tokens": summary.get("total_tokens", 0),
-            "total_cache_reads": summary.get("total_cache_reads", 0),
-            "total_cache_writes": summary.get("total_cache_writes", 0),
-            "total_context_tokens": summary.get("total_context_tokens", 0),
-            "cache_hit_rate": summary.get("cache_hit_rate", 0.0),
-            "total_cost": summary.get("total_cost", 0.0),
-            "cost_captured": cost_captured,
-            "total_duration": summary.get("total_duration", 0.0),
-            "all_successful": summary.get("all_successful", False),
-            "cascade_recovery": summary.get("cascade_recovery", False),
-            "worktree": worktree,
-            "test_count": recovered_tests,
-            "test_lines": summary.get("test_lines", 0) or 0,
-            "code_lines": recovered_loc,
-            "test_code_ratio": summary.get("test_code_ratio", 0.0) or 0.0,
-        })
-
-        for s in d.get("sessions", []):
-            a = s.get("agentic", {})
-            session_rows.append({
-                "session_id": f"{Path(f.name).stem}_{s.get('session_number', 0)}",
+        story_rows.append(
+            {
                 "story_name": story_name,
                 "tier": tier,
                 "quality": quality,
                 "condition": condition,
-                "session_number": s.get("session_number", 0),
-                "task_type": s.get("task_type", ""),
                 "model": model,
-                "prompt_tokens": a.get("prompt_tokens", 0) or 0,
-                "completion_tokens": a.get("completion_tokens", 0) or 0,
-                "reasoning_tokens": a.get("reasoning_tokens", 0) or 0,
-                "total_tokens": a.get("total_tokens", 0) or 0,
-                "cache_read_tokens": a.get("cache_read_tokens", 0) or 0,
-                "cache_write_tokens": a.get("cache_write_tokens", 0) or 0,
-                "context_tokens": a.get("context_tokens", 0) or 0,
-                "cache_hit_rate": a.get("cache_hit_rate", 0.0) or 0.0,
-                "cost_usd": s.get("cost_usd", 0.0),
-                "duration_s": s.get("duration_s", 0.0),
-                "exit_code": s.get("exit_code", 0),
-                "tool_calls": a.get("tool_calls", 0) or 0,
-                "depth": a.get("depth", 0) or 0,
-                "retries": a.get("retries", 0) or 0,
-                "tests_passed": a.get("tests_passed", 0) or 0,
-                "tests_total": a.get("tests_total", 0) or 0,
-                "files_changed": s.get("files_changed", 0),
-                "error": s.get("error", ""),
-                "continuation_used": s.get("continuation_used", False),
+                "cell_key": cell_key,
+                "repetition": repetition,
+                "session_count": summary.get("session_count", len(d.get("sessions", []))),
+                "total_tokens": summary.get("total_tokens", 0),
+                "total_cache_reads": summary.get("total_cache_reads", 0),
+                "total_cache_writes": summary.get("total_cache_writes", 0),
+                "total_context_tokens": summary.get("total_context_tokens", 0),
+                "cache_hit_rate": summary.get("cache_hit_rate", 0.0),
+                "total_cost": summary.get("total_cost", 0.0),
+                "cost_captured": cost_captured,
+                "total_duration": summary.get("total_duration", 0.0),
+                "all_successful": summary.get("all_successful", False),
+                "cascade_recovery": summary.get("cascade_recovery", False),
                 "worktree": worktree,
-                "started_at": d.get("started_at", ""),
-                "test_count": s.get("test_count", 0) or 0,
-                "test_lines": s.get("test_lines", 0) or 0,
-                "code_lines": s.get("code_lines", 0) or 0,
-            })
+                "test_count": recovered_tests,
+                "test_lines": summary.get("test_lines", 0) or 0,
+                "code_lines": recovered_loc,
+                "test_code_ratio": summary.get("test_code_ratio", 0.0) or 0.0,
+            }
+        )
+
+        for s in d.get("sessions", []):
+            a = s.get("agentic", {})
+            session_rows.append(
+                {
+                    "session_id": f"{story_id}_{s.get('session_number', 0)}",
+                    "story_name": story_name,
+                    "tier": tier,
+                    "quality": quality,
+                    "condition": condition,
+                    "session_number": s.get("session_number", 0),
+                    "task_type": s.get("task_type", ""),
+                    "model": model,
+                    "prompt_tokens": a.get("prompt_tokens", 0) or 0,
+                    "completion_tokens": a.get("completion_tokens", 0) or 0,
+                    "reasoning_tokens": a.get("reasoning_tokens", 0) or 0,
+                    "total_tokens": a.get("total_tokens", 0) or 0,
+                    "cache_read_tokens": a.get("cache_read_tokens", 0) or 0,
+                    "cache_write_tokens": a.get("cache_write_tokens", 0) or 0,
+                    "context_tokens": a.get("context_tokens", 0) or 0,
+                    "cache_hit_rate": a.get("cache_hit_rate", 0.0) or 0.0,
+                    "cost_usd": s.get("cost_usd", 0.0),
+                    "duration_s": s.get("duration_s", 0.0),
+                    "exit_code": s.get("exit_code", 0),
+                    "tool_calls": a.get("tool_calls", 0) or 0,
+                    "depth": a.get("depth", 0) or 0,
+                    "retries": a.get("retries", 0) or 0,
+                    "tests_passed": a.get("tests_passed", 0) or 0,
+                    "tests_total": a.get("tests_total", 0) or 0,
+                    "files_changed": s.get("files_changed", 0),
+                    "error": s.get("error", ""),
+                    "continuation_used": s.get("continuation_used", False),
+                    "worktree": worktree,
+                    "started_at": d.get("started_at", ""),
+                    "test_count": s.get("test_count", 0) or 0,
+                    "test_lines": s.get("test_lines", 0) or 0,
+                    "code_lines": s.get("code_lines", 0) or 0,
+                }
+            )
 
     if session_rows:
         table = pa.Table.from_pylist(session_rows, schema=SESSION_SCHEMA)

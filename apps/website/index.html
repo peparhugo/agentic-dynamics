@@ -164,7 +164,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   <div class="finding">
     <div class="fn">Finding 4</div>
     <h3>Degradation can leak across sessions, and recovery can be measured.</h3>
-    <p>Corrupting the session-1 spec (early_degrade) drops success to 85% and doubles the cascade rate; a pre-degraded seed (bad_seed) costs the most ($1.48/story) but succeeds 88%. Degradation raises cost and cascades slightly; it does not dominate the outcome.</p>
+    <p>Corrupting the session-1 spec (<code>early_degrade</code>) lowers the success rate to 86% (versus 97% clean) and raises the cascade rate (1.5% &rarr; 2.5%). Degradation raises risk at the margin; it does not dominate the outcome. Cells labelled <code>bad_seed</code>/<code>early_degrade</code> that carried no instrumented test verdict received no actual perturbation and are counted as <code>clean</code> (<code>docs/data_integrity_findings.md</code> treatment rule 1), so the arms above are the corrected ones.</p>
   </div>
   <div class="hero-actions"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
 </div></section>

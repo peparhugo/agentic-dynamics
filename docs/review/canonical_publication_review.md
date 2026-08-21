@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Canonical-Publication Closure Review — external critique (2026-08-21)
 
 **Provenance [X]:** operator-provided external review of main at `ec66947d5` (the merged

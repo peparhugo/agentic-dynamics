@@ -1196,6 +1196,144 @@ sequenced after the now-complete lab contract + context guards.
 **Release verdict: PASS** — the semantic-integrity release is complete (10 implementation phases
 + this gate, one explicit deferral).
 
+## Canonical publication closure
+
+Input: `docs/review/canonical_publication_review.md` (external review of main at `ec66947d5`).
+Spec: `workflows/repository/canonical_publication_closure.yaml`.
+
+### c1_canonical_tables — route the primary publication path through CanonicalTables (review P0)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **One complete canonical input** — `build_data.py` resolves `load_canonical_tables("story","finding","review","analysis")` once and every section consumes that `tables` object; `load_canonical_corpus` maps the resolver's flattened `finding` runs into the summary-shaped entry vocabulary | PASS |
+| 2 | **`sync_data.py` stops globbing the raw stories dir** — it now iterates `load_canonical_tables("story","analysis")` (registry-selected payloads) and writes the resolver's `_canonical_condition` into `stories.parquet`/`sessions.parquet`; the analysis LOC fallback comes from `tables.analysis`, not a glob | PASS |
+| 3 | **Consumers read the canonical tables, not parquet/globs** — `compute_story_models(stories)` and `_load_story_data(stories)` aggregate `tables.stories` in memory (duckdb/parquet dependency removed); `_load_review_data(reviews, stories)` and `_load_analysis_data(analysis, stories)` join via the resolver-stamped `_story_id` and skip reviews/analysis whose story is not current | PASS |
+| 4 | **The condition split matches the relabel policy** — `data.js` `stories.conditions` is exactly `clean 135 / early_degrade 80`; no `bad_seed 41`, no `early_degrade 91`, no empty label (the resolver now folds absent labels into `clean`, matching `lab_condition_effects`'s `or "clean"`) | PASS |
+| 5 | **Guard test added** — `tests/test_publication_singular_door.py`: AST guard rejecting any public-data producer (`build_data.py`, `sync_data.py`) that constructs its own path into `experiments/results/{stories,reviews,analysis}` outside the resolver, plus functional asserts on the canonical split and on `data.js` agreement | PASS |
+| 6 | **Parquet + data.js regenerated** — `sync_data.py` → 1067 sessions / 215 stories; `build_data.py` → `data.js` with the canonical split (7 story models, 155 current-story reviews, 156 analyses) | PASS |
+| 7 | **Setup-commit leftovers resolved (green tests)** — `canonical_publication_review.md` gained `status: accepted`; `canonical_publication_closure.yaml` re-homed `experiments/specs/` → `workflows/repository/` with `artifact_kind: workflow` metadata, spec index regenerated (80 specs) | PASS |
+| 8 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1406 passed, 106 deselected**; full `pytest tests/`: **1511 passed, 1 skipped** (one `external`-marked Ollama test flakes intermittently across full runs — unrelated to this phase) | PASS |
+
+**c1_canonical_tables result: 8/8 PASS.**
+
+Carried forward (later phases, not dropped): resolution completeness + fail-closed semantics on
+the 10 payload-less current story rows (c2); semantic lab-contract validation against the manifest
+entry (c3); honest record-count scopes `n_resolved`/`n_eligible`/`n_used`/`n_excluded` (c4); the
+test-count scope renames (c5); README/site prose reconciliation (c6); the full release-gate
+verification (c7).
+
+### c2_resolution_fail_closed — resolution completeness + fail-closed publication (review P1)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **`ResolutionReport` added** — `canonical_corpus.ResolutionReport` carries exactly the six review fields (`expected_current`, `resolved`, `missing`, `unreadable`, `ambiguous`, `duplicate`) plus an `issues` list (one `ResolutionIssue` per unresolved row, with table/entity_id/logical_locator/source_uri/kind). Resolvers now return `(payloads, issues)`; `load_canonical_tables` aggregates them and attaches `tables.resolution` | PASS |
+| 2 | **Every failure kind is detected** — `missing` (no payload file / no matching run), `unreadable` (invalid JSON), `ambiguous` (multiple matching files/runs), `duplicate` (two current rows sharing a locator). Analysis is a best-effort derived join, not a row→payload obligation, so it contributes no fail-closed issues | PASS (unit-tested per kind) |
+| 3 | **Committed waiver artifact** — `experiments/waivers/unresolved_payloads.json` (schema `waiver/v1`) lists the 10 known payload-less story rows with entity_id + a reason-bearing rationale (cost-0 Claude stubs dropped in `994454f79`: claude CLI unavailable, cell never ran) | PASS (10/10 rows) |
+| 4 | **Publication fails closed** — `build_data._assert_resolution_complete` aborts with a `RuntimeError` naming every unresolved current row not covered by a waiver; `build()` runs it after resolving the four tables | PASS |
+| 5 | **The waiver is visible in the output** — `data.js` gains a `resolution_report` block (the six counts) plus the waived rows with their reasons, and `summary` gains the scoped counts `registry_current_records` (225) / `resolved_measurement_payloads` (215) / `eligible_records` (215) / `records_used` (215) / `unresolved_waivered` (10); the misleading `canonical_stories` key is gone | PASS |
+| 6 | **Site copy uses the scoped terms** — `evidence.html` + `app.js` report "current story rows" vs "resolved measurement payloads" (and the waived count) instead of a single "canonical stories" number | PASS |
+| 7 | **Tests** — missing payload without a waiver → `_assert_resolution_complete` raises; with a waiver → returns the waived row (visible); plus per-kind `ResolutionReport` unit tests and a real-corpus integration guard (10 missing, 10 waived) that fails closed on future drift | PASS (7 new tests) |
+| 8 | **data.js + manifest regenerated** — `build_data.py` rebuilds against the waived resolver; `generate_manifest.py` re-hashes `data.js` (registry array byte-identical, so lab-contract identity is unchanged) | PASS |
+| 9 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1413 passed, 106 deselected**; full `pytest tests/`: **1518 passed, 1 skipped** | PASS |
+
+**c2_resolution_fail_closed result: 9/9 PASS.**
+
+Carried forward (later phases, not dropped): semantic lab-contract validation against the manifest
+entry (`metric_definition_version` grit/v1 vs committed grit/v0) — c3; honest record-count scopes
+`n_resolved`/`n_eligible`/`n_used`/`n_excluded` — c4; the test-count scope renames — c5; README/site
+prose reconciliation — c6; the full release-gate verification — c7.
+
+### c3_contract_semantic — semantic lab-contract validation + payload-content identity (review P1 + P2)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Semantic validation** — `validate_contract(payload, manifest_entry, current_identity)` now compares, for exact equality, every field with an authoritative source: `lab` / `metric_definition_version` / `requires_external_service` against the manifest entry, `data_integrity_policy` / `contract_version` against the module constants, `input_dataset_id` against the tables the entry's `input_sources` declare, and `registry_version` against the current identity. Any mismatch fails | PASS |
+| 2 | **No `<lab>/v0` fallback** — `build_contract` now raises for an unclassified lab (no invented metric version); the previous `_metric_definition_version` fallback is gone | PASS |
+| 3 | **P2 rename** — `input_manifest_sha256` → `registry_identity_sha256` across `ManifestIdentity`, `LabContract`, and `REQUIRED_FIELDS` (the hash value is unchanged — it was already the registry projection, just misleadingly named) | PASS |
+| 4 | **P2 content hash** — `canonical_corpus.resolved_input_identity` computes `resolved_input_sha256` over the stable sorted `(table, entity_id, knowledge_id, payload-content-digest)` sequence; `_payload_content` excludes the resolver's underscore-provenance keys (incl. absolute `_source_path`) so only measured bytes move it. `resolve_reviews`/`resolve_analysis` now stamp `_registry` so every resolved payload is keyable | PASS |
+| 5 | **Contracts embed both** — `build_contract` writes `registry_identity_sha256` + `resolved_input_sha256`; `contract_version` bumped to `lab-contract/v2` (field renamed + added); `validate_contract` verifies the content hash when the caller recomputes it (build_data resolves each lab's own tables) | PASS |
+| 6 | **Mutation tests** — `test_semantic_field_mismatch_is_rejected` parametrises over all 7 semantic fields, altering each independently and asserting rejection with the field named; plus the stale-registry-hash and content-hash-sensitivity tests | PASS (7 param + 2 named) |
+| 7 | **grit/v0 fixed** — the committed `lab_grit.json` embedded `grit/v0` while the manifest declares `grit/v1`; all 8 publication-eligible lab artifacts regenerated, `lab_grit.json` now carries `grit/v1`, all at `lab-contract/v2` with both hashes | PASS (8/8 regenerated) |
+| 8 | **data.js rebuilt** — the `labs` section re-published with the v2 contracts (7 published labs, each carrying `registry_identity_sha256` + `resolved_input_sha256`); manifest re-hashed (registry byte-identical, so identity unchanged) | PASS |
+| 9 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1424 passed, 106 deselected**; full `pytest tests/`: **1529 passed, 1 skipped** | PASS |
+
+**c3_contract_semantic result: 9/9 PASS.**
+
+Carried forward (later phases, not dropped): honest record-count scopes
+`n_resolved`/`n_eligible`/`n_used`/`n_excluded` — c4; the test-count scope renames — c5; README/site
+prose reconciliation — c6; the full release-gate verification — c7.
+
+### c4_record_scopes — honest record counts (review P2)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Schema replaced** — `n_input_records` is gone; `LabContract` now carries `n_resolved_records` / `n_eligible_records` / `n_used_records` / `n_excluded_records` + an `exclusions` breakdown (reason → count), all in `REQUIRED_FIELDS`; `contract_version` → `lab-contract/v3` | PASS |
+| 2 | **Sensible defaults** — `build_contract` derives `n_resolved_records` from the lab's own resolved slice (`_resolved_count`), and defaults `eligible = used = resolved` / `excluded = resolved − eligible` so a no-exclusion lab needs no extra args | PASS |
+| 3 | **Grit reports the real gap** — `collect_cells` now returns an exclusions tally; `lab_grit` contracts `n_resolved 279 / n_eligible 144 / n_used 144 / n_excluded 135` with `exclusions {missing_strength_and_verdict: 135}`, and the same breakdown lands in its `summary` (not just the contract) | PASS |
+| 4 | **Consistency enforced** — `validate_contract` rejects any contract whose `eligible + excluded ≠ resolved`, `used > eligible`, or `exclusions` do not sum to `n_excluded_records` (and `0` counts are no longer treated as "empty" values) | PASS |
+| 5 | **Every lab emitter updated** — all 8 canonical labs call `attach_contract` with the new field set (grit passes counts explicitly; the other 7 rely on the defaults) | PASS (8/8) |
+| 6 | **Guard tests updated** — `test_published_artifacts_match_the_current_registry` checks `n_resolved_records == registry resolution`, the self-consistency invariant, and that `exclusions` sum correctly; new `test_inconsistent_record_counts_are_rejected` mutation test proves a broken count is rejected | PASS |
+| 7 | **Outputs regenerated** — all 8 lab artifacts + `data.js` rebuilt at `lab-contract/v3` with honest counts; manifest re-hashed (registry byte-identical) | PASS |
+| 8 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1431 passed, 106 deselected**; full `pytest tests/`: **1536 passed, 1 skipped** | PASS |
+
+**c4_record_scopes result: 8/8 PASS.**
+
+Carried forward (later phases, not dropped): the test-count scope renames — c5; README/site prose
+reconciliation — c6; the full release-gate verification — c7.
+
+### c5_test_scope_names — distinct test-count scopes (review "smaller")
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Conflated fields renamed** — the model-card no longer publishes `tests_total` / `tests_passed` / `tests_run`; it now carries `final_tests_discovered` (story-level peak test count), `test_executions_passed` / `test_executions_run` (summed across session executions), and the old names are gone | PASS |
+| 2 | **Pass rate labelled** — the model-card carries `pass_rate_scope` ("weighted over repeated session-level test executions…"), and `evidence.html`'s model-card caption states it explicitly instead of a bare "Test pass rate" | PASS |
+| 3 | **Source-of-truth guard** — `tests/test_data_integrity.py` gains `test_story_model_test_counts_use_distinct_scope_names` (asserts the new keys exist in `build_data.py`), and the P0-1 comment is updated to the new names | PASS |
+| 4 | **data.js regenerated** — model cards now show e.g. `final_tests_discovered 1623` vs `test_executions_passed 3290 / test_executions_run 3292` under distinct names; manifest re-hashed | PASS |
+| 5 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1432 passed, 106 deselected**; full `pytest tests/`: **1537 passed, 1 skipped** | PASS |
+
+**c5_test_scope_names result: 5/5 PASS.**
+
+Carried forward (later phases, not dropped): README/site prose reconciliation — c6; the full
+release-gate verification — c7.
+
+### c6_readme_site_reconcile — reconcile README + site prose + Docker persistence (review "smaller")
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **One public-statistics artifact** — `data.js` gains a `public_statistics` block (story_sessions 1,067 / db_sessions_total 3,370 / game_reports 344 / model_variants 7 / experiment_configs 35 / perturbation_operators 10 / lab_books 20 / measured_spend_usd 309.17) — the single source README prose cites | PASS |
+| 2 | **README reconciled** — hero line, "By the Numbers" table (1,067 sessions / 35 configs / $309.17 spend / 80 specs = 6 experiments + 74 workflows), and the BibTeX note all updated; a scope note states the figures mirror `data.js`'s `public_statistics` and distinguishes the 1,067 canonical story sessions from the 3,370 raw DB sessions | PASS |
+| 3 | **Home-page prose bound to the canonical split** — `index.html` Finding 4 no longer claims a `bad_seed` arm or "$1.48/story / 88%"; it reports `early_degrade` 86% vs `clean` 97% and the 1.5% → 2.5% cascade, with the relabel note | PASS |
+| 4 | **Docker persistence fixed** — the `docker run` example mounts `experiments/data_manifest.json` (a single file OUTSIDE the results/ mount), and the persistence comment + mount-point list accurately describe what persists (the manifest is load-bearing: the lab-contract identity hashes its registry) | PASS |
+| 5 | **CI verifies manifest survival** — the container CORE gate now mounts the manifest and asserts its `generated_at` differs from the committed one (i.e. it was actually regenerated inside the container, not just present) | PASS |
+| 6 | **Guard test** — `test_readme_figures_match_public_statistics` asserts README's headline figures equal the `public_statistics` block and that the stale `1,097` / `$288.69` / `36 (33+3)` strings never return | PASS |
+| 7 | Full suite green — deterministic gate `pytest tests/ -m "not external"`: **1433 passed, 106 deselected**; full `pytest tests/`: **1538 passed, 1 skipped** | PASS |
+
+**c6_readme_site_reconcile result: 7/7 PASS.**
+
+Carried forward (later phases, not dropped): the full release-gate verification — c7.
+
+### c7_closure_verify — release gate (coverage proof + invariant audit)
+
+| # | Acceptance criterion | Result |
+|---|---|---|
+| 1 | **Coverage proof** — every P0/P1/P2/smaller finding in `docs/review/canonical_publication_review.md` maps to a passing phase (P0→c1, P1-completeness→c2, P1-semantic→c3, P2-bytes→c3, P2-counts→c4, test-counts→c5, README→c6, Docker→c6); **zero orphans, zero deferrals** | PASS |
+| 2 | **Condition split asserted** — `data.js` carries `clean 135 / early_degrade 80` exactly once, no `bad_seed 41`, no `early_degrade 91`; `test_data_js_story_conditions_match_the_canonical_split` strengthened to assert exactly-once | PASS |
+| 3 | **Full suite green** — `pytest tests/`: **1538 passed, 1 skipped** | PASS |
+| 4 | **All guard suites green** — 15 guard files (the 13 canonical + `test_publication_singular_door.py` + `test_build_data.py`): **220 passed** | PASS |
+| 5 | **Compile-gate all specs** — `load_spec` + `compile_spec` over `experiments/definitions/*.yaml` + `workflows/**/*.yaml`: **80/80 compile, 0 fail** | PASS |
+| 6 | **Reproduce core dry-run + container core run** — `reproduce.sh core --dry-run` exit 0 (8 labs, `--no-tests --no-sonar`); `docker build` success; container CORE run produces `data.js` (116,193 bytes) AND a regenerated manifest (`generated_at` advanced, `files.data.js.sha256` matches) | PASS |
+| 7 | **Container defect fixed** — the image lacked `experiments/waivers/`, so the fail-closed gate aborted in-container; `Dockerfile` now `COPY`s `experiments/waivers/` | PASS |
+| 8 | **Invariant audit** — Redis 6380 isolation, Firebase dual-host, CAP frozen-not-implemented, no retired summary in publication input, lab lineage + fail-closed guards all PASS | PASS |
+| 9 | **Verification artifact** — `docs/review/canonical_publication_verification.md` written (status: accepted), PASS/FAIL per check + final verdict "PASS — semantic-integrity signoff: YES"; passes `test_doc_lifecycle.py` + `test_stale_path_guard.py` | PASS |
+
+**c7_closure_verify result: 9/9 PASS.**
+
+**Release verdict: PASS — semantic-integrity signoff: YES.** The canonical-publication closure
+(c1–c7) is complete: one canonical door (`load_canonical_tables`), one lineage to `data.js`.
+
+
+
+
 
 
 

@@ -6,9 +6,9 @@ with ``source_type in {story, finding}``, join measurement payloads) and the two
 rules the site must obey: tombstoned records are excluded, and a no-op story condition
 is relabeled ``clean``. A missing manifest degrades to an empty corpus with a warning.
 
-Every test builds a fixture manifest in ``tmp_path`` and monkeypatches
-``build_data.MANIFEST_PATH``/``build_data.STORIES_DIR``/``build_data.ROOT`` — never the
-real ``experiments/data_manifest.json``.
+Every test builds a fixture manifest in ``tmp_path`` and monkeypatches the resolver's
+paths (``cc.STORIES_DIR``/``cc.PROJECT_ROOT``) — never the real
+``experiments/data_manifest.json``.
 """
 
 from __future__ import annotations
@@ -17,11 +17,15 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import build_data  # noqa: E402
+
+from agentic_dynamics.reporting import canonical_corpus as cc  # noqa: E402
 
 
 def _row(**overrides) -> dict:
@@ -106,7 +110,7 @@ def test_tombstoned_story_records_are_excluded(tmp_path, monkeypatch):
              logical_locator="bad", source_uri="story:bad",
              lifecycle_state="tombstoned", reason="contaminated: ran as clean (P0-7)"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -140,7 +144,7 @@ def test_tombstoned_finding_records_are_excluded(tmp_path, monkeypatch):
              source_uri="file://experiments/results/task_manager_deepseek-v4-pro.json",
              lifecycle_state="tombstoned", reason="contaminated"),
     ])
-    monkeypatch.setattr(build_data, "ROOT", tmp_path)
+    monkeypatch.setattr(cc, "PROJECT_ROOT", tmp_path)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -165,7 +169,7 @@ def test_noop_story_condition_is_relabeled_clean(tmp_path, monkeypatch):
     _write_manifest(manifest_path, [
         _row(logical_locator="noop", source_uri="story:noop"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -184,7 +188,7 @@ def test_instrumented_story_keeps_its_condition(tmp_path, monkeypatch):
     _write_manifest(manifest_path, [
         _row(logical_locator="real", source_uri="story:real"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -202,7 +206,7 @@ def test_genuinely_clean_story_is_untouched(tmp_path, monkeypatch):
     _write_manifest(manifest_path, [
         _row(logical_locator="clean", source_uri="story:clean"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
     assert corpus.stories[0]["_canonical_condition"] == "clean"
@@ -241,7 +245,7 @@ def test_finding_row_joins_to_its_run(tmp_path, monkeypatch):
              logical_locator="exp_jgikdggu",
              source_uri="file://experiments/results/task_manager_deepseek-v4-pro.json"),
     ])
-    monkeypatch.setattr(build_data, "ROOT", tmp_path)
+    monkeypatch.setattr(cc, "PROJECT_ROOT", tmp_path)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -299,7 +303,7 @@ def test_missing_payload_resolves_to_nothing(tmp_path, monkeypatch):
     _write_manifest(manifest_path, [
         _row(logical_locator="orphan", source_uri="story:orphan"),
     ])
-    monkeypatch.setattr(build_data, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     corpus = build_data.load_canonical_corpus(manifest_path)
 
@@ -376,4 +380,127 @@ def test_lab_gate_rejects_a_stale_manifest_lab_json(tmp_path, monkeypatch, capsy
     out = capsys.readouterr().out
     assert "[lab-gate] rejected" in out
     assert "lab_story_arc.py" in out, "the rejection must name the lab"
-    assert "stale input_manifest_sha256" in out
+    assert "stale registry_identity_sha256" in out
+
+
+# ---------------------------------------------------------------------------
+# Resolution completeness + fail-closed (canonical-publication closure, phase c2)
+# ---------------------------------------------------------------------------
+
+
+def test_resolution_report_counts_missing_payload(tmp_path, monkeypatch):
+    """A current story row with no payload file is a ``missing`` issue, not a silent drop."""
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_row(logical_locator="orphan", source_uri="story:orphan")])
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    r = tables.resolution
+
+    assert r.expected_current == 1
+    assert r.resolved == 0
+    assert r.missing == 1
+    assert r.unresolved == 1
+    assert not r.complete
+    assert tables.stories == []
+
+
+def test_resolution_report_flags_unreadable_payload(tmp_path, monkeypatch):
+    """A payload file that is not valid JSON is ``unreadable``, not ``missing``."""
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    (stories_dir / "note_service_bad.json").write_text("{ not valid json")
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_row(logical_locator="bad", source_uri="story:bad")])
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    assert tables.resolution.unreadable == 1
+    assert tables.resolution.missing == 0
+
+
+def test_resolution_report_flags_ambiguous_payload(tmp_path, monkeypatch):
+    """Two payload files matching one locator is ``ambiguous``."""
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    payload = json.dumps(_story_payload("dup", condition="clean", instrumented=True))
+    (stories_dir / "a_dup.json").write_text(payload)
+    (stories_dir / "b_dup.json").write_text(payload)
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_row(logical_locator="dup", source_uri="story:dup")])
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    assert tables.resolution.ambiguous == 1
+
+
+def test_resolution_report_flags_duplicate_rows(tmp_path, monkeypatch):
+    """Two current rows sharing a locator is a ``duplicate`` defect."""
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    (stories_dir / "note_service_dup.json").write_text(
+        json.dumps(_story_payload("dup", condition="clean", instrumented=True))
+    )
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [
+        _row(knowledge_id="k1", entity_id="e1", logical_locator="dup", source_uri="story:dup"),
+        _row(knowledge_id="k2", entity_id="e2", logical_locator="dup", source_uri="story:dup"),
+    ])
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    assert tables.resolution.duplicate == 1
+    assert tables.resolution.expected_current == 2
+
+
+def test_fail_closed_on_unwaivered_missing_row(tmp_path, monkeypatch):
+    """A missing payload without a waiver aborts publication."""
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_row(logical_locator="orphan", source_uri="story:orphan")])
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    with pytest.raises(RuntimeError, match="not covered by a waiver"):
+        build_data._assert_resolution_complete(tables, waiver_path=tmp_path / "absent.json")
+
+
+def test_fail_closed_passes_with_waiver_and_waiver_visible(tmp_path, monkeypatch):
+    """A missing payload with a reason-bearing waiver builds, and the waiver is returned."""
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [_row(logical_locator="orphan", source_uri="story:orphan")])
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    waiver_path = tmp_path / "waivers.json"
+    waiver_path.write_text(json.dumps({
+        "schema_version": "waiver/v1",
+        "waivers": [
+            {"table": "story", "logical_locator": "orphan", "entity_id": None,
+             "reason": "known payload-less stub"},
+        ],
+    }))
+
+    waived = build_data._assert_resolution_complete(tables, waiver_path=waiver_path)
+    assert len(waived) == 1
+    assert waived[0]["logical_locator"] == "orphan"
+    assert waived[0]["reason"] == "known payload-less stub"
+
+
+def test_real_corpus_resolution_is_waivered():
+    """The committed corpus resolves once the 10 payload-less rows are waived.
+
+    An integration guard: if a new payload-less current row appears without a matching
+    waiver, this raises — publication fails closed against drift, not just in fixtures.
+    """
+    if not cc.current_manifest_identity().registry_identity_sha256:  # pragma: no cover
+        pytest.skip("no data_manifest.json registry in this checkout")
+    tables = cc.load_canonical_tables("story", "finding", "review")
+    waived = build_data._assert_resolution_complete(tables)
+    assert tables.resolution.missing == 10
+    assert len(waived) == 10

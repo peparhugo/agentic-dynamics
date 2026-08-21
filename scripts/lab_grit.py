@@ -49,7 +49,7 @@ Output:
 
 import json
 import math
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -114,19 +114,34 @@ def _rate_row(label_key: str, label: str | float, successes: int, n: int, **extr
     }
 
 
-def collect_cells(findings: list[dict], stories: list[dict]) -> list[dict]:
-    """Every canonical cell carrying BOTH fields the metric needs.
+def _exclusion_reason(has_strength: bool, has_verdict: bool) -> str:
+    """Name the reason a cell was excluded from the metric (for the exclusions breakdown)."""
+    if not has_strength and not has_verdict:
+        return "missing_strength_and_verdict"
+    if not has_strength:
+        return "missing_strength"
+    return "missing_verdict"
+
+
+def collect_cells(findings: list[dict], stories: list[dict]) -> tuple[list[dict], dict[str, int]]:
+    """Every canonical cell carrying BOTH fields the metric needs, plus the exclusion tally.
 
     A cell missing either field is excluded outright — the metric is a conditional
     probability, and a cell with no strength or no executed verdict cannot condition on
-    anything. It is never imputed to 0.0 / False.
+    anything. It is never imputed to 0.0 / False. The returned ``exclusions`` maps each
+    reason to its count, so the lab's contract can report *why* cells dropped out (review
+    P2: ``n_resolved`` vs ``n_eligible`` vs ``n_excluded``).
     """
     cells: list[dict] = []
+    exclusions: Counter = Counter()
 
     for run in findings:
         strength = run.get("perturbation_strength")
         verdict = run.get("test_executed_success")
-        if not isinstance(verdict, bool) or not isinstance(strength, (int, float)):
+        if not isinstance(strength, (int, float)) or not isinstance(verdict, bool):
+            exclusions[
+                _exclusion_reason(isinstance(strength, (int, float)), isinstance(verdict, bool))
+            ] += 1
             continue
         cells.append(
             {
@@ -142,7 +157,10 @@ def collect_cells(findings: list[dict], stories: list[dict]) -> list[dict]:
     for story in stories:
         strength = story.get("perturbation_strength")
         verdict = story.get("test_executed_success")
-        if not isinstance(verdict, bool) or not isinstance(strength, (int, float)):
+        if not isinstance(strength, (int, float)) or not isinstance(verdict, bool):
+            exclusions[
+                _exclusion_reason(isinstance(strength, (int, float)), isinstance(verdict, bool))
+            ] += 1
             continue
         cells.append(
             {
@@ -157,7 +175,7 @@ def collect_cells(findings: list[dict], stories: list[dict]) -> list[dict]:
             }
         )
 
-    return cells
+    return cells, dict(exclusions)
 
 
 def _group_rates(cells: list[dict], key: str, label_key: str) -> list[dict]:
@@ -182,7 +200,7 @@ def compute(findings: list[dict], stories: list[dict]) -> dict:
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
-    cells = collect_cells(findings, stories)
+    cells, exclusions = collect_cells(findings, stories)
 
     # ── G(s) overall, per strength level ────────────────────────────────────────────
     by_strength: dict[float, list[dict]] = defaultdict(list)
@@ -243,6 +261,9 @@ def compute(findings: list[dict], stories: list[dict]) -> dict:
             "stories": len(stories),
             # The controlled comparison is the headline; the overall one is descriptive.
             "controlled_delta_grit": controlled_delta,
+            # Record-count scope (review P2): why resolved cells dropped out of the metric.
+            "excluded": sum(exclusions.values()),
+            "exclusions": exclusions,
         },
         "by_strength": strength_rows,
         "by_strength_finding_corpus": controlled,
@@ -269,11 +290,21 @@ def compute(findings: list[dict], stories: list[dict]) -> dict:
 def main():
     tables = load_canonical_tables("finding", "story")
     output = compute(tables.findings, tables.stories)
+
+    # Record-count scope (review P2): the resolver hands back ``n_resolved`` payloads, of
+    # which only ``n_eligible`` carry both fields the metric conditions on. The gap is
+    # itemised so the contract reports *why*, not just *how many*.
+    n_resolved = len(tables.findings) + len(tables.stories)
+    summary = output["summary"]
     attach_contract(
         output,
         LAB,
         tables,
-        n_input_records=len(tables.findings) + len(tables.stories),
+        n_resolved_records=n_resolved,
+        n_eligible_records=summary["cells"],
+        n_used_records=summary["cells"],
+        n_excluded_records=n_resolved - summary["cells"],
+        exclusions=summary["exclusions"],
     )
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))

@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 00:47:50 UTC by build_data.py */
+/* Generated 2026-08-21 16:44:48 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T00:47:49.936902+00:00",
+    "generated_at": "2026-08-21T16:44:47.503792+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -13,12 +13,16 @@ window.DYNAMICS_DATA = {
     "architectures": 3,
     "variants": 7,
     "stories_total": 215,
-    "stories_unique": 200,
-    "stories_re_runs": 15,
+    "stories_unique": 150,
+    "stories_re_runs": 65,
     "story_sessions": 1067,
     "story_total_cost": 309.1685,
     "configs": 35,
-    "canonical_stories": 225,
+    "registry_current_records": 225,
+    "resolved_measurement_payloads": 215,
+    "eligible_records": 215,
+    "records_used": 215,
+    "unresolved_waivered": 10,
     "canonical_findings": 64,
     "tombstoned_excluded": 77,
     "_provenance": {
@@ -34,9 +38,113 @@ window.DYNAMICS_DATA = {
       "story_sessions": "C",
       "story_total_cost": "C",
       "configs": "M",
-      "canonical_stories": "M",
+      "registry_current_records": "M",
+      "resolved_measurement_payloads": "M",
+      "eligible_records": "C",
+      "records_used": "C",
+      "unresolved_waivered": "M",
       "canonical_findings": "M",
       "tombstoned_excluded": "M"
+    }
+  },
+  "resolution_report": {
+    "expected_current": 531,
+    "resolved": 521,
+    "missing": 10,
+    "unreadable": 0,
+    "ambiguous": 0,
+    "duplicate": 0,
+    "waivers": [
+      {
+        "table": "story",
+        "logical_locator": "5b87673f0d7a",
+        "entity_id": "0db496afe0bb29fca6090a43385a3e98e83209c387205fea3cb2144d96bb6f82",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      },
+      {
+        "table": "story",
+        "logical_locator": "5be412dd5b87",
+        "entity_id": "1685dafdadfc5b8c577eac34c2497976c9bfff8e109d495276faecc6330b43be",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      },
+      {
+        "table": "story",
+        "logical_locator": "5d7640124ed4",
+        "entity_id": "35230d9da6d444f48dd963ef8306bd5532298022c07fc977092f22e02c14130f",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      },
+      {
+        "table": "story",
+        "logical_locator": "6bc71fa28f35",
+        "entity_id": "37679fe003cab12e4e9a4ded2bae75a218577770ae87d7558748f2a7445a581e",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      },
+      {
+        "table": "story",
+        "logical_locator": "4e7abddc43f1",
+        "entity_id": "4fcea64d301b7094e2ed6f48c9e6bb9858b2437201dbd9e40413fae107ffd670",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      },
+      {
+        "table": "story",
+        "logical_locator": "4f80a9ea38aa",
+        "entity_id": "57b397cf8a61996066ded79743f15f2d56b8ee7b3797bddb1fc7ab73aa8219b0",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      },
+      {
+        "table": "story",
+        "logical_locator": "5196e779c1ca",
+        "entity_id": "5a1734eacc30df76c52c1871d553db125f49a7d552b98f74ce97ba13bab75335",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      },
+      {
+        "table": "story",
+        "logical_locator": "7005f70e2fd6",
+        "entity_id": "61e6e3cc61958913e77ba73961096aa4d3128d566019111dc2047370e2975010",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      },
+      {
+        "table": "story",
+        "logical_locator": "890584be7186",
+        "entity_id": "647f3536a7bb16e17da1aa818f9389172fe762e70086be5fce35af4061d89193",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      },
+      {
+        "table": "story",
+        "logical_locator": "98507441e613",
+        "entity_id": "aa5b8de3eb51f9c8bddb4ae2d7b0dc874588d29898b5b078d3e363d197cbb408",
+        "kind": "missing",
+        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
+      }
+    ]
+  },
+  "public_statistics": {
+    "story_sessions": 1067,
+    "db_sessions_total": 3370,
+    "game_reports": 344,
+    "model_variants": 7,
+    "experiment_configs": 35,
+    "perturbation_operators": 10,
+    "lab_books": 20,
+    "measured_spend_usd": 309.17,
+    "_provenance": {
+      "story_sessions": "M",
+      "db_sessions_total": "M",
+      "game_reports": "M",
+      "model_variants": "M",
+      "experiment_configs": "M",
+      "perturbation_operators": "M",
+      "lab_books": "M",
+      "measured_spend_usd": "M"
     }
   },
   "models": [
@@ -45,26 +153,27 @@ window.DYNAMICS_DATA = {
       "label": "DeepSeek v4 Flash",
       "provider": "deepseek",
       "cells": 31,
-      "unique_cells": 30,
-      "re_runs": 1,
+      "unique_cells": 21,
+      "re_runs": 10,
       "sessions": 155,
       "total_cost": 2.308294,
       "avg_cost": 0.074461,
       "cost_cells": 31,
       "avg_cache_hit": 0.964,
-      "avg_tests": 57.0,
+      "avg_tests": 52.4,
       "avg_test_code_ratio": 0.666,
       "avg_tok_per_session": 50036.0,
       "avg_duration_s": 1401.0,
-      "avg_code_lines": 2068.0,
-      "tests_total": 1767,
-      "tests_passed": 3290,
-      "tests_run": 3292,
+      "avg_code_lines": 991.0,
+      "final_tests_discovered": 1623,
+      "test_executions_passed": 3290,
+      "test_executions_run": 3292,
       "pass_rate": "100% (3290/3292)",
+      "pass_rate_scope": "weighted over repeated session-level test executions (each session re-runs the suite; the count is summed across sessions)",
       "avg_cost_per_session": 0.014892,
-      "avg_loc": 2068.0,
+      "avg_loc": 991.0,
       "avg_energy_j": 54395.2,
-      "avg_energy_j_per_loc": 26.3,
+      "avg_energy_j_per_loc": 54.89,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
@@ -80,8 +189,8 @@ window.DYNAMICS_DATA = {
       "label": "GPT-5.6 Luna",
       "provider": "openai",
       "cells": 34,
-      "unique_cells": 30,
-      "re_runs": 4,
+      "unique_cells": 23,
+      "re_runs": 11,
       "sessions": 170,
       "total_cost": 3.180633,
       "avg_cost": 0.093548,
@@ -91,15 +200,16 @@ window.DYNAMICS_DATA = {
       "avg_test_code_ratio": 0.275,
       "avg_tok_per_session": 17957.0,
       "avg_duration_s": 658.0,
-      "avg_code_lines": 937.0,
-      "tests_total": 486,
-      "tests_passed": 858,
-      "tests_run": 858,
+      "avg_code_lines": 697.0,
+      "final_tests_discovered": 486,
+      "test_executions_passed": 858,
+      "test_executions_run": 858,
       "pass_rate": "100% (858/858)",
+      "pass_rate_scope": "weighted over repeated session-level test executions (each session re-runs the suite; the count is summed across sessions)",
       "avg_cost_per_session": 0.01871,
-      "avg_loc": 937.0,
+      "avg_loc": 697.0,
       "avg_energy_j": 14130.0,
-      "avg_energy_j_per_loc": 15.08,
+      "avg_energy_j_per_loc": 20.27,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
@@ -115,26 +225,27 @@ window.DYNAMICS_DATA = {
       "label": "DeepSeek v4 Pro",
       "provider": "deepseek",
       "cells": 39,
-      "unique_cells": 30,
-      "re_runs": 9,
+      "unique_cells": 24,
+      "re_runs": 15,
       "sessions": 187,
       "total_cost": 6.314403,
       "avg_cost": 0.161908,
       "cost_cells": 39,
       "avg_cache_hit": 0.801,
-      "avg_tests": 47.9,
+      "avg_tests": 44.6,
       "avg_test_code_ratio": 0.798,
       "avg_tok_per_session": 38647.0,
       "avg_duration_s": 1766.0,
-      "avg_code_lines": 2219.0,
-      "tests_total": 1870,
-      "tests_passed": 3144,
-      "tests_run": 3145,
+      "avg_code_lines": 879.0,
+      "final_tests_discovered": 1739,
+      "test_executions_passed": 3144,
+      "test_executions_run": 3145,
       "pass_rate": "100% (3144/3145)",
+      "pass_rate_scope": "weighted over repeated session-level test executions (each session re-runs the suite; the count is summed across sessions)",
       "avg_cost_per_session": 0.033767,
-      "avg_loc": 2219.0,
+      "avg_loc": 879.0,
       "avg_energy_j": 39819.6,
-      "avg_energy_j_per_loc": 17.94,
+      "avg_energy_j_per_loc": 45.3,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
@@ -150,8 +261,8 @@ window.DYNAMICS_DATA = {
       "label": "openai/gpt-5.6-terra",
       "provider": "openai",
       "cells": 30,
-      "unique_cells": 30,
-      "re_runs": 0,
+      "unique_cells": 22,
+      "re_runs": 8,
       "sessions": 150,
       "total_cost": 31.329782,
       "avg_cost": 1.044326,
@@ -161,15 +272,16 @@ window.DYNAMICS_DATA = {
       "avg_test_code_ratio": 0.337,
       "avg_tok_per_session": 31804.0,
       "avg_duration_s": 785.0,
-      "avg_code_lines": 809.0,
-      "tests_total": 458,
-      "tests_passed": 1060,
-      "tests_run": 1060,
+      "avg_code_lines": 566.0,
+      "final_tests_discovered": 458,
+      "test_executions_passed": 1060,
+      "test_executions_run": 1060,
       "pass_rate": "100% (1060/1060)",
+      "pass_rate_scope": "weighted over repeated session-level test executions (each session re-runs the suite; the count is summed across sessions)",
       "avg_cost_per_session": 0.208865,
-      "avg_loc": 809.0,
+      "avg_loc": 566.0,
       "avg_energy_j": 18681.4,
-      "avg_energy_j_per_loc": 23.09,
+      "avg_energy_j_per_loc": 33.01,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
@@ -185,8 +297,8 @@ window.DYNAMICS_DATA = {
       "label": "anthropic/claude-haiku-4-5",
       "provider": "anthropic",
       "cells": 24,
-      "unique_cells": 24,
-      "re_runs": 0,
+      "unique_cells": 20,
+      "re_runs": 4,
       "sessions": 120,
       "total_cost": 32.616808,
       "avg_cost": 1.63084,
@@ -196,15 +308,16 @@ window.DYNAMICS_DATA = {
       "avg_test_code_ratio": 1.221,
       "avg_tok_per_session": 13581.0,
       "avg_duration_s": 862.0,
-      "avg_code_lines": 1586.0,
-      "tests_total": 3069,
-      "tests_passed": 0,
-      "tests_run": 0,
+      "avg_code_lines": 1484.0,
+      "final_tests_discovered": 3069,
+      "test_executions_passed": 0,
+      "test_executions_run": 0,
       "pass_rate": "unknown",
+      "pass_rate_scope": "weighted over repeated session-level test executions (each session re-runs the suite; the count is summed across sessions)",
       "avg_cost_per_session": 0.326168,
-      "avg_loc": 1586.0,
+      "avg_loc": 1484.0,
       "avg_energy_j": 15438.9,
-      "avg_energy_j_per_loc": 9.73,
+      "avg_energy_j_per_loc": 10.4,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 2,
@@ -220,26 +333,27 @@ window.DYNAMICS_DATA = {
       "label": "openai/gpt-5.6-sol",
       "provider": "openai",
       "cells": 30,
-      "unique_cells": 30,
-      "re_runs": 0,
+      "unique_cells": 19,
+      "re_runs": 11,
       "sessions": 150,
       "total_cost": 114.52382,
       "avg_cost": 3.817461,
       "cost_cells": 30,
       "avg_cache_hit": 0.85,
-      "avg_tests": 24.4,
+      "avg_tests": 23.6,
       "avg_test_code_ratio": 0.447,
       "avg_tok_per_session": 46636.0,
       "avg_duration_s": 1146.0,
-      "avg_code_lines": 1399.0,
-      "tests_total": 732,
-      "tests_passed": 1953,
-      "tests_run": 1953,
+      "avg_code_lines": 739.0,
+      "final_tests_discovered": 708,
+      "test_executions_passed": 1953,
+      "test_executions_run": 1953,
       "pass_rate": "100% (1953/1953)",
+      "pass_rate_scope": "weighted over repeated session-level test executions (each session re-runs the suite; the count is summed across sessions)",
       "avg_cost_per_session": 0.763492,
-      "avg_loc": 1399.0,
+      "avg_loc": 739.0,
       "avg_energy_j": 27822.1,
-      "avg_energy_j_per_loc": 19.89,
+      "avg_energy_j_per_loc": 37.65,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
@@ -255,8 +369,8 @@ window.DYNAMICS_DATA = {
       "label": "Claude Sonnet 5",
       "provider": "anthropic",
       "cells": 27,
-      "unique_cells": 26,
-      "re_runs": 1,
+      "unique_cells": 21,
+      "re_runs": 6,
       "sessions": 135,
       "total_cost": 118.894751,
       "avg_cost": 5.169337,
@@ -266,15 +380,16 @@ window.DYNAMICS_DATA = {
       "avg_test_code_ratio": 0.695,
       "avg_tok_per_session": 18404.0,
       "avg_duration_s": 1062.0,
-      "avg_code_lines": 2010.0,
-      "tests_total": 3163,
-      "tests_passed": 455,
-      "tests_run": 455,
+      "avg_code_lines": 1761.0,
+      "final_tests_discovered": 3163,
+      "test_executions_passed": 455,
+      "test_executions_run": 455,
       "pass_rate": "100% (455/455)",
+      "pass_rate_scope": "weighted over repeated session-level test executions (each session re-runs the suite; the count is summed across sessions)",
       "avg_cost_per_session": 1.033867,
-      "avg_loc": 2010.0,
+      "avg_loc": 1761.0,
       "avg_energy_j": 21095.0,
-      "avg_energy_j_per_loc": 10.5,
+      "avg_energy_j_per_loc": 11.98,
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 2,
@@ -911,13 +1026,13 @@ window.DYNAMICS_DATA = {
       null
     ],
     "locData": [
-      2068.0,
-      937.0,
-      2219.0,
-      809.0,
-      1586.0,
-      1399.0,
-      2010.0
+      991.0,
+      697.0,
+      879.0,
+      566.0,
+      1484.0,
+      739.0,
+      1761.0
     ],
     "costY": [
       0.074461,
@@ -1648,57 +1763,57 @@ window.DYNAMICS_DATA = {
       "id": "anthropic/claude-haiku-4-5",
       "label": "anthropic/claude-haiku-4-5",
       "avg_energy_j": 15438.9,
-      "avg_energy_j_per_loc": 9.73,
+      "avg_energy_j_per_loc": 10.4,
       "avg_cost": 1.63084,
-      "avg_loc": 1586.0
+      "avg_loc": 1484.0
     },
     {
       "id": "anthropic/claude-sonnet-5",
       "label": "Claude Sonnet 5",
       "avg_energy_j": 21095.0,
-      "avg_energy_j_per_loc": 10.5,
+      "avg_energy_j_per_loc": 11.98,
       "avg_cost": 5.169337,
-      "avg_loc": 2010.0
+      "avg_loc": 1761.0
     },
     {
       "id": "openai/gpt-5.6-luna",
       "label": "GPT-5.6 Luna",
       "avg_energy_j": 14130.0,
-      "avg_energy_j_per_loc": 15.08,
+      "avg_energy_j_per_loc": 20.27,
       "avg_cost": 0.093548,
-      "avg_loc": 937.0
-    },
-    {
-      "id": "deepseek/deepseek-v4-pro",
-      "label": "DeepSeek v4 Pro",
-      "avg_energy_j": 39819.6,
-      "avg_energy_j_per_loc": 17.94,
-      "avg_cost": 0.161908,
-      "avg_loc": 2219.0
-    },
-    {
-      "id": "openai/gpt-5.6-sol",
-      "label": "openai/gpt-5.6-sol",
-      "avg_energy_j": 27822.1,
-      "avg_energy_j_per_loc": 19.89,
-      "avg_cost": 3.817461,
-      "avg_loc": 1399.0
+      "avg_loc": 697.0
     },
     {
       "id": "openai/gpt-5.6-terra",
       "label": "openai/gpt-5.6-terra",
       "avg_energy_j": 18681.4,
-      "avg_energy_j_per_loc": 23.09,
+      "avg_energy_j_per_loc": 33.01,
       "avg_cost": 1.044326,
-      "avg_loc": 809.0
+      "avg_loc": 566.0
+    },
+    {
+      "id": "openai/gpt-5.6-sol",
+      "label": "openai/gpt-5.6-sol",
+      "avg_energy_j": 27822.1,
+      "avg_energy_j_per_loc": 37.65,
+      "avg_cost": 3.817461,
+      "avg_loc": 739.0
+    },
+    {
+      "id": "deepseek/deepseek-v4-pro",
+      "label": "DeepSeek v4 Pro",
+      "avg_energy_j": 39819.6,
+      "avg_energy_j_per_loc": 45.3,
+      "avg_cost": 0.161908,
+      "avg_loc": 879.0
     },
     {
       "id": "deepseek/deepseek-v4-flash",
       "label": "DeepSeek v4 Flash",
       "avg_energy_j": 54395.2,
-      "avg_energy_j_per_loc": 26.3,
+      "avg_energy_j_per_loc": 54.89,
       "avg_cost": 0.074461,
-      "avg_loc": 2068.0
+      "avg_loc": 991.0
     }
   ],
   "strategy_distribution": {
@@ -2002,30 +2117,21 @@ window.DYNAMICS_DATA = {
     ],
     "conditions": [
       {
-        "condition": "bad_seed",
-        "cells": 41,
-        "variants": 6,
-        "total_cost": 59.719593,
-        "avg_cost": 1.456575,
-        "success": 39,
-        "fail": 2
-      },
-      {
         "condition": "clean",
-        "cells": 83,
+        "cells": 135,
         "variants": 12,
-        "total_cost": 119.36938,
-        "avg_cost": 1.438185,
-        "success": 81,
-        "fail": 2
+        "total_cost": 208.287391,
+        "avg_cost": 1.54287,
+        "success": 131,
+        "fail": 4
       },
       {
         "condition": "early_degrade",
-        "cells": 91,
+        "cells": 80,
         "variants": 12,
-        "total_cost": 130.079518,
-        "avg_cost": 1.429445,
-        "success": 80,
+        "total_cost": 100.8811,
+        "avg_cost": 1.261014,
+        "success": 69,
         "fail": 11
       }
     ],
@@ -2094,7 +2200,7 @@ window.DYNAMICS_DATA = {
     ],
     "sessions": {
       "total": 1067,
-      "total_cost": 309.1684907100002,
+      "total_cost": 309.16849071000047,
       "total_tokens": 33518193,
       "total_cache_reads": 823919043,
       "cache_hit_rate": 0.977,
@@ -2102,7 +2208,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T00:47:49.967351+00:00"
+    "generated_at": "2026-08-21T16:44:47.508231+00:00"
   },
   "reviews": {
     "models": [
@@ -2188,11 +2294,11 @@ window.DYNAMICS_DATA = {
             "count": 32
           },
           {
-            "theme": "incomplete refactor",
+            "theme": "security",
             "count": 18
           },
           {
-            "theme": "security",
+            "theme": "incomplete refactor",
             "count": 18
           },
           {
@@ -2266,7 +2372,7 @@ window.DYNAMICS_DATA = {
             "count": 8
           },
           {
-            "theme": "incomplete refactor",
+            "theme": "missing surface",
             "count": 7
           }
         ]
@@ -2299,7 +2405,7 @@ window.DYNAMICS_DATA = {
             "count": 18
           },
           {
-            "theme": "schema drift",
+            "theme": "coupling",
             "count": 9
           }
         ]
@@ -2316,10 +2422,6 @@ window.DYNAMICS_DATA = {
         "neutral_pct": 21.2,
         "top_issues": [
           {
-            "theme": "test gaps",
-            "count": 12
-          },
-          {
             "theme": "security",
             "count": 12
           },
@@ -2328,84 +2430,26 @@ window.DYNAMICS_DATA = {
             "count": 12
           },
           {
-            "theme": "incomplete refactor",
-            "count": 8
-          },
-          {
-            "theme": "missing surface",
-            "count": 8
-          }
-        ]
-      },
-      {
-        "model": "?",
-        "label": "?",
-        "stories": 87,
-        "overall_coherence": 0.753,
-        "architectural_fit": 0.817,
-        "convention_adherence": 0.783,
-        "better_pct": 51.9,
-        "worse_pct": 7.4,
-        "neutral_pct": 38.0,
-        "top_issues": [
-          {
-            "theme": "other",
-            "count": 172
-          },
-          {
-            "theme": "security",
-            "count": 74
-          },
-          {
-            "theme": "incomplete refactor",
-            "count": 55
-          },
-          {
             "theme": "test gaps",
-            "count": 53
+            "count": 12
           },
           {
             "theme": "missing surface",
-            "count": 24
+            "count": 8
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 8
           }
         ]
       }
     ],
-    "commit_reviews": 1199,
-    "story_reviews": 240,
+    "commit_reviews": 767,
+    "story_reviews": 153,
     "reviewer": "deepseek/deepseek-v4-flash"
   },
   "analysis": {
     "models": [
-      {
-        "model": "?",
-        "label": "?",
-        "commits": 434,
-        "lines_added": 145141,
-        "lines_removed": 17723,
-        "functions_added": 2954,
-        "classes_added": 359,
-        "imports_added": 2641,
-        "sonar_available": 0,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
-        "avg_convention": 0.732,
-        "deep_cells": 87,
-        "lsp_available": 0,
-        "lsp_errors_per_cell": 0.0,
-        "lsp_warnings_per_cell": 0.0,
-        "solution_correctness": 0.736,
-        "solution_constraints": 0.893,
-        "solution_quality": 0.129,
-        "solution_novelty": 0.67,
-        "solution_composite": 0.652,
-        "basin_escape": 0.558,
-        "strategies": {
-          "exploratory": 64,
-          "conservative": 23
-        }
-      },
       {
         "model": "deepseek-v4-pro",
         "label": "DeepSeek v4 Pro",
@@ -2605,14 +2649,14 @@ window.DYNAMICS_DATA = {
         }
       }
     ],
-    "stories_analyzed": 243,
-    "commits_analyzed": 1208,
+    "stories_analyzed": 156,
+    "commits_analyzed": 774,
     "sonar_commits_available": 98
   },
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-21T02:33:08.330358",
+      "generated_at": "2026-08-21T18:18:08.124545",
       "summary": {
         "models": 7,
         "stories": 215
@@ -2699,19 +2743,24 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_cache_economics.py",
         "input_dataset_id": "canonical_registry/story",
-        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "cache_economics/v1",
+        "n_resolved_records": 215,
+        "n_eligible_records": 215,
+        "n_used_records": 215,
+        "n_excluded_records": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "n_input_records": 215,
-        "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:33:08.330375+00:00"
+        "exclusions": {},
+        "contract_version": "lab-contract/v3",
+        "generated_at": "2026-08-21T16:18:08.124791+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-21T02:33:08.689359",
+      "generated_at": "2026-08-21T18:18:08.524409",
       "summary": {
         "conditions": 2,
         "stories": 215,
@@ -2742,19 +2791,24 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_condition_effects.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "resolved_input_sha256": "bfdbbad00673d09f074cd6931d0f1c6d2c41c39396a7b62d5e6b9b9cd303038d",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "condition_effects/v1",
+        "n_resolved_records": 457,
+        "n_eligible_records": 457,
+        "n_used_records": 457,
+        "n_excluded_records": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "n_input_records": 457,
-        "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:33:08.689382+00:00"
+        "exclusions": {},
+        "contract_version": "lab-contract/v3",
+        "generated_at": "2026-08-21T16:18:08.524693+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-21T02:45:37.146743",
+      "generated_at": "2026-08-21T18:18:09.060357",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 144,
@@ -2766,7 +2820,11 @@ window.DYNAMICS_DATA = {
         ],
         "findings": 64,
         "stories": 215,
-        "controlled_delta_grit": 0.0037
+        "controlled_delta_grit": 0.0037,
+        "excluded": 135,
+        "exclusions": {
+          "missing_strength_and_verdict": 135
+        }
       },
       "by_strength": [
         {
@@ -3003,19 +3061,26 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_grit.py",
         "input_dataset_id": "canonical_registry/finding+story",
-        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "resolved_input_sha256": "518839ba4aaa2be6fdd07e1ace9712dbf90838573471a8cd8caf5ab52c4d6681",
         "registry_version": "data-manifest/1.0+701rows",
-        "metric_definition_version": "grit/v0",
+        "metric_definition_version": "grit/v1",
+        "n_resolved_records": 279,
+        "n_eligible_records": 144,
+        "n_used_records": 144,
+        "n_excluded_records": 135,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "n_input_records": 279,
-        "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:45:37.146770+00:00"
+        "exclusions": {
+          "missing_strength_and_verdict": 135
+        },
+        "contract_version": "lab-contract/v3",
+        "generated_at": "2026-08-21T16:18:09.060636+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-21T02:37:49.214020",
+      "generated_at": "2026-08-21T18:18:09.488452",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3097,19 +3162,24 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_quality_frontier.py",
         "input_dataset_id": "canonical_registry/story+analysis",
-        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "resolved_input_sha256": "5819547a8b163fb2bc8a412f396ed700517ae2481d5c264f137a5cc82e2f90be",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "quality_frontier/v1",
+        "n_resolved_records": 381,
+        "n_eligible_records": 381,
+        "n_used_records": 381,
+        "n_excluded_records": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "n_input_records": 381,
-        "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:37:49.214046+00:00"
+        "exclusions": {},
+        "contract_version": "lab-contract/v3",
+        "generated_at": "2026-08-21T16:18:09.488714+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-21T02:33:09.384866",
+      "generated_at": "2026-08-21T18:18:09.867633",
       "summary": {
         "snowball_factor": 2.26,
         "session1_cost": 0.1668,
@@ -3224,19 +3294,24 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_story_arc.py",
         "input_dataset_id": "canonical_registry/story",
-        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "story_arc/v1",
+        "n_resolved_records": 215,
+        "n_eligible_records": 215,
+        "n_used_records": 215,
+        "n_excluded_records": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "n_input_records": 215,
-        "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:33:09.384957+00:00"
+        "exclusions": {},
+        "contract_version": "lab-contract/v3",
+        "generated_at": "2026-08-21T16:18:09.867958+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-21T02:33:10.082440",
+      "generated_at": "2026-08-21T18:18:10.618511",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3315,19 +3390,24 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_frontier.py",
         "input_dataset_id": "canonical_registry/story",
-        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "verification_frontier/v1",
+        "n_resolved_records": 215,
+        "n_eligible_records": 215,
+        "n_used_records": 215,
+        "n_excluded_records": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "n_input_records": 215,
-        "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:33:10.082457+00:00"
+        "exclusions": {},
+        "contract_version": "lab-contract/v3",
+        "generated_at": "2026-08-21T16:18:10.618758+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-21T02:33:10.449758",
+      "generated_at": "2026-08-21T18:18:11.005269",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
         "cells": 106,
@@ -4081,14 +4161,19 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_value.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "resolved_input_sha256": "bfdbbad00673d09f074cd6931d0f1c6d2c41c39396a7b62d5e6b9b9cd303038d",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "verification_value/v1",
+        "n_resolved_records": 457,
+        "n_eligible_records": 457,
+        "n_used_records": 457,
+        "n_excluded_records": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "n_input_records": 457,
-        "contract_version": "lab-contract/v1",
-        "generated_at": "2026-08-21T00:33:10.449784+00:00"
+        "exclusions": {},
+        "contract_version": "lab-contract/v3",
+        "generated_at": "2026-08-21T16:18:11.005531+00:00"
       }
     }
   }

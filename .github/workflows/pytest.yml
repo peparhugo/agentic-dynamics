@@ -93,11 +93,26 @@ jobs:
           # not merely build + dry-run. Core needs no opencode.db, SonarQube, or
           # Neo4j (inventory/analyze warn-and-continue; labs read the registry).
           # Mount a scratch dir as apps/website so the rebuilt data.js persists and
-          # is verifiable (the review item 7 data.js persistence fix).
+          # is verifiable (the review item 7 data.js persistence fix). Also mount the
+          # manifest as a single file (it regenerates OUTSIDE the results/ mount) so
+          # its regeneration is verifiable too (the canonical-publication c6 fix).
           mkdir -p /tmp/repro-out/website
-          docker run --rm -v /tmp/repro-out/website:/app/apps/website agentic-dynamics
+          cp experiments/data_manifest.json /tmp/repro-out/data_manifest.json
+          docker run --rm \
+            -v /tmp/repro-out/website:/app/apps/website \
+            -v /tmp/repro-out/data_manifest.json:/app/experiments/data_manifest.json \
+            agentic-dynamics
           test -s /tmp/repro-out/website/data.js
+          test -s /tmp/repro-out/data_manifest.json
           echo "CORE reproduce produced data.js ($(wc -c < /tmp/repro-out/website/data.js) bytes)"
+          python - <<'PY'
+          import json
+          committed = json.load(open("experiments/data_manifest.json"))
+          regenerated = json.load(open("/tmp/repro-out/data_manifest.json"))
+          assert regenerated["generated_at"] != committed["generated_at"], \
+              "data_manifest.json was not regenerated inside the container"
+          print(f"CORE reproduce regenerated data_manifest.json (generated_at {regenerated['generated_at']})")
+          PY
 
   # Refactor-repair P1-2 (packaging): the CLI is checkout-only — it forwards to repo-level
   # scripts/ which a wheel does not ship. This job proves the wheel install is honest about

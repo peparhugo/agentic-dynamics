@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_story_arc",
-  "generated_at": "2026-08-21T02:33:09.384866",
+  "generated_at": "2026-08-21T18:18:09.867633",
   "summary": {
     "snowball_factor": 2.26,
     "session1_cost": 0.1668,
@@ -115,13 +115,18 @@
   "lab_contract": {
     "lab": "lab_story_arc.py",
     "input_dataset_id": "canonical_registry/story",
-    "input_manifest_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+    "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+    "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
     "registry_version": "data-manifest/1.0+701rows",
     "metric_definition_version": "story_arc/v1",
+    "n_resolved_records": 215,
+    "n_eligible_records": 215,
+    "n_used_records": 215,
+    "n_excluded_records": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "n_input_records": 215,
-    "contract_version": "lab-contract/v1",
-    "generated_at": "2026-08-21T00:33:09.384957+00:00"
+    "exclusions": {},
+    "contract_version": "lab-contract/v3",
+    "generated_at": "2026-08-21T16:18:09.867958+00:00"
   }
 }
