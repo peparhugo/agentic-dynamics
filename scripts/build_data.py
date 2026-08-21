@@ -51,6 +51,7 @@ from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
     read_manifest,
     registry_rows,
     unwaivered_issues,
+    validate_waivers,
 )
 from agentic_dynamics.reporting.lab_contract import expected_tables, validate_contract  # noqa: E402
 from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
@@ -1413,34 +1414,41 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
 
 
 def _assert_resolution_complete(tables, waiver_path=None) -> list[dict]:
-    """Fail closed on unresolved current rows unless a reason-bearing waiver covers them.
+    """Fail closed on unresolved current rows unless a valid, hard-bound waiver covers them.
 
-    Review P1: a current registry row whose payload cannot be resolved must not silently
-    drop out of the published dataset. It is either repaired or waived — and the waiver
-    must be explicit (a committed, reason-bearing entry). Returns the waivered issues as
-    plain dicts so :func:`build` can emit them into ``data.js`` (the waiver is *visible*,
-    not just permitted). Raises :class:`RuntimeError` naming every unwaivered row.
+    Review P1 (tightened in public-truth P1/p4): a current registry row whose payload cannot
+    be resolved must not silently drop out of the published dataset. It is repaired,
+    tombstoned, or covered by a hard-bound waiver — and the waiver is validated first, so a
+    stale/duplicate/unmatched waiver is a publication-blocking defect, not a silent no-op.
+    Returns the waivered issues as plain dicts so :func:`build` can emit them into ``data.js``
+    (the waiver is *visible*, not just permitted). Raises :class:`RuntimeError` naming every
+    rejected waiver and every unwaivered row.
     """
     waivers = load_waivers(waiver_path)
-    unwaivered = unwaivered_issues(tables.resolution, waivers)
+    valid_waivers, rejected = validate_waivers(tables.resolution, waivers)
+    unwaivered = unwaivered_issues(tables.resolution, valid_waivers)
+
+    problems = list(rejected)
     if unwaivered:
         detail = "\n".join(
             f"  - {i.table} {i.logical_locator!r} ({i.kind}) entity_id={i.entity_id}"
             for i in unwaivered
         )
-        raise RuntimeError(
+        problems.append(
             "publication aborted: current registry rows could not be resolved to a "
-            "measurement payload and are not covered by a waiver:\n"
+            "measurement payload and are not covered by a valid waiver:\n"
             f"{detail}\n"
-            "Repair the payload, or add a reason-bearing entry to "
+            "Repair the payload, tombstone the row, or add a hard-bound waiver entry to "
             f"{DEFAULT_WAIVER_PATH.relative_to(ROOT)}."
         )
+    if problems:
+        raise RuntimeError("waiver/resolution failures:\n" + "\n".join(problems))
 
     # Waiver visibility: the waivered issues (matched to their reason) travel into data.js.
-    reason_by_key = {(w.table, w.logical_locator): w.reason for w in waivers}
+    reason_by_key = {w.key: w.reason for w in valid_waivers}
     waived = []
     for i in tables.resolution.issues:
-        reason = reason_by_key.get((i.table, i.logical_locator))
+        reason = reason_by_key.get((i.table, i.logical_locator, i.kind))
         if reason is not None:
             waived.append(
                 {

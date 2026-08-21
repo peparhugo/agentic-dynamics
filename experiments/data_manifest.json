@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-21T16:47:25.632234+00:00",
+  "generated_at": "2026-08-21T21:11:30.689562+00:00",
   "opencode_version": "1.18.15",
-  "git_commit": "18bc874e",
+  "git_commit": "ffc413ff",
   "files": {
     "inventory.json": {
       "sha256": "a2aa4974de23c094533ddb4c5d6d593c96a5208bb3bf80495782f4115058746c",
@@ -17,8 +17,8 @@
       "size_bytes": 1748
     },
     "data.js": {
-      "sha256": "10175551b8f4471d09252975cf6787378ddb1d3e19815c00f8f2e24151ebfa90",
-      "size_bytes": 116204
+      "sha256": "5acea41f7e96a916997c66524274f1de5786753bf75447b34e29fbed8dd57450",
+      "size_bytes": 116926
     }
   },
   "pipeline_steps": [
@@ -876,17 +876,17 @@
     },
     {
       "entity_id": "0db496afe0bb29fca6090a43385a3e98e83209c387205fea3cb2144d96bb6f82",
-      "knowledge_id": "305abaf08f2f53ceef77e262fac6c5f3f8ce31cef0dbd36be59d6fcdf4941439",
+      "knowledge_id": "0fa805ed1600a070603ff27227adcc84c9a2dcdde81c79f6dc4a4c2a5b1e7cc2",
       "source_type": "story",
       "logical_locator": "5b87673f0d7a",
       "source_uri": "story:5b87673f0d7a",
-      "observed_at": "2026-08-13T04:18:40.969600+00:00",
-      "indexed_at": "2026-08-19T19:19:39.188282+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "305abaf08f2f53ceef77e262fac6c5f3f8ce31cef0dbd36be59d6fcdf4941439",
@@ -895,6 +895,14 @@
           "observed_at": "2026-08-13T04:18:40.969600+00:00",
           "indexed_at": "2026-08-19T19:19:39.188282+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "0fa805ed1600a070603ff27227adcc84c9a2dcdde81c79f6dc4a4c2a5b1e7cc2",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },
@@ -1500,17 +1508,17 @@
     },
     {
       "entity_id": "1685dafdadfc5b8c577eac34c2497976c9bfff8e109d495276faecc6330b43be",
-      "knowledge_id": "6f864aed3510772e783fcfc3428b7ad07f0e49a4676a08761cf7a41cdd3ba245",
+      "knowledge_id": "3417ec835bd22d6e281dd5ed74a69e707cd9d788c79c9840fb61dc654f78a9a6",
       "source_type": "story",
       "logical_locator": "5be412dd5b87",
       "source_uri": "story:5be412dd5b87",
-      "observed_at": "2026-08-13T04:51:32.152447+00:00",
-      "indexed_at": "2026-08-19T19:19:39.187490+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "6f864aed3510772e783fcfc3428b7ad07f0e49a4676a08761cf7a41cdd3ba245",
@@ -1519,6 +1527,14 @@
           "observed_at": "2026-08-13T04:51:32.152447+00:00",
           "indexed_at": "2026-08-19T19:19:39.187490+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "3417ec835bd22d6e281dd5ed74a69e707cd9d788c79c9840fb61dc654f78a9a6",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },
@@ -3420,17 +3436,17 @@
     },
     {
       "entity_id": "35230d9da6d444f48dd963ef8306bd5532298022c07fc977092f22e02c14130f",
-      "knowledge_id": "7325620d4502d8c81ce3ac7ba10353fbb544b35c26c6d9f82abc5067e9e0ccad",
+      "knowledge_id": "017016d9a108056272566f1607447f0e39b10f64abf8a1b7fd25e9f3cc1c1cd6",
       "source_type": "story",
       "logical_locator": "5d7640124ed4",
       "source_uri": "story:5d7640124ed4",
-      "observed_at": "2026-08-13T05:05:00.875980+00:00",
-      "indexed_at": "2026-08-19T19:19:39.188670+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "7325620d4502d8c81ce3ac7ba10353fbb544b35c26c6d9f82abc5067e9e0ccad",
@@ -3439,6 +3455,14 @@
           "observed_at": "2026-08-13T05:05:00.875980+00:00",
           "indexed_at": "2026-08-19T19:19:39.188670+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "017016d9a108056272566f1607447f0e39b10f64abf8a1b7fd25e9f3cc1c1cd6",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },
@@ -3516,17 +3540,17 @@
     },
     {
       "entity_id": "37679fe003cab12e4e9a4ded2bae75a218577770ae87d7558748f2a7445a581e",
-      "knowledge_id": "9f3e290ce44248c556eaae2d5af81b82d393e3c2d072987c16b862fc41e3b1d1",
+      "knowledge_id": "0455b52d5b1e05ec693e9c80a329eea9c8686d4bd52c48df8c9a13b1c241da4d",
       "source_type": "story",
       "logical_locator": "6bc71fa28f35",
       "source_uri": "story:6bc71fa28f35",
-      "observed_at": "2026-08-13T08:27:59.763044+00:00",
-      "indexed_at": "2026-08-19T19:19:39.185091+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "9f3e290ce44248c556eaae2d5af81b82d393e3c2d072987c16b862fc41e3b1d1",
@@ -3535,6 +3559,14 @@
           "observed_at": "2026-08-13T08:27:59.763044+00:00",
           "indexed_at": "2026-08-19T19:19:39.185091+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "0455b52d5b1e05ec693e9c80a329eea9c8686d4bd52c48df8c9a13b1c241da4d",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },
@@ -4740,17 +4772,17 @@
     },
     {
       "entity_id": "4fcea64d301b7094e2ed6f48c9e6bb9858b2437201dbd9e40413fae107ffd670",
-      "knowledge_id": "85a4a4b7658ed6a200833a963175fd4b9894032ae38d9981d3f0a26b6444f744",
+      "knowledge_id": "59b2338c1d037d56aa2f5f7e11f9cc57243777c11795add43384416e7c65f8e6",
       "source_type": "story",
       "logical_locator": "4e7abddc43f1",
       "source_uri": "story:4e7abddc43f1",
-      "observed_at": "2026-08-13T04:14:44.351383+00:00",
-      "indexed_at": "2026-08-19T19:19:39.185494+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "85a4a4b7658ed6a200833a963175fd4b9894032ae38d9981d3f0a26b6444f744",
@@ -4759,6 +4791,14 @@
           "observed_at": "2026-08-13T04:14:44.351383+00:00",
           "indexed_at": "2026-08-19T19:19:39.185494+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "59b2338c1d037d56aa2f5f7e11f9cc57243777c11795add43384416e7c65f8e6",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },
@@ -5196,17 +5236,17 @@
     },
     {
       "entity_id": "57b397cf8a61996066ded79743f15f2d56b8ee7b3797bddb1fc7ab73aa8219b0",
-      "knowledge_id": "3fb37289e5871bf9548cbb19739c9a6fa3acab69b19ca129e71f53578373af23",
+      "knowledge_id": "b8aae2c063bc1d895b78118321c28bf79f2977356c34bc96d9474a7cf689f726",
       "source_type": "story",
       "logical_locator": "4f80a9ea38aa",
       "source_uri": "story:4f80a9ea38aa",
-      "observed_at": "2026-08-13T05:04:47.731737+00:00",
-      "indexed_at": "2026-08-19T19:19:39.185887+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "3fb37289e5871bf9548cbb19739c9a6fa3acab69b19ca129e71f53578373af23",
@@ -5215,6 +5255,14 @@
           "observed_at": "2026-08-13T05:04:47.731737+00:00",
           "indexed_at": "2026-08-19T19:19:39.185887+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "b8aae2c063bc1d895b78118321c28bf79f2977356c34bc96d9474a7cf689f726",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },
@@ -5412,17 +5460,17 @@
     },
     {
       "entity_id": "5a1734eacc30df76c52c1871d553db125f49a7d552b98f74ce97ba13bab75335",
-      "knowledge_id": "9feb4d56c8f592f6e80a037ca73c75d68fa693972264f05fd6a5e1d5742fa760",
+      "knowledge_id": "71fdd6fe7cd0d2c47d9c1c820daa1b163475287967dcf9df77f18c312ada27b7",
       "source_type": "story",
       "logical_locator": "5196e779c1ca",
       "source_uri": "story:5196e779c1ca",
-      "observed_at": "2026-08-13T04:36:39.878386+00:00",
-      "indexed_at": "2026-08-19T19:19:39.187882+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "9feb4d56c8f592f6e80a037ca73c75d68fa693972264f05fd6a5e1d5742fa760",
@@ -5431,6 +5479,14 @@
           "observed_at": "2026-08-13T04:36:39.878386+00:00",
           "indexed_at": "2026-08-19T19:19:39.187882+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "71fdd6fe7cd0d2c47d9c1c820daa1b163475287967dcf9df77f18c312ada27b7",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },
@@ -5964,17 +6020,17 @@
     },
     {
       "entity_id": "61e6e3cc61958913e77ba73961096aa4d3128d566019111dc2047370e2975010",
-      "knowledge_id": "da3471b6d22a03427de9a484c6b5b230d6ae7b0cebc8aae3a1f24007d31c9790",
+      "knowledge_id": "5772ebb7edd76da966202bb4c7ee6cb38d45de0243525f3b6114efa46d67e7dc",
       "source_type": "story",
       "logical_locator": "7005f70e2fd6",
       "source_uri": "story:7005f70e2fd6",
-      "observed_at": "2026-08-13T04:51:45.111356+00:00",
-      "indexed_at": "2026-08-19T19:19:39.186280+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "da3471b6d22a03427de9a484c6b5b230d6ae7b0cebc8aae3a1f24007d31c9790",
@@ -5983,6 +6039,14 @@
           "observed_at": "2026-08-13T04:51:45.111356+00:00",
           "indexed_at": "2026-08-19T19:19:39.186280+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "5772ebb7edd76da966202bb4c7ee6cb38d45de0243525f3b6114efa46d67e7dc",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },
@@ -6108,17 +6172,17 @@
     },
     {
       "entity_id": "647f3536a7bb16e17da1aa818f9389172fe762e70086be5fce35af4061d89193",
-      "knowledge_id": "aad0488294640324f0aa805524e5adda245435e7b5aebc110361ddb960ab583f",
+      "knowledge_id": "db41c2f08af33e7b5ddc4844e13551ac5d30f08ea866063d0a6447cfc73f93e9",
       "source_type": "story",
       "logical_locator": "890584be7186",
       "source_uri": "story:890584be7186",
-      "observed_at": "2026-08-13T05:18:37.146288+00:00",
-      "indexed_at": "2026-08-19T19:19:39.186670+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "aad0488294640324f0aa805524e5adda245435e7b5aebc110361ddb960ab583f",
@@ -6127,6 +6191,14 @@
           "observed_at": "2026-08-13T05:18:37.146288+00:00",
           "indexed_at": "2026-08-19T19:19:39.186670+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "db41c2f08af33e7b5ddc4844e13551ac5d30f08ea866063d0a6447cfc73f93e9",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },
@@ -9948,17 +10020,17 @@
     },
     {
       "entity_id": "aa5b8de3eb51f9c8bddb4ae2d7b0dc874588d29898b5b078d3e363d197cbb408",
-      "knowledge_id": "fb396e37fdee091dde40f42d34c82a46fcab41b791b120f4902480cf816a5b5f",
+      "knowledge_id": "0f961d8480d52a3a0a7deeffc8af7c63cdb2b069105604834933339b5de59249",
       "source_type": "story",
       "logical_locator": "98507441e613",
       "source_uri": "story:98507441e613",
-      "observed_at": "2026-08-13T04:31:41.224024+00:00",
-      "indexed_at": "2026-08-19T19:19:39.187087+00:00",
+      "observed_at": "2026-08-21T21:02:35.419247+00:00",
+      "indexed_at": "2026-08-21T21:02:35.419247+00:00",
       "supersedes": null,
       "causes": null,
-      "reason": "",
-      "lifecycle_state": "current",
-      "valid_to": null,
+      "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted",
+      "lifecycle_state": "tombstoned",
+      "valid_to": "2026-08-21T21:02:35.419247+00:00",
       "versions": [
         {
           "knowledge_id": "fb396e37fdee091dde40f42d34c82a46fcab41b791b120f4902480cf816a5b5f",
@@ -9967,6 +10039,14 @@
           "observed_at": "2026-08-13T04:31:41.224024+00:00",
           "indexed_at": "2026-08-19T19:19:39.187087+00:00",
           "reason": ""
+        },
+        {
+          "knowledge_id": "0f961d8480d52a3a0a7deeffc8af7c63cdb2b069105604834933339b5de59249",
+          "lifecycle_state": "tombstoned",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
+          "observed_at": "2026-08-21T21:02:35.419247+00:00",
+          "indexed_at": "2026-08-21T21:02:35.419247+00:00",
+          "reason": "no usable measurement payload: cost-0 Claude stub dropped in commit 994454f79 ('Complete the re-run: drop 13 un-runnable Claude stubs'); the claude CLI was unavailable on this host, so the cell never ran and the story file was deleted"
         }
       ]
     },

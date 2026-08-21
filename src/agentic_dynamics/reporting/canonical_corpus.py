@@ -55,6 +55,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -318,24 +319,40 @@ class ResolutionReport:
 
 @dataclass(frozen=True)
 class Waiver:
-    """One reason-bearing exemption for an unresolved current row.
+    """One hard-bound, *temporary* exemption for an unresolved current row.
 
-    ``logical_locator`` + ``entity_id`` together name the row; ``reason`` must be non-empty
-    (a reason-less waiver is indistinguishable from "we did not look").
+    ``logical_locator`` + ``issue_kind`` name *which* unresolved problem is excused (a
+    broad ``(table, locator)`` key would let a future, different problem at the same
+    locator inherit an old waiver — public-truth review P1). ``entity_id``/``knowledge_id``/
+    ``source_uri`` are carried for auditability, ``reason``/``review_by`` are required
+    non-empty, and ``expiry`` is the deadline after which the waiver is no longer accepted
+    (a waiver is an operational exception, never a permanent "this locator is fine" marker).
     """
 
     table: str
     logical_locator: str
+    issue_kind: str
     entity_id: str | None
+    knowledge_id: str | None
+    source_uri: str | None
     reason: str
+    review_by: str
+    expiry: str
+
+    @property
+    def key(self) -> tuple[str, str, str]:
+        """The ``(table, logical_locator, issue_kind)`` identity a waiver is matched on."""
+        return (self.table, self.logical_locator, self.issue_kind)
 
 
 def load_waivers(path: Path | None = None) -> list[Waiver]:
     """Load the committed waiver artifact, degrading to ``[]`` when absent/unreadable.
 
-    The same file-fallback posture as :func:`read_manifest`: a missing waiver file is a
-    *state* (no exemptions claimed), not a crash — the caller's fail-closed check then
-    rejects every unresolved row, which is the safe default.
+    Each entry must carry the hard-bound fields (a non-empty ``reason``/``review_by``/
+    ``expiry`` and a recognised ``issue_kind``); an entry missing one is skipped — the same
+    file-fallback posture as :func:`read_manifest`: a malformed waiver is a *state* (no
+    exemption claimed), not a crash, and the caller's fail-closed check then rejects the
+    unresolved row, which is the safe default.
     """
     waiver_path = path or DEFAULT_WAIVER_PATH
     if not waiver_path.exists():
@@ -347,42 +364,106 @@ def load_waivers(path: Path | None = None) -> list[Waiver]:
     waivers = []
     for entry in raw.get("waivers") or []:
         reason = str(entry.get("reason") or "").strip()
-        if not reason:
-            continue  # a reason-less waiver is not a waiver
+        review_by = str(entry.get("review_by") or "").strip()
+        expiry = str(entry.get("expiry") or "").strip()
+        issue_kind = str(entry.get("issue_kind") or "")
+        if not reason or not review_by or not expiry:
+            continue  # a hard-bound field is missing — not a waiver
+        if issue_kind not in UNRESOLVED_KINDS:
+            continue  # an unknown issue kind can never match a real resolution issue
         waivers.append(
             Waiver(
                 table=str(entry.get("table") or ""),
                 logical_locator=str(entry.get("logical_locator") or ""),
+                issue_kind=issue_kind,
                 entity_id=entry.get("entity_id"),
+                knowledge_id=entry.get("knowledge_id"),
+                source_uri=entry.get("source_uri"),
                 reason=reason,
+                review_by=review_by,
+                expiry=expiry,
             )
         )
     return waivers
 
 
-def _waiver_key(table: str, logical_locator: str, entity_id: str | None) -> tuple[str, str]:
-    """The row identity a waiver is matched on: ``(table, logical_locator)``.
+def _waiver_key(table: str, logical_locator: str, issue_kind: str) -> tuple[str, str, str]:
+    """The row identity a waiver is matched on: ``(table, logical_locator, issue_kind)``.
 
-    ``logical_locator`` is unique within a table (it *is* the story id for ``story``), so
-    the pair is a stable key. ``entity_id`` is carried on the waiver for auditability but is
-    not part of the match — the registry regenerates ids on some ingestions and a waiver
-    keyed on the id would silently stop matching after a re-ingest.
+    ``logical_locator`` is unique within a table (it *is* the story id for ``story``), and
+    ``issue_kind`` narrows the key to the *specific* unresolved problem, so a "missing"
+    waiver can never silently cover a future "unreadable" defect at the same locator.
     """
-    return (table, logical_locator)
+    return (table, logical_locator, issue_kind)
+
+
+def _is_expired(waiver: Waiver, now: datetime) -> bool:
+    """True when ``waiver.expiry`` is at or before ``now`` (a waiver is temporary).
+
+    An unparseable expiry is treated as expired — a waiver must state a real deadline, not
+    an opaque string that never lapses.
+    """
+    try:
+        exp = datetime.fromisoformat(waiver.expiry)
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        return exp <= now
+    except ValueError:
+        return True
+
+
+def validate_waivers(
+    report: ResolutionReport, waivers: list[Waiver]
+) -> tuple[list[Waiver], list[str]]:
+    """Return ``(valid, rejected)`` — reject stale, duplicate, and unmatched waivers.
+
+    The three rejection classes (public-truth review P1, phase p4):
+
+    * **stale** — ``expiry`` has already passed;
+    * **duplicate** — two waivers share the same ``(table, logical_locator, issue_kind)``;
+    * **unmatched** — the waiver's key names no unresolved issue in ``report`` (its row was
+      fixed or tombstoned since the waiver was written, so the waiver is dead).
+
+    A rejected waiver is *not* applied; its reason string is returned so the caller can
+    surface the defect instead of silently dropping the coverage it thought it had.
+    """
+    now = datetime.now(timezone.utc)
+    valid: list[Waiver] = []
+    rejected: list[str] = []
+    seen: set[tuple[str, str, str]] = set()
+    issue_keys = {(i.table, i.logical_locator, i.kind) for i in report.issues}
+
+    for w in waivers:
+        if _is_expired(w, now):
+            rejected.append(
+                f"stale waiver {w.table}/{w.logical_locator} ({w.issue_kind}): "
+                f"expiry {w.expiry!r} has passed"
+            )
+            continue
+        if w.key in seen:
+            rejected.append(f"duplicate waiver {w.table}/{w.logical_locator} ({w.issue_kind})")
+            continue
+        if w.key not in issue_keys:
+            rejected.append(
+                f"unmatched waiver {w.table}/{w.logical_locator} ({w.issue_kind}): "
+                f"no such unresolved row"
+            )
+            continue
+        seen.add(w.key)
+        valid.append(w)
+
+    return valid, rejected
 
 
 def unwaivered_issues(report: ResolutionReport, waivers: list[Waiver]) -> list[ResolutionIssue]:
-    """The unresolved rows *not* covered by a waiver — the fail-closed trigger.
+    """The unresolved rows *not* covered by a valid waiver — the fail-closed trigger.
 
-    A waiver covers an issue when its ``(table, logical_locator)`` matches. Everything else
-    — missing, unreadable, ambiguous, duplicate — is a publication-blocking defect.
+    A waiver covers an issue when its ``(table, logical_locator, issue_kind)`` matches.
+    Everything else — missing, unreadable, ambiguous, duplicate — is a publication-blocking
+    defect unless a valid waiver covers it.
     """
-    waived = {_waiver_key(w.table, w.logical_locator, w.entity_id) for w in waivers}
-    return [
-        i
-        for i in report.issues
-        if _waiver_key(i.table, i.logical_locator, i.entity_id) not in waived
-    ]
+    waived = {w.key for w in waivers}
+    return [i for i in report.issues if (i.table, i.logical_locator, i.kind) not in waived]
 
 
 # ---------------------------------------------------------------------------

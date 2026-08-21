@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_verification_value",
-  "generated_at": "2026-08-21T22:44:42.072963",
+  "generated_at": "2026-08-21T23:04:30.323354",
   "summary": {
     "correlation_tests_vs_worse_rate": -0.154,
     "cells": 106,
@@ -754,7 +754,7 @@
   "lab_contract": {
     "lab": "lab_verification_value.py",
     "input_dataset_id": "canonical_registry/story+review",
-    "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+    "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
     "resolved_input_sha256": "bfdbbad00673d09f074cd6931d0f1c6d2c41c39396a7b62d5e6b9b9cd303038d",
     "registry_version": "data-manifest/1.0+701rows",
     "metric_definition_version": "verification_value/v1",
@@ -770,6 +770,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v4",
-    "generated_at": "2026-08-21T20:44:42.073225+00:00"
+    "generated_at": "2026-08-21T21:04:30.323619+00:00"
   }
 }

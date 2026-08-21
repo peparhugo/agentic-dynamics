@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 20:48:37 UTC by build_data.py */
+/* Generated 2026-08-21 21:11:39 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T20:48:36.482587+00:00",
+    "generated_at": "2026-08-21T21:11:38.110277+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -18,13 +18,13 @@ window.DYNAMICS_DATA = {
     "story_sessions": 1067,
     "story_total_cost": 309.1685,
     "configs": 35,
-    "registry_current_records": 225,
+    "registry_current_records": 215,
     "resolved_measurement_payloads": 215,
     "eligible_records": 215,
     "records_used": 215,
-    "unresolved_waivered": 10,
+    "unresolved_waivered": 0,
     "canonical_findings": 64,
-    "tombstoned_excluded": 77,
+    "tombstoned_excluded": 87,
     "_provenance": {
       "worktrees_total": "M",
       "sessions_total": "M",
@@ -48,84 +48,13 @@ window.DYNAMICS_DATA = {
     }
   },
   "resolution_report": {
-    "expected_current": 531,
+    "expected_current": 521,
     "resolved": 521,
-    "missing": 10,
+    "missing": 0,
     "unreadable": 0,
     "ambiguous": 0,
     "duplicate": 0,
-    "waivers": [
-      {
-        "table": "story",
-        "logical_locator": "5b87673f0d7a",
-        "entity_id": "0db496afe0bb29fca6090a43385a3e98e83209c387205fea3cb2144d96bb6f82",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "5be412dd5b87",
-        "entity_id": "1685dafdadfc5b8c577eac34c2497976c9bfff8e109d495276faecc6330b43be",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "5d7640124ed4",
-        "entity_id": "35230d9da6d444f48dd963ef8306bd5532298022c07fc977092f22e02c14130f",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "6bc71fa28f35",
-        "entity_id": "37679fe003cab12e4e9a4ded2bae75a218577770ae87d7558748f2a7445a581e",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "4e7abddc43f1",
-        "entity_id": "4fcea64d301b7094e2ed6f48c9e6bb9858b2437201dbd9e40413fae107ffd670",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "4f80a9ea38aa",
-        "entity_id": "57b397cf8a61996066ded79743f15f2d56b8ee7b3797bddb1fc7ab73aa8219b0",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "5196e779c1ca",
-        "entity_id": "5a1734eacc30df76c52c1871d553db125f49a7d552b98f74ce97ba13bab75335",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "7005f70e2fd6",
-        "entity_id": "61e6e3cc61958913e77ba73961096aa4d3128d566019111dc2047370e2975010",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "890584be7186",
-        "entity_id": "647f3536a7bb16e17da1aa818f9389172fe762e70086be5fce35af4061d89193",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      },
-      {
-        "table": "story",
-        "logical_locator": "98507441e613",
-        "entity_id": "aa5b8de3eb51f9c8bddb4ae2d7b0dc874588d29898b5b078d3e363d197cbb408",
-        "kind": "missing",
-        "reason": "cost-0 Claude stub dropped in commit 994454f79 (\"Complete the re-run: drop 13 un-runnable Claude stubs\"): the claude CLI was unavailable on this host, so the cell never ran and produced no measurement payload. The story file was deleted but its registry row was left lifecycle_state=current."
-      }
-    ]
+    "waivers": []
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -2304,7 +2233,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T20:48:36.487702+00:00"
+    "generated_at": "2026-08-21T21:11:38.114949+00:00"
   },
   "reviews": {
     "models": [
@@ -2822,7 +2751,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-21T22:44:39.240880",
+      "generated_at": "2026-08-21T23:04:27.455541",
       "summary": {
         "models": 7,
         "stories": 215
@@ -2909,7 +2838,7 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_cache_economics.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
         "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "cache_economics/v1",
@@ -2925,12 +2854,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T20:44:39.241144+00:00"
+        "generated_at": "2026-08-21T21:04:27.455799+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-21T22:44:39.622813",
+      "generated_at": "2026-08-21T23:04:27.851742",
       "summary": {
         "conditions": 2,
         "stories": 215,
@@ -2963,7 +2892,7 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_condition_effects.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
         "resolved_input_sha256": "bfdbbad00673d09f074cd6931d0f1c6d2c41c39396a7b62d5e6b9b9cd303038d",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "condition_effects/v1",
@@ -2979,12 +2908,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T20:44:39.623105+00:00"
+        "generated_at": "2026-08-21T21:04:27.852003+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-21T22:44:40.157944",
+      "generated_at": "2026-08-21T23:04:28.408028",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 144,
@@ -3237,7 +3166,7 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_grit.py",
         "input_dataset_id": "canonical_registry/finding+story",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
         "resolved_input_sha256": "518839ba4aaa2be6fdd07e1ace9712dbf90838573471a8cd8caf5ab52c4d6681",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "grit/v1",
@@ -3253,16 +3182,16 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T20:44:40.158199+00:00"
+        "generated_at": "2026-08-21T21:04:28.408293+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-21T22:44:40.570000",
+      "generated_at": "2026-08-21T23:04:28.832003",
       "summary": {
         "models": 7,
         "stories": 215,
-        "analyses": 166,
+        "analyses": 156,
         "lsp_available_cells": 0
       },
       "models": [
@@ -3340,13 +3269,13 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_quality_frontier.py",
         "input_dataset_id": "canonical_registry/story+analysis",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
-        "resolved_input_sha256": "5819547a8b163fb2bc8a412f396ed700517ae2481d5c264f137a5cc82e2f90be",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "resolved_input_sha256": "e8525d47d2aaa7439004489fa191944f17b702b5a0ccbf6a467bdf3deb23e2a3",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "quality_frontier/v1",
-        "n_resolved_records": 381,
-        "n_eligible_records": 381,
-        "n_used_records": 381,
+        "n_resolved_records": 371,
+        "n_eligible_records": 371,
+        "n_used_records": 371,
         "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
         "review_without_current_story": 0,
@@ -3356,12 +3285,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T20:44:40.570250+00:00"
+        "generated_at": "2026-08-21T21:04:28.832256+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-21T22:44:40.947147",
+      "generated_at": "2026-08-21T23:04:29.204147",
       "summary": {
         "snowball_factor": 2.26,
         "session1_cost": 0.1668,
@@ -3476,7 +3405,7 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_story_arc.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
         "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "story_arc/v1",
@@ -3492,12 +3421,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T20:44:40.947468+00:00"
+        "generated_at": "2026-08-21T21:04:29.204476+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-21T22:44:41.694905",
+      "generated_at": "2026-08-21T23:04:29.940076",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3576,7 +3505,7 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_frontier.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
         "resolved_input_sha256": "a2131c7cace999231f20fcb274380e8242073efde58aea04be084a9138f7238a",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "verification_frontier/v1",
@@ -3592,12 +3521,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T20:44:41.695151+00:00"
+        "generated_at": "2026-08-21T21:04:29.940320+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-21T22:44:42.072963",
+      "generated_at": "2026-08-21T23:04:30.323354",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
         "cells": 106,
@@ -4351,7 +4280,7 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_value.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "fbc90be569740fa7f1d4af1f0baf75d83ad6a0abc20370d66789ff92242453e3",
+        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
         "resolved_input_sha256": "bfdbbad00673d09f074cd6931d0f1c6d2c41c39396a7b62d5e6b9b9cd303038d",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "verification_value/v1",
@@ -4367,7 +4296,7 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T20:44:42.073225+00:00"
+        "generated_at": "2026-08-21T21:04:30.323619+00:00"
       }
     }
   }

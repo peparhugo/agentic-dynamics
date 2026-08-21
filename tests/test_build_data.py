@@ -468,12 +468,12 @@ def test_fail_closed_on_unwaivered_missing_row(tmp_path, monkeypatch):
     monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
 
     tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
-    with pytest.raises(RuntimeError, match="not covered by a waiver"):
+    with pytest.raises(RuntimeError, match="not covered by a valid waiver"):
         build_data._assert_resolution_complete(tables, waiver_path=tmp_path / "absent.json")
 
 
 def test_fail_closed_passes_with_waiver_and_waiver_visible(tmp_path, monkeypatch):
-    """A missing payload with a reason-bearing waiver builds, and the waiver is returned."""
+    """A missing payload with a hard-bound waiver builds, and the waiver is returned."""
     stories_dir = tmp_path / "stories"
     stories_dir.mkdir()
     manifest_path = tmp_path / "data_manifest.json"
@@ -483,31 +483,129 @@ def test_fail_closed_passes_with_waiver_and_waiver_visible(tmp_path, monkeypatch
     tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
     waiver_path = tmp_path / "waivers.json"
     waiver_path.write_text(json.dumps({
-        "schema_version": "waiver/v1",
+        "schema_version": "waiver/v2",
         "waivers": [
-            {"table": "story", "logical_locator": "orphan", "entity_id": None,
-             "reason": "known payload-less stub"},
+            {
+                "table": "story",
+                "logical_locator": "orphan",
+                "issue_kind": "missing",
+                "entity_id": None,
+                "knowledge_id": None,
+                "source_uri": "story:orphan",
+                "reason": "known payload-less stub",
+                "review_by": "operator",
+                "expiry": "2999-01-01T00:00:00+00:00",
+            },
         ],
     }))
 
     waived = build_data._assert_resolution_complete(tables, waiver_path=waiver_path)
     assert len(waived) == 1
     assert waived[0]["logical_locator"] == "orphan"
+    assert waived[0]["kind"] == "missing"
     assert waived[0]["reason"] == "known payload-less stub"
 
 
-def test_real_corpus_resolution_is_waivered():
-    """The committed corpus resolves once the 10 payload-less rows are waived.
+def test_real_corpus_resolution_is_tombstoned():
+    """The committed corpus resolves with zero unresolved rows — the ten payload-less
+    stories are tombstoned (never waived), so publication needs no waiver at all.
 
-    An integration guard: if a new payload-less current row appears without a matching
-    waiver, this raises — publication fails closed against drift, not just in fixtures.
+    An integration guard: if a new payload-less *current* row appears (without a tombstone
+    or a valid waiver), ``_assert_resolution_complete`` raises — publication fails closed
+    against drift, not just in fixtures.
     """
     if not cc.current_manifest_identity().registry_identity_sha256:  # pragma: no cover
         pytest.skip("no data_manifest.json registry in this checkout")
     tables = cc.load_canonical_tables("story", "finding", "review")
+    assert tables.resolution.missing == 0
+    assert tables.resolution.unresolved == 0
+    assert tables.resolution.complete
     waived = build_data._assert_resolution_complete(tables)
-    assert tables.resolution.missing == 10
-    assert len(waived) == 10
+    assert waived == []
+
+
+def test_tombstoned_row_creates_no_unresolved_issue(tmp_path, monkeypatch):
+    """A tombstoned registry row is excluded outright — no payload, no issue (P1)."""
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()  # empty — no payload for the tombstoned row
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(manifest_path, [
+        _row(logical_locator="retracted", source_uri="story:retracted",
+             lifecycle_state="tombstoned", reason="no usable measurement payload"),
+    ])
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    tables = cc.load_canonical_tables("story", manifest_path=manifest_path)
+    assert tables.stories == []
+    assert tables.resolution.expected_current == 0
+    assert tables.resolution.missing == 0
+    assert tables.resolution.complete
+
+
+def test_validate_waivers_rejects_stale_duplicate_and_unmatched():
+    """``validate_waivers`` drops expired, duplicated, and dead waivers (P1)."""
+    from agentic_dynamics.reporting.canonical_corpus import (
+        ResolutionIssue,
+        ResolutionReport,
+        Waiver,
+        validate_waivers,
+    )
+
+    issue = ResolutionIssue(
+        table="story", entity_id="e1", logical_locator="abc", source_uri="story:abc",
+        kind="missing",
+    )
+    report = ResolutionReport.from_issues(expected_current=1, resolved=0, issues=[issue])
+
+    def waiver(logical_locator, kind, expiry, review_by="operator"):
+        return Waiver(
+            table="story", logical_locator=logical_locator, issue_kind=kind,
+            entity_id="e1", knowledge_id=None, source_uri=f"story:{logical_locator}",
+            reason="r", review_by=review_by, expiry=expiry,
+        )
+
+    stale = waiver("abc", "missing", "2000-01-01T00:00:00+00:00")
+    duplicate = [waiver("abc", "missing", "2999-01-01T00:00:00+00:00"),
+                 waiver("abc", "missing", "2999-01-01T00:00:00+00:00")]
+    unmatched = waiver("zzz", "missing", "2999-01-01T00:00:00+00:00")
+    good = waiver("abc", "missing", "2999-01-01T00:00:00+00:00")
+
+    valid, rejected = validate_waivers(report, [stale])
+    assert valid == [] and any("stale" in r for r in rejected)
+
+    valid, rejected = validate_waivers(report, duplicate)
+    assert len(valid) == 1 and any("duplicate" in r for r in rejected)
+
+    valid, rejected = validate_waivers(report, [unmatched])
+    assert valid == [] and any("unmatched" in r for r in rejected)
+
+    valid, rejected = validate_waivers(report, [good])
+    assert len(valid) == 1 and rejected == []
+
+
+def test_waiver_issue_kind_narrows_the_match():
+    """A waiver for one issue kind does not cover a different kind at the same locator (P1)."""
+    from agentic_dynamics.reporting.canonical_corpus import (
+        ResolutionIssue,
+        ResolutionReport,
+        Waiver,
+        unwaivered_issues,
+    )
+
+    # A "missing" issue at locator "abc", but the waiver excuses an "unreadable" defect.
+    issue = ResolutionIssue(
+        table="story", entity_id="e1", logical_locator="abc", source_uri="story:abc",
+        kind="missing",
+    )
+    report = ResolutionReport.from_issues(expected_current=1, resolved=0, issues=[issue])
+    mismatched = Waiver(
+        table="story", logical_locator="abc", issue_kind="unreadable",
+        entity_id="e1", knowledge_id=None, source_uri="story:abc",
+        reason="r", review_by="operator", expiry="2999-01-01T00:00:00+00:00",
+    )
+
+    still_unwaivered = unwaivered_issues(report, [mismatched])
+    assert len(still_unwaivered) == 1
 # ---------------------------------------------------------------------------
 # Null-not-zero (LSP) + one cost denominator (public-truth closure, phase p2)
 # ---------------------------------------------------------------------------
