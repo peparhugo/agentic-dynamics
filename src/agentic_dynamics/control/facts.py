@@ -476,6 +476,9 @@ FACT_PREDICATES: dict[str, PredicateSpec] = {
         produced_by=("workflow_facts/v1",),
         default_ttl_seconds=None,
         volatile=False,
+        # Rolls up from the per-phase status facts (aggregation through a declared parent-scope
+        # reducer only — §10.2.3).
+        aggregates_from="phase_status",
     ),
     "workflow_phases_remaining": PredicateSpec(
         name="workflow_phases_remaining",
@@ -487,6 +490,7 @@ FACT_PREDICATES: dict[str, PredicateSpec] = {
         produced_by=("workflow_facts/v1",),
         default_ttl_seconds=None,
         volatile=False,
+        aggregates_from="phase_status",
     ),
     "workflow_status": PredicateSpec(
         name="workflow_status",
@@ -498,6 +502,34 @@ FACT_PREDICATES: dict[str, PredicateSpec] = {
         produced_by=("workflow_facts/v1",),
         default_ttl_seconds=None,
         volatile=False,
+        aggregates_from="job_status",
+    ),
+    "workflow_health": PredicateSpec(
+        name="workflow_health",
+        value_type="enum",
+        unit="",
+        subject_type="workflow",
+        scope_type="workflow",
+        abstraction_level="workflow",
+        produced_by=("workflow_facts/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        # healthy | degraded | at_risk — derived from the job's status + spend-against-ceiling.
+        aggregates_from="job_status",
+    ),
+    "projected_budget_overrun": PredicateSpec(
+        name="projected_budget_overrun",
+        value_type="usd",
+        unit="usd",
+        subject_type="workflow",
+        scope_type="workflow",
+        abstraction_level="workflow",
+        produced_by=("workflow_facts/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        # max(0, accumulated spend − max_spend_usd) — emitted only when a ceiling exists (§4.2's
+        # "spend-against-declared-ceiling" substitution for the unproducible deadline_slack).
+        aggregates_from="job_accumulated_cost_usd",
     ),
     # policy facts (I3, L5 — declared, inheritable downward).
     "allowed_models": PredicateSpec(
@@ -766,3 +798,66 @@ def verify_chain(
             f"{fact.epistemic_status!r}"
         )
     return errors
+
+
+# ── Staleness cascade (§4.5) — read-time derivation, no scheduler ─
+
+
+def fact_state(
+    fact: CanonicalFact,
+    *,
+    now: str,
+    resolve: Callable[[str], Mapping[str, Any] | None],
+    current_versions: Callable[[str], tuple[Mapping[str, Any], ...] | None] | None = None,
+) -> str:
+    """Return ``current | stale | superseded | tombstoned | conflicted`` for one fact (§4.5).
+
+    Read-time derivation, exactly as ``generate_manifest._derive_lifecycle`` derives
+    ``current | superseded | tombstoned`` from the successor pointer — and DELIBERATELY kept
+    separate from it (F4): that function's vocabulary stays untouched, and the two NEW states
+    (``conflicted``, and the cascade's ``stale``) are computed here, in the plane, not pushed
+    into the shared lifecycle vocabulary.
+
+    ``resolve(id)`` maps a ``fact_id`` (or ``evidence_id``) to its registry row — a Mapping with
+    at least a ``lifecycle_state`` key (``current | superseded | tombstoned``) — or ``None`` when
+    unresolvable. ``current_versions(entity_id)`` returns ALL current rows for a slot (for the
+    ``conflicted`` check); ``None`` skips that check.
+
+    Precedence is fixed and total — first match wins (§4.5's "an ambiguous state is worse than a
+    wrong one"):
+
+    1. ``tombstoned`` — this fact's own row was explicitly retracted.
+    2. ``superseded`` — this fact's own row was replaced (successor pointer).
+    3. ``conflicted`` — two or more CURRENT rows share ``fact_entity_id`` with different ids.
+    4. ``stale`` — ``expires_at < now``, OR any ``evidence_id`` resolves to a non-current row
+       (the staleness cascade: superseding an L1 fact makes the L3 fact that cites it stale on
+       the next read, transitively by construction — §4.5). The third stale condition — "a NEWER
+       registered reducer version produces this predicate" — is deferred: reducer deprecation has
+       no registry representation yet.
+    5. ``current`` — otherwise.
+    """
+    row = resolve(fact.fact_id) if fact.fact_id else None
+    if row is not None and row.get("lifecycle_state") == "tombstoned":
+        return "tombstoned"
+    if fact.lifecycle_state == "tombstoned":
+        return "tombstoned"
+    if row is not None and row.get("lifecycle_state") == "superseded":
+        return "superseded"
+    if fact.lifecycle_state == "superseded":
+        return "superseded"
+
+    if current_versions is not None:
+        rows = current_versions(fact.fact_entity_id) or ()
+        current = [r for r in rows if r.get("lifecycle_state") in (None, "current")]
+        ids = {r.get("knowledge_id") or r.get("fact_id") for r in current}
+        if len(ids) > 1:
+            return "conflicted"
+
+    if fact.expires_at and fact.expires_at < now:
+        return "stale"
+    for eid in fact.evidence_ids:
+        erow = resolve(eid)
+        if erow is not None and erow.get("lifecycle_state") in ("superseded", "tombstoned"):
+            return "stale"
+
+    return "current"

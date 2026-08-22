@@ -29,18 +29,24 @@ from agentic_dynamics.control.facts import (
     EvidenceItem,
     ReducerInput,
     compute_fact_entity_id,
+    fact_state,
     verify_chain,
 )
 from agentic_dynamics.control.reducers import (
     ATTEMPT_FACTS_V1,
     JOB_FACTS_V1,
+    POLICY_FACTS_V1,
     REDUCERS,
     SPEC_STATUS_V1,
+    WORKFLOW_FACTS_V1,
     attempt_facts_v1,
     get_reducer,
     job_facts_v1,
+    policy_facts_v1,
     spec_status_v1,
+    workflow_facts_v1,
 )
+from agentic_dynamics.control.reducers.policy_facts import tighten
 from agentic_dynamics.experiment.spec_status import SpecStatusEntry
 from agentic_dynamics.knowledge.spec_ingestion import load_index_entries, registry_head
 
@@ -747,5 +753,294 @@ def test_verify_chain_accepts_i2_facts():
     attempt = _by_predicate(attempt_facts_v1(_runs_inp(_run())))["attempt_cost_usd"][0]
     job = job_facts_v1(_runs_inp(_run()))[0]
     for fact in (attempt, job):
+        finalized = fi.finalize_fact(fact, fi.build_fact_record(fact))
+        assert verify_chain(finalized, REDUCERS) == []
+
+
+# ── I3: workflow_facts/v1 + policy_facts/v1 + the staleness cascade ──
+
+WORKFLOW_FACTS_PRODUCES = {
+    "workflow_phases_completed",
+    "workflow_phases_remaining",
+    "workflow_status",
+    "workflow_health",
+    "projected_budget_overrun",
+}
+POLICY_FACTS_PRODUCES = {"allowed_models", "max_spend_usd", "max_attempts"}
+
+
+def _config(**overrides) -> dict:
+    """A declared L5 config projection — the shape the producer hands ``policy_facts/v1``."""
+    base = {
+        "name": "foo",
+        "budget_usd": 2.0,
+        "max_attempts": 5,
+        "model_pool": ["deepseek/deepseek-v4-pro", "anthropic/claude-haiku-4-5"],
+    }
+    base.update(overrides)
+    return base
+
+
+def _policy_inp(*configs: dict) -> ReducerInput:
+    return ReducerInput(
+        scope_path=f"org:{REPO}",
+        scope_type="workload",
+        scope_id="",
+        repository_id=REPO,
+        evidence=tuple(
+            EvidenceItem(source_type="spec", evidence_id=f"spec:{c.get('name') or '?'}", payload=c)
+            for c in configs
+        ),
+        facts=(),
+        now=NOW,
+        source_revision=REVISION,
+    )
+
+
+def _workflow(run: dict, config: dict | None = None) -> list[CanonicalFact]:
+    """Run the full reduction LADDER over one run + config; return the workflow facts."""
+    run_inp = _runs_inp(run)
+    lower = attempt_facts_v1(run_inp) + job_facts_v1(run_inp)
+    if config is not None:
+        lower += policy_facts_v1(_policy_inp(config))
+    finalized = [fi.finalize_fact(f, fi.build_fact_record(f)) for f in lower]
+    wf_inp = ReducerInput(
+        scope_path=f"org:{REPO}",
+        scope_type="workflow",
+        scope_id="",
+        repository_id=REPO,
+        evidence=(),
+        facts=tuple(finalized),
+        now=NOW,
+        source_revision=REVISION,
+    )
+    return workflow_facts_v1(wf_inp)
+
+
+def test_i3_reducers_are_registered():
+    assert REDUCERS[WORKFLOW_FACTS_V1.version] is WORKFLOW_FACTS_V1
+    assert WORKFLOW_FACTS_V1.level == "workflow"
+    assert WORKFLOW_FACTS_V1.scope_type == "workflow"
+    assert set(WORKFLOW_FACTS_V1.produces) == WORKFLOW_FACTS_PRODUCES
+    # consumes names the lower-fact predicates (the reduction ladder, §10.2.3).
+    assert "phase_status" in WORKFLOW_FACTS_V1.consumes
+    assert "job_accumulated_cost_usd" in WORKFLOW_FACTS_V1.consumes
+    assert "max_spend_usd" in WORKFLOW_FACTS_V1.consumes
+
+    assert REDUCERS[POLICY_FACTS_V1.version] is POLICY_FACTS_V1
+    assert POLICY_FACTS_V1.level == "policy"
+    assert POLICY_FACTS_V1.scope_type == "workload"
+    assert POLICY_FACTS_V1.consumes == ("spec",)
+    assert set(POLICY_FACTS_V1.produces) == POLICY_FACTS_PRODUCES
+
+
+def test_workflow_predicates_declare_aggregates_from():
+    from agentic_dynamics.control.facts import FACT_PREDICATES
+
+    assert FACT_PREDICATES["workflow_phases_completed"].aggregates_from == "phase_status"
+    assert FACT_PREDICATES["workflow_phases_remaining"].aggregates_from == "phase_status"
+    assert FACT_PREDICATES["workflow_status"].aggregates_from == "job_status"
+    assert FACT_PREDICATES["projected_budget_overrun"].aggregates_from == "job_accumulated_cost_usd"
+
+
+def test_policy_facts_emit_declared_l5_at_workload_scope():
+    facts = policy_facts_v1(_policy_inp(_config()))
+    by = _by_predicate(facts)
+    assert set(by) == POLICY_FACTS_PRODUCES
+    assert by["max_spend_usd"][0].value == "2.0"
+    assert by["max_attempts"][0].value == "5"
+    assert by["allowed_models"][0].value == "deepseek/deepseek-v4-pro,anthropic/claude-haiku-4-5"
+    for fact in facts:
+        assert fact.scope_type == "workload"
+        assert fact.scope_id == "foo"
+        assert fact.subject_type == "policy"
+        assert fact.epistemic_status == "declared"
+        assert fact.authority is Authority.POLICY
+        assert fact.evidence_class == "[P]"
+        assert fact.evidence_ids == ()  # declared, not reduced from evidence
+
+
+def test_policy_facts_are_absent_when_undeclared():
+    facts = policy_facts_v1(
+        _policy_inp(_config(name="bar", budget_usd=None, max_attempts=None, model_pool=[]))
+    )
+    assert facts == []
+
+
+def test_tighten_resolves_max_spend_to_the_min_over_the_chain():
+    a = _by_predicate(policy_facts_v1(_policy_inp(_config(name="org", budget_usd=10.0))))[
+        "max_spend_usd"
+    ]
+    b = _by_predicate(policy_facts_v1(_policy_inp(_config(name="foo", budget_usd=3.0))))[
+        "max_spend_usd"
+    ]
+    assert tighten(a + b, "max_spend_usd") == "3.0"  # min over the ancestor chain
+
+
+def test_tighten_resolves_allowed_models_to_the_intersection():
+    a = _by_predicate(
+        policy_facts_v1(_policy_inp(_config(name="a", model_pool=["m1", "m2", "m3"])))
+    )["allowed_models"]
+    b = _by_predicate(
+        policy_facts_v1(_policy_inp(_config(name="b", model_pool=["m2", "m3", "m4"])))
+    )["allowed_models"]
+    assert tighten(a + b, "allowed_models") == "m2,m3"
+
+
+def test_workflow_facts_compute_phase_completion_counts():
+    by = _by_predicate(_workflow(_run()))
+    assert by["workflow_phases_completed"][0].value == "2"
+    assert by["workflow_phases_remaining"][0].value == "0"
+
+
+def test_workflow_status_and_health():
+    by = _by_predicate(_workflow(_run()))
+    assert by["workflow_status"][0].value == "completed"
+    assert by["workflow_health"][0].value == "healthy"
+
+
+def test_workflow_health_is_at_risk_when_a_phase_failed():
+    run = _run(
+        ok=False,
+        phases=[
+            {
+                "phase": "implement",
+                "kind": "agent",
+                "status": "failed",
+                "model": "m",
+                "commit_hash": "x",
+                "tokens": {"in": 1, "out": 1},
+                "cost_usd": 1.0,
+            },
+            {"phase": "test", "kind": "test", "status": "failed", "test_executed_success": False},
+        ],
+    )
+    by = _by_predicate(_workflow(run))
+    assert by["workflow_status"][0].value == "failed"
+    assert by["workflow_health"][0].value == "at_risk"
+
+
+def test_projected_budget_overrun_when_inputs_exist():
+    # cost 1.5 vs budget 2.0 → no overrun. cost 1.5 vs budget 1.0 → overrun 0.5.
+    run = _run(total_cost_usd=1.5)
+    assert (
+        _by_predicate(_workflow(run, _config(budget_usd=2.0)))["projected_budget_overrun"][0].value
+        == "0.0"
+    )
+    assert (
+        _by_predicate(_workflow(run, _config(budget_usd=1.0)))["projected_budget_overrun"][0].value
+        == "0.5"
+    )
+
+
+def test_projected_budget_overrun_is_absent_without_a_ceiling():
+    by = _by_predicate(_workflow(_run()))  # no config -> no max_spend_usd
+    assert "projected_budget_overrun" not in by
+
+
+def test_workflow_facts_carry_evidence_ids_and_derived_epistemics():
+    facts = _workflow(_run(), _config())
+    for fact in facts:
+        assert fact.scope_type == "workflow"
+        assert fact.scope_id == "wf_foo_deepseek_deepseek_v4_pro"
+        assert fact.subject_type == "workflow"
+        assert fact.epistemic_status == "derived"
+        assert fact.authority is Authority.DERIVED
+        assert fact.evidence_class == "[C]"
+        # Aggregation carries the child fact_ids (the cascade backbone), never child identities.
+        assert fact.evidence_ids  # non-empty
+        assert all(isinstance(eid, str) and len(eid) == 64 for eid in fact.evidence_ids)
+
+
+# ── fact_state (§4.5) — the staleness cascade ──────────────────
+
+
+def _resolve(rows: dict[str, dict]) -> callable:
+    def resolve(eid: str) -> dict | None:
+        return rows.get(eid)
+
+    return resolve
+
+
+def test_fact_state_current():
+    fact = _workflow(_run())[0]
+    fact = fi.finalize_fact(fact, fi.build_fact_record(fact))
+    assert (
+        fact_state(fact, now=NOW, resolve=_resolve({fact.fact_id: {"lifecycle_state": "current"}}))
+        == "current"
+    )
+
+
+def test_fact_state_superseded_and_tombstoned():
+    fact = fi.finalize_fact(_workflow(_run())[0], fi.build_fact_record(_workflow(_run())[0]))
+    assert (
+        fact_state(
+            fact, now=NOW, resolve=_resolve({fact.fact_id: {"lifecycle_state": "superseded"}})
+        )
+        == "superseded"
+    )
+    assert (
+        fact_state(
+            fact, now=NOW, resolve=_resolve({fact.fact_id: {"lifecycle_state": "tombstoned"}})
+        )
+        == "tombstoned"
+    )
+
+
+def test_fact_state_conflicted():
+    fact = fi.finalize_fact(_workflow(_run())[0], fi.build_fact_record(_workflow(_run())[0]))
+    rows = (
+        {"knowledge_id": fact.fact_id, "lifecycle_state": "current"},
+        {"knowledge_id": "other_fact_id", "lifecycle_state": "current"},
+    )
+    state = fact_state(
+        fact,
+        now=NOW,
+        resolve=_resolve({fact.fact_id: {"lifecycle_state": "current"}}),
+        current_versions=lambda _eid: rows,
+    )
+    assert state == "conflicted"
+
+
+def test_fact_state_expired_fact_is_stale():
+    fact = fi.finalize_fact(_workflow(_run())[0], fi.build_fact_record(_workflow(_run())[0]))
+    from dataclasses import replace
+
+    expired = replace(fact, expires_at="2026-01-01T00:00:00+00:00")
+    assert fact_state(expired, now=NOW, resolve=_resolve({})) == "stale"
+
+
+def test_staleness_cascade_superseding_an_l1_fact_makes_the_l3_fact_stale():
+    """The §9 I3 gate: supersede an L1 fact; the L3 workflow fact that cites it resolves stale.
+
+    The workflow fact's ``evidence_ids`` carry the finalized L1 ``phase_status`` fact_id. When
+    that L1 fact is superseded (its registry row now reads ``superseded``), ``fact_state`` walks
+    the evidence set, finds a non-current input, and marks the L3 fact stale — with no write and
+    no scheduler (read-time derivation, §4.5).
+    """
+    run = _run()
+    # The L1 rung: one phase_status fact, finalized (fact_id == the record's knowledge_id).
+    l1 = _by_predicate(attempt_facts_v1(_runs_inp(run)))["phase_status"][0]
+    l1 = fi.finalize_fact(l1, fi.build_fact_record(l1))
+
+    # The L3 rung: the workflow fact, whose evidence_ids cite l1.fact_id.
+    l3 = _workflow(run)[0]
+    l3 = fi.finalize_fact(l3, fi.build_fact_record(l3))
+    assert l1.fact_id in l3.evidence_ids  # the citation that makes the cascade transitive
+
+    # Before the supersede: everything resolves current -> the L3 fact is current.
+    rows = {eid: {"lifecycle_state": "current"} for eid in l3.evidence_ids}
+    assert fact_state(l3, now=NOW, resolve=_resolve(rows)) == "current"
+
+    # Supersede the L1 fact: its own row now reads "superseded".
+    rows[l1.fact_id] = {"lifecycle_state": "superseded"}
+    assert fact_state(l3, now=NOW, resolve=_resolve(rows)) == "stale"
+
+
+def test_verify_chain_accepts_i3_facts():
+    for fact in _workflow(_run(), _config()):
+        finalized = fi.finalize_fact(fact, fi.build_fact_record(fact))
+        assert verify_chain(finalized, REDUCERS) == []
+    for fact in policy_facts_v1(_policy_inp(_config())):
         finalized = fi.finalize_fact(fact, fi.build_fact_record(fact))
         assert verify_chain(finalized, REDUCERS) == []

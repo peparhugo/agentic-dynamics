@@ -51,8 +51,18 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 from agentic_dynamics.control import fact_ingestion as fi  # noqa: E402
 from agentic_dynamics.control.facts import EvidenceItem, ReducerInput  # noqa: E402
-from agentic_dynamics.control.reducers import REDUCERS, get_reducer  # noqa: E402
+from agentic_dynamics.control.reducers import (  # noqa: E402
+    REDUCERS,
+    attempt_facts_v1,
+    get_reducer,
+    job_facts_v1,
+    policy_facts_v1,
+    spec_status_v1,
+    workflow_facts_v1,
+)
 from agentic_dynamics.core.paths import KB_ARTIFACT_DIR, REGISTRY_INDEX_PATH  # noqa: E402
+from agentic_dynamics.experiment.experiment_spec import load_spec  # noqa: E402
+from agentic_dynamics.experiment.spec_status import _spec_paths  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
 from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
 from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
@@ -109,6 +119,114 @@ def load_run_jsons() -> list[dict]:
     return runs
 
 
+def load_spec_configs() -> list[dict]:
+    """Load the declared L5 config from every spec YAML.
+
+    Returns one projection per spec — ``name`` + the three L5 fields (``budget_usd`` /
+    ``max_attempts`` / ``model_pool``) — the shape ``policy_facts/v1`` consumes. Uses the same
+    path scan as ``spec_status.collect_entries`` (``_spec_paths``) so the fact plane's view of
+    "the spec corpus" can never drift from the lifecycle index's.
+    """
+    configs: list[dict] = []
+    for path in _spec_paths(REPO_ROOT):
+        try:
+            spec = load_spec(path)
+        except Exception:  # noqa: BLE001 — one broken spec must not hide the rest
+            continue
+        pool = spec.workflow.params.get("model_pool") or spec.workflow.params.get("allowed_models")
+        configs.append(
+            {
+                "name": spec.name,
+                "budget_usd": spec.stop.budget_usd,
+                "max_attempts": spec.stop.max_attempts,
+                "model_pool": list(pool) if isinstance(pool, (list, tuple)) else pool,
+            }
+        )
+    return configs
+
+
+def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
+    return tuple(
+        EvidenceItem(
+            source_type="workflow_run",
+            evidence_id=f"workflow:{run.get('spec_name') or '?'}",
+            payload=run,
+        )
+        for run in runs
+    )
+
+
+def _finalize(facts: list) -> list:
+    """Attach each fact's real ``fact_id`` (= the record's ``knowledge_id``), ready for the ladder."""
+    return [fi.finalize_fact(fact, fi.build_fact_record(fact)) for fact in facts]
+
+
+def _derive_workflow_facts(repository_id: str, revision: str, now: str) -> list:
+    """Run the reduction LADDER: lower reducers → finalize → workflow_facts/v1 → records.
+
+    ``workflow_facts/v1`` is the first reducer that consumes FACTS, not evidence. The producer
+    therefore runs the lower rungs (attempt/job over the run JSONs, policy over the spec configs,
+    spec_status over the index), finalizes each lower fact (so it carries a citable ``fact_id``),
+    then hands the FINALIZED lower facts to ``workflow_facts_v1`` — which folds their ``fact_id``s
+    into its own ``evidence_ids``. That is the backbone of the §4.5 staleness cascade.
+    """
+    runs = load_run_jsons()
+    run_inp = ReducerInput(
+        scope_path=f"org:{repository_id}",
+        scope_type="workload",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=_run_evidence(runs),
+        facts=(),
+        now=now,
+        source_revision=revision,
+    )
+    lower: list = attempt_facts_v1(run_inp) + job_facts_v1(run_inp)
+
+    policy_inp = ReducerInput(
+        scope_path=f"org:{repository_id}",
+        scope_type="workload",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=tuple(
+            EvidenceItem(source_type="spec", evidence_id=f"spec:{c.get('name') or '?'}", payload=c)
+            for c in load_spec_configs()
+        ),
+        facts=(),
+        now=now,
+        source_revision=revision,
+    )
+    lower += policy_facts_v1(policy_inp)
+
+    spec_inp = ReducerInput(
+        scope_path=f"org:{repository_id}",
+        scope_type="workload",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=tuple(
+            EvidenceItem(source_type="spec", evidence_id=f"spec:{e.name}", payload=e)
+            for e in si.load_index_entries(root=REPO_ROOT)
+        ),
+        facts=(),
+        now=now,
+        source_revision=revision,
+    )
+    lower += spec_status_v1(spec_inp)
+
+    wf_inp = ReducerInput(
+        scope_path=f"org:{repository_id}",
+        scope_type="workflow",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=(),
+        facts=tuple(_finalize(lower)),
+        now=now,
+        source_revision=revision,
+    )
+    wf_facts = workflow_facts_v1(wf_inp)
+    return fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+
+
 def derive_facts(
     reducer_version: str,
     repository_id: str,
@@ -117,34 +235,34 @@ def derive_facts(
 ) -> list:
     """Run the named reducer over its evidence source; return the persistable fact records.
 
-    Each reducer names its own source: ``spec_status/v1`` reads the generated spec index (I1 —
-    ``spec_ingestion.load_index_entries``); ``attempt_facts/v1`` / ``job_facts/v1`` read the typed
-    workflow run JSONs (I2 — :func:`load_run_jsons`). The producer resolves that source and hands
-    it to the PURE reducer as ``ReducerInput.evidence`` — the reducer does no I/O (design §4.1).
+    Each reducer names its own source: ``spec_status/v1`` reads the generated spec index (I1);
+    ``attempt_facts/v1`` / ``job_facts/v1`` read the typed workflow run JSONs (I2);
+    ``policy_facts/v1`` reads the declared L5 config (I3); ``workflow_facts/v1`` runs the
+    reduction LADDER over the lower reducers' finalized facts (I3). The producer resolves that
+    source and hands it to the PURE reducer — the reducer does no I/O (design §4.1).
 
     The injected ``revision``/``now`` are the fallback ``source_revision``/clock; a properly
-    stamped run JSON carries its own ``git_sha``/``ended_at``, which is what the reducers prefer,
-    so re-derivation over the same JSONs is byte-for-byte stable.
+    stamped run JSON carries its own ``git_sha``/``ended_at``, which the reducers prefer, so
+    re-derivation over the same inputs is byte-for-byte stable.
     """
     reducer_fn = get_reducer(reducer_version)
     if reducer_fn is None:
         raise SystemExit(f"unknown reducer {reducer_version!r} (registered: {sorted(REDUCERS)})")
 
-    if reducer_version in RUN_REDUCERS:
-        runs = load_run_jsons()
+    if reducer_version == "workflow_facts/v1":
+        return _derive_workflow_facts(repository_id, revision, now)
+
+    if reducer_version == "policy_facts/v1":
         evidence = tuple(
-            EvidenceItem(
-                source_type="workflow_run",
-                evidence_id=f"workflow:{run.get('spec_name') or '?'}",
-                payload=run,
-            )
-            for run in runs
+            EvidenceItem(source_type="spec", evidence_id=f"spec:{c.get('name') or '?'}", payload=c)
+            for c in load_spec_configs()
         )
-    else:
-        entries = si.load_index_entries(root=REPO_ROOT)
+    elif reducer_version in RUN_REDUCERS:
+        evidence = _run_evidence(load_run_jsons())
+    else:  # spec_status/v1
         evidence = tuple(
             EvidenceItem(source_type="spec", evidence_id=f"spec:{e.name}", payload=e)
-            for e in entries
+            for e in si.load_index_entries(root=REPO_ROOT)
         )
 
     inp = ReducerInput(

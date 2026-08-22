@@ -15,13 +15,17 @@ from __future__ import annotations
 from agentic_dynamics.control.facts import Reducer, ReducerSpec
 from agentic_dynamics.control.reducers.attempt_facts import ATTEMPT_FACTS_V1, attempt_facts_v1
 from agentic_dynamics.control.reducers.job_facts import JOB_FACTS_V1, job_facts_v1
+from agentic_dynamics.control.reducers.policy_facts import POLICY_FACTS_V1, policy_facts_v1
 from agentic_dynamics.control.reducers.spec_status import SPEC_STATUS_V1, spec_status_v1
+from agentic_dynamics.control.reducers.workflow_facts import WORKFLOW_FACTS_V1, workflow_facts_v1
 
 #: version → ReducerSpec — the declarative registry ``facts.verify_chain`` consumes.
 REDUCERS: dict[str, ReducerSpec] = {
     SPEC_STATUS_V1.version: SPEC_STATUS_V1,
     ATTEMPT_FACTS_V1.version: ATTEMPT_FACTS_V1,
     JOB_FACTS_V1.version: JOB_FACTS_V1,
+    WORKFLOW_FACTS_V1.version: WORKFLOW_FACTS_V1,
+    POLICY_FACTS_V1.version: POLICY_FACTS_V1,
 }
 
 #: version → pure reducer callable — what ``scripts/kb_produce_facts.py`` invokes.
@@ -29,6 +33,8 @@ _IMPLS: dict[str, Reducer] = {
     SPEC_STATUS_V1.version: spec_status_v1,
     ATTEMPT_FACTS_V1.version: attempt_facts_v1,
     JOB_FACTS_V1.version: job_facts_v1,
+    WORKFLOW_FACTS_V1.version: workflow_facts_v1,
+    POLICY_FACTS_V1.version: policy_facts_v1,
 }
 
 
@@ -46,4 +52,8 @@ __all__ = [
     "attempt_facts_v1",
     "JOB_FACTS_V1",
     "job_facts_v1",
+    "WORKFLOW_FACTS_V1",
+    "workflow_facts_v1",
+    "POLICY_FACTS_V1",
+    "policy_facts_v1",
 ]

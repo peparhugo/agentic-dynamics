@@ -273,6 +273,8 @@ def test_predicate_registry_has_the_design_seed_rows():
         "workflow_phases_completed",
         "workflow_phases_remaining",
         "workflow_status",
+        "workflow_health",
+        "projected_budget_overrun",
         "allowed_models",
         "max_spend_usd",
         "max_attempts",
@@ -310,9 +312,19 @@ def test_predicate_inheritance_flags_match_the_design_table():
         "max_spend_usd",
         "max_attempts",
     }
-    # Every predicate defaults aggregates_from to "" (no implicit upward rollup).
+    # Only the workflow aggregates declare ``aggregates_from`` (the legal upward roll-up path,
+    # §10.2.3); every other predicate defaults it to "" (no implicit upward rollup).
+    aggregated = {
+        name: spec.aggregates_from for name, spec in FACT_PREDICATES.items() if spec.aggregates_from
+    }
+    assert aggregated == {
+        "workflow_phases_completed": "phase_status",
+        "workflow_phases_remaining": "phase_status",
+        "workflow_status": "job_status",
+        "workflow_health": "job_status",
+        "projected_budget_overrun": "job_accumulated_cost_usd",
+    }
     for spec in FACT_PREDICATES.values():
-        assert spec.aggregates_from == ""
         assert spec.default_ttl_seconds is None
         assert spec.volatile is False
 
