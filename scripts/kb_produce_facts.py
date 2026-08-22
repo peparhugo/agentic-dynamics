@@ -1,15 +1,22 @@
 """Batch producer for the fact plane — derive canonical facts and emit pointer events.
 
-This is the *facts* producer (CAP I1, design §4.3 / §9): it runs a registered reducer over the
-spec-lifecycle index and persists the resulting :class:`~agentic_dynamics.control.facts.CanonicalFact`
-objects through the EXISTING knowledge pipe — ``build_fact_record`` → ``record_to_artifact`` →
-``record_to_event`` → ``publish_event`` — onto ``kb:v1:changes`` (DB 2 on 6380). It is the sibling
-of ``scripts/kb_produce_sources.py`` (which emits code/quality/policy/spec records) and shares its
-idempotence + isolation contracts verbatim.
+This is the *facts* producer (CAP I1–I2, design §4.3 / §9): it runs a registered reducer over
+its evidence source and persists the resulting
+:class:`~agentic_dynamics.control.facts.CanonicalFact` objects through the EXISTING knowledge
+pipe — ``build_fact_record`` → ``record_to_artifact`` → ``record_to_event`` → ``publish_event`` —
+onto ``kb:v1:changes`` (DB 2 on 6380). It is the sibling of ``scripts/kb_produce_sources.py``
+(which emits code/quality/policy/spec records) and shares its idempotence + isolation contracts
+verbatim.
 
-    python scripts/kb_produce_facts.py --reducer spec_status/v1 --dry-run
-    python scripts/kb_produce_facts.py --reducer spec_status/v1 --limit 5   # smoke
-    python scripts/kb_produce_facts.py --reducer spec_status/v1             # full emit
+    python scripts/kb_produce_facts.py --reducer spec_status/v1 --dry-run     # I1: spec index
+    python scripts/kb_produce_facts.py --reducer attempt_facts/v1 --dry-run   # I2: run JSONs
+    python scripts/kb_produce_facts.py --reducer job_facts/v1 --limit 5       # I2: run JSONs
+
+Each reducer names its own evidence source: ``spec_status/v1`` reads the generated
+``experiments/specs/index.json`` (I1); ``attempt_facts/v1`` / ``job_facts/v1`` read the typed
+workflow run JSONs (``experiments/results/workflows/**/*.json``, the
+``WorkflowRunResult.to_dict()`` shape — I2). The producer resolves that source and hands it to
+the pure reducer; the reducer itself does no I/O (design §4.1).
 
 Like the ``spec`` source, a fact record can emit a ``supersede`` (rather than ``upsert``) event:
 when ``registry_index.jsonl`` already holds a fact for the same ``fact_entity_id`` (the stable
@@ -28,6 +35,7 @@ Isolation (load-bearing): this producer touches only ``127.0.0.1:FINOPS_REDIS_PO
 """
 
 import argparse
+import json
 import os
 import subprocess
 from datetime import datetime
@@ -76,6 +84,30 @@ def git_head_sha() -> str:
 
 # ── Derivation: run one registered reducer → facts → records ────
 
+#: The reducers that consume the typed workflow run JSONs (I2) rather than the spec index (I1).
+RUN_REDUCERS = frozenset({"attempt_facts/v1", "job_facts/v1"})
+
+
+def load_run_jsons() -> list[dict]:
+    """Load every typed workflow run JSON (``experiments/results/workflows/**/*.json``).
+
+    Skips unreadable/non-object files — a run ledger that fails to parse must not hide the rest.
+    Each returned dict is the ``WorkflowRunResult.to_dict()`` shape ``scripts/run_workflow.py:108``
+    writes (spec_name / model / git_sha / ended_at / phases[] / total_cost_usd / ok / …).
+    """
+    results_dir = REPO_ROOT / "experiments" / "results" / "workflows"
+    runs: list[dict] = []
+    if not results_dir.is_dir():
+        return runs
+    for path in sorted(results_dir.rglob("*.json")):
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict):
+            runs.append(payload)
+    return runs
+
 
 def derive_facts(
     reducer_version: str,
@@ -83,32 +115,44 @@ def derive_facts(
     revision: str,
     now: str,
 ) -> list:
-    """Run the named reducer over the spec index; return the persistable fact records.
+    """Run the named reducer over its evidence source; return the persistable fact records.
 
-    Reads the *generated* ``experiments/specs/index.json`` (via ``spec_ingestion.load_index_entries``)
-    rather than the YAMLs directly — the index is the single place the spec corpus and the run
-    ledgers have already been joined, and re-deriving that join here would give the fact plane a
-    second, drift-prone opinion about what "done" means. Regenerate it first with
-    ``python scripts/spec_status.py``; a missing index yields zero facts.
+    Each reducer names its own source: ``spec_status/v1`` reads the generated spec index (I1 —
+    ``spec_ingestion.load_index_entries``); ``attempt_facts/v1`` / ``job_facts/v1`` read the typed
+    workflow run JSONs (I2 — :func:`load_run_jsons`). The producer resolves that source and hands
+    it to the PURE reducer as ``ReducerInput.evidence`` — the reducer does no I/O (design §4.1).
 
-    The reducer is a pure function: its ``ReducerInput`` carries the resolved evidence (one
-    :class:`~agentic_dynamics.control.facts.EvidenceItem` per index entry), an injected clock, and
-    the injected revision — no I/O happens inside the reducer itself (design §4.1).
+    The injected ``revision``/``now`` are the fallback ``source_revision``/clock; a properly
+    stamped run JSON carries its own ``git_sha``/``ended_at``, which is what the reducers prefer,
+    so re-derivation over the same JSONs is byte-for-byte stable.
     """
     reducer_fn = get_reducer(reducer_version)
     if reducer_fn is None:
         raise SystemExit(f"unknown reducer {reducer_version!r} (registered: {sorted(REDUCERS)})")
 
-    entries = si.load_index_entries(root=REPO_ROOT)
+    if reducer_version in RUN_REDUCERS:
+        runs = load_run_jsons()
+        evidence = tuple(
+            EvidenceItem(
+                source_type="workflow_run",
+                evidence_id=f"workflow:{run.get('spec_name') or '?'}",
+                payload=run,
+            )
+            for run in runs
+        )
+    else:
+        entries = si.load_index_entries(root=REPO_ROOT)
+        evidence = tuple(
+            EvidenceItem(source_type="spec", evidence_id=f"spec:{e.name}", payload=e)
+            for e in entries
+        )
+
     inp = ReducerInput(
         scope_path=f"org:{repository_id}",
         scope_type="workload",
-        scope_id="",  # the whole spec corpus — the reducer emits per-spec workload facts
+        scope_id="",  # the whole corpus — the reducer emits per-spec / per-run / per-phase facts
         repository_id=repository_id,
-        evidence=tuple(
-            EvidenceItem(source_type="spec", evidence_id=f"spec:{e.name}", payload=e)
-            for e in entries
-        ),
+        evidence=evidence,
         facts=(),
         now=now,
         source_revision=revision,

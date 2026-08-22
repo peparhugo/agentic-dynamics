@@ -1,12 +1,16 @@
-"""Tests for CAP I1 — the ``spec_status/v1`` reducer, fact ingestion, and the facts producer.
+"""Tests for CAP I1–I2 — the fact reducers, fact ingestion, and the facts producer.
 
-Covers the reducer's declaration (registered in ``REDUCERS``, the pinned predicate set), its
-purity and determinism, the measured-or-absent semantics (an unmeasured run field is *absent*,
-never a fabricated ``0``/``false``), the fact shape (workload scope, ``derived`` epistemics,
-time-invariant ``fact_entity_id``), the fact-ingestion mapping (``fact_id`` IS the record's
-``knowledge_id``, the canonical JSON payload, the registry-driven supersede chain), the downstream
-payoff (``generate_manifest.py`` derives ``current`` vs ``superseded`` from the fact chain), and
-that the reducer covers every spec in the real ``experiments/specs/index.json``.
+I1 (``spec_status/v1``): the reducer's declaration, purity and determinism, the measured-or-absent
+semantics (an unmeasured run field is *absent*, never a fabricated ``0``/``false``), the fact shape
+(workload scope, ``derived`` epistemics, time-invariant ``fact_entity_id``), the fact-ingestion
+mapping (``fact_id`` IS the record's ``knowledge_id``, the canonical JSON payload, the
+registry-driven supersede chain), the downstream payoff (``generate_manifest.py`` derives
+``current`` vs ``superseded``), and corpus coverage.
+
+I2 (``attempt_facts/v1`` + ``job_facts/v1``): per-phase and per-run facts over the typed workflow
+run artifacts, the per-predicate epistemics (``observed``/``verified``/``advisory``), the
+job-qualified attempt scope, and — the I2 gate — byte-for-byte re-derivation stability (two runs
+over identical run JSONs yield identical fact values and ``knowledge_id``s).
 
 Everything runs against fixture entries and a ``tmp_path`` registry; nothing here needs Redis, an
 LLM, or the live corpus (except the one corpus-coverage test, which reads the generated index).
@@ -28,9 +32,13 @@ from agentic_dynamics.control.facts import (
     verify_chain,
 )
 from agentic_dynamics.control.reducers import (
+    ATTEMPT_FACTS_V1,
+    JOB_FACTS_V1,
     REDUCERS,
     SPEC_STATUS_V1,
+    attempt_facts_v1,
     get_reducer,
+    job_facts_v1,
     spec_status_v1,
 )
 from agentic_dynamics.experiment.spec_status import SpecStatusEntry
@@ -493,3 +501,251 @@ def test_reducer_covers_every_spec_in_the_real_index():
     assert len(by["spec_n_runs"]) == len(entries)  # ... and one spec_n_runs fact per spec
     # Every fact is scoped to its spec's workload scope.
     assert {f.scope_id for f in facts} == {e.name for e in entries}
+
+
+# ── I2: attempt_facts/v1 + job_facts/v1 over the typed run artifacts ──
+
+#: The two I2 reducer versions.
+ATTEMPT_FACTS_PRODUCES = {
+    "phase_status",
+    "attempt_model",
+    "attempt_tokens_in",
+    "attempt_tokens_out",
+    "attempt_cost_usd",
+    "attempt_cache_hit_rate",
+    "phase_test_verified",
+    "attempt_confidence",
+    "phase_commit",
+}
+JOB_FACTS_PRODUCES = {"current_commit", "job_accumulated_cost_usd", "job_status", "job_n_phases"}
+
+
+def _run(**overrides) -> dict:
+    """A minimal typed run artifact — the ``WorkflowRunResult.to_dict()`` shape."""
+    base = {
+        "spec_name": "foo",
+        "spec_id": "foo@1.0",
+        "model": "deepseek/deepseek-v4-pro",
+        "workdir": "/tmp/pipeline/feature_foo",
+        "goal": "build foo",
+        "git_sha": "abc123",
+        "started_at": "2026-08-22T00:00:00+00:00",
+        "ended_at": "2026-08-22T00:10:00+00:00",
+        "total_cost_usd": 1.5,
+        "ok": True,
+        "phases": [
+            {
+                "phase": "implement",
+                "kind": "agent",
+                "status": "ok",
+                "model": "deepseek/deepseek-v4-pro",
+                "commit_hash": "abc123",
+                "tokens": {"in": 100, "out": 50},
+                "cost_usd": 1.0,
+                "cache_hit_rate": 0.5,
+                "confidence": 0.9,
+            },
+            {
+                "phase": "test",
+                "kind": "test",
+                "status": "ok",
+                "test_executed_success": True,
+            },
+        ],
+    }
+    base.update(overrides)
+    return base
+
+
+def _runs_inp(*runs: dict, repository_id: str = REPO, now: str = NOW) -> ReducerInput:
+    """Build a ReducerInput whose evidence is the given run JSONs (the I2 producer's shape)."""
+    return ReducerInput(
+        scope_path=f"org:{repository_id}",
+        scope_type="workload",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=tuple(
+            EvidenceItem(
+                source_type="workflow_run",
+                evidence_id=f"workflow:{r.get('spec_name') or '?'}",
+                payload=r,
+            )
+            for r in runs
+        ),
+        facts=(),
+        now=now,
+        source_revision=REVISION,
+    )
+
+
+def test_i2_reducers_are_registered():
+    assert REDUCERS[ATTEMPT_FACTS_V1.version] is ATTEMPT_FACTS_V1
+    assert ATTEMPT_FACTS_V1.name == "attempt_facts"
+    assert ATTEMPT_FACTS_V1.level == "fact"
+    assert ATTEMPT_FACTS_V1.scope_type == "attempt"
+    assert ATTEMPT_FACTS_V1.consumes == ("workflow_run",)
+    assert set(ATTEMPT_FACTS_V1.produces) == ATTEMPT_FACTS_PRODUCES
+
+    assert REDUCERS[JOB_FACTS_V1.version] is JOB_FACTS_V1
+    assert JOB_FACTS_V1.name == "job_facts"
+    assert JOB_FACTS_V1.level == "job"
+    assert JOB_FACTS_V1.scope_type == "job"
+    assert JOB_FACTS_V1.consumes == ("workflow_run",)
+    assert set(JOB_FACTS_V1.produces) == JOB_FACTS_PRODUCES
+
+    assert callable(get_reducer("attempt_facts/v1"))
+    assert callable(get_reducer("job_facts/v1"))
+
+
+def test_attempt_facts_emit_per_phase_and_per_predicate():
+    facts = attempt_facts_v1(_runs_inp(_run()))
+    by = _by_predicate(facts)
+    # Agent phase: 8 predicates (no test_executed_success); test phase: 2 (status + verified).
+    assert by["phase_status"] and len(by["phase_status"]) == 2
+    assert by["attempt_model"][0].value == "deepseek/deepseek-v4-pro"
+    assert by["attempt_tokens_in"][0].value == "100"
+    assert by["attempt_tokens_out"][0].value == "50"
+    assert by["attempt_cost_usd"][0].value == "1.0"
+    assert by["attempt_cache_hit_rate"][0].value == "0.5"
+    assert by["attempt_confidence"][0].value == "0.9"
+    assert by["phase_commit"][0].value == "abc123"
+    assert by["phase_test_verified"][0].value == "true"
+
+
+def test_attempt_fact_scope_is_job_qualified():
+    facts = attempt_facts_v1(_runs_inp(_run()))
+    status = _by_predicate(facts)["phase_status"][0]
+    # scope attempt:<phase> under job:<workflow-cell> — the workflow cell is wf_<spec>_<model>.
+    assert status.scope_type == "attempt"
+    assert status.scope_id == "wf_foo_deepseek_deepseek_v4_pro:implement"
+    assert status.scope_path == (
+        "org:agentic-dynamics/workload:foo/job:wf_foo_deepseek_deepseek_v4_pro/attempt:implement"
+    )
+    assert status.subject_type == "attempt"
+    assert status.subject_id == "implement"
+
+
+def test_attempt_fact_epistemics_follow_the_design():
+    by = _by_predicate(attempt_facts_v1(_runs_inp(_run())))
+    # measured -> observed [M]; confidence -> advisory [H]; test_executed_success -> verified [M].
+    assert by["attempt_cost_usd"][0].epistemic_status == "observed"
+    assert by["attempt_cost_usd"][0].authority is Authority.MEASURED
+    assert by["attempt_cost_usd"][0].evidence_class == "[M]"
+    assert by["attempt_confidence"][0].epistemic_status == "advisory"
+    assert by["attempt_confidence"][0].authority is Authority.ADVISORY
+    assert by["attempt_confidence"][0].evidence_class == "[H]"
+    assert by["phase_test_verified"][0].epistemic_status == "verified"
+    assert by["phase_test_verified"][0].authority is Authority.MEASURED
+
+
+def test_attempt_confidence_is_not_canonical():
+    # design §5: confidence is ADVISORY — stored, but is_canonical() refuses it.
+    from agentic_dynamics.control.facts import is_canonical
+
+    fact = _by_predicate(attempt_facts_v1(_runs_inp(_run())))["attempt_confidence"][0]
+    assert not is_canonical(fact)
+
+
+def test_attempt_facts_are_measured_or_absent():
+    # A test phase carries no model/tokens/cost/cache/confidence — none must be fabricated.
+    run = _run(
+        phases=[
+            {"phase": "test", "kind": "test", "status": "failed", "test_executed_success": False}
+        ]
+    )
+    facts = attempt_facts_v1(_runs_inp(run))
+    preds = {f.predicate for f in facts}
+    assert preds == {"phase_status", "phase_test_verified"}
+    assert _by_predicate(facts)["phase_test_verified"][0].value == "false"
+
+
+def test_attempt_fact_identity_is_time_invariant():
+    # entity_id is keyed by (repo, scope_id, subject, predicate) — never by ended_at/revision.
+    a = _by_predicate(attempt_facts_v1(_runs_inp(_run())))["attempt_cost_usd"][0]
+    b = attempt_facts_v1(_runs_inp(_run(), now="2027-01-01T00:00:00+00:00"))
+    b = _by_predicate(b)["attempt_cost_usd"][0]
+    assert a.fact_entity_id == b.fact_entity_id
+    assert a.fact_entity_id == compute_fact_entity_id(
+        repository_id=REPO,
+        scope_type="attempt",
+        scope_id="wf_foo_deepseek_deepseek_v4_pro:implement",
+        predicate="attempt_cost_usd",
+        subject_type="attempt",
+        subject_id="implement",
+    )
+
+
+def test_job_facts_emit_the_four_per_run_facts():
+    facts = job_facts_v1(_runs_inp(_run()))
+    by = _by_predicate(facts)
+    assert set(by) == JOB_FACTS_PRODUCES
+    assert by["current_commit"][0].value == "abc123"
+    assert by["job_accumulated_cost_usd"][0].value == "1.5"
+    assert by["job_status"][0].value == "ok"
+    assert by["job_n_phases"][0].value == "2"
+
+
+def test_job_fact_scope_and_epistemics():
+    fact = job_facts_v1(_runs_inp(_run()))[0]
+    assert fact.scope_type == "job"
+    assert fact.scope_id == "wf_foo_deepseek_deepseek_v4_pro"
+    assert (
+        fact.scope_path == "org:agentic-dynamics/workload:foo/job:wf_foo_deepseek_deepseek_v4_pro"
+    )
+    assert fact.subject_type == "job"
+    assert fact.subject_id == "wf_foo_deepseek_deepseek_v4_pro"
+    assert fact.epistemic_status == "observed"
+    assert fact.authority is Authority.MEASURED
+    assert fact.evidence_class == "[M]"
+    assert fact.source_revision == "abc123"  # the run's git_sha, not the producer's revision
+
+
+def test_job_status_is_enum_not_bool():
+    by = _by_predicate(job_facts_v1(_runs_inp(_run(ok=False))))
+    assert by["job_status"][0].value == "failed"
+    assert by["job_status"][0].value_type == "enum"
+
+
+def test_unaddressable_run_yields_no_job_facts():
+    # No spec_name/model means no cell identity — the run is skipped, never crashed on.
+    assert job_facts_v1(_runs_inp({})) == []
+    assert attempt_facts_v1(_runs_inp({})) == []
+
+
+# ── I2 gate: byte-for-byte re-derivation ────────────────────────
+
+
+def test_re_derivation_is_byte_for_byte_stable():
+    """The §9 I2 gate: two runs over identical run JSONs yield identical facts AND knowledge_ids.
+
+    Byte-identity is the whole point: the reducer is pure (no wall clock, no RNG), the fact's
+    ``observed_at``/``source_revision`` come from the run JSON itself (not the producer clock),
+    and the record's ``knowledge_id`` folds only stable fields (the record factory blanks the
+    volatile timestamps). So a re-run is a genuine no-op.
+    """
+    run = _run()
+    first_attempt = attempt_facts_v1(_runs_inp(run))
+    second_attempt = attempt_facts_v1(_runs_inp(run))
+    first_job = job_facts_v1(_runs_inp(run))
+    second_job = job_facts_v1(_runs_inp(run))
+
+    for first, second in (first_attempt, second_attempt), (first_job, second_job):
+        assert len(first) == len(second)
+        for a, b in zip(first, second, strict=True):
+            assert a.predicate == b.predicate
+            assert a.value == b.value
+            assert a.fact_entity_id == b.fact_entity_id
+            assert a.inputs_digest == b.inputs_digest
+            # The persistable record — and therefore the fact_id — must be byte-identical too.
+            ra, rb = fi.build_fact_record(a), fi.build_fact_record(b)
+            assert ra.knowledge_id == rb.knowledge_id
+            assert ra.content_hash == rb.content_hash
+            assert fi.fact_fingerprint(ra) == fi.fact_fingerprint(rb)
+
+
+def test_verify_chain_accepts_i2_facts():
+    attempt = _by_predicate(attempt_facts_v1(_runs_inp(_run())))["attempt_cost_usd"][0]
+    job = job_facts_v1(_runs_inp(_run()))[0]
+    for fact in (attempt, job):
+        finalized = fi.finalize_fact(fact, fi.build_fact_record(fact))
+        assert verify_chain(finalized, REDUCERS) == []
