@@ -42,6 +42,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("analyze", "worktrees"): "analyze_worktrees.py",
     ("analyze", "trajectories"): "analyze_trajectories.py",
     ("analyze", "stories"): "analyze_stories.py",
+    ("analyze", "session-routing"): "retro_session_routing.py",
     # data
     ("data", "build"): "build_data.py",
     ("data", "sync"): "sync_data.py",
@@ -90,7 +91,7 @@ Subcommands (each forwards to its backing script):
   story       run|batch
   workflow    run
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
-  analyze     worktrees|trajectories|stories|lab <name>
+  analyze     worktrees|trajectories|stories|session-routing|lab <name>
   data        build|sync|manifest|inventory
   knowledge   ingest|sources|worker
   registry    query|show|lineage
