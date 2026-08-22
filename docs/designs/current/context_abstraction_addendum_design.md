@@ -360,24 +360,43 @@ class SessionPolicy:
 
 ---
 
-## 3. I9 — the `pattern` epistemic class (answers OQ4, OQ5)
+## 3. I9 — the `pattern` fact kind (answers OQ4, OQ5)
 
-### 3.1 The `EPISTEMIC_MAP` row (NEW, additive)
+### 3.1 The category axis — answered explicitly (adversarial vector 7, added post-review)
+
+**Question:** does `pattern` belong in `EPISTEMIC_MAP` (a new way of knowing) or in the predicate
+registry (a new *type of statement*)?
+
+**Decision: `pattern` is a FACT KIND, not an epistemic status.** `EPISTEMIC_MAP` answers "how do
+we know this?" — observed, verified, derived, declared, advisory. A pattern's epistemology is
+always the same as any derived fact: a deterministic reducer computed it from measured evidence.
+Adding `EPISTEMIC_MAP["pattern"]` would put a statement type on an axis that measures ways of
+knowing, collapsing the two questions the frozen design deliberately keeps separate (review
+§4.5: `epistemic_status` is the single discriminator; kind lives in the predicate). Concretely:
 
 ```python
-# control/facts.py (I0's reserved home) — ONE additive row to the map that I0 lands there.
-# [design-only] the map itself (context_abstraction_design.md:385-399); this design declares the
-# row, it does not create the table.
-EPISTEMIC_MAP["pattern"] = (Authority.DERIVED, "[C]")     # REUSE Authority (knowledge.py:61-85)
+# control/facts.py — NO new EPISTEMIC_MAP row. The kind is carried by the predicate:
+#   FACT_PREDICATES["pattern"] = PatternPayload          # the fact-kind declaration
+#   epistemic_status for every pattern fact is "derived"  # existing EPISTEMIC_MAP row:
+#     EPISTEMIC_MAP["derived"] = (Authority.DERIVED, "[C]")   (context_abstraction_design.md:385-399)
 ```
+
+This **deviates from Addendum A.3**, which proposed the additive row — deviation **D7** (design
+§5, noted in the deviation table below): the payload is kept exactly as Addendum A specified; only
+the categorical placement moves. *Why this deviation:* the frozen design's own discipline — the
+three provenance axes (`epistemic_status` / `authority` / `evidence_class`) are computed from one
+mapping so they can never disagree (§3.4). A `pattern` row would make `EPISTEMIC_MAP` a mixed
+dictionary of "ways of knowing" and "statement types", inviting exactly the drift that mapping
+was built to prevent.
 
 **Why `DERIVED`/`[C]` and not `MEASURED` or `POLICY`:** a pattern is a *compressed abstraction over
 measured evidence*, produced by a deterministic reducer — it is derived, not raw-measured, and it is
 not operator-declared policy. The `DERIVED`/`[C]` pairing is already the repo's convention for
 "analysis generated from measurements" (`Authority.DERIVED` docstring, `knowledge.py:75-76`), so the
-row extends an existing meaning rather than inventing one (review §3b.1). The nominal `SOURCE_TYPES`
-authority column remains documentation-only (`knowledge.py:110-113`); the real values come from this
-map at construction time (the same arrangement the frozen verify cleared for `fact`, `verify.md:258-262`).
+existing `derived` row extends its meaning rather than inventing one (review §3b.1). The nominal
+`SOURCE_TYPES` authority column remains documentation-only (`knowledge.py:110-113`); the real values
+come from this map at construction time (the same arrangement the frozen verify cleared for `fact`,
+`verify.md:258-262`).
 
 ### 3.2 `PatternPayload` (NEW — the typed body of every `pattern` fact)
 
@@ -738,6 +757,7 @@ add a second decision type") applies to session decisions exactly as it did to t
 | D4 | I8 "the contract remains the sole gate" (`context_abstraction_design.md:1494-1496`) | Narrowed to "sole **safety** gate": `verification_policy`/`deliberation`/`session_policy` are strategy inputs bound by monotone tightening, never a second authority. | The profile's three non-`context_requirements` fields are not composed by `compose_requirements`; without this narrowing they are a concrete widening path past the contract (adversarial F2). |
 | D5 | I10 "narrative components ride along as ADVISORY annotations" (`context_abstraction_design.md:1563-1564`) | Implemented as **separate `checkpoint_narrative` ADVISORY records**, not same-fact annotations. | `CanonicalFact` has one `epistemic_status` and the payload is hashed into `fact_id`; a same-fact ADVISORY narrative would re-key the canonical fact and leak through C5 at fact granularity (adversarial F3). |
 | D6 | I8 "profiles are L4's producer" (`context_abstraction_design.md:1488-1490`) | v1 profiles declare L5-policy-adjacent facts + their own predicates; they do **not** declare L4 workload facts (capacity/priority/value), which stay deferred per frozen §11.5. | Declaring L4 predicates now would reproduce the `LEDGER_FIELDS` failure the frozen design explicitly refuses (`context_abstraction_design.md:1415`); "L4 producer" is deferred until budget/deadline ownership is declared (adversarial F6). |
+| D7 | A.3's additive `EPISTEMIC_MAP["pattern"]` row (`context_abstraction_design.md:1561`) | `pattern` is a **fact kind** carried by `FACT_PREDICATES`; its `epistemic_status` is the existing `derived` row. No new map row. | Epistemic status answers "how we know", the predicate answers "what type of statement"; a `pattern` map row would make `EPISTEMIC_MAP` a mixed dictionary of ways-of-knowing and statement types, inviting the drift §3.4 was built to prevent (adversarial vector 7, post-review). |
 
 F4 (session `continue` conflation) and F5 (experiment sufficiency) are resolved by design edits that
 **align with / specify within** Addendum A (A.4's "never applied" and "4 arms") rather than change
@@ -757,7 +777,7 @@ Each new home is declared in the same zero-call-sites style the CAP homes alread
 |---|---|---|---|
 | **I8** | `control/profiles.py` (NEW) | `DomainProfile`, `ChallengeProfile`, `SessionPolicy` (§2.6), the `PROFILES` lookup registry, the deliberation table (§2.5), `compose_requirements` (§2.3) | `control/__init__.py:7-9` reserved-homes comment (adds `profiles.py`) |
 | **I9** | `control/reducers/pattern.py` (NEW) | `PATTERN_V1` + `pattern_v1` (§3.3) | the reserved `control/reducers/` package (`__init__.py:1-9`) |
-| | `control/facts.py` (additive, I0 home) | the `"pattern"` `EPISTEMIC_MAP` row (§3.1) + `PatternPayload` (§3.2) + the `pattern` `FACT_PREDICATES` entry | the existing I0 home (`control/facts.py:1-8`) |
+| | `control/facts.py` (additive, I0 home) | `PatternPayload` (§3.2) + the `pattern` `FACT_PREDICATES` entry (kind-only; no `EPISTEMIC_MAP` row, §3.1) | the existing I0 home (`control/facts.py:1-8`) |
 | **I10** | `control/checkpoint.py` (NEW) | `SessionCheckpoint` (§4.1) | `control/__init__.py:7-9` reserved-homes comment |
 | | `control/reducers/checkpoint.py` (NEW) | `checkpoint/v1` — the deterministic reducer deriving the DERIVED fields (§4.1) | the reserved `control/reducers/` package |
 | | `experiments/contexts/session_routing.yaml` (NEW) | the contract (§4.2) | the contract directory I4 reserves (review §I8.3) |
@@ -792,7 +812,7 @@ belongs to the implementation spec, not this addendum's design-only scope (§7).
 |---|---|
 | §4.1 "the contract remains the sole gate" assumes a gate/contract that do not exist | §2.3 — `compose_requirements` is specified *against* the [design-only] `FactRequirement`/R1–R10, and states plainly it waits on I5 |
 | §4.2 profiles re-enter the `LEDGER_FIELDS` trap | §2.1/§2.3 — `predicates`/`policies`/`patterns` are references resolved by address; a producerless name is refused by R1/R2, not silently empty |
-| §4.3 "`is_canonical()` unchanged" presumes a predicate that does not exist | §3.1/§3.4 — the `pattern` row is declared against the [design-only] map; the LLM→ADVISORY interaction is specified (C5), not assumed |
+| §4.3 "`is_canonical()` unchanged" presumes a predicate that does not exist | §3.1/§3.4 — the `pattern` kind is declared via `FACT_PREDICATES` with `epistemic_status="derived"` (no map row, D7); the LLM→ADVISORY interaction is specified (C5), not assumed |
 | §4.4 `verified_facts` DERIVED is an over-claim | §4.1 D1 — demoted to ADVISORY in v1 |
 | §4.5 `challenge` collides with `TASK_TYPES` | §2.5 — a documented mapping, no re-fork of `core/session_types.py` |
 | §5 constraint 1 (treat the four primitives as planned) | §0 + every `[design-only]` marker; no primitive is assumed to exist |
