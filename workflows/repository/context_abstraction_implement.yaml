@@ -123,10 +123,11 @@ workflow:
           READ FIRST:
           - docs/designs/current/context_abstraction_design.md §4 (reducer signature: pure, no I/O) + §9 I1 row
             + "Why spec_lifecycle's spec-status facts go first" (reasons 1-5)
-          - src/agentic_dynamics/experiment/spec_status.py (RunSummary, collect_entries, load_index_entries —
-            the measured inputs this reducer consumes)
-          - src/agentic_dynamics/knowledge/spec_ingestion.py (the existing spec record pipe — the fact payload
-            must NOT duplicate its lifecycle document; the fact carries subject/predicate/value)
+          - src/agentic_dynamics/experiment/spec_status.py (RunSummary, collect_entries — the measured
+            inputs this reducer consumes)
+          - src/agentic_dynamics/knowledge/spec_ingestion.py (load_index_entries :480 + the existing spec
+            record pipe — the fact payload must NOT duplicate its lifecycle document; the fact carries
+            subject/predicate/value)
           - scripts/registry.py (the query surface the gate uses)
 
           REQUIRED SEMANTICS (fixed):
@@ -165,7 +166,7 @@ workflow:
 
           READ FIRST:
           - docs/designs/current/context_abstraction_design.md §4 + §9 I2 row
-          - src/agentic_dynamics/runtime/workflow_runner.py (PhaseResult :64-135, WorkflowRunResult :137-171 —
+          - src/agentic_dynamics/runtime/workflow_runner.py (PhaseResult :76-152, WorkflowRunResult :154-192 —
             the typed artifacts) + experiments/results/workflows/<spec>/<ts>.json (the durable
             run JSONs)
           - src/agentic_dynamics/knowledge/ledger_ingestion.py (the existing ledger record producers — facts
@@ -240,7 +241,7 @@ workflow:
           READ FIRST:
           - docs/designs/current/context_abstraction_design.md §6 (contracts, compile_context() algorithm,
             ControlContext/FactRef/Unknown, halt-vs-degrade, snapshot_id) + §9 I4 row
-          - src/agentic_dynamics/control/step_routing.py (route_step :424-469 — the decision the compiler
+          - src/agentic_dynamics/control/step_routing.py (route_step :188-233 — the decision the compiler
             snapshots beside; NOT modified)
           - src/agentic_dynamics/knowledge/prompt_constructor.py (the executor-side analogue — do not conflate;
             the compiler serves the controller, not the executor)
@@ -282,8 +283,9 @@ workflow:
           READ FIRST:
           - docs/designs/current/context_abstraction_design.md §7 (FactRequirement, normalize_requirement,
             R1-R11) + §9 I5 row
-          - src/agentic_dynamics/experiment/experiment_spec.py (RuleSpec :249-270 area, validate_rules :373-409,
-            LEDGER_FIELDS) + src/agentic_dynamics/experiment/compile_experiment.py (validate_rules gate :87-96)
+          - src/agentic_dynamics/experiment/experiment_spec.py (RuleSpec :271-303, validate_rules :590-628,
+            LEDGER_FIELDS :135) + src/agentic_dynamics/experiment/compile_experiment.py (compile_spec :87-96 — the
+            validate-then-compile gate)
 
           REQUIRED SEMANTICS (fixed):
           - RuleSpec gains fact contracts: each `requires` entry may be a flat signal name
