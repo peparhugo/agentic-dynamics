@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_quality_frontier",
-  "generated_at": "2026-08-22T02:46:12.088951",
+  "generated_at": "2026-08-22T19:03:28.869736",
   "summary": {
     "models": 7,
     "stories": 215,
@@ -246,20 +246,24 @@
     "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
     "resolved_input_sha256": "58e642e6b38d847304d7f3dc8e649f53fd1126cb2222ed86c52393c0bd9c7c8f",
     "registry_version": "data-manifest/1.0+701rows",
-    "metric_definition_version": "quality_frontier/v1",
-    "metric_source_sha256": "13a6f3fed0f77112ca5882856c6aa611809b1ce438a7d1a39ca1f79a874a4c85",
+    "metric_definition_version": "quality_frontier/v2",
+    "metric_source_sha256": "4bf5e2c7953d5ffe68ed0499541f12143991be7b4ebbf25dd8622f1cadcf4d1c",
     "n_resolved_records": 371,
     "n_eligible_records": 312,
     "n_used_records": 312,
     "n_excluded_records": 59,
     "n_unused_eligible_records": 0,
+    "used_record_refs_sha256": "fecf45e2c5ece4a52c66e8c350765428e382b7f0d0e0d765768cceaf564a3dbe",
+    "excluded_record_refs_sha256": "2fa0d763603e714429cc4911c447fbb8a954f97b8f4cc648953e27d8b25e140c",
+    "used_unique_records": 312,
+    "used_contributions": 312,
     "review_without_current_story": 0,
     "story_without_review": 0,
     "missing_required_field": 0,
     "outside_analysis_population": 59,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v5",
-    "generated_at": "2026-08-22T00:46:12.089262+00:00"
+    "contract_version": "lab-contract/v6",
+    "generated_at": "2026-08-22T17:03:28.870692+00:00"
   }
 }

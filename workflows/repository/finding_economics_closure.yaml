@@ -12,6 +12,9 @@ question: >-
   MeasurementCoverage), not string patterns. Then the adversarial hunt + release gate, and the
   final signoff.
 version: "0.1"
+# Artifact identity (refactor-repair P1-3): a source-modifying work order (each phase edits
+# src/, scripts/, tests/ and apps/website/), so it is a *workflow*, not an experiment.
+artifact_kind: workflow
 workflow:
   kind: agent_task
   params:

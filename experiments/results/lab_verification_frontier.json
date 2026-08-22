@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_verification_frontier",
-  "generated_at": "2026-08-22T02:46:10.369672",
+  "generated_at": "2026-08-22T19:03:29.662622",
   "summary": {
     "models": 7,
     "stories": 215,
@@ -117,20 +117,24 @@
     "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
     "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
     "registry_version": "data-manifest/1.0+701rows",
-    "metric_definition_version": "verification_frontier/v1",
-    "metric_source_sha256": "6a78b794427ef7fa5882ad970b156dd26b88d86c3cd8602523f54042c387bf94",
+    "metric_definition_version": "verification_frontier/v2",
+    "metric_source_sha256": "3c9ec2ce0be32ac9c6ae3e3ba3e3cdb4e2930a11d87dbb07c0933472b356457c",
     "n_resolved_records": 215,
     "n_eligible_records": 215,
     "n_used_records": 215,
     "n_excluded_records": 0,
     "n_unused_eligible_records": 0,
+    "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+    "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "used_unique_records": 215,
+    "used_contributions": 215,
     "review_without_current_story": 0,
     "story_without_review": 0,
     "missing_required_field": 0,
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v5",
-    "generated_at": "2026-08-22T00:46:10.369941+00:00"
+    "contract_version": "lab-contract/v6",
+    "generated_at": "2026-08-22T17:03:29.663132+00:00"
   }
 }

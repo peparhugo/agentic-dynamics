@@ -338,15 +338,39 @@ def sync() -> dict[str, int]:
     return counts
 
 
-def check() -> int:
-    """Real parity check: parquet rows + identities vs the current resolver output.
+def _actual_rows_hash(path: Path) -> tuple[str, int]:
+    """``(content hash, row count)`` of the ACTUAL Parquet file, read back once.
 
-    Returns exit code (0 = current, 1 = stale). A stale sync is detected when the sidecar's
-    registry/resolved-input identity differs from the resolver's, or when a parquet row count
-    differs from the freshly recomputed row count — not merely that a file exists.
+    (f3 — actual-Parquet parity.) The Parquet is read through the typed schema and its rows are
+    hashed with the SAME canonical JSON encoding the sidecar/expected hashes use, so the three
+    hashes are directly comparable. ``to_pylist`` round-trips the schema types
+    (int32/int64/float64/bool_/string/null) back to the same Python types the transform
+    produced, keeping the canonical JSON byte-identical — a corrupted *value* (with an
+    unchanged row count) therefore moves this hash. Returns the row count from the same read so
+    the content check and the count check can never disagree on which file they inspected.
+    """
+    table = pq.read_table(path)
+    return _content_sha256(table.to_pylist()), table.num_rows
+
+
+def check() -> int:
+    """Real parity check: the ACTUAL Parquet bytes vs the transform and the sidecar (f3).
+
+    Returns exit code (0 = current, 1 = stale/corrupt). Three-way content parity per table —
+    ``expected == sidecar == actual`` — where:
+
+    * **expected** is recomputed from the in-memory transform (``_build_rows``);
+    * **sidecar** is the hash the last ``sync`` wrote;
+    * **actual** is read back from the Parquet file on disk.
+
+    A corrupted or hand-modified Parquet value with an *unchanged row count* fails here (the
+    actual-rows hash moves) even though the counts still line up — which is exactly the gap the
+    count-only check left open. The registry/resolved-input identities, the transform hash, and
+    the schema hash are also re-verified.
     """
     tables = load_canonical_tables("story", "analysis")
     session_rows, story_rows = _build_rows(tables)
+    rows_by_table = {"sessions": session_rows, "stories": story_rows}
     expected = {"sessions": len(session_rows), "stories": len(story_rows)}
 
     if not SYNC_IDENTITY_PATH.exists():
@@ -364,41 +388,59 @@ def check() -> int:
     if sidecar.get("resolved_input_sha256") != tables.resolved_input_sha256:
         problems.append("resolved-input identity mismatch — the parquet is stale")
 
-    # ── m4 content hashes: the rows, the transform, and the schema are all unchanged ──
+    # ── f3 three-way content parity: expected == sidecar == actual (per table) ─────────
+    # Each table is read from disk ONCE; its actual hash and row count both come from the
+    # same read, so the count check and the content check can never disagree on "which file".
+    for table in ("sessions", "stories"):
+        path = DATA_DIR / f"{table}.parquet"
+        if not path.exists():
+            problems.append(f"{table}.parquet is missing")
+            continue
+        expected_sha = _content_sha256(rows_by_table[table])
+        sidecar_sha = str(sidecar.get(f"{table}_rows_sha256") or "")
+        actual_sha, actual_n = _actual_rows_hash(path)
+
+        print(
+            f"  {table}.parquet: {actual_n:,} rows | "
+            f"expected={expected_sha[:8]}… sidecar={sidecar_sha[:8]}… actual={actual_sha[:8]}…"
+        )
+
+        # Three-way: each pair independently, so the failure message names the drift.
+        if expected_sha != sidecar_sha:
+            problems.append(
+                f"{table}_rows_sha256: sidecar != recomputed rows — the transform or source "
+                f"changed; re-run sync"
+            )
+        if sidecar_sha != actual_sha:
+            problems.append(
+                f"{table}_rows_sha256: sidecar != actual Parquet content — the Parquet was "
+                f"modified or corrupted after sync; re-run sync"
+            )
+        if expected_sha != actual_sha:
+            problems.append(
+                f"{table}_rows_sha256: actual Parquet content != recomputed rows — re-run sync"
+            )
+        if actual_n != expected[table]:
+            problems.append(f"{table}.parquet has {actual_n} rows, expected {expected[table]}")
+        if sidecar.get("rows", {}).get(table) != actual_n:
+            problems.append(
+                f"{table}.parquet rows {actual_n} != sidecar {sidecar.get('rows', {}).get(table)}"
+            )
+
+    # ── the transform and schema identities are unchanged (m4) ─────────────────────────
     for field, recomputed in (
-        ("sessions_rows_sha256", _content_sha256(session_rows)),
-        ("stories_rows_sha256", _content_sha256(story_rows)),
         ("sync_transform_sha256", _transform_sha256()),
         ("schema_sha256", _schema_sha256()),
     ):
         if sidecar.get(field) != recomputed:
-            problems.append(f"{field} mismatch — re-run sync (the transform/schema/rows changed)")
-
-    conn = duckdb.connect()
-    try:
-        for table, expected_n in expected.items():
-            path = DATA_DIR / f"{table}.parquet"
-            if not path.exists():
-                problems.append(f"{table}.parquet is missing")
-                continue
-            actual_n = conn.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
-            print(f"  {table}.parquet: {actual_n:,} rows (expected {expected_n:,})")
-            if actual_n != expected_n:
-                problems.append(f"{table}.parquet has {actual_n} rows, expected {expected_n}")
-            if sidecar.get("rows", {}).get(table) != actual_n:
-                problems.append(
-                    f"{table}.parquet rows {actual_n} != sidecar "
-                    f"{sidecar.get('rows', {}).get(table)}"
-                )
-    finally:
-        conn.close()
+            problems.append(f"{field} mismatch — re-run sync (the transform/schema changed)")
 
     if problems:
         print("FAIL:")
         for p in problems:
             print(f"  - {p}")
         return 1
-    print("OK: parquet matches the current canonical source")
+    print("OK: parquet matches the current canonical source (content + counts + identities)")
     return 0
 
 

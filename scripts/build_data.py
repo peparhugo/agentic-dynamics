@@ -125,38 +125,74 @@ class CanonicalCorpus:
     no_measurement_tombstones: int = 0
 
 
+def _opt_float(value):
+    """Coerce a present finding *score* to float; ``None``/absent stays ``None``.
+
+    For a measured score (correctness, escape, divergence, composite, thinking ratio) a
+    present ``0.0`` is a real measurement and is coerced; an absent value is absent. A
+    non-numeric present value is treated as absent rather than raising. Economic fields
+    (cost, energy) must NOT use this — see :func:`_optional_economic`.
+    """
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_economic(run: dict, key: str) -> float | None:
+    """An economic field (cost/energy), or ``None`` when it was not captured.
+
+    Reuses the shared :func:`cost_captured` test (m2): an economic value is *captured*
+    only when it is a finite, positive real. A ``0.0`` — the Claude cells whose
+    cost/energy parser never ran — means "not priced / not metered" and publishes as
+    null, never a numeric zero that would dilute a ratio's denominator to nonsense.
+    """
+    value = run.get(key)
+    return float(value) if cost_captured(value) else None
+
+
 def _finding_entry_from_run(experiment: str, run: dict, locator: str) -> dict:
     """Map one finding payload ``run`` into a summary-shaped entry dict.
 
     This is the vocabulary translation the retired summary's consumers already speak:
     the finding's native field names (``cost_usd``, ``lines_of_code``, ``escape_score``,
-    ``prompt_tokens``…) are remapped to the summary field names, and every field the
-    finding corpus does not measure is emitted as ``None`` (renders em-dash, never a
-    fabricated value). ``test_results``/``evaluator_source`` come from the measured
-    ``tests_passed``/``tests_total``/``test_executed_success`` only.
+    ``prompt_tokens``…) are remapped to the summary field names. Every field the finding
+    corpus does not measure is emitted as ``None`` (renders em-dash, never a fabricated
+    value) — including the economics (``cost``, ``energy_total_j``, ``quality_per_joule``)
+    and the optional scores (``escape``, ``architecture_divergence``, ``composite_score``,
+    ``thinking_ratio``). ``narration_failure`` is unmeasured in the finding corpus, so it
+    is ``None`` (never an invented ``False``). ``test_results``/``evaluator_source`` come
+    from the measured ``tests_passed``/``tests_total``/``test_executed_success`` only.
     """
-    cost = float(run.get("cost_usd") or 0.0)
+    energy_total_j = _optional_economic(run, "energy_j")
+    # quality_per_joule is a ratio whose denominator is energy: it is null unless energy
+    # was captured (finite AND positive) — a 0.0-energy cell's payload ratio is the
+    # meaningless ``composite / 0.01`` floor and must never be published.
+    quality_per_joule = (
+        _opt_float(run.get("quality_per_joule")) if energy_total_j is not None else None
+    )
     tests_total = int(run.get("tests_total") or 0)
     tests_passed = int(run.get("tests_passed") or 0)
-    correctness = run.get("correctness")
     return {
         "experiment": experiment,
         "type": run.get("type", "perturbed"),
         "worktree_name": locator,
         "model": run.get("model", "unknown"),
-        # The clean re-runs are never "narrated" — the flail dimension is unmeasured
-        # in the finding corpus, so narration_failure is always False here.
-        "narration_failure": False,
-        "correctness": correctness if isinstance(correctness, (int, float)) else 0.0,
-        "cost": cost,
-        "strategy": run.get("strategy", ""),
+        # The flail dimension is unmeasured in the finding corpus, so narration_failure
+        # is None (renders em-dash), never an invented False.
+        "narration_failure": None,
+        "correctness": _opt_float(run.get("correctness")),
+        "cost": _optional_economic(run, "cost_usd"),
+        "strategy": run.get("strategy"),
         "code_lines": int(run.get("lines_of_code") or 0),
-        "thinking_ratio": float(run.get("thinking_ratio") or 0.0),
-        "escape": float(run.get("escape_score") or 0.0),
-        "architecture_divergence": float(run.get("architecture_divergence") or 0.0),
-        "composite_score": float(run.get("composite_score") or 0.0),
-        "energy_total_j": float(run.get("energy_j") or 0.0),
-        "quality_per_joule": float(run.get("quality_per_joule") or 0.0),
+        "thinking_ratio": _opt_float(run.get("thinking_ratio")),
+        "escape": _opt_float(run.get("escape_score")),
+        "architecture_divergence": _opt_float(run.get("architecture_divergence")),
+        "composite_score": _opt_float(run.get("composite_score")),
+        "energy_total_j": energy_total_j,
+        "quality_per_joule": quality_per_joule,
         "constraints_met": int(run.get("constraints_met") or 0),
         "constraints_total": int(run.get("constraints_total") or 0),
         "tokens": int(run.get("total_tokens") or 0),
@@ -201,7 +237,10 @@ def _compute_by_operator_model(entries: list) -> dict:
     Key shape matches the retired ``by_operator_model`` block
     (``"<type>|<perturbation_class>|<model>"``) so the existing ``op_comparison`` loop
     in :func:`build` is unchanged. Aggregates are computed from the canonical entries,
-    not read pre-aggregated.
+    not read pre-aggregated. Every economic/optional field carries its coverage shape
+    (m2, extended to the finding corpus): cost → the five-field captured-cost tuple, the
+    optional scores → ``{value, n_available, n_total, coverage}`` — with a plain captured
+    mean kept alongside, never a missing-as-zero average.
     """
     groups: dict[str, list] = defaultdict(list)
     for e in entries:
@@ -212,35 +251,58 @@ def _compute_by_operator_model(entries: list) -> dict:
 
     result = {}
     for key, rows in groups.items():
-        costs = [r.get("cost", 0) for r in rows]
-        escapes = [r.get("escape", 0) for r in rows]
-        correctness = [r.get("correctness", 0) for r in rows]
-        thinking = [r.get("thinking_ratio", 0) for r in rows]
-        energy = [r.get("energy_total_j", 0) for r in rows]
+        costs = [r.get("cost") for r in rows if cost_captured(r.get("cost"))]
+        escapes = [r.get("escape") for r in rows if r.get("escape") is not None]
+        correctness = [r.get("correctness") for r in rows if r.get("correctness") is not None]
+        thinking = [r.get("thinking_ratio") for r in rows if r.get("thinking_ratio") is not None]
+        energy = [r.get("energy_total_j") for r in rows if r.get("energy_total_j") is not None]
+        arch = [
+            r.get("architecture_divergence")
+            for r in rows
+            if r.get("architecture_divergence") is not None
+        ]
+        composite = [r.get("composite_score") for r in rows if r.get("composite_score") is not None]
+        qj = [r.get("quality_per_joule") for r in rows if r.get("quality_per_joule") is not None]
         n = len(rows)
         result[key] = {
             "n": n,
             "count": n,
-            "cost_avg": round(sum(costs) / n, 4),
-            "cost_ci95_lo": bootstrap_ci(costs)[0] if n >= 5 else None,
-            "cost_ci95_hi": bootstrap_ci(costs)[1] if n >= 5 else None,
-            "escape_avg": round(sum(escapes) / n, 2),
-            "escape_ci95_lo": bootstrap_ci(escapes)[0] if n >= 5 else None,
-            "escape_ci95_hi": bootstrap_ci(escapes)[1] if n >= 5 else None,
-            "correctness_avg": round(sum(correctness) / n, 2),
-            "correctness_ci95_lo": bootstrap_ci(correctness)[0] if n >= 5 else None,
-            "correctness_ci95_hi": bootstrap_ci(correctness)[1] if n >= 5 else None,
-            "thinking_ratio_avg": round(sum(thinking) / n, 3),
-            "energy_total_j_avg": round(sum(energy) / n, 1),
+            # cost → the five-field captured-cost tuple (m2 cost_coverage)
+            **cost_coverage([r.get("cost") for r in rows], n_total=n),
+            "cost_avg": round(sum(costs) / len(costs), 4) if costs else None,
+            "cost_ci95_lo": bootstrap_ci(costs)[0] if len(costs) >= 5 else None,
+            "cost_ci95_hi": bootstrap_ci(costs)[1] if len(costs) >= 5 else None,
+            "escape_avg": round(sum(escapes) / len(escapes), 2) if escapes else None,
+            "escape_ci95_lo": bootstrap_ci(escapes)[0] if len(escapes) >= 5 else None,
+            "escape_ci95_hi": bootstrap_ci(escapes)[1] if len(escapes) >= 5 else None,
+            "correctness_avg": round(sum(correctness) / len(correctness), 2)
+            if correctness
+            else None,
+            "correctness_ci95_lo": bootstrap_ci(correctness)[0] if len(correctness) >= 5 else None,
+            "correctness_ci95_hi": bootstrap_ci(correctness)[1] if len(correctness) >= 5 else None,
+            "thinking_ratio_avg": round(sum(thinking) / len(thinking), 3) if thinking else None,
+            "energy_total_j_avg": round(sum(energy) / len(energy), 1) if energy else None,
+            "escape_coverage": _coverage_dict(escapes, n_total=n, round_value=2),
+            "correctness_coverage": _coverage_dict(correctness, n_total=n, round_value=2),
+            "thinking_ratio_coverage": _coverage_dict(thinking, n_total=n, round_value=3),
+            "energy_j_coverage": _coverage_dict(energy, n_total=n, round_value=1),
+            "architecture_divergence_coverage": _coverage_dict(arch, n_total=n, round_value=3),
+            "composite_score_coverage": _coverage_dict(composite, n_total=n, round_value=3),
+            "quality_per_joule_coverage": _coverage_dict(qj, n_total=n, round_value=4),
         }
     return result
 
 
 def _compute_strategy_distribution(entries: list) -> dict:
-    """Re-derive the strategy-archetype counts from the canonical entries."""
+    """Re-derive the strategy-archetype counts from the canonical entries.
+
+    An unmeasured strategy is labelled ``unknown`` (never a fabricated ``?`` or a silent
+    drop): the distribution states an unknown strategy as such, and the counts sum to the
+    entry total.
+    """
     dist: dict[str, int] = defaultdict(int)
     for e in entries:
-        dist[(e.get("strategy") or "?").lower()] += 1
+        dist[(e.get("strategy") or "unknown").lower()] += 1
     return dict(dist)
 
 
@@ -400,13 +462,39 @@ def compute_model_data(entries):
         label = MODEL_LABELS.get(mid, mid)
         provider = get_provider(mid)
 
-        valid = [
-            r for r in reports if not r.get("narration_failure") and r.get("correctness", 0) >= 0
-        ]
+        valid = [r for r in reports if not r.get("narration_failure")]
         narrated = [r for r in reports if r.get("narration_failure")]
 
-        avg_cost = _fmt_usd(sum(r.get("cost", 0) for r in valid) / max(len(valid), 1))
-        total_cost = _fmt_usd(sum(r.get("cost", 0) for r in reports))
+        # Cost → the five-field captured-cost tuple (m2). A missing/zero cost is "not
+        # captured", never a $0 that dilutes the average.
+        cost_stats = cost_coverage([r.get("cost") for r in valid], n_total=len(valid))
+        avg_cost = (
+            _fmt_usd(cost_stats["avg_captured_cost"])
+            if cost_stats["avg_captured_cost"] is not None
+            else None
+        )
+        total_cost = _fmt_usd(cost_stats["total_captured_cost"])
+
+        # Optional/economic fields → coverage shapes over the non-None values only.
+        correctness_vals = [r.get("correctness") for r in valid if r.get("correctness") is not None]
+        thinking_vals = [
+            r.get("thinking_ratio") for r in valid if r.get("thinking_ratio") is not None
+        ]
+        escape_vals = [r.get("escape") for r in valid if r.get("escape") is not None]
+        arch_vals = [
+            r.get("architecture_divergence")
+            for r in valid
+            if r.get("architecture_divergence") is not None
+        ]
+        composite_vals = [
+            r.get("composite_score") for r in valid if r.get("composite_score") is not None
+        ]
+        energy_vals = [
+            r.get("energy_total_j") for r in valid if r.get("energy_total_j") is not None
+        ]
+        qj_vals = [
+            r.get("quality_per_joule") for r in valid if r.get("quality_per_joule") is not None
+        ]
 
         # Pass rate — measured tests only. No fabricated correctness-heuristic fallback.
         total_tests = 0
@@ -422,31 +510,52 @@ def compute_model_data(entries):
                 f"{total_passed / total_tests:.0%} ({total_passed}/{total_tests}) [tests]"
             )
 
-        strategies = {"conservative": 0, "exploratory": 0, "wasteful": 0, "efficient": 0}
+        # An unknown strategy is ``unknown`` — a fifth bucket, never silently dropped.
+        strategies = {
+            "conservative": 0,
+            "exploratory": 0,
+            "wasteful": 0,
+            "efficient": 0,
+            "unknown": 0,
+        }
         for r in valid:
-            s = (r.get("strategy", "") or "").lower()
-            if s in strategies:
-                strategies[s] += 1
+            s = (r.get("strategy") or "unknown").lower()
+            strategies[s] += 1
 
         avg_loc = round(sum(r.get("code_lines", 0) for r in valid) / max(len(valid), 1))
-        avg_thinking = round(sum(r.get("thinking_ratio", 0) for r in valid) / max(len(valid), 1), 3)
-        avg_escape = round(sum(r.get("escape", 0) for r in valid) / max(len(valid), 1), 2)
-        avg_arch_div = round(
-            sum(r.get("architecture_divergence", 0) for r in valid) / max(len(valid), 1), 3
+        avg_correctness = (
+            round(sum(correctness_vals) / len(correctness_vals), 2) if correctness_vals else None
         )
-        avg_composite = round(
-            sum(r.get("composite_score", 0) for r in valid) / max(len(valid), 1), 3
+        avg_thinking = round(sum(thinking_vals) / len(thinking_vals), 3) if thinking_vals else None
+        avg_escape = round(sum(escape_vals) / len(escape_vals), 2) if escape_vals else None
+        avg_arch_div = round(sum(arch_vals) / len(arch_vals), 3) if arch_vals else None
+        avg_composite = (
+            round(sum(composite_vals) / len(composite_vals), 3) if composite_vals else None
         )
 
-        avg_energy = round(sum(r.get("energy_total_j", 0) for r in valid) / max(len(valid), 1), 1)
-        avg_energy_per_loc = round(avg_energy / max(avg_loc, 1), 2)
-        correctness_per_dollar = round(
-            sum((r.get("correctness") or 0) / max(r.get("cost", 0), 1e-9) for r in valid)
-            / max(len(valid), 1),
-            4,
+        avg_energy = round(sum(energy_vals) / len(energy_vals), 1) if energy_vals else None
+        avg_energy_per_loc = (
+            round(avg_energy / max(avg_loc, 1), 2) if avg_energy is not None else None
         )
-        avg_joules_per_loc = round(
-            sum(r.get("quality_per_joule", 0) for r in valid) / max(len(valid), 1), 4
+
+        # Economic ratios are null unless their denominator is captured AND > 0 (m2):
+        # correctness/dollar needs a captured cost; quality/joule needs a captured energy.
+        cpd_vals = [
+            r.get("correctness") / r.get("cost")
+            for r in valid
+            if r.get("correctness") is not None and cost_captured(r.get("cost"))
+        ]
+        correctness_per_dollar = round(sum(cpd_vals) / len(cpd_vals), 4) if cpd_vals else None
+
+        qj_ratio_vals = [
+            r.get("quality_per_joule")
+            for r in valid
+            if r.get("quality_per_joule") is not None
+            and r.get("energy_total_j") is not None
+            and r.get("energy_total_j") > 0
+        ]
+        avg_quality_per_joule = (
+            round(sum(qj_ratio_vals) / len(qj_ratio_vals), 4) if qj_ratio_vals else None
         )
 
         avg_constraints_met = round(
@@ -474,15 +583,25 @@ def compute_model_data(entries):
                 "n_narrated": len(narrated),
                 "avg_cost": avg_cost,
                 "total_cost": total_cost,
-                "cost_ci95": bootstrap_ci([r.get("cost", 0) for r in valid])
-                if len(valid) >= 5
+                # cost → the five-field captured-cost tuple (m2)
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "cost_coverage": cost_stats["cost_coverage"],
+                "cost_ci95": bootstrap_ci(
+                    [r.get("cost") for r in valid if cost_captured(r.get("cost"))]
+                )
+                if cost_stats["cost_captured_records"] >= 5
                 else None,
                 "pass_rate": pass_rate_val,
                 "strategy_cons": strategies["conservative"],
                 "strategy_expl": strategies["exploratory"],
                 "strategy_waste": strategies["wasteful"],
                 "strategy_efficient": strategies["efficient"],
+                "strategy_unknown": strategies["unknown"],
                 "avg_loc": avg_loc,
+                "avg_correctness": avg_correctness,
                 "avg_thinking_ratio": avg_thinking,
                 "avg_escape": avg_escape,
                 "avg_arch_divergence": avg_arch_div,
@@ -490,9 +609,27 @@ def compute_model_data(entries):
                 "avg_energy_j": avg_energy,
                 "avg_energy_j_per_loc": avg_energy_per_loc,
                 "correctness_per_dollar": correctness_per_dollar,
-                "avg_quality_per_joule": avg_joules_per_loc,
+                "avg_quality_per_joule": avg_quality_per_joule,
                 "avg_constraints_met": avg_constraints_met,
                 "avg_constraints_total": avg_constraints_total,
+                # coverage shapes for the optional/economic fields (m2)
+                "correctness_coverage": _coverage_dict(
+                    correctness_vals, n_total=len(valid), round_value=2
+                ),
+                "thinking_ratio_coverage": _coverage_dict(
+                    thinking_vals, n_total=len(valid), round_value=3
+                ),
+                "escape_coverage": _coverage_dict(escape_vals, n_total=len(valid), round_value=2),
+                "architecture_divergence_coverage": _coverage_dict(
+                    arch_vals, n_total=len(valid), round_value=3
+                ),
+                "composite_score_coverage": _coverage_dict(
+                    composite_vals, n_total=len(valid), round_value=3
+                ),
+                "energy_j_coverage": _coverage_dict(energy_vals, n_total=len(valid), round_value=1),
+                "quality_per_joule_coverage": _coverage_dict(
+                    qj_vals, n_total=len(valid), round_value=4
+                ),
                 "tokens_total": total_tok,
                 "tokens_input": tokens_in,
                 "tokens_output": tokens_out,
@@ -542,8 +679,14 @@ def compute_model_data(entries):
                     "tokens_reasoning": "M",
                     "tokens_total": "M",
                     "avg_cost": "C",
+                    "avg_captured_cost": "C",
+                    "total_captured_cost": "C",
+                    "cost_captured_records": "M",
+                    "total_records": "M",
+                    "cost_coverage": "C",
                     "cost_ci95": "C",
                     "avg_loc": "C",
+                    "avg_correctness": "C",
                     "avg_thinking_ratio": "C",
                     "avg_escape": "C",
                     "avg_arch_divergence": "C",
@@ -552,12 +695,20 @@ def compute_model_data(entries):
                     "avg_energy_j_per_loc": "C",
                     "avg_quality_per_joule": "C",
                     "correctness_per_dollar": "C",
+                    "correctness_coverage": "C",
+                    "thinking_ratio_coverage": "C",
+                    "escape_coverage": "C",
+                    "architecture_divergence_coverage": "C",
+                    "composite_score_coverage": "C",
+                    "energy_j_coverage": "C",
+                    "quality_per_joule_coverage": "C",
                     "avg_constraints_met": "C",
                     "avg_constraints_total": "C",
                     "strategy_cons": "C",
                     "strategy_expl": "C",
                     "strategy_waste": "C",
                     "strategy_efficient": "C",
+                    "strategy_unknown": "C",
                     "pass_rate": "M" if total_tests > 0 else None,
                 },
             }
@@ -567,8 +718,12 @@ def compute_model_data(entries):
 
 
 def _median_cost(entries: list) -> float:
-    """Median cost of a model's entries (a robust ordering key for the model list)."""
-    costs = sorted(r.get("cost", 0) for r in entries)
+    """Median cost of a model's entries (a robust ordering key for the model list).
+
+    Skips uncaptured costs (``None``/zero — m2) so a model with missing costs orders by its
+    captured costs only, never by a fabricated ``0``.
+    """
+    costs = sorted(c for c in (r.get("cost") for r in entries) if cost_captured(c))
     if not costs:
         return float("inf")
     n = len(costs)
@@ -842,6 +997,18 @@ def _optional_measurement(value, n_available: int, n_total: int) -> dict:
         n_total=n_total,
         coverage=round(n_available / n_total, 4) if n_total else 0.0,
     ).to_dict()
+
+
+def _coverage_dict(values, *, n_total: int, round_value: int = 3) -> dict:
+    """The m2 coverage shape ``{value, n_available, n_total, coverage}`` over non-None values.
+
+    A list-based sibling of :func:`_optional_measurement` for the finding-corpus
+    aggregations: it drops ``None`` values first (so an uncaptured economic/optional
+    measurement never folds into the mean as zero) and delegates the denominator policy to
+    the shared :class:`MeasurementCoverage` primitive.
+    """
+    available = [v for v in values if v is not None]
+    return MeasurementCoverage.over(available, n_total=n_total, round_value=round_value).to_dict()
 
 
 def _append_if_present(target: list, value) -> None:
@@ -1195,12 +1362,16 @@ def _load_story_data(stories: list[dict]) -> dict:
                 "total_records": cost_stats["total_records"],
                 "total_captured_cost": cost_stats["total_captured_cost"],
                 "cost_coverage": cost_stats["cost_coverage"],
-                "total_tokens": sum(c["total_tokens"] for c in rows if c["total_tokens"] is not None),
+                "total_tokens": sum(
+                    c["total_tokens"] for c in rows if c["total_tokens"] is not None
+                ),
                 "avg_cache_hit": round(
                     sum(c["cache_hit_rate"] for c in rows if c["cache_hit_rate"] is not None)
                     / max(len([c for c in rows if c["cache_hit_rate"] is not None]), 1),
                     3,
-                ) if any(c["cache_hit_rate"] is not None for c in rows) else None,
+                )
+                if any(c["cache_hit_rate"] is not None for c in rows)
+                else None,
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
             }
         )
@@ -1261,7 +1432,9 @@ def _load_story_data(stories: list[dict]) -> dict:
                     )
                     / max(len([c for c in rows if c["total_tokens"] is not None]), 1),
                     0,
-                ) if any(c["total_tokens"] is not None for c in rows) else None,
+                )
+                if any(c["total_tokens"] is not None for c in rows)
+                else None,
             }
         )
 
@@ -1292,7 +1465,9 @@ def _load_story_data(stories: list[dict]) -> dict:
                     )
                     / max(len([c for c in rows if c["total_tokens"] is not None]), 1),
                     0,
-                ) if any(c["total_tokens"] is not None for c in rows) else None,
+                )
+                if any(c["total_tokens"] is not None for c in rows)
+                else None,
                 "avg_session_duration_s": round(
                     sum(c["total_duration"] / max(c["session_count"], 1) for c in rows) / n, 0
                 ),
@@ -1303,7 +1478,9 @@ def _load_story_data(stories: list[dict]) -> dict:
     # contributes nothing to the cost total rather than a fabricated zero.
     total_cost = sum(s["cost_usd"] for s in sessions if s["cost_usd"] is not None)
     total_tokens = sum(s["total_tokens"] for s in sessions if s["total_tokens"] is not None)
-    cached = [s for s in sessions if s["cache_read_tokens"] is not None and s["prompt_tokens"] is not None]
+    cached = [
+        s for s in sessions if s["cache_read_tokens"] is not None and s["prompt_tokens"] is not None
+    ]
     total_cache_reads = sum(s["cache_read_tokens"] for s in cached)
     total_prompt = sum(s["prompt_tokens"] for s in cached)
     denom = total_cache_reads + total_prompt
@@ -1440,16 +1617,24 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
                     sum(c["cache_hit_rate"] for c in rows if c["cache_hit_rate"] is not None)
                     / max(len([c for c in rows if c["cache_hit_rate"] is not None]), 1),
                     3,
-                ) if any(c["cache_hit_rate"] is not None for c in rows) else None,
+                )
+                if any(c["cache_hit_rate"] is not None for c in rows)
+                else None,
                 "avg_tests": round(sum(c["test_count"] for c in rows) / total_runs, 1),
                 "avg_test_code_ratio": round(
                     sum(c["test_code_ratio"] for c in rows) / total_runs, 3
                 ),
                 "avg_tok_per_session": round(
-                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows if c["total_tokens"] is not None)
+                    sum(
+                        c["total_tokens"] / max(c["session_count"], 1)
+                        for c in rows
+                        if c["total_tokens"] is not None
+                    )
                     / max(len([c for c in rows if c["total_tokens"] is not None]), 1),
                     0,
-                ) if any(c["total_tokens"] is not None for c in rows) else None,
+                )
+                if any(c["total_tokens"] is not None for c in rows)
+                else None,
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / total_runs, 0),
                 "avg_code_lines": avg_code_lines,
                 # ── Test-count scope (review "smaller"): two DIFFERENT quantities, no longer
@@ -1464,9 +1649,12 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
                     "weighted over repeated session-level test executions (each session "
                     "re-runs the suite; the count is summed across sessions)"
                 ),
-                # keep legacy keys populated for existing charts
-                "avg_cost_per_session": round(
-                    (avg_cost or 0) / max(sessions_sum / max(total_runs, 1), 1), 6
+                # keep legacy keys populated for existing charts — but a null captured-cost
+                # average stays null (m2), never a fabricated $0 per session.
+                "avg_cost_per_session": (
+                    round(avg_cost / max(sessions_sum / max(total_runs, 1), 1), 6)
+                    if avg_cost is not None
+                    else None
                 ),
                 "avg_loc": avg_code_lines,
                 "avg_energy_j": avg_energy_j,
@@ -1548,27 +1736,68 @@ def _assert_resolution_complete(tables, waiver_path=None) -> list[dict]:
 #: imports.
 
 
-def _generator_source_files() -> list[Path]:
-    """The direct computation-dependency manifest, DERIVED from the import graph.
+def _source_closure(entry: Path, src_root: Path, *, root_module: str) -> list[Path]:
+    """The transitive source closure of ``entry`` over the package rooted at ``src_root``.
 
-    Walks ``build_data.py``'s ``agentic_dynamics.*`` imports transitively and returns every
-    source file reachable from it, sorted for determinism. The list is *computed*, never
-    hand-maintained, so a newly-added computation dependency is covered automatically.
+    (f4 — transitive identity.) Walks ``entry``'s imports recursively and returns every source
+    file reachable, sorted for determinism. Both absolute imports (``from agentic_dynamics.x
+    import ...``) and RELATIVE imports (``from .x import ...``) are resolved — a relative import
+    is resolved against the importing file's own package, so ``from .canonical_corpus import …``
+    inside ``lab_contract.py`` contributes ``canonical_corpus.py`` (and its own dependencies)
+    transitively. The list is *computed*, never hand-maintained.
     """
-    src_root = ROOT / "src" / "agentic_dynamics"
     seen: dict[Path, None] = {}
 
     def resolve(name: str) -> None:
-        if not name.startswith("agentic_dynamics"):
+        """Resolve an absolute ``root_module.*`` name to a file (or a package ``__init__``)."""
+        if not name.startswith(root_module):
             return
-        rel = name[len("agentic_dynamics.") :].replace(".", "/")
-        candidate = src_root / f"{rel}.py"
-        if candidate.is_file():
-            visit(candidate)
-            return
-        package = src_root / rel / "__init__.py"
-        if package.is_file():
-            visit(package)
+        suffix = name[len(root_module) :]
+        rel = suffix[1:].replace(".", "/") if suffix.startswith(".") else ""
+        if rel:
+            candidate = src_root / f"{rel}.py"
+            if candidate.is_file():
+                visit(candidate)
+                return
+            package = src_root / rel / "__init__.py"
+            if package.is_file():
+                visit(package)
+        else:
+            package = src_root / "__init__.py"
+            if package.is_file():
+                visit(package)
+
+    def _module_parts(path: Path) -> list[str]:
+        """The dotted module name of ``path`` (``[]`` for files outside ``src_root``).
+
+        ``src_root/reporting/lab_contract.py`` → ``("agentic_dynamics", "reporting",
+        "lab_contract")``; ``src_root/reporting/__init__.py`` → ``("agentic_dynamics",
+        "reporting")``.
+        """
+        try:
+            rel = path.relative_to(src_root)
+        except ValueError:
+            return []
+        parts = list(rel.with_suffix("").parts)
+        if parts and parts[-1] == "__init__":
+            parts = parts[:-1]
+        return [root_module, *parts]
+
+    def _resolve_from(node: ast.ImportFrom, package_parts: list[str]) -> None:
+        """Resolve an ImportFrom: relative (``level > 0``) against ``package_parts``, else absolute.
+
+        ``from .x import ...`` (level 1) targets the current package; each extra level climbs one
+        package (``from ..x`` → the parent package). A level that climbs above the package root
+        resolves outside the tree and is skipped.
+        """
+        if node.level and node.level > 0:
+            if node.level - 1 >= len(package_parts):
+                return
+            base = package_parts[: len(package_parts) - (node.level - 1)]
+            name = ".".join([*base, node.module]) if node.module else ".".join(base)
+            resolve(name)
+        elif node.module:
+            resolve(node.module)
 
     def visit(path: Path) -> None:
         path = path.resolve()
@@ -1579,30 +1808,59 @@ def _generator_source_files() -> list[Path]:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except (OSError, SyntaxError):
             return
+        module_parts = _module_parts(path)
+        package_parts = module_parts[:-1] if module_parts else []
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     resolve(alias.name)
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                resolve(node.module)
+            elif isinstance(node, ast.ImportFrom):
+                _resolve_from(node, package_parts)
 
-    visit(ROOT / "scripts" / "build_data.py")
+    visit(entry)
     return sorted(seen)
 
 
-def generator_source_tree_identity() -> str:
-    """``sha256`` over the generated source-tree dependency manifest (name + bytes).
+def _generator_source_files() -> list[Path]:
+    """The direct computation-dependency manifest, DERIVED from the import graph.
 
-    Deterministic and environment-independent: only the source file *contents* enter the
-    digest, never their absolute paths. The file list comes from
-    :func:`_generator_source_files` (derived from the import graph), so the identity
-    tracks the full computation surface, not a remembered subset.
+    (f4 — transitive identity.) Delegates to :func:`_source_closure` over ``build_data.py``'s
+    imports inside the ``agentic_dynamics`` package.
+    """
+    return _source_closure(
+        ROOT / "scripts" / "build_data.py",
+        ROOT / "src" / "agentic_dynamics",
+        root_module="agentic_dynamics",
+    )
+
+
+def _source_tree_identity(paths: list[Path], *, base: Path) -> str:
+    """``sha256`` over ``(repo-relative path, file length, file bytes)`` for each source file.
+
+    (f4 — transitive identity.) The repo-relative path is hashed — not just ``path.name`` — so
+    two ``__init__.py`` files in different packages are distinct; the file length is folded in so
+    a truncation/extension is distinguishable from a same-name rename. Deterministic and
+    environment-independent: only the relative path and the bytes enter the digest.
     """
     h = hashlib.sha256()
-    for path in _generator_source_files():
-        h.update(path.name.encode("utf-8"))
-        h.update(path.read_bytes())
+    for path in paths:
+        rel = path.relative_to(base).as_posix()
+        data = path.read_bytes()
+        h.update(rel.encode("utf-8"))
+        h.update(str(len(data)).encode("utf-8"))
+        h.update(data)
     return h.hexdigest()
+
+
+def generator_source_tree_identity() -> str:
+    """``sha256`` over the generated source-tree dependency manifest.
+
+    Deterministic and environment-independent. The file list comes from
+    :func:`_generator_source_files` (derived from the import graph — now resolving relative
+    imports transitively), and each file is hashed as (repo-relative path, length, bytes), so the
+    identity tracks the full computation surface, not a remembered subset.
+    """
+    return _source_tree_identity(_generator_source_files(), base=ROOT)
 
 
 #: The generated spec lifecycle index (``scripts/spec_status.py``) — the machine-readable
@@ -1706,20 +1964,33 @@ def build():
                 op_comparison[op] = {"perturbation_class": pc, "models": {}}
             op_comparison[op]["models"][model_label] = {
                 "n": agg.get("n", agg.get("count", 0)),
-                "avg_cost": agg.get("cost_avg", 0),
+                "avg_cost": agg.get("cost_avg"),
                 "cost_ci95": [agg.get("cost_ci95_lo"), agg.get("cost_ci95_hi")]
                 if agg.get("cost_ci95_lo") is not None
                 else None,
-                "avg_escape": agg.get("escape_avg", 0),
+                "avg_escape": agg.get("escape_avg"),
                 "escape_ci95": [agg.get("escape_ci95_lo"), agg.get("escape_ci95_hi")]
                 if agg.get("escape_ci95_lo") is not None
                 else None,
-                "avg_correctness": agg.get("correctness_avg", 0),
+                "avg_correctness": agg.get("correctness_avg"),
                 "correctness_ci95": [agg.get("correctness_ci95_lo"), agg.get("correctness_ci95_hi")]
                 if agg.get("correctness_ci95_lo") is not None
                 else None,
-                "avg_thinking_ratio": agg.get("thinking_ratio_avg", 0),
-                "avg_energy_j": agg.get("energy_total_j_avg", 0),
+                "avg_thinking_ratio": agg.get("thinking_ratio_avg"),
+                "avg_energy_j": agg.get("energy_total_j_avg"),
+                # coverage shapes (m2): cost five-field + optional-field coverage
+                "avg_captured_cost": agg.get("avg_captured_cost"),
+                "total_captured_cost": agg.get("total_captured_cost"),
+                "cost_captured_records": agg.get("cost_captured_records"),
+                "total_records": agg.get("total_records"),
+                "cost_coverage": agg.get("cost_coverage"),
+                "correctness_coverage": agg.get("correctness_coverage"),
+                "thinking_ratio_coverage": agg.get("thinking_ratio_coverage"),
+                "escape_coverage": agg.get("escape_coverage"),
+                "architecture_divergence_coverage": agg.get("architecture_divergence_coverage"),
+                "composite_score_coverage": agg.get("composite_score_coverage"),
+                "energy_j_coverage": agg.get("energy_j_coverage"),
+                "quality_per_joule_coverage": agg.get("quality_per_joule_coverage"),
                 "low_n": (agg.get("n", agg.get("count", 0)) < 5),
             }
 
@@ -1745,10 +2016,10 @@ def build():
             }
         pb = pert_class_breakdown[pc][model_label]
         pb["count"] += 1
-        pb["costs"].append(e.get("cost", 0))
-        pb["escapes"].append(e.get("escape", 0))
-        pb["correctness"].append(e.get("correctness", 0))
-        pb["thinking_ratios"].append(e.get("thinking_ratio", 0))
+        pb["costs"].append(e.get("cost"))
+        pb["escapes"].append(e.get("escape"))
+        pb["correctness"].append(e.get("correctness"))
+        pb["thinking_ratios"].append(e.get("thinking_ratio"))
         pb["locs"].append(e.get("code_lines", 0))
         pb["tokens"].append(e.get("tokens", 0))
 
@@ -1757,18 +2028,29 @@ def build():
         pert_class_summary[pc] = {}
         for label, pb in pc_models.items():
             n = pb["count"]
+            costs = [c for c in pb["costs"] if cost_captured(c)]
+            escapes = [v for v in pb["escapes"] if v is not None]
+            correctness = [v for v in pb["correctness"] if v is not None]
+            thinking = [v for v in pb["thinking_ratios"] if v is not None]
             pert_class_summary[pc][label] = {
                 "n": n,
                 "low_n": n < 5,
-                "avg_cost": round(sum(pb["costs"]) / n, 4),
-                "cost_ci95": bootstrap_ci(pb["costs"]) if n >= 5 else None,
-                "avg_escape": round(sum(pb["escapes"]) / n, 2),
-                "escape_ci95": bootstrap_ci(pb["escapes"]) if n >= 5 else None,
-                "avg_correctness": round(sum(pb["correctness"]) / n, 2),
-                "correctness_ci95": bootstrap_ci(pb["correctness"]) if n >= 5 else None,
-                "avg_thinking_ratio": round(sum(pb["thinking_ratios"]) / n, 3),
+                "avg_cost": round(sum(costs) / len(costs), 4) if costs else None,
+                "cost_ci95": bootstrap_ci(costs) if len(costs) >= 5 else None,
+                "avg_escape": round(sum(escapes) / len(escapes), 2) if escapes else None,
+                "escape_ci95": bootstrap_ci(escapes) if len(escapes) >= 5 else None,
+                "avg_correctness": round(sum(correctness) / len(correctness), 2)
+                if correctness
+                else None,
+                "correctness_ci95": bootstrap_ci(correctness) if len(correctness) >= 5 else None,
+                "avg_thinking_ratio": round(sum(thinking) / len(thinking), 3) if thinking else None,
                 "avg_loc": round(sum(pb["locs"]) / n),
                 "avg_tokens": round(sum(pb["tokens"]) / n),
+                # cost → five-field captured-cost tuple + optional-field coverage (m2)
+                **cost_coverage(pb["costs"], n_total=n),
+                "correctness_coverage": _coverage_dict(correctness, n_total=n, round_value=2),
+                "thinking_ratio_coverage": _coverage_dict(thinking, n_total=n, round_value=3),
+                "escape_coverage": _coverage_dict(escapes, n_total=n, round_value=2),
                 # Historical: narration is not measured in the finding corpus → None.
                 "avg_narration_penalty": None,
             }

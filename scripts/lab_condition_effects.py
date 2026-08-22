@@ -86,11 +86,17 @@ def compute(stories: list[dict], reviews: list[dict]) -> tuple[dict, Contributio
     review_outcomes = _review_outcomes_by_story(reviews)
     story_sids = {str(s.get("story_id") or "") for s in stories}
     # Used records: every current story + the reviews whose `_story_id` names a current
-    # story (the exact join the metric consumes).
-    used_ids = [record_id(s) for s in stories] + [
+    # story (the exact join the metric consumes). Excluded records: the reviews whose story
+    # is not current — collected as qualified refs (f2) so the contract attests WHICH.
+    used_refs = [record_id(s) for s in stories] + [
         record_id(r)
         for r in reviews
         if str(r.get("_story_id") or r.get("story_id") or "") in story_sids
+    ]
+    excluded_refs = [
+        record_id(r)
+        for r in reviews
+        if str(r.get("_story_id") or r.get("story_id") or "") not in story_sids
     ]
 
     by_condition = defaultdict(
@@ -160,7 +166,8 @@ def compute(stories: list[dict], reviews: list[dict]) -> tuple[dict, Contributio
         "conditions": conditions,
     }
     contribution = ContributionReport.of(
-        used_record_ids=used_ids,
+        used_record_refs=used_refs,
+        excluded_record_refs=excluded_refs,
         exclusion_reasons={"review_without_current_story": len(reviews) - joined_reviews},
     )
     return result, contribution

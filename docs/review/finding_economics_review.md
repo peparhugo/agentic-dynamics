@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # Finding-Economics Closure Review — external critique (2026-08-22)
 
 **Provenance [X]:** operator-provided external review of main at `1ea54bbed` (the merged

@@ -131,19 +131,21 @@ def _exclusion_reason(has_strength: bool, has_verdict: bool) -> str:
 
 def collect_cells(
     findings: list[dict], stories: list[dict]
-) -> tuple[list[dict], dict[str, int], list[str]]:
+) -> tuple[list[dict], dict[str, int], list[str], list[str]]:
     """Every canonical cell carrying BOTH fields the metric needs, plus the exclusion tally.
 
     A cell missing either field is excluded outright — the metric is a conditional
     probability, and a cell with no strength or no executed verdict cannot condition on
     anything. It is never imputed to 0.0 / False. The returned ``exclusions`` maps each
     reason to its count, so the lab's contract can report *why* cells dropped out (review
-    P2: ``n_resolved`` vs ``n_eligible`` vs ``n_excluded``). The returned ``used_ids`` are
-    the record ids of the cells that DID contribute (m3 ContributionReport).
+    P2: ``n_resolved`` vs ``n_eligible`` vs ``n_excluded``). The returned ``used_refs`` /
+    ``excluded_refs`` are the table-qualified record refs of the cells that DID / did NOT
+    contribute (m3 ContributionReport; f2 exact contributor attestation).
     """
     cells: list[dict] = []
     exclusions: Counter = Counter()
-    used_ids: list[str] = []
+    used_refs: list[str] = []
+    excluded_refs: list[str] = []
 
     for run in findings:
         strength = run.get("perturbation_strength")
@@ -152,8 +154,9 @@ def collect_cells(
             exclusions[
                 _exclusion_reason(isinstance(strength, (int, float)), isinstance(verdict, bool))
             ] += 1
+            excluded_refs.append(record_id(run))
             continue
-        used_ids.append(record_id(run))
+        used_refs.append(record_id(run))
         cells.append(
             {
                 "source": "finding",
@@ -172,8 +175,9 @@ def collect_cells(
             exclusions[
                 _exclusion_reason(isinstance(strength, (int, float)), isinstance(verdict, bool))
             ] += 1
+            excluded_refs.append(record_id(story))
             continue
-        used_ids.append(record_id(story))
+        used_refs.append(record_id(story))
         cells.append(
             {
                 "source": "story",
@@ -187,7 +191,7 @@ def collect_cells(
             }
         )
 
-    return cells, dict(exclusions), used_ids
+    return cells, dict(exclusions), used_refs, excluded_refs
 
 
 def _group_rates(cells: list[dict], key: str, label_key: str) -> list[dict]:
@@ -215,7 +219,7 @@ def compute(findings: list[dict], stories: list[dict]) -> tuple[dict, Contributi
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
-    cells, exclusions, used_ids = collect_cells(findings, stories)
+    cells, exclusions, used_refs, excluded_refs = collect_cells(findings, stories)
 
     # ── G(s) overall, per strength level ────────────────────────────────────────────
     by_strength: dict[float, list[dict]] = defaultdict(list)
@@ -301,7 +305,8 @@ def compute(findings: list[dict], stories: list[dict]) -> tuple[dict, Contributi
         ],
     }
     contribution = ContributionReport.of(
-        used_record_ids=used_ids,
+        used_record_refs=used_refs,
+        excluded_record_refs=excluded_refs,
         exclusion_reasons={"missing_required_field": sum(exclusions.values())},
     )
     return result, contribution

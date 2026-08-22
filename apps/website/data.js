@@ -1,8 +1,8 @@
-/* Generated 2026-08-22 01:40:16 UTC by build_data.py */
+/* Generated 2026-08-22 17:05:41 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-22T01:40:15.555968+00:00",
+    "generated_at": "2026-08-22T17:05:39.748569+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -66,7 +66,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "f1859f1017edd78489738172e28f1d0050bcdab9afbfee271af9a852c081181f"
+    "generator_source_tree_identity": "d9c2c28ca6aec573db01c8062707bf237f0f6a4044a9df82435b0a56b92b9bac"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 35,
     "experiment_specs": 6,
-    "workflow_specs": 76,
+    "workflow_specs": 77,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
@@ -393,105 +393,6 @@ window.DYNAMICS_DATA = {
   ],
   "perturbation_models": [
     {
-      "id": "anthropic/claude-haiku-4-5",
-      "label": "anthropic/claude-haiku-4-5",
-      "provider": "anthropic",
-      "reports": 7,
-      "reports_valid": 7,
-      "reports_narrated": 0,
-      "n_reports": 7,
-      "n_valid": 7,
-      "n_narrated": 0,
-      "avg_cost": 0.0442,
-      "total_cost": 0.3097,
-      "cost_ci95": [
-        0.0,
-        0.1327
-      ],
-      "pass_rate": null,
-      "strategy_cons": 0,
-      "strategy_expl": 6,
-      "strategy_waste": 0,
-      "strategy_efficient": 0,
-      "avg_loc": 1270,
-      "avg_thinking_ratio": 0.0,
-      "avg_escape": 0.66,
-      "avg_arch_divergence": 0.833,
-      "avg_composite_score": 0.8,
-      "avg_energy_j": 749.5,
-      "avg_energy_j_per_loc": 0.59,
-      "correctness_per_dollar": 857142857.6041,
-      "avg_quality_per_joule": 68.8659,
-      "avg_constraints_met": 8.9,
-      "avg_constraints_total": 9.0,
-      "tokens_total": 22980,
-      "tokens_input": 258,
-      "tokens_output": 22722,
-      "tokens_reasoning": 0,
-      "avg_narration_penalty": null,
-      "avg_struct_divergence": null,
-      "avg_code_quality": null,
-      "avg_comment_ratio": null,
-      "narration_rate": null,
-      "ast_files": null,
-      "ast_functions": null,
-      "ast_classes": null,
-      "ast_type_hint_pct": null,
-      "ast_docstring_pct": null,
-      "cost_input": null,
-      "cost_output": null,
-      "cost_reasoning": null,
-      "cost_cache": null,
-      "tokens_cache_read": null,
-      "tokens_cache_write": null,
-      "_historical_fields": [
-        "avg_narration_penalty",
-        "avg_struct_divergence",
-        "avg_code_quality",
-        "avg_comment_ratio",
-        "narration_rate",
-        "ast_files",
-        "ast_functions",
-        "ast_classes",
-        "ast_type_hint_pct",
-        "ast_docstring_pct",
-        "cost_input",
-        "cost_output",
-        "cost_reasoning",
-        "cost_cache",
-        "tokens_cache_read",
-        "tokens_cache_write"
-      ],
-      "_provenance": {
-        "reports": "M",
-        "reports_valid": "M",
-        "reports_narrated": "M",
-        "total_cost": "M",
-        "tokens_input": "M",
-        "tokens_output": "M",
-        "tokens_reasoning": "M",
-        "tokens_total": "M",
-        "avg_cost": "C",
-        "cost_ci95": "C",
-        "avg_loc": "C",
-        "avg_thinking_ratio": "C",
-        "avg_escape": "C",
-        "avg_arch_divergence": "C",
-        "avg_composite_score": "C",
-        "avg_energy_j": "C",
-        "avg_energy_j_per_loc": "C",
-        "avg_quality_per_joule": "C",
-        "correctness_per_dollar": "C",
-        "avg_constraints_met": "C",
-        "avg_constraints_total": "C",
-        "strategy_cons": "C",
-        "strategy_expl": "C",
-        "strategy_waste": "C",
-        "strategy_efficient": "C",
-        "pass_rate": null
-      }
-    },
-    {
       "id": "deepseek/deepseek-v4-flash",
       "label": "DeepSeek v4 Flash",
       "provider": "deepseek",
@@ -503,6 +404,11 @@ window.DYNAMICS_DATA = {
       "n_narrated": 0,
       "avg_cost": 0.0096,
       "total_cost": 0.0672,
+      "avg_captured_cost": 0.009603,
+      "total_captured_cost": 0.067223,
+      "cost_captured_records": 7,
+      "total_records": 7,
+      "cost_coverage": 1.0,
       "cost_ci95": [
         0.0083,
         0.0111
@@ -512,10 +418,12 @@ window.DYNAMICS_DATA = {
       "strategy_expl": 4,
       "strategy_waste": 0,
       "strategy_efficient": 1,
+      "strategy_unknown": 1,
       "avg_loc": 1143,
+      "avg_correctness": 0.88,
       "avg_thinking_ratio": 0.228,
-      "avg_escape": 0.54,
-      "avg_arch_divergence": 0.571,
+      "avg_escape": 0.63,
+      "avg_arch_divergence": 0.667,
       "avg_composite_score": 0.793,
       "avg_energy_j": 7992.3,
       "avg_energy_j_per_loc": 6.99,
@@ -523,6 +431,48 @@ window.DYNAMICS_DATA = {
       "avg_quality_per_joule": 0.0001,
       "avg_constraints_met": 8.6,
       "avg_constraints_total": 9.0,
+      "correctness_coverage": {
+        "value": 0.88,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "thinking_ratio_coverage": {
+        "value": 0.228,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "escape_coverage": {
+        "value": 0.63,
+        "n_available": 6,
+        "n_total": 7,
+        "coverage": 0.8571
+      },
+      "architecture_divergence_coverage": {
+        "value": 0.667,
+        "n_available": 6,
+        "n_total": 7,
+        "coverage": 0.8571
+      },
+      "composite_score_coverage": {
+        "value": 0.793,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "energy_j_coverage": {
+        "value": 7992.3,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "quality_per_joule_coverage": {
+        "value": 0.0001,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
       "tokens_total": 230235,
       "tokens_input": 66381,
       "tokens_output": 109898,
@@ -571,8 +521,14 @@ window.DYNAMICS_DATA = {
         "tokens_reasoning": "M",
         "tokens_total": "M",
         "avg_cost": "C",
+        "avg_captured_cost": "C",
+        "total_captured_cost": "C",
+        "cost_captured_records": "M",
+        "total_records": "M",
+        "cost_coverage": "C",
         "cost_ci95": "C",
         "avg_loc": "C",
+        "avg_correctness": "C",
         "avg_thinking_ratio": "C",
         "avg_escape": "C",
         "avg_arch_divergence": "C",
@@ -581,12 +537,20 @@ window.DYNAMICS_DATA = {
         "avg_energy_j_per_loc": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
+        "correctness_coverage": "C",
+        "thinking_ratio_coverage": "C",
+        "escape_coverage": "C",
+        "architecture_divergence_coverage": "C",
+        "composite_score_coverage": "C",
+        "energy_j_coverage": "C",
+        "quality_per_joule_coverage": "C",
         "avg_constraints_met": "C",
         "avg_constraints_total": "C",
         "strategy_cons": "C",
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
+        "strategy_unknown": "C",
         "pass_rate": "M"
       }
     },
@@ -602,6 +566,11 @@ window.DYNAMICS_DATA = {
       "n_narrated": 0,
       "avg_cost": 0.0173,
       "total_cost": 0.1211,
+      "avg_captured_cost": 0.017297,
+      "total_captured_cost": 0.121081,
+      "cost_captured_records": 7,
+      "total_records": 7,
+      "cost_coverage": 1.0,
       "cost_ci95": [
         0.0152,
         0.0196
@@ -611,10 +580,12 @@ window.DYNAMICS_DATA = {
       "strategy_expl": 0,
       "strategy_waste": 0,
       "strategy_efficient": 6,
+      "strategy_unknown": 1,
       "avg_loc": 334,
+      "avg_correctness": 1.0,
       "avg_thinking_ratio": 0.021,
-      "avg_escape": 0.29,
-      "avg_arch_divergence": 0.198,
+      "avg_escape": 0.34,
+      "avg_arch_divergence": 0.231,
       "avg_composite_score": 0.838,
       "avg_energy_j": 4060.4,
       "avg_energy_j_per_loc": 12.16,
@@ -622,6 +593,48 @@ window.DYNAMICS_DATA = {
       "avg_quality_per_joule": 0.0002,
       "avg_constraints_met": 8.9,
       "avg_constraints_total": 9.0,
+      "correctness_coverage": {
+        "value": 1.0,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "thinking_ratio_coverage": {
+        "value": 0.021,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "escape_coverage": {
+        "value": 0.34,
+        "n_available": 6,
+        "n_total": 7,
+        "coverage": 0.8571
+      },
+      "architecture_divergence_coverage": {
+        "value": 0.231,
+        "n_available": 6,
+        "n_total": 7,
+        "coverage": 0.8571
+      },
+      "composite_score_coverage": {
+        "value": 0.838,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "energy_j_coverage": {
+        "value": 4060.4,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "quality_per_joule_coverage": {
+        "value": 0.0002,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
       "tokens_total": 241190,
       "tokens_input": 187936,
       "tokens_output": 48507,
@@ -670,8 +683,14 @@ window.DYNAMICS_DATA = {
         "tokens_reasoning": "M",
         "tokens_total": "M",
         "avg_cost": "C",
+        "avg_captured_cost": "C",
+        "total_captured_cost": "C",
+        "cost_captured_records": "M",
+        "total_records": "M",
+        "cost_coverage": "C",
         "cost_ci95": "C",
         "avg_loc": "C",
+        "avg_correctness": "C",
         "avg_thinking_ratio": "C",
         "avg_escape": "C",
         "avg_arch_divergence": "C",
@@ -680,12 +699,20 @@ window.DYNAMICS_DATA = {
         "avg_energy_j_per_loc": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
+        "correctness_coverage": "C",
+        "thinking_ratio_coverage": "C",
+        "escape_coverage": "C",
+        "architecture_divergence_coverage": "C",
+        "composite_score_coverage": "C",
+        "energy_j_coverage": "C",
+        "quality_per_joule_coverage": "C",
         "avg_constraints_met": "C",
         "avg_constraints_total": "C",
         "strategy_cons": "C",
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
+        "strategy_unknown": "C",
         "pass_rate": "M"
       }
     },
@@ -701,6 +728,11 @@ window.DYNAMICS_DATA = {
       "n_narrated": 0,
       "avg_cost": 0.0169,
       "total_cost": 0.2032,
+      "avg_captured_cost": 0.016934,
+      "total_captured_cost": 0.203213,
+      "cost_captured_records": 12,
+      "total_records": 12,
+      "cost_coverage": 1.0,
       "cost_ci95": [
         0.0143,
         0.0195
@@ -710,10 +742,12 @@ window.DYNAMICS_DATA = {
       "strategy_expl": 8,
       "strategy_waste": 0,
       "strategy_efficient": 2,
+      "strategy_unknown": 2,
       "avg_loc": 636,
+      "avg_correctness": 1.0,
       "avg_thinking_ratio": 0.211,
-      "avg_escape": 0.58,
-      "avg_arch_divergence": 0.646,
+      "avg_escape": 0.69,
+      "avg_arch_divergence": 0.775,
       "avg_composite_score": 0.772,
       "avg_energy_j": 5015.1,
       "avg_energy_j_per_loc": 7.89,
@@ -721,6 +755,48 @@ window.DYNAMICS_DATA = {
       "avg_quality_per_joule": 0.0002,
       "avg_constraints_met": 6.2,
       "avg_constraints_total": 7.8,
+      "correctness_coverage": {
+        "value": 1.0,
+        "n_available": 12,
+        "n_total": 12,
+        "coverage": 1.0
+      },
+      "thinking_ratio_coverage": {
+        "value": 0.211,
+        "n_available": 12,
+        "n_total": 12,
+        "coverage": 1.0
+      },
+      "escape_coverage": {
+        "value": 0.69,
+        "n_available": 10,
+        "n_total": 12,
+        "coverage": 0.8333
+      },
+      "architecture_divergence_coverage": {
+        "value": 0.775,
+        "n_available": 10,
+        "n_total": 12,
+        "coverage": 0.8333
+      },
+      "composite_score_coverage": {
+        "value": 0.772,
+        "n_available": 12,
+        "n_total": 12,
+        "coverage": 1.0
+      },
+      "energy_j_coverage": {
+        "value": 5015.1,
+        "n_available": 12,
+        "n_total": 12,
+        "coverage": 1.0
+      },
+      "quality_per_joule_coverage": {
+        "value": 0.0002,
+        "n_available": 12,
+        "n_total": 12,
+        "coverage": 1.0
+      },
       "tokens_total": 270027,
       "tokens_input": 107878,
       "tokens_output": 102747,
@@ -769,8 +845,14 @@ window.DYNAMICS_DATA = {
         "tokens_reasoning": "M",
         "tokens_total": "M",
         "avg_cost": "C",
+        "avg_captured_cost": "C",
+        "total_captured_cost": "C",
+        "cost_captured_records": "M",
+        "total_records": "M",
+        "cost_coverage": "C",
         "cost_ci95": "C",
         "avg_loc": "C",
+        "avg_correctness": "C",
         "avg_thinking_ratio": "C",
         "avg_escape": "C",
         "avg_arch_divergence": "C",
@@ -779,50 +861,104 @@ window.DYNAMICS_DATA = {
         "avg_energy_j_per_loc": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
+        "correctness_coverage": "C",
+        "thinking_ratio_coverage": "C",
+        "escape_coverage": "C",
+        "architecture_divergence_coverage": "C",
+        "composite_score_coverage": "C",
+        "energy_j_coverage": "C",
+        "quality_per_joule_coverage": "C",
         "avg_constraints_met": "C",
         "avg_constraints_total": "C",
         "strategy_cons": "C",
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
+        "strategy_unknown": "C",
         "pass_rate": "M"
       }
     },
     {
-      "id": "anthropic/claude-sonnet-5",
-      "label": "Claude Sonnet 5",
+      "id": "anthropic/claude-haiku-4-5",
+      "label": "anthropic/claude-haiku-4-5",
       "provider": "anthropic",
-      "reports": 12,
-      "reports_valid": 12,
+      "reports": 7,
+      "reports_valid": 7,
       "reports_narrated": 0,
-      "n_reports": 12,
-      "n_valid": 12,
+      "n_reports": 7,
+      "n_valid": 7,
       "n_narrated": 0,
-      "avg_cost": 0.3065,
-      "total_cost": 3.6785,
-      "cost_ci95": [
-        0.1126,
-        0.5311
-      ],
+      "avg_cost": 0.3097,
+      "total_cost": 0.3097,
+      "avg_captured_cost": 0.309695,
+      "total_captured_cost": 0.309695,
+      "cost_captured_records": 1,
+      "total_records": 7,
+      "cost_coverage": 0.1429,
+      "cost_ci95": null,
       "pass_rate": null,
-      "strategy_cons": 2,
-      "strategy_expl": 2,
+      "strategy_cons": 0,
+      "strategy_expl": 6,
       "strategy_waste": 0,
-      "strategy_efficient": 6,
-      "avg_loc": 691,
+      "strategy_efficient": 0,
+      "strategy_unknown": 1,
+      "avg_loc": 1270,
+      "avg_correctness": 1.0,
       "avg_thinking_ratio": 0.0,
-      "avg_escape": 0.46,
-      "avg_arch_divergence": 0.389,
-      "avg_composite_score": 0.757,
-      "avg_energy_j": 1622.8,
-      "avg_energy_j_per_loc": 2.35,
-      "correctness_per_dollar": 416666668.1888,
-      "avg_quality_per_joule": 32.5887,
-      "avg_constraints_met": 6.7,
-      "avg_constraints_total": 7.8,
-      "tokens_total": 84843,
-      "tokens_input": 266,
-      "tokens_output": 84577,
+      "avg_escape": 0.77,
+      "avg_arch_divergence": 0.972,
+      "avg_composite_score": 0.8,
+      "avg_energy_j": 5246.7,
+      "avg_energy_j_per_loc": 4.13,
+      "correctness_per_dollar": 3.229,
+      "avg_quality_per_joule": 0.0001,
+      "avg_constraints_met": 8.9,
+      "avg_constraints_total": 9.0,
+      "correctness_coverage": {
+        "value": 1.0,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "thinking_ratio_coverage": {
+        "value": 0.0,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "escape_coverage": {
+        "value": 0.77,
+        "n_available": 6,
+        "n_total": 7,
+        "coverage": 0.8571
+      },
+      "architecture_divergence_coverage": {
+        "value": 0.972,
+        "n_available": 6,
+        "n_total": 7,
+        "coverage": 0.8571
+      },
+      "composite_score_coverage": {
+        "value": 0.8,
+        "n_available": 7,
+        "n_total": 7,
+        "coverage": 1.0
+      },
+      "energy_j_coverage": {
+        "value": 5246.7,
+        "n_available": 1,
+        "n_total": 7,
+        "coverage": 0.1429
+      },
+      "quality_per_joule_coverage": {
+        "value": 0.0001,
+        "n_available": 1,
+        "n_total": 7,
+        "coverage": 0.1429
+      },
+      "tokens_total": 22980,
+      "tokens_input": 258,
+      "tokens_output": 22722,
       "tokens_reasoning": 0,
       "avg_narration_penalty": null,
       "avg_struct_divergence": null,
@@ -868,8 +1004,14 @@ window.DYNAMICS_DATA = {
         "tokens_reasoning": "M",
         "tokens_total": "M",
         "avg_cost": "C",
+        "avg_captured_cost": "C",
+        "total_captured_cost": "C",
+        "cost_captured_records": "M",
+        "total_records": "M",
+        "cost_coverage": "C",
         "cost_ci95": "C",
         "avg_loc": "C",
+        "avg_correctness": "C",
         "avg_thinking_ratio": "C",
         "avg_escape": "C",
         "avg_arch_divergence": "C",
@@ -878,12 +1020,20 @@ window.DYNAMICS_DATA = {
         "avg_energy_j_per_loc": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
+        "correctness_coverage": "C",
+        "thinking_ratio_coverage": "C",
+        "escape_coverage": "C",
+        "architecture_divergence_coverage": "C",
+        "composite_score_coverage": "C",
+        "energy_j_coverage": "C",
+        "quality_per_joule_coverage": "C",
         "avg_constraints_met": "C",
         "avg_constraints_total": "C",
         "strategy_cons": "C",
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
+        "strategy_unknown": "C",
         "pass_rate": null
       }
     },
@@ -899,6 +1049,11 @@ window.DYNAMICS_DATA = {
       "n_narrated": 0,
       "avg_cost": 0.3522,
       "total_cost": 6.6916,
+      "avg_captured_cost": 0.35219,
+      "total_captured_cost": 6.691605,
+      "cost_captured_records": 19,
+      "total_records": 19,
+      "cost_coverage": 1.0,
       "cost_ci95": [
         0.2841,
         0.415
@@ -908,10 +1063,12 @@ window.DYNAMICS_DATA = {
       "strategy_expl": 4,
       "strategy_waste": 0,
       "strategy_efficient": 11,
+      "strategy_unknown": 3,
       "avg_loc": 474,
+      "avg_correctness": 0.97,
       "avg_thinking_ratio": 0.022,
-      "avg_escape": 0.39,
-      "avg_arch_divergence": 0.334,
+      "avg_escape": 0.46,
+      "avg_arch_divergence": 0.397,
       "avg_composite_score": 0.808,
       "avg_energy_j": 3820.4,
       "avg_energy_j_per_loc": 8.06,
@@ -919,6 +1076,48 @@ window.DYNAMICS_DATA = {
       "avg_quality_per_joule": 0.0003,
       "avg_constraints_met": 7.8,
       "avg_constraints_total": 8.2,
+      "correctness_coverage": {
+        "value": 0.97,
+        "n_available": 19,
+        "n_total": 19,
+        "coverage": 1.0
+      },
+      "thinking_ratio_coverage": {
+        "value": 0.022,
+        "n_available": 19,
+        "n_total": 19,
+        "coverage": 1.0
+      },
+      "escape_coverage": {
+        "value": 0.46,
+        "n_available": 16,
+        "n_total": 19,
+        "coverage": 0.8421
+      },
+      "architecture_divergence_coverage": {
+        "value": 0.397,
+        "n_available": 16,
+        "n_total": 19,
+        "coverage": 0.8421
+      },
+      "composite_score_coverage": {
+        "value": 0.808,
+        "n_available": 19,
+        "n_total": 19,
+        "coverage": 1.0
+      },
+      "energy_j_coverage": {
+        "value": 3820.4,
+        "n_available": 19,
+        "n_total": 19,
+        "coverage": 1.0
+      },
+      "quality_per_joule_coverage": {
+        "value": 0.0003,
+        "n_available": 19,
+        "n_total": 19,
+        "coverage": 1.0
+      },
       "tokens_total": 572413,
       "tokens_input": 412819,
       "tokens_output": 147700,
@@ -967,8 +1166,14 @@ window.DYNAMICS_DATA = {
         "tokens_reasoning": "M",
         "tokens_total": "M",
         "avg_cost": "C",
+        "avg_captured_cost": "C",
+        "total_captured_cost": "C",
+        "cost_captured_records": "M",
+        "total_records": "M",
+        "cost_coverage": "C",
         "cost_ci95": "C",
         "avg_loc": "C",
+        "avg_correctness": "C",
         "avg_thinking_ratio": "C",
         "avg_escape": "C",
         "avg_arch_divergence": "C",
@@ -977,13 +1182,183 @@ window.DYNAMICS_DATA = {
         "avg_energy_j_per_loc": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
+        "correctness_coverage": "C",
+        "thinking_ratio_coverage": "C",
+        "escape_coverage": "C",
+        "architecture_divergence_coverage": "C",
+        "composite_score_coverage": "C",
+        "energy_j_coverage": "C",
+        "quality_per_joule_coverage": "C",
         "avg_constraints_met": "C",
         "avg_constraints_total": "C",
         "strategy_cons": "C",
         "strategy_expl": "C",
         "strategy_waste": "C",
         "strategy_efficient": "C",
+        "strategy_unknown": "C",
         "pass_rate": "M"
+      }
+    },
+    {
+      "id": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "provider": "anthropic",
+      "reports": 12,
+      "reports_valid": 12,
+      "reports_narrated": 0,
+      "n_reports": 12,
+      "n_valid": 12,
+      "n_narrated": 0,
+      "avg_cost": 0.5255,
+      "total_cost": 3.6785,
+      "avg_captured_cost": 0.525497,
+      "total_captured_cost": 3.678477,
+      "cost_captured_records": 7,
+      "total_records": 12,
+      "cost_coverage": 0.5833,
+      "cost_ci95": [
+        0.2899,
+        0.7756
+      ],
+      "pass_rate": null,
+      "strategy_cons": 2,
+      "strategy_expl": 2,
+      "strategy_waste": 0,
+      "strategy_efficient": 6,
+      "strategy_unknown": 2,
+      "avg_loc": 691,
+      "avg_correctness": 0.92,
+      "avg_thinking_ratio": 0.0,
+      "avg_escape": 0.55,
+      "avg_arch_divergence": 0.467,
+      "avg_composite_score": 0.757,
+      "avg_energy_j": 2782.0,
+      "avg_energy_j_per_loc": 4.03,
+      "correctness_per_dollar": 2.6094,
+      "avg_quality_per_joule": 0.0004,
+      "avg_constraints_met": 6.7,
+      "avg_constraints_total": 7.8,
+      "correctness_coverage": {
+        "value": 0.92,
+        "n_available": 12,
+        "n_total": 12,
+        "coverage": 1.0
+      },
+      "thinking_ratio_coverage": {
+        "value": 0.0,
+        "n_available": 12,
+        "n_total": 12,
+        "coverage": 1.0
+      },
+      "escape_coverage": {
+        "value": 0.55,
+        "n_available": 10,
+        "n_total": 12,
+        "coverage": 0.8333
+      },
+      "architecture_divergence_coverage": {
+        "value": 0.467,
+        "n_available": 10,
+        "n_total": 12,
+        "coverage": 0.8333
+      },
+      "composite_score_coverage": {
+        "value": 0.757,
+        "n_available": 12,
+        "n_total": 12,
+        "coverage": 1.0
+      },
+      "energy_j_coverage": {
+        "value": 2782.0,
+        "n_available": 7,
+        "n_total": 12,
+        "coverage": 0.5833
+      },
+      "quality_per_joule_coverage": {
+        "value": 0.0004,
+        "n_available": 7,
+        "n_total": 12,
+        "coverage": 0.5833
+      },
+      "tokens_total": 84843,
+      "tokens_input": 266,
+      "tokens_output": 84577,
+      "tokens_reasoning": 0,
+      "avg_narration_penalty": null,
+      "avg_struct_divergence": null,
+      "avg_code_quality": null,
+      "avg_comment_ratio": null,
+      "narration_rate": null,
+      "ast_files": null,
+      "ast_functions": null,
+      "ast_classes": null,
+      "ast_type_hint_pct": null,
+      "ast_docstring_pct": null,
+      "cost_input": null,
+      "cost_output": null,
+      "cost_reasoning": null,
+      "cost_cache": null,
+      "tokens_cache_read": null,
+      "tokens_cache_write": null,
+      "_historical_fields": [
+        "avg_narration_penalty",
+        "avg_struct_divergence",
+        "avg_code_quality",
+        "avg_comment_ratio",
+        "narration_rate",
+        "ast_files",
+        "ast_functions",
+        "ast_classes",
+        "ast_type_hint_pct",
+        "ast_docstring_pct",
+        "cost_input",
+        "cost_output",
+        "cost_reasoning",
+        "cost_cache",
+        "tokens_cache_read",
+        "tokens_cache_write"
+      ],
+      "_provenance": {
+        "reports": "M",
+        "reports_valid": "M",
+        "reports_narrated": "M",
+        "total_cost": "M",
+        "tokens_input": "M",
+        "tokens_output": "M",
+        "tokens_reasoning": "M",
+        "tokens_total": "M",
+        "avg_cost": "C",
+        "avg_captured_cost": "C",
+        "total_captured_cost": "C",
+        "cost_captured_records": "M",
+        "total_records": "M",
+        "cost_coverage": "C",
+        "cost_ci95": "C",
+        "avg_loc": "C",
+        "avg_correctness": "C",
+        "avg_thinking_ratio": "C",
+        "avg_escape": "C",
+        "avg_arch_divergence": "C",
+        "avg_composite_score": "C",
+        "avg_energy_j": "C",
+        "avg_energy_j_per_loc": "C",
+        "avg_quality_per_joule": "C",
+        "correctness_per_dollar": "C",
+        "correctness_coverage": "C",
+        "thinking_ratio_coverage": "C",
+        "escape_coverage": "C",
+        "architecture_divergence_coverage": "C",
+        "composite_score_coverage": "C",
+        "energy_j_coverage": "C",
+        "quality_per_joule_coverage": "C",
+        "avg_constraints_met": "C",
+        "avg_constraints_total": "C",
+        "strategy_cons": "C",
+        "strategy_expl": "C",
+        "strategy_waste": "C",
+        "strategy_efficient": "C",
+        "strategy_unknown": "C",
+        "pass_rate": null
       }
     }
   ],
@@ -1153,18 +1528,112 @@ window.DYNAMICS_DATA = {
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.068,
           "avg_energy_j": 3582.8,
+          "avg_captured_cost": 0.014741,
+          "total_captured_cost": 0.029483,
+          "cost_captured_records": 2,
+          "total_records": 2,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.068,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": 0.68,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "architecture_divergence_coverage": {
+            "value": 0.75,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "composite_score_coverage": {
+            "value": 0.762,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 3582.8,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0002,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
           "low_n": true
         },
         "Claude Sonnet 5": {
           "n": 2,
-          "avg_cost": 0.0,
+          "avg_cost": null,
           "cost_ci95": null,
           "avg_escape": 0.32,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 0.0,
+          "avg_energy_j": null,
+          "avg_captured_cost": null,
+          "total_captured_cost": 0,
+          "cost_captured_records": 0,
+          "total_records": 2,
+          "cost_coverage": 0.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": 0.32,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "architecture_divergence_coverage": {
+            "value": 0.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "composite_score_coverage": {
+            "value": 0.783,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
+          "quality_per_joule_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
           "low_n": true
         },
         "openai/gpt-5.6-terra": {
@@ -1177,6 +1646,53 @@ window.DYNAMICS_DATA = {
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.023,
           "avg_energy_j": 3910.1,
+          "avg_captured_cost": 0.243143,
+          "total_captured_cost": 0.486286,
+          "cost_captured_records": 2,
+          "total_records": 2,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.023,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": 0.42,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "architecture_divergence_coverage": {
+            "value": 0.3,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "composite_score_coverage": {
+            "value": 0.845,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 3910.1,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0002,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
           "low_n": true
         },
         "DeepSeek v4 Flash": {
@@ -1189,18 +1705,112 @@ window.DYNAMICS_DATA = {
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.292,
           "avg_energy_j": 8231.7,
+          "avg_captured_cost": 0.009605,
+          "total_captured_cost": 0.01921,
+          "cost_captured_records": 2,
+          "total_records": 2,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 0.99,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.292,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": 0.6,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "architecture_divergence_coverage": {
+            "value": 0.5,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "composite_score_coverage": {
+            "value": 0.79,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 8231.7,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0001,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
           "low_n": true
         },
         "anthropic/claude-haiku-4-5": {
           "n": 2,
-          "avg_cost": 0.0,
+          "avg_cost": null,
           "cost_ci95": null,
           "avg_escape": 0.79,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 0.0,
+          "avg_energy_j": null,
+          "avg_captured_cost": null,
+          "total_captured_cost": 0,
+          "cost_captured_records": 0,
+          "total_records": 2,
+          "cost_coverage": 0.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": 0.79,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "architecture_divergence_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "composite_score_coverage": {
+            "value": 0.813,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
+          "quality_per_joule_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
           "low_n": true
         },
         "openai/gpt-5.6-sol": {
@@ -1213,6 +1823,53 @@ window.DYNAMICS_DATA = {
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.016,
           "avg_energy_j": 4659.6,
+          "avg_captured_cost": 0.51495,
+          "total_captured_cost": 1.0299,
+          "cost_captured_records": 2,
+          "total_records": 2,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.016,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": 0.44,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "architecture_divergence_coverage": {
+            "value": 0.45,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "composite_score_coverage": {
+            "value": 0.823,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 4659.6,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0002,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
           "low_n": true
         },
         "GPT-5.6 Luna": {
@@ -1225,6 +1882,53 @@ window.DYNAMICS_DATA = {
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.024,
           "avg_energy_j": 3555.4,
+          "avg_captured_cost": 0.015643,
+          "total_captured_cost": 0.031287,
+          "cost_captured_records": 2,
+          "total_records": 2,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.024,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": 0.37,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "architecture_divergence_coverage": {
+            "value": 0.3,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "composite_score_coverage": {
+            "value": 0.835,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 3555.4,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0002,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
           "low_n": true
         }
       }
@@ -1234,86 +1938,415 @@ window.DYNAMICS_DATA = {
       "models": {
         "Claude Sonnet 5": {
           "n": 2,
-          "avg_cost": 0.3131,
+          "avg_cost": 0.6261,
           "cost_ci95": null,
-          "avg_escape": 0.0,
+          "avg_escape": null,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 1624.1,
+          "avg_energy_j": 3248.2,
+          "avg_captured_cost": 0.626113,
+          "total_captured_cost": 0.626113,
+          "cost_captured_records": 1,
+          "total_records": 2,
+          "cost_coverage": 0.5,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
+          "architecture_divergence_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
+          "composite_score_coverage": {
+            "value": 0.714,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 3248.2,
+            "n_available": 1,
+            "n_total": 2,
+            "coverage": 0.5
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0002,
+            "n_available": 1,
+            "n_total": 2,
+            "coverage": 0.5
+          },
           "low_n": true
         },
         "DeepSeek v4 Pro": {
           "n": 2,
           "avg_cost": 0.0134,
           "cost_ci95": null,
-          "avg_escape": 0.0,
+          "avg_escape": null,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.148,
           "avg_energy_j": 3558.1,
+          "avg_captured_cost": 0.01339,
+          "total_captured_cost": 0.02678,
+          "cost_captured_records": 2,
+          "total_records": 2,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.148,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
+          "architecture_divergence_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
+          "composite_score_coverage": {
+            "value": 0.747,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 3558.1,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0002,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
           "low_n": true
         },
         "openai/gpt-5.6-sol": {
           "n": 2,
           "avg_cost": 0.458,
           "cost_ci95": null,
-          "avg_escape": 0.0,
+          "avg_escape": null,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.021,
           "avg_energy_j": 4111.1,
+          "avg_captured_cost": 0.457954,
+          "total_captured_cost": 0.915907,
+          "cost_captured_records": 2,
+          "total_records": 2,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.021,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
+          "architecture_divergence_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 2,
+            "coverage": 0.0
+          },
+          "composite_score_coverage": {
+            "value": 0.763,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 4111.1,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0002,
+            "n_available": 2,
+            "n_total": 2,
+            "coverage": 1.0
+          },
           "low_n": true
         },
         "GPT-5.6 Luna": {
           "n": 1,
           "avg_cost": 0.0168,
           "cost_ci95": null,
-          "avg_escape": 0.0,
+          "avg_escape": null,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.019,
           "avg_energy_j": 4056.5,
+          "avg_captured_cost": 0.016778,
+          "total_captured_cost": 0.016778,
+          "cost_captured_records": 1,
+          "total_records": 1,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.019,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
+          "architecture_divergence_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
+          "composite_score_coverage": {
+            "value": 0.789,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 4056.5,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0002,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
           "low_n": true
         },
         "anthropic/claude-haiku-4-5": {
           "n": 1,
-          "avg_cost": 0.0,
+          "avg_cost": null,
           "cost_ci95": null,
-          "avg_escape": 0.0,
+          "avg_escape": null,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 0.0,
+          "avg_energy_j": null,
+          "avg_captured_cost": null,
+          "total_captured_cost": 0,
+          "cost_captured_records": 0,
+          "total_records": 1,
+          "cost_coverage": 0.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.0,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
+          "architecture_divergence_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
+          "composite_score_coverage": {
+            "value": 0.747,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
+          "quality_per_joule_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
           "low_n": true
         },
         "DeepSeek v4 Flash": {
           "n": 1,
           "avg_cost": 0.012,
           "cost_ci95": null,
-          "avg_escape": 0.0,
+          "avg_escape": null,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.186,
           "avg_energy_j": 9024.4,
+          "avg_captured_cost": 0.01195,
+          "total_captured_cost": 0.01195,
+          "cost_captured_records": 1,
+          "total_records": 1,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.186,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
+          "architecture_divergence_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
+          "composite_score_coverage": {
+            "value": 0.738,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 9024.4,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0001,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
           "low_n": true
         },
         "openai/gpt-5.6-terra": {
           "n": 1,
           "avg_cost": 0.2095,
           "cost_ci95": null,
-          "avg_escape": 0.0,
+          "avg_escape": null,
           "escape_ci95": null,
           "avg_correctness": 1.0,
           "correctness_ci95": null,
           "avg_thinking_ratio": 0.017,
           "avg_energy_j": 3602.8,
+          "avg_captured_cost": 0.209516,
+          "total_captured_cost": 0.209516,
+          "cost_captured_records": 1,
+          "total_records": 1,
+          "cost_coverage": 1.0,
+          "correctness_coverage": {
+            "value": 1.0,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "thinking_ratio_coverage": {
+            "value": 0.017,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "escape_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
+          "architecture_divergence_coverage": {
+            "value": null,
+            "n_available": 0,
+            "n_total": 1,
+            "coverage": 0.0
+          },
+          "composite_score_coverage": {
+            "value": 0.783,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "energy_j_coverage": {
+            "value": 3602.8,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
+          "quality_per_joule_coverage": {
+            "value": 0.0002,
+            "n_available": 1,
+            "n_total": 1,
+            "coverage": 1.0
+          },
           "low_n": true
         }
       }
@@ -1342,6 +2375,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.254,
         "avg_loc": 512,
         "avg_tokens": 21811,
+        "avg_captured_cost": 0.016247,
+        "total_captured_cost": 0.097485,
+        "cost_captured_records": 6,
+        "total_records": 6,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 6,
+          "n_total": 6,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.254,
+          "n_available": 6,
+          "n_total": 6,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.67,
+          "n_available": 6,
+          "n_total": 6,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "openai/gpt-5.6-terra": {
@@ -1356,6 +2412,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.026,
         "avg_loc": 192,
         "avg_tokens": 17103,
+        "avg_captured_cost": 0.108776,
+        "total_captured_cost": 0.217552,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 0.7,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.026,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.57,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "DeepSeek v4 Flash": {
@@ -1370,12 +2449,35 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.119,
         "avg_loc": 1194,
         "avg_tokens": 27850,
+        "avg_captured_cost": 0.007888,
+        "total_captured_cost": 0.015776,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.119,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.75,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "anthropic/claude-haiku-4-5": {
         "n": 2,
         "low_n": true,
-        "avg_cost": 0.0,
+        "avg_cost": null,
         "cost_ci95": null,
         "avg_escape": 0.74,
         "escape_ci95": null,
@@ -1384,6 +2486,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.0,
         "avg_loc": 1146,
         "avg_tokens": 0,
+        "avg_captured_cost": null,
+        "total_captured_cost": 0,
+        "cost_captured_records": 0,
+        "total_records": 2,
+        "cost_coverage": 0.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.74,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "openai/gpt-5.6-sol": {
@@ -1407,15 +2532,38 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.029,
         "avg_loc": 464,
         "avg_tokens": 29168,
+        "avg_captured_cost": 0.389425,
+        "total_captured_cost": 2.33655,
+        "cost_captured_records": 6,
+        "total_records": 6,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 6,
+          "n_total": 6,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.029,
+          "n_available": 6,
+          "n_total": 6,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.5,
+          "n_available": 6,
+          "n_total": 6,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "Claude Sonnet 5": {
         "n": 6,
         "low_n": false,
-        "avg_cost": 0.3063,
+        "avg_cost": 0.3675,
         "cost_ci95": [
-          0.1161,
-          0.4907
+          0.1777,
+          0.5574
         ],
         "avg_escape": 0.63,
         "escape_ci95": [
@@ -1430,6 +2578,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.0,
         "avg_loc": 460,
         "avg_tokens": 8283,
+        "avg_captured_cost": 0.367538,
+        "total_captured_cost": 1.837691,
+        "cost_captured_records": 5,
+        "total_records": 6,
+        "cost_coverage": 0.8333,
+        "correctness_coverage": {
+          "value": 0.83,
+          "n_available": 6,
+          "n_total": 6,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.0,
+          "n_available": 6,
+          "n_total": 6,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.63,
+          "n_available": 6,
+          "n_total": 6,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "GPT-5.6 Luna": {
@@ -1444,6 +2615,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.016,
         "avg_loc": 343,
         "avg_tokens": 45713,
+        "avg_captured_cost": 0.019588,
+        "total_captured_cost": 0.039175,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.016,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.37,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       }
     },
@@ -1451,7 +2645,7 @@ window.DYNAMICS_DATA = {
       "Claude Sonnet 5": {
         "n": 2,
         "low_n": true,
-        "avg_cost": 0.6073,
+        "avg_cost": 1.2147,
         "cost_ci95": null,
         "avg_escape": 0.54,
         "escape_ci95": null,
@@ -1460,6 +2654,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.0,
         "avg_loc": 856,
         "avg_tokens": 10494,
+        "avg_captured_cost": 1.214673,
+        "total_captured_cost": 1.214673,
+        "cost_captured_records": 1,
+        "total_records": 2,
+        "cost_coverage": 0.5,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.54,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "openai/gpt-5.6-sol": {
@@ -1474,6 +2691,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.012,
         "avg_loc": 682,
         "avg_tokens": 39448,
+        "avg_captured_cost": 0.550508,
+        "total_captured_cost": 1.101016,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.012,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.46,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "openai/gpt-5.6-terra": {
@@ -1488,6 +2728,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.019,
         "avg_loc": 342,
         "avg_tokens": 31686,
+        "avg_captured_cost": 0.197439,
+        "total_captured_cost": 0.394879,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.019,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.32,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "DeepSeek v4 Flash": {
@@ -1502,12 +2765,35 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.292,
         "avg_loc": 932,
         "avg_tokens": 32778,
+        "avg_captured_cost": 0.009605,
+        "total_captured_cost": 0.01921,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 0.99,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.292,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.6,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "anthropic/claude-haiku-4-5": {
         "n": 2,
         "low_n": true,
-        "avg_cost": 0.1548,
+        "avg_cost": 0.3097,
         "cost_ci95": null,
         "avg_escape": 0.76,
         "escape_ci95": null,
@@ -1516,6 +2802,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.0,
         "avg_loc": 1416,
         "avg_tokens": 11490,
+        "avg_captured_cost": 0.309695,
+        "total_captured_cost": 0.309695,
+        "cost_captured_records": 1,
+        "total_records": 2,
+        "cost_coverage": 0.5,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.76,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "DeepSeek v4 Pro": {
@@ -1530,6 +2839,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.068,
         "avg_loc": 738,
         "avg_tokens": 20344,
+        "avg_captured_cost": 0.014741,
+        "total_captured_cost": 0.029483,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.068,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.68,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "GPT-5.6 Luna": {
@@ -1544,6 +2876,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.024,
         "avg_loc": 340,
         "avg_tokens": 28792,
+        "avg_captured_cost": 0.015643,
+        "total_captured_cost": 0.031287,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.024,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.37,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       }
     },
@@ -1560,6 +2915,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.287,
         "avg_loc": 1006,
         "avg_tokens": 30844,
+        "avg_captured_cost": 0.024733,
+        "total_captured_cost": 0.049466,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.287,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.77,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "DeepSeek v4 Flash": {
@@ -1574,6 +2952,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.294,
         "avg_loc": 1120,
         "avg_tokens": 35268,
+        "avg_captured_cost": 0.010144,
+        "total_captured_cost": 0.020287,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 0.58,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.294,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.56,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "GPT-5.6 Luna": {
@@ -1588,12 +2989,35 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.024,
         "avg_loc": 330,
         "avg_tokens": 28330,
+        "avg_captured_cost": 0.01692,
+        "total_captured_cost": 0.033841,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.024,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.26,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "Claude Sonnet 5": {
         "n": 2,
         "low_n": true,
-        "avg_cost": 0.0,
+        "avg_cost": null,
         "cost_ci95": null,
         "avg_escape": 0.32,
         "escape_ci95": null,
@@ -1602,6 +3026,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.0,
         "avg_loc": 1156,
         "avg_tokens": 0,
+        "avg_captured_cost": null,
+        "total_captured_cost": 0,
+        "cost_captured_records": 0,
+        "total_records": 2,
+        "cost_coverage": 0.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.32,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "openai/gpt-5.6-sol": {
@@ -1616,6 +3063,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.016,
         "avg_loc": 749,
         "avg_tokens": 33576,
+        "avg_captured_cost": 0.51495,
+        "total_captured_cost": 1.0299,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.016,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.44,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "openai/gpt-5.6-terra": {
@@ -1630,12 +3100,35 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.023,
         "avg_loc": 405,
         "avg_tokens": 30637,
+        "avg_captured_cost": 0.243143,
+        "total_captured_cost": 0.486286,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.023,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.42,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       },
       "anthropic/claude-haiku-4-5": {
         "n": 2,
         "low_n": true,
-        "avg_cost": 0.0,
+        "avg_cost": null,
         "cost_ci95": null,
         "avg_escape": 0.79,
         "escape_ci95": null,
@@ -1644,6 +3137,29 @@ window.DYNAMICS_DATA = {
         "avg_thinking_ratio": 0.0,
         "avg_loc": 1432,
         "avg_tokens": 0,
+        "avg_captured_cost": null,
+        "total_captured_cost": 0,
+        "cost_captured_records": 0,
+        "total_records": 2,
+        "cost_coverage": 0.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": 0.79,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
         "avg_narration_penalty": null
       }
     },
@@ -1651,15 +3167,38 @@ window.DYNAMICS_DATA = {
       "Claude Sonnet 5": {
         "n": 2,
         "low_n": true,
-        "avg_cost": 0.3131,
+        "avg_cost": 0.6261,
         "cost_ci95": null,
-        "avg_escape": 0.0,
+        "avg_escape": null,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
         "avg_thinking_ratio": 0.0,
         "avg_loc": 753,
         "avg_tokens": 7078,
+        "avg_captured_cost": 0.626113,
+        "total_captured_cost": 0.626113,
+        "cost_captured_records": 1,
+        "total_records": 2,
+        "cost_coverage": 0.5,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 2,
+          "coverage": 0.0
+        },
         "avg_narration_penalty": null
       },
       "DeepSeek v4 Pro": {
@@ -1667,13 +3206,36 @@ window.DYNAMICS_DATA = {
         "low_n": true,
         "avg_cost": 0.0134,
         "cost_ci95": null,
-        "avg_escape": 0.0,
+        "avg_escape": null,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
         "avg_thinking_ratio": 0.148,
         "avg_loc": 534,
         "avg_tokens": 18392,
+        "avg_captured_cost": 0.01339,
+        "total_captured_cost": 0.02678,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.148,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 2,
+          "coverage": 0.0
+        },
         "avg_narration_penalty": null
       },
       "openai/gpt-5.6-sol": {
@@ -1681,13 +3243,36 @@ window.DYNAMICS_DATA = {
         "low_n": true,
         "avg_cost": 0.458,
         "cost_ci95": null,
-        "avg_escape": 0.0,
+        "avg_escape": null,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
         "avg_thinking_ratio": 0.021,
         "avg_loc": 568,
         "avg_tokens": 31681,
+        "avg_captured_cost": 0.457954,
+        "total_captured_cost": 0.915907,
+        "cost_captured_records": 2,
+        "total_records": 2,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.021,
+          "n_available": 2,
+          "n_total": 2,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 2,
+          "coverage": 0.0
+        },
         "avg_narration_penalty": null
       },
       "GPT-5.6 Luna": {
@@ -1695,27 +3280,73 @@ window.DYNAMICS_DATA = {
         "low_n": true,
         "avg_cost": 0.0168,
         "cost_ci95": null,
-        "avg_escape": 0.0,
+        "avg_escape": null,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
         "avg_thinking_ratio": 0.019,
         "avg_loc": 314,
         "avg_tokens": 35520,
+        "avg_captured_cost": 0.016778,
+        "total_captured_cost": 0.016778,
+        "cost_captured_records": 1,
+        "total_records": 1,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 1,
+          "n_total": 1,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.019,
+          "n_available": 1,
+          "n_total": 1,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 1,
+          "coverage": 0.0
+        },
         "avg_narration_penalty": null
       },
       "anthropic/claude-haiku-4-5": {
         "n": 1,
         "low_n": true,
-        "avg_cost": 0.0,
+        "avg_cost": null,
         "cost_ci95": null,
-        "avg_escape": 0.0,
+        "avg_escape": null,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
         "avg_thinking_ratio": 0.0,
         "avg_loc": 902,
         "avg_tokens": 0,
+        "avg_captured_cost": null,
+        "total_captured_cost": 0,
+        "cost_captured_records": 0,
+        "total_records": 1,
+        "cost_coverage": 0.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 1,
+          "n_total": 1,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.0,
+          "n_available": 1,
+          "n_total": 1,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 1,
+          "coverage": 0.0
+        },
         "avg_narration_penalty": null
       },
       "DeepSeek v4 Flash": {
@@ -1723,13 +3354,36 @@ window.DYNAMICS_DATA = {
         "low_n": true,
         "avg_cost": 0.012,
         "cost_ci95": null,
-        "avg_escape": 0.0,
+        "avg_escape": null,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
         "avg_thinking_ratio": 0.186,
         "avg_loc": 1510,
         "avg_tokens": 38442,
+        "avg_captured_cost": 0.01195,
+        "total_captured_cost": 0.01195,
+        "cost_captured_records": 1,
+        "total_records": 1,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 1,
+          "n_total": 1,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.186,
+          "n_available": 1,
+          "n_total": 1,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 1,
+          "coverage": 0.0
+        },
         "avg_narration_penalty": null
       },
       "openai/gpt-5.6-terra": {
@@ -1737,13 +3391,36 @@ window.DYNAMICS_DATA = {
         "low_n": true,
         "avg_cost": 0.2095,
         "cost_ci95": null,
-        "avg_escape": 0.0,
+        "avg_escape": null,
         "escape_ci95": null,
         "avg_correctness": 1.0,
         "correctness_ci95": null,
         "avg_thinking_ratio": 0.017,
         "avg_loc": 343,
         "avg_tokens": 29140,
+        "avg_captured_cost": 0.209516,
+        "total_captured_cost": 0.209516,
+        "cost_captured_records": 1,
+        "total_records": 1,
+        "cost_coverage": 1.0,
+        "correctness_coverage": {
+          "value": 1.0,
+          "n_available": 1,
+          "n_total": 1,
+          "coverage": 1.0
+        },
+        "thinking_ratio_coverage": {
+          "value": 0.017,
+          "n_available": 1,
+          "n_total": 1,
+          "coverage": 1.0
+        },
+        "escape_coverage": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 1,
+          "coverage": 0.0
+        },
         "avg_narration_penalty": null
       }
     }
@@ -1809,7 +3486,7 @@ window.DYNAMICS_DATA = {
   "strategy_distribution": {
     "exploratory": 24,
     "efficient": 26,
-    "?": 10,
+    "unknown": 10,
     "conservative": 4
   },
   "routing": {
@@ -1830,18 +3507,24 @@ window.DYNAMICS_DATA = {
         "models": {
           "openai/gpt-5.6-sol": {
             "n": 5,
+            "n_outcome": 5,
+            "n_cost": 5,
             "avg_correctness": 1.0,
             "avg_cost": 0.40127,
             "efficiency": 2.49
           },
           "anthropic/claude-sonnet-5": {
             "n": 5,
+            "n_outcome": 5,
+            "n_cost": 5,
             "avg_correctness": 0.92,
             "avg_cost": 0.476491,
             "efficiency": 1.93
           },
           "deepseek/deepseek-v4-pro": {
             "n": 5,
+            "n_outcome": 5,
+            "n_cost": 5,
             "avg_correctness": 1.0,
             "avg_cost": 0.01351,
             "efficiency": 74.02
@@ -1860,42 +3543,56 @@ window.DYNAMICS_DATA = {
         "models": {
           "deepseek/deepseek-v4-pro": {
             "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
             "avg_correctness": 0.9974,
             "avg_cost": 0.01938,
             "efficiency": 51.47
           },
           "anthropic/claude-sonnet-5": {
             "n": 7,
+            "n_outcome": 7,
+            "n_cost": 2,
             "avg_correctness": 0.9143,
-            "avg_cost": 0.185146,
-            "efficiency": 4.94
+            "avg_cost": 0.648012,
+            "efficiency": 1.41
           },
           "openai/gpt-5.6-terra": {
             "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
             "avg_correctness": 0.9143,
             "avg_cost": 0.18689,
             "efficiency": 4.89
           },
           "deepseek/deepseek-v4-flash": {
             "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
             "avg_correctness": 0.8792,
             "avg_cost": 0.009603,
             "efficiency": 91.55
           },
           "anthropic/claude-haiku-4-5": {
             "n": 7,
+            "n_outcome": 7,
+            "n_cost": 1,
             "avg_correctness": 1.0,
-            "avg_cost": 0.044242,
-            "efficiency": 22.6
+            "avg_cost": 0.309695,
+            "efficiency": 3.23
           },
           "openai/gpt-5.6-sol": {
             "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
             "avg_correctness": 1.0,
             "avg_cost": 0.482432,
             "efficiency": 2.07
           },
           "openai/gpt-5.6-luna": {
             "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
             "avg_correctness": 1.0,
             "avg_cost": 0.017297,
             "efficiency": 57.81
@@ -1906,50 +3603,66 @@ window.DYNAMICS_DATA = {
     "strategies": {
       "anthropic/claude-haiku-4-5_only": {
         "n": 7,
+        "n_cost": 1,
+        "n_outcome": 7,
         "total_cost": 0.309695,
-        "avg_cost": 0.044242,
+        "avg_cost": 0.309695,
         "avg_correctness": 1.0
       },
       "anthropic/claude-sonnet-5_only": {
         "n": 12,
+        "n_cost": 7,
+        "n_outcome": 12,
         "total_cost": 3.678477,
-        "avg_cost": 0.30654,
+        "avg_cost": 0.525497,
         "avg_correctness": 0.9167
       },
       "deepseek/deepseek-v4-flash_only": {
         "n": 7,
+        "n_cost": 7,
+        "n_outcome": 7,
         "total_cost": 0.067223,
         "avg_cost": 0.009603,
         "avg_correctness": 0.8792
       },
       "deepseek/deepseek-v4-pro_only": {
         "n": 12,
+        "n_cost": 12,
+        "n_outcome": 12,
         "total_cost": 0.203213,
         "avg_cost": 0.016934,
         "avg_correctness": 0.9985
       },
       "openai/gpt-5.6-luna_only": {
         "n": 7,
+        "n_cost": 7,
+        "n_outcome": 7,
         "total_cost": 0.121081,
         "avg_cost": 0.017297,
         "avg_correctness": 1.0
       },
       "openai/gpt-5.6-sol_only": {
         "n": 12,
+        "n_cost": 12,
+        "n_outcome": 12,
         "total_cost": 5.383373,
         "avg_cost": 0.448614,
         "avg_correctness": 1.0
       },
       "openai/gpt-5.6-terra_only": {
         "n": 7,
+        "n_cost": 7,
+        "n_outcome": 7,
         "total_cost": 1.308232,
         "avg_cost": 0.18689,
         "avg_correctness": 0.9143
       },
       "grit_routed": {
         "n": 12,
+        "n_cost": 6,
+        "n_outcome": 12,
         "total_cost": 0.377245,
-        "avg_cost": 0.031437,
+        "avg_cost": 0.062874,
         "avg_correctness": 1.0,
         "routing_distribution": {
           "deepseek/deepseek-v4-pro": 5,
@@ -2278,7 +3991,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-22T01:40:15.717467+00:00"
+    "generated_at": "2026-08-22T17:05:39.919013+00:00"
   },
   "reviews": {
     "models": [
@@ -3006,7 +4719,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-22T03:35:59.250644",
+      "generated_at": "2026-08-22T18:49:09.564481",
       "summary": {
         "models": 7,
         "stories": 215
@@ -3258,25 +4971,29 @@ window.DYNAMICS_DATA = {
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "cache_economics/v2",
-        "metric_source_sha256": "a3f0e7d0d4f538942923070a88d452ddc11b5379a2f163cf23cb94e8ad57e046",
+        "metric_source_sha256": "c3c4ea9e7f5875b281d24905d28cdaacd4e9cb3be779327c77e856f486f47d5a",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
         "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+        "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "used_unique_records": 215,
+        "used_contributions": 215,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v5",
-        "generated_at": "2026-08-22T01:35:59.250947+00:00"
+        "contract_version": "lab-contract/v6",
+        "generated_at": "2026-08-22T16:49:09.564969+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-22T02:46:10.746498",
+      "generated_at": "2026-08-22T19:03:28.384806",
       "summary": {
         "conditions": 2,
         "stories": 215,
@@ -3322,26 +5039,30 @@ window.DYNAMICS_DATA = {
         "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
         "registry_version": "data-manifest/1.0+701rows",
-        "metric_definition_version": "condition_effects/v1",
-        "metric_source_sha256": "5d589f0fbf01284835ff5e155f667ee25511633b83ab96dd59585b47b3d707c1",
+        "metric_definition_version": "condition_effects/v2",
+        "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
         "n_resolved_records": 457,
         "n_eligible_records": 370,
         "n_used_records": 370,
         "n_excluded_records": 87,
         "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": "72d08bac0f77c258736be8cef849c1df1b560211cc17f8deccfe5a26ce6195bf",
+        "excluded_record_refs_sha256": "b9f23e41d491fb219bd9ef35f71b785a6adba1b092bb77d337183067b8b13a86",
+        "used_unique_records": 370,
+        "used_contributions": 370,
         "review_without_current_story": 87,
         "story_without_review": 0,
         "missing_required_field": 0,
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v5",
-        "generated_at": "2026-08-22T00:46:10.746783+00:00"
+        "contract_version": "lab-contract/v6",
+        "generated_at": "2026-08-22T17:03:28.385482+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-22T02:46:11.278326",
+      "generated_at": "2026-08-22T18:49:10.630506",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 144,
@@ -3597,26 +5318,30 @@ window.DYNAMICS_DATA = {
         "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
         "registry_version": "data-manifest/1.0+701rows",
-        "metric_definition_version": "grit/v1",
-        "metric_source_sha256": "2cb68d5999571956d2d3be1a720abb18d1c934a596e813199d3dcc213e67887e",
+        "metric_definition_version": "grit/v2",
+        "metric_source_sha256": "efffc47f8bc8e92356489e96cc82a9b08bd6b07eb5196e5c0250b8baf04b1e91",
         "n_resolved_records": 279,
         "n_eligible_records": 144,
         "n_used_records": 144,
         "n_excluded_records": 135,
         "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": "d598c97bb58d32e5ca9c90b63502a713d113fca52f53d60413922a43457fb8aa",
+        "excluded_record_refs_sha256": "406e4dcfb0de6257038bf88643c3577caf680c24ba5dd5009f64e7bc119b4edf",
+        "used_unique_records": 144,
+        "used_contributions": 144,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 135,
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v5",
-        "generated_at": "2026-08-22T00:46:11.278596+00:00"
+        "contract_version": "lab-contract/v6",
+        "generated_at": "2026-08-22T16:49:10.631044+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-22T02:46:12.088951",
+      "generated_at": "2026-08-22T19:03:28.869736",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3862,26 +5587,30 @@ window.DYNAMICS_DATA = {
         "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "58e642e6b38d847304d7f3dc8e649f53fd1126cb2222ed86c52393c0bd9c7c8f",
         "registry_version": "data-manifest/1.0+701rows",
-        "metric_definition_version": "quality_frontier/v1",
-        "metric_source_sha256": "13a6f3fed0f77112ca5882856c6aa611809b1ce438a7d1a39ca1f79a874a4c85",
+        "metric_definition_version": "quality_frontier/v2",
+        "metric_source_sha256": "4bf5e2c7953d5ffe68ed0499541f12143991be7b4ebbf25dd8622f1cadcf4d1c",
         "n_resolved_records": 371,
         "n_eligible_records": 312,
         "n_used_records": 312,
         "n_excluded_records": 59,
         "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": "fecf45e2c5ece4a52c66e8c350765428e382b7f0d0e0d765768cceaf564a3dbe",
+        "excluded_record_refs_sha256": "2fa0d763603e714429cc4911c447fbb8a954f97b8f4cc648953e27d8b25e140c",
+        "used_unique_records": 312,
+        "used_contributions": 312,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
         "outside_analysis_population": 59,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v5",
-        "generated_at": "2026-08-22T00:46:12.089262+00:00"
+        "contract_version": "lab-contract/v6",
+        "generated_at": "2026-08-22T17:03:28.870692+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-22T03:35:58.888247",
+      "generated_at": "2026-08-22T18:49:11.524614",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
@@ -4025,25 +5754,29 @@ window.DYNAMICS_DATA = {
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "story_arc/v2",
-        "metric_source_sha256": "18b362ab4ef9b2f744e3aae318af8d53cf2867935da77c6d3a5ace485bffb4ce",
+        "metric_source_sha256": "1e10f13a3df8657c2e75ca2045a1bb8835fb3880b6c475f5d2da6747b40a7c95",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
         "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+        "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "used_unique_records": 215,
+        "used_contributions": 215,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v5",
-        "generated_at": "2026-08-22T01:35:58.888627+00:00"
+        "contract_version": "lab-contract/v6",
+        "generated_at": "2026-08-22T16:49:11.525158+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-22T02:46:10.369672",
+      "generated_at": "2026-08-22T19:03:29.662622",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -4160,26 +5893,30 @@ window.DYNAMICS_DATA = {
         "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
-        "metric_definition_version": "verification_frontier/v1",
-        "metric_source_sha256": "6a78b794427ef7fa5882ad970b156dd26b88d86c3cd8602523f54042c387bf94",
+        "metric_definition_version": "verification_frontier/v2",
+        "metric_source_sha256": "3c9ec2ce0be32ac9c6ae3e3ba3e3cdb4e2930a11d87dbb07c0933472b356457c",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
         "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+        "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "used_unique_records": 215,
+        "used_contributions": 215,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v5",
-        "generated_at": "2026-08-22T00:46:10.369941+00:00"
+        "contract_version": "lab-contract/v6",
+        "generated_at": "2026-08-22T17:03:29.663132+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-22T02:46:11.687632",
+      "generated_at": "2026-08-22T18:49:12.739207",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
         "cells": 105,
@@ -4932,20 +6669,24 @@ window.DYNAMICS_DATA = {
         "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "verification_value/v2",
-        "metric_source_sha256": "503f0026ec90bf096325b621c801c6389578247061838bc8eec1307bb6599702",
+        "metric_source_sha256": "f8331d35688c569a39b7247378995514661aa372eef25b879a4536ce544e339a",
         "n_resolved_records": 457,
         "n_eligible_records": 310,
         "n_used_records": 310,
         "n_excluded_records": 147,
         "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": "d97d3c41fa0c6b75296d300bb5e33079444ca39a59795f6893b2860af9f2d357",
+        "excluded_record_refs_sha256": "b5b9866ea3fa813f15b095db5d63b3dc7456190b82dbfe14ea76d58de1642111",
+        "used_unique_records": 310,
+        "used_contributions": 310,
         "review_without_current_story": 87,
         "story_without_review": 60,
         "missing_required_field": 0,
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v5",
-        "generated_at": "2026-08-22T00:46:11.687936+00:00"
+        "contract_version": "lab-contract/v6",
+        "generated_at": "2026-08-22T16:49:12.739908+00:00"
       }
     }
   }

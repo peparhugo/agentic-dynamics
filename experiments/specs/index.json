@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-22T17:22:25.991812+00:00",
-  "n_specs": 82,
+  "generated_at": "2026-08-22T17:29:00.847819+00:00",
+  "n_specs": 83,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -38,6 +38,24 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0
+    },
+    {
+      "name": "finding_economics_closure",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/finding_economics_closure.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-22T17:22:25.841562+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 1.282006,
+      "latest_git_sha": "92374fb57",
+      "results_pointer": "experiments/results/workflows/finding_economics_closure/20260822T172225Z.json",
+      "n_runs": 1
     },
     {
       "name": "labbook_refresh",

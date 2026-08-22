@@ -69,14 +69,14 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
             "cells": 0,
         }
     )
-    used_ids: list[str] = []
+    used_refs: list[str] = []
 
     for d in stories:
         m = _short_model(d.get("model", "unknown"))
         s = d.get("summary", {}) or {}
         b = by_model[m]
         b["cells"] += 1
-        used_ids.append(record_id(d))
+        used_refs.append(record_id(d))
         # m2 null-not-zero: only a *captured* cost enters the average; a missing/zero cost
         # is counted (cost_coverage) but never averaged in as $0 (review P1).
         cost = s.get("total_cost")
@@ -137,7 +137,7 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
         "models": models,
     }
     # m3: every current story is consumed — no exclusion, no unused-eligible gap.
-    contribution = ContributionReport.of(used_record_ids=used_ids)
+    contribution = ContributionReport.of(used_record_refs=used_refs)
     return result, contribution
 
 

@@ -92,6 +92,7 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> tuple[dict, Cont
     review_without_current_story = 0
     joined_story_rids: set[str] = set()
     joined_review_rids: list[str] = []
+    excluded_review_refs: list[str] = []
 
     for d in reviews:
         # `_story_id` comes from the review's registry row — an exact join, not a
@@ -103,6 +104,7 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> tuple[dict, Cont
             # story (tombstoned or payload-less). Exclude it and count it — never assign
             # it a placeholder identity.
             review_without_current_story += 1
+            excluded_review_refs.append(record_id(d))
             continue
         model, tests, story_rid = entry
         joined_story_rids.add(story_rid)
@@ -116,6 +118,11 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> tuple[dict, Cont
     # A current story that no review joined is eligible for the metric but produced no
     # joined observation — counted, not silently folded into a placeholder row.
     story_without_review = len(stories) - len(joined_story_rids)
+    # f2: collect the qualified refs of the excluded stories too, so the contract attests
+    # WHICH records dropped out, not just how many.
+    excluded_story_refs = [
+        rid for (_model, _tests, rid) in stories.values() if rid not in joined_story_rids
+    ]
 
     # Summarize worse-rate as a function of test count (per model).
     rows = []
@@ -158,7 +165,8 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> tuple[dict, Cont
         "rows": rows,
     }
     contribution = ContributionReport.of(
-        used_record_ids=sorted(joined_story_rids) + sorted(joined_review_rids),
+        used_record_refs=sorted(joined_story_rids) + sorted(joined_review_rids),
+        excluded_record_refs=excluded_review_refs + excluded_story_refs,
         exclusion_reasons={
             "review_without_current_story": review_without_current_story,
             "story_without_review": story_without_review,

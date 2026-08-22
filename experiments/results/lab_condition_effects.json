@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_condition_effects",
-  "generated_at": "2026-08-22T02:46:10.746498",
+  "generated_at": "2026-08-22T19:03:28.384806",
   "summary": {
     "conditions": 2,
     "stories": 215,
@@ -46,20 +46,24 @@
     "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
     "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
     "registry_version": "data-manifest/1.0+701rows",
-    "metric_definition_version": "condition_effects/v1",
-    "metric_source_sha256": "5d589f0fbf01284835ff5e155f667ee25511633b83ab96dd59585b47b3d707c1",
+    "metric_definition_version": "condition_effects/v2",
+    "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
     "n_resolved_records": 457,
     "n_eligible_records": 370,
     "n_used_records": 370,
     "n_excluded_records": 87,
     "n_unused_eligible_records": 0,
+    "used_record_refs_sha256": "72d08bac0f77c258736be8cef849c1df1b560211cc17f8deccfe5a26ce6195bf",
+    "excluded_record_refs_sha256": "b9f23e41d491fb219bd9ef35f71b785a6adba1b092bb77d337183067b8b13a86",
+    "used_unique_records": 370,
+    "used_contributions": 370,
     "review_without_current_story": 87,
     "story_without_review": 0,
     "missing_required_field": 0,
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v5",
-    "generated_at": "2026-08-22T00:46:10.746783+00:00"
+    "contract_version": "lab-contract/v6",
+    "generated_at": "2026-08-22T17:03:28.385482+00:00"
   }
 }

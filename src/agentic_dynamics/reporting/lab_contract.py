@@ -83,6 +83,7 @@ Design notes
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
@@ -93,6 +94,7 @@ from .canonical_corpus import (
     CanonicalTables,
     ManifestIdentity,
     current_manifest_identity,
+    payload_content_digest,
 )
 from .lab_manifest import LabEntry, load_lab_manifest
 
@@ -105,7 +107,11 @@ from .lab_manifest import LabEntry, load_lab_manifest
 #: P1, phase p3. Bumped to v5 in m4 (measurement-contribution closure) when
 #: ``metric_source_sha256`` was added — the hash of the lab's own source file, so a
 #: contract attests to *which code* computed the metric, not just which corpus fed it.
-CONTRACT_VERSION = "lab-contract/v5"
+#: Bumped to v6 in f2 (exact contributor attestation) when the table-qualified ref digests
+#: ``used_record_refs_sha256``/``excluded_record_refs_sha256`` and the unique/contribution
+#: counts were added — the contract now attests WHICH records produced the result, not just
+#: how many.
+CONTRACT_VERSION = "lab-contract/v6"
 
 #: The key under which the contract is embedded in a lab's output JSON.
 CONTRACT_KEY = "lab_contract"
@@ -140,6 +146,10 @@ REQUIRED_FIELDS = (
     "n_used_records",
     "n_excluded_records",
     "n_unused_eligible_records",
+    "used_record_refs_sha256",
+    "excluded_record_refs_sha256",
+    "used_unique_records",
+    "used_contributions",
     *EXCLUSION_REASONS,
 )
 
@@ -182,6 +192,10 @@ class LabContract:
     n_used_records: int
     n_excluded_records: int
     n_unused_eligible_records: int
+    used_record_refs_sha256: str
+    excluded_record_refs_sha256: str
+    used_unique_records: int
+    used_contributions: int
     review_without_current_story: int = 0
     story_without_review: int = 0
     missing_required_field: int = 0
@@ -198,13 +212,15 @@ class LabContract:
 
 @dataclass(frozen=True)
 class ContributionReport:
-    """The computation's *self-report* of which records it consumed (m3).
+    """The computation's *self-report* of which records it consumed (m3; f2-extended).
 
     The review's P1 finding was that record-scope contracts were "explicit, but not proven
     against computation": the validator checked the counts *added up*, not that they
-    described the records that actually contributed. This dataclass closes that gap — the
-    lab's ``compute()`` returns it alongside the result payload, and the contract is
-    DERIVED from it (:func:`attach_contribution`), never hand-authored afterwards.
+    described the records that actually contributed. m3 closed the count half (the
+    ``compute()`` returns this report and the contract is DERIVED from it); f2 closes the
+    identity half — the report now carries the **table-qualified refs** of the exact records
+    used and excluded, and the contract embeds their digests (see
+    :func:`attach_contribution`), so a contract attests *which* records, not just how many.
 
     The five counts obey two invariants (enforced by :meth:`of`):
 
@@ -214,9 +230,10 @@ class ContributionReport:
       declared unused.
 
     ``exclusion_reasons`` itemises ``excluded`` with exactly the :data:`EXCLUSION_REASONS`
-    vocabulary, and ``used_record_ids`` is the stable identity of every record the
-    computation actually consumed (its length is ``used``, so the "used" count is derived
-    from real records rather than asserted).
+    vocabulary. ``used_record_refs`` / ``excluded_record_refs`` are the table-qualified
+    identities of the consumed / excluded records (their lengths are ``used_contributions``
+    / ``excluded``), and ``used_unique_records`` is the deduplicated set size — so the
+    "used" count is derived from real, distinct records rather than asserted.
     """
 
     resolved: int
@@ -225,27 +242,70 @@ class ContributionReport:
     excluded: int
     unused_eligible: int
     exclusion_reasons: dict[str, int]
-    used_record_ids: tuple[str, ...]
+    used_record_refs: tuple[str, ...]
+    excluded_record_refs: tuple[str, ...]
+    used_unique_records: int
+    used_contributions: int
 
     @classmethod
     def of(
         cls,
         *,
-        used_record_ids: Iterable[str],
+        used_record_refs: Iterable[str],
+        excluded_record_refs: Iterable[str] = (),
         unused_eligible: int = 0,
         exclusion_reasons: dict[str, int] | None = None,
+        allow_multiplicity: bool = False,
     ) -> ContributionReport:
-        """Build a report from the used records, the unused-eligible gap, and the exclusions.
+        """Build a report from the used/excluded refs, the unused gap, and the exclusions.
 
         The ``resolved`` total is *derived* (``used + unused_eligible + excluded``), which
-        forces the caller to account for every resolved record — a lab that drops a record
-        without naming it produces a ``resolved`` that no longer matches the resolver, and
-        the existing registry-consistency test rejects the artifact.
+        forces the caller to account for every resolved record. The refs are validated:
+
+        * an **empty ref** (``""`` or whitespace) is rejected — a record with no identity
+          cannot be attested;
+        * a **duplicate ref** is rejected unless ``allow_multiplicity`` is set — a record
+          may contribute more than once only when the caller says so explicitly (the
+          unique-vs-contribution split is then meaningful rather than accidental);
+        * a **negative** exclusion count is rejected;
+        * an **unknown** exclusion reason (outside :data:`EXCLUSION_REASONS`) is rejected.
+
+        ``used_contributions`` is the total ref count (with multiplicity) and
+        ``used_unique_records`` the deduplicated set size; ``used`` equals the former.
         """
-        used_ids = tuple(sorted(used_record_ids))
-        reasons = {k: int(v) for k, v in (exclusion_reasons or {}).items() if int(v)}
-        used = len(used_ids)
+        used_refs = tuple(sorted(used_record_refs))
+        excluded_refs = tuple(sorted(excluded_record_refs))
+        _reject_empty_refs(used_refs)
+        _reject_empty_refs(excluded_refs)
+        if not allow_multiplicity:
+            _reject_duplicate_refs(used_refs)
+        # Excluded refs are a per-record "why did this drop out" ledger — multiplicity is
+        # never meaningful there.
+        _reject_duplicate_refs(excluded_refs)
+
+        reasons = {}
+        for k, v in (exclusion_reasons or {}).items():
+            n = int(v)
+            if n < 0:
+                raise ValueError(
+                    f"negative exclusion count for {k!r}: {v!r} — an exclusion count "
+                    f"cannot be negative"
+                )
+            if k not in EXCLUSION_REASONS:
+                raise ValueError(
+                    f"unknown exclusion reason {k!r}; the vocabulary is {EXCLUSION_REASONS}"
+                )
+            if n:
+                reasons[k] = n
+
+        used = len(used_refs)
+        used_unique = len(set(used_refs))
         excluded = sum(reasons.values())
+        if excluded != len(excluded_refs):
+            raise ValueError(
+                f"excluded_record_refs has {len(excluded_refs)} entries but exclusion_reasons "
+                f"sum to {excluded} — every excluded record must be itemised"
+            )
         eligible = used + unused_eligible
         resolved = eligible + excluded
         return cls(
@@ -255,19 +315,73 @@ class ContributionReport:
             excluded=excluded,
             unused_eligible=unused_eligible,
             exclusion_reasons=reasons,
-            used_record_ids=used_ids,
+            used_record_refs=used_refs,
+            excluded_record_refs=excluded_refs,
+            used_unique_records=used_unique,
+            used_contributions=used,
         )
 
 
-def record_id(payload: dict) -> str:
-    """The stable identity of a resolved payload — ``entity_id`` (else ``knowledge_id``).
+def _reject_empty_refs(refs: tuple[str, ...]) -> None:
+    """Reject an empty (whitespace-only) ref — a record with no identity cannot be attested."""
+    for ref in refs:
+        if not ref.strip():
+            raise ValueError(
+                f"empty record ref {ref!r} — a consumed/excluded record must carry a "
+                f"table-qualified identity"
+            )
 
-    A ``story``/``review``/``finding`` payload carries its registry ``entity_id``; an
-    ``analysis`` payload carries its story's (it is a derived view). The id is what a lab
-    puts into :class:`ContributionReport.used_record_ids` so the "used" count is auditable.
+
+def _reject_duplicate_refs(refs: tuple[str, ...]) -> None:
+    """Reject a duplicate ref unless the caller explicitly permits multiplicity.
+
+    Two refs are "the same record" when their table-qualified strings are equal. A duplicate
+    is a sign the join is double-counting (or that ``record_id`` is colliding), which is
+    exactly the story/analysis collision the review found — fail loudly rather than count it.
     """
+    seen: set[str] = set()
+    for ref in refs:
+        if ref in seen:
+            raise ValueError(
+                f"duplicate record ref {ref!r} — pass allow_multiplicity=True only when a "
+                f"record legitimately contributes more than once"
+            )
+        seen.add(ref)
+
+
+def refs_digest(refs: Iterable[str]) -> str:
+    """The ``sha256`` of the sorted, table-qualified record refs (f2 contributor attestation).
+
+    Deterministic (sorted, canonical separators) so a guard test can recompute the exact ref
+    set from the resolver and compare it to a contract's ``used_record_refs_sha256`` /
+    ``excluded_record_refs_sha256``. An empty ref set hashes to ``sha256("[]")`` — a real
+    value, distinct from every non-empty set.
+    """
+    return hashlib.sha256(
+        json.dumps(sorted(refs), separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def record_id(payload: dict) -> str:
+    """The **table-qualified** stable identity of a resolved payload (f2).
+
+    ``story``/``review``/``finding`` → ``"<table>:<entity_id>:<knowledge_id>"`` — both ids
+    come from the payload's ``_registry`` provenance, stamped by the resolver.
+
+    ``analysis`` → ``"analysis:<story_entity_id>:<content_digest>"`` — an analysis is a
+    *derived view* of its story (no registry ``knowledge_id`` of its own), so its identity is
+    the story entity it joins onto plus the digest of its own measured content. This is the
+    f2 fix: before this, ``record_id`` returned the bare ``entity_id``, so a story and its
+    analysis produced the SAME id and a lab consuming both (``lab_quality_frontier``) counted
+    them as one record.
+    """
+    table = str(payload.get("_table") or "")
     reg = payload.get("_registry") or {}
-    return str(reg.get("entity_id") or reg.get("knowledge_id") or "")
+    entity_id = str(reg.get("entity_id") or "")
+    knowledge_id = str(reg.get("knowledge_id") or "")
+    if table == "analysis":
+        return f"analysis:{entity_id}:{payload_content_digest(payload)}"
+    return f"{table}:{entity_id}:{knowledge_id}"
 
 
 def expected_tables(entry: LabEntry) -> tuple[str, ...]:
@@ -339,6 +453,10 @@ def build_contract(
     n_used_records: int | None = None,
     n_excluded_records: int | None = None,
     n_unused_eligible_records: int | None = None,
+    used_record_refs_sha256: str | None = None,
+    excluded_record_refs_sha256: str | None = None,
+    used_unique_records: int | None = None,
+    used_contributions: int | None = None,
     review_without_current_story: int = 0,
     story_without_review: int = 0,
     missing_required_field: int = 0,
@@ -358,6 +476,12 @@ def build_contract(
     used" defaults are removed, so a lab that drops records must say how many and why. The
     excluded/unused gaps are derived (``resolved - eligible`` / ``eligible - used``) but may
     be overridden; the four exclusion-reason counts itemise ``n_excluded_records``.
+
+    The contributor attestation (f2): ``used_record_refs_sha256`` / ``excluded_record_refs_sha256``
+    are the digests of the exact record refs (required — :func:`attach_contribution` supplies
+    them; the legacy :func:`attach_contract` falls back to the empty-set digest so a
+    hand-counted caller can never fabricate an attestation), and ``used_unique_records`` /
+    ``used_contributions`` default to ``used`` (a no-multiplicity lab).
     """
     entry = _lab_entry(lab_script)
     stamp = (now or datetime.now(timezone.utc)).isoformat()
@@ -386,6 +510,14 @@ def build_contract(
     unused = int(
         n_unused_eligible_records if n_unused_eligible_records is not None else (eligible - used)
     )
+    used_refs_sha = (
+        used_record_refs_sha256 if used_record_refs_sha256 is not None else refs_digest(())
+    )
+    excluded_refs_sha = (
+        excluded_record_refs_sha256 if excluded_record_refs_sha256 is not None else refs_digest(())
+    )
+    unique = int(used_unique_records if used_unique_records is not None else used)
+    contributions = int(used_contributions if used_contributions is not None else used)
 
     return LabContract(
         lab=lab_script,
@@ -400,6 +532,10 @@ def build_contract(
         n_used_records=used,
         n_excluded_records=excluded,
         n_unused_eligible_records=unused,
+        used_record_refs_sha256=used_refs_sha,
+        excluded_record_refs_sha256=excluded_refs_sha,
+        used_unique_records=unique,
+        used_contributions=contributions,
         review_without_current_story=int(review_without_current_story),
         story_without_review=int(story_without_review),
         missing_required_field=int(missing_required_field),
@@ -448,12 +584,17 @@ def attach_contribution(
     tables: CanonicalTables,
     contribution: ContributionReport,
 ) -> dict:
-    """Embed a contract DERIVED from the computation's :class:`ContributionReport` (m3).
+    """Embed a contract DERIVED from the computation's :class:`ContributionReport` (m3; f2).
 
     The pattern is ``result, contribution = compute(...); attach_contribution(result, LAB,
     tables, contribution)`` — the contract's record scope comes from the computation, never
     from counts hand-authored in ``main`` afterwards. Each :data:`EXCLUSION_REASONS` count
     is read from ``contribution.exclusion_reasons``; a reason the report does not name is 0.
+
+    f2: the exact contributor refs are hashed into the contract here (they were previously
+    discarded by :func:`build_contract`): ``used_record_refs_sha256`` and
+    ``excluded_record_refs_sha256`` bind the contract to the *records* that produced the
+    result, and ``used_unique_records``/``used_contributions`` record the dedup vs. total.
     """
     reasons = contribution.exclusion_reasons
     payload[CONTRACT_KEY] = build_contract(
@@ -464,6 +605,10 @@ def attach_contribution(
         n_used_records=contribution.used,
         n_excluded_records=contribution.excluded,
         n_unused_eligible_records=contribution.unused_eligible,
+        used_record_refs_sha256=refs_digest(contribution.used_record_refs),
+        excluded_record_refs_sha256=refs_digest(contribution.excluded_record_refs),
+        used_unique_records=contribution.used_unique_records,
+        used_contributions=contribution.used_contributions,
         review_without_current_story=reasons.get("review_without_current_story", 0),
         story_without_review=reasons.get("story_without_review", 0),
         missing_required_field=reasons.get("missing_required_field", 0),
@@ -618,6 +763,31 @@ def validate_contract(
         return (
             f"{manifest_entry.script}: exclusion reasons sum to {reason_total}, "
             f"but n_excluded_records is {excluded_i}"
+        )
+
+    # ── contributor attestation (f2): the ref digests are well-formed and the unique/ ──
+    # ── contribution counts are consistent with the used count ─────────────────────────
+    for field in ("used_record_refs_sha256", "excluded_record_refs_sha256"):
+        digest = str(block.get(field) or "")
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            return (
+                f"{manifest_entry.script}: contract field '{field}' is not a 64-hex digest: "
+                f"{digest!r}"
+            )
+    try:
+        unique_i = int(block.get("used_unique_records", 0))
+        contrib_i = int(block.get("used_contributions", 0))
+    except (TypeError, ValueError):
+        return f"{manifest_entry.script}: used_unique_records / used_contributions must be integers"
+    if contrib_i != used_i:
+        return (
+            f"{manifest_entry.script}: used_contributions ({contrib_i}) != n_used_records "
+            f"({used_i}) — the contribution count must equal the used count"
+        )
+    if unique_i > contrib_i:
+        return (
+            f"{manifest_entry.script}: used_unique_records ({unique_i}) > used_contributions "
+            f"({contrib_i}) — unique cannot exceed total"
         )
 
     return None

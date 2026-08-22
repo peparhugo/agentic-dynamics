@@ -12,6 +12,12 @@ from collections import defaultdict
 from typing import Any
 
 from agentic_dynamics.core.session_types import normalize_task
+from agentic_dynamics.reporting.measurement_coverage import captured_costs, cost_captured
+
+
+def _mean(values):
+    """Mean of ``values``, or ``None`` when empty — never a missing-as-zero average."""
+    return sum(values) / len(values) if values else None
 
 
 def recommend_route(
@@ -23,10 +29,18 @@ def recommend_route(
 ) -> dict[str, Any]:
     """Recommend a route (default vs escalate) for one task type.
 
+    Cost-unavailable and outcome-unavailable observations are treated as UNAVAILABLE —
+    excluded from the efficiency comparison and from the cost/correctness ranking, never
+    modelled as a zero-cost success:
+
+    * a model's ``avg_cost`` averages only captured costs (``cost_captured``);
+    * a model's ``avg_correctness`` averages only measured outcomes (non-``None``);
+    * ``efficiency`` is ``None`` unless both a captured cost and an outcome exist.
+
     Args:
         task_type: normalized task name.
         entries: experiment entries for this task, each carrying at least
-            ``model``, ``correctness``, and ``cost``.
+            ``model``, ``correctness``, and ``cost`` (any may be ``None``).
         correctness_threshold: minimum correctness for a model to be eligible
             as the cheap default.
         lead_margin: correctness delta above which a higher-correctness model
@@ -40,8 +54,8 @@ def recommend_route(
         by_model[e.get("model", "unknown")].append(e)
 
     model_stats: dict[str, dict[str, Any]] = {}
-    best_correctness = 0.0
-    best_efficiency = 0.0
+    best_correctness: float | None = None
+    best_efficiency: float | None = None
     best_model_correct = ""
     best_model_eff = ""
     cheapest_qualified = ""
@@ -49,22 +63,37 @@ def recommend_route(
 
     for mid, group in by_model.items():
         n = len(group)
-        avg_correctness = sum(e.get("correctness", 0) for e in group) / n
-        avg_cost = sum(e.get("cost", 0) for e in group) / n
-        efficiency = avg_correctness / max(avg_cost, 1e-6)
+        outcome_values = [e.get("correctness") for e in group if e.get("correctness") is not None]
+        cost_values = [e.get("cost") for e in group if cost_captured(e.get("cost"))]
+        n_outcome = len(outcome_values)
+        n_cost = len(cost_values)
+        avg_correctness = _mean(outcome_values)
+        avg_cost = _mean(cost_values)
+        efficiency = None
+        if avg_correctness is not None and avg_cost is not None and avg_cost > 0:
+            efficiency = avg_correctness / avg_cost
         model_stats[mid] = {
             "n": n,
-            "avg_correctness": round(avg_correctness, 4),
-            "avg_cost": round(avg_cost, 6),
-            "efficiency": round(efficiency, 2),
+            "n_outcome": n_outcome,
+            "n_cost": n_cost,
+            "avg_correctness": round(avg_correctness, 4) if avg_correctness is not None else None,
+            "avg_cost": round(avg_cost, 6) if avg_cost is not None else None,
+            "efficiency": round(efficiency, 2) if efficiency is not None else None,
         }
-        if avg_correctness > best_correctness:
+        if avg_correctness is not None and (
+            best_correctness is None or avg_correctness > best_correctness
+        ):
             best_correctness = avg_correctness
             best_model_correct = mid
-        if efficiency > best_efficiency:
+        if efficiency is not None and (best_efficiency is None or efficiency > best_efficiency):
             best_efficiency = efficiency
             best_model_eff = mid
-        if avg_cost < cheapest_cost and avg_correctness >= correctness_threshold:
+        if (
+            avg_cost is not None
+            and avg_correctness is not None
+            and avg_correctness >= correctness_threshold
+            and avg_cost < cheapest_cost
+        ):
             cheapest_cost = avg_cost
             cheapest_qualified = mid
 
@@ -73,7 +102,11 @@ def recommend_route(
     routing = "default"
     if escalate_model and default_model in model_stats:
         default_correctness = model_stats[default_model]["avg_correctness"]
-        if best_correctness - default_correctness > lead_margin:
+        if (
+            default_correctness is not None
+            and best_correctness is not None
+            and best_correctness - default_correctness > lead_margin
+        ):
             routing = "escalate"
 
     return {
@@ -96,41 +129,56 @@ def simulate_strategies(
     per_task: list[dict[str, Any]],
     by_task: dict[str, list[dict[str, Any]]],
 ) -> dict[str, Any]:
-    """Simulate single-model and grit-routed strategies across the corpus."""
+    """Simulate single-model and grit-routed strategies across the corpus.
+
+    Cost and outcome are each averaged over the *available* observations only — an
+    unavailable cost is never a zero-cost success, and an unavailable outcome never a
+    zero-correctness failure.
+    """
     models = sorted({e.get("model", "unknown") for e in entries})
     strategies: dict[str, Any] = {}
 
     for mid in models:
         subset = [e for e in entries if e.get("model") == mid]
         n = len(subset)
-        total_cost = sum(e.get("cost", 0) for e in subset)
-        avg_correctness = sum(e.get("correctness", 0) for e in subset) / max(n, 1)
+        captured = captured_costs([e.get("cost") for e in subset])
+        outcomes = [c for e in subset if (c := e.get("correctness")) is not None]
+        total_cost = sum(captured)
+        avg_cost = _mean(captured)
+        avg_correctness = _mean(outcomes)
         strategies[f"{mid}_only"] = {
             "n": n,
+            "n_cost": len(captured),
+            "n_outcome": len(outcomes),
             "total_cost": round(total_cost, 6),
-            "avg_cost": round(total_cost / max(n, 1), 6),
-            "avg_correctness": round(avg_correctness, 4),
+            "avg_cost": round(avg_cost, 6) if avg_cost is not None else None,
+            "avg_correctness": round(avg_correctness, 4) if avg_correctness is not None else None,
         }
 
-    routed_cost = 0.0
-    routed_correctness_sum = 0.0
     routed_n = 0
+    routed_costs: list[float] = []
+    routed_outcomes: list[float] = []
     distribution: dict[str, int] = defaultdict(int)
     for rec in per_task:
         model = rec["escalate_model"] if rec["routing"] == "escalate" else rec["default_model"]
         if not model:
             continue
         subset = [e for e in by_task.get(rec["task"], []) if e.get("model") == model]
-        routed_cost += sum(e.get("cost", 0) for e in subset)
-        routed_correctness_sum += sum(e.get("correctness", 0) for e in subset)
         routed_n += len(subset)
+        routed_costs.extend(captured_costs([e.get("cost") for e in subset]))
+        routed_outcomes.extend(c for e in subset if (c := e.get("correctness")) is not None)
         distribution[model] += len(subset)
 
+    total_cost = sum(routed_costs)
+    avg_cost = _mean(routed_costs)
+    avg_correctness = _mean(routed_outcomes)
     strategies["grit_routed"] = {
         "n": routed_n,
-        "total_cost": round(routed_cost, 6),
-        "avg_cost": round(routed_cost / max(routed_n, 1), 6),
-        "avg_correctness": round(routed_correctness_sum / max(routed_n, 1), 4),
+        "n_cost": len(routed_costs),
+        "n_outcome": len(routed_outcomes),
+        "total_cost": round(total_cost, 6),
+        "avg_cost": round(avg_cost, 6) if avg_cost is not None else None,
+        "avg_correctness": round(avg_correctness, 4) if avg_correctness is not None else None,
         "routing_distribution": dict(distribution),
     }
     return strategies
@@ -141,7 +189,7 @@ def compute_routing(entries: list[dict[str, Any]], *, min_models: int = 2) -> di
 
     Args:
         entries: experiment entries (each with model, correctness, cost,
-            experiment name).
+            experiment name — any may be ``None``).
         min_models: minimum number of distinct models required for a task to
             be considered.
 
@@ -149,7 +197,7 @@ def compute_routing(entries: list[dict[str, Any]], *, min_models: int = 2) -> di
         dict with ``_meta``, ``per_task`` recommendations, ``strategies``,
         and ``routing_distribution``.
     """
-    valid = [e for e in entries if not e.get("narration_failure") and e.get("correctness", 0) >= 0]
+    valid = [e for e in entries if not e.get("narration_failure")]
 
     by_task: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for e in valid:

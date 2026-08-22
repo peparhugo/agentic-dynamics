@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_cache_economics",
-  "generated_at": "2026-08-22T03:35:59.250644",
+  "generated_at": "2026-08-22T18:49:09.564481",
   "summary": {
     "models": 7,
     "stories": 215
@@ -252,19 +252,23 @@
     "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
     "registry_version": "data-manifest/1.0+701rows",
     "metric_definition_version": "cache_economics/v2",
-    "metric_source_sha256": "a3f0e7d0d4f538942923070a88d452ddc11b5379a2f163cf23cb94e8ad57e046",
+    "metric_source_sha256": "c3c4ea9e7f5875b281d24905d28cdaacd4e9cb3be779327c77e856f486f47d5a",
     "n_resolved_records": 215,
     "n_eligible_records": 215,
     "n_used_records": 215,
     "n_excluded_records": 0,
     "n_unused_eligible_records": 0,
+    "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+    "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "used_unique_records": 215,
+    "used_contributions": 215,
     "review_without_current_story": 0,
     "story_without_review": 0,
     "missing_required_field": 0,
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v5",
-    "generated_at": "2026-08-22T01:35:59.250947+00:00"
+    "contract_version": "lab-contract/v6",
+    "generated_at": "2026-08-22T16:49:09.564969+00:00"
   }
 }

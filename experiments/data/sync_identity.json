@@ -1,6 +1,6 @@
 {
   "schema_version": "sync-identity/v2",
-  "generated_at": "2026-08-22T01:33:37.855713+00:00",
+  "generated_at": "2026-08-22T16:57:11.062293+00:00",
   "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
   "resolved_input_sha256": "58e642e6b38d847304d7f3dc8e649f53fd1126cb2222ed86c52393c0bd9c7c8f",
   "rows": {
@@ -9,6 +9,6 @@
   },
   "sessions_rows_sha256": "82dd220ccd4f762fcc56423b65dccaac05c5c41fc8c73062933421f62155829a",
   "stories_rows_sha256": "6a4e2a6670f50210c46c05350da7701d352da1b7095d6fcc8679bcc57b91d68b",
-  "sync_transform_sha256": "3f0713c173d14f86210ffbf1890ec765b6bea878cfa1b6425d24468c1f1ca746",
+  "sync_transform_sha256": "61c47ca1dd960996d1ceff88e24b19ea5b3f80780189a03bd3629b987b64c2fb",
   "schema_sha256": "8bac678e802e14f87b1d7a18cafd2c6b47a636d7760895967ada63f43836778f"
 }
