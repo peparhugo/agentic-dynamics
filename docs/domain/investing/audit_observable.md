@@ -91,7 +91,8 @@ Kraken, Binance — public tickers only).
 
 Sources named, not connected: **broker monthly/quarterly statements**, **account activity CSV
 exports**, **broker account-summary / buying-power reports**, **Bank of Canada** noon FX rates,
-and **T5008 / T5 / T3** tax slips.
+and **registered-account slips** (RRSP contribution receipt, T4RSP withdrawal slip, CRA Notice of
+Assessment — see § 8 for the T5008/T5/T3 exclusion).
 
 | ID | Signal | Tag | Source (named) | RRSP/TFSA | Notes / reducer inputs |
 |----|--------|-----|----------------|-----------|------------------------|
@@ -100,7 +101,7 @@ and **T5008 / T5 / T3** tax slips.
 | PS-3 | Position market value | `[C]` | = PS-1 × MD-1 | partial (statement-date) | Inputs: quantity `[M]`, last price `[X]`. |
 | PS-4 | Cash balance (per currency) | `[M]` | Broker account summary | visible | CAD and USD sub-ledgers separately. |
 | PS-5 | Buying power | `[M]` | Broker buying-power report (margin account) | n/a (registered accounts have no margin BP) | Broker's own formula; in RRSP/TFSA the analog is available cash + contribution room (CX-7). |
-| PS-6 | Realized P/L (per position / aggregate) | `[C]` | = Σ(sale proceeds − cost basis − commissions) over fills | visible (realized gains reported) | Inputs: execution fills `[M]` (§ 3). Tax-cost basis in registered accounts differs (see T5008 note). |
+| PS-6 | Realized P/L (per position / aggregate) | `[C]` | = Σ(sale proceeds − cost basis − commissions) over fills | visible (statement shows dispositions) | Inputs: execution fills `[M]` (§ 3). **Registered-account nuance:** no T5008, no capital-gains tax — "realized P/L" here is a bookkeeping reducer, not a tax figure (see § 8). |
 | PS-7 | Unrealized P/L (per position / aggregate) | `[C]` | = PS-1 × (MD-1 − PS-2) | partial (statement-date) | Inputs: quantity `[M]`, mark `[X]`, cost basis `[M]`. |
 | PS-8 | Account equity / net asset value | `[C]` | = Σ(PS-3) + PS-4 | visible (statement total) | Broker also reports it `[M]`; `[C]` recompute is the cross-check. |
 | PS-9 | Time-weighted return | `[C]` | = Π(1 + rᵢ) − 1 over cash-flow-dated sub-periods | visible (inferred from statement history) | Inputs: dated contributions/withdrawals + period-end NAVs (PS-8). |
@@ -113,8 +114,8 @@ and **T5008 / T5 / T3** tax slips.
 
 Sources named, not connected: **broker trade confirmations**, **monthly/quarterly activity
 statements**, **account activity CSV / Flex-Query exports**, **options expiry & assignment
-notices**, and **T5008** (disposition slip). The export formats below are the canonical
-operator-produced files a reducer can parse.
+notices**. The export formats below are the canonical operator-produced files a reducer can parse
+(T5008/T5/T3 are CRA slips, not operator exports — see § 8).
 
 | ID | Signal | Tag | Source (named) | RRSP/TFSA | Notes / reducer inputs |
 |----|--------|-----|----------------|-----------|------------------------|
@@ -122,11 +123,11 @@ operator-produced files a reducer can parse.
 | EX-2 | Order lifecycle (submitted → partial → filled / cancelled) | `[M]` | Broker order ticket / activity log | visible (final state; not intraday tick stream) | Enables fill-rate `[C]` = filled / submitted. |
 | EX-3 | Option expiry (expired worthless / auto-exercised) | `[M]` | Broker expiry notice; activity statement | visible (as a fill/expiry line, not a live chain) | Distinguishes ITM auto-exercise from OTM worthless expiry. |
 | EX-4 | Assignment / exercise notice | `[M]` | Broker assignment notice; MX/OCC assignment report | visible | Short-option assignment is only possible in permitted registered strategies. |
-| EX-5 | Dividends / distributions received | `[M]` | Broker statement; CDS dividend ledger; T5/T3 | visible | Cash (and DRIP) distribution events. |
-| EX-6 | Broker export format inventory | `[M]` | Questrade activity CSV; Interactive Brokers Flex Query (XML/CSV); TD/Scotia monthly statement PDF; T5008 slip | visible | Meta-signal: *which* parseable formats the operator can produce. |
+| EX-5 | Dividends / distributions received | `[M]` | Broker statement; CDS dividend ledger | visible | Cash (and DRIP) distribution events; US-source dividends carry 15% non-recoverable withholding in RRSP/TFSA (no T5/T3 in-registered). |
+| EX-6 | Broker export format inventory | `[M]` | Questrade activity CSV; Interactive Brokers Flex Query (XML/CSV); TD Direct Investing / Scotia iTRADE / RBC Direct Investing / Wealthsimple / BMO InvestorLine CSV or statement PDF | visible | Meta-signal: *which* parseable formats the operator can produce (T5008 is **not** a broker export — see § 8). |
 | EX-7 | Fees / commissions / ECN charges | `[M]` | Broker trade confirmation | visible | Per-fill cost; feeds PS-6 cost basis. |
 | EX-8 | Settlement date + settlement currency | `[M]` | Broker confirmation | visible | T+2 equity (T+1 post-2024 for many); distinct from trade date. |
-| EX-9 | Book-value adjustments (DRIP, return-of-capital, ROC) | `[M]` | Broker statement; T3 (ROC) | visible | ROC lowers book value; `[C]` recompute = book value − ROC distributions. |
+| EX-9 | Book-value adjustments (DRIP, return-of-capital, ROC) | `[M]` | Broker statement (broker-tracked) | visible | ROC lowers book value; `[C]` recompute = book value − ROC distributions. No T3 is issued in-registered — the broker statement itself shows the adjustment. |
 
 ---
 
@@ -208,6 +209,91 @@ be written as measured.
 
 ---
 
+## 7. Policy writability — which control rules become writable
+
+The load-bearing rule in action: a control rule (trading policy arm) is only writable when every
+signal its `requires` names has a producer. Each arm below maps its `requires` to the tags
+established in §§1–5. "Writable" means the compiler's `requires`/`produces` gate passes; "blocked"
+means a `requires` signal has no producer yet.
+
+| # | Policy arm (control rule) | `requires` (information consumed) | Producer chain | Status |
+|---|---|---|---|---|
+| P-1 | Rebalance band (trim/size when a position drifts ±X% of target) | PS-3, PS-8, CX-7 | `[M]`/`[C]`/`[X]` | writable |
+| P-2 | Position-size cap (max % NAV per name / per sector) | PS-3, PS-8 | `[C]` over `[M]`/`[X]` | writable |
+| P-3 | Covered-call strike selection at target delta | MD-4, MD-5, MD-6 | needs `[X]` MX chain feed | **blocked** (G-1) |
+| P-4 | Ex-dividend timing (defer entry to capture/avoid ex-div) | CX-2, MD-10 | `[X]` | writable |
+| P-5 | Earnings blackout (no new positions within N days of earnings) | CX-1 | `[X]` | writable |
+| P-6 | Stop / loss-realization discipline | PS-6, MD-1 | `[C]` over `[M]`/`[X]`, EOD only | writable (EOD) |
+| P-7 | Currency conversion trigger (CAD↔USD above FX threshold / Norbert's gambit) | PS-10, PS-4 | `[M]`/`[X]` | writable |
+| P-8 | Crypto-ETF premium/discount arbitrage gate | MD-8 | `[X]` | writable |
+| P-9 | Contribution schedule / contribution-room gate | PS-11, CX-7, PS-4 | `[M]`/`[X]` | writable |
+| P-10 | Thesis-entry gate (no order without a recorded thesis) | DR-1, DR-2, DR-3 | `[P]` + `[M]` | writable only under operator discipline |
+| P-11 | Confidence-gated sizing / escalation | DR-8 | `[H]` only | **blocked** (G-4) |
+
+**Read:** 8 of 11 arms writable today (P-1, P-2, P-4, P-5, P-6, P-7, P-8, P-9) because their
+`requires` trace to `[M]`/`[C]`/`[X]` producers. P-10 is writable only if the operator commits to
+recording theses prospectively. P-3 and P-11 are blocked by the gap map (§ 8).
+
+---
+
+## 8. Gap map — what is not observable, and what it blocks
+
+Signals a policy might name but that have **no producer** in this domain, with the arm each one
+blocks and the honest downgrade path. A gap is either (a) instrumentable later by adding a named
+producer, or (b) unmeasurable in principle and usable only as `[H]`.
+
+| # | Missing signal | Why it is unobservable | Blocks | Downgrade path |
+|---|---|---|---|---|
+| G-1 | Intraday options chain, live greeks, IV | Registered accounts show only executed fills, never a live chain; needs an MX/Cboe real-time feed | P-3 (covered-call delta), any greek-based arm | Add a named `[X]` chain producer; else EOD snapshot |
+| G-2 | Intraday price / Level-2 depth | No live quote stream in registered accounts | intraday stop/rebalance arms | EOD close `[X]`/`[M]` |
+| G-3 | Margin buying power | RRSP/TFSA forbid margin | leverage arms | n/a — structurally inapplicable |
+| G-4 | Decision confidence at decision time (DR-8) | Only recalled self-report; not captured at decision time | P-11 confidence-gated arms | Capture prospectively as `[P]`; else `[H]`, never measured |
+| G-5 | Unstructured thesis rationale | Free text; not machine-tagged | thesis-verification arms | Structured thesis template `[P]` |
+| G-6 | Counterfactual opportunity cost | What-else-could-have-been-bought is unmeasurable | regret-minimization arms | `[H]` only — never a measured input |
+| G-7 | Real-time news sentiment | Requires a vendor NLP feed + licence | event-response arms | `[X]` raw headlines (CX-3) → `[H]` sentiment score |
+
+**Key structural gap:** every `[C]` greek/IV reducer (§ 6) depends on MD-4 (a market option
+price). MD-4 is `[X]`-only and absent from registered statements. Until a chain producer is named
+and obtained, the `[C]` greeks/IV must not be emitted as measured — they are the single largest
+producer dependency in the domain.
+
+---
+
+## 9. Adversarial compliance review
+
+The audit attacks its own claims. Each attack line, and the verdict:
+
+1. **"Every row has exactly one primary tag."** Scanned all 45 signal rows in §§1–5; each carries
+   exactly one primary tag (secondary tags are parenthesized and non-governing). **PASS.**
+2. **"No `[H]` written as measured."** The only `[H]` signal is DR-8; it is marked subjective and
+   appears in no `[C]` reducer's inputs. **PASS.**
+3. **"Sources named, not connected."** No API keys, no scraping, no live calls anywhere; sources
+   are named (TMX Datalinx, MX/Cboe, Bank of Canada, CDS, named crypto exchanges, named
+   newswires). **PASS.**
+4. **"Registered-account visibility annotated."** Every row carries a visible/partial/not
+   visible/n/a annotation. **PASS.**
+5. **T5008 self-attack (caught and corrected this revision).** The prior draft listed T5008 as a
+   source for registered-account realized P/L (PS-6) and as an operator export (EX-6). Both are
+   wrong: **T5008 is a CRA "Statement of Securities Transactions" issued only for NON-registered
+   dispositions, and it is not operator-produced.** A reducer reading an RRSP/TFSA statement would
+   never see a T5008, so citing it as a source would silently produce empty measurements — the
+   null-not-zero violation the measurement plane exists to prevent. Corrected: registered
+   dispositions carry no T5008/T5/T3 and no capital-gains tax; realized P/L is a bookkeeping
+   reducer (PS-6), and the relevant registered slips are the contribution receipt and T4RSP.
+6. **"Every `[C]` reducer traces to a producer."** Verified each `[C]` row's inputs against the
+   tag table. The one broken chain is greeks/IV (MD-5/MD-6), which need MD-4 (`[X]`, absent from
+   registered statements). Flagged in § 8, not silently claimed measured. **PASS-with-flag.**
+7. **"American vs European model honesty."** MX single-name equity options are American; the § 6
+   closed forms are European (BSM). The audit does not claim `[C]` greeks as primary — it keeps
+   vendor-published values as `[X]` primary and local recomputation as the cross-check. **PASS.**
+8. **Dividend-withholding nuance.** US-source dividends in RRSP/TFSA carry 15% non-recoverable
+   withholding; noted on EX-5 so a dividend-based arm does not overcount gross yield. **PASS.**
+
+**Adversarial verdict: PASS** — one material finding (the T5008 misclassification) was caught and
+corrected; no remaining row claims a measurement it cannot support.
+
+---
+
 ## LOG
 
 **Signal counts per area**
@@ -219,7 +305,11 @@ be written as measured.
 | 3. Execution records | 9 |
 | 4. Decision records | 8 |
 | 5. External context | 7 |
-| **Total** | **45** |
+| **Total (observability)** | **45** |
+| 7. Policy arms | 11 |
+| 8. Gap map | 7 |
+
+**Tag distribution** (primary, §§1–5): `[M]` 16 · `[C]` 9 · `[X]` 15 · `[P]` 4 · `[H]` 1.
 
 **Guard checks**
 
@@ -230,7 +320,11 @@ be written as measured.
 - [x] Sources are named, not connected — no API keys, no scraping, no live calls. **PASS.**
 - [x] Greeks and IV carry their pricing inputs and the closed-form reducers. **PASS.**
 - [x] Instrumentation gap flagged: a market-option-price producer (MD-4) is a prerequisite for
-      any `[C]` IV/greek producer (§ 6). **PASS — flagged, not blocked.**
+      any `[C]` IV/greek producer (§ 6, § 8). **PASS — flagged, not blocked.**
+- [x] Adversarial review caught and corrected the T5008 misclassification (§ 9, item 5). **PASS.**
 
-**Result: PASS** — 45 signals inventoried, 0 unguarded `[H]` rows, all reducers stated with
-inputs.
+**Result: PASS** — 45 signals inventoried, 0 unguarded `[H]` rows, 11 policy arms mapped (8
+writable, 3 blocked/conditional), 7 gaps catalogued, all reducers stated with inputs.
+
+**Commit:** recorded on branch `feature/investing-domain-audit` (completes the Stage-0 seeding:
+observable + policy + gap map + adversarial review).
