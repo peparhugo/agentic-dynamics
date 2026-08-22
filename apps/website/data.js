@@ -1,8 +1,8 @@
-/* Generated 2026-08-22 00:57:16 UTC by build_data.py */
+/* Generated 2026-08-22 01:40:16 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-22T00:57:14.856141+00:00",
+    "generated_at": "2026-08-22T01:40:15.555968+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -66,7 +66,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "52c54b3907a5f0e242683a7938da4134e7cdf2c6a9d39c351835b635c04225a5"
+    "generator_source_tree_identity": "f1859f1017edd78489738172e28f1d0050bcdab9afbfee271af9a852c081181f"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 35,
     "experiment_specs": 6,
-    "workflow_specs": 75,
+    "workflow_specs": 76,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
@@ -2278,7 +2278,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-22T00:57:15.016223+00:00"
+    "generated_at": "2026-08-22T01:40:15.717467+00:00"
   },
   "reviews": {
     "models": [
@@ -3006,7 +3006,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-22T02:46:09.662069",
+      "generated_at": "2026-08-22T03:35:59.250644",
       "summary": {
         "models": 7,
         "stories": 215
@@ -3022,11 +3022,29 @@ window.DYNAMICS_DATA = {
           "total_records": 31,
           "cost_coverage": 1.0,
           "avg_cache_hit": 0.964,
+          "cache_hit_coverage": {
+            "value": 0.964,
+            "n_available": 31,
+            "n_total": 31,
+            "coverage": 1.0
+          },
           "cache_reads": 224381696,
           "cache_writes": 0,
           "read_write_ratio": null,
           "avg_context_per_cell": 7488299.0,
-          "avg_tokens_per_cell": 250180.0
+          "context_coverage": {
+            "value": 7488299.0,
+            "n_available": 31,
+            "n_total": 31,
+            "coverage": 1.0
+          },
+          "avg_tokens_per_cell": 250180.0,
+          "tokens_coverage": {
+            "value": 250180.0,
+            "n_available": 31,
+            "n_total": 31,
+            "coverage": 1.0
+          }
         },
         {
           "model": "gpt-5.6-luna",
@@ -3038,11 +3056,29 @@ window.DYNAMICS_DATA = {
           "total_records": 34,
           "cost_coverage": 1.0,
           "avg_cache_hit": 0.937,
+          "cache_hit_coverage": {
+            "value": 0.937,
+            "n_available": 34,
+            "n_total": 34,
+            "coverage": 1.0
+          },
           "cache_reads": 44099872,
           "cache_writes": 2378880,
           "read_write_ratio": 18.5,
           "avg_context_per_cell": 1386840.0,
-          "avg_tokens_per_cell": 89785.0
+          "context_coverage": {
+            "value": 1386840.0,
+            "n_available": 34,
+            "n_total": 34,
+            "coverage": 1.0
+          },
+          "avg_tokens_per_cell": 89785.0,
+          "tokens_coverage": {
+            "value": 89785.0,
+            "n_available": 34,
+            "n_total": 34,
+            "coverage": 1.0
+          }
         },
         {
           "model": "deepseek-v4-pro",
@@ -3054,11 +3090,29 @@ window.DYNAMICS_DATA = {
           "total_records": 39,
           "cost_coverage": 1.0,
           "avg_cache_hit": 0.801,
+          "cache_hit_coverage": {
+            "value": 0.801,
+            "n_available": 39,
+            "n_total": 39,
+            "coverage": 1.0
+          },
           "cache_reads": 146609152,
           "cache_writes": 0,
           "read_write_ratio": null,
           "avg_context_per_cell": 3952443.0,
-          "avg_tokens_per_cell": 193234.0
+          "context_coverage": {
+            "value": 3952443.0,
+            "n_available": 39,
+            "n_total": 39,
+            "coverage": 1.0
+          },
+          "avg_tokens_per_cell": 193234.0,
+          "tokens_coverage": {
+            "value": 193234.0,
+            "n_available": 39,
+            "n_total": 39,
+            "coverage": 1.0
+          }
         },
         {
           "model": "gpt-5.6-terra",
@@ -3070,11 +3124,29 @@ window.DYNAMICS_DATA = {
           "total_records": 30,
           "cost_coverage": 1.0,
           "avg_cache_hit": 0.832,
+          "cache_hit_coverage": {
+            "value": 0.832,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          },
           "cache_reads": 23958016,
           "cache_writes": 0,
           "read_write_ratio": null,
           "avg_context_per_cell": 957618.0,
-          "avg_tokens_per_cell": 159018.0
+          "context_coverage": {
+            "value": 957618.0,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          },
+          "avg_tokens_per_cell": 159018.0,
+          "tokens_coverage": {
+            "value": 159018.0,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          }
         },
         {
           "model": "claude-haiku-4-5",
@@ -3086,11 +3158,29 @@ window.DYNAMICS_DATA = {
           "total_records": 24,
           "cost_coverage": 0.8333,
           "avg_cache_hit": 0.824,
+          "cache_hit_coverage": {
+            "value": 0.824,
+            "n_available": 24,
+            "n_total": 24,
+            "coverage": 1.0
+          },
           "cache_reads": 163588556,
           "cache_writes": 3922476,
           "read_write_ratio": 41.7,
           "avg_context_per_cell": 6884097.0,
-          "avg_tokens_per_cell": 67907.0
+          "context_coverage": {
+            "value": 6884097.0,
+            "n_available": 24,
+            "n_total": 24,
+            "coverage": 1.0
+          },
+          "avg_tokens_per_cell": 67907.0,
+          "tokens_coverage": {
+            "value": 67907.0,
+            "n_available": 24,
+            "n_total": 24,
+            "coverage": 1.0
+          }
         },
         {
           "model": "gpt-5.6-sol",
@@ -3102,11 +3192,29 @@ window.DYNAMICS_DATA = {
           "total_records": 30,
           "cost_coverage": 1.0,
           "avg_cache_hit": 0.85,
+          "cache_hit_coverage": {
+            "value": 0.85,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          },
           "cache_reads": 43466752,
           "cache_writes": 0,
           "read_write_ratio": null,
           "avg_context_per_cell": 1682070.0,
-          "avg_tokens_per_cell": 233178.0
+          "context_coverage": {
+            "value": 1682070.0,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          },
+          "avg_tokens_per_cell": 233178.0,
+          "tokens_coverage": {
+            "value": 233178.0,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          }
         },
         {
           "model": "claude-sonnet-5",
@@ -3118,11 +3226,29 @@ window.DYNAMICS_DATA = {
           "total_records": 27,
           "cost_coverage": 0.8519,
           "avg_cache_hit": 0.84,
+          "cache_hit_coverage": {
+            "value": 0.84,
+            "n_available": 27,
+            "n_total": 27,
+            "coverage": 1.0
+          },
           "cache_reads": 177814999,
           "cache_writes": 5250530,
           "read_write_ratio": 33.9,
           "avg_context_per_cell": 6677761.0,
-          "avg_tokens_per_cell": 92021.0
+          "context_coverage": {
+            "value": 6677761.0,
+            "n_available": 27,
+            "n_total": 27,
+            "coverage": 1.0
+          },
+          "avg_tokens_per_cell": 92021.0,
+          "tokens_coverage": {
+            "value": 92021.0,
+            "n_available": 27,
+            "n_total": 27,
+            "coverage": 1.0
+          }
         }
       ],
       "lab_contract": {
@@ -3131,8 +3257,8 @@ window.DYNAMICS_DATA = {
         "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
-        "metric_definition_version": "cache_economics/v1",
-        "metric_source_sha256": "883e8797611c1d43201535a9de4d6bb7db6448f306d5e0e62285775ad7863e80",
+        "metric_definition_version": "cache_economics/v2",
+        "metric_source_sha256": "a3f0e7d0d4f538942923070a88d452ddc11b5379a2f163cf23cb94e8ad57e046",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
@@ -3145,7 +3271,7 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v5",
-        "generated_at": "2026-08-22T00:46:09.662339+00:00"
+        "generated_at": "2026-08-22T01:35:59.250947+00:00"
       }
     },
     "condition_effects": {
@@ -3755,7 +3881,7 @@ window.DYNAMICS_DATA = {
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-22T02:46:10.012103",
+      "generated_at": "2026-08-22T03:35:58.888247",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
@@ -3898,8 +4024,8 @@ window.DYNAMICS_DATA = {
         "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
-        "metric_definition_version": "story_arc/v1",
-        "metric_source_sha256": "b98fadc6867f6ebb6da573bcb9f6eb0617b0440c4af0161496f542c7b82e11e1",
+        "metric_definition_version": "story_arc/v2",
+        "metric_source_sha256": "18b362ab4ef9b2f744e3aae318af8d53cf2867935da77c6d3a5ace485bffb4ce",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
@@ -3912,7 +4038,7 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v5",
-        "generated_at": "2026-08-22T00:46:10.012453+00:00"
+        "generated_at": "2026-08-22T01:35:58.888627+00:00"
       }
     },
     "verification_frontier": {

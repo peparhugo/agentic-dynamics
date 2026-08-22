@@ -48,6 +48,9 @@ _OPTIONAL_FIELDS = (
     "composite_score",
     "escape_score",
     "cyclomatic_complexity",
+    "cache_hit_rate",
+    "total_context_tokens",
+    "total_tokens",
 )
 
 #: `get("field", 0) or 0` / `get("field", 0.0) or 0.0` for an optional field — the exact

@@ -126,7 +126,7 @@ def test_contract_carries_all_required_fields(tables_factory):
     assert contract["contract_version"] == CONTRACT_VERSION
     assert contract["lab"] == "lab_story_arc.py"
     # metric_definition_version comes from the manifest, not invented by the lab.
-    assert contract["metric_definition_version"] == "story_arc/v1"
+    assert contract["metric_definition_version"] == "story_arc/v2"
     assert contract["data_integrity_policy"] == "docs/data_integrity_findings.md"
     # Both identities are embedded (P2): the selection hash and the content hash.
     assert len(contract["registry_identity_sha256"]) == 64
@@ -322,7 +322,7 @@ def test_absent_registry_rejects_everything(tmp_path, manifest_entry):
         "registry_identity_sha256": "a" * 64,
         "resolved_input_sha256": "a" * 64,
         "registry_version": "absent",
-        "metric_definition_version": "story_arc/v1",
+        "metric_definition_version": "story_arc/v2",
         "metric_source_sha256": lab_source_sha256("lab_story_arc.py"),
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": None,

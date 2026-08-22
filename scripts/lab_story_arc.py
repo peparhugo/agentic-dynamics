@@ -101,9 +101,10 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
             # be inserted into the average as 0 (the review's P1 story-arc finding).
             cost = s.get("cost_usd")
             a = s.get("agentic", {}) or {}
-            tokens = a.get("total_tokens", 0) or s.get("total_tokens", 0) or 0
+            tokens = a.get("total_tokens") or s.get("total_tokens")
             tests = a.get("tests_total", 0) or 0
-            by_session[sn]["tokens"].append(tokens)
+            if tokens is not None:
+                by_session[sn]["tokens"].append(tokens)
             by_session[sn]["tests"].append(tests)
             by_session[sn]["n"] += 1
             if cost_captured(cost):
@@ -130,7 +131,7 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
                 "cost_captured_records": cost_stats["cost_captured_records"],
                 "total_records": cost_stats["total_records"],
                 "cost_coverage": cost_stats["cost_coverage"],
-                "avg_tokens": round(_avg(v["tokens"]), 0),
+                "avg_tokens": round(_avg(v["tokens"]), 0) if v["tokens"] else None,
                 "avg_tests": round(_avg(v["tests"]), 1),
             }
         )

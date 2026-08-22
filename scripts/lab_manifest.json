@@ -99,8 +99,9 @@
       "reads_retired_summary": false,
       "requires_external_service": null,
       "contract_status": "enforced",
-      "metric_definition_version": "cache_economics/v1",
-      "rationale": "Consumes the canonical registry resolver only (reporting.canonical_corpus, story table). Contract-bearing: the output embeds input_dataset_id/input_manifest_sha256/registry_version/metric_definition_version/data_integrity_policy/requires_external_service."
+      "metric_definition_version": "cache_economics/v2",
+      "rationale": "Consumes the canonical registry resolver only (reporting.canonical_corpus, story table). Contract-bearing: the output embeds input_dataset_id/input_manifest_sha256/registry_version/metric_definition_version/data_integrity_policy/requires_external_service.",
+      "metric_source_sha256": "a3f0e7d0d4f538942923070a88d452ddc11b5379a2f163cf23cb94e8ad57e046"
     },
     "lab_claude_audit.py": {
       "lab_status": "quarantined",
@@ -257,8 +258,9 @@
       "reads_retired_summary": false,
       "requires_external_service": null,
       "contract_status": "enforced",
-      "metric_definition_version": "story_arc/v1",
-      "rationale": "Consumes the canonical registry resolver only (story table). Cited on the evidence page (D.labs.story_arc). Contract-bearing."
+      "metric_definition_version": "story_arc/v2",
+      "rationale": "Consumes the canonical registry resolver only (story table). Cited on the evidence page (D.labs.story_arc). Contract-bearing.",
+      "metric_source_sha256": "18b362ab4ef9b2f744e3aae318af8d53cf2867935da77c6d3a5ace485bffb4ce"
     },
     "lab_story_review.py": {
       "lab_status": "canonical",

@@ -1138,9 +1138,9 @@ def _story_pipeline_rows(stories: list[dict]) -> tuple[list[dict], list[dict]]:
                 "quality": quality,
                 "condition": condition,
                 "session_count": session_count,
-                "total_tokens": summary.get("total_tokens", 0) or 0,
+                "total_tokens": summary.get("total_tokens"),
                 "total_cost": summary.get("total_cost"),
-                "cache_hit_rate": summary.get("cache_hit_rate", 0.0) or 0.0,
+                "cache_hit_rate": summary.get("cache_hit_rate"),
                 "total_duration": summary.get("total_duration", 0.0) or 0.0,
                 "all_successful": bool(summary.get("all_successful", False)),
                 "test_count": summary.get("test_count", 0) or 0,
@@ -1158,7 +1158,7 @@ def _story_pipeline_rows(stories: list[dict]) -> tuple[list[dict], list[dict]]:
                     "prompt_tokens": a.get("prompt_tokens", 0) or 0,
                     "completion_tokens": a.get("completion_tokens", 0) or 0,
                     "reasoning_tokens": a.get("reasoning_tokens", 0) or 0,
-                    "total_tokens": a.get("total_tokens", 0) or 0,
+                    "total_tokens": a.get("total_tokens"),
                     "cache_read_tokens": a.get("cache_read_tokens", 0) or 0,
                     "cost_usd": s.get("cost_usd"),
                     "duration_s": s.get("duration_s", 0.0) or 0.0,
@@ -1195,8 +1195,12 @@ def _load_story_data(stories: list[dict]) -> dict:
                 "total_records": cost_stats["total_records"],
                 "total_captured_cost": cost_stats["total_captured_cost"],
                 "cost_coverage": cost_stats["cost_coverage"],
-                "total_tokens": sum(c["total_tokens"] for c in rows),
-                "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / n, 3),
+                "total_tokens": sum(c["total_tokens"] for c in rows if c["total_tokens"] is not None),
+                "avg_cache_hit": round(
+                    sum(c["cache_hit_rate"] for c in rows if c["cache_hit_rate"] is not None)
+                    / max(len([c for c in rows if c["cache_hit_rate"] is not None]), 1),
+                    3,
+                ) if any(c["cache_hit_rate"] is not None for c in rows) else None,
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
             }
         )
@@ -1250,8 +1254,14 @@ def _load_story_data(stories: list[dict]) -> dict:
                 "sessions": sum(c["session_count"] for c in rows),
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
                 "avg_tokens_per_session": round(
-                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / n, 0
-                ),
+                    sum(
+                        c["total_tokens"] / max(c["session_count"], 1)
+                        for c in rows
+                        if c["total_tokens"] is not None
+                    )
+                    / max(len([c for c in rows if c["total_tokens"] is not None]), 1),
+                    0,
+                ) if any(c["total_tokens"] is not None for c in rows) else None,
             }
         )
 
@@ -1275,8 +1285,14 @@ def _load_story_data(stories: list[dict]) -> dict:
                 "total_captured_cost": cost_stats["total_captured_cost"],
                 "cost_coverage": cost_stats["cost_coverage"],
                 "avg_tokens_per_session": round(
-                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / n, 0
-                ),
+                    sum(
+                        c["total_tokens"] / max(c["session_count"], 1)
+                        for c in rows
+                        if c["total_tokens"] is not None
+                    )
+                    / max(len([c for c in rows if c["total_tokens"] is not None]), 1),
+                    0,
+                ) if any(c["total_tokens"] is not None for c in rows) else None,
                 "avg_session_duration_s": round(
                     sum(c["total_duration"] / max(c["session_count"], 1) for c in rows) / n, 0
                 ),
@@ -1286,11 +1302,12 @@ def _load_story_data(stories: list[dict]) -> dict:
     # Per-session stats. m2 null-not-zero: a session with no captured cost (cost_usd None)
     # contributes nothing to the cost total rather than a fabricated zero.
     total_cost = sum(s["cost_usd"] for s in sessions if s["cost_usd"] is not None)
-    total_tokens = sum(s["total_tokens"] for s in sessions)
-    total_cache_reads = sum(s["cache_read_tokens"] for s in sessions)
-    total_prompt = sum(s["prompt_tokens"] for s in sessions)
+    total_tokens = sum(s["total_tokens"] for s in sessions if s["total_tokens"] is not None)
+    cached = [s for s in sessions if s["cache_read_tokens"] is not None and s["prompt_tokens"] is not None]
+    total_cache_reads = sum(s["cache_read_tokens"] for s in cached)
+    total_prompt = sum(s["prompt_tokens"] for s in cached)
     denom = total_cache_reads + total_prompt
-    cache_hit_rate = (total_cache_reads / denom) if denom else 0.0
+    cache_hit_rate = (total_cache_reads / denom) if denom else None
 
     return {
         "_provenance": "[M] token counts from session.jsonl; cost from opencode DB verified",
@@ -1303,7 +1320,7 @@ def _load_story_data(stories: list[dict]) -> dict:
             "total_cost": total_cost,
             "total_tokens": total_tokens,
             "total_cache_reads": total_cache_reads,
-            "cache_hit_rate": round(cache_hit_rate, 3),
+            "cache_hit_rate": round(cache_hit_rate, 3) if cache_hit_rate is not None else None,
             "duration_s": sum(s["duration_s"] for s in sessions),
             "successful": sum(1 for s in sessions if s["exit_code"] == 0),
             "failed": sum(1 for s in sessions if s["exit_code"] != 0),
@@ -1419,15 +1436,20 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
                 "total_records": cost_stats["total_records"],
                 "total_captured_cost": cost_stats["total_captured_cost"],
                 "cost_coverage": cost_stats["cost_coverage"],
-                "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / total_runs, 3),
+                "avg_cache_hit": round(
+                    sum(c["cache_hit_rate"] for c in rows if c["cache_hit_rate"] is not None)
+                    / max(len([c for c in rows if c["cache_hit_rate"] is not None]), 1),
+                    3,
+                ) if any(c["cache_hit_rate"] is not None for c in rows) else None,
                 "avg_tests": round(sum(c["test_count"] for c in rows) / total_runs, 1),
                 "avg_test_code_ratio": round(
                     sum(c["test_code_ratio"] for c in rows) / total_runs, 3
                 ),
                 "avg_tok_per_session": round(
-                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / total_runs,
+                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows if c["total_tokens"] is not None)
+                    / max(len([c for c in rows if c["total_tokens"] is not None]), 1),
                     0,
-                ),
+                ) if any(c["total_tokens"] is not None for c in rows) else None,
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / total_runs, 0),
                 "avg_code_lines": avg_code_lines,
                 # ── Test-count scope (review "smaller"): two DIFFERENT quantities, no longer

@@ -34,7 +34,11 @@ from agentic_dynamics.reporting.lab_contract import (
     attach_contribution,
     record_id,
 )
-from agentic_dynamics.reporting.measurement_coverage import cost_captured, cost_coverage
+from agentic_dynamics.reporting.measurement_coverage import (
+    MeasurementCoverage,
+    cost_captured,
+    cost_coverage,
+)
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_cache_economics.py"
@@ -43,10 +47,6 @@ OUTPUT_PATH = Path("experiments/results/lab_cache_economics.json")
 
 def _short_model(model: str) -> str:
     return model.split("/")[-1]
-
-
-def _avg(lst):
-    return round(sum(lst) / len(lst), 3) if lst else 0.0
 
 
 def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
@@ -82,17 +82,27 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
         cost = s.get("total_cost")
         if cost_captured(cost):
             b["costs"].append(cost)
-        b["cache_hit"].append(s.get("cache_hit_rate", 0) or 0)
+        # Same rule for the optional per-cell measurements: a RATE (cache_hit_rate) and the
+        # token volumes are captured-only — a session that did not record them is
+        # "unavailable", never "zero". (reads/writes below stay count sums: a count's zero
+        # is a real value, and they are published as totals, not averages.)
+        if s.get("cache_hit_rate") is not None:
+            b["cache_hit"].append(s["cache_hit_rate"])
+        if s.get("total_context_tokens") is not None:
+            b["context"].append(s["total_context_tokens"])
+        if s.get("total_tokens") is not None:
+            b["tokens"].append(s["total_tokens"])
         b["reads"].append(s.get("total_cache_reads", 0) or 0)
         b["writes"].append(s.get("total_cache_writes", 0) or 0)
-        b["context"].append(s.get("total_context_tokens", 0) or 0)
-        b["tokens"].append(s.get("total_tokens", 0) or 0)
 
     models = []
     for m, v in by_model.items():
         reads = sum(v["reads"])
         writes = sum(v["writes"])
         cost_stats = cost_coverage(v["costs"], n_total=v["cells"])
+        cache_hit = MeasurementCoverage.over(v["cache_hit"], n_total=v["cells"], round_value=3)
+        context = MeasurementCoverage.over(v["context"], n_total=v["cells"], round_value=0)
+        tokens = MeasurementCoverage.over(v["tokens"], n_total=v["cells"], round_value=0)
         models.append(
             {
                 "model": m,
@@ -103,12 +113,15 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
                 "cost_captured_records": cost_stats["cost_captured_records"],
                 "total_records": cost_stats["total_records"],
                 "cost_coverage": cost_stats["cost_coverage"],
-                "avg_cache_hit": _avg(v["cache_hit"]),
+                "avg_cache_hit": cache_hit.value,
+                "cache_hit_coverage": cache_hit.to_dict(),
                 "cache_reads": reads,
                 "cache_writes": writes,
                 "read_write_ratio": round(reads / writes, 1) if writes else None,
-                "avg_context_per_cell": round(sum(v["context"]) / len(v["context"]), 0),
-                "avg_tokens_per_cell": round(sum(v["tokens"]) / len(v["tokens"]), 0),
+                "avg_context_per_cell": context.value,
+                "context_coverage": context.to_dict(),
+                "avg_tokens_per_cell": tokens.value,
+                "tokens_coverage": tokens.to_dict(),
             }
         )
     # None-safe ordering: un-priced models sort last (matching the captured-only average).
