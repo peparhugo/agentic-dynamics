@@ -88,21 +88,21 @@ def _report(correctness, novelty, escape, thinking_ratio, cost, energy=1000.0):
 
 
 def test_economic_ratios_null_when_denominator_uncaptured():
-    """Cost/energy-denominated ratios are not inflated when the denominator is uncaptured.
+    """Cost/energy-denominated ratios are null (unavailable), not zero, when the denominator is uncaptured.
 
     The finding-economics closure removed the ``/ max(cost, 0.0001)`` ratio floor from the
     published corpus; the strategy report's exploration_premium (cost-denominated) and
-    thermal_efficiency (energy-denominated) carried the same floor. An uncaptured 0 cost/energy
-    must leave them at their 0.0 default, never a superspiked value.
+    thermal_efficiency (energy-denominated) carried the same floor. An uncaptured cost/energy
+    must leave them None — a ratio unavailable is not a ratio measured as zero.
     """
     # Exploration premium is cost-denominated.
     uncaptured_cost = _report(0.9, 0.6, 0.7, 0.2, cost=0.0)
     captured_cost = _report(0.9, 0.6, 0.7, 0.2, cost=0.005)
-    assert uncaptured_cost.exploration_premium == 0.0
+    assert uncaptured_cost.exploration_premium is None
     assert captured_cost.exploration_premium > 0.0
 
     # Thermal efficiency is energy-denominated.
     uncaptured_energy = _report(0.9, 0.2, 0.2, 0.1, cost=0.005, energy=0.0)
     captured_energy = _report(0.9, 0.2, 0.2, 0.1, cost=0.005, energy=1000.0)
-    assert uncaptured_energy.thermal_efficiency == 0.0
+    assert uncaptured_energy.thermal_efficiency is None
     assert captured_energy.thermal_efficiency > 0.0

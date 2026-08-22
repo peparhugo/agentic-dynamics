@@ -1,7 +1,9 @@
 name: cap_session_routing_spec
 question: >-
   Author and gate the evidence-seed ExperimentSpec at
-  experiments/specs/cap_session_routing_evidence.yaml: the retrospective 4-arm comparison of
+  experiments/definitions/cap_session_routing_evidence.yaml (NOT experiments/specs/ — that
+  directory is generated-only: STATUS.md + index.json; a YAML there trips the classification
+  guard): the retrospective 4-arm comparison of
   session continuation vs checkpointed forking (continue / fork_with_checkpoint / fork_blind /
   escalate_with_checkpoint), evaluated offline over existing ledger data — the same shape as
   routing.simulate_strategies. Per the load-bearing rule, every rule the spec declares must have
@@ -10,6 +12,11 @@ question: >-
   exists, V_continue and any session policy stay [H] shadow — never promoted.
 version: "0.1"
 artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:
@@ -48,8 +55,9 @@ workflow:
         retrospective-simulation precedent. compile_experiment.py's validate_rules enforces the
         load-bearing rule.
       hard_rules: >-
-        (1) Every phase commits '[workflow] <phase>' with green tests. (2) The authored spec is
-        an EXPERIMENT spec (artifact_kind: experiment) in experiments/specs/ — not a workflow.
+        (1) Every phase commits '[workflow] <phase>' with green tests.         (2) The authored spec is
+        an EXPERIMENT spec (artifact_kind: experiment) in experiments/definitions/ (NEVER
+        experiments/specs/ — that directory is generated-only and guarded) — not a workflow.
         (3) Every requires in every rule must resolve to a producer that exists TODAY (ledger
         fields, story results, test_runner, or the lab pipelines) — an unresolvable requires is a
         spec defect, not a gap to paper over: drop the rule and record the gap in the spec's
@@ -75,10 +83,11 @@ workflow:
         timeout: 10800
         prompt: |
           GOAL: {goal}
-          DELIVER exactly one file: experiments/specs/cap_session_routing_evidence.yaml
+          DELIVER exactly one file: experiments/definitions/cap_session_routing_evidence.yaml
           ROLE: experiment designer. Write the ExperimentSpec for the retrospective 4-arm session-routing comparison.
           SHAPE (from the spec/compiler design): name, question, version, artifact_kind: experiment, workflow kind experiment, factors: session_policy arm {continue, fork_with_checkpoint, fork_blind, escalate_with_checkpoint} x model (the models present in the existing ledger), design factorial, rules: measurement rules that COMPUTE per-arm outcomes from existing ledger fields (verified success, cost per verified outcome, cache utilization, rework cost, token growth) — each rule's requires must name only fields produced today (see current_state); comparison: effect_size over arm_factor session_policy, loss {cost, quality}; stop with a small budget; writeup lab_book.
           CONSTRAINTS: no requires on snapshot_id/ControlContext/CAP facts; the arms are RETROSPECTIVE counterfactuals over attempt lineage (parent_attempt_id, attempt_number, escalation_from/to, cache_hit) — the simulation logic is described in the spec as an evaluation rule, generalizing routing.simulate_strategies; null-not-zero coverage semantics throughout; state the null hypothesis explicitly (no arm outperforms `continue` on cost per verified outcome).
+          SPLIT (encode this identifiability limit in the spec — do not rediscover it): the experiment is TWO studies. (1) RETROSPECTIVE, executable now: arms distinguishable from existing lineage — continue / historical fresh-session proxy / historical model escalation — measuring cache hit, context growth, verified success, captured cost, rework, repeated failures, latency. (2) PROSPECTIVE, gated on CAP I10: the randomized arms continue / fork_with_checkpoint / fork_blind / escalate_with_checkpoint. A retrospective dataset CANNOT estimate the causal effect of typed checkpointing (checkpoints were never recorded) — the spec states this and declares study 2's requires as I10-produced, marked blocked-until-instrumented in its writeup.
           GUARD: the spec YAML parses; every rule's requires resolves to an existing producer (name it in a comment).
           LOG: arms, factors, rules, requires->producer mapping table; PASS/FAIL; commit.
       - name: s2_compile_gate
@@ -87,7 +96,7 @@ workflow:
         prompt: |
           GOAL: {goal}
           INVARIANT: the spec passes the requires/produces gate — no rule consumes information nothing produces.
-          FIX: run the compile-gate validation on experiments/specs/cap_session_routing_evidence.yaml (the compile_experiment.validate_rules path — invoke via python3 with the module's public API; if no standalone CLI exists, import and call the validator in a one-off). Fix every refusal. A refusal that is LEGITIMATE (the signal truly is not measured) is fixed by DROPPING the consuming rule and recording the gap in the spec's writeup sections — never by declaring a phantom producer.
+          FIX: run the compile-gate validation on experiments/definitions/cap_session_routing_evidence.yaml (the compile_experiment.validate_rules path — invoke via python3 with the module's public API; if no standalone CLI exists, import and call the validator in a one-off). Fix every refusal. A refusal that is LEGITIMATE (the signal truly is not measured) is fixed by DROPPING the consuming rule and recording the gap in the spec's writeup sections — never by declaring a phantom producer.
           GUARD: validation returns zero errors; the spec still parses; requires->producer mapping table updated in s1's LOG section if changed.
           LOG: refusals before/after with resolutions; PASS/FAIL; commit.
       - name: s3_adversarial_check

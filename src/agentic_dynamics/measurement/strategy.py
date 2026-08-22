@@ -63,8 +63,8 @@ class StrategyReport:
 
     # Scores
     strategy_score: float = 0.0  # composite strategic quality
-    exploration_premium: float = 0.0  # bonus for novel correct solutions
-    thermal_efficiency: float = 0.0  # correctness per joule
+    exploration_premium: float | None = None  # bonus for novel correct solutions (None = denominator uncaptured)
+    thermal_efficiency: float | None = None  # correctness per joule (None = denominator uncaptured)
 
     # Verdict
     verdict: str = ""
@@ -80,8 +80,12 @@ class StrategyReport:
         return {
             "strategy": self.strategy.value,
             "strategy_score": round(self.strategy_score, 4),
-            "exploration_premium": round(self.exploration_premium, 4),
-            "thermal_efficiency": round(self.thermal_efficiency, 4),
+            "exploration_premium": (
+                round(self.exploration_premium, 4) if self.exploration_premium is not None else None
+            ),
+            "thermal_efficiency": (
+                round(self.thermal_efficiency, 4) if self.thermal_efficiency is not None else None
+            ),
             "verdict": self.verdict,
             "recommendation": self.recommendation,
             "operator": self.operator,
@@ -166,7 +170,8 @@ def classify_strategy(
         # The exploration premium is cost-denominated: it is only meaningful when a cost
         # was captured (> 0). The old ``/ max(cost, 0.0001)`` floor turned an uncaptured
         # $0 cost into an enormous premium — the same ratio-superspike the finding-economics
-        # closure removed elsewhere. An uncaptured cost leaves the premium at its 0.0 default.
+        # closure removed elsewhere. An uncaptured cost leaves the premium None — the ratio
+        # is UNAVAILABLE, not zero.
         if cost > 0:
             r.exploration_premium = novelty * correctness / cost
     elif is_correct and is_reasoning_lean:
@@ -179,7 +184,7 @@ def classify_strategy(
         r.recommendation = "This operator+model combination is production-ready."
         # Thermal efficiency is energy-denominated: only meaningful when energy was
         # captured (> 0). The old ``/ max(energy, 0.01)`` floor inflated it for an
-        # unmetered 0J run. An uncaptured energy leaves it at its 0.0 default.
+        # unmetered 0J run. An uncaptured energy leaves it None — UNAVAILABLE, not zero.
         if energy > 0:
             r.thermal_efficiency = correctness / energy
     else:

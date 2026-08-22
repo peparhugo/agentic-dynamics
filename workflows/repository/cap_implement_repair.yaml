@@ -9,6 +9,11 @@ question: >-
   This is the hard blocker for CAP I0-I7 — two prior runs already failed on unresolvable paths.
 version: "0.1"
 artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:
@@ -45,10 +50,10 @@ workflow:
         as empty placeholders. Finding-economics closure merged at 58c684a87.
       hard_rules: >-
         (1) Every phase commits '[workflow] <phase>' with green tests. (2) Do NOT start
-        implementing I0-I7 — this workflow only makes the spec runnable; no src/ edits. (3) Every
+        implementing I0-I7 — this workflow only makes the spec runnable; no src/ edits.         (3) Every
         path reference in the repaired spec must exist (verify with ls/glob, log each). (4) The
-        freeze provenance is preserved as a historical note, but the spec must parse, carry
-        status: active, and the derived index must reflect it. (5) The adversarial audit (r4) is
+        freeze provenance is preserved as a historical note, but the spec must parse, the derived
+        index must show runnable (never an invalid status like active). (5) The adversarial audit (r4) is
         mandatory and must find at least 3 verified defects or document a clean sweep with
         evidence. (6) docs/context_abstraction/implementation_notes.md is append-only — never
         rewrite existing lines. (7) Invariants survive: Redis 6380/6379, dual Firebase, frozen
@@ -71,7 +76,7 @@ workflow:
           GOAL: {goal}
           INVARIANT: every path referenced by workflows/repository/context_abstraction_implement.yaml resolves to a file that exists in the post-consolidation tree.
           SHAPE: no src/ edits, no I0-I7 implementation. Only the spec file changes in this phase.
-          FIX: re-point ALL 10 occurrences of docs/context_abstraction/design.md -> docs/designs/current/context_abstraction_design.md (review.md stays — docs/context_abstraction/review.md still exists). Re-point ALL 20 src/instrument/* references to their post-consolidation homes: src/agentic_dynamics/knowledge/{knowledge.py,record_factory.py,actuation_ingestion.py,...}, src/agentic_dynamics/runtime/{workflow_runner.py,test_runner.py}, src/agentic_dynamics/experiment/{experiment_spec.py,compile_experiment.py}, src/agentic_dynamics/control/{step_routing.py,supervisor.py,...}. For each reference: ls/glob to confirm the target exists; fix the fixed_semantics conventions text (src/instrument/__init__.py -> plane __init__ exports).
+          FIX: re-point ALL 10 occurrences of docs/context_abstraction/design.md -> docs/designs/current/context_abstraction_design.md (review.md stays — docs/context_abstraction/review.md still exists). Re-point ALL 20 src/instrument/* references to their post-consolidation homes, using the ACTUAL plane layout — verify each target with ls/glob before writing: knowledge/{knowledge.py,record_factory.py,...} under src/agentic_dynamics/knowledge/; actuation_ingestion.py, observation_ingestion.py under src/agentic_dynamics/control/; workflow_runner.py, test_runner.py under src/agentic_dynamics/runtime/; experiment_spec.py, compile_experiment.py under src/agentic_dynamics/experiment/; step_routing.py, supervisor.py under src/agentic_dynamics/control/. This example mapping is a HINT, not authority — the file system is the authority.
           HUNT: grep the spec for ANY remaining 'src/instrument' or 'docs/context_abstraction/design.md' string — zero matches required.
           GUARD: a path-check pass over the final file (list every referenced path; every one exists).
           LOG: one line per re-point (old -> new, verified y/n); PASS/FAIL; commit.
@@ -80,9 +85,9 @@ workflow:
         timeout: 7200
         prompt: |
           GOAL: {goal}
-          INVARIANT: the spec is runnable again: status: active, no active PAUSED marker, and the derived lifecycle index reflects it.
-          FIX: remove the PAUSED freeze header (the comment block + bracketed PAUSED paragraph in `question`), replace with a one-line historical provenance note ('resumed after consolidation S6 — was PAUSED per consolidation_release/stage_map §6'). Set status: active. Keep the design-path references and phase content unchanged. Run: python3 scripts/spec_status.py. Verify the regenerated experiments/specs/STATUS.md + index.json show context_abstraction_implement as active (grep + show the row).
-          GUARD: the spec parses (python3 -c yaml load); grep PAUSED in the file returns only the historical note line; index shows active.
+          INVARIANT: the spec is runnable again: the lifecycle index derives `runnable` (a non-repeatable, unexecuted-in-main workflow), no active PAUSED marker remains.
+          FIX: remove the PAUSED freeze header (the comment block + bracketed PAUSED paragraph in `question`), replace with a one-line historical provenance note ('resumed after consolidation S6 — was PAUSED per consolidation_release/stage_map §6'). Remove the authored status: draft line — do NOT set status: active (not in the lifecycle vocabulary). Let spec_status derive the status. Run: python3 scripts/spec_status.py. Verify the regenerated experiments/specs/STATUS.md + index.json show context_abstraction_implement as runnable (grep + show the row).
+          GUARD: the spec parses (python3 -c yaml load); grep PAUSED in the file returns only the historical note line; the index row shows runnable — not active, not draft.
           LOG: the STATUS.md row before/after; PASS/FAIL; commit (including the regenerated index files).
       - name: r3_implementation_notes
         kind: agent
@@ -99,7 +104,7 @@ workflow:
         prompt: |
           GOAL: {goal}
           ROLE: adversarial auditor — try to break the repaired spec; find at least 3 verified defects or document a clean sweep with evidence.
-          HUNT, systematically: (1) grep the spec for any surviving stale path ('src/instrument', 'docs/context_abstraction/design.md'); (2) resolve EVERY referenced path in the spec against the tree (script the check — any miss is a defect); (3) re-read the un-paused spec end-to-end: does any phase still assume pre-consolidation layout or the frozen status? (4) check the index row is active AND the freeze note no longer present; (5) confirm implementation_notes.md contains F1-F6 + Addendum A; (6) attempt the compile/validation gate the spec lifecycle provides (scripts/spec_status.py is authoritative for indexing; a full compile of the workflow spec is NOT required — do not run its phases); (7) confirm no src/ or tests/ file was modified by r1-r3.
+          HUNT, systematically: (1) grep the spec for any surviving stale path ('src/instrument', 'docs/context_abstraction/design.md'); (2) resolve EVERY referenced path in the spec against the tree (script the check — any miss is a defect); (3) re-read the un-paused spec end-to-end: does any phase still assume pre-consolidation layout or the frozen status? is the lifecycle status a valid vocabulary value (runnable, never active)? (4) check the index row is runnable AND the freeze note no longer present; (5) confirm implementation_notes.md contains F1-F6 + Addendum A; (6) attempt the compile/validation gate the spec lifecycle provides (scripts/spec_status.py is authoritative for indexing; a full compile of the workflow spec is NOT required — do not run its phases); (7) confirm no src/ or tests/ file was modified by r1-r3.
           Every finding: fix it (within this workflow's scope) or log a reason-bearing FAIL. No finding may be silently dropped.
           LOG: one line per check with evidence; PASS/FAIL; commit.
 factors:

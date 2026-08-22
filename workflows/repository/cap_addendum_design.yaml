@@ -1,15 +1,21 @@
 name: cap_addendum_design
 question: >-
-  Produce the design-only addendum for CAP increments I8-I10, exactly per Addendum A of
+  Produce the design-only addendum for CAP increments I8-I10, seeded by Addendum A of
   docs/designs/current/context_abstraction_design.md: (I8) DomainProfile + ChallengeProfile as
-  the spec-driven domain-loading layer; (I9) the `pattern` epistemic class with its enforced
+  the spec-driven domain-loading layer; (I9) the validated-pattern fact kind with its enforced
   payload; (I10) the typed SessionCheckpoint and the session_routing decision-type contract.
-  Run the repo's seeding protocol — review -> design -> verify -> adversarial critique — with
-  the review → design → verify phase shape that produced the frozen CAP design itself. This is a
-  DESIGN-ONLY spec: it adds docs under docs/designs/current/ and modifies nothing under src/,
-  scripts/, or tests/.
+  Addendum A is a PROVISIONAL design input — its commitments may be amended or rejected when the
+  component audit or adversarial review contradicts them (the proper order is proposal -> audit
+  -> design -> verification -> acceptance, not accepted-answer -> audit). Run the repo's seeding
+  protocol — review -> design -> verify -> adversarial critique. This is a DESIGN-ONLY spec: it
+  adds docs under docs/designs/current/ and modifies nothing under src/, scripts/, or tests/.
 version: "0.1"
 artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:
@@ -51,8 +57,9 @@ workflow:
         (1) Every phase commits '[workflow] <phase>' with green tests. (2) DESIGN-ONLY: the only
         files added/modified live under docs/designs/current/ — git status must show nothing
         under src/, scripts/, tests/, workflows/, experiments/. (3) Every schema is a sketch, not
-        code; dataclass syntax with docstrings (repo convention). (4) A deviation from Addendum A
-        is permitted only with a one-line note in the design doc's deviation table. (5) The
+        code; dataclass syntax with docstrings (repo convention).         (4) Addendum A is provisional: a deviation is recorded with a one-line note in the design
+        doc's deviation table, and a rejected commitment is recorded with its reason — the
+        adversarial critique may require either. (5) The
         adversarial critique (a4) is mandatory — at least 3 material findings, each re-verified
         against the tree, each resolved in the design or logged as an accepted risk. (6) Hard
         rules 1-7 of the frozen design still bind: deterministic reducers only, no new transport,
@@ -92,11 +99,11 @@ workflow:
         prompt: |
           GOAL: {goal}
           DELIVER exactly one file: docs/designs/current/context_abstraction_addendum_design.md
-          ROLE: designer. Authority: Addendum A (docs/designs/current/context_abstraction_design.md). Answer every OQ from a1 with a schema.
+          ROLE: designer. Seeding input: Addendum A (docs/designs/current/context_abstraction_design.md) — provisional, amendable. Answer every OQ from a1 with a schema.
           DESIGN, in three bounded sections:
-          (1) I8 — DomainProfile + ChallengeProfile dataclasses (fields, versioning, where they live: propose control/profiles.py, cite the reserved-homes table), the compile_context signature change, the composition rule (the contract remains the sole gate — profiles resolve through requires_facts), profile facts as `declared` (POLICY), and the deliberation-stage table per archetype (greenfield, cross_cutting, small_change, research, incident, migration).
-          (2) I9 — the EPISTEMIC_MAP additive row, PatternPayload fields, the pattern reducer signature (consumes lab/campaign artifacts; deterministic), minting rules (hard rule 3), and source_experiment via lab-contract refs.
-          (3) I10 — SessionCheckpoint schema with per-field epistemic markers (DERIVED vs ADVISORY), the session_routing contract YAML (experiments/contexts/session_routing.yaml: allowed_actions [continue, fork, compress_and_fork, escalate], invariants incl. snapshot identity for continue and checkpoint-presence for fork, max_snapshot_age_seconds), the AUTOMATABLE_ACTIONS question (continue is automatable; are fork/compress/escalate code or proposals?), and the 4-arm evidence-seed experiment design (arms, required signals mapped to EXISTING ledger fields only — no requires on snapshot_id, which does not exist until I4).
+          (1) I8 — DomainProfile + ChallengeProfile dataclasses (fields, versioning, where they live: propose control/profiles.py, cite the reserved-homes table), the compile_context signature change, the composition rule (the contract remains the sole gate — profiles resolve through requires_facts), profile facts as `declared` (POLICY), and the deliberation-stage table per archetype (greenfield, cross_cutting, small_change, research, incident, migration). Position the profiles honestly: they are L5 context-selection + policy metadata (they determine HOW L4-L1 facts are projected) — they do NOT produce L4 workload state (capacity, budget, priority, value); L4 stays empty until workload state has real producers. Do not fill a layer merely because a place exists.
+          (2) I9 — decide the categorical placement explicitly: is `pattern` a new epistemic_status in EPISTEMIC_MAP, or a fact_kind / predicate namespace whose epistemic_status remains `derived`? Answer with reasoning (epistemic status = how we know; fact kind = what type of statement), then design accordingly: the PatternPayload fields, the pattern reducer signature (consumes lab/campaign artifacts; deterministic), minting rules (hard rule 3), and source_experiment via lab-contract refs.
+          (3) I10 — SessionCheckpoint schema with per-field epistemic markers (DERIVED vs ADVISORY), the session_routing contract YAML (experiments/contexts/session_routing.yaml: allowed_actions [continue, fork, compress_and_fork, escalate], invariants incl. snapshot identity for continue and checkpoint-presence for fork, max_snapshot_age_seconds), the AUTOMATABLE_ACTIONS question (continue is automatable; are fork/compress/escalate code or proposals?), and the two-study evidence design: retrospective arms (executable now) + prospective arms (gated on I10), with the retrospective study's required signals mapped to EXISTING ledger fields only — no requires on snapshot_id, which does not exist until I4.
           END with: a deviation table (empty unless you deviate from Addendum A), the reserved-homes declaration for each increment, and the explicit scope boundary (what I8-I10 do NOT build).
           GUARD: design-only — git status shows only the new doc; every NEW mechanism is marked NEW, every REUSE names the existing mechanism with file:line.
           LOG: PASS/FAIL; commit.
@@ -117,7 +124,7 @@ workflow:
         prompt: |
           GOAL: {goal}
           ROLE: adversarial external critic — attack the design like docs/review/finding_economics_review.md attacked the measurement-contribution closure. Find at least 3 material findings; every finding re-verified against the tree; every finding resolved in the design or logged as an accepted risk.
-          ATTACK vectors (work all of them): (1) does the pattern class violate hard rule 3 anywhere (can a pattern become canonical without a deterministic reducer)? (2) can a profile widen a controller's view past its contract — find a concrete path; (3) does the SessionCheckpoint duplicate PhaseResult, and do ADVISORY narrative fields leak into canonical payload? (4) the session_routing contract vs AUTOMATABLE_ACTIONS {continue, route} — are fork/compress_and_fork/escalate applied or proposed? (5) is the 4-arm experiment's evidence sufficient — sample sizes, confounding model×session_policy, coverage semantics (null-not-zero) for every required signal; (6) does anything in I8-I10 conflict with the frozen design §11 scope boundary or the observe-only supervisor (§8.6)?
+          ATTACK vectors (work all of them): (1) does the pattern class violate hard rule 3 anywhere (can a pattern become canonical without a deterministic reducer)? (2) can a profile widen a controller's view past its contract — find a concrete path; (3) does the SessionCheckpoint duplicate PhaseResult, and do ADVISORY narrative fields leak into canonical payload? (4) the session_routing contract vs AUTOMATABLE_ACTIONS {continue, route} — are fork/compress_and_fork/escalate applied or proposed? (5) is the retrospective study's evidence sufficient — sample sizes, confounding model×session_policy, coverage semantics (null-not-zero) for every required signal; and is the prospective study honestly gated on I10? (6) does anything in I8-I10 conflict with the frozen design §11 scope boundary or the observe-only supervisor (§8.6)? (7) CATEGORY AXIS: is `pattern` placed on the correct conceptual axis — epistemic status (how we know) vs fact kind (what type of statement)? If the design put it in EPISTEMIC_MAP, argue why it is not a fact_kind/predicate namespace with epistemic_status derived. (8) LAYER HONESTY: do the profiles claim to produce L4 workload state (capacity, budget, priority, value), or do they correctly sit at L5 as context-selection metadata with L4 left empty?
           DELIVER: an appendix section 'Adversarial findings' in docs/designs/current/context_abstraction_addendum_design.md + the resolution of each finding (design edit with a one-line deviation note, or an accepted-risk entry with reasoning).
           GUARD: git status shows only docs/designs/current/ files; findings count >= 3 or a documented clean sweep with the evidence for why no finding exists.
           LOG: one line per attack vector with evidence; PASS/FAIL; commit.

@@ -9,6 +9,11 @@ question: >-
   the new repo at fork time). This is audit + design of the DOMAIN — no framework code changes.
 version: "0.1"
 artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
 workflow:
   kind: agent_task
   params:
@@ -20,10 +25,15 @@ workflow:
         the investing repo's I8 profile exists, this block is replaced by the compiled profile
         and MUST be deleted from this spec.
         domain: investing (personal RRSP / Canadian equities+options / crypto exposure)
-        canonical_sources: [CRA RRSP rules (registered accounts: no naked puts/calls, no margin;
-          covered calls permitted), IIROC/CIRO order rules, TMX data model (quotes, options
-          chains, greeks), crypto exchange/ETF data (spot ETFs inside RRSP; direct holdings
-          outside), operator-declared risk policy]
+        canonical_sources:
+          - {source_id: cra_registered_account_rules, authority: external, status: to_verify}
+          - {source_id: ciro_iiroc_order_rules, authority: external, status: to_verify}
+          - {source_id: broker_account_permissions, authority: external, status: to_verify}
+          - {source_id: tmx_market_data_model, authority: external, status: to_verify}
+          - {source_id: crypto_exchange_and_etf_data, authority: external, status: to_verify}
+          - {source_id: operator_risk_policy, authority: policy}
+        # Sources are NAMED, never pre-concluded — every claim they support is tagged and
+        # verified in the audit deliverables. No conclusion may be embedded in a source name.
         predicates: [position_delta, short_exposure, buying_power, iv_rank, dte, premium,
           portfolio_value, realized_pnl]
         policies: [calls_only_invariant, no_naked_exposure, registered_account_limits,
@@ -88,7 +98,8 @@ workflow:
           GOAL: {goal}
           DELIVER exactly one file: docs/domain/investing/audit_policies.md
           ROLE: policy auditor — enumerate the candidate investing policies and apply the load-bearing rule literally.
-          STRUCTURE: one row per candidate policy: (a) calls_only_invariant — no naked puts/calls; long calls and covered calls only; (b) no_short_delta — net short delta exposure is a contract invariant, not a convention; (c) registered_account_limits — RRSP/TFSA eligibility, no margin in registered accounts; (d) position_size — requires portfolio_value + vol; (e) exit_rules — requires iv_rank + pnl_since_entry; (f) expiry_selection — requires dte + chain liquidity; (g) crypto_cap — requires portfolio weights; (h) weekly_review — requires the thesis -> outcome chain. For each row: the policy's requires list -> per-requires producer status (produced-by: d1 signal, or UNINSTRUMENTED) -> writable now? (yes only if every requires is produced — per the load-bearing rule, an unwritable policy is recorded as pending-instrumentation with its instrumentation order).
+          STRUCTURE: one row per candidate policy: (a) calls_only_invariant — no naked puts/calls; (b) no_short_delta — net short delta exposure is a contract invariant, not a convention; (c) registered_account_limits — RRSP/TFSA eligibility, no margin in registered accounts; (d) position_size — requires portfolio_value + vol; (e) exit_rules — requires iv_rank + pnl_since_entry; (f) expiry_selection — requires dte + chain liquidity; (g) crypto_cap — requires portfolio weights; (h) weekly_review — requires the thesis -> outcome chain. For each row: the policy's requires list -> per-requires producer status (produced-by: d1 signal, or UNINSTRUMENTED) -> writable now? (yes only if every requires is produced — per the load-bearing rule, an unwritable policy is recorded as pending-instrumentation with its instrumentation order).
+          THREE-WAY STRATEGY SPLIT: keep these distinct in every row — (1) EXTERNAL ELIGIBILITY: what the account type legally permits, tagged [X] with the authority source, to-verify where unconfirmed; (2) BROKER CAPABILITY: what the operator's platform can actually execute; (3) OPERATOR-SELECTED STRATEGY: what the operator chooses to trade, tagged [P]. The operator's question states 'purchase calls; no naked puts or calls' — whether covered calls (short call against long stock) are an operator-selected strategy is an OPEN OPERATOR DECISION: record it as [P] to-confirm, never infer it from external eligibility. CAP must enforce the operator's stricter policy even where an external authority allows more.
           COMPLIANCE: tag the account rules [P] with the external authority they rest on ([X] CRA/CIRO, name the rule class); mark any rule you cannot verify as [X] to-verify — never assert. Note the enforcement question: the calls_only invariant is only enforceable if the decision engine can SEE short exposure — state which producer that requires.
           GUARD: every requires cell names a producer or says UNINSTRUMENTED; no policy is marked writable with an unproduced requires.
           LOG: policy count, writable vs pending; PASS/FAIL; commit.
@@ -108,7 +119,7 @@ workflow:
         prompt: |
           GOAL: {goal}
           ROLE: adversarial compliance + feasibility critic — attack the audit like docs/review/finding_economics_review.md attacked the measurement release. Find at least 3 material findings, each re-verified against the docs and the framework, each resolved in the docs.
-          ATTACK vectors (work all of them): (1) fact/hypothesis contamination — find any d1/d2 claim where a hypothesis is written as a measured fact, or a policy asserted without an external authority; (2) deadline_slack-class phantoms — a policy whose requires names a signal with no real producer path (e.g. a greek whose inputs the broker cannot provide, an iv_rank with no chain history); (3) enforcement gaps — the calls_only invariant: does d2's producer mapping give the decision engine the short_exposure fact it needs, or is the invariant unenforceable as designed? (4) RRSP-specific traps — direct crypto not RRSP-eligible (spot ETFs only), US-settled assignments in registered accounts, contribution-room interactions — are they in the audit? (5) observability blind spots — currency (CAD/USD), corporate actions (splits/mergers on positions and chains), assignment on short calls — missed? (6) scope honesty — did d3 claim anything the framework already does that it does not?
+          ATTACK vectors (work all of them): (1) fact/hypothesis contamination — find any d1/d2 claim where a hypothesis is written as a measured fact, or a policy asserted without an external authority; (2) deadline_slack-class phantoms — a policy whose requires names a signal with no real producer path (e.g. a greek whose inputs the broker cannot provide, an iv_rank with no chain history); (3) enforcement gaps — the calls_only invariant: does d2's producer mapping give the decision engine the short_exposure fact it needs, or is the invariant unenforceable as designed? (4) RRSP-specific traps — direct crypto not RRSP-eligible (spot ETFs only), US-settled assignments in registered accounts, contribution-room interactions — are they in the audit? (5) observability blind spots — currency (CAD/USD), corporate actions (splits/mergers on positions and chains), assignment on short calls — missed? (6) scope honesty — did d3 claim anything the framework already does that it does not? (7) SOURCE-CLAIM SEPARATION — do the deliverables cite a source only as a source, with every conclusion tagged [X] to-verify / [P] / [M], or did any conclusion leak into the source list or the provisional profile? (8) OPERATOR-POLICY AMBIGUITY — is the covered-call question recorded as an OPEN [P] to-confirm operator decision, distinct from external eligibility, or did the audit silently assume an answer?
           Every finding: amend the relevant doc (commit) or record an accepted limitation with reasoning.
           LOG: one line per attack vector with evidence; PASS/FAIL; commit.
 factors:

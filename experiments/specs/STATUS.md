@@ -3,18 +3,14 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-22T17:42:52.471618+00:00`  ·  87 spec(s)
-**Work remaining:** 24 open · 63 completed/retired
+Generated at: `2026-08-22T18:30:46.112995+00:00`  ·  87 spec(s)
+**Work remaining:** 20 open · 67 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
-| `cap_addendum_design` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_implement_repair` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_session_routing_spec` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
-| `investing_domain_audit` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
 | `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -37,6 +33,9 @@ Generated at: `2026-08-22T17:42:52.471618+00:00`  ·  87 spec(s)
 | `canonical_state_finalize` | workflow | no | completed | 0.1 | — | 2026-08-18 20:38 | ok | anthropic/claude-fable-5 | $14.5891 | 1 |
 | `canonical_state_implement` | workflow | no | completed | 0.1 | — | 2026-08-18 19:51 | ok | anthropic/claude-fable-5 | $51.4204 | 1 |
 | `canonical_state_round2` | workflow | no | completed | 0.1 | — | 2026-08-18 17:55 | ok | anthropic/claude-fable-5 | $4.8433 | 2 |
+| `cap_addendum_design` | workflow | no | completed | 0.1 | — | 2026-08-22 18:15 | ok | deepseek/deepseek-v4-pro | $0.4667 | 1 |
+| `cap_implement_repair` | workflow | no | completed | 0.1 | — | 2026-08-22 18:16 | ok | deepseek/deepseek-v4-pro | $0.2652 | 1 |
+| `cap_session_routing_spec` | workflow | no | completed | 0.1 | — | 2026-08-22 17:59 | ok | deepseek/deepseek-v4-pro | $0.1430 | 1 |
 | `claude_tools_to_skills` | workflow | no | completed | 0.1 | — | 2026-08-14 22:29 | ok | anthropic/claude-fable-5 | $8.3582 | 1 |
 | `code_review` | workflow | no | completed | 0.1 | — | 2026-08-14 05:38 | ok | anthropic/claude-fable-5 | $2.4257 | 1 |
 | `consolidation_release` | workflow | no | completed | 0.1 | — | 2026-08-20 13:10 | ok | deepseek/deepseek-v4-pro | $0.1756 | 1 |
@@ -60,6 +59,7 @@ Generated at: `2026-08-22T17:42:52.471618+00:00`  ·  87 spec(s)
 | `evidence_redesign` | workflow | no | completed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
 | `fix_review_findings` | workflow | no | completed | 0.1 | — | 2026-08-14 13:48 | ok | deepseek/deepseek-v4-pro | $0.1504 | 1 |
 | `framework_facelift` | workflow | no | completed | 0.2 | — | 2026-08-14 15:18 | ok | openai/gpt-5.6-sol | $0.0000 | 1 |
+| `investing_domain_audit` | workflow | no | completed | 0.1 | — | 2026-08-22 18:09 | ok | deepseek/deepseek-v4-pro | $0.2010 | 1 |
 | `kb_event_typing` | workflow | no | completed | 0.1 | — | 2026-08-19 00:38 | ok | deepseek/deepseek-v4-pro | $0.2661 | 1 |
 | `kb_lineage_reconcile` | workflow | no | completed | 0.1 | — | 2026-08-19 00:31 | ok | deepseek/deepseek-v4-pro | $0.3715 | 1 |
 | `kb_producer_factory` | workflow | no | completed | 0.1 | — | 2026-08-18 23:58 | ok | deepseek/deepseek-v4-pro | $0.4744 | 1 |
