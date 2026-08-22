@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-22T17:29:00.847819+00:00",
+  "generated_at": "2026-08-22T18:10:16.388512+00:00",
   "n_specs": 83,
   "specs": [
     {
@@ -20,6 +20,24 @@
       "latest_git_sha": "01517934f",
       "results_pointer": "experiments/results/workflows/auto_posthoc_wiring/20260817T161730Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "context_abstraction_implement",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/context_abstraction_implement.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-20T00:56:43.897968+00:00",
+      "latest_ok": false,
+      "latest_model": "anthropic/claude-opus-5",
+      "latest_cost_usd": 0.0,
+      "latest_git_sha": "bf05f1c82",
+      "results_pointer": "experiments/results/workflows/context_abstraction_implement/20260820T005643Z.json",
+      "n_runs": 2
     },
     {
       "name": "explanation_tax",
@@ -344,24 +362,6 @@
       "latest_git_sha": "d5f85126b",
       "results_pointer": "experiments/results/workflows/design_sessions/20260814T065812Z.json",
       "n_runs": 1
-    },
-    {
-      "name": "context_abstraction_implement",
-      "version": "0.1",
-      "status": "draft",
-      "spec_path": "workflows/repository/context_abstraction_implement.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-20T00:56:43.897968+00:00",
-      "latest_ok": false,
-      "latest_model": "anthropic/claude-opus-5",
-      "latest_cost_usd": 0.0,
-      "latest_git_sha": "bf05f1c82",
-      "results_pointer": "experiments/results/workflows/context_abstraction_implement/20260820T005643Z.json",
-      "n_runs": 2
     },
     {
       "name": "canonical_publication_closure",

@@ -1,23 +1,4 @@
-# ── CAP RESUMED — consolidation S6 complete; freeze lifted ─────────────────────
-# The CAP freeze (consolidation_release / stage_map §6, rec 1) is lifted: `resume_after`
-# (consolidation S6) is satisfied and the reserved homes exist (ARCHITECTURE.md §4, and
-# docs/consolidation/cap_freeze_note.md). This spec is un-paused — `status: runnable` — and its
-# paths re-pointed to the post-consolidation tree.
-#
-# Verify findings from docs/designs/current/context_abstraction_verify.md §9, recorded so the
-# implementer handles them (material = fix before implementing; minor = fix during
-# implementation; non-issue = cleared, do not re-open):
-#   F1 (material) — an invariant may declare on_missing only {halt, escalate}; add compile-time
-#     refusal R11 (design §7 carries R1-R11). Wired into I5.
-#   F2 (minor)    — validator C5 additionally requires facts_used non-empty for any action other
-#     than continue. Wired into I6.
-#   F3 (minor)    — expected_effect is scored by a named measurement rule decision_calibration
-#     (plane measurement, [C]) producing decision_regret. Wired into I6 + rules.
-#   F4 (minor)    — conflicted/stale computed ONLY in fact_state(); generate_manifest._derive_lifecycle
-#     stays untouched. Wired into I3.
-#   F5 (minor)    — OQ3/OQ7 answered as tables (accepted deviation; optional remedy: increments:
-#     YAML list).
-#   F6 (non-issue)— source_type="fact" nominal DERIVED vs POLICY: cleared, do not re-open.
+# resumed after consolidation S6 — was PAUSED per consolidation_release/stage_map §6
 name: context_abstraction_implement
 question: >-
   Implement the Context Abstraction Plane incrementally, exactly per
