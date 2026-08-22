@@ -703,11 +703,13 @@ def test_story_model_sections_agree_on_avg_cost():
     assert top[mid]["avg_cost"] == 3.0
     assert nested[mid]["avg_cost"] == 3.0
     assert top[mid]["avg_cost"] == nested[mid]["avg_cost"]
-    # The four shared denominator fields are published on both views.
-    assert nested[mid]["cost_captured_cells"] == 2
-    assert nested[mid]["total_cells"] == 3
+    # The shared denominator fields are published on both views (m2: renamed to the
+    # shared cost_coverage vocabulary — cost_captured_records / total_records).
+    assert nested[mid]["cost_captured_records"] == 2
+    assert nested[mid]["total_records"] == 3
     assert nested[mid]["cost_coverage"] == round(2 / 3, 4)
     assert top[mid]["avg_captured_cost"] == nested[mid]["avg_captured_cost"]
+    assert nested[mid]["total_captured_cost"] == 6.0
 
 
 def test_real_data_js_model_sections_agree_on_avg_cost():

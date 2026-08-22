@@ -31,6 +31,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
 from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.measurement_coverage import cost_captured, cost_coverage
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_verification_frontier.py"
@@ -64,11 +65,13 @@ def compute(stories: list[dict]) -> dict:
     for d in stories:
         m = _short_model(d.get("model", "unknown"))
         summary = d.get("summary", {}) or {}
-        cost = summary.get("total_cost", 0) or 0
+        # m2 null-not-zero: only a *captured* cost enters the average; a missing/zero cost
+        # is counted but never averaged in as $0 (review P1).
+        cost = summary.get("total_cost")
         tests = _test_count(d)
         by_model[m]["tests"].append(tests)
         by_model[m]["cells"] += 1
-        if cost > 0:
+        if cost_captured(cost):
             by_model[m]["costs"].append(cost)
 
     def avg(lst):
@@ -76,26 +79,38 @@ def compute(stories: list[dict]) -> dict:
 
     models = []
     for m, v in by_model.items():
+        cost_stats = cost_coverage(v["costs"], n_total=v["cells"])
         models.append(
             {
                 "model": m,
                 "cells": v["cells"],
-                "cost_cells": len(v["costs"]),
-                "avg_cost": avg(v["costs"]),
+                "cost_cells": cost_stats["cost_captured_records"],
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "avg_tests": avg(v["tests"]),
-                "total_cost": round(sum(v["costs"]), 4),
+                "total_cost": cost_stats["total_captured_cost"],
                 "total_tests": sum(v["tests"]),
             }
         )
-    models.sort(key=lambda x: x["avg_cost"])
+    # None-safe ordering: un-priced models (avg_cost None) sort last.
+    models.sort(key=lambda x: (x["avg_cost"] is None, x["avg_cost"] or 0))
 
-    # Pareto frontier: models not dominated (cheaper AND more tests) by another.
+    # Pareto frontier: models not dominated (cheaper AND more tests) by another. An
+    # un-priced model (avg_cost None) is treated as infinitely expensive, so it can only
+    # survive the frontier if nothing cheaper writes as many tests.
+    def _cost(m):
+        return m["avg_cost"] if m["avg_cost"] is not None else float("inf")
+
     frontier = []
     for m in models:
         dominated = any(
-            o["avg_cost"] <= m["avg_cost"]
+            _cost(o) <= _cost(m)
             and o["avg_tests"] >= m["avg_tests"]
-            and (o["avg_cost"] < m["avg_cost"] or o["avg_tests"] > m["avg_tests"])
+            and (_cost(o) < _cost(m) or o["avg_tests"] > m["avg_tests"])
             for o in models
         )
         if not dominated:
@@ -133,8 +148,9 @@ def main():
     print(f"Saved: {OUTPUT_PATH}")
     print(f"  canonical input: {len(tables.stories)} stories ({tables.identity.registry_version})")
     for m in output["models"]:
+        cost = "—" if m["avg_cost"] is None else f"${m['avg_cost']:>7.3f}"
         print(
-            f"  {m['model']:20s} cells={m['cells']:3d} cost=${m['avg_cost']:>7.3f} "
+            f"  {m['model']:20s} cells={m['cells']:3d} cost={cost} "
             f"tests={m['avg_tests']:>7.1f} {'[FRONTIER]' if m['model'] in frontier else ''}"
         )
 

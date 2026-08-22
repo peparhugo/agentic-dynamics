@@ -30,6 +30,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
 from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.measurement_coverage import cost_captured, cost_coverage
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_cache_economics.py"
@@ -67,8 +68,10 @@ def compute(stories: list[dict]) -> dict:
         s = d.get("summary", {}) or {}
         b = by_model[m]
         b["cells"] += 1
-        cost = s.get("total_cost", 0) or 0
-        if cost > 0:
+        # m2 null-not-zero: only a *captured* cost enters the average; a missing/zero cost
+        # is counted (cost_coverage) but never averaged in as $0 (review P1).
+        cost = s.get("total_cost")
+        if cost_captured(cost):
             b["costs"].append(cost)
         b["cache_hit"].append(s.get("cache_hit_rate", 0) or 0)
         b["reads"].append(s.get("total_cache_reads", 0) or 0)
@@ -80,11 +83,17 @@ def compute(stories: list[dict]) -> dict:
     for m, v in by_model.items():
         reads = sum(v["reads"])
         writes = sum(v["writes"])
+        cost_stats = cost_coverage(v["costs"], n_total=v["cells"])
         models.append(
             {
                 "model": m,
                 "cells": v["cells"],
-                "avg_cost": _avg(v["costs"]),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "avg_cache_hit": _avg(v["cache_hit"]),
                 "cache_reads": reads,
                 "cache_writes": writes,
@@ -93,7 +102,8 @@ def compute(stories: list[dict]) -> dict:
                 "avg_tokens_per_cell": round(sum(v["tokens"]) / len(v["tokens"]), 0),
             }
         )
-    models.sort(key=lambda x: x["avg_cost"])
+    # None-safe ordering: un-priced models sort last (matching the captured-only average).
+    models.sort(key=lambda x: (x["avg_cost"] is None, x["avg_cost"] or 0))
 
     return {
         "experiment_id": "lab_cache_economics",
@@ -123,8 +133,9 @@ def main():
     print(f"Saved: {OUTPUT_PATH}")
     print(f"  canonical input: {len(tables.stories)} stories ({tables.identity.registry_version})")
     for m in output["models"]:
+        cost = "—" if m["avg_cost"] is None else f"${m['avg_cost']:>7.3f}"
         print(
-            f"  {m['model']:20s} cost=${m['avg_cost']:>7.3f} hit={m['avg_cache_hit']:.0%} "
+            f"  {m['model']:20s} cost={cost} hit={m['avg_cache_hit']:.0%} "
             f"r/w={m['read_write_ratio']} context/cell={m['avg_context_per_cell']:>9.0f}"
         )
 

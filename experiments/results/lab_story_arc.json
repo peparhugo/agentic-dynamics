@@ -1,10 +1,10 @@
 {
   "experiment_id": "lab_story_arc",
-  "generated_at": "2026-08-21T23:18:17.916347",
+  "generated_at": "2026-08-22T01:58:40.716385",
   "summary": {
-    "snowball_factor": 2.26,
-    "session1_cost": 0.1668,
-    "session5_cost": 0.3773,
+    "snowball_factor": 2.32,
+    "session1_cost": 0.173207,
+    "session5_cost": 0.402034,
     "stories": 215
   },
   "sessions": [
@@ -12,7 +12,12 @@
       "session_number": 1,
       "task_type": "greenfield",
       "n": 215,
-      "avg_cost": 0.1668,
+      "avg_cost": 0.173207,
+      "avg_captured_cost": 0.173207,
+      "total_captured_cost": 35.853902,
+      "cost_captured_records": 207,
+      "total_records": 215,
+      "cost_coverage": 0.9628,
       "avg_tokens": 21663.0,
       "avg_tests": 4.5
     },
@@ -20,7 +25,12 @@
       "session_number": 2,
       "task_type": "feature",
       "n": 215,
-      "avg_cost": 0.232,
+      "avg_cost": 0.242173,
+      "avg_captured_cost": 0.242173,
+      "total_captured_cost": 49.88772,
+      "cost_captured_records": 206,
+      "total_records": 215,
+      "cost_coverage": 0.9581,
       "avg_tokens": 28432.0,
       "avg_tests": 8.6
     },
@@ -28,7 +38,12 @@
       "session_number": 3,
       "task_type": "integration",
       "n": 215,
-      "avg_cost": 0.3363,
+      "avg_cost": 0.35613,
+      "avg_captured_cost": 0.35613,
+      "total_captured_cost": 72.294344,
+      "cost_captured_records": 203,
+      "total_records": 215,
+      "cost_coverage": 0.9442,
       "avg_tokens": 34852.0,
       "avg_tests": 11.5
     },
@@ -36,7 +51,12 @@
       "session_number": 4,
       "task_type": "refactor",
       "n": 211,
-      "avg_cost": 0.339,
+      "avg_cost": 0.359446,
+      "avg_captured_cost": 0.359446,
+      "total_captured_cost": 71.529731,
+      "cost_captured_records": 199,
+      "total_records": 211,
+      "cost_coverage": 0.9431,
       "avg_tokens": 35257.0,
       "avg_tests": 11.0
     },
@@ -44,37 +64,42 @@
       "session_number": 5,
       "task_type": "cross_cutting",
       "n": 211,
-      "avg_cost": 0.3773,
+      "avg_cost": 0.402034,
+      "avg_captured_cost": 0.402034,
+      "total_captured_cost": 79.602794,
+      "cost_captured_records": 198,
+      "total_records": 211,
+      "cost_coverage": 0.9384,
       "avg_tokens": 40655.0,
       "avg_tests": 14.9
     }
   ],
   "by_condition": {
     "clean_s1": 0.1772,
-    "clean_s2": 0.2418,
-    "clean_s3": 0.3892,
-    "clean_s4": 0.3522,
-    "clean_s5": 0.4048,
-    "early_degrade_s1": 0.1492,
-    "early_degrade_s2": 0.2155,
-    "early_degrade_s3": 0.2468,
-    "early_degrade_s4": 0.3173,
-    "early_degrade_s5": 0.3321
+    "clean_s2": 0.2436,
+    "clean_s3": 0.3981,
+    "clean_s4": 0.3605,
+    "clean_s5": 0.4176,
+    "early_degrade_s1": 0.1658,
+    "early_degrade_s2": 0.2395,
+    "early_degrade_s3": 0.2781,
+    "early_degrade_s4": 0.3575,
+    "early_degrade_s5": 0.3742
   },
   "by_model": {
     "claude-haiku-4-5": {
-      "1": 0.1851,
-      "2": 0.2663,
-      "3": 0.2609,
-      "4": 0.2557,
-      "5": 0.3911
+      "1": 0.2221,
+      "2": 0.3196,
+      "3": 0.3478,
+      "4": 0.3609,
+      "5": 0.5521
     },
     "claude-sonnet-5": {
-      "1": 0.452,
-      "2": 0.6493,
-      "3": 1.075,
-      "4": 0.9413,
-      "5": 1.2859
+      "1": 0.5306,
+      "2": 0.7969,
+      "3": 1.3193,
+      "4": 1.1553,
+      "5": 1.6533
     },
     "deepseek-v4-flash": {
       "1": 0.0061,
@@ -86,7 +111,7 @@
     "deepseek-v4-pro": {
       "1": 0.0189,
       "2": 0.0245,
-      "3": 0.0477,
+      "3": 0.049,
       "4": 0.0311,
       "5": 0.0478
     },
@@ -131,6 +156,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v4",
-    "generated_at": "2026-08-21T21:18:17.916678+00:00"
+    "generated_at": "2026-08-21T23:58:40.716714+00:00"
   }
 }

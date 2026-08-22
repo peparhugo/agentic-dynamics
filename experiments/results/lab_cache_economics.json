@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_cache_economics",
-  "generated_at": "2026-08-21T23:18:16.219936",
+  "generated_at": "2026-08-22T01:58:40.364248",
   "summary": {
     "models": 7,
     "stories": 215
@@ -9,7 +9,12 @@
     {
       "model": "deepseek-v4-flash",
       "cells": 31,
-      "avg_cost": 0.074,
+      "avg_cost": 0.074461,
+      "avg_captured_cost": 0.074461,
+      "total_captured_cost": 2.308294,
+      "cost_captured_records": 31,
+      "total_records": 31,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.964,
       "cache_reads": 224381696,
       "cache_writes": 0,
@@ -20,7 +25,12 @@
     {
       "model": "gpt-5.6-luna",
       "cells": 34,
-      "avg_cost": 0.094,
+      "avg_cost": 0.093548,
+      "avg_captured_cost": 0.093548,
+      "total_captured_cost": 3.180633,
+      "cost_captured_records": 34,
+      "total_records": 34,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.937,
       "cache_reads": 44099872,
       "cache_writes": 2378880,
@@ -31,7 +41,12 @@
     {
       "model": "deepseek-v4-pro",
       "cells": 39,
-      "avg_cost": 0.162,
+      "avg_cost": 0.161908,
+      "avg_captured_cost": 0.161908,
+      "total_captured_cost": 6.314403,
+      "cost_captured_records": 39,
+      "total_records": 39,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.801,
       "cache_reads": 146609152,
       "cache_writes": 0,
@@ -42,7 +57,12 @@
     {
       "model": "gpt-5.6-terra",
       "cells": 30,
-      "avg_cost": 1.044,
+      "avg_cost": 1.044326,
+      "avg_captured_cost": 1.044326,
+      "total_captured_cost": 31.329782,
+      "cost_captured_records": 30,
+      "total_records": 30,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.832,
       "cache_reads": 23958016,
       "cache_writes": 0,
@@ -53,7 +73,12 @@
     {
       "model": "claude-haiku-4-5",
       "cells": 24,
-      "avg_cost": 1.631,
+      "avg_cost": 1.63084,
+      "avg_captured_cost": 1.63084,
+      "total_captured_cost": 32.616808,
+      "cost_captured_records": 20,
+      "total_records": 24,
+      "cost_coverage": 0.8333,
       "avg_cache_hit": 0.824,
       "cache_reads": 163588556,
       "cache_writes": 3922476,
@@ -64,7 +89,12 @@
     {
       "model": "gpt-5.6-sol",
       "cells": 30,
-      "avg_cost": 3.817,
+      "avg_cost": 3.817461,
+      "avg_captured_cost": 3.817461,
+      "total_captured_cost": 114.52382,
+      "cost_captured_records": 30,
+      "total_records": 30,
+      "cost_coverage": 1.0,
       "avg_cache_hit": 0.85,
       "cache_reads": 43466752,
       "cache_writes": 0,
@@ -75,7 +105,12 @@
     {
       "model": "claude-sonnet-5",
       "cells": 27,
-      "avg_cost": 5.169,
+      "avg_cost": 5.169337,
+      "avg_captured_cost": 5.169337,
+      "total_captured_cost": 118.894751,
+      "cost_captured_records": 23,
+      "total_records": 27,
+      "cost_coverage": 0.8519,
       "avg_cache_hit": 0.84,
       "cache_reads": 177814999,
       "cache_writes": 5250530,
@@ -103,6 +138,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v4",
-    "generated_at": "2026-08-21T21:18:16.220187+00:00"
+    "generated_at": "2026-08-21T23:58:40.364506+00:00"
   }
 }

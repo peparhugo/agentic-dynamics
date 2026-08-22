@@ -7,6 +7,7 @@ boundary** — three cooperating modules that decide what may reach the website:
 * ``lab_manifest``    — WHICH labs may publish (classification: canonical/historical/quarantined)
 * ``canonical_corpus`` — WHAT they may read (the registry resolver; the only lab input door)
 * ``lab_contract``    — WHETHER a given artifact is still fresh (embedded lineage + validation)
+* ``measurement_coverage`` — the shared optional-measurement primitive (null-not-zero)
 
 Output does not steer (rec 8): reporting never imports ``control``.
 """
@@ -16,6 +17,7 @@ from . import (
     game_report,
     lab_contract,
     lab_manifest,
+    measurement_coverage,
     ollama_analyzer,
     opencode_analyzer,
     review,
@@ -26,6 +28,7 @@ __all__ = [
     "game_report",
     "lab_contract",
     "lab_manifest",
+    "measurement_coverage",
     "ollama_analyzer",
     "opencode_analyzer",
     "review",

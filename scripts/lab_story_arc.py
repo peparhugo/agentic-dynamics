@@ -40,6 +40,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
 from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.measurement_coverage import cost_captured, cost_coverage
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_story_arc.py"
@@ -59,7 +60,13 @@ def _short_model(model: str) -> str:
 
 
 def _avg(lst):
+    """Mean with a 0.0 fallback for countable fields (tokens, tests) — 0 is a real value."""
     return round(sum(lst) / len(lst), 4) if lst else 0.0
+
+
+def _captured_avg(lst):
+    """Mean over captured values only; ``None`` when nothing captured (m2 null-not-zero)."""
+    return round(sum(lst) / len(lst), 4) if lst else None
 
 
 def compute(stories: list[dict]) -> dict:
@@ -81,37 +88,48 @@ def compute(stories: list[dict]) -> dict:
             sn = s.get("session_number", 0)
             if not sn:
                 continue
-            cost = s.get("cost_usd", 0) or 0
+            # m2 null-not-zero: an absent/zero session cost is "not captured" and must not
+            # be inserted into the average as 0 (the review's P1 story-arc finding).
+            cost = s.get("cost_usd")
             a = s.get("agentic", {}) or {}
             tokens = a.get("total_tokens", 0) or s.get("total_tokens", 0) or 0
             tests = a.get("tests_total", 0) or 0
-            by_session[sn]["cost"].append(cost)
             by_session[sn]["tokens"].append(tokens)
             by_session[sn]["tests"].append(tests)
             by_session[sn]["n"] += 1
-            by_cond_session[(cond, sn)]["cost"].append(cost)
+            if cost_captured(cost):
+                by_session[sn]["cost"].append(cost)
+                by_cond_session[(cond, sn)]["cost"].append(cost)
+                by_model_session[model][sn]["cost"].append(cost)
             by_cond_session[(cond, sn)]["n"] += 1
-            by_model_session[model][sn]["cost"].append(cost)
             by_model_session[model][sn]["n"] += 1
 
     sessions = []
     for sn in sorted(by_session):
         v = by_session[sn]
+        cost_stats = cost_coverage(v["cost"], n_total=v["n"])
         sessions.append(
             {
                 "session_number": sn,
                 "task_type": SESSION_LABELS.get(sn, "?"),
                 "n": v["n"],
-                "avg_cost": _avg(v["cost"]),
+                # Captured-only mean (None when nothing captured) + the five shared
+                # coverage fields, so a session's cost denominator is explicit.
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "avg_tokens": round(_avg(v["tokens"]), 0),
                 "avg_tests": round(_avg(v["tests"]), 1),
             }
         )
 
-    # Snowball factor: session 5 cost / session 1 cost.
-    s1 = sessions[0]["avg_cost"] if sessions else 0
-    s5 = sessions[-1]["avg_cost"] if sessions else 0
-    snowball = round(s5 / s1, 2) if s1 else 0.0
+    # Snowball factor: session 5 cost / session 1 cost (None when either is un-captured).
+    s1 = sessions[0]["avg_cost"] if sessions else None
+    s5 = sessions[-1]["avg_cost"] if sessions else None
+    snowball = round(s5 / s1, 2) if (s1 and s5) else None
 
     return {
         "experiment_id": "lab_story_arc",
@@ -124,10 +142,11 @@ def compute(stories: list[dict]) -> dict:
         },
         "sessions": sessions,
         "by_condition": {
-            f"{cond}_s{sn}": _avg(v["cost"]) for (cond, sn), v in sorted(by_cond_session.items())
+            f"{cond}_s{sn}": _captured_avg(v["cost"])
+            for (cond, sn), v in sorted(by_cond_session.items())
         },
         "by_model": {
-            m: {str(sn): _avg(v["cost"]) for sn, v in sorted(sessions_map.items())}
+            m: {str(sn): _captured_avg(v["cost"]) for sn, v in sorted(sessions_map.items())}
             for m, sessions_map in sorted(by_model_session.items())
         },
     }
@@ -151,9 +170,10 @@ def main():
     print(f"Saved: {OUTPUT_PATH}")
     print(f"  canonical input: {len(tables.stories)} stories ({tables.identity.registry_version})")
     for s in output["sessions"]:
+        cost = "—" if s["avg_cost"] is None else f"${s['avg_cost']:>7.4f}"
         print(
             f"  session {s['session_number']} ({s['task_type']:14s}) n={s['n']:4d} "
-            f"cost=${s['avg_cost']:>7.4f} tokens={s['avg_tokens']:>7.0f} tests={s['avg_tests']}"
+            f"cost={cost} tokens={s['avg_tokens']:>7.0f} tests={s['avg_tests']}"
         )
     print(f"Snowball factor (S5/S1): {output['summary']['snowball_factor']}x")
 
