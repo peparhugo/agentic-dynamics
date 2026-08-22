@@ -1736,27 +1736,68 @@ def _assert_resolution_complete(tables, waiver_path=None) -> list[dict]:
 #: imports.
 
 
-def _generator_source_files() -> list[Path]:
-    """The direct computation-dependency manifest, DERIVED from the import graph.
+def _source_closure(entry: Path, src_root: Path, *, root_module: str) -> list[Path]:
+    """The transitive source closure of ``entry`` over the package rooted at ``src_root``.
 
-    Walks ``build_data.py``'s ``agentic_dynamics.*`` imports transitively and returns every
-    source file reachable from it, sorted for determinism. The list is *computed*, never
-    hand-maintained, so a newly-added computation dependency is covered automatically.
+    (f4 — transitive identity.) Walks ``entry``'s imports recursively and returns every source
+    file reachable, sorted for determinism. Both absolute imports (``from agentic_dynamics.x
+    import ...``) and RELATIVE imports (``from .x import ...``) are resolved — a relative import
+    is resolved against the importing file's own package, so ``from .canonical_corpus import …``
+    inside ``lab_contract.py`` contributes ``canonical_corpus.py`` (and its own dependencies)
+    transitively. The list is *computed*, never hand-maintained.
     """
-    src_root = ROOT / "src" / "agentic_dynamics"
     seen: dict[Path, None] = {}
 
     def resolve(name: str) -> None:
-        if not name.startswith("agentic_dynamics"):
+        """Resolve an absolute ``root_module.*`` name to a file (or a package ``__init__``)."""
+        if not name.startswith(root_module):
             return
-        rel = name[len("agentic_dynamics.") :].replace(".", "/")
-        candidate = src_root / f"{rel}.py"
-        if candidate.is_file():
-            visit(candidate)
-            return
-        package = src_root / rel / "__init__.py"
-        if package.is_file():
-            visit(package)
+        suffix = name[len(root_module) :]
+        rel = suffix[1:].replace(".", "/") if suffix.startswith(".") else ""
+        if rel:
+            candidate = src_root / f"{rel}.py"
+            if candidate.is_file():
+                visit(candidate)
+                return
+            package = src_root / rel / "__init__.py"
+            if package.is_file():
+                visit(package)
+        else:
+            package = src_root / "__init__.py"
+            if package.is_file():
+                visit(package)
+
+    def _module_parts(path: Path) -> list[str]:
+        """The dotted module name of ``path`` (``[]`` for files outside ``src_root``).
+
+        ``src_root/reporting/lab_contract.py`` → ``("agentic_dynamics", "reporting",
+        "lab_contract")``; ``src_root/reporting/__init__.py`` → ``("agentic_dynamics",
+        "reporting")``.
+        """
+        try:
+            rel = path.relative_to(src_root)
+        except ValueError:
+            return []
+        parts = list(rel.with_suffix("").parts)
+        if parts and parts[-1] == "__init__":
+            parts = parts[:-1]
+        return [root_module, *parts]
+
+    def _resolve_from(node: ast.ImportFrom, package_parts: list[str]) -> None:
+        """Resolve an ImportFrom: relative (``level > 0``) against ``package_parts``, else absolute.
+
+        ``from .x import ...`` (level 1) targets the current package; each extra level climbs one
+        package (``from ..x`` → the parent package). A level that climbs above the package root
+        resolves outside the tree and is skipped.
+        """
+        if node.level and node.level > 0:
+            if node.level - 1 >= len(package_parts):
+                return
+            base = package_parts[: len(package_parts) - (node.level - 1)]
+            name = ".".join([*base, node.module]) if node.module else ".".join(base)
+            resolve(name)
+        elif node.module:
+            resolve(node.module)
 
     def visit(path: Path) -> None:
         path = path.resolve()
@@ -1767,30 +1808,59 @@ def _generator_source_files() -> list[Path]:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except (OSError, SyntaxError):
             return
+        module_parts = _module_parts(path)
+        package_parts = module_parts[:-1] if module_parts else []
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     resolve(alias.name)
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                resolve(node.module)
+            elif isinstance(node, ast.ImportFrom):
+                _resolve_from(node, package_parts)
 
-    visit(ROOT / "scripts" / "build_data.py")
+    visit(entry)
     return sorted(seen)
 
 
-def generator_source_tree_identity() -> str:
-    """``sha256`` over the generated source-tree dependency manifest (name + bytes).
+def _generator_source_files() -> list[Path]:
+    """The direct computation-dependency manifest, DERIVED from the import graph.
 
-    Deterministic and environment-independent: only the source file *contents* enter the
-    digest, never their absolute paths. The file list comes from
-    :func:`_generator_source_files` (derived from the import graph), so the identity
-    tracks the full computation surface, not a remembered subset.
+    (f4 — transitive identity.) Delegates to :func:`_source_closure` over ``build_data.py``'s
+    imports inside the ``agentic_dynamics`` package.
+    """
+    return _source_closure(
+        ROOT / "scripts" / "build_data.py",
+        ROOT / "src" / "agentic_dynamics",
+        root_module="agentic_dynamics",
+    )
+
+
+def _source_tree_identity(paths: list[Path], *, base: Path) -> str:
+    """``sha256`` over ``(repo-relative path, file length, file bytes)`` for each source file.
+
+    (f4 — transitive identity.) The repo-relative path is hashed — not just ``path.name`` — so
+    two ``__init__.py`` files in different packages are distinct; the file length is folded in so
+    a truncation/extension is distinguishable from a same-name rename. Deterministic and
+    environment-independent: only the relative path and the bytes enter the digest.
     """
     h = hashlib.sha256()
-    for path in _generator_source_files():
-        h.update(path.name.encode("utf-8"))
-        h.update(path.read_bytes())
+    for path in paths:
+        rel = path.relative_to(base).as_posix()
+        data = path.read_bytes()
+        h.update(rel.encode("utf-8"))
+        h.update(str(len(data)).encode("utf-8"))
+        h.update(data)
     return h.hexdigest()
+
+
+def generator_source_tree_identity() -> str:
+    """``sha256`` over the generated source-tree dependency manifest.
+
+    Deterministic and environment-independent. The file list comes from
+    :func:`_generator_source_files` (derived from the import graph — now resolving relative
+    imports transitively), and each file is hashed as (repo-relative path, length, bytes), so the
+    identity tracks the full computation surface, not a remembered subset.
+    """
+    return _source_tree_identity(_generator_source_files(), base=ROOT)
 
 
 #: The generated spec lifecycle index (``scripts/spec_status.py``) — the machine-readable

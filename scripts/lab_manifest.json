@@ -132,8 +132,8 @@
       "reads_retired_summary": false,
       "requires_external_service": null,
       "contract_status": "enforced",
-      "metric_definition_version": "condition_effects/v1",
-      "rationale": "Consumes the canonical registry resolver only (story + review tables). Conditions come from the resolver's no-op relabel, and the 77 tombstoned early_degrade cells are excluded \u2014 both load-bearing for a condition comparison. Contract-bearing."
+      "metric_definition_version": "condition_effects/v2",
+      "rationale": "Consumes the canonical registry resolver only (story + review tables). Conditions come from the resolver's no-op relabel, and the 77 tombstoned early_degrade cells are excluded \u2014 both load-bearing for a condition comparison. Contract-bearing. metric_definition_version bumped v1 -> v2 in m2 (measurement-contribution closure): cost went missing-as-zero to captured-only, so the published per-condition average changed meaning."
     },
     "lab_correctness_escape_quadrants.py": {
       "lab_status": "quarantined",
@@ -228,8 +228,8 @@
       "reads_retired_summary": false,
       "requires_external_service": null,
       "contract_status": "enforced",
-      "metric_definition_version": "quality_frontier/v1",
-      "rationale": "Consumes the canonical registry resolver only. Analysis artifacts are not a registered source_type, but the resolver reads analysis_<story_id>.json only for CURRENT story rows \u2014 a registry-filtered join, not a directory glob. Contract-bearing."
+      "metric_definition_version": "quality_frontier/v2",
+      "rationale": "Consumes the canonical registry resolver only. Analysis artifacts are not a registered source_type, but the resolver reads analysis_<story_id>.json only for CURRENT story rows \u2014 a registry-filtered join, not a directory glob. Contract-bearing. metric_definition_version bumped v1 -> v2 in m2 (measurement-contribution closure): the population became 371 resolved / 312 joined (was 371/371), and the optional metrics now carry coverage."
     },
     "lab_sonar_quality.py": {
       "lab_status": "quarantined",
@@ -274,8 +274,8 @@
       "reads_retired_summary": false,
       "requires_external_service": null,
       "contract_status": "enforced",
-      "metric_definition_version": "story_review/v1",
-      "rationale": "Consumes the canonical registry resolver only; the typed load_story_result loader runs on the paths the registry resolved (_source_path), never on a glob. Eligible, but no site section consumes it today (website_key null), so build_data does not load it. Contract-bearing."
+      "metric_definition_version": "story_review/v2",
+      "rationale": "Consumes the canonical registry resolver only; the typed load_story_result loader runs on the paths the registry resolved (_source_path), never on a glob. Eligible, but no site section consumes it today (website_key null), so build_data does not load it. Contract-bearing. metric_definition_version bumped v1 -> v2 in m2 (measurement-contribution closure): missing correctness became null (never an averaged-in zero) and cost became captured-only."
     },
     "lab_survival_horizon.py": {
       "lab_status": "quarantined",
@@ -351,8 +351,8 @@
       "reads_retired_summary": false,
       "requires_external_service": null,
       "contract_status": "enforced",
-      "metric_definition_version": "verification_frontier/v1",
-      "rationale": "Consumes the canonical registry resolver only (story table). Contract-bearing."
+      "metric_definition_version": "verification_frontier/v2",
+      "rationale": "Consumes the canonical registry resolver only (story table). Contract-bearing. metric_definition_version bumped v1 -> v2 in m2 (measurement-contribution closure): model cost became captured-only (a missing/zero cost is no longer averaged in as $0)."
     },
     "lab_verification_value.py": {
       "lab_status": "canonical",

@@ -782,3 +782,68 @@ def test_data_js_generator_source_tree_identity_is_current():
     assert contract["generator_source_tree_identity"] == build_data.generator_source_tree_identity(), (
         "data.js's generator_source_tree_identity is stale — re-run scripts/build_data.py"
     )
+
+
+# ---------------------------------------------------------------------------
+# f4 — transitive generator source-tree identity (relative imports + path-aware)
+# ---------------------------------------------------------------------------
+
+
+def test_source_closure_resolves_relative_imports(tmp_path):
+    """The source-tree identity includes modules reached ONLY via relative imports (f4).
+
+    The pre-f4 walk followed only absolute ``agentic_dynamics.*`` imports, so ``from .b import
+    ...`` inside ``a.py`` never contributed ``b.py``. This synthetic package proves the closure
+    now resolves relative imports against their own package.
+    """
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "a.py").write_text("from .b import X\n")
+    (pkg / "b.py").write_text("X = 1\n")
+    entry = tmp_path / "entry.py"
+    entry.write_text("from pkg.a import X\n")
+
+    closure = build_data._source_closure(entry, pkg, root_module="pkg")
+    names = {p.name for p in closure}
+    assert "a.py" in names, "the directly-imported module is missing"
+    assert "b.py" in names, "the relative-imported module was omitted from the closure"
+
+
+def test_source_closure_resolves_parent_relative_imports(tmp_path):
+    """``from ..b import ...`` (one level up) resolves against the parent package (f4)."""
+    pkg = tmp_path / "pkg"
+    (pkg / "sub").mkdir(parents=True)
+    (pkg / "__init__.py").write_text("")
+    (pkg / "b.py").write_text("X = 1\n")
+    (pkg / "sub" / "__init__.py").write_text("")
+    (pkg / "sub" / "c.py").write_text("from ..b import Y\n")
+    entry = tmp_path / "entry.py"
+    entry.write_text("from pkg.sub.c import Y\n")
+
+    closure = build_data._source_closure(entry, pkg, root_module="pkg")
+    names = {p.name for p in closure}
+    assert "b.py" in names, "the parent-relative import (..b) was omitted from the closure"
+
+
+def test_source_tree_identity_changes_when_init_py_package_renamed(tmp_path):
+    """Renaming a package (byte-identical ``__init__.py``) moves the identity (f4).
+
+    The pre-f4 identity hashed ``path.name`` + bytes, so two ``__init__.py`` files with identical
+    bytes were indistinguishable. The identity now hashes the repo-relative path, so renaming the
+    package directory changes the hash even though the file bytes do not.
+    """
+    body = "# identical init\n"
+    pkg = tmp_path / "orig" / "__init__.py"
+    pkg.parent.mkdir()
+    pkg.write_text(body)
+    before = build_data._source_tree_identity([pkg], base=tmp_path)
+
+    renamed = tmp_path / "renamed" / "__init__.py"
+    renamed.parent.mkdir()
+    renamed.write_text(body)
+    after = build_data._source_tree_identity([renamed], base=tmp_path)
+
+    assert before != after, (
+        "renaming the package must move the identity — the repo-relative path is part of the hash"
+    )
