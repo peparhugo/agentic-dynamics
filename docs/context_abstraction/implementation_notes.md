@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Context Abstraction Plane — Implementation Notes
 
 **Append-only.** This file records the design deviations and verify-phase findings that the
