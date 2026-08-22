@@ -30,7 +30,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
 from agentic_dynamics.reporting.measurement_coverage import cost_captured, cost_coverage
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
@@ -55,15 +59,19 @@ def _test_count(d: dict) -> int:
     return peak
 
 
-def compute(stories: list[dict]) -> dict:
+def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
     """Compute the cost x test-thoroughness frontier over the canonical story payloads.
+
+    Returns ``(result, contribution)`` (m3): every current story is consumed.
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
     by_model = defaultdict(lambda: {"costs": [], "tests": [], "cells": 0})
+    used_ids: list[str] = []
 
     for d in stories:
         m = _short_model(d.get("model", "unknown"))
+        used_ids.append(record_id(d))
         summary = d.get("summary", {}) or {}
         # m2 null-not-zero: only a *captured* cost enters the average; a missing/zero cost
         # is counted but never averaged in as $0 (review P1).
@@ -116,7 +124,7 @@ def compute(stories: list[dict]) -> dict:
         if not dominated:
             frontier.append(m["model"])
 
-    return {
+    result = {
         "experiment_id": "lab_verification_frontier",
         "generated_at": datetime.now().isoformat(),
         "summary": {
@@ -128,20 +136,14 @@ def compute(stories: list[dict]) -> dict:
         },
         "models": models,
     }
+    contribution = ContributionReport.of(used_record_ids=used_ids)
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("story")
-    output = compute(tables.stories)
-    # Record scope (public-truth review P1): every current story is consumed, so
-    # eligible == used == resolved — declared explicitly, not via a permissive default.
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_eligible_records=len(tables.stories),
-        n_used_records=len(tables.stories),
-    )
+    output, contribution = compute(tables.stories)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     frontier = output["summary"]["pareto_frontier"]

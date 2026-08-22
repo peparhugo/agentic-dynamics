@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_story_review",
-  "generated_at": "2026-08-22T01:58:41.100732",
+  "generated_at": "2026-08-22T02:18:54.543215",
   "summary": {
     "cells": 215,
     "sessions": 1067,
@@ -3907,6 +3907,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v4",
-    "generated_at": "2026-08-21T23:58:41.102948+00:00"
+    "generated_at": "2026-08-22T00:18:54.545394+00:00"
   }
 }

@@ -522,7 +522,7 @@ def test_publication_lab_uses_the_canonical_resolver(entry: LabEntry):
         f"{entry.script} must consume agentic_dynamics.reporting.canonical_corpus"
     )
     assert "load_canonical_tables" in src, f"{entry.script} must call load_canonical_tables"
-    assert "attach_contract" in src or "build_contract" in src, (
+    assert "attach_contract" in src or "attach_contribution" in src, (
         f"{entry.script} must embed a lab_contract block in its output"
     )
 

@@ -39,7 +39,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
 from agentic_dynamics.reporting.measurement_coverage import cost_captured, cost_coverage
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
@@ -69,8 +73,11 @@ def _captured_avg(lst):
     return round(sum(lst) / len(lst), 4) if lst else None
 
 
-def compute(stories: list[dict]) -> dict:
+def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
     """Aggregate the per-session arc over the canonical story payloads.
+
+    Returns ``(result, contribution)`` (m3): every current story is consumed, so the
+    contribution reports ``used == resolved`` with no exclusions.
 
     Split out of :func:`main` so the analysis is testable without touching the registry
     or the filesystem.
@@ -78,9 +85,11 @@ def compute(stories: list[dict]) -> dict:
     by_session = defaultdict(lambda: {"cost": [], "tokens": [], "tests": [], "n": 0})
     by_cond_session = defaultdict(lambda: {"cost": [], "n": 0})
     by_model_session = defaultdict(lambda: defaultdict(lambda: {"cost": [], "n": 0}))
+    used_ids: list[str] = []
 
     for d in stories:
         model = _short_model(d.get("model", "unknown"))
+        used_ids.append(record_id(d))
         # `_canonical_condition` is the relabelled condition the resolver computed;
         # the raw `perturbation_condition` is deliberately not used here.
         cond = d.get("_canonical_condition") or "clean"
@@ -131,7 +140,7 @@ def compute(stories: list[dict]) -> dict:
     s5 = sessions[-1]["avg_cost"] if sessions else None
     snowball = round(s5 / s1, 2) if (s1 and s5) else None
 
-    return {
+    result = {
         "experiment_id": "lab_story_arc",
         "generated_at": datetime.now().isoformat(),
         "summary": {
@@ -150,21 +159,14 @@ def compute(stories: list[dict]) -> dict:
             for m, sessions_map in sorted(by_model_session.items())
         },
     }
+    contribution = ContributionReport.of(used_record_ids=used_ids)
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("story")
-    output = compute(tables.stories)
-    # The contract records WHICH corpus produced these numbers; build_data re-checks it.
-    # Record scope (public-truth review P1): every current story is consumed, so
-    # eligible == used == resolved — declared explicitly, not via a permissive default.
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_eligible_records=len(tables.stories),
-        n_used_records=len(tables.stories),
-    )
+    output, contribution = compute(tables.stories)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")

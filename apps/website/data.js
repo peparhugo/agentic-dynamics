@@ -1,8 +1,8 @@
-/* Generated 2026-08-21 23:58:50 UTC by build_data.py */
+/* Generated 2026-08-22 00:19:13 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-21T23:58:49.269243+00:00",
+    "generated_at": "2026-08-22T00:19:11.689317+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -62,7 +62,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "f3a22f1e78fbc55c3cf6061a13d1406ce9555934a9ae9f61892697c80b938b55"
+    "generator_source_tree_identity": "c8f6d99c127a92a2446850cd31bf19d81c14a4608cb98ab9dee10fa0580c5a8a"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -2274,7 +2274,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-21T23:58:49.366234+00:00"
+    "generated_at": "2026-08-22T00:19:11.789587+00:00"
   },
   "reviews": {
     "models": [
@@ -3002,7 +3002,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-22T01:58:40.364248",
+      "generated_at": "2026-08-22T02:18:51.565692",
       "summary": {
         "models": 7,
         "stories": 215
@@ -3140,12 +3140,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T23:58:40.364506+00:00"
+        "generated_at": "2026-08-22T00:18:51.566285+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-22T01:58:39.986568",
+      "generated_at": "2026-08-22T02:18:52.714730",
       "summary": {
         "conditions": 2,
         "stories": 215,
@@ -3204,12 +3204,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T23:58:39.986825+00:00"
+        "generated_at": "2026-08-22T00:18:52.715046+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-21T23:18:17.132049",
+      "generated_at": "2026-08-22T02:18:53.258132",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 144,
@@ -3478,12 +3478,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T21:18:17.132314+00:00"
+        "generated_at": "2026-08-22T00:18:53.258402+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-22T01:58:41.480751",
+      "generated_at": "2026-08-22T02:18:54.113177",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3731,23 +3731,23 @@ window.DYNAMICS_DATA = {
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "quality_frontier/v1",
         "n_resolved_records": 371,
-        "n_eligible_records": 371,
-        "n_used_records": 371,
-        "n_excluded_records": 0,
+        "n_eligible_records": 312,
+        "n_used_records": 312,
+        "n_excluded_records": 59,
         "n_unused_eligible_records": 0,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
-        "outside_analysis_population": 0,
+        "outside_analysis_population": 59,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T23:58:41.481016+00:00"
+        "generated_at": "2026-08-22T00:18:54.113478+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-22T01:58:40.716385",
+      "generated_at": "2026-08-22T02:18:51.924557",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
@@ -3903,12 +3903,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T23:58:40.716714+00:00"
+        "generated_at": "2026-08-22T00:18:51.924905+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-22T01:58:41.860744",
+      "generated_at": "2026-08-22T02:18:52.280414",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -4038,12 +4038,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T23:58:41.861007+00:00"
+        "generated_at": "2026-08-22T00:18:52.280684+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-22T01:14:49.318767",
+      "generated_at": "2026-08-22T02:18:53.674096",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
         "cells": 105,
@@ -4808,7 +4808,7 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-21T23:14:49.319061+00:00"
+        "generated_at": "2026-08-22T00:18:53.674412+00:00"
       }
     }
   }

@@ -39,7 +39,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
 from agentic_dynamics.reporting.measurement_coverage import cost_captured, cost_coverage
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
@@ -70,12 +74,24 @@ def _review_outcomes_by_story(reviews: list[dict]) -> dict[str, dict[str, int]]:
     return outcomes
 
 
-def compute(stories: list[dict], reviews: list[dict]) -> dict:
+def compute(stories: list[dict], reviews: list[dict]) -> tuple[dict, ContributionReport]:
     """Aggregate outcome metrics per perturbation condition.
+
+    Returns ``(result, contribution)`` (m3): every current story is used, plus only the
+    reviews whose story is still current; the rest are excluded as
+    ``review_without_current_story``.
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
     review_outcomes = _review_outcomes_by_story(reviews)
+    story_sids = {str(s.get("story_id") or "") for s in stories}
+    # Used records: every current story + the reviews whose `_story_id` names a current
+    # story (the exact join the metric consumes).
+    used_ids = [record_id(s) for s in stories] + [
+        record_id(r)
+        for r in reviews
+        if str(r.get("_story_id") or r.get("story_id") or "") in story_sids
+    ]
 
     by_condition = defaultdict(
         lambda: {"cells": 0, "cost": [], "success": 0, "cascade": 0, "worse": 0, "reviewed": 0}
@@ -128,11 +144,10 @@ def compute(stories: list[dict], reviews: list[dict]) -> dict:
         )
     conditions.sort(key=lambda x: x["condition"])
 
-    # Record scope (public-truth review P1): the metric consumes every current story and
-    # only the reviews whose story is still current. The rest are declared, not silently
-    # assumed away — the permissive "everything resolved is used" default hid them.
+    # Record scope (m3): the metric consumes every current story and only the reviews
+    # whose story is still current — declared via the ContributionReport, not by hand.
     joined_reviews = sum(c["reviews"] for c in conditions)
-    return {
+    result = {
         "experiment_id": "lab_condition_effects",
         "generated_at": datetime.now().isoformat(),
         "summary": {
@@ -144,26 +159,17 @@ def compute(stories: list[dict], reviews: list[dict]) -> dict:
         },
         "conditions": conditions,
     }
+    contribution = ContributionReport.of(
+        used_record_ids=used_ids,
+        exclusion_reasons={"review_without_current_story": len(reviews) - joined_reviews},
+    )
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("story", "review")
-    output = compute(tables.stories, tables.reviews)
-
-    # Record scope (public-truth review P1): 215 stories + 242 reviews resolve, but only
-    # 155 reviews join a current story — the 87 others are excluded as
-    # ``review_without_current_story`` and declared explicitly in the contract.
-    n_resolved = len(tables.stories) + len(tables.reviews)
-    n_used = len(tables.stories) + output["summary"]["joined_reviews"]
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_resolved_records=n_resolved,
-        n_eligible_records=n_used,
-        n_used_records=n_used,
-        review_without_current_story=output["summary"]["reviews_without_current_story"],
-    )
+    output, contribution = compute(tables.stories, tables.reviews)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")

@@ -83,6 +83,7 @@ Design notes
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -188,6 +189,80 @@ class LabContract:
     def to_dict(self) -> dict:
         """Plain dict for JSON embedding (field order preserved for readable diffs)."""
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ContributionReport:
+    """The computation's *self-report* of which records it consumed (m3).
+
+    The review's P1 finding was that record-scope contracts were "explicit, but not proven
+    against computation": the validator checked the counts *added up*, not that they
+    described the records that actually contributed. This dataclass closes that gap — the
+    lab's ``compute()`` returns it alongside the result payload, and the contract is
+    DERIVED from it (:func:`attach_contribution`), never hand-authored afterwards.
+
+    The five counts obey two invariants (enforced by :meth:`of`):
+
+    * ``eligible + excluded == resolved`` — every resolved record is either eligible for
+      the metric or excluded (with a reason);
+    * ``used + unused_eligible == eligible`` — every eligible record is either consumed or
+      declared unused.
+
+    ``exclusion_reasons`` itemises ``excluded`` with exactly the :data:`EXCLUSION_REASONS`
+    vocabulary, and ``used_record_ids`` is the stable identity of every record the
+    computation actually consumed (its length is ``used``, so the "used" count is derived
+    from real records rather than asserted).
+    """
+
+    resolved: int
+    eligible: int
+    used: int
+    excluded: int
+    unused_eligible: int
+    exclusion_reasons: dict[str, int]
+    used_record_ids: tuple[str, ...]
+
+    @classmethod
+    def of(
+        cls,
+        *,
+        used_record_ids: Iterable[str],
+        unused_eligible: int = 0,
+        exclusion_reasons: dict[str, int] | None = None,
+    ) -> ContributionReport:
+        """Build a report from the used records, the unused-eligible gap, and the exclusions.
+
+        The ``resolved`` total is *derived* (``used + unused_eligible + excluded``), which
+        forces the caller to account for every resolved record — a lab that drops a record
+        without naming it produces a ``resolved`` that no longer matches the resolver, and
+        the existing registry-consistency test rejects the artifact.
+        """
+        used_ids = tuple(sorted(used_record_ids))
+        reasons = {k: int(v) for k, v in (exclusion_reasons or {}).items() if int(v)}
+        used = len(used_ids)
+        excluded = sum(reasons.values())
+        eligible = used + unused_eligible
+        resolved = eligible + excluded
+        return cls(
+            resolved=resolved,
+            eligible=eligible,
+            used=used,
+            excluded=excluded,
+            unused_eligible=unused_eligible,
+            exclusion_reasons=reasons,
+            used_record_ids=used_ids,
+        )
+
+
+def record_id(payload: dict) -> str:
+    """The stable identity of a resolved payload — ``entity_id`` (else ``knowledge_id``).
+
+    A ``story``/``review``/``finding`` payload carries its registry ``entity_id``; an
+    ``analysis`` payload carries its story's (it is a derived view). The id is what a lab
+    puts into :class:`ContributionReport.used_record_ids` so the "used" count is auditable.
+    """
+    reg = payload.get("_registry") or {}
+    return str(reg.get("entity_id") or reg.get("knowledge_id") or "")
 
 
 def expected_tables(entry: LabEntry) -> tuple[str, ...]:
@@ -346,6 +421,36 @@ def attach_contract(
         story_without_review=story_without_review,
         missing_required_field=missing_required_field,
         outside_analysis_population=outside_analysis_population,
+    )
+    return payload
+
+
+def attach_contribution(
+    payload: dict,
+    lab_script: str,
+    tables: CanonicalTables,
+    contribution: ContributionReport,
+) -> dict:
+    """Embed a contract DERIVED from the computation's :class:`ContributionReport` (m3).
+
+    The pattern is ``result, contribution = compute(...); attach_contribution(result, LAB,
+    tables, contribution)`` — the contract's record scope comes from the computation, never
+    from counts hand-authored in ``main`` afterwards. Each :data:`EXCLUSION_REASONS` count
+    is read from ``contribution.exclusion_reasons``; a reason the report does not name is 0.
+    """
+    reasons = contribution.exclusion_reasons
+    payload[CONTRACT_KEY] = build_contract(
+        lab_script,
+        tables,
+        n_resolved_records=contribution.resolved,
+        n_eligible_records=contribution.eligible,
+        n_used_records=contribution.used,
+        n_excluded_records=contribution.excluded,
+        n_unused_eligible_records=contribution.unused_eligible,
+        review_without_current_story=reasons.get("review_without_current_story", 0),
+        story_without_review=reasons.get("story_without_review", 0),
+        missing_required_field=reasons.get("missing_required_field", 0),
+        outside_analysis_population=reasons.get("outside_analysis_population", 0),
     )
     return payload
 

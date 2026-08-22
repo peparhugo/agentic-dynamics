@@ -245,7 +245,7 @@ def test_verification_value_join_publishes_no_placeholder_identity():
     summary = payload["summary"]
 
     tables = cc.load_canonical_tables("story", "review")
-    recomputed = lvv.compute(tables.stories, tables.reviews)
+    recomputed, recomputed_contribution = lvv.compute(tables.stories, tables.reviews)
     rs = recomputed["summary"]
 
     # (1) No recomputed — and no published — row carries a placeholder identity.

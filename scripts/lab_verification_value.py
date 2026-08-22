@@ -36,7 +36,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_verification_value.py"
@@ -59,7 +63,7 @@ def _test_count(d: dict) -> int:
     return peak
 
 
-def compute(story_payloads: list[dict], reviews: list[dict]) -> dict:
+def compute(story_payloads: list[dict], reviews: list[dict]) -> tuple[dict, ContributionReport]:
     """Join test thoroughness to reviewer outcomes over the canonical corpus.
 
     The join is **explicit** (measurement-contribution closure, m1): a review whose
@@ -68,23 +72,26 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> dict:
     A current story that no review joined is counted as ``story_without_review``; it never
     contributes a row (and therefore never a fabricated ``model: "?"`` row).
 
+    Returns ``(result, contribution)`` (m3): used = joined stories + joined reviews.
+
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
-    # story_id -> (model, test_count), from the current story rows only. A story must
-    # carry a real model to be a usable join target — one without is not a measurement
+    # story_id -> (model, test_count, record_id), from the current story rows only. A story
+    # must carry a real model to be a usable join target — one without is not a measurement
     # record and is dropped from the map (its reviews become `review_without_current_story`).
     stories = {}
     for d in story_payloads:
         sid = str(d.get("story_id") or "")
         model = d.get("model")
         if len(sid) >= 8 and model:
-            stories[sid] = (_short_model(model), _test_count(d))
+            stories[sid] = (_short_model(model), _test_count(d), record_id(d))
 
     # Buckets of test thoroughness -> worse/better outcomes. Only joined reviews reach a
     # bucket, so no bucket can ever carry a placeholder model.
     buckets = defaultdict(lambda: {"better": 0, "worse": 0, "neutral": 0, "n": 0})
     review_without_current_story = 0
-    joined_story_ids: set[str] = set()
+    joined_story_rids: set[str] = set()
+    joined_review_rids: list[str] = []
 
     for d in reviews:
         # `_story_id` comes from the review's registry row — an exact join, not a
@@ -97,8 +104,9 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> dict:
             # it a placeholder identity.
             review_without_current_story += 1
             continue
-        model, tests = entry
-        joined_story_ids.add(sid)
+        model, tests, story_rid = entry
+        joined_story_rids.add(story_rid)
+        joined_review_rids.append(record_id(d))
         for cr in d.get("commit_reviews", []):
             outcome = cr.get("better_or_worse", "?")
             b = buckets[(model, tests)]
@@ -107,7 +115,7 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> dict:
 
     # A current story that no review joined is eligible for the metric but produced no
     # joined observation — counted, not silently folded into a placeholder row.
-    story_without_review = len(stories) - len(joined_story_ids)
+    story_without_review = len(stories) - len(joined_story_rids)
 
     # Summarize worse-rate as a function of test count (per model).
     rows = []
@@ -136,7 +144,7 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> dict:
         dy = sum((w - my) ** 2 for _, w in pts) ** 0.5
         corr = round(num / (dx * dy), 3) if dx and dy else None
 
-    return {
+    result = {
         "experiment_id": "lab_verification_value",
         "generated_at": datetime.now().isoformat(),
         "summary": {
@@ -149,33 +157,20 @@ def compute(story_payloads: list[dict], reviews: list[dict]) -> dict:
         },
         "rows": rows,
     }
+    contribution = ContributionReport.of(
+        used_record_ids=sorted(joined_story_rids) + sorted(joined_review_rids),
+        exclusion_reasons={
+            "review_without_current_story": review_without_current_story,
+            "story_without_review": story_without_review,
+        },
+    )
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("story", "review")
-    output = compute(tables.stories, tables.reviews)
-    summary = output["summary"]
-
-    # Record scope (measurement-contribution closure, m1): the contract counts are the
-    # JOINED populations, not "everything resolved". resolved = stories + reviews;
-    # excluded = reviews whose story is not current + stories no review joined; the rest
-    # is eligible and all of it is used. Hand-set here because the typed
-    # ContributionReport primitive lands in m3.
-    n_resolved = len(tables.stories) + len(tables.reviews)
-    n_excluded = summary["review_without_current_story"] + summary["story_without_review"]
-    n_eligible = n_resolved - n_excluded
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_resolved_records=n_resolved,
-        n_eligible_records=n_eligible,
-        n_used_records=n_eligible,
-        n_excluded_records=n_excluded,
-        n_unused_eligible_records=0,
-        review_without_current_story=summary["review_without_current_story"],
-        story_without_review=summary["story_without_review"],
-    )
+    output, contribution = compute(tables.stories, tables.reviews)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")
@@ -184,8 +179,8 @@ def main():
         f"({tables.identity.registry_version})"
     )
     print(
-        f"  joined: {summary['review_without_current_story']} reviews without a current story, "
-        f"{summary['story_without_review']} stories without a review"
+        f"  joined: {output['summary']['review_without_current_story']} reviews without a "
+        f"current story, {output['summary']['story_without_review']} stories without a review"
     )
     for r in output["rows"][:40]:
         print(

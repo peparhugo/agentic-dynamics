@@ -29,7 +29,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
 from agentic_dynamics.reporting.measurement_coverage import cost_captured, cost_coverage
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
@@ -45,8 +49,11 @@ def _avg(lst):
     return round(sum(lst) / len(lst), 3) if lst else 0.0
 
 
-def compute(stories: list[dict]) -> dict:
+def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
     """Aggregate per-model cache economics over the canonical story payloads.
+
+    Returns ``(result, contribution)`` (m3) — the computation reports exactly which
+    records it consumed, and the contract is derived from that report in :func:`main`.
 
     Split out of :func:`main` so the analysis is testable without touching the registry
     or the filesystem.
@@ -62,12 +69,14 @@ def compute(stories: list[dict]) -> dict:
             "cells": 0,
         }
     )
+    used_ids: list[str] = []
 
     for d in stories:
         m = _short_model(d.get("model", "unknown"))
         s = d.get("summary", {}) or {}
         b = by_model[m]
         b["cells"] += 1
+        used_ids.append(record_id(d))
         # m2 null-not-zero: only a *captured* cost enters the average; a missing/zero cost
         # is counted (cost_coverage) but never averaged in as $0 (review P1).
         cost = s.get("total_cost")
@@ -105,7 +114,7 @@ def compute(stories: list[dict]) -> dict:
     # None-safe ordering: un-priced models sort last (matching the captured-only average).
     models.sort(key=lambda x: (x["avg_cost"] is None, x["avg_cost"] or 0))
 
-    return {
+    result = {
         "experiment_id": "lab_cache_economics",
         "generated_at": datetime.now().isoformat(),
         "summary": {
@@ -114,20 +123,15 @@ def compute(stories: list[dict]) -> dict:
         },
         "models": models,
     }
+    # m3: every current story is consumed — no exclusion, no unused-eligible gap.
+    contribution = ContributionReport.of(used_record_ids=used_ids)
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("story")
-    output = compute(tables.stories)
-    # Record scope (public-truth review P1): the metric consumes every current story, so
-    # eligible == used == resolved — declared explicitly, not via a permissive default.
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_eligible_records=len(tables.stories),
-        n_used_records=len(tables.stories),
-    )
+    output, contribution = compute(tables.stories)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")

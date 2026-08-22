@@ -31,7 +31,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
 from agentic_dynamics.reporting.measurement_coverage import (
     MeasurementCoverage,
     cost_captured,
@@ -61,14 +65,18 @@ def _coverage(lst, *, n_total):
     return MeasurementCoverage.over(lst, n_total=n_total, round_value=3).to_dict()
 
 
-def compute(stories: list[dict], analyses: list[dict]) -> dict:
+def compute(stories: list[dict], analyses: list[dict]) -> tuple[dict, ContributionReport]:
     """Join per-story cost to mechanical quality signals over the canonical corpus.
+
+    Returns ``(result, contribution)`` (m3): used = the stories an analysis joined onto +
+    the analyses themselves; a story no analysis covers is ``outside_analysis_population``
+    (the review's 59-story overstatement).
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
-    # story_id -> (model, cost), from the current story rows only. A story must carry a
-    # real model to be a usable join target; one without is dropped from the map so the
-    # join below (``sid not in cost_by_sid``) excludes it rather than emitting a
+    # story_id -> (model, cost, record_id), from the current story rows only. A story must
+    # carry a real model to be a usable join target; one without is dropped from the map so
+    # the join below (``sid not in cost_by_sid``) excludes it rather than emitting a
     # placeholder ``model: "?"`` row (measurement-contribution closure, m1).
     cost_by_sid = {}
     for d in stories:
@@ -78,7 +86,7 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
             summary = d.get("summary", {}) or {}
             # Raw cost (None when absent) — captured-ness is decided by cost_captured,
             # not re-derived here with `or 0` (m2).
-            cost_by_sid[sid] = (model, summary.get("total_cost"))
+            cost_by_sid[sid] = (model, summary.get("total_cost"), record_id(d))
 
     by_model = defaultdict(
         lambda: {
@@ -90,12 +98,16 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
             "novelty": [],
         }
     )
+    used_story_rids: set[str] = set()
+    used_analysis_rids: list[str] = []
 
     for d in analyses:
         sid = str(d.get("_story_id") or d.get("story_id") or "")
         if sid not in cost_by_sid:
             continue
-        model, cost = cost_by_sid[sid]
+        model, cost, story_rid = cost_by_sid[sid]
+        used_story_rids.add(story_rid)
+        used_analysis_rids.append(record_id(d))
         deep = d.get("deep", {}) or {}
         lsp = deep.get("lsp", {}) or {}
         sol = deep.get("solution", {}) or {}
@@ -147,7 +159,7 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
         )
     models.sort(key=lambda x: (x["avg_cost"] is None, x["avg_cost"] or 0))
 
-    return {
+    result = {
         "experiment_id": "lab_quality_frontier",
         "generated_at": datetime.now().isoformat(),
         "summary": {
@@ -160,21 +172,19 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
         },
         "models": models,
     }
+    # m3: a story the analyses never joined onto produced no measurement — it is outside
+    # the effective population (the review's 59-story overstatement), not silently "used".
+    contribution = ContributionReport.of(
+        used_record_ids=sorted(used_story_rids) + sorted(used_analysis_rids),
+        exclusion_reasons={"outside_analysis_population": len(cost_by_sid) - len(used_story_rids)},
+    )
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("story", "analysis")
-    output = compute(tables.stories, tables.analysis)
-    # Record scope (public-truth review P1): the metric consumes every current story and
-    # every analysis the registry resolved for them — declared explicitly, not via a
-    # permissive default.
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_eligible_records=len(tables.stories) + len(tables.analysis),
-        n_used_records=len(tables.stories) + len(tables.analysis),
-    )
+    output, contribution = compute(tables.stories, tables.analysis)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")
