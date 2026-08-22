@@ -163,7 +163,12 @@ def classify_strategy(
             f"Cost: ${cost:.4f}, ~{energy:.0f}J."
         )
         r.recommendation = "Promote this operator. The perturbation succeeded."
-        r.exploration_premium = novelty * correctness / max(cost, 0.0001)
+        # The exploration premium is cost-denominated: it is only meaningful when a cost
+        # was captured (> 0). The old ``/ max(cost, 0.0001)`` floor turned an uncaptured
+        # $0 cost into an enormous premium — the same ratio-superspike the finding-economics
+        # closure removed elsewhere. An uncaptured cost leaves the premium at its 0.0 default.
+        if cost > 0:
+            r.exploration_premium = novelty * correctness / cost
     elif is_correct and is_reasoning_lean:
         r.strategy = StrategyType.EFFICIENT
         r.verdict = (
@@ -172,7 +177,11 @@ def classify_strategy(
             f"{thinking_ratio:.0%} thinking). Thermodynamically optimal."
         )
         r.recommendation = "This operator+model combination is production-ready."
-        r.thermal_efficiency = correctness / max(energy, 0.01)
+        # Thermal efficiency is energy-denominated: only meaningful when energy was
+        # captured (> 0). The old ``/ max(energy, 0.01)`` floor inflated it for an
+        # unmetered 0J run. An uncaptured energy leaves it at its 0.0 default.
+        if energy > 0:
+            r.thermal_efficiency = correctness / energy
     else:
         r.strategy = StrategyType.CONSERVATIVE
         r.verdict = (
