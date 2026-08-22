@@ -103,7 +103,7 @@ Assessment — see § 8 for the T5008/T5/T3 exclusion).
 | PS-5 | Buying power | `[M]` | Broker buying-power report (margin account) | n/a (registered accounts have no margin BP) | Broker's own formula; in RRSP/TFSA the analog is available cash + contribution room (CX-7). |
 | PS-6 | Realized P/L (per position / aggregate) | `[C]` | = Σ(sale proceeds − cost basis − commissions) over fills | visible (statement shows dispositions) | Inputs: execution fills `[M]` (§ 3). **Registered-account nuance:** no T5008, no capital-gains tax — "realized P/L" here is a bookkeeping reducer, not a tax figure (see § 8). |
 | PS-7 | Unrealized P/L (per position / aggregate) | `[C]` | = PS-1 × (MD-1 − PS-2) | partial (statement-date) | Inputs: quantity `[M]`, mark `[X]`, cost basis `[M]`. |
-| PS-8 | Account equity / net asset value | `[C]` | = Σ(PS-3) + PS-4 | visible (statement total) | Broker also reports it `[M]`; `[C]` recompute is the cross-check. |
+| PS-8 | Account equity / net asset value | `[C]` | = Σ(PS-3 · fx) + Σ(PS-4 · fx) — all-in-CAD | visible (statement total) | Broker also reports it `[M]`; `[C]` recompute is the cross-check. Each position and cash leg converts to CAD via PS-10 before summing (USD/CAD never summed raw). |
 | PS-9 | Time-weighted return | `[C]` | = Π(1 + rᵢ) − 1 over cash-flow-dated sub-periods | visible (inferred from statement history) | Inputs: dated contributions/withdrawals + period-end NAVs (PS-8). |
 | PS-10 | Currency balances + FX rate | `[M]` (balances) `[X]` (rate) | Broker statement; Bank of Canada noon rate | visible | FX rate source is `[X]`; CAD-equivalent value `[C]` = balance × rate. |
 | PS-11 | Contributions / withdrawals | `[M]` | Broker statement; RRSP contribution receipt | visible | Feeds PS-9 and contribution-room tracking. |
@@ -122,11 +122,11 @@ notices**. The export formats below are the canonical operator-produced files a 
 | EX-1 | Fill record (ticker, side, qty, price, commission, time, currency, venue) | `[M]` | Broker trade confirmation; activity CSV | visible | The atomic execution unit. |
 | EX-2 | Order lifecycle (submitted → partial → filled / cancelled) | `[M]` | Broker order ticket / activity log | visible (final state; not intraday tick stream) | Enables fill-rate `[C]` = filled / submitted. |
 | EX-3 | Option expiry (expired worthless / auto-exercised) | `[M]` | Broker expiry notice; activity statement | visible (as a fill/expiry line, not a live chain) | Distinguishes ITM auto-exercise from OTM worthless expiry. |
-| EX-4 | Assignment / exercise notice | `[M]` | Broker assignment notice; MX/OCC assignment report | visible | Short-option assignment is only possible in permitted registered strategies. |
+| EX-4 | Assignment / exercise notice | `[M]` | Broker assignment notice; MX/OCC assignment report | visible | Short-option assignment is only possible in permitted registered strategies. **Assignment on a US-listed (USD) option settles in USD** — requires a USD sub-account and lands as a USD cash credit (PS-10 FX exposure); a TFSA may not permit a USD short-cash balance (`[X]` to-verify per broker). |
 | EX-5 | Dividends / distributions received | `[M]` | Broker statement; CDS dividend ledger | visible | Cash (and DRIP) distribution events; US-source dividends carry 15% non-recoverable withholding in RRSP/TFSA (no T5/T3 in-registered). |
 | EX-6 | Broker export format inventory | `[M]` | Questrade activity CSV; Interactive Brokers Flex Query (XML/CSV); TD Direct Investing / Scotia iTRADE / RBC Direct Investing / Wealthsimple / BMO InvestorLine CSV or statement PDF | visible | Meta-signal: *which* parseable formats the operator can produce (T5008 is **not** a broker export — see § 8). |
 | EX-7 | Fees / commissions / ECN charges | `[M]` | Broker trade confirmation | visible | Per-fill cost; feeds PS-6 cost basis. |
-| EX-8 | Settlement date + settlement currency | `[M]` | Broker confirmation | visible | T+2 equity (T+1 post-2024 for many); distinct from trade date. |
+| EX-8 | Settlement date + settlement currency | `[M]` | Broker confirmation | visible | T+2 equity (T+1 post-2024 for many); distinct from trade date. US-underlying trades/assignments settle in USD — the settlement currency is the trigger for the PS-10 FX conversion, not a label. |
 | EX-9 | Book-value adjustments (DRIP, return-of-capital, ROC) | `[M]` | Broker statement (broker-tracked) | visible | ROC lowers book value; `[C]` recompute = book value − ROC distributions. No T3 is issued in-registered — the broker statement itself shows the adjustment. |
 
 ---
@@ -163,7 +163,7 @@ calendar**, **TMX corporate-action feed**, **Statistics Canada**, **Bank of Cana
 | CX-3 | Ticker-tagged news / headlines | `[X]` | Reuters, Bloomberg, Globe Investor, PR Newswire | n/a | Raw headlines are `[X]`; a sentiment score over them would be `[H]`. |
 | CX-4 | Analyst consensus rating / price target | `[X]` | Refinitiv / Bloomberg consensus | n/a | Vendor consensus is `[X]`; the operator's own target is `[P]` (DR-1). |
 | CX-5 | Economic calendar (BoC rate decisions, CPI, GDP) | `[X]` | Statistics Canada; Bank of Canada | n/a | Scheduled releases; surprises `[C]` = actual − consensus. |
-| CX-6 | Corporate actions (splits, mergers, ticker changes) | `[X]` | CDS; TMX corporate-action feed | visible (post-action on statement) | Feeds PS-2 book-value adjustments. |
+| CX-6 | Corporate actions (splits, mergers, ticker changes) | `[X]` | CDS; TMX corporate-action feed | visible (post-action on statement) | Feeds PS-2 book-value adjustments. **Splits/mergers also adjust the option deliverable** (e.g. a 2:1 split turns a standard contract into a 200-share deliverable) — the `calls_only` coverage multiplier must be re-derived post-adjustment, never assumed fixed-100. |
 | CX-7 | Registered-account contribution room (TFSA/RRSP) | `[X]` | CRA Notice of Assessment / My Account | visible (statement side) | Operator-tracked remaining room is `[P]`. |
 
 ---
@@ -213,26 +213,31 @@ be written as measured.
 
 The load-bearing rule in action: a control rule (trading policy arm) is only writable when every
 signal its `requires` names has a producer. Each arm below maps its `requires` to the tags
-established in §§1–5. "Writable" means the compiler's `requires`/`produces` gate passes; "blocked"
-means a `requires` signal has no producer yet.
+established in §§1–5. **Status vocabulary (corrected):** "source-named" means every `requires`
+resolves to a *named* producer (`[M]`/`[C]`/`[X]`/`[P]` source exists — for `[X]`, named-not-connected);
+"instrumented" means a producer actually *runs in this repo*. **None of the arms below is
+instrumented today** — d3 § 1's producers are prospective, and the CAP gate is paused
+(`workflows/repository/context_abstraction_implement.yaml`). The authoritative literal gate is d2,
+which yields 4 writable arms. "blocked" means a `requires` has no producer at all.
 
 | # | Policy arm (control rule) | `requires` (information consumed) | Producer chain | Status |
 |---|---|---|---|---|
-| P-1 | Rebalance band (trim/size when a position drifts ±X% of target) | PS-3, PS-8, CX-7 | `[M]`/`[C]`/`[X]` | writable |
-| P-2 | Position-size cap (max % NAV per name / per sector) | PS-3, PS-8 | `[C]` over `[M]`/`[X]` | writable |
+| P-1 | Rebalance band (trim/size when a position drifts ±X% of target) | PS-3, PS-8, CX-7 | `[M]`/`[C]`/`[X]` | source-named |
+| P-2 | Position-size cap (max % NAV per name / per sector) | PS-3, PS-8 | `[C]` over `[M]`/`[X]` | source-named |
 | P-3 | Covered-call strike selection at target delta | MD-4, MD-5, MD-6 | needs `[X]` MX chain feed | **blocked** (G-1) |
-| P-4 | Ex-dividend timing (defer entry to capture/avoid ex-div) | CX-2, MD-10 | `[X]` | writable |
-| P-5 | Earnings blackout (no new positions within N days of earnings) | CX-1 | `[X]` | writable |
-| P-6 | Stop / loss-realization discipline | PS-6, MD-1 | `[C]` over `[M]`/`[X]`, EOD only | writable (EOD) |
-| P-7 | Currency conversion trigger (CAD↔USD above FX threshold / Norbert's gambit) | PS-10, PS-4 | `[M]`/`[X]` | writable |
-| P-8 | Crypto-ETF premium/discount arbitrage gate | MD-8 | `[X]` | writable |
-| P-9 | Contribution schedule / contribution-room gate | PS-11, CX-7, PS-4 | `[M]`/`[X]` | writable |
-| P-10 | Thesis-entry gate (no order without a recorded thesis) | DR-1, DR-2, DR-3 | `[P]` + `[M]` | writable only under operator discipline |
+| P-4 | Ex-dividend timing (defer entry to capture/avoid ex-div) | CX-2, MD-10 | `[X]` | source-named |
+| P-5 | Earnings blackout (no new positions within N days of earnings) | CX-1 | `[X]` | source-named |
+| P-6 | Stop / loss-realization discipline | PS-6, MD-1 | `[C]` over `[M]`/`[X]`, EOD only | source-named (EOD) |
+| P-7 | Currency conversion trigger (CAD↔USD above FX threshold / Norbert's gambit) | PS-10, PS-4 | `[M]`/`[X]` | source-named |
+| P-8 | Crypto-ETF premium/discount arbitrage gate | MD-8 | `[X]` | source-named |
+| P-9 | Contribution schedule / contribution-room gate | PS-11, CX-7, PS-4 | `[M]`/`[X]` | source-named |
+| P-10 | Thesis-entry gate (no order without a recorded thesis) | DR-1, DR-2, DR-3 | `[P]` + `[M]` | source-named (operator discipline) |
 | P-11 | Confidence-gated sizing / escalation | DR-8 | `[H]` only | **blocked** (G-4) |
 
-**Read:** 8 of 11 arms writable today (P-1, P-2, P-4, P-5, P-6, P-7, P-8, P-9) because their
-`requires` trace to `[M]`/`[C]`/`[X]` producers. P-10 is writable only if the operator commits to
-recording theses prospectively. P-3 and P-11 are blocked by the gap map (§ 8).
+**Read:** 8 of 11 arms are **source-named** (P-1, P-2, P-4, P-5, P-6, P-7, P-8, P-9) because their
+`requires` trace to a *named* `[M]`/`[C]`/`[X]` source; **none is instrumented in this repo today**.
+P-10 is source-named only under operator discipline. P-3 and P-11 are blocked (§ 8). The
+authoritative writable set is d2's literal gate: a, c, g, h.
 
 ---
 
@@ -324,7 +329,7 @@ corrected; no remaining row claims a measurement it cannot support.
 - [x] Adversarial review caught and corrected the T5008 misclassification (§ 9, item 5). **PASS.**
 
 **Result: PASS** — 45 signals inventoried, 0 unguarded `[H]` rows, 11 policy arms mapped (8
-writable, 3 blocked/conditional), 7 gaps catalogued, all reducers stated with inputs.
+source-named, 3 blocked/conditional), 7 gaps catalogued, all reducers stated with inputs.
 
 **Commit:** recorded on branch `feature/investing-domain-audit` (completes the Stage-0 seeding:
 observable + policy + gap map + adversarial review).

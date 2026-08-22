@@ -81,7 +81,7 @@ The domain introduces **additive** `subject_type`/`scope_type` values — `instr
 (`job|workflow|workload|…`, design § 3.1). Additive, mirroring how `policy` is already a
 `subject_type`.
 
-### 2A. Declarable now (producer exists, or reducer over produced records)
+### 2A. Declarable once its producer lands (migration phase 1) — none exists in the repo today
 
 | predicate | value_type | subject | scope | level | produced_by | ttl | volatile |
 |---|---|---|---|---|---|---|---|
@@ -107,7 +107,7 @@ The domain introduces **additive** `subject_type`/`scope_type` values — `instr
 |---|---|---|
 | `option_delta` | needs `MD-4` chain (greeks) | adapter step 1 → reducer step 3 |
 | `option_iv` | needs `MD-4` chain | adapter step 1 → reducer step 3 |
-| `iv_rank` | needs `option_iv` time series | reducer step 5 |
+| `iv_rank` | needs `option_iv` **time series** — plus ≥52 weeks of *accumulated* history before the rank is non-empty | reducer step 5 + 52-week accumulation (cold start) |
 | `dte` | needs `MD-4` chain (expiries) | reducer step 4 |
 | `chain_liquidity` | needs `MD-4` chain (OI/volume/spread) | reducer step 4 |
 | `net_delta` | needs `option_delta` for the option leg | reducer step 3 |
@@ -125,9 +125,9 @@ The four reducer modules mirror the design's `src/agentic_dynamics/control/reduc
 | Reducer | version | consumes | produces | formula (inputs) |
 |---|---|---|---|---|
 | `market_facts` | `market_facts/v1` | `market` records | `last_price`, `daily_ohlcv`, `realized_vol` | `realized_vol = std(ln(P_t / P_{t-1}))` over a window of `daily_ohlcv` closes |
-| `portfolio_facts` | `portfolio_facts/v1` | `portfolio` + `market` | `portfolio_value`, `position_weight`, `crypto_weight`, `unrealized_pnl`, (`net_delta` when unblocked) | `portfolio_value = Σ position_qty·last_price + cash`; `position_weight = position_value / portfolio_value`; `unrealized_pnl = qty·(last_price − avg_cost_basis)` |
+| `portfolio_facts` | `portfolio_facts/v1` | `portfolio` + `market` | `portfolio_value`, `position_weight`, `crypto_weight`, `unrealized_pnl`, (`net_delta` when unblocked) | `portfolio_value = Σ position_qty·last_price·fx_to_cad + Σ cash·fx_to_cad` (all-in-CAD, fx from PS-10); `position_weight = position_value / portfolio_value`; `unrealized_pnl = qty·(last_price − avg_cost_basis)·fx_to_cad` |
 | `trade_facts` | `trade_facts/v1` | `trade` records | `realized_pnl` | `realized_pnl = Σ (sale proceeds − cost − commission)` over fills per position |
-| `policy_facts` | `policy_facts/v1` | `portfolio` + `trade` + `policy` | `calls_only_holds` | `calls_only_holds = (no short put) ∧ ∀ short call: shares(underlying) ≥ 100·qty` |
+| `policy_facts` | `policy_facts/v1` | `portfolio` + `trade` + `policy` | `calls_only_holds` | `calls_only_holds = (no short put) ∧ ∀ short call: shares(underlying) ≥ multiplier·qty` — input contract: `position_qty` is **signed** (short legs negative), `multiplier` is the contract's **deliverable multiplier** (100 standard; non-standard after a corporate action, CX-6), and `EX-4` assignments re-key positions before the reducer runs |
 
 Every reducer is a **pure function** (`determinism="pure"`, injected clock via `ReducerInput.now`)
 — the same discipline as `step_routing.route_step` and the design § 4.1. `net_delta` and the
@@ -406,7 +406,7 @@ halt` refusal.
 | Category | Reuse | NEW | Blocked |
 |---|---|---|---|
 | Producers | 1 (`policy/v1`) | 4 (`market`, `portfolio`, `trade`, `thesis`) | 0 |
-| Predicates | 0 | 15 declarable (§ 2A) | 6 (§ 2B, all gated on `MD-4` except `net_delta`) |
+| Predicates | 0 | 15 declarable-once-produced (§ 2A) | 6 (§ 2B, all gated on `MD-4` except `net_delta`) |
 | Contracts | 1 (`session_routing`) | 2 (`open_long_call/v1`, `weekly_review/v1`) | 0 |
 | Adapters | 0 | 1 (`market_data`) | 0 |
 | Workflows/stories | 0 | 3 (`research_ticker`, `backtest_strategy`, `weekly_review`) | 0 |
@@ -423,7 +423,7 @@ halt` refusal.
 - [x] Adapter has no live-trading surface (observation family only; actuation gate closed). **PASS.**
 - [x] `[X]` mapped to provenance-by-locator, no new authority tier. **PASS.**
 
-**Result: PASS** — 4 new producers, 21 candidate predicates (15 declarable / 6 blocked), 2 new
+**Result: PASS** — 4 new producers, 21 candidate predicates (15 declarable-once-produced / 6 blocked), 2 new
 contracts + 1 reuse, 1 adapter, 3 workflow specs, 4 profile blocks, 4 migration phases; every new
 kind traced to a mechanism or marked NEW.
 

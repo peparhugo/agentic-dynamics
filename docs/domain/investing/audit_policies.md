@@ -209,7 +209,9 @@ Anything in the "verification" column that this audit has not confirmed is tagge
 ### (e) `exit_rules` — exit on iv_rank or pnl_since_entry
 
 - `requires:`
-  - `iv_rank` → `✗ UNINSTRUMENTED` — needs the `MD-6` IV **time series**, gated on `MD-4`.
+  - `iv_rank` → `✗ UNINSTRUMENTED` — needs the `MD-6` IV **time series**, gated on `MD-4`; even after
+    the reducer lands, a ~1-year window must **accumulate** before `iv_rank` is non-empty (cold
+    start — the contract's `on_missing: classify` carries the first year).
   - `pnl_since_entry` → `✓ PS-7 [C]` (avg-cost unrealized P/L) or a `[C]` lot-reducer over `EX-1`
     (entry-price-per-lot → P/L since that entry).
 - **Writable: no → pending-instrumentation, step 5.**
