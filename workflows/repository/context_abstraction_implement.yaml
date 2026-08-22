@@ -15,7 +15,7 @@ question: >-
   superseded; this spec resumes after the consolidation release.]
 
   Implement the Context Abstraction Plane incrementally, exactly per
-  docs/context_abstraction/design.md (the merged opus-5 design; review.md is its audit). The
+  docs/designs/current/context_abstraction_design.md (the merged opus-5 design; review.md is its audit). The
   plane transforms authoritative evidence into canonical, scope-aware state at the
   job/workflow/workload/policy levels; control agents consume decision-specific snapshots of
   that state rather than raw histories. Eight increments, each unit-tested and gated before
@@ -39,7 +39,7 @@ workflow:
     fork: true
     context:
       authority: >-
-        docs/context_abstraction/design.md is THE authority (merged via PR #6); this spec only
+        docs/designs/current/context_abstraction_design.md is THE authority (merged via PR #6); this spec only
         pins the ordering and the fixed semantics below. docs/context_abstraction/review.md is
         the audit the design answers. Implement what the design says; a deviation is permitted
         only with a one-line note in docs/context_abstraction/implementation_notes.md
@@ -67,7 +67,7 @@ workflow:
         single-valued causes can point at it (design §8.5 chain). (8) step_routing.route_step
         is NOT modified; the plane runs beside it until I7 and only then for an opted-in spec.
         (9) Conventions: snake_case, PascalCase, type hints, dataclasses over dicts,
-        src/instrument/__init__.py exports. (10) Tests: exact file names, never bare pytest;
+        plane __init__ exports. (10) Tests: exact file names, never bare pytest;
         new modules get tests/test_context_plane_*.py files; keep CI-compatible (ruff-clean,
         -m "not external" safe: anything touching Redis DBs marks external).
       prerequisites: >-
@@ -76,7 +76,7 @@ workflow:
         source_type with 66 registry rows, and the kb producer/worker path. I1 consumes these
         directly (design §9's dependency note is now resolved). The run-workflow end hook
         already refreshes the index — I4's snapshot recording beside route_step and I7's seam
-        live in scripts/run_workflow.py and src/instrument/workflow_runner.py.
+        live in scripts/run_workflow.py and src/agentic_dynamics/runtime/workflow_runner.py.
       run_shape: >-
         SINGLE-model: run once with --model anthropic/claude-opus-5 (claude_cli backend). One
         worktree, one branch (feature/context-abstraction-implement); each phase commits
@@ -92,15 +92,15 @@ workflow:
           {goal}
 
           READ FIRST:
-          - docs/context_abstraction/design.md §3 (schema, identity, epistemics) + §4 (ReducerSpec —
+          - docs/designs/current/context_abstraction_design.md §3 (schema, identity, epistemics) + §4 (ReducerSpec —
             the schema verify_chain() will consume) + §9 I0 row
           - docs/context_abstraction/review.md §2 rows 7-8 (what KnowledgeRecord already has)
-          - src/instrument/knowledge.py (SOURCE_TYPES, Authority, KnowledgeRecord lineage fields)
-          - src/instrument/record_factory.py (build_record — the single identity owner)
-          - src/instrument/actuation_ingestion.py:8-22 (the zero-call-sites-by-design pattern)
+          - src/agentic_dynamics/knowledge/knowledge.py (SOURCE_TYPES, Authority, KnowledgeRecord lineage fields)
+          - src/agentic_dynamics/knowledge/record_factory.py (build_record — the single identity owner)
+          - src/agentic_dynamics/control/actuation_ingestion.py:8-22 (the zero-call-sites-by-design pattern)
 
           REQUIRED SEMANTICS (fixed — design §3):
-          - New src/instrument/context_facts.py: frozen CanonicalFact dataclass (subject,
+          - New src/agentic_dynamics/control/facts.py: frozen CanonicalFact dataclass (subject,
             predicate, value, scope_type, scope_id/scope_path, abstraction_level, authority,
             epistemic_status, evidence_ids TUPLE, source_revision, observed_at, valid_from,
             valid_to, expires_at, reducer_version, supersedes), FactRef, Unknown, EpistemicMap.
@@ -133,11 +133,11 @@ workflow:
           {prior_phases}
 
           READ FIRST:
-          - docs/context_abstraction/design.md §4 (reducer signature: pure, no I/O) + §9 I1 row
+          - docs/designs/current/context_abstraction_design.md §4 (reducer signature: pure, no I/O) + §9 I1 row
             + "Why spec_lifecycle's spec-status facts go first" (reasons 1-5)
-          - src/instrument/spec_status.py (RunSummary, collect_entries, load_index_entries —
+          - src/agentic_dynamics/experiment/spec_status.py (RunSummary, collect_entries, load_index_entries —
             the measured inputs this reducer consumes)
-          - src/instrument/spec_ingestion.py (the existing spec record pipe — the fact payload
+          - src/agentic_dynamics/knowledge/spec_ingestion.py (the existing spec record pipe — the fact payload
             must NOT duplicate its lifecycle document; the fact carries subject/predicate/value)
           - scripts/registry.py (the query surface the gate uses)
 
@@ -176,11 +176,11 @@ workflow:
           {prior_phases}
 
           READ FIRST:
-          - docs/context_abstraction/design.md §4 + §9 I2 row
-          - src/instrument/workflow_runner.py (PhaseResult :64-135, WorkflowRunResult :137-171 —
+          - docs/designs/current/context_abstraction_design.md §4 + §9 I2 row
+          - src/agentic_dynamics/runtime/workflow_runner.py (PhaseResult :64-135, WorkflowRunResult :137-171 —
             the typed artifacts) + experiments/results/workflows/<spec>/<ts>.json (the durable
             run JSONs)
-          - src/instrument/ledger_ingestion.py (the existing ledger record producers — facts
+          - src/agentic_dynamics/knowledge/ledger_ingestion.py (the existing ledger record producers — facts
             are the subject/predicate/value layer ABOVE them, not a replacement)
 
           REQUIRED SEMANTICS (fixed):
@@ -212,7 +212,7 @@ workflow:
           {prior_phases}
 
           READ FIRST:
-          - docs/context_abstraction/design.md §4 (conflict ladder, fact_state()) + §5 (L0-L5
+          - docs/designs/current/context_abstraction_design.md §4 (conflict ladder, fact_state()) + §5 (L0-L5
             mapping) + §9 I3 row + §10.2 (aggregation only through a declared parent-scope
             reducer; no implicit rollup)
           - docs/context_abstraction/review.md §2 rows 4-6 (what L3/L4/L5 lack today)
@@ -247,15 +247,15 @@ workflow:
           {prior_phases}
 
           READ FIRST:
-          - docs/context_abstraction/design.md §6 (contracts, compile_context() algorithm,
+          - docs/designs/current/context_abstraction_design.md §6 (contracts, compile_context() algorithm,
             ControlContext/FactRef/Unknown, halt-vs-degrade, snapshot_id) + §9 I4 row
-          - src/instrument/step_routing.py (route_step :424-469 — the decision the compiler
+          - src/agentic_dynamics/control/step_routing.py (route_step :424-469 — the decision the compiler
             snapshots beside; NOT modified)
-          - src/instrument/prompt_constructor.py (the executor-side analogue — do not conflate;
+          - src/agentic_dynamics/knowledge/prompt_constructor.py (the executor-side analogue — do not conflate;
             the compiler serves the controller, not the executor)
 
           REQUIRED SEMANTICS (fixed):
-          - New src/instrument/context_compiler.py: compile_context(decision_type, scope,
+          - New src/agentic_dynamics/control/context_compiler.py: compile_context(decision_type, scope,
             registry, contract, policy) -> ControlContext; snapshot_id = f(sorted fact_ids);
             unknowns/conflicts/stale_facts surfaced (never silently dropped).
           - experiments/contexts/route_next_job.yaml — the design §6 contract verbatim
@@ -289,10 +289,10 @@ workflow:
           {prior_phases}
 
           READ FIRST:
-          - docs/context_abstraction/design.md §7 (FactRequirement, normalize_requirement,
+          - docs/designs/current/context_abstraction_design.md §7 (FactRequirement, normalize_requirement,
             R1-R10) + §9 I5 row
-          - src/instrument/experiment_spec.py (RuleSpec :249-270 area, validate_rules :373-409,
-            LEDGER_FIELDS) + src/instrument/compile_experiment.py (validate_rules gate :87-96)
+          - src/agentic_dynamics/experiment/experiment_spec.py (RuleSpec :249-270 area, validate_rules :373-409,
+            LEDGER_FIELDS) + src/agentic_dynamics/experiment/compile_experiment.py (validate_rules gate :87-96)
 
           REQUIRED SEMANTICS (fixed):
           - RuleSpec gains fact contracts: each `requires` entry may be a flat signal name
@@ -328,17 +328,17 @@ workflow:
           {prior_phases}
 
           READ FIRST:
-          - docs/context_abstraction/design.md §8 (ControlDecision/Precondition/ExpectedEffect,
+          - docs/designs/current/context_abstraction_design.md §8 (ControlDecision/Precondition/ExpectedEffect,
             AUTOMATABLE_ACTIONS, C1-C10) + §8.4 (step_routing is the reference rule, untouched)
             + §9 I6 row
-          - src/instrument/actuation_ingestion.py (the actuation envelope the decisions ride in;
+          - src/agentic_dynamics/control/actuation_ingestion.py (the actuation envelope the decisions ride in;
             causes must resolve to the snapshot's observation record)
 
           REQUIRED SEMANTICS (fixed):
-          - src/instrument/control_rules/route_next_job.py: the fact-based rule — compiles the
+          - src/agentic_dynamics/control/rules.py: the fact-based rule — compiles the
             route_next_job/v1 contract, chooses {route, continue}, returns a typed
             ControlDecision with facts_used + expected_effect.
-          - src/instrument/control_validator.py: validate_decision() implementing C1-C10
+          - src/agentic_dynamics/control/validator.py: validate_decision() implementing C1-C10
             verbatim, ordered, first-failure short-circuits.
           - SHADOW MODE ONLY: after every route_step call, compile + validate + record the
             decision as an actuation record (armed gates OFF — recording, not applying). The
@@ -367,9 +367,9 @@ workflow:
           {prior_phases}
 
           READ FIRST:
-          - docs/context_abstraction/design.md §8.3-8.6 + §9 I7 row + §10 (scope addressing and
+          - docs/designs/current/context_abstraction_design.md §8.3-8.6 + §9 I7 row + §10 (scope addressing and
             inheritance the seam must respect)
-          - scripts/run_workflow.py + src/instrument/workflow_runner.py (where the seam lives)
+          - scripts/run_workflow.py + src/agentic_dynamics/runtime/workflow_runner.py (where the seam lives)
 
           REQUIRED SEMANTICS (fixed):
           - The seam: a per-spec opt-in (an explicit flag/field in the spec YAML, e.g.
@@ -385,7 +385,7 @@ workflow:
           - compare_arms hookup: a script/report that scores the shadow decisions against
             step_routing via compile_experiment.compare_arms-style loss (cost/quality) so the
             operator can make the I7 flip decision with measured evidence.
-          - Update docs/context_abstraction/implementation_notes.md + src/instrument/CONTEXT.md
+          - Update docs/context_abstraction/implementation_notes.md + src/agentic_dynamics/control/__init__.py
             (the plane's modules, the pipe, the OFF-by-default seam).
 
           GATE (design §9 I7): the seam is exercised in tests with a fixture spec (applies the
