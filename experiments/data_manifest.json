@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-21T21:50:38.324047+00:00",
-  "opencode_version": "1.18.15",
-  "git_commit": "14f5d044",
+  "generated_at": "2026-08-22T01:36:01.556104+00:00",
+  "opencode_version": "unknown",
+  "git_commit": "d765b25c",
   "files": {
     "canonical_inputs": {
       "inventory.json": {
@@ -16,8 +16,8 @@
     },
     "canonical_outputs": {
       "data.js": {
-        "sha256": "9db18ba1f6aa12b6d450d8625d66ed9c6f95d90d441a90c3737c881f08782515",
-        "size_bytes": 117749
+        "sha256": "7ad8d3a8f2dbdb6ac8e674cce6b3b1a9e996560a733498ff4f8073c0728dcea9",
+        "size_bytes": 136581
       }
     },
     "historical_artifacts": {
@@ -896,8 +896,8 @@
       "versions": [
         {
           "knowledge_id": "305abaf08f2f53ceef77e262fac6c5f3f8ce31cef0dbd36be59d6fcdf4941439",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T04:18:40.969600+00:00",
           "indexed_at": "2026-08-19T19:19:39.188282+00:00",
           "reason": ""
@@ -1528,8 +1528,8 @@
       "versions": [
         {
           "knowledge_id": "6f864aed3510772e783fcfc3428b7ad07f0e49a4676a08761cf7a41cdd3ba245",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T04:51:32.152447+00:00",
           "indexed_at": "2026-08-19T19:19:39.187490+00:00",
           "reason": ""
@@ -3456,8 +3456,8 @@
       "versions": [
         {
           "knowledge_id": "7325620d4502d8c81ce3ac7ba10353fbb544b35c26c6d9f82abc5067e9e0ccad",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T05:05:00.875980+00:00",
           "indexed_at": "2026-08-19T19:19:39.188670+00:00",
           "reason": ""
@@ -3560,8 +3560,8 @@
       "versions": [
         {
           "knowledge_id": "9f3e290ce44248c556eaae2d5af81b82d393e3c2d072987c16b862fc41e3b1d1",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T08:27:59.763044+00:00",
           "indexed_at": "2026-08-19T19:19:39.185091+00:00",
           "reason": ""
@@ -4792,8 +4792,8 @@
       "versions": [
         {
           "knowledge_id": "85a4a4b7658ed6a200833a963175fd4b9894032ae38d9981d3f0a26b6444f744",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T04:14:44.351383+00:00",
           "indexed_at": "2026-08-19T19:19:39.185494+00:00",
           "reason": ""
@@ -5256,8 +5256,8 @@
       "versions": [
         {
           "knowledge_id": "3fb37289e5871bf9548cbb19739c9a6fa3acab69b19ca129e71f53578373af23",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T05:04:47.731737+00:00",
           "indexed_at": "2026-08-19T19:19:39.185887+00:00",
           "reason": ""
@@ -5480,8 +5480,8 @@
       "versions": [
         {
           "knowledge_id": "9feb4d56c8f592f6e80a037ca73c75d68fa693972264f05fd6a5e1d5742fa760",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T04:36:39.878386+00:00",
           "indexed_at": "2026-08-19T19:19:39.187882+00:00",
           "reason": ""
@@ -6040,8 +6040,8 @@
       "versions": [
         {
           "knowledge_id": "da3471b6d22a03427de9a484c6b5b230d6ae7b0cebc8aae3a1f24007d31c9790",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T04:51:45.111356+00:00",
           "indexed_at": "2026-08-19T19:19:39.186280+00:00",
           "reason": ""
@@ -6192,8 +6192,8 @@
       "versions": [
         {
           "knowledge_id": "aad0488294640324f0aa805524e5adda245435e7b5aebc110361ddb960ab583f",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T05:18:37.146288+00:00",
           "indexed_at": "2026-08-19T19:19:39.186670+00:00",
           "reason": ""
@@ -10040,8 +10040,8 @@
       "versions": [
         {
           "knowledge_id": "fb396e37fdee091dde40f42d34c82a46fcab41b791b120f4902480cf816a5b5f",
-          "lifecycle_state": "current",
-          "valid_to": null,
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-21T21:02:35.419247+00:00",
           "observed_at": "2026-08-13T04:31:41.224024+00:00",
           "indexed_at": "2026-08-19T19:19:39.187087+00:00",
           "reason": ""

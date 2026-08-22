@@ -34,6 +34,7 @@ from agentic_dynamics.reporting.lab_contract import (
     CONTRACT_VERSION,
     REQUIRED_FIELDS,
     build_contract,
+    lab_source_sha256,
     validate_contract,
 )
 from agentic_dynamics.reporting.lab_manifest import (
@@ -125,7 +126,7 @@ def test_contract_carries_all_required_fields(tables_factory):
     assert contract["contract_version"] == CONTRACT_VERSION
     assert contract["lab"] == "lab_story_arc.py"
     # metric_definition_version comes from the manifest, not invented by the lab.
-    assert contract["metric_definition_version"] == "story_arc/v1"
+    assert contract["metric_definition_version"] == "story_arc/v2"
     assert contract["data_integrity_policy"] == "docs/data_integrity_findings.md"
     # Both identities are embedded (P2): the selection hash and the content hash.
     assert len(contract["registry_identity_sha256"]) == 64
@@ -321,7 +322,8 @@ def test_absent_registry_rejects_everything(tmp_path, manifest_entry):
         "registry_identity_sha256": "a" * 64,
         "resolved_input_sha256": "a" * 64,
         "registry_version": "absent",
-        "metric_definition_version": "story_arc/v1",
+        "metric_definition_version": "story_arc/v2",
+        "metric_source_sha256": lab_source_sha256("lab_story_arc.py"),
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": None,
         "contract_version": CONTRACT_VERSION,
@@ -353,6 +355,7 @@ SEMANTIC_MUTATIONS = (
     ("input_dataset_id", "canonical_registry/review"),
     ("registry_version", "data-manifest/9.9+0rows"),
     ("metric_definition_version", "story_arc/v0"),
+    ("metric_source_sha256", "0" * 64),
     ("data_integrity_policy", "docs/some_other_policy.md"),
     ("requires_external_service", "sonar"),
     ("contract_version", "lab-contract/v1"),
@@ -522,7 +525,7 @@ def test_publication_lab_uses_the_canonical_resolver(entry: LabEntry):
         f"{entry.script} must consume agentic_dynamics.reporting.canonical_corpus"
     )
     assert "load_canonical_tables" in src, f"{entry.script} must call load_canonical_tables"
-    assert "attach_contract" in src or "build_contract" in src, (
+    assert "attach_contract" in src or "attach_contribution" in src, (
         f"{entry.script} must embed a lab_contract block in its output"
     )
 

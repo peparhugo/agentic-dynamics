@@ -31,7 +31,16 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
+from agentic_dynamics.reporting.measurement_coverage import (
+    MeasurementCoverage,
+    cost_captured,
+    cost_coverage,
+)
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_quality_frontier.py"
@@ -46,21 +55,42 @@ def _avg(lst):
     return round(sum(lst) / len(lst), 3) if lst else 0.0
 
 
-def compute(stories: list[dict], analyses: list[dict]) -> dict:
+def _captured_avg(lst):
+    """Mean over *available* values only; ``None`` when none available (m2 null-not-zero)."""
+    return round(sum(lst) / len(lst), 3) if lst else None
+
+
+def _coverage(lst, *, n_total):
+    """The ``{value, n_available, n_total, coverage}`` shape for an optional metric (m2)."""
+    return MeasurementCoverage.over(lst, n_total=n_total, round_value=3).to_dict()
+
+
+def compute(stories: list[dict], analyses: list[dict]) -> tuple[dict, ContributionReport]:
     """Join per-story cost to mechanical quality signals over the canonical corpus.
+
+    Returns ``(result, contribution)`` (m3): used = the stories an analysis joined onto +
+    the analyses themselves; a story no analysis covers is ``outside_analysis_population``
+    (the review's 59-story overstatement).
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
-    # story_id -> (model, cost), from the current story rows only.
+    # story_id -> (model, cost, record_id), from the current story rows only. A story must
+    # carry a real model to be a usable join target; one without is dropped from the map so
+    # the join below (``sid not in cost_by_sid``) excludes it rather than emitting a
+    # placeholder ``model: "?"`` row (measurement-contribution closure, m1).
     cost_by_sid = {}
     for d in stories:
         sid = str(d.get("story_id") or "")
-        if len(sid) >= 8:
+        model = d.get("model")
+        if len(sid) >= 8 and model:
             summary = d.get("summary", {}) or {}
-            cost_by_sid[sid] = (d.get("model", "?"), summary.get("total_cost", 0) or 0)
+            # Raw cost (None when absent) — captured-ness is decided by cost_captured,
+            # not re-derived here with `or 0` (m2).
+            cost_by_sid[sid] = (model, summary.get("total_cost"), record_id(d))
 
     by_model = defaultdict(
         lambda: {
+            "cells": 0,
             "costs": [],
             "lsp_errors": [],
             "quality": [],
@@ -68,17 +98,22 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
             "novelty": [],
         }
     )
+    used_story_rids: set[str] = set()
+    used_analysis_rids: list[str] = []
 
     for d in analyses:
         sid = str(d.get("_story_id") or d.get("story_id") or "")
         if sid not in cost_by_sid:
             continue
-        model, cost = cost_by_sid[sid]
+        model, cost, story_rid = cost_by_sid[sid]
+        used_story_rids.add(story_rid)
+        used_analysis_rids.append(record_id(d))
         deep = d.get("deep", {}) or {}
         lsp = deep.get("lsp", {}) or {}
         sol = deep.get("solution", {}) or {}
         b = by_model[_short_model(model)]
-        if cost > 0:
+        b["cells"] += 1
+        if cost_captured(cost):
             b["costs"].append(cost)
         # LSP: count a cell ONLY when the language server actually ran. Every analysis
         # payload carries `errors: 0` by default, so averaging the raw field publishes a
@@ -86,29 +121,45 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
         # (`docs/data_integrity_findings.md`: an unmeasured value is null, never 0.)
         if lsp.get("available"):
             b["lsp_errors"].append(lsp.get("errors", 0) or 0)
-        b["quality"].append(sol.get("code_quality_score", 0) or 0)
-        b["cyclomatic"].append(sol.get("cyclomatic_complexity", 0) or 0)
-        b["novelty"].append(sol.get("novelty_score", 0) or 0)
+        # m2 null-not-zero: an absent solution score is "not measured" and must not enter
+        # the average as zero; a present field — even 0.0 — is a real value.
+        for field, target in (
+            ("code_quality_score", "quality"),
+            ("cyclomatic_complexity", "cyclomatic"),
+            ("novelty_score", "novelty"),
+        ):
+            score = sol.get(field)
+            if score is not None:
+                b[target].append(score)
 
     models = []
     for m, v in by_model.items():
         lsp_cells = len(v["lsp_errors"])
+        cost_stats = cost_coverage(v["costs"], n_total=v["cells"])
         models.append(
             {
                 "model": m,
-                "cells": len(v["costs"]),
-                "avg_cost": _avg(v["costs"]),
+                "cells": v["cells"],
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 # None (renders as an em-dash) when the LSP never ran for this model.
                 "lsp_errors_per_cell": _avg(v["lsp_errors"]) if lsp_cells else None,
                 "lsp_cells": lsp_cells,
-                "code_quality_score": _avg(v["quality"]),
-                "cyclomatic_complexity": _avg(v["cyclomatic"]),
-                "novelty_score": _avg(v["novelty"]),
+                "code_quality_score": _captured_avg(v["quality"]),
+                "code_quality_score_coverage": _coverage(v["quality"], n_total=v["cells"]),
+                "cyclomatic_complexity": _captured_avg(v["cyclomatic"]),
+                "cyclomatic_complexity_coverage": _coverage(v["cyclomatic"], n_total=v["cells"]),
+                "novelty_score": _captured_avg(v["novelty"]),
+                "novelty_score_coverage": _coverage(v["novelty"], n_total=v["cells"]),
             }
         )
-    models.sort(key=lambda x: x["avg_cost"])
+    models.sort(key=lambda x: (x["avg_cost"] is None, x["avg_cost"] or 0))
 
-    return {
+    result = {
         "experiment_id": "lab_quality_frontier",
         "generated_at": datetime.now().isoformat(),
         "summary": {
@@ -121,21 +172,19 @@ def compute(stories: list[dict], analyses: list[dict]) -> dict:
         },
         "models": models,
     }
+    # m3: a story the analyses never joined onto produced no measurement — it is outside
+    # the effective population (the review's 59-story overstatement), not silently "used".
+    contribution = ContributionReport.of(
+        used_record_ids=sorted(used_story_rids) + sorted(used_analysis_rids),
+        exclusion_reasons={"outside_analysis_population": len(cost_by_sid) - len(used_story_rids)},
+    )
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("story", "analysis")
-    output = compute(tables.stories, tables.analysis)
-    # Record scope (public-truth review P1): the metric consumes every current story and
-    # every analysis the registry resolved for them — declared explicitly, not via a
-    # permissive default.
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_eligible_records=len(tables.stories) + len(tables.analysis),
-        n_used_records=len(tables.stories) + len(tables.analysis),
-    )
+    output, contribution = compute(tables.stories, tables.analysis)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")
@@ -145,9 +194,14 @@ def main():
     )
     for m in output["models"]:
         lsp = "—" if m["lsp_errors_per_cell"] is None else f"{m['lsp_errors_per_cell']:.1f}"
+        cost = "—" if m["avg_cost"] is None else f"${m['avg_cost']:>7.3f}"
+        quality = "—" if m["code_quality_score"] is None else f"{m['code_quality_score']:>6.3f}"
+        cyclomatic = (
+            "—" if m["cyclomatic_complexity"] is None else f"{m['cyclomatic_complexity']:>7.1f}"
+        )
         print(
-            f"  {m['model']:20s} cost=${m['avg_cost']:>7.3f} lsp_err={lsp:>5s} "
-            f"quality={m['code_quality_score']:>6.3f} cyclomatic={m['cyclomatic_complexity']:>7.1f}"
+            f"  {m['model']:20s} cost={cost} lsp_err={lsp:>5s} "
+            f"quality={quality} cyclomatic={cyclomatic}"
         )
 
 

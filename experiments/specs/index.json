@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-22T01:23:43.648147+00:00",
-  "n_specs": 81,
+  "generated_at": "2026-08-22T01:41:12.888872+00:00",
+  "n_specs": 82,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -955,6 +955,24 @@
       "latest_cost_usd": 0.101108,
       "latest_git_sha": "7f40d9a10",
       "results_pointer": "experiments/results/workflows/measurement_bug_fixes/20260818T233938Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "measurement_contribution_closure",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/measurement_contribution_closure.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-22T01:23:43.486570+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 1.901813,
+      "latest_git_sha": "d765b25c2",
+      "results_pointer": "experiments/results/workflows/measurement_contribution_closure/20260822T012343Z.json",
       "n_runs": 1
     },
     {

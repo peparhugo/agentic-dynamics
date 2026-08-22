@@ -17,6 +17,7 @@ Usage:
     python scripts/build_data.py --dry-run    # Print what would be written
 """
 
+import ast
 import hashlib
 import json
 import os
@@ -62,6 +63,11 @@ from agentic_dynamics.reporting.lab_manifest import (  # noqa: E402
     load_lab_manifest,
     publication_labs,
     rejection_reason,
+)
+from agentic_dynamics.reporting.measurement_coverage import (  # noqa: E402
+    MeasurementCoverage,
+    cost_captured,
+    cost_coverage,
 )
 
 #: The registry ``source_type`` values the site consumes as measurement corpus.
@@ -112,6 +118,11 @@ class CanonicalCorpus:
     story_count: int = 0
     finding_count: int = 0
     tombstoned_count: int = 0
+    #: m4: the tombstone population split by reason — the 77 contaminated early_degrade
+    #: cells vs the 10 "no usable measurement payload" retractions (cost-0 Claude stubs).
+    #: A retraction is NOT contamination, so the two must never be described together.
+    contaminated_tombstones: int = 0
+    no_measurement_tombstones: int = 0
 
 
 def _finding_entry_from_run(experiment: str, run: dict, locator: str) -> dict:
@@ -283,6 +294,20 @@ def load_canonical_corpus(
             for r in rows
             if r.get("lifecycle_state") == "tombstoned"
             and r.get("source_type") in CANONICAL_SOURCE_TYPES
+        ),
+        contaminated_tombstones=sum(
+            1
+            for r in rows
+            if r.get("lifecycle_state") == "tombstoned"
+            and r.get("source_type") in CANONICAL_SOURCE_TYPES
+            and "contaminat" in (r.get("reason") or "").lower()
+        ),
+        no_measurement_tombstones=sum(
+            1
+            for r in rows
+            if r.get("lifecycle_state") == "tombstoned"
+            and r.get("source_type") in CANONICAL_SOURCE_TYPES
+            and "no usable measurement" in (r.get("reason") or "").lower()
         ),
     )
 
@@ -701,7 +726,7 @@ def _load_review_data(reviews: list[dict], stories: list[dict]) -> dict:
     from collections import Counter
 
     sid_to_model = {
-        str(s.get("story_id") or ""): s.get("model", "?") for s in stories if s.get("story_id")
+        str(s.get("story_id") or ""): s.get("model") for s in stories if s.get("story_id")
     }
 
     by_model = {}
@@ -806,13 +831,27 @@ def _optional_measurement(value, n_available: int, n_total: int) -> dict:
     Instead every optional measurement carries ``value`` (the average over the cells that
     actually measured it, ``None`` when none did) plus the availability accounting, so a
     reader can tell "0 errors" from "no diagnostics tool ran".
+
+    Thin wrapper over :class:`MeasurementCoverage` (m2) for the call sites that already
+    hold a pre-rounded value rather than a list — the shared primitive, one denominator
+    policy.
     """
-    return {
-        "value": value,
-        "n_available": n_available,
-        "n_total": n_total,
-        "coverage": round(n_available / n_total, 4) if n_total else 0.0,
-    }
+    return MeasurementCoverage(
+        value=value,
+        n_available=n_available,
+        n_total=n_total,
+        coverage=round(n_available / n_total, 4) if n_total else 0.0,
+    ).to_dict()
+
+
+def _append_if_present(target: list, value) -> None:
+    """Append ``value`` to ``target`` only when it is a real measurement (not ``None``).
+
+    The m2 null-not-zero rule: an absent field (``None``) is "not measured" and must not
+    be folded into an average as zero; a present field — even ``0.0`` — is a real value.
+    """
+    if value is not None:
+        target.append(value)
 
 
 def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
@@ -826,7 +865,7 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
     from collections import Counter
 
     sid_to_model = {
-        str(s.get("story_id") or ""): s.get("model", "?") for s in stories if s.get("story_id")
+        str(s.get("story_id") or ""): s.get("model") for s in stories if s.get("story_id")
     }
 
     by_model = {}
@@ -903,17 +942,21 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
                 m["lsp_errors"] += lsp.get("errors", 0) or 0
                 m["lsp_warnings"] += lsp.get("warnings", 0) or 0
             sol = deep.get("solution", {})
-            m["solution_correctness"].append(sol.get("correctness_score", 0) or 0)
-            m["solution_constraints"].append(sol.get("constraint_score", 0) or 0)
-            m["solution_quality"].append(sol.get("code_quality_score", 0) or 0)
-            m["solution_novelty"].append(sol.get("novelty_score", 0) or 0)
-            m["solution_composite"].append(sol.get("composite_score", 0) or 0)
+            # m2 null-not-zero: an absent deep metric (None) is "not measured" and must
+            # not enter the average as zero; a present field — even 0.0 — is a real value.
+            _append_if_present(m["solution_correctness"], sol.get("correctness_score"))
+            _append_if_present(m["solution_constraints"], sol.get("constraint_score"))
+            _append_if_present(m["solution_quality"], sol.get("code_quality_score"))
+            _append_if_present(m["solution_novelty"], sol.get("novelty_score"))
+            _append_if_present(m["solution_composite"], sol.get("composite_score"))
             basin = deep.get("basin", {})
-            m["basin_escape"].append(basin.get("escape_score", 0) or 0)
+            _append_if_present(m["basin_escape"], basin.get("escape_score"))
             m["strategies"][deep.get("strategy", {}).get("strategy", "?")] += 1
 
-    def _avg(lst):
-        return round(sum(lst) / len(lst), 3) if lst else None
+    def _deep_coverage(values):
+        # m2: publish each optional deep metric as {value, n_available, n_total, coverage}
+        # — None when no analysis carried the field, rather than an averaged-in zero.
+        return MeasurementCoverage.over(values, n_total=m["deep_cells"], round_value=3).to_dict()
 
     models = []
     for reviewed, m in by_model.items():
@@ -947,12 +990,12 @@ def _load_analysis_data(analysis: list[dict], stories: list[dict]) -> dict:
                     m["lsp_available"],
                     m["deep_cells"],
                 ),
-                "solution_correctness": _avg(m["solution_correctness"]),
-                "solution_constraints": _avg(m["solution_constraints"]),
-                "solution_quality": _avg(m["solution_quality"]),
-                "solution_novelty": _avg(m["solution_novelty"]),
-                "solution_composite": _avg(m["solution_composite"]),
-                "basin_escape": _avg(m["basin_escape"]),
+                "solution_correctness": _deep_coverage(m["solution_correctness"]),
+                "solution_constraints": _deep_coverage(m["solution_constraints"]),
+                "solution_quality": _deep_coverage(m["solution_quality"]),
+                "solution_novelty": _deep_coverage(m["solution_novelty"]),
+                "solution_composite": _deep_coverage(m["solution_composite"]),
+                "basin_escape": _deep_coverage(m["basin_escape"]),
                 "strategies": dict(m["strategies"]),
             }
         )
@@ -1095,9 +1138,9 @@ def _story_pipeline_rows(stories: list[dict]) -> tuple[list[dict], list[dict]]:
                 "quality": quality,
                 "condition": condition,
                 "session_count": session_count,
-                "total_tokens": summary.get("total_tokens", 0) or 0,
-                "total_cost": summary.get("total_cost", 0.0) or 0.0,
-                "cache_hit_rate": summary.get("cache_hit_rate", 0.0) or 0.0,
+                "total_tokens": summary.get("total_tokens"),
+                "total_cost": summary.get("total_cost"),
+                "cache_hit_rate": summary.get("cache_hit_rate"),
                 "total_duration": summary.get("total_duration", 0.0) or 0.0,
                 "all_successful": bool(summary.get("all_successful", False)),
                 "test_count": summary.get("test_count", 0) or 0,
@@ -1115,9 +1158,9 @@ def _story_pipeline_rows(stories: list[dict]) -> tuple[list[dict], list[dict]]:
                     "prompt_tokens": a.get("prompt_tokens", 0) or 0,
                     "completion_tokens": a.get("completion_tokens", 0) or 0,
                     "reasoning_tokens": a.get("reasoning_tokens", 0) or 0,
-                    "total_tokens": a.get("total_tokens", 0) or 0,
+                    "total_tokens": a.get("total_tokens"),
                     "cache_read_tokens": a.get("cache_read_tokens", 0) or 0,
-                    "cost_usd": s.get("cost_usd", 0.0) or 0.0,
+                    "cost_usd": s.get("cost_usd"),
                     "duration_s": s.get("duration_s", 0.0) or 0.0,
                     "exit_code": s.get("exit_code", 0) or 0,
                 }
@@ -1138,21 +1181,26 @@ def _load_story_data(stories: list[dict]) -> dict:
     for c in cells:
         by_model[c["model"]].append(c)
     models = []
-    for mid, rows in sorted(by_model.items(), key=lambda kv: sum(c["total_cost"] for c in kv[1])):
+    for mid, rows in sorted(by_model.items(), key=lambda kv: _total_captured_cost(kv[1])):
         n = len(rows)
         cost_stats = _captured_cost_stats(rows)
         models.append(
             {
                 "model": mid,
                 "cells": n,
-                "total_cost": round(sum(c["total_cost"] for c in rows), 6),
+                "total_cost": round(_total_captured_cost(rows), 6),
                 "avg_cost": cost_stats["avg_captured_cost"],
                 "avg_captured_cost": cost_stats["avg_captured_cost"],
-                "cost_captured_cells": cost_stats["cost_captured_cells"],
-                "total_cells": cost_stats["total_cells"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
                 "cost_coverage": cost_stats["cost_coverage"],
-                "total_tokens": sum(c["total_tokens"] for c in rows),
-                "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / n, 3),
+                "total_tokens": sum(c["total_tokens"] for c in rows if c["total_tokens"] is not None),
+                "avg_cache_hit": round(
+                    sum(c["cache_hit_rate"] for c in rows if c["cache_hit_rate"] is not None)
+                    / max(len([c for c in rows if c["cache_hit_rate"] is not None]), 1),
+                    3,
+                ) if any(c["cache_hit_rate"] is not None for c in rows) else None,
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
             }
         )
@@ -1172,11 +1220,12 @@ def _load_story_data(stories: list[dict]) -> dict:
                 "condition": cond,
                 "cells": n,
                 "variants": variants,
-                "total_cost": round(sum(c["total_cost"] for c in rows), 6),
+                "total_cost": round(_total_captured_cost(rows), 6),
                 "avg_cost": cost_stats["avg_captured_cost"],
                 "avg_captured_cost": cost_stats["avg_captured_cost"],
-                "cost_captured_cells": cost_stats["cost_captured_cells"],
-                "total_cells": cost_stats["total_cells"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
                 "cost_coverage": cost_stats["cost_coverage"],
                 "success": sum(1 for c in rows if c["all_successful"]),
                 "fail": sum(1 for c in rows if not c["all_successful"]),
@@ -1188,24 +1237,31 @@ def _load_story_data(stories: list[dict]) -> dict:
     for c in cells:
         by_story[c["story_name"]].append(c)
     stories_out = []
-    for name, rows in sorted(by_story.items(), key=lambda kv: sum(c["total_cost"] for c in kv[1])):
+    for name, rows in sorted(by_story.items(), key=lambda kv: _total_captured_cost(kv[1])):
         n = len(rows)
         cost_stats = _captured_cost_stats(rows)
         stories_out.append(
             {
                 "story": name,
                 "cells": n,
-                "total_cost": round(sum(c["total_cost"] for c in rows), 6),
+                "total_cost": round(_total_captured_cost(rows), 6),
                 "avg_cost": cost_stats["avg_captured_cost"],
                 "avg_captured_cost": cost_stats["avg_captured_cost"],
-                "cost_captured_cells": cost_stats["cost_captured_cells"],
-                "total_cells": cost_stats["total_cells"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
                 "cost_coverage": cost_stats["cost_coverage"],
                 "sessions": sum(c["session_count"] for c in rows),
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / n, 0),
                 "avg_tokens_per_session": round(
-                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / n, 0
-                ),
+                    sum(
+                        c["total_tokens"] / max(c["session_count"], 1)
+                        for c in rows
+                        if c["total_tokens"] is not None
+                    )
+                    / max(len([c for c in rows if c["total_tokens"] is not None]), 1),
+                    0,
+                ) if any(c["total_tokens"] is not None for c in rows) else None,
             }
         )
 
@@ -1224,25 +1280,34 @@ def _load_story_data(stories: list[dict]) -> dict:
                 "cells": n,
                 "avg_cost": cost_stats["avg_captured_cost"],
                 "avg_captured_cost": cost_stats["avg_captured_cost"],
-                "cost_captured_cells": cost_stats["cost_captured_cells"],
-                "total_cells": cost_stats["total_cells"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
                 "cost_coverage": cost_stats["cost_coverage"],
                 "avg_tokens_per_session": round(
-                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / n, 0
-                ),
+                    sum(
+                        c["total_tokens"] / max(c["session_count"], 1)
+                        for c in rows
+                        if c["total_tokens"] is not None
+                    )
+                    / max(len([c for c in rows if c["total_tokens"] is not None]), 1),
+                    0,
+                ) if any(c["total_tokens"] is not None for c in rows) else None,
                 "avg_session_duration_s": round(
                     sum(c["total_duration"] / max(c["session_count"], 1) for c in rows) / n, 0
                 ),
             }
         )
 
-    # Per-session stats.
-    total_cost = sum(s["cost_usd"] for s in sessions)
-    total_tokens = sum(s["total_tokens"] for s in sessions)
-    total_cache_reads = sum(s["cache_read_tokens"] for s in sessions)
-    total_prompt = sum(s["prompt_tokens"] for s in sessions)
+    # Per-session stats. m2 null-not-zero: a session with no captured cost (cost_usd None)
+    # contributes nothing to the cost total rather than a fabricated zero.
+    total_cost = sum(s["cost_usd"] for s in sessions if s["cost_usd"] is not None)
+    total_tokens = sum(s["total_tokens"] for s in sessions if s["total_tokens"] is not None)
+    cached = [s for s in sessions if s["cache_read_tokens"] is not None and s["prompt_tokens"] is not None]
+    total_cache_reads = sum(s["cache_read_tokens"] for s in cached)
+    total_prompt = sum(s["prompt_tokens"] for s in cached)
     denom = total_cache_reads + total_prompt
-    cache_hit_rate = (total_cache_reads / denom) if denom else 0.0
+    cache_hit_rate = (total_cache_reads / denom) if denom else None
 
     return {
         "_provenance": "[M] token counts from session.jsonl; cost from opencode DB verified",
@@ -1255,7 +1320,7 @@ def _load_story_data(stories: list[dict]) -> dict:
             "total_cost": total_cost,
             "total_tokens": total_tokens,
             "total_cache_reads": total_cache_reads,
-            "cache_hit_rate": round(cache_hit_rate, 3),
+            "cache_hit_rate": round(cache_hit_rate, 3) if cache_hit_rate is not None else None,
             "duration_s": sum(s["duration_s"] for s in sessions),
             "successful": sum(1 for s in sessions if s["exit_code"] == 0),
             "failed": sum(1 for s in sessions if s["exit_code"] != 0),
@@ -1291,25 +1356,24 @@ def _captured_cost_stats(rows: list[dict]) -> dict:
 
     A cell whose cost was not captured must not enter the average as ``0`` — that would
     lower the same model's average in one view and not another (public-truth review P1).
-    Every aggregation over cost therefore publishes the same four fields, so two views of
-    the same model can never disagree on its average cost.
+    Delegates to the shared :func:`cost_coverage` primitive (m2) so the website and every
+    lab use the exact same captured-cost determination and the same five published fields
+    (``avg_captured_cost`` / ``total_captured_cost`` / ``cost_captured_records`` /
+    ``total_records`` / ``cost_coverage``).
     """
-    costs = [c["total_cost"] for c in rows if c.get("total_cost", 0) > 0]
-    captured = len(costs)
-    total = len(rows)
-    return {
-        "total_cells": total,
-        "cost_captured_cells": captured,
-        "avg_captured_cost": round(sum(costs) / captured, 6) if captured else None,
-        "cost_coverage": round(captured / total, 4) if total else 0.0,
-    }
+    return cost_coverage([c["total_cost"] for c in rows], n_total=len(rows))
+
+
+def _total_captured_cost(rows: list[dict]) -> float:
+    """Sum of captured cell costs only — skips missing (``None``) and zero costs (m2)."""
+    return sum(c["total_cost"] for c in rows if cost_captured(c["total_cost"]))
 
 
 def _captured_cost_key(rows: list[dict]) -> float:
     """Ordering key: mean captured cost (inf when nothing captured), matching the old
-    ``ORDER BY avg_cost`` (NULLs last)."""
-    costs = [c["total_cost"] for c in rows if c["total_cost"] > 0]
-    return sum(costs) / len(costs) if costs else float("inf")
+    ``ORDER BY avg_cost`` (NULLs last). Uses the shared :func:`cost_captured` test (m2)."""
+    captured = [c["total_cost"] for c in rows if cost_captured(c["total_cost"])]
+    return sum(captured) / len(captured) if captured else float("inf")
 
 
 def compute_story_models(stories: list[dict]) -> list[dict]:
@@ -1346,7 +1410,7 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
         t = test_by_model[mid]
         sessions_sum = sum(c["session_count"] for c in rows)
         cost_stats = _captured_cost_stats(rows)
-        cost_cells = cost_stats["cost_captured_cells"]
+        cost_cells = cost_stats["cost_captured_records"]
         avg_cost = cost_stats["avg_captured_cost"]
         avg_code_lines = round(sum(c["code_lines"] for c in rows) / total_runs, 0)
         # Energy is a [C]omputed estimate from measured tokens (J per token).
@@ -1364,22 +1428,28 @@ def compute_story_models(stories: list[dict]) -> list[dict]:
                 "unique_cells": unique_cells,
                 "re_runs": total_runs - unique_cells,
                 "sessions": sessions_sum,
-                "total_cost": round(sum(c["total_cost"] for c in rows), 6),
+                "total_cost": round(_total_captured_cost(rows), 6),
                 "avg_cost": avg_cost,
                 "cost_cells": cost_cells,
                 "avg_captured_cost": cost_stats["avg_captured_cost"],
-                "cost_captured_cells": cost_stats["cost_captured_cells"],
-                "total_cells": cost_stats["total_cells"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
                 "cost_coverage": cost_stats["cost_coverage"],
-                "avg_cache_hit": round(sum(c["cache_hit_rate"] for c in rows) / total_runs, 3),
+                "avg_cache_hit": round(
+                    sum(c["cache_hit_rate"] for c in rows if c["cache_hit_rate"] is not None)
+                    / max(len([c for c in rows if c["cache_hit_rate"] is not None]), 1),
+                    3,
+                ) if any(c["cache_hit_rate"] is not None for c in rows) else None,
                 "avg_tests": round(sum(c["test_count"] for c in rows) / total_runs, 1),
                 "avg_test_code_ratio": round(
                     sum(c["test_code_ratio"] for c in rows) / total_runs, 3
                 ),
                 "avg_tok_per_session": round(
-                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows) / total_runs,
+                    sum(c["total_tokens"] / max(c["session_count"], 1) for c in rows if c["total_tokens"] is not None)
+                    / max(len([c for c in rows if c["total_tokens"] is not None]), 1),
                     0,
-                ),
+                ) if any(c["total_tokens"] is not None for c in rows) else None,
                 "avg_duration_s": round(sum(c["total_duration"] for c in rows) / total_runs, 0),
                 "avg_code_lines": avg_code_lines,
                 # ── Test-count scope (review "smaller"): two DIFFERENT quantities, no longer
@@ -1470,22 +1540,66 @@ def _assert_resolution_complete(tables, waiver_path=None) -> list[dict]:
 #: (public-truth review P1/P2). Their contents are hashed so the publication contract
 #: records *which code* produced the numbers, not just *which data*: a generator change
 #: (a new reducer, a projection change) is visible even when the input is unchanged.
-GENERATOR_SOURCES = (
-    ROOT / "scripts" / "build_data.py",
-    ROOT / "src" / "agentic_dynamics" / "reporting" / "canonical_corpus.py",
-    ROOT / "src" / "agentic_dynamics" / "reporting" / "lab_contract.py",
-    ROOT / "src" / "agentic_dynamics" / "reporting" / "lab_manifest.py",
-)
+#:
+#: m4: the file list is DERIVED from ``build_data``'s import graph
+#: (:func:`_generator_source_files`) rather than a hand-maintained tuple. The P2 finding
+#: was that the hand tuple silently omitted ``core.constants``, ``control.routing`` and
+#: ``measurement.solution`` — a derived manifest cannot omit a module build_data actually
+#: imports.
+
+
+def _generator_source_files() -> list[Path]:
+    """The direct computation-dependency manifest, DERIVED from the import graph.
+
+    Walks ``build_data.py``'s ``agentic_dynamics.*`` imports transitively and returns every
+    source file reachable from it, sorted for determinism. The list is *computed*, never
+    hand-maintained, so a newly-added computation dependency is covered automatically.
+    """
+    src_root = ROOT / "src" / "agentic_dynamics"
+    seen: dict[Path, None] = {}
+
+    def resolve(name: str) -> None:
+        if not name.startswith("agentic_dynamics"):
+            return
+        rel = name[len("agentic_dynamics.") :].replace(".", "/")
+        candidate = src_root / f"{rel}.py"
+        if candidate.is_file():
+            visit(candidate)
+            return
+        package = src_root / rel / "__init__.py"
+        if package.is_file():
+            visit(package)
+
+    def visit(path: Path) -> None:
+        path = path.resolve()
+        if path in seen:
+            return
+        seen[path] = None
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            return
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    resolve(alias.name)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                resolve(node.module)
+
+    visit(ROOT / "scripts" / "build_data.py")
+    return sorted(seen)
 
 
 def generator_source_tree_identity() -> str:
-    """``sha256`` over the generator source files (name + bytes, in a fixed order).
+    """``sha256`` over the generated source-tree dependency manifest (name + bytes).
 
     Deterministic and environment-independent: only the source file *contents* enter the
-    digest, never their absolute paths.
+    digest, never their absolute paths. The file list comes from
+    :func:`_generator_source_files` (derived from the import graph), so the identity
+    tracks the full computation surface, not a remembered subset.
     """
     h = hashlib.sha256()
-    for path in GENERATOR_SOURCES:
+    for path in _generator_source_files():
         h.update(path.name.encode("utf-8"))
         h.update(path.read_bytes())
     return h.hexdigest()
@@ -1717,7 +1831,12 @@ def build():
             "records_used": len(tables.stories),
             "unresolved_waivered": len(waivers),
             "canonical_findings": corpus.finding_count,
-            "tombstoned_excluded": corpus.tombstoned_count,
+            # ── m4: the tombstone population split by reason — a retraction (no usable
+            # ── measurement payload) is NOT contamination, so the two categories are
+            # ── published separately, never merged into a single "contaminated, excluded".
+            "contaminated_tombstones": corpus.contaminated_tombstones,
+            "no_measurement_tombstones": corpus.no_measurement_tombstones,
+            "tombstones_total": corpus.tombstoned_count,
             "_provenance": {
                 "worktrees_total": "M",
                 "sessions_total": "M",
@@ -1737,7 +1856,9 @@ def build():
                 "records_used": "C",
                 "unresolved_waivered": "M",
                 "canonical_findings": "M",
-                "tombstoned_excluded": "M",
+                "contaminated_tombstones": "M",
+                "no_measurement_tombstones": "M",
+                "tombstones_total": "M",
             },
         },
         # ── Resolution completeness (review P1) — the report + the waived rows, so the

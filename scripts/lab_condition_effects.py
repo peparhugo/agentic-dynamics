@@ -39,7 +39,12 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
+from agentic_dynamics.reporting.measurement_coverage import cost_captured, cost_coverage
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_condition_effects.py"
@@ -69,12 +74,24 @@ def _review_outcomes_by_story(reviews: list[dict]) -> dict[str, dict[str, int]]:
     return outcomes
 
 
-def compute(stories: list[dict], reviews: list[dict]) -> dict:
+def compute(stories: list[dict], reviews: list[dict]) -> tuple[dict, ContributionReport]:
     """Aggregate outcome metrics per perturbation condition.
+
+    Returns ``(result, contribution)`` (m3): every current story is used, plus only the
+    reviews whose story is still current; the rest are excluded as
+    ``review_without_current_story``.
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
     review_outcomes = _review_outcomes_by_story(reviews)
+    story_sids = {str(s.get("story_id") or "") for s in stories}
+    # Used records: every current story + the reviews whose `_story_id` names a current
+    # story (the exact join the metric consumes).
+    used_ids = [record_id(s) for s in stories] + [
+        record_id(r)
+        for r in reviews
+        if str(r.get("_story_id") or r.get("story_id") or "") in story_sids
+    ]
 
     by_condition = defaultdict(
         lambda: {"cells": 0, "cost": [], "success": 0, "cascade": 0, "worse": 0, "reviewed": 0}
@@ -83,10 +100,14 @@ def compute(stories: list[dict], reviews: list[dict]) -> dict:
     for d in stories:
         cond = d.get("_canonical_condition") or "clean"
         summary = d.get("summary", {}) or {}
-        cost = summary.get("total_cost", 0) or 0
+        # m2 null-not-zero: only a *captured* cost (finite, positive) enters the average;
+        # a missing/zero cost is "no billable work priced" and is counted, never averaged
+        # in as $0 (the review's P1 denominator-policy split).
+        cost = summary.get("total_cost")
         b = by_condition[cond]
         b["cells"] += 1
-        b["cost"].append(cost)
+        if cost_captured(cost):
+            b["cost"].append(cost)
         if summary.get("all_successful"):
             b["success"] += 1
         if summary.get("cascade_recovery"):
@@ -100,14 +121,22 @@ def compute(stories: list[dict], reviews: list[dict]) -> dict:
     for cond, b in by_condition.items():
         n = b["cells"]
         reviewed = b["reviewed"]
+        cost_stats = cost_coverage(b["cost"], n_total=n)
         conditions.append(
             {
                 "condition": cond,
                 "cells": n,
                 "success_rate": round(b["success"] / n, 3) if n else 0,
                 "cascade_rate": round(b["cascade"] / n, 3) if n else 0,
-                "avg_cost": round(sum(b["cost"]) / n, 4) if n else 0,
-                "total_cost": round(sum(b["cost"]), 4),
+                # Captured-only mean (None when nothing captured), plus the five shared
+                # coverage fields so two views can never disagree on the denominator.
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "total_cost": cost_stats["total_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "cost_coverage": cost_stats["cost_coverage"],
                 "reviews": reviewed,
                 # None (not 0) when nothing was reviewed — an unmeasured rate is not "0%".
                 "worse_rate": round(b["worse"] / reviewed, 3) if reviewed else None,
@@ -115,11 +144,10 @@ def compute(stories: list[dict], reviews: list[dict]) -> dict:
         )
     conditions.sort(key=lambda x: x["condition"])
 
-    # Record scope (public-truth review P1): the metric consumes every current story and
-    # only the reviews whose story is still current. The rest are declared, not silently
-    # assumed away — the permissive "everything resolved is used" default hid them.
+    # Record scope (m3): the metric consumes every current story and only the reviews
+    # whose story is still current — declared via the ContributionReport, not by hand.
     joined_reviews = sum(c["reviews"] for c in conditions)
-    return {
+    result = {
         "experiment_id": "lab_condition_effects",
         "generated_at": datetime.now().isoformat(),
         "summary": {
@@ -131,26 +159,17 @@ def compute(stories: list[dict], reviews: list[dict]) -> dict:
         },
         "conditions": conditions,
     }
+    contribution = ContributionReport.of(
+        used_record_ids=used_ids,
+        exclusion_reasons={"review_without_current_story": len(reviews) - joined_reviews},
+    )
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("story", "review")
-    output = compute(tables.stories, tables.reviews)
-
-    # Record scope (public-truth review P1): 215 stories + 242 reviews resolve, but only
-    # 155 reviews join a current story — the 87 others are excluded as
-    # ``review_without_current_story`` and declared explicitly in the contract.
-    n_resolved = len(tables.stories) + len(tables.reviews)
-    n_used = len(tables.stories) + output["summary"]["joined_reviews"]
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_resolved_records=n_resolved,
-        n_eligible_records=n_used,
-        n_used_records=n_used,
-        review_without_current_story=output["summary"]["reviews_without_current_story"],
-    )
+    output, contribution = compute(tables.stories, tables.reviews)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")
@@ -160,9 +179,10 @@ def main():
     )
     for c in output["conditions"]:
         worse = "—" if c["worse_rate"] is None else f"{c['worse_rate']:.0%}"
+        cost = "—" if c["avg_cost"] is None else f"${c['avg_cost']:.4f}"
         print(
             f"  {c['condition']:15s} cells={c['cells']:3d} success={c['success_rate']:.0%} "
-            f"cascade={c['cascade_rate']:.0%} avg_cost=${c['avg_cost']:.4f} worse={worse}"
+            f"cascade={c['cascade_rate']:.0%} avg_cost={cost} worse={worse}"
         )
 
 

@@ -265,6 +265,28 @@ def test_compact_registry_index_supersede_then_tombstone(tmp_path):
     assert versions_by_kid["kid_v1"]["lifecycle_state"] == "superseded"
 
 
+def test_compact_registry_index_terminal_tombstone_supersedes_earlier_open_version(tmp_path):
+    # m4: a terminal tombstone closes every earlier OPEN version of its entity - a
+    # "current" predecessor becomes "superseded" with valid_to = the tombstone's
+    # valid_from, even when the tombstone carries no explicit `supersedes` pointer
+    # (the entity 37679fe003ca retraction bug).
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_v1", entity_id="eid_1", indexed_at="2026-08-15T00:00:00+00:00",
+             observed_at="2026-08-15T00:00:00+00:00", lifecycle_state="current"),
+        _row(knowledge_id="kid_v1_tombstone", entity_id="eid_1", indexed_at="2026-08-16T00:00:00+00:00",
+             observed_at="2026-08-16T00:00:00+00:00", lifecycle_state="tombstoned"),
+    ])
+    compacted = gm._compact_registry_index(path)
+    entity_row = compacted[0]
+    assert entity_row["knowledge_id"] == "kid_v1_tombstone"
+    assert entity_row["lifecycle_state"] == "tombstoned"
+
+    versions_by_kid = {v["knowledge_id"]: v for v in entity_row["versions"]}
+    assert versions_by_kid["kid_v1"]["lifecycle_state"] == "superseded"
+    assert versions_by_kid["kid_v1"]["valid_to"] == "2026-08-16T00:00:00+00:00"
+
+
 def test_compact_registry_index_independent_entities_do_not_interfere(tmp_path):
     # A supersede chain under one entity_id must not affect an unrelated entity_id's
     # own, independent version.

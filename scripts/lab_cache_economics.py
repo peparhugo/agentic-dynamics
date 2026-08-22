@@ -29,7 +29,16 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
+from agentic_dynamics.reporting.measurement_coverage import (
+    MeasurementCoverage,
+    cost_captured,
+    cost_coverage,
+)
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_cache_economics.py"
@@ -40,12 +49,11 @@ def _short_model(model: str) -> str:
     return model.split("/")[-1]
 
 
-def _avg(lst):
-    return round(sum(lst) / len(lst), 3) if lst else 0.0
-
-
-def compute(stories: list[dict]) -> dict:
+def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
     """Aggregate per-model cache economics over the canonical story payloads.
+
+    Returns ``(result, contribution)`` (m3) — the computation reports exactly which
+    records it consumed, and the contract is derived from that report in :func:`main`.
 
     Split out of :func:`main` so the analysis is testable without touching the registry
     or the filesystem.
@@ -61,41 +69,65 @@ def compute(stories: list[dict]) -> dict:
             "cells": 0,
         }
     )
+    used_ids: list[str] = []
 
     for d in stories:
         m = _short_model(d.get("model", "unknown"))
         s = d.get("summary", {}) or {}
         b = by_model[m]
         b["cells"] += 1
-        cost = s.get("total_cost", 0) or 0
-        if cost > 0:
+        used_ids.append(record_id(d))
+        # m2 null-not-zero: only a *captured* cost enters the average; a missing/zero cost
+        # is counted (cost_coverage) but never averaged in as $0 (review P1).
+        cost = s.get("total_cost")
+        if cost_captured(cost):
             b["costs"].append(cost)
-        b["cache_hit"].append(s.get("cache_hit_rate", 0) or 0)
+        # Same rule for the optional per-cell measurements: a RATE (cache_hit_rate) and the
+        # token volumes are captured-only — a session that did not record them is
+        # "unavailable", never "zero". (reads/writes below stay count sums: a count's zero
+        # is a real value, and they are published as totals, not averages.)
+        if s.get("cache_hit_rate") is not None:
+            b["cache_hit"].append(s["cache_hit_rate"])
+        if s.get("total_context_tokens") is not None:
+            b["context"].append(s["total_context_tokens"])
+        if s.get("total_tokens") is not None:
+            b["tokens"].append(s["total_tokens"])
         b["reads"].append(s.get("total_cache_reads", 0) or 0)
         b["writes"].append(s.get("total_cache_writes", 0) or 0)
-        b["context"].append(s.get("total_context_tokens", 0) or 0)
-        b["tokens"].append(s.get("total_tokens", 0) or 0)
 
     models = []
     for m, v in by_model.items():
         reads = sum(v["reads"])
         writes = sum(v["writes"])
+        cost_stats = cost_coverage(v["costs"], n_total=v["cells"])
+        cache_hit = MeasurementCoverage.over(v["cache_hit"], n_total=v["cells"], round_value=3)
+        context = MeasurementCoverage.over(v["context"], n_total=v["cells"], round_value=0)
+        tokens = MeasurementCoverage.over(v["tokens"], n_total=v["cells"], round_value=0)
         models.append(
             {
                 "model": m,
                 "cells": v["cells"],
-                "avg_cost": _avg(v["costs"]),
-                "avg_cache_hit": _avg(v["cache_hit"]),
+                "avg_cost": cost_stats["avg_captured_cost"],
+                "avg_captured_cost": cost_stats["avg_captured_cost"],
+                "total_captured_cost": cost_stats["total_captured_cost"],
+                "cost_captured_records": cost_stats["cost_captured_records"],
+                "total_records": cost_stats["total_records"],
+                "cost_coverage": cost_stats["cost_coverage"],
+                "avg_cache_hit": cache_hit.value,
+                "cache_hit_coverage": cache_hit.to_dict(),
                 "cache_reads": reads,
                 "cache_writes": writes,
                 "read_write_ratio": round(reads / writes, 1) if writes else None,
-                "avg_context_per_cell": round(sum(v["context"]) / len(v["context"]), 0),
-                "avg_tokens_per_cell": round(sum(v["tokens"]) / len(v["tokens"]), 0),
+                "avg_context_per_cell": context.value,
+                "context_coverage": context.to_dict(),
+                "avg_tokens_per_cell": tokens.value,
+                "tokens_coverage": tokens.to_dict(),
             }
         )
-    models.sort(key=lambda x: x["avg_cost"])
+    # None-safe ordering: un-priced models sort last (matching the captured-only average).
+    models.sort(key=lambda x: (x["avg_cost"] is None, x["avg_cost"] or 0))
 
-    return {
+    result = {
         "experiment_id": "lab_cache_economics",
         "generated_at": datetime.now().isoformat(),
         "summary": {
@@ -104,27 +136,23 @@ def compute(stories: list[dict]) -> dict:
         },
         "models": models,
     }
+    # m3: every current story is consumed — no exclusion, no unused-eligible gap.
+    contribution = ContributionReport.of(used_record_ids=used_ids)
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("story")
-    output = compute(tables.stories)
-    # Record scope (public-truth review P1): the metric consumes every current story, so
-    # eligible == used == resolved — declared explicitly, not via a permissive default.
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_eligible_records=len(tables.stories),
-        n_used_records=len(tables.stories),
-    )
+    output, contribution = compute(tables.stories)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")
     print(f"  canonical input: {len(tables.stories)} stories ({tables.identity.registry_version})")
     for m in output["models"]:
+        cost = "—" if m["avg_cost"] is None else f"${m['avg_cost']:>7.3f}"
         print(
-            f"  {m['model']:20s} cost=${m['avg_cost']:>7.3f} hit={m['avg_cache_hit']:.0%} "
+            f"  {m['model']:20s} cost={cost} hit={m['avg_cache_hit']:.0%} "
             f"r/w={m['read_write_ratio']} context/cell={m['avg_context_per_cell']:>9.0f}"
         )
 

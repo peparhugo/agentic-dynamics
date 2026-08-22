@@ -60,7 +60,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
-from agentic_dynamics.reporting.lab_contract import attach_contract
+from agentic_dynamics.reporting.lab_contract import (
+    ContributionReport,
+    attach_contribution,
+    record_id,
+)
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_grit.py"
@@ -125,17 +129,21 @@ def _exclusion_reason(has_strength: bool, has_verdict: bool) -> str:
     return "missing_required_field"
 
 
-def collect_cells(findings: list[dict], stories: list[dict]) -> tuple[list[dict], dict[str, int]]:
+def collect_cells(
+    findings: list[dict], stories: list[dict]
+) -> tuple[list[dict], dict[str, int], list[str]]:
     """Every canonical cell carrying BOTH fields the metric needs, plus the exclusion tally.
 
     A cell missing either field is excluded outright — the metric is a conditional
     probability, and a cell with no strength or no executed verdict cannot condition on
     anything. It is never imputed to 0.0 / False. The returned ``exclusions`` maps each
     reason to its count, so the lab's contract can report *why* cells dropped out (review
-    P2: ``n_resolved`` vs ``n_eligible`` vs ``n_excluded``).
+    P2: ``n_resolved`` vs ``n_eligible`` vs ``n_excluded``). The returned ``used_ids`` are
+    the record ids of the cells that DID contribute (m3 ContributionReport).
     """
     cells: list[dict] = []
     exclusions: Counter = Counter()
+    used_ids: list[str] = []
 
     for run in findings:
         strength = run.get("perturbation_strength")
@@ -145,6 +153,7 @@ def collect_cells(findings: list[dict], stories: list[dict]) -> tuple[list[dict]
                 _exclusion_reason(isinstance(strength, (int, float)), isinstance(verdict, bool))
             ] += 1
             continue
+        used_ids.append(record_id(run))
         cells.append(
             {
                 "source": "finding",
@@ -164,6 +173,7 @@ def collect_cells(findings: list[dict], stories: list[dict]) -> tuple[list[dict]
                 _exclusion_reason(isinstance(strength, (int, float)), isinstance(verdict, bool))
             ] += 1
             continue
+        used_ids.append(record_id(story))
         cells.append(
             {
                 "source": "story",
@@ -177,7 +187,7 @@ def collect_cells(findings: list[dict], stories: list[dict]) -> tuple[list[dict]
             }
         )
 
-    return cells, dict(exclusions)
+    return cells, dict(exclusions), used_ids
 
 
 def _group_rates(cells: list[dict], key: str, label_key: str) -> list[dict]:
@@ -197,12 +207,15 @@ def _group_rates(cells: list[dict], key: str, label_key: str) -> list[dict]:
     return rows
 
 
-def compute(findings: list[dict], stories: list[dict]) -> dict:
+def compute(findings: list[dict], stories: list[dict]) -> tuple[dict, ContributionReport]:
     """Compute the formal Grit metric over the canonical corpus.
+
+    Returns ``(result, contribution)`` (m3): used = cells carrying both fields; excluded
+    = cells missing either field (``missing_required_field``).
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
-    cells, exclusions = collect_cells(findings, stories)
+    cells, exclusions, used_ids = collect_cells(findings, stories)
 
     # ── G(s) overall, per strength level ────────────────────────────────────────────
     by_strength: dict[float, list[dict]] = defaultdict(list)
@@ -250,7 +263,7 @@ def compute(findings: list[dict], stories: list[dict]) -> dict:
     overall_n = len(cells)
     overall_success = sum(1 for c in cells if c["success"])
 
-    return {
+    result = {
         "experiment_id": "lab_grit",
         "generated_at": datetime.now().isoformat(),
         "metric_definition": METRIC_DEFINITION,
@@ -287,27 +300,17 @@ def compute(findings: list[dict], stories: list[dict]) -> dict:
             "operators, or classes; differences are not claimed to be causal.",
         ],
     }
+    contribution = ContributionReport.of(
+        used_record_ids=used_ids,
+        exclusion_reasons={"missing_required_field": sum(exclusions.values())},
+    )
+    return result, contribution
 
 
 def main():
     tables = load_canonical_tables("finding", "story")
-    output = compute(tables.findings, tables.stories)
-
-    # Record-count scope (review P2): the resolver hands back ``n_resolved`` payloads, of
-    # which only ``n_eligible`` carry both fields the metric conditions on. The gap is
-    # itemised so the contract reports *why*, not just *how many*.
-    n_resolved = len(tables.findings) + len(tables.stories)
-    summary = output["summary"]
-    attach_contract(
-        output,
-        LAB,
-        tables,
-        n_resolved_records=n_resolved,
-        n_eligible_records=summary["cells"],
-        n_used_records=summary["cells"],
-        n_excluded_records=n_resolved - summary["cells"],
-        missing_required_field=summary["excluded"],
-    )
+    output, contribution = compute(tables.findings, tables.stories)
+    attach_contribution(output, LAB, tables, contribution)
 
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"Saved: {OUTPUT_PATH}")

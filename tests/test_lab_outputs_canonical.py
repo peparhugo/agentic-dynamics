@@ -222,6 +222,64 @@ def test_condition_effects_contract_reconciles_with_output():
     assert sum(c["reviews"] for c in payload["conditions"]) == summary["joined_reviews"]
 
 
+def test_verification_value_join_publishes_no_placeholder_identity():
+    """The story→review join fails explicitly — no ``model: "?"`` row survives (m1).
+
+    ``docs/review/measurement_contribution_review.md`` P0: ``lab_verification_value``
+    converted unmatched reviews into ``stories.get(sid, ("?", 0))`` placeholder rows (432
+    commit-review observations driving a −0.154 correlation) while its contract declared
+    457/457/457/0. The m1 fix makes the join fail explicitly: a review whose ``_story_id``
+    names no current resolved story is counted as ``review_without_current_story`` and
+    excluded, a current story no review joined is counted as ``story_without_review``, and
+    the contract declares the joined populations. This test recomputes the join from the
+    resolver and reconciles the artifact against it, so a reintroduced placeholder breaks
+    here before any artifact is regenerated.
+    """
+    from scripts import lab_verification_value as lvv
+
+    path = RESULTS_DIR / "lab_verification_value.json"
+    if not path.exists():  # pragma: no cover
+        pytest.skip("lab_verification_value not run")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    contract = payload[CONTRACT_KEY]
+    summary = payload["summary"]
+
+    tables = cc.load_canonical_tables("story", "review")
+    recomputed, recomputed_contribution = lvv.compute(tables.stories, tables.reviews)
+    rs = recomputed["summary"]
+
+    # (1) No recomputed — and no published — row carries a placeholder identity.
+    assert recomputed["rows"], "the recomputed join produced no rows"
+    assert all(r["model"] != "?" for r in recomputed["rows"]), (
+        "the join still emits a placeholder model '?' row"
+    )
+    assert all(r["model"] for r in payload["rows"]), "a published row has an empty model"
+    assert all(r["model"] != "?" for r in payload["rows"]), (
+        "a published row still carries model '?' — regenerate the artifact"
+    )
+
+    # (2) Every review contributing to the correlation has a joined current story: the
+    # recomputed join counts and rows must equal what the artifact declared.
+    assert summary["review_without_current_story"] == rs["review_without_current_story"]
+    assert summary["story_without_review"] == rs["story_without_review"]
+    assert payload["rows"] == recomputed["rows"], (
+        "the published rows do not match the recomputed join — regenerate the artifact"
+    )
+
+    # (3) The contract counts reconcile with the join, not "everything resolved".
+    n_resolved = len(tables.stories) + len(tables.reviews)
+    n_excluded = rs["review_without_current_story"] + rs["story_without_review"]
+    assert contract["n_resolved_records"] == n_resolved
+    assert contract["n_excluded_records"] == n_excluded
+    assert contract["review_without_current_story"] == rs["review_without_current_story"]
+    assert contract["story_without_review"] == rs["story_without_review"]
+    assert contract["n_eligible_records"] == n_resolved - n_excluded
+    assert contract["n_used_records"] == contract["n_eligible_records"]
+    assert contract["n_unused_eligible_records"] == 0
+    # The correlation in the artifact must be the one the recomputed join produces.
+    assert summary["correlation_tests_vs_worse_rate"] == rs["correlation_tests_vs_worse_rate"]
+
+
 # ---------------------------------------------------------------------------
 # 4. The site's lab sections draw only from contract-bearing JSONs
 # ---------------------------------------------------------------------------

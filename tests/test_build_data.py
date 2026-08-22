@@ -703,11 +703,13 @@ def test_story_model_sections_agree_on_avg_cost():
     assert top[mid]["avg_cost"] == 3.0
     assert nested[mid]["avg_cost"] == 3.0
     assert top[mid]["avg_cost"] == nested[mid]["avg_cost"]
-    # The four shared denominator fields are published on both views.
-    assert nested[mid]["cost_captured_cells"] == 2
-    assert nested[mid]["total_cells"] == 3
+    # The shared denominator fields are published on both views (m2: renamed to the
+    # shared cost_coverage vocabulary — cost_captured_records / total_records).
+    assert nested[mid]["cost_captured_records"] == 2
+    assert nested[mid]["total_records"] == 3
     assert nested[mid]["cost_coverage"] == round(2 / 3, 4)
     assert top[mid]["avg_captured_cost"] == nested[mid]["avg_captured_cost"]
+    assert nested[mid]["total_captured_cost"] == 6.0
 
 
 def test_real_data_js_model_sections_agree_on_avg_cost():
@@ -759,3 +761,24 @@ def test_data_js_publication_contract_present_and_verifies():
     assert contract["waiver_digest"] == cc.waiver_set_digest()
     assert contract["normalization_version"] == cc.NORMALIZATION_VERSION
     assert contract["data_integrity_policy_version"] == cc.DATA_INTEGRITY_POLICY_VERSION
+
+
+def test_data_js_generator_source_tree_identity_is_current():
+    """The publication contract's generator_source_tree_identity matches a fresh recompute.
+
+    The m5 adversarial hunt found data.js stale after a build_data.py edit (the identity is
+    a hash of the generator's own source, so ANY source edit invalidates it). This guard
+    recomputes the derived dependency manifest and fails on drift, so a stale artifact can
+    never ship.
+    """
+    import json
+
+    data_js = Path(__file__).resolve().parent.parent / "apps" / "website" / "data.js"
+    if not data_js.exists():  # pragma: no cover - generated file, present in CI
+        pytest.skip("apps/website/data.js not generated")
+    text = data_js.read_text(encoding="utf-8")
+    payload = json.loads(text[text.index("{") : text.rindex("}") + 1])
+    contract = payload["publication_contract"]
+    assert contract["generator_source_tree_identity"] == build_data.generator_source_tree_identity(), (
+        "data.js's generator_source_tree_identity is stale — re-run scripts/build_data.py"
+    )

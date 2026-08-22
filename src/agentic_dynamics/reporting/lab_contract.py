@@ -82,7 +82,9 @@ Design notes
 
 from __future__ import annotations
 
+import hashlib
 import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -100,8 +102,10 @@ from .lab_manifest import LabEntry, load_lab_manifest
 #: when the permissive ``eligible=resolved``/``used=eligible`` defaults were removed, the
 #: eligible→used gap became explicit (``n_unused_eligible_records``), and the free-form
 #: ``exclusions`` dict became the four named exclusion-reason counts — public-truth review
-#: P1, phase p3.
-CONTRACT_VERSION = "lab-contract/v4"
+#: P1, phase p3. Bumped to v5 in m4 (measurement-contribution closure) when
+#: ``metric_source_sha256`` was added — the hash of the lab's own source file, so a
+#: contract attests to *which code* computed the metric, not just which corpus fed it.
+CONTRACT_VERSION = "lab-contract/v5"
 
 #: The key under which the contract is embedded in a lab's output JSON.
 CONTRACT_KEY = "lab_contract"
@@ -128,6 +132,7 @@ REQUIRED_FIELDS = (
     "resolved_input_sha256",
     "registry_version",
     "metric_definition_version",
+    "metric_source_sha256",
     "data_integrity_policy",
     "requires_external_service",
     "n_resolved_records",
@@ -171,6 +176,7 @@ class LabContract:
     resolved_input_sha256: str
     registry_version: str
     metric_definition_version: str
+    metric_source_sha256: str
     n_resolved_records: int
     n_eligible_records: int
     n_used_records: int
@@ -188,6 +194,80 @@ class LabContract:
     def to_dict(self) -> dict:
         """Plain dict for JSON embedding (field order preserved for readable diffs)."""
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ContributionReport:
+    """The computation's *self-report* of which records it consumed (m3).
+
+    The review's P1 finding was that record-scope contracts were "explicit, but not proven
+    against computation": the validator checked the counts *added up*, not that they
+    described the records that actually contributed. This dataclass closes that gap — the
+    lab's ``compute()`` returns it alongside the result payload, and the contract is
+    DERIVED from it (:func:`attach_contribution`), never hand-authored afterwards.
+
+    The five counts obey two invariants (enforced by :meth:`of`):
+
+    * ``eligible + excluded == resolved`` — every resolved record is either eligible for
+      the metric or excluded (with a reason);
+    * ``used + unused_eligible == eligible`` — every eligible record is either consumed or
+      declared unused.
+
+    ``exclusion_reasons`` itemises ``excluded`` with exactly the :data:`EXCLUSION_REASONS`
+    vocabulary, and ``used_record_ids`` is the stable identity of every record the
+    computation actually consumed (its length is ``used``, so the "used" count is derived
+    from real records rather than asserted).
+    """
+
+    resolved: int
+    eligible: int
+    used: int
+    excluded: int
+    unused_eligible: int
+    exclusion_reasons: dict[str, int]
+    used_record_ids: tuple[str, ...]
+
+    @classmethod
+    def of(
+        cls,
+        *,
+        used_record_ids: Iterable[str],
+        unused_eligible: int = 0,
+        exclusion_reasons: dict[str, int] | None = None,
+    ) -> ContributionReport:
+        """Build a report from the used records, the unused-eligible gap, and the exclusions.
+
+        The ``resolved`` total is *derived* (``used + unused_eligible + excluded``), which
+        forces the caller to account for every resolved record — a lab that drops a record
+        without naming it produces a ``resolved`` that no longer matches the resolver, and
+        the existing registry-consistency test rejects the artifact.
+        """
+        used_ids = tuple(sorted(used_record_ids))
+        reasons = {k: int(v) for k, v in (exclusion_reasons or {}).items() if int(v)}
+        used = len(used_ids)
+        excluded = sum(reasons.values())
+        eligible = used + unused_eligible
+        resolved = eligible + excluded
+        return cls(
+            resolved=resolved,
+            eligible=eligible,
+            used=used,
+            excluded=excluded,
+            unused_eligible=unused_eligible,
+            exclusion_reasons=reasons,
+            used_record_ids=used_ids,
+        )
+
+
+def record_id(payload: dict) -> str:
+    """The stable identity of a resolved payload — ``entity_id`` (else ``knowledge_id``).
+
+    A ``story``/``review``/``finding`` payload carries its registry ``entity_id``; an
+    ``analysis`` payload carries its story's (it is a derived view). The id is what a lab
+    puts into :class:`ContributionReport.used_record_ids` so the "used" count is auditable.
+    """
+    reg = payload.get("_registry") or {}
+    return str(reg.get("entity_id") or reg.get("knowledge_id") or "")
 
 
 def expected_tables(entry: LabEntry) -> tuple[str, ...]:
@@ -237,6 +317,17 @@ def _resolved_count(tables: CanonicalTables) -> int:
     tables the lab actually requested (not the whole four-table corpus).
     """
     return sum(len(tables.rows(t)) for t in tables.tables)
+
+
+def lab_source_sha256(lab_script: str) -> str:
+    """``sha256`` of the lab's own source file (m4) — the *code* that computed the metric.
+
+    Every lab lives at ``scripts/<lab_script>``. Hashing its bytes lets a contract attest
+    to *which code* produced the numbers — a metric re-implementation is visible even when
+    the corpus and the metric_definition_version are unchanged.
+    """
+    path = Path(__file__).resolve().parents[3] / "scripts" / lab_script
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def build_contract(
@@ -303,6 +394,7 @@ def build_contract(
         resolved_input_sha256=tables.resolved_input_sha256,
         registry_version=tables.identity.registry_version,
         metric_definition_version=entry.metric_definition_version,
+        metric_source_sha256=lab_source_sha256(lab_script),
         n_resolved_records=resolved,
         n_eligible_records=eligible,
         n_used_records=used,
@@ -346,6 +438,36 @@ def attach_contract(
         story_without_review=story_without_review,
         missing_required_field=missing_required_field,
         outside_analysis_population=outside_analysis_population,
+    )
+    return payload
+
+
+def attach_contribution(
+    payload: dict,
+    lab_script: str,
+    tables: CanonicalTables,
+    contribution: ContributionReport,
+) -> dict:
+    """Embed a contract DERIVED from the computation's :class:`ContributionReport` (m3).
+
+    The pattern is ``result, contribution = compute(...); attach_contribution(result, LAB,
+    tables, contribution)`` — the contract's record scope comes from the computation, never
+    from counts hand-authored in ``main`` afterwards. Each :data:`EXCLUSION_REASONS` count
+    is read from ``contribution.exclusion_reasons``; a reason the report does not name is 0.
+    """
+    reasons = contribution.exclusion_reasons
+    payload[CONTRACT_KEY] = build_contract(
+        lab_script,
+        tables,
+        n_resolved_records=contribution.resolved,
+        n_eligible_records=contribution.eligible,
+        n_used_records=contribution.used,
+        n_excluded_records=contribution.excluded,
+        n_unused_eligible_records=contribution.unused_eligible,
+        review_without_current_story=reasons.get("review_without_current_story", 0),
+        story_without_review=reasons.get("story_without_review", 0),
+        missing_required_field=reasons.get("missing_required_field", 0),
+        outside_analysis_population=reasons.get("outside_analysis_population", 0),
     )
     return payload
 
@@ -416,6 +538,14 @@ def validate_contract(
                 f"{manifest_entry.script}: contract field '{field_name}' is "
                 f"{block.get(field_name)!r}, expected {expected!r}"
             )
+
+    # ── metric source identity (m4): the contract attests to WHICH code computed it ──────
+    current_source = lab_source_sha256(manifest_entry.script)
+    if str(block.get("metric_source_sha256") or "") != current_source:
+        return (
+            f"{manifest_entry.script}: metric_source_sha256 mismatch — the lab's source "
+            f"changed since the artifact was written; re-run the lab"
+        )
 
     identity = (
         current_identity

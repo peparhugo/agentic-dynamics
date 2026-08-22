@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections import Counter
@@ -35,6 +36,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables  # noqa: E402
+from agentic_dynamics.reporting.measurement_coverage import cost_captured  # noqa: E402
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "experiments" / "data"
 
@@ -168,8 +170,12 @@ def _build_rows(tables) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         )
         recovered_tests = summary.get("test_count", 0) or agentic_test_floor
         recovered_loc = summary.get("code_lines", 0) or analysis_loc.get(story_id, 0)
-        story_cost = summary.get("total_cost", 0) or 0
-        cost_captured = story_cost > 0
+        # m2 null-not-zero: a cost is *captured* only when it is a finite, positive real
+        # number — inferred from the shared primitive, never from ``> 0`` (the review's P1
+        # denominator-policy split). The raw ``total_cost`` is kept (None when absent), and
+        # ``cost_captured`` flags it explicitly for the parquet reader.
+        story_cost = summary.get("total_cost")
+        cost_captured_flag = cost_captured(story_cost)
 
         # Cell identity: story × model × tier × quality × canonical condition.
         # Re-runs of the same cell share cell_key but get an increasing repetition
@@ -193,8 +199,8 @@ def _build_rows(tables) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                 "total_cache_writes": summary.get("total_cache_writes", 0),
                 "total_context_tokens": summary.get("total_context_tokens", 0),
                 "cache_hit_rate": summary.get("cache_hit_rate", 0.0),
-                "total_cost": summary.get("total_cost", 0.0),
-                "cost_captured": cost_captured,
+                "total_cost": story_cost,
+                "cost_captured": cost_captured_flag,
                 "total_duration": summary.get("total_duration", 0.0),
                 "all_successful": summary.get("all_successful", False),
                 "cascade_recovery": summary.get("cascade_recovery", False),
@@ -221,12 +227,12 @@ def _build_rows(tables) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                     "prompt_tokens": a.get("prompt_tokens", 0) or 0,
                     "completion_tokens": a.get("completion_tokens", 0) or 0,
                     "reasoning_tokens": a.get("reasoning_tokens", 0) or 0,
-                    "total_tokens": a.get("total_tokens", 0) or 0,
+                    "total_tokens": a.get("total_tokens"),
                     "cache_read_tokens": a.get("cache_read_tokens", 0) or 0,
                     "cache_write_tokens": a.get("cache_write_tokens", 0) or 0,
                     "context_tokens": a.get("context_tokens", 0) or 0,
-                    "cache_hit_rate": a.get("cache_hit_rate", 0.0) or 0.0,
-                    "cost_usd": s.get("cost_usd", 0.0),
+                    "cache_hit_rate": a.get("cache_hit_rate"),
+                    "cost_usd": s.get("cost_usd"),
                     "duration_s": s.get("duration_s", 0.0),
                     "exit_code": s.get("exit_code", 0),
                     "tool_calls": a.get("tool_calls", 0) or 0,
@@ -261,14 +267,54 @@ def _write_parquet_atomic(rows: list[dict[str, Any]], schema: pa.Schema, final_p
     os.replace(tmp_path, final_path)
 
 
-def _write_identity_sidecar(tables, counts: dict[str, int]) -> None:
-    """Write the source-identity sidecar alongside the parquet (atomic, like the tables)."""
+def _content_sha256(rows: list[dict[str, Any]]) -> str:
+    """Deterministic content hash of the flattened rows (m4 sidecar field).
+
+    Hashing the *rows* (not the parquet bytes) makes the hash independent of pyarrow's
+    serialization metadata, so ``--check`` can recompute it from ``_build_rows`` alone.
+    """
+    return hashlib.sha256(
+        json.dumps(rows, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+
+
+def _transform_sha256() -> str:
+    """Hash of the sync transform code — this file (m4 sidecar field)."""
+    return hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest()
+
+
+def _schema_sha256() -> str:
+    """Hash of the two table schemas, field name + type (m4 sidecar field)."""
+
+    def _fields(schema: pa.Schema) -> list[tuple[str, str]]:
+        return [(f.name, str(f.type)) for f in schema]
+
+    return hashlib.sha256(
+        json.dumps(
+            {"sessions": _fields(SESSION_SCHEMA), "stories": _fields(STORY_SCHEMA)},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _write_identity_sidecar(tables, counts: dict[str, int], session_rows, story_rows) -> None:
+    """Write the source-identity sidecar alongside the parquet (atomic, like the tables).
+
+    m4: the sidecar now carries content hashes — the sessions/stories row digests, the sync
+    transform's own source hash, and the schema hash — so ``--check`` proves not just "the
+    row counts match" but "the rows, the transform, and the schema are all unchanged".
+    """
     sidecar = {
-        "schema_version": "sync-identity/v1",
+        "schema_version": "sync-identity/v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "registry_identity_sha256": tables.identity.registry_identity_sha256,
         "resolved_input_sha256": tables.resolved_input_sha256,
         "rows": counts,
+        "sessions_rows_sha256": _content_sha256(session_rows),
+        "stories_rows_sha256": _content_sha256(story_rows),
+        "sync_transform_sha256": _transform_sha256(),
+        "schema_sha256": _schema_sha256(),
     }
     tmp_path = SYNC_IDENTITY_PATH.with_suffix(".json.tmp")
     tmp_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
@@ -288,7 +334,7 @@ def sync() -> dict[str, int]:
     _write_parquet_atomic(story_rows, STORY_SCHEMA, DATA_DIR / "stories.parquet")
 
     counts = {"sessions": len(session_rows), "stories": len(story_rows)}
-    _write_identity_sidecar(tables, counts)
+    _write_identity_sidecar(tables, counts, session_rows, story_rows)
     return counts
 
 
@@ -317,6 +363,16 @@ def check() -> int:
         problems.append("registry identity mismatch — the parquet is stale")
     if sidecar.get("resolved_input_sha256") != tables.resolved_input_sha256:
         problems.append("resolved-input identity mismatch — the parquet is stale")
+
+    # ── m4 content hashes: the rows, the transform, and the schema are all unchanged ──
+    for field, recomputed in (
+        ("sessions_rows_sha256", _content_sha256(session_rows)),
+        ("stories_rows_sha256", _content_sha256(story_rows)),
+        ("sync_transform_sha256", _transform_sha256()),
+        ("schema_sha256", _schema_sha256()),
+    ):
+        if sidecar.get(field) != recomputed:
+            problems.append(f"{field} mismatch — re-run sync (the transform/schema/rows changed)")
 
     conn = duckdb.connect()
     try:
