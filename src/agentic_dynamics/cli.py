@@ -50,6 +50,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # knowledge
     ("knowledge", "ingest"): "kb_produce.py",
     ("knowledge", "sources"): "kb_produce_sources.py",
+    ("knowledge", "facts"): "kb_produce_facts.py",
     ("knowledge", "worker"): "kb_worker.py",
     # review
     ("review", "all"): "review_all.py",
@@ -92,7 +93,7 @@ Subcommands (each forwards to its backing script):
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
   analyze     worktrees|trajectories|stories|lab <name>
   data        build|sync|manifest|inventory
-  knowledge   ingest|sources|worker
+  knowledge   ingest|sources|facts|worker
   registry    query|show|lineage
   review      all|stories|trigger|enqueue|finalize
   spec        status|pipeline

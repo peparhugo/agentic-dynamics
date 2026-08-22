@@ -338,14 +338,22 @@ class RegistryHead:
         )
 
 
-def _fingerprint_from_reason(reason: str) -> str:
-    """Extract the lifecycle fingerprint from a registry line's ``reason``, or ``""``."""
+def _fingerprint_from_reason(reason: str, prefix: str = REASON_PREFIX) -> str:
+    """Extract a lifecycle/content fingerprint from a registry line's ``reason``, or ``""``.
+
+    The ``prefix`` is parameterised so the fact plane (``control.fact_ingestion``) can reuse
+    ``registry_head`` with its own ``fact-content=`` annotation instead of duplicating the
+    two-pass head resolution.
+    """
     text = str(reason or "")
-    return text[len(REASON_PREFIX):] if text.startswith(REASON_PREFIX) else ""
+    return text[len(prefix):] if text.startswith(prefix) else ""
 
 
 def registry_head(
-    entity_id: str, *, registry_path: Path | str = REGISTRY_INDEX_PATH
+    entity_id: str,
+    *,
+    registry_path: Path | str = REGISTRY_INDEX_PATH,
+    reason_prefix: str = REASON_PREFIX,
 ) -> RegistryHead | None:
     """Return the current (non-superseded) head of ``entity_id``'s chain, or ``None``.
 
@@ -361,6 +369,10 @@ def registry_head(
     truncated JSON line all degrade to "no head" / skip-the-line — a producer must never be
     blocked by a damaged index, and treating a damaged index as "no predecessor" fails toward
     a plain ``upsert`` rather than toward a bogus lineage link.
+
+    ``reason_prefix`` selects which annotation prefix carries the fingerprint (the spec
+    lifecycle's ``spec-lifecycle-content=`` by default; the fact plane passes
+    ``fact-content=``) — it is how one shared head-resolution serves both producers.
     """
     path = Path(registry_path)
     order: list[str] = []
@@ -396,7 +408,9 @@ def registry_head(
 
     for kid in reversed(order):
         if kid not in superseded:
-            return RegistryHead(kid, _fingerprint_from_reason(lines[kid].get("reason", "")))
+            return RegistryHead(
+                kid, _fingerprint_from_reason(lines[kid].get("reason", ""), reason_prefix)
+            )
     return None
 
 

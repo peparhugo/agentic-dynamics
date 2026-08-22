@@ -251,6 +251,12 @@ def test_predicate_registry_has_the_design_seed_rows():
     assert set(FACT_PREDICATES) == {
         "spec_status",
         "spec_superseded_by",
+        "spec_supersedes",
+        "spec_last_run_at",
+        "spec_latest_ok",
+        "spec_latest_model",
+        "spec_latest_cost_usd",
+        "spec_n_runs",
         "current_commit",
         "phase_status",
         "phase_test_verified",
@@ -289,6 +295,12 @@ def test_predicate_inheritance_flags_match_the_design_table():
     assert inheritable == {
         "spec_status",
         "spec_superseded_by",
+        "spec_supersedes",
+        "spec_last_run_at",
+        "spec_latest_ok",
+        "spec_latest_model",
+        "spec_latest_cost_usd",
+        "spec_n_runs",
         "allowed_models",
         "max_spend_usd",
         "max_attempts",
@@ -405,11 +417,24 @@ def test_fact_is_registered_as_an_observation_source_type():
     assert "fact" not in ACTUATION_TYPES
 
 
-# ── CI-enforced invariant: zero call sites today ────────────────
+# ── CI-enforced invariant: only authorized callers import the schema ──
 
 #: The unambiguous public names this module exports. A bare reference to any of these outside
-#: ``facts.py`` (and its test) is a call site the design forbids at I0.
+#: ``facts.py`` (and its test) is a call site the gate below must account for.
 PUBLIC_NAMES = frozenset({"CanonicalFact", "FACT_PREDICATES", "EPISTEMIC_MAP", "verify_chain"})
+
+#: The exact call sites CAP I1 authorizes — the fact-ingestion mapping and the batch producer.
+#: I0 had none (the zero-call-sites gate); I1 adds these as the schema's first consumers.
+LEGITIMATE_CALLERS = frozenset(
+    {
+        "src/agentic_dynamics/control/fact_ingestion.py",
+        "scripts/kb_produce_facts.py",
+    }
+)
+
+#: The reducer package (I1–I3) is the schema's first producer and is authorized wholesale; it
+#: will grow with I2/I3, so it is a directory prefix rather than a per-file allowlist.
+LEGITIMATE_DIRS = ("src/agentic_dynamics/control/reducers/",)
 
 
 def _references_facts_module(path: Path) -> bool:
@@ -437,11 +462,18 @@ def _references_facts_module(path: Path) -> bool:
     return False
 
 
-def test_no_call_sites_import_the_facts_module():
-    # design §9 I0: the schema ships with ZERO call sites — nothing imports control.facts except
-    # tests and the module itself, exactly as actuation_ingestion ships call-site-free
-    # (actuation_ingestion.py:8-22). The first legitimate call site is the reducers package (I1),
-    # which must update this test when it lands.
+def _legitimate(rel: str) -> bool:
+    """True when ``rel`` is one of the call sites the current increment authorizes."""
+    return rel in LEGITIMATE_CALLERS or any(rel.startswith(prefix) for prefix in LEGITIMATE_DIRS)
+
+
+def test_only_authorized_callers_import_the_facts_module():
+    # design §9: the fact schema gains call sites one increment at a time. I0 shipped with ZERO
+    # (the schema exercised in tests only, exactly as actuation_ingestion ships call-site-free);
+    # I1 authorizes the reducer package (the first producer), the fact-ingestion mapping, and the
+    # batch producer. Anything else — especially a ``knowledge`` module or a controller — that
+    # imports the schema is a design violation: facts must not reach retrieval or a control rule
+    # before a declared producer exists.
     scan_roots = [REPO_ROOT / "src", REPO_ROOT / "scripts", REPO_ROOT / "apps"]
     offenders = []
     for root in scan_roots:
@@ -451,5 +483,7 @@ def test_no_call_sites_import_the_facts_module():
             if path.resolve() == FACTS_MODULE.resolve():
                 continue
             if _references_facts_module(path):
-                offenders.append(str(path.relative_to(REPO_ROOT)))
-    assert offenders == [], f"unexpected facts module call site(s): {offenders}"
+                rel = str(path.relative_to(REPO_ROOT))
+                if not _legitimate(rel):
+                    offenders.append(rel)
+    assert offenders == [], f"unauthorized facts module call site(s): {offenders}"

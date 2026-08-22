@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from agentic_dynamics.knowledge.knowledge import Authority, compute_entity_id
 
@@ -246,6 +247,78 @@ FACT_PREDICATES: dict[str, PredicateSpec] = {
         volatile=False,
         inheritable=True,
     ),
+    "spec_supersedes": PredicateSpec(
+        name="spec_supersedes",
+        value_type="enum-list",
+        unit="",
+        subject_type="spec",
+        scope_type="workload",
+        abstraction_level="fact",
+        produced_by=("spec_status/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        inheritable=True,
+    ),
+    "spec_last_run_at": PredicateSpec(
+        name="spec_last_run_at",
+        value_type="timestamp",
+        unit="",
+        subject_type="spec",
+        scope_type="workload",
+        abstraction_level="fact",
+        produced_by=("spec_status/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        inheritable=True,
+    ),
+    "spec_latest_ok": PredicateSpec(
+        name="spec_latest_ok",
+        value_type="bool",
+        unit="",
+        subject_type="spec",
+        scope_type="workload",
+        abstraction_level="fact",
+        produced_by=("spec_status/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        inheritable=True,
+    ),
+    "spec_latest_model": PredicateSpec(
+        name="spec_latest_model",
+        value_type="str",
+        unit="",
+        subject_type="spec",
+        scope_type="workload",
+        abstraction_level="fact",
+        produced_by=("spec_status/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        inheritable=True,
+    ),
+    "spec_latest_cost_usd": PredicateSpec(
+        name="spec_latest_cost_usd",
+        value_type="usd",
+        unit="usd",
+        subject_type="spec",
+        scope_type="workload",
+        abstraction_level="fact",
+        produced_by=("spec_status/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        inheritable=True,
+    ),
+    "spec_n_runs": PredicateSpec(
+        name="spec_n_runs",
+        value_type="int",
+        unit="",
+        subject_type="spec",
+        scope_type="workload",
+        abstraction_level="fact",
+        produced_by=("spec_status/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        inheritable=True,
+    ),
     # job facts (I2).
     "current_commit": PredicateSpec(
         name="current_commit",
@@ -434,6 +507,45 @@ class ReducerSpec:
     rule requires the top of it."""
     produces: tuple[str, ...]  # predicate names; must all exist in FACT_PREDICATES
     determinism: str = "pure"  # "pure" | "pure_with_injected_clock"
+
+
+# ── Reducer input (the §4.1 "everything a reducer may see" shape) ─
+
+
+@dataclass(frozen=True)
+class EvidenceItem:
+    """One resolved L0 evidence input a reducer may consume (design §4.1).
+
+    A reducer never does I/O — the CALLER resolves inputs (reads the index, loads the records)
+    and hands them over. ``source_type`` names the evidence family; ``evidence_id`` is a stable
+    locator (a ``knowledge_id`` when the evidence IS a knowledge record, else a deterministic
+    key); ``payload`` is the resolved object the reducer reads (e.g. a ``SpecStatusEntry``).
+    """
+
+    source_type: str
+    evidence_id: str
+    payload: Any = None
+
+
+@dataclass(frozen=True)
+class ReducerInput:
+    """Everything a reducer may see. Deliberately narrow: no Redis handle, no filesystem, no
+    network. If a reducer needs more inputs, that is a ``consumes`` change and therefore a
+    VERSION change — which is the point (design §4.1)."""
+
+    scope_path: str
+    scope_type: str
+    scope_id: str
+    repository_id: str
+    evidence: tuple[EvidenceItem, ...]  # resolved L0 records/artifacts, ordered deterministically
+    facts: tuple[CanonicalFact, ...]  # resolved lower-level facts (already filtered to current)
+    now: str  # injected clock — a reducer that reads the wall clock is not reproducible
+    source_revision: str
+
+
+#: The signature every reducer implements (design §4.1). No I/O: the caller resolves inputs and
+#: persists outputs, so the reducer itself is a pure function a test can call with fixtures.
+Reducer = Callable[[ReducerInput], list[CanonicalFact]]
 
 
 # ── Snapshot-facing value types (§6.3) ──────────────────────────

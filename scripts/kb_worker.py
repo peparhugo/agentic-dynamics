@@ -336,6 +336,12 @@ def build_handler(group: str, r: redis.Redis):
 
     if group == "kb-chroma-v1":
         def handler(record):
+            # Facts are resolved by ADDRESS, never by relevance (CAP design §3.3): the dense leg
+            # skips source_type == "fact" wholesale, so a fact's canonical JSON payload (not
+            # prose) can never enter the ranking index and "relevance is never truth" stays
+            # structural, not a convention.
+            if record.source_type == "fact":
+                return
             from agentic_dynamics.knowledge.embeddings import ChromaStore
 
             store = ChromaStore(collection_name="knowledge_chunks_v1")
@@ -361,6 +367,10 @@ def build_handler(group: str, r: redis.Redis):
 
     if group == "kb-neo4j-v1":
         def handler(record, *, operation="upsert", reason=""):
+            # Facts are resolved by ADDRESS, never by relevance (CAP design §3.3): the graph leg
+            # skips source_type == "fact" wholesale, mirroring the dense leg above.
+            if record.source_type == "fact":
+                return
             from agentic_dynamics.knowledge.graph import Neo4jClient
 
             client = Neo4jClient()

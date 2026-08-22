@@ -1,9 +1,34 @@
-"""CAP I1–I3 — the fact reducers package (reserved home).
+"""CAP I1–I3 — the fact reducers package: the ``REDUCERS`` registry, its only public surface.
 
-Will hold ``spec_status/v1`` (I1), the ledger reducers ``attempt_facts/v1`` / ``job_facts/v1``
-(I2), and the workflow reducer ``workflow_facts/v1`` / ``policy_facts/v1`` (I3). Frozen until
-post-consolidation CAP implementation (``ARCHITECTURE.md`` §4); the home exists so the
-implementation is drop-in.
+Per design §4.1, reducers live here and are exposed through ONE surface — :data:`REDUCERS`
+(``reducer_version`` → :class:`~agentic_dynamics.control.facts.ReducerSpec`) — so the
+derivation-chain validator (``facts.verify_chain``) and a producer
+(``scripts/kb_produce_facts.py``) both resolve the same declaration for a version string.
+
+``REDUCERS`` maps version → spec (what ``verify_chain`` consults); :func:`get_reducer` maps
+version → the pure callable (what a producer invokes). The two are kept in lockstep here so a
+registered version always has a runnable implementation and vice versa.
 """
 
-# reserved for CAP I1-I3
+from __future__ import annotations
+
+from agentic_dynamics.control.facts import Reducer, ReducerSpec
+from agentic_dynamics.control.reducers.spec_status import SPEC_STATUS_V1, spec_status_v1
+
+#: version → ReducerSpec — the declarative registry ``facts.verify_chain`` consumes.
+REDUCERS: dict[str, ReducerSpec] = {
+    SPEC_STATUS_V1.version: SPEC_STATUS_V1,
+}
+
+#: version → pure reducer callable — what ``scripts/kb_produce_facts.py`` invokes.
+_IMPLS: dict[str, Reducer] = {
+    SPEC_STATUS_V1.version: spec_status_v1,
+}
+
+
+def get_reducer(version: str) -> Reducer | None:
+    """Return the pure reducer callable for ``version``, or ``None`` when unregistered."""
+    return _IMPLS.get(version)
+
+
+__all__ = ["REDUCERS", "get_reducer", "SPEC_STATUS_V1", "spec_status_v1"]
