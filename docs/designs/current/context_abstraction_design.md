@@ -1454,3 +1454,151 @@ review made at audit row 5.
 4. **The registry is append-only JSONL plus a compaction pass.** Fact volume is higher than
    document volume. If compaction becomes slow, the fix is a compaction cadence, not a new store.
 5. **`spec_lifecycle` merge order** (§9) is a real sequencing dependency on work running now.
+
+---
+
+## Addendum A — post-closure refinements (2026-08-22)
+
+**Status:** accepted addendum to the frozen design. **Trigger:** the finding-economics
+closure merged at `58c684a87` (2026-08-22), satisfying the external review's signoff condition —
+"CAP fact-authority readiness follows finding-economics closure"
+(`docs/review/finding_economics_review.md:147`). This addendum records three operator-agreed
+refinements (I8–I10) and the closure deltas that now bind I0–I7.
+
+**Discipline:** the frozen design's own rules — schemas are sketches, no file is created by this
+addendum. I8–I10 are **not** part of `context_abstraction_implement` (its authority is §§1–13);
+they are implemented under a follow-up design-only spec in the review → design → verify shape,
+and the implement spec's deviation note (`docs/context_abstraction/implementation_notes.md`,
+append-only) references this addendum when it resumes.
+
+### A.1 The three refinements, and why now
+
+The frozen design says a controller receives a contract-bounded snapshot and nothing else. What
+it leaves open: who selects the contract and the deliberation stages (the design ships one
+contract, `route_next_job/v1`), how validated experience is compressed into citable form
+("leverage the entire learned system"), and what durable residue a session leaves when forked.
+Three increments close those gaps:
+
+| Inc | Refinement | Closes |
+|---|---|---|
+| **I8** | `DomainProfile` + `ChallengeProfile` | spec-driven domain loading; routing generalizes from model routing to execution-strategy routing |
+| **I9** | `pattern` epistemic class | learned experience as compressed, citable, validity-carrying facts |
+| **I10** | typed session checkpoint | session continuation/fork as a CAP decision, not a token-management detail |
+
+I8 also answers the frozen design's own L4 absence (§5: "absent by necessity… Declaring L4
+predicates now would reproduce the `LEDGER_FIELDS` failure"): profiles are L4's producer —
+declared facts, measured later, never invented.
+
+### A.2 I8 — `DomainProfile` and `ChallengeProfile`
+
+Two first-class, versioned objects. The compiler gains two profile inputs; the **contract remains
+the sole gate** — a profile cannot widen a controller's view, because its
+`context_requirements` resolve through the same `requires_facts` mechanism as §6.1.
+
+```python
+@dataclass(frozen=True)
+class DomainProfile:
+    """The reusable representation of one domain. Declared, not measured."""
+    domain: str                        # e.g. software_delivery, investing
+    canonical_sources: tuple[str, ...] # ARCHITECTURE.md, pyproject.toml, account_rules.md, ...
+    predicates: tuple[str, ...]        # the subset of FACT_PREDICATES this domain registers
+    policies: tuple[str, ...]          # L5 policy fact ids (tests_must_pass, calls_only, ...)
+    patterns: tuple[str, ...]          # I9 pattern fact ids considered in-domain
+    verification: tuple[str, ...]      # deterministic tools: pytest, ruff, mypy, dependency guards
+
+@dataclass(frozen=True)
+class ChallengeProfile:
+    """The working strategy for a problem archetype. Selected, not hard-coded."""
+    challenge: str                     # greenfield | cross_cutting | small_change | research
+                                       # | incident | migration
+    context_requirements: tuple[FactRequirement, ...]   # §6.1 vocabulary, resolved by the compiler
+    deliberation: tuple[str, ...]      # stages per archetype — see the table below
+    session_policy: SessionPolicy      # A.4 — session routing is a CAP decision
+    verification_policy: tuple[str, ...]   # which of the domain's tools gate this challenge
+
+def compile_context(request, *, store, now):   # the §6 algorithm, with two profile inputs added
+    # shared kernel + domain profile + challenge profile + phase + canonical facts
+    # = bounded ControlContext
+```
+
+*Why:* the "shared execution experience plus a small filtered domain context" framing is made
+literal — the kernel is domain-generic, the profile is the filter, the contract is the gate.
+Deliberation stages are **selected per challenge, never universally imposed**: a small mechanical
+change runs `locate → edit → lint/test → finish`; a cross-cutting change runs
+`map_impact → identify_invariants → choose_sequence → implement in slices → regression gates`; a
+research question runs `state null/alternative → measurable variables → inspect priors →
+design discriminating test → execute → accept/reject/inconclusive`. Profile facts are `declared`
+(POLICY) at construction; their *performance* is measured by campaigns before any is promoted —
+same ladder as every other policy.
+
+### A.3 I9 — the `pattern` epistemic class
+
+`EPISTEMIC_MAP` (§3.4) gains one additive row, and pattern facts carry a required payload:
+
+```python
+#: additive row — a pattern IS a derived fact with an enforced payload.
+"pattern": (Authority.DERIVED, "[C]")
+
+@dataclass(frozen=True)
+class PatternPayload:               # the typed body of every `pattern` fact (§3.3 mapping)
+    claim: str                      # the compressed abstraction: "incremental_refactor", ...
+    population: str                 # what this pattern was learned over
+    conditions: tuple[str, ...]     # when it applied
+    support: int                    # n of observations behind it
+    uncertainty: float | None       # residual risk / interval width
+    validity_window: str            # the version/date range it claims to hold
+    source_experiment: str          # lab-contract ref, e.g. finding:<entity_id>:<knowledge_id>
+```
+
+Rules: minted **only** by a deterministic reducer from measured evidence (hard rule 3 — an LLM
+may propose a pattern only as ADVISORY, structurally uncitable via C5); `is_canonical()`
+unchanged; consumed like any other fact. *Why:* "leverage the entire learned system" must mean
+compressed abstractions — the pattern is the compression unit, and the payload is what lets a
+consumer judge *transferability* instead of blindly trusting. `source_experiment` reuses the
+contribution-lineage primitive merged in the closure (§A.5) rather than inventing a second one.
+
+### A.4 I10 — the typed session checkpoint
+
+The session's durable residue. Persisted through the existing pipe (§3.3, §4.3) as a fact of
+predicate `session_checkpoint/v1`; the deterministic components are canonical, the session's own
+narrative components ride along as ADVISORY annotations:
+
+```python
+@dataclass(frozen=True)
+class SessionCheckpoint:
+    goal: str
+    completed: tuple[str, ...]            # phases/steps with commit evidence — DERIVED
+    current_revision: str                 # git sha — DERIVED
+    verified_facts: tuple[str, ...]       # canonical fact ids, by reference — DERIVED
+    open_hypotheses: tuple[str, ...]      # ADVISORY (the session's own account)
+    failed_approaches: tuple[str, ...]    # ADVISORY
+    next_action: str                      # ADVISORY proposal — never applied (§8.6, AUTOMATABLE_ACTIONS)
+    acceptance_state: str                 # DERIVED from the gates
+    context_snapshot_id: str              # §6.4 — the identity of what this session reasoned from
+```
+
+The `session_routing` decision-type contract: `allowed_actions: [continue, fork,
+compress_and_fork, escalate]`; invariants — `continue` requires the checkpoint's
+`context_snapshot_id` to equal the freshly compiled snapshot's id AND unchanged goal, phase, and
+model; `fork`/`compress_and_fork` require a checkpoint to exist (never fork blind); `escalate`
+requires a checkpoint plus a model change. *Why:* sessions stay disposable; the checkpoint is
+the handoff.
+
+The continue-vs-fork trade (`V_continue = cache reuse − stale-context risk − context-pressure
+cost − strategy lock-in risk`) is a **hypothesis `[H]` until measured** — per the load-bearing
+rule, no session policy is promoted before its evidence-seed experiment:
+
+- 4 arms: continue / fork-with-checkpoint / fork-blind / escalate-with-checkpoint.
+- Measured: verified success, total cost, cache utilization, latency, rework, repeated failures,
+  context-token growth.
+- Until it lands, `session_policy` runs in shadow mode — recorded and surfaced, never applied
+  (the §8.6 boundary).
+
+### A.5 Closure deltas now binding I0–I7
+
+| Delta | From the closure (`58c684a87`) | Binds |
+|---|---|---|
+| Coverage primitive | `reporting/measurement_coverage.py` — invariant m2: *an unavailable measurement is `null` with zero coverage — never a defaulted zero* | I1/I2 ledger reducers must reuse it for `attempt_cost_usd`, `attempt_tokens_*` etc. — a missing measurement is `unknown`, never `0.0` |
+| Routing semantics | `control/routing.py` — `recommend_route`/`simulate_strategies` carry `n_cost`/`n_outcome` and nullable aggregates; efficiency is `None` unless cost AND outcome exist | the reference behavior the I6 shadow controller is measured against (§8.4) |
+| Fact-lineage cite format | `reporting/lab_contract.py` v6 — table-qualified refs + `used_record_refs_sha256` / `used_unique_records` | the derivation-chain cite format (§4.4) and I9's `source_experiment` |
+| Gate conditions | review signoff "CAP fact-authority readiness follows finding-economics closure" | satisfied — I0–I7 are unblocked on the economics axis; the implement spec still needs its post-consolidation path re-point and un-pause before execution |
