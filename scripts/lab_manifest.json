@@ -195,8 +195,8 @@
       "reads_retired_summary": false,
       "requires_external_service": null,
       "contract_status": "enforced",
-      "metric_definition_version": "grit/v1",
-      "rationale": "THE formal Grit metric, G(s) = P(test_executed_success | perturbation_strength = s) \u2014 the definition the README, the glossary and the website already state. Added in phase s4 (review item 4) because the definition was published with no implementation behind it while a quadrant chart carried the name. Consumes the canonical registry resolver (finding + story tables); 144 canonical cells carry both required fields. Contract-bearing."
+      "metric_definition_version": "grit/v2",
+      "rationale": "THE formal Grit metric, G(s) = P(test_executed_success | perturbation_strength = s) \u2014 the definition the README, the glossary and the website already state. Added in phase s4 (review item 4) because the definition was published with no implementation behind it while a quadrant chart carried the name. Consumes the canonical registry resolver (finding + story tables); 144 canonical cells carry both required fields. Contract-bearing. metric_definition_version bumped v1 -> v2 in the finding-economics closure: the finding corpus Grit conditions on now publishes its economics and optional measurements as null-with-coverage (never numeric zero), so the finding-corpus publication semantics changed even though G(s)'s formula is unchanged."
     },
     "lab_opencode_meta_analysis.py": {
       "lab_status": "quarantined",

@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_grit",
-  "generated_at": "2026-08-22T02:46:11.278326",
+  "generated_at": "2026-08-22T18:05:09.358552",
   "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
   "summary": {
     "cells": 144,
@@ -256,7 +256,7 @@
     "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
     "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
     "registry_version": "data-manifest/1.0+701rows",
-    "metric_definition_version": "grit/v1",
+    "metric_definition_version": "grit/v2",
     "metric_source_sha256": "2cb68d5999571956d2d3be1a720abb18d1c934a596e813199d3dcc213e67887e",
     "n_resolved_records": 279,
     "n_eligible_records": 144,
@@ -270,6 +270,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v5",
-    "generated_at": "2026-08-22T00:46:11.278596+00:00"
+    "generated_at": "2026-08-22T16:05:09.358824+00:00"
   }
 }

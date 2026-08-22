@@ -1918,18 +1918,18 @@ document.addEventListener('DOMContentLoaded', function () {
   var stratDiv = document.getElementById('strategy-distribution');
   if (stratDiv && D.strategy_distribution) {
     var sd = D.strategy_distribution;
-    var total = (sd.conservative||0) + (sd.exploratory||0) + (sd.wasteful||0) + (sd['?']||0);
+    var total = (sd.conservative||0) + (sd.exploratory||0) + (sd.wasteful||0) + (sd.unknown||0);
     if (total === 0) return;
     var items = [
       { key: 'conservative', pct: sd.conservative / total * 100, cls: 'cons', bg: 'rgba(34,197,94,0.4)', color: 'var(--success)', label: 'CONS' },
       { key: 'exploratory', pct: sd.exploratory / total * 100, cls: 'expl', bg: 'rgba(251,191,36,0.4)', color: 'var(--am)', label: 'EXPL' },
       { key: 'wasteful', pct: sd.wasteful / total * 100, cls: 'waste', bg: 'rgba(239,68,68,0.4)', color: 'var(--danger)', label: 'WASTE' },
-      { key: '?', pct: (sd['?']||0) / total * 100, cls: '', bg: 'rgba(161,161,170,0.3)', color: 'var(--t3)', label: '?' }
+      { key: 'unknown', pct: (sd.unknown||0) / total * 100, cls: '', bg: 'rgba(161,161,170,0.3)', color: 'var(--t3)', label: 'UNK' }
     ];
     var barParts = '';
     var tagParts = '';
     items.forEach(function(it) {
-      var val = it.key === '?' ? (sd['?']||0) : sd[it.key];
+      var val = sd[it.key] || 0;
       var pctStr = it.pct.toFixed(1);
       barParts += '<div style="width:' + pctStr + '%;background:' + it.bg + ';display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:' + it.color + '" title="' + it.key + ': ' + val + '">' + (it.pct > 5 ? it.label + ' ' + val : '') + '</div>';
       tagParts += '<span class="stag' + (it.cls ? ' ' + it.cls : '') + '">' + it.key.charAt(0).toUpperCase() + it.key.slice(1) + ': ' + val + ' (' + pctStr + '%)</span>';
