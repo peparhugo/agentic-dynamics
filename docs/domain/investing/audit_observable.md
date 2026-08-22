@@ -1,309 +1,236 @@
 ---
 status: accepted
-evidence_classes: [M] measured, [C] computed (deterministic reducer), [X] external, [P] operator-declared, [H] hypothesis
+---
+# Investing Domain — Observability Audit
+
+**Role:** domain auditor. This document inventories every signal the investing domain makes
+*observable*, so the measurement plane can attach one producer to each. It is a source
+inventory, not a connector: every source is **named, never connected** — no API keys, no
+scraping, no live calls. A downstream instrument step decides *how* to pull each named source;
+this step only establishes *what exists* and *what provenance class it carries*.
+
+**Scope.** Canadian retail / registered-account investing, per the constraint set:
+
+- **Market data** — TMX (Toronto Stock Exchange / TSX Venture) equities; options chains with
+  greeks and implied volatility (single-name Canadian equity options trade on the **Montréal
+  Exchange (MX)**); crypto spot; Canadian crypto spot ETFs (listed securities on TSX).
+- **Portfolio state** — positions, buying power, realized/unrealized P/L, currency.
+- **Execution records** — fills, expiries, assignments, plus the broker export formats the
+  operator can produce.
+- **Decision records** — theses, orders proposed vs executed, outcomes.
+- **External context** — earnings dates, ex-dividend dates, news.
+
 ---
 
-# RRSP Investing — Stage-0 Observability Audit
+## How to read this document
 
-**Stage-0 seeding audit.** This document inventories every signal the investing domain makes
-**observable**, so the measurement plane (`knowledge` producers) has a producer for each one —
-*before* any control rule is authored. It is a catalog, not a connection: sources are **named**,
-never keyed, scraped, or called live.
+### Provenance tags
 
----
+Each signal row carries exactly one primary provenance tag. The tag describes the **strongest
+claim we can make about that signal** given the stated source:
 
-## 0. How to read this audit
+| Tag | Meaning (per this audit's contract) |
+|-----|-------------------------------------|
+| `[M]` | **Measured** — directly readable from a stated source (a broker statement, a confirmation, an export file). No derivation. |
+| `[C]` | **Computed** — derivable by a deterministic reducer. The row states the formula and its inputs. |
+| `[X]` | **External** — sourced from a named third-party vendor/exchange/issuer, consumed as published. |
+| `[P]` | **Operator-declared** — stated by the operator (thesis, proposed order, risk limit, journal). Not measured. |
+| `[H]` | **Hypothesis** — an estimate or subjective score with no primary measurement behind it. Never written as if measured. |
 
-**Tag legend** (maps to the knowledge plane's `evidence_class` + authority ordering):
+A row may carry a *secondary* tag in parentheses (e.g. `[X] (recomputable [C])`) where a vendor
+publishes a value that can also be reproduced locally. The **primary tag governs**: a signal is
+only `[M]` if the stated source itself records it.
 
-| Tag | Meaning | Authority (knowledge.py) | Rule |
-|-----|---------|--------------------------|------|
-| `[M]` | Directly measurable from a **stated source** (broker statement, exchange feed, export file) | `MEASURED` | The row names the source. |
-| `[C]` | Derivable by a **deterministic reducer**; the formula's inputs are stated in the row | `DERIVED` | No `[C]` row may omit its inputs. |
-| `[X]` | **External** — named source/vendor outside the operator's own records | `—` (evidence `[X]`) | The row names the vendor. |
-| `[P]` | **Operator-declared** (thesis, intent, declared limit, declared contribution room) | `POLICY` | The row names who declares it. |
-| `[H]` | **Hypothesis** — not yet observable; isolated in §7, never in the measured tables | `ADVISORY` | No `[H]` row is written as if measured. |
+### Registered-account visibility convention
 
-**Registered-account visibility column (`REG`):**
+Every signal is annotated for visibility inside a **RRSP / TFSA** (registered) account. The
+governing fact: registered-account statements (monthly/quarterly) provide **fills, positions,
+dividends, contributions, and book values — but not intraday data**. There is no live quote
+stream, no intraday options chain, and no margin buying power in a registered account (TFSA and
+RRSP do not permit margin). Options activity in a registered account is restricted to the
+permitted strategies (covered calls, protective puts, cash-secured puts where offered); only
+**fills of executed, permitted trades** appear on the statement — never a live chain of
+unexecuted strikes. Each row states one of:
 
-- `yes` — appears in an RRSP/TFSA statement/export as-is.
-- `partial` — the statement shows the **end-of-day** value only (no intraday series).
-- `no` — not visible inside a registered account at all; requires an external source or a
-  non-registered account.
+- `RRSP/TFSA: visible` — appears on the statement.
+- `RRSP/TFSA: partial` — appears only as a point-in-time snapshot (e.g. statement-date valuation).
+- `RRSP/TFSA: not visible` — requires an intraday/live feed or a margin account.
+- `RRSP/TFSA: n/a` — asset class ineligible in the account (direct crypto) or not account-scoped.
 
-**Hard scoping constraints baked into the tags below:**
+### The load-bearing rule, restated for this domain
 
-1. **Registered accounts (RRSP/TFSA) have no margin.** "Buying power" = settled cash, not margin
-   equity. Listed-option strategies are limited to *covered call*, *cash-secured put*, and *long*
-   call/put/protective-put. Any naked/spread/margin option signal is out of scope for a registered
-   account and is marked `REG:no`.
-2. **Registered accounts cannot hold crypto spot directly.** Crypto exposure inside an RRSP/TFSA
-   is via Canadian **crypto spot ETFs** (qualified investments — §1.4), not the venues in §1.3.
-   §1.3 exists only if the operator also runs a non-registered account.
-3. **No API keys, no scraping, no live calls.** `[X]` rows name a vendor for *future* wiring; `[M]`
-   rows name the file/feed the operator or broker already produces.
+> To make a control rule (a trading policy arm) writable, every signal its `requires` clause
+> names must have a producer. A row below that carries no producer — only an `[H]` hypothesis —
+> is **not instrumentable as-is** and must be downgraded to a proxy or measured first.
 
 ---
 
 ## 1. Market data
 
-### 1.1 TMX equities
+Sources named, not connected: **TMX Datalinx** (end-of-day and real-time Toronto feeds),
+**Montréal Exchange / Cboe** (options chains, greeks, IV, VIXC), **Bank of Canada** (CORRA,
+government yield curve), **issuer IR pages**, and **named crypto spot exchanges** (Coinbase,
+Kraken, Binance — public tickers only).
 
-| ID | Signal | Tag | Source / formula | REG |
-|----|--------|-----|------------------|-----|
-| M1 | Last trade price | `[M]` | TMX Datalinx L1/L2 feed; broker streaming quote | `no` (statement = EOD mark) |
-| M2 | Bid / ask (Level 1) | `[M]` | TMX L1 feed; broker quote | `no` |
-| M3 | Order-book depth (Level 2) | `[M]` | TMX Datalinx L2 (MDS) | `no` |
-| M4 | Session volume | `[M]` | TMX trade tape | `no` |
-| M5 | Daily OHLC | `[C]` | open = first trade, high = max, low = min, close = last/closing auction; inputs: timestamped trades | `partial` (close only) |
-| M6 | VWAP | `[C]` | Σ(pᵢ·vᵢ)/Σvᵢ over the session; inputs: `(price, volume)` trades | `no` |
-| M7 | Market cap | `[C]` | price × shares outstanding; inputs: M1, M10 | `no` |
-| M8 | Dividend yield | `[C]` | annualized dividend ÷ price; inputs: dividend (`[X]` issuer), M1 | `no` |
-| M9 | P/E | `[C]` | price ÷ EPS; inputs: M1, EPS (`[X]` filings) | `no` |
-| M10 | Shares outstanding | `[X]` | SEDAR / issuer filings | `no` |
-| M11 | Corporate actions (split, dividend declared) | `[X]` | TMX notices / SEDAR / issuer IR | `no` |
-
-### 1.2 Options chains (Montreal Exchange, MX) — greeks & IV
-
-> MX equity options are **American-style, CAD-denominated, physically settled**. Black–Scholes is
-> therefore a first-order approximation; exact greeks use a binomial (CRR) or finite-difference
-> lattice (§6). All `REG` = `no`: registered statements show fills/positions but **not** chains.
-
-| ID | Signal | Tag | Source / formula | REG |
-|----|--------|-----|------------------|-----|
-| O1 | Option bid / ask / last | `[M]` | MX chain (broker or vendor) | `no` |
-| O2 | Strike, expiry, type, underlying | `[M]` | MX reference data | `no` |
-| O3 | Open interest | `[M]` | MX daily OI report | `no` |
-| O4 | Option volume | `[M]` | MX trade tape | `no` |
-| O5 | Implied volatility (per strike/expiry) | `[C]` | invert pricing model at O1; inputs §6 | `no` |
-| O6 | Delta | `[C]` | ∂V/∂S; inputs §6 | `no` |
-| O7 | Gamma | `[C]` | ∂²V/∂S²; inputs §6 | `no` |
-| O8 | Theta | `[C]` | ∂V/∂t; inputs §6 | `no` |
-| O9 | Vega | `[C]` | ∂V/∂σ; inputs §6 | `no` |
-| O10 | Rho | `[C]` | ∂V/∂r; inputs §6 | `no` |
-| O11 | Moneyness (ITM/ATM/OTM) | `[C]` | S vs K; inputs O2, M1 | `no` |
-| O12 | Time to expiry (years) | `[C]` | (expiry − now)/365.25; day-count convention; inputs O2, clock | `no` |
-| O13 | Risk-free rate r | `[X]` | Bank of Canada / CORRA / GoC yield curve | `no` |
-| O14 | Dividend yield q | `[C]` | implied via put-call parity, or `[X]` issuer; inputs O1(call), O1(put), S, K, r, T | `no` |
-
-### 1.3 Crypto spot (non-registered only — see constraint 2)
-
-| ID | Signal | Tag | Source / formula | REG |
-|----|--------|-----|------------------|-----|
-| C1 | BTC spot price | `[X]` | Coinbase / Kraken / Binance / CoinGecko / Kaiko / Coin Metrics | `no` |
-| C2 | ETH spot price | `[X]` | same venues | `no` |
-| C3 | Crypto OHLC / volume | `[X]` | venue or aggregator feed | `no` |
-| C4 | Perpetual funding rate | `[X]` | Binance / Bybit / Deribit | `no` |
-
-### 1.4 Canadian crypto spot ETFs (the registered-account path)
-
-| ID | Signal | Tag | Source / formula | REG |
-|----|--------|-----|------------------|-----|
-| E1 | ETF market price (BTCC, ETHH, etc.) | `[M]` | TMX feed | `partial` (EOD mark) |
-| E2 | ETF NAV per share | `[X]` | fund issuer daily NAV (Purpose / CI Global / Evolve) | `no` |
-| E3 | Premium / discount to NAV | `[C]` | (price − NAV)/NAV; inputs E1, E2 | `no` |
-| E4 | BTC/ETH held per share | `[X]` | issuer disclosure / SEDAR / on-chain analytics | `no` |
-| E5 | MER / management fee | `[X]` | Fund Facts (SEDAR) | `no` |
-
-**Area 1 total: 34 signals** (11 equities · 14 options · 4 crypto · 5 ETF).
+| ID | Signal | Tag | Source (named) | RRSP/TFSA | Notes / reducer inputs |
+|----|--------|-----|----------------|-----------|------------------------|
+| MD-1 | Equity last / settlement price | `[X]` | TMX Datalinx EOD file; broker quote | partial (statement-date valuation only) | Settlement is the official close; `[C]` cross-check = last traded price. |
+| MD-2 | Equity daily OHLCV bar | `[X]` | TMX Datalinx historical; broker chart data | partial | Open/high/low/close/volume per trading day. |
+| MD-3 | Equity bid/ask + depth (Level 1/2) | `[X]` | TMX Datalinx real-time feed | not visible (no live quotes in registered accounts) | Level 1 top-of-book; Level 2 full book depth. |
+| MD-4 | Options chain: strike, expiry, bid/ask, last, open interest, volume | `[X]` | Montréal Exchange / Cboe options feed | not visible (no intraday chain; only executed fills appear) | Chain is the price surface the greeks and IV are computed over. |
+| MD-5 | Option greeks — delta, gamma, theta, vega, rho | `[C]` (published `[X]`) | MX/Cboe publish; recompute from pricing inputs (§ 6) | not visible | Inputs: S, K, T, r, q, σ — see § 6 for the closed forms. |
+| MD-6 | Implied volatility (per strike/expiry) | `[C]` (published `[X]`) | MX/Cboe publish; recompute by inverting the model | not visible | Inputs: market option price + S, K, T, r, q — see § 6. |
+| MD-7 | Crypto spot price (BTC, ETH, …) | `[X]` | Named exchanges: Coinbase, Kraken, Binance public tickers | n/a (direct crypto ineligible) | Per-exchange ticker; cross-exchange `[C]` = volume-weighted mid. |
+| MD-8 | Canadian crypto spot ETF NAV + market price | `[X]` | Market price from TMX; NAV published daily by issuer (Purpose BTCC, CI Galaxy ETHX, Evolve EBIT) | visible (ordinary listed security) | Premium/discount `[C]` = (market − NAV) / NAV; inputs MD-8 both legs. |
+| MD-9 | Risk-free rate (term-matched) | `[X]` | Bank of Canada: CORRA + government bond yield curve | n/a (pricing input, not a position) | CDOR discontinued 2024; CORRA is the current risk-free benchmark. |
+| MD-10 | Forward dividend yield / declared dividends | `[X]` | Issuer IR; TMX; CDS dividend calendar | visible (dividends appear on statement as cash) | Dividend yield `[C]` = annualized dividends / price (inputs MD-10 + MD-1). |
 
 ---
 
 ## 2. Portfolio state
 
-| ID | Signal | Tag | Source / formula | REG |
-|----|--------|-----|------------------|-----|
-| P1 | Position quantity | `[M]` | broker statement / activity export | `yes` |
-| P2 | Average cost (book value) | `[M]` | broker statement (broker-computed) | `yes` |
-| P3 | Market value per position | `[C]` | qty × last price; inputs P1, M1 (EOD) | `yes` (EOD) |
-| P4 | Cash / buying power | `[M]` | broker account view | `yes` (settled cash; no margin) |
-| P5 | Unrealized P/L | `[C]` | market value − book cost; inputs P3, P2 | `yes` |
-| P6 | Realized P/L | `[M]` | broker trade history/statement (alt `[C]`: Σ(proceeds − cost) per closed lot) | `yes` |
-| P7 | Currency balances (CAD + USD sub-accounts) | `[M]` | broker sub-account view | `yes` |
-| P8 | FX rate applied by broker | `[M]` | broker conversion record (incl. Norbert's Gambit journal) | `yes` |
-| P9 | Reference FX (USD/CAD) | `[X]` | Bank of Canada noon rate | `no` |
-| P10 | RRSP contribution room | `[P]` | operator-declared; cross-check `[X]` CRA Notice of Assessment | `yes` (CRA) |
-| P11 | TFSA contribution room | `[P]` | operator-declared; cross-check `[X]` CRA My Account | `yes` (CRA) |
-| P12 | FX-adjusted P/L | `[C]` | Σ FX-adjusted proceeds − Σ FX-adjusted cost; inputs P6, P8 (or P9) | `yes` |
-| P13 | Position weight / concentration | `[C]` | market value ÷ total portfolio value; inputs P3, ΣP3 | `yes` |
+Sources named, not connected: **broker monthly/quarterly statements**, **account activity CSV
+exports**, **broker account-summary / buying-power reports**, **Bank of Canada** noon FX rates,
+and **T5008 / T5 / T3** tax slips.
 
-**Area 2 total: 13 signals.**
+| ID | Signal | Tag | Source (named) | RRSP/TFSA | Notes / reducer inputs |
+|----|--------|-----|----------------|-----------|------------------------|
+| PS-1 | Position quantity (shares / contracts) | `[M]` | Broker statement holdings page | visible | Current held quantity per security. |
+| PS-2 | Average cost basis (book value) | `[M]` | Broker statement (broker-tracked) | visible | Broker computes; `[C]` recompute = Σ(fill cost) / Σ(qty) over fill history (§ 3). |
+| PS-3 | Position market value | `[C]` | = PS-1 × MD-1 | partial (statement-date) | Inputs: quantity `[M]`, last price `[X]`. |
+| PS-4 | Cash balance (per currency) | `[M]` | Broker account summary | visible | CAD and USD sub-ledgers separately. |
+| PS-5 | Buying power | `[M]` | Broker buying-power report (margin account) | n/a (registered accounts have no margin BP) | Broker's own formula; in RRSP/TFSA the analog is available cash + contribution room (CX-7). |
+| PS-6 | Realized P/L (per position / aggregate) | `[C]` | = Σ(sale proceeds − cost basis − commissions) over fills | visible (realized gains reported) | Inputs: execution fills `[M]` (§ 3). Tax-cost basis in registered accounts differs (see T5008 note). |
+| PS-7 | Unrealized P/L (per position / aggregate) | `[C]` | = PS-1 × (MD-1 − PS-2) | partial (statement-date) | Inputs: quantity `[M]`, mark `[X]`, cost basis `[M]`. |
+| PS-8 | Account equity / net asset value | `[C]` | = Σ(PS-3) + PS-4 | visible (statement total) | Broker also reports it `[M]`; `[C]` recompute is the cross-check. |
+| PS-9 | Time-weighted return | `[C]` | = Π(1 + rᵢ) − 1 over cash-flow-dated sub-periods | visible (inferred from statement history) | Inputs: dated contributions/withdrawals + period-end NAVs (PS-8). |
+| PS-10 | Currency balances + FX rate | `[M]` (balances) `[X]` (rate) | Broker statement; Bank of Canada noon rate | visible | FX rate source is `[X]`; CAD-equivalent value `[C]` = balance × rate. |
+| PS-11 | Contributions / withdrawals | `[M]` | Broker statement; RRSP contribution receipt | visible | Feeds PS-9 and contribution-room tracking. |
 
 ---
 
 ## 3. Execution records
 
-| ID | Signal | Tag | Source / formula | REG |
-|----|--------|-----|------------------|-----|
-| X1 | Fill (symbol, side, qty, price, timestamp, venue) | `[M]` | trade confirmation + monthly statement | `yes` |
-| X2 | Trade date / settle date | `[M]` | trade confirmation | `yes` |
-| X3 | Commission & fees | `[M]` | confirmation / statement | `yes` |
-| X4 | FX on a USD fill in a CAD account (incl. journaling) | `[M]` | statement / activity export | `yes` |
-| X5 | Broker export (named formats below) | `[M]` | see format list | `yes` |
-| X6 | Option expiry auto-exercise (ITM long) | `[M]` | statement / trade confirmation | `yes` |
-| X7 | Assignment (short option assigned) | `[M]` | statement / trade confirmation | `yes` (covered/cash-secured only) |
-| X8 | Dividends / distributions received | `[M]` | statement | `yes` |
-| X9 | Return of capital (ROC) | `[M]` | T3/T5 tax slip + broker activity | `yes` |
-| X10 | Corporate-action fills (split / merger) | `[M]` | statement | `yes` |
+Sources named, not connected: **broker trade confirmations**, **monthly/quarterly activity
+statements**, **account activity CSV / Flex-Query exports**, **options expiry & assignment
+notices**, and **T5008** (disposition slip). The export formats below are the canonical
+operator-produced files a reducer can parse.
 
-**Broker export formats the operator can provide** (named sources, not connections):
-
-| Format | Broker / mechanism |
-|--------|--------------------|
-| CSV activity / transaction download | Questrade, Wealthsimple Trade, TD Direct Investing, RBC, BMO InvestorLine, CIBC Investor's Edge, National Bank |
-| API (read-only queries) | Questrade API, Interactive Brokers **Flex Query** (XML/CSV) |
-| OFX / QFX | bank-style direct-connect (legacy; many Canadian brokers) |
-| QIF | legacy import |
-| PDF statements (monthly/quarterly) | all brokers — the fallback when no structured export exists |
-
-**Area 3 total: 10 signals** (the format list is the named *source* for X1–X10, not a separate tag).
+| ID | Signal | Tag | Source (named) | RRSP/TFSA | Notes / reducer inputs |
+|----|--------|-----|----------------|-----------|------------------------|
+| EX-1 | Fill record (ticker, side, qty, price, commission, time, currency, venue) | `[M]` | Broker trade confirmation; activity CSV | visible | The atomic execution unit. |
+| EX-2 | Order lifecycle (submitted → partial → filled / cancelled) | `[M]` | Broker order ticket / activity log | visible (final state; not intraday tick stream) | Enables fill-rate `[C]` = filled / submitted. |
+| EX-3 | Option expiry (expired worthless / auto-exercised) | `[M]` | Broker expiry notice; activity statement | visible (as a fill/expiry line, not a live chain) | Distinguishes ITM auto-exercise from OTM worthless expiry. |
+| EX-4 | Assignment / exercise notice | `[M]` | Broker assignment notice; MX/OCC assignment report | visible | Short-option assignment is only possible in permitted registered strategies. |
+| EX-5 | Dividends / distributions received | `[M]` | Broker statement; CDS dividend ledger; T5/T3 | visible | Cash (and DRIP) distribution events. |
+| EX-6 | Broker export format inventory | `[M]` | Questrade activity CSV; Interactive Brokers Flex Query (XML/CSV); TD/Scotia monthly statement PDF; T5008 slip | visible | Meta-signal: *which* parseable formats the operator can produce. |
+| EX-7 | Fees / commissions / ECN charges | `[M]` | Broker trade confirmation | visible | Per-fill cost; feeds PS-6 cost basis. |
+| EX-8 | Settlement date + settlement currency | `[M]` | Broker confirmation | visible | T+2 equity (T+1 post-2024 for many); distinct from trade date. |
+| EX-9 | Book-value adjustments (DRIP, return-of-capital, ROC) | `[M]` | Broker statement; T3 (ROC) | visible | ROC lowers book value; `[C]` recompute = book value − ROC distributions. |
 
 ---
 
 ## 4. Decision records
 
-> The operator's own judgment is the hardest thing to make observable. Rows D1, D2, D8, D9 have
-> **no producer today** — they are `[P]` and must be journaled to exist. Flagged in the gap map (§8).
+These are the *thesis-side* signals — what the operator intended and believed, before the market
+answered. By construction most are `[P]` (operator-declared) or `[H]` (subjective). The guard
+below is enforced: **no `[H]` row is written as if measured.**
 
-| ID | Signal | Tag | Source / formula | REG |
-|----|--------|-----|------------------|-----|
-| D1 | Investment thesis (why enter/exit/hold) | `[P]` | operator-declared (decision journal) | `yes` |
-| D2 | Proposed order (intent: symbol, side, qty, limit, thesis id) | `[P]` | operator-declared (order ticket journal) | `yes` |
-| D3 | Executed order (join to fill) | `[M]` | broker — same record as X1 | `yes` |
-| D4 | Proposed ↔ executed match | `[C]` | join on symbol+side+timestamp tolerance; inputs D2, X1 | `yes` |
-| D5 | Slippage (fill − limit) | `[C]` | fill price − limit price; inputs X1, D2 | `yes` |
-| D6 | P/L attribution per thesis | `[C]` | Σ fills grouped by thesis id; inputs X1, D1 | `yes` |
-| D7 | Holding period | `[C]` | exit date − entry date; inputs X2 | `yes` |
-| D8 | Risk limits (max position, max sector weight) | `[P]` | operator-declared policy | `yes` |
-| D9 | Exit reason / post-mortem note | `[P]` | operator-declared (journal) | `yes` |
-| D10 | Outcome verdict (win/loss vs thesis) | `[C]` | sign(D6) reconciled against D9; inputs D6, D9 | `yes` |
-
-**Area 4 total: 10 signals.**
+| ID | Signal | Tag | Source (named) | RRSP/TFSA | Notes / reducer inputs |
+|----|--------|-----|----------------|-----------|------------------------|
+| DR-1 | Thesis (entry/exit rationale, target, stop, horizon) | `[P]` | Operator journal / trade note | n/a (operator-scoped) | Free text; only taggable by operator policy. |
+| DR-2 | Proposed order (ticker, side, qty, limit, TIF) | `[P]` | Operator order ticket at decision time | n/a | The *intended* execution, recorded before submission. |
+| DR-3 | Executed order (what actually filled) | `[M]` | = EX-1 (execution record) | visible | The *actual* execution, cross-checked against DR-2. |
+| DR-4 | Proposed-vs-executed delta (slippage, partial fill, cancelled) | `[C]` | = DR-3 − DR-2 | visible (via the two inputs) | Inputs: proposed order `[P]`, executed fill `[M]`. |
+| DR-5 | Outcome vs thesis (realized P/L vs target/stop) | `[C]` | = PS-6 vs DR-1 target/stop | visible | Inputs: realized P/L `[C]`, thesis `[P]`. |
+| DR-6 | Decision timestamp + review notes | `[P]` | Operator journal | n/a | Anchors DR-2 to a clock; enables latency-to-decision measures. |
+| DR-7 | Risk limits / position-sizing rules | `[P]` | Operator policy document | n/a | A control rule; becomes a *factor level* in the grid once instrumented. |
+| DR-8 | Confidence at decision time | `[H]` | Operator self-report (recalled) | n/a | **Subjective.** Not a measurement; usable only as a hypothesis axis, never as a measured input. |
 
 ---
 
 ## 5. External context
 
-| ID | Signal | Tag | Source / formula | REG |
-|----|--------|-----|------------------|-----|
-| T1 | Next earnings date | `[X]` | Refinitiv / FactSet / Bloomberg; free: TMX Money, company IR, Yahoo | `no` |
-| T2 | Ex-dividend / record date | `[X]` | TMX listing / issuer IR | `no` |
-| T3 | News headlines | `[X]` | Canadian Press / Reuters / PR Newswire / Business Wire | `no` |
-| T4 | Macro calendar (BoC rate, CPI, GDP, employment) | `[X]` | Bank of Canada / Statistics Canada | `no` |
-| T5 | RRSP/TFSA annual limits + rules | `[X]` | CRA | `no` |
-| T6 | US dividend withholding-tax treatment | `[X]` | CRA / Canada–US treaty (RRSP exempt; TFSA **not** exempt) | `no` |
-| T7 | GICS sector / industry classification | `[X]` | MSCI / S&P GICS | `no` |
-| T8 | Realized (historical) volatility | `[C]` | annualized std of log returns; inputs historical prices (M5) | `no` |
-| T9 | Beta | `[C]` | cov(rᵢ, rₘ)/var(rₘ) regression; inputs returns (M5), benchmark (`[X]`) | `no` |
+Sources named, not connected: **issuer IR calendars**, **CDS corporate-action / dividend
+calendar**, **TMX corporate-action feed**, **Statistics Canada**, **Bank of Canada**, **Cboe**
+(VIXC), and **named newswires** (Reuters, Bloomberg, Globe Investor, PR Newswire).
 
-**Area 5 total: 9 signals.**
-
----
-
-## 6. Greeks & IV — pricing inputs (required for O5–O10)
-
-Every greek and every IV value is a function of the **same six inputs** plus a model choice.
-A `[C]` row in §1.2 is only writable when all six are present; the table states which signal
-supplies each.
-
-| Input | Symbol | Supplied by |
-|-------|--------|-------------|
-| Underlying spot price | S | M1 |
-| Strike | K | O2 |
-| Time to expiry | T | O12 |
-| Risk-free rate | r | O13 |
-| Dividend yield | q | O14 |
-| Market option price | V_market | O1 |
-| Model (European vs American) | — | `[P]`/`[C]` choice; MX is American → binomial (CRR) or FD lattice; BS only as approximation |
-
-- **Implied volatility (O5):** the root σ solving `V_model(S,K,T,r,q,σ) = V_market`. A deterministic
-  reducer (bisection/Newton) over one variable; inputs = the six above.
-- **Greeks (O6–O10):** partial derivatives of `V_model` — Delta `∂V/∂S`, Gamma `∂²V/∂S²`,
-  Theta `∂V/∂t`, Vega `∂V/∂σ`, Rho `∂V/∂r`. Closed-form under Black–Scholes; lattice sensitivities
-  under the binomial/PDE model. All require the same six inputs.
-
-**Consequence:** O5–O10 are `[C]`, *never* `[M]` — no vendor "sells a delta"; a delta is computed.
-They also cannot be written for a registered account until an `[X]` chain source (MX) is wired,
-because the statement carries no chain (§8, G2).
+| ID | Signal | Tag | Source (named) | RRSP/TFSA | Notes / reducer inputs |
+|----|--------|-----|----------------|-----------|------------------------|
+| CX-1 | Next earnings date (announced / confirmed) | `[X]` | Issuer IR calendar; TMX corporate calendar | n/a (context, not position) | Announced dates are firm; estimates are `[H]`. |
+| CX-2 | Ex-dividend date, record date, pay date, amount | `[X]` | Issuer IR; CDS dividend calendar | visible (payments land on statement) | Ex-div is the entitlement trigger. |
+| CX-3 | Ticker-tagged news / headlines | `[X]` | Reuters, Bloomberg, Globe Investor, PR Newswire | n/a | Raw headlines are `[X]`; a sentiment score over them would be `[H]`. |
+| CX-4 | Analyst consensus rating / price target | `[X]` | Refinitiv / Bloomberg consensus | n/a | Vendor consensus is `[X]`; the operator's own target is `[P]` (DR-1). |
+| CX-5 | Economic calendar (BoC rate decisions, CPI, GDP) | `[X]` | Statistics Canada; Bank of Canada | n/a | Scheduled releases; surprises `[C]` = actual − consensus. |
+| CX-6 | Corporate actions (splits, mergers, ticker changes) | `[X]` | CDS; TMX corporate-action feed | visible (post-action on statement) | Feeds PS-2 book-value adjustments. |
+| CX-7 | Registered-account contribution room (TFSA/RRSP) | `[X]` | CRA Notice of Assessment / My Account | visible (statement side) | Operator-tracked remaining room is `[P]`. |
 
 ---
 
-## 7. Hypotheses (isolated — never treated as measured)
+## 6. Greeks and IV — the pricing inputs they require
 
-These are `[H]` and are **excluded** from the observable counts. They may become `[C]` only once a
-deterministic reducer is specified over measured inputs; today they have none.
+Every option greek and the implied volatility are **deterministic reducers over the
+Black–Scholes–Merton (dividend-adjusted) model** (European closed form; American single-name
+equities on MX require a binomial/trinomial tree or PDE — which is why vendor-published values
+are the `[X]` primary and local recomputation is the `[C]` cross-check).
 
-| ID | Hypothesis | Why it is `[H]`, not `[C]` |
-|----|-----------|----------------------------|
-| H1 | Probability of assignment on a short option | model estimate over an *unobserved* distribution; no reducer specified yet |
-| H2 | Forward expected return per thesis | subjective; no deterministic formula over measured inputs |
-| H3 | "Optimal" position size | a policy *candidate*, not a measurement — must be authored as a control rule (§9), not observed |
+**Model inputs (the observable prerequisites for any `[C]` greek/IV):**
 
----
+| Symbol | Input | Provenance of the input |
+|--------|-------|-------------------------|
+| `S` | Underlying spot price | `[X]` MD-1 |
+| `K` | Strike price | `[X]` MD-4 (chain) |
+| `T` | Time to expiry (years) | `[C]` = (expiry − now) in the option's day-count convention (calendar vs trading days affects theta) |
+| `r` | Risk-free rate | `[X]` MD-9 (CORRA / bond yield, term-matched) |
+| `q` | Dividend yield (continuous, or discrete dividends) | `[X]` MD-10 |
+| `σ` | Volatility | for greeks: the IV (`[C]` MD-6); for IV itself: the *unknown* to solve |
 
-## 8. Gap map — policy wants, measurement lacks
+**Closed forms** (with `d₁ = [ln(S/K) + (r − q + σ²/2)T] / (σ√T)`, `d₂ = d₁ − σ√T`,
+`N(·)` the standard-normal CDF, `N′(·)` its density):
 
-| Gap | Missing producer | Impact | Register path |
-|-----|------------------|--------|---------------|
-| G1 | Intraday marks for registered accounts | statements are EOD only | `[X]` TMX/MX vendor, or accept EOD (M1 `partial`) |
-| G2 | Live options chain (intraday greeks/IV) | no chain in statements | `[X]` MX/OPRA-equivalent, or EOD snapshot; blocks O5–O10 for registered accounts |
-| G3 | Order-book depth | L2 is `[X]`-only | optional — most policy needs L1/EOD only |
-| G4 | Operator thesis / intent / limits (D1, D2, D8, D9) | `[P]` with **no journal tool** — the single largest gap | decision journal producer (highest priority) |
-| G5 | Crypto spot in registered accounts | not directly holdable | route via spot ETFs (E1–E5, already `[M]`); §1.3 is non-registered-only |
-| G6 | Contribution room | `[P]`-declared; no automated CRA producer | operator declares P10/P11, cross-check `[X]` CRA |
-| G7 | Dividend yield q for pricing (O14) | thin — implied or issuer-only | wire `[X]` issuer dividend feed or accept parity-implied q |
+| Quantity | Formula |
+|----------|---------|
+| Call price | `C = S·e^(−qT)·N(d₁) − K·e^(−rT)·N(d₂)` |
+| Put price | `P = K·e^(−rT)·N(−d₂) − S·e^(−qT)·N(−d₁)` |
+| Delta | `∂V/∂S = e^(−qT)·N(d₁)` (call) / `e^(−qT)·(N(d₁) − 1)` (put) |
+| Gamma | `∂²V/∂S² = e^(−qT)·N′(d₁) / (S·σ·√T)` |
+| Theta | `−S·e^(−qT)·N′(d₁)·σ/(2√T) − r·K·e^(−rT)·N(d₂) + q·S·e^(−qT)·N(d₁)` (call) |
+| Vega | `∂V/∂σ = S·e^(−qT)·N′(d₁)·√T` (per 1.0 vol; scale by 0.01 for per-point) |
+| Rho | `∂V/∂r = K·T·e^(−rT)·N(d₂)` (call) / `−K·T·e^(−rT)·N(−d₂)` (put) |
 
----
-
-## 9. Policy map — prospective control rules and their `requires`
-
-Per the load-bearing rule (*to make policies, we need information*): each rule below states its
-`requires` and every field is resolvable to a measured signal above — or it is **unwritable** and
-named as such.
-
-| Rule | Type | `requires` | Resolved by | Verdict |
-|------|------|------------|-------------|---------|
-| POL-1 Covered-call entry | control | IV, moneyness, underlying price, position | O5, O11, M1, P1/P3 | **writable** iff O5 resolvable (else blocked by G2) |
-| POL-2 Position sizing (max weight) | control | weight, total value, cash | P13, ΣP3, P4 | **writable** |
-| POL-3 Contribution-room guard | control | RRSP/TFSA room | P10, P11 | **writable** (operator-declared) |
-| POL-4 Exit-on-invalidation | control | thesis, P/L attribution, earnings/ex-div/news | D1, D6, T1, T2, T3 | **writable** iff D1 journaled (G4) |
-| POL-5 Expiry / roll management | control | time to expiry, IV, expiry/assignment events | O12, O5, X6, X7 | **writable** iff O5 resolvable (G2) |
-
-The compiler's `requires`/`produces` gate will reject POL-1/POL-5 as drafted if O5 is not produced
-in the spec — which is exactly why this audit lands *before* any spec is authored.
+**Implied volatility** is the inverse: solve `σ` such that the model price equals the observed
+**market option price** (bid/ask midpoint or last trade). It has no closed form — it is a
+numerical root-find (bisection / Newton). Its required inputs are therefore `{market option
+price, S, K, T, r, q}` — all of which this audit tags `[X]` (MD-1, MD-4, MD-9, MD-10) except
+`T`, which is a `[C]` time difference. A producer for IV therefore needs a market-option-price
+producer first; without one, IV (and every `[C]` greek built on it) is unmeasurable and must not
+be written as measured.
 
 ---
 
-## 10. Adversarial compliance review
+## LOG
 
-Self-check against the guard rails, answered adversarially (assume a reviewer will try to break it):
-
-1. **Every signal row tagged?** Yes — §1–§5 carry exactly one of `[M]/[C]/[X]/[P]` per row; §7 carries `[H]`.
-2. **Any `[H]` written as measured?** No — `[H]` rows live only in §7, are counted separately, and carry an explicit "why not `[C]`" column.
-3. **Every `[M]` names a stated source?** Yes — broker statement/confirmation/export, or TMX/MX feed.
-4. **Every `[C]` states its formula inputs?** Yes — inline per row; greeks/IV centralized in §6.
-5. **Every `[X]` names a vendor?** Yes — each row names the vendor(s); no `[X]` row is vendor-less.
-6. **RRSP/TFSA visibility noted per market/execution signal?** Yes — `REG` column on §1–§3.
-7. **No API keys / scraping / live calls?** Yes — sources are named, never connected (§0 constraint 3).
-8. **Any `[C]` depending on an `[H]` input?** No — no `[C]` formula in §1–§6 consumes a §7 hypothesis.
-9. **Registered-account constraint honored in option scope?** Yes — naked/spread/margin strategies marked `REG:no`; only covered/cash-secured/long marked `yes`.
-
-**Verdict: PASS** — with gap flags G1–G7 recorded (§8) as the input to the next seeding step.
-
----
-
-## 11. Log
+**Signal counts per area**
 
 | Area | Signals |
 |------|---------|
-| 1 Market data (TMX / options / crypto / ETF) | 34 |
-| 2 Portfolio state | 13 |
-| 3 Execution records | 10 |
-| 4 Decision records | 10 |
-| 5 External context | 9 |
-| **Observable total** | **76** |
-| 7 Hypotheses (`[H]`, isolated) | 3 |
+| 1. Market data | 10 |
+| 2. Portfolio state | 11 |
+| 3. Execution records | 9 |
+| 4. Decision records | 8 |
+| 5. External context | 7 |
+| **Total** | **45** |
 
-- **PASS/FAIL:** PASS (all rows tagged; zero `[H]`-as-measured; all `[C]` reducers have inputs; all `[M]`/`[X]` sources named).
-- **Outstanding gaps:** G1–G7 (highest priority: G4 decision journal, then G2 options chain).
-- **Commit:** see `git log` for the seeding commit.
+**Guard checks**
+
+- [x] Every signal row carries exactly one primary provenance tag. **PASS.**
+- [x] No `[H]` row is written as if measured — the only `[H]` signal (DR-8, decision confidence)
+      is explicitly marked subjective and excluded from the measured-input set. **PASS.**
+- [x] Registered-account visibility annotated per signal (visible / partial / not visible / n/a). **PASS.**
+- [x] Sources are named, not connected — no API keys, no scraping, no live calls. **PASS.**
+- [x] Greeks and IV carry their pricing inputs and the closed-form reducers. **PASS.**
+- [x] Instrumentation gap flagged: a market-option-price producer (MD-4) is a prerequisite for
+      any `[C]` IV/greek producer (§ 6). **PASS — flagged, not blocked.**
+
+**Result: PASS** — 45 signals inventoried, 0 unguarded `[H]` rows, all reducers stated with
+inputs.
