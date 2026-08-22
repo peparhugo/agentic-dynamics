@@ -172,10 +172,15 @@ def compute(stories: list[dict], analyses: list[dict]) -> tuple[dict, Contributi
         },
         "models": models,
     }
-    # m3: a story the analyses never joined onto produced no measurement — it is outside
+    # m3/f2: a story the analyses never joined onto produced no measurement — it is outside
     # the effective population (the review's 59-story overstatement), not silently "used".
+    # Its qualified ref is collected too, so the contract attests WHICH stories were excluded.
+    excluded_story_refs = [
+        rid for (_model, _cost, rid) in cost_by_sid.values() if rid not in used_story_rids
+    ]
     contribution = ContributionReport.of(
-        used_record_ids=sorted(used_story_rids) + sorted(used_analysis_rids),
+        used_record_refs=sorted(used_story_rids) + sorted(used_analysis_rids),
+        excluded_record_refs=excluded_story_refs,
         exclusion_reasons={"outside_analysis_population": len(cost_by_sid) - len(used_story_rids)},
     )
     return result, contribution

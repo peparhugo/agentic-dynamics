@@ -60,19 +60,20 @@ def _captured_correctness(cells: list[dict]) -> float | None:
 def _collect_cells(story_payloads: list[dict]) -> tuple[list[dict], list[str]]:
     """Build the per-story cell rows from the canonical payloads.
 
-    Returns ``(cells, used_ids)`` (m3) — the cells plus the record id of every story that
-    produced one, so the contract's "used" population is derived from the computation.
+    Returns ``(cells, used_refs)`` (m3/f2) — the cells plus the table-qualified record ref
+    of every story that produced one, so the contract's "used" population is derived from
+    the computation.
 
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
     cells = []
-    used_ids: list[str] = []
+    used_refs: list[str] = []
 
     for d in story_payloads:
         source_path = d.get("_source_path")
         if not source_path:
             continue
-        used_ids.append(record_id(d))
+        used_refs.append(record_id(d))
         story = load_story_result(Path(source_path))
         # The resolver's relabelled condition, not the raw field.
         cond = d.get("_canonical_condition") or "clean"
@@ -112,12 +113,12 @@ def _collect_cells(story_payloads: list[dict]) -> tuple[list[dict], list[str]]:
             }
         )
 
-    return cells, used_ids
+    return cells, used_refs
 
 
 def main():
     tables = load_canonical_tables("story")
-    cells, used_ids = _collect_cells(tables.stories)
+    cells, used_refs = _collect_cells(tables.stories)
     print(f"canonical input: {len(tables.stories)} stories ({tables.identity.registry_version})")
 
     # ── Table 1: Condition Comparison ──
@@ -289,7 +290,7 @@ def main():
 
     # m3: the contract is derived from the computation's self-report — every story that
     # produced a cell is used; a story without a payload is simply absent from the corpus.
-    contribution = ContributionReport.of(used_record_ids=used_ids)
+    contribution = ContributionReport.of(used_record_refs=used_refs)
     attach_contribution(output, LAB, tables, contribution)
     OUTPUT_PATH.write_text(json.dumps(output, indent=2))
     print(f"\nSaved: {OUTPUT_PATH}")

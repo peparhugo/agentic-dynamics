@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_grit",
-  "generated_at": "2026-08-22T18:05:09.358552",
+  "generated_at": "2026-08-22T18:49:10.630506",
   "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
   "summary": {
     "cells": 144,
@@ -257,19 +257,23 @@
     "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
     "registry_version": "data-manifest/1.0+701rows",
     "metric_definition_version": "grit/v2",
-    "metric_source_sha256": "2cb68d5999571956d2d3be1a720abb18d1c934a596e813199d3dcc213e67887e",
+    "metric_source_sha256": "efffc47f8bc8e92356489e96cc82a9b08bd6b07eb5196e5c0250b8baf04b1e91",
     "n_resolved_records": 279,
     "n_eligible_records": 144,
     "n_used_records": 144,
     "n_excluded_records": 135,
     "n_unused_eligible_records": 0,
+    "used_record_refs_sha256": "d598c97bb58d32e5ca9c90b63502a713d113fca52f53d60413922a43457fb8aa",
+    "excluded_record_refs_sha256": "406e4dcfb0de6257038bf88643c3577caf680c24ba5dd5009f64e7bc119b4edf",
+    "used_unique_records": 144,
+    "used_contributions": 144,
     "review_without_current_story": 0,
     "story_without_review": 0,
     "missing_required_field": 135,
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v5",
-    "generated_at": "2026-08-22T16:05:09.358824+00:00"
+    "contract_version": "lab-contract/v6",
+    "generated_at": "2026-08-22T16:49:10.631044+00:00"
   }
 }

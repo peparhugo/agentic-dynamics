@@ -196,8 +196,10 @@ NORMALIZATION_VERSION = "canonical-projection/v2"
 #: so a *future* derived semantic field (like ``_canonical_condition``) is included unless it
 #: is added here. ``_source_path`` is an absolute path (environment-dependent); ``_registry``
 #: is the provenance block already folded into the resolved identity; ``_story_id`` is the
-#: review/analysis join key; ``_experiment`` is the finding's parent-file provenance.
-_PROVENANCE_KEYS = frozenset({"_source_path", "_registry", "_story_id", "_experiment"})
+#: review/analysis join key; ``_experiment`` is the finding's parent-file provenance; ``_table``
+#: is the resolver table a payload came from (the f2 table-qualification discriminator — it is
+#: provenance, not measured content, so it must not move ``resolved_input_sha256``).
+_PROVENANCE_KEYS = frozenset({"_source_path", "_registry", "_story_id", "_experiment", "_table"})
 
 
 def _payload_projection(payload: dict) -> dict:
@@ -211,6 +213,18 @@ def _payload_projection(payload: dict) -> dict:
     analysis population changed; this projection closes that gap.
     """
     return {k: v for k, v in payload.items() if k not in _PROVENANCE_KEYS}
+
+
+def payload_content_digest(payload: dict) -> str:
+    """The ``sha256`` content digest of ONE resolved payload's semantic projection.
+
+    The f2 contributor-attestation primitive: a table-qualified ``analysis`` ref needs a
+    content digest (an analysis is a derived view with no registry ``knowledge_id`` of its
+    own), and this is exactly the per-payload digest :func:`resolved_input_identity` folds
+    into the corpus identity — same projection, same canonical JSON encoding, so the two
+    can never disagree about a payload's content.
+    """
+    return hashlib.sha256(_canonical_json(_payload_projection(payload))).hexdigest()
 
 
 def resolved_input_identity(tables: CanonicalTables, *, waiver_digest: str | None = None) -> str:
@@ -656,6 +670,7 @@ def resolve_stories(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]:
             continue
         payload["_canonical_condition"] = effective_story_condition(payload)
         payload["_source_path"] = str(matches[0])
+        payload["_table"] = "story"
         payload["_registry"] = {
             "entity_id": row.get("entity_id"),
             "knowledge_id": row.get("knowledge_id"),
@@ -690,6 +705,7 @@ def resolve_reviews(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]:
             issues.append(_issue("review", row, "unreadable"))
             continue
         payload["_story_id"] = story_id
+        payload["_table"] = "review"
         payload["_registry"] = {
             "entity_id": row.get("entity_id"),
             "knowledge_id": row.get("knowledge_id"),
@@ -724,6 +740,7 @@ def resolve_analysis(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]
         if payload is None:
             continue
         payload["_story_id"] = story_id
+        payload["_table"] = "analysis"
         # Analysis is derived from a story, so its canonical entity is the story row it
         # joins onto — the provenance that ``resolved_input_identity`` folds into the
         # payload-content hash.
@@ -793,6 +810,7 @@ def resolve_findings(manifest: dict) -> tuple[list[dict], list[ResolutionIssue]]
             continue
         run = dict(matches[0])  # never mutate the shared payload
         run["_experiment"] = payload.get("experiment", "")
+        run["_table"] = "finding"
         run["_registry"] = {
             "entity_id": row.get("entity_id"),
             "knowledge_id": row.get("knowledge_id"),

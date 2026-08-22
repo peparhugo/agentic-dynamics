@@ -35,6 +35,7 @@ from agentic_dynamics.reporting.lab_contract import (
     REQUIRED_FIELDS,
     build_contract,
     lab_source_sha256,
+    refs_digest,
     validate_contract,
 )
 from agentic_dynamics.reporting.lab_manifest import (
@@ -332,6 +333,10 @@ def test_absent_registry_rejects_everything(tmp_path, manifest_entry):
         "n_used_records": 1,
         "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": refs_digest(["story:a:k"]),
+        "excluded_record_refs_sha256": refs_digest(()),
+        "used_unique_records": 1,
+        "used_contributions": 1,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,

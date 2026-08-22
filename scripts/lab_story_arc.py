@@ -85,11 +85,11 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
     by_session = defaultdict(lambda: {"cost": [], "tokens": [], "tests": [], "n": 0})
     by_cond_session = defaultdict(lambda: {"cost": [], "n": 0})
     by_model_session = defaultdict(lambda: defaultdict(lambda: {"cost": [], "n": 0}))
-    used_ids: list[str] = []
+    used_refs: list[str] = []
 
     for d in stories:
         model = _short_model(d.get("model", "unknown"))
-        used_ids.append(record_id(d))
+        used_refs.append(record_id(d))
         # `_canonical_condition` is the relabelled condition the resolver computed;
         # the raw `perturbation_condition` is deliberately not used here.
         cond = d.get("_canonical_condition") or "clean"
@@ -160,7 +160,7 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
             for m, sessions_map in sorted(by_model_session.items())
         },
     }
-    contribution = ContributionReport.of(used_record_ids=used_ids)
+    contribution = ContributionReport.of(used_record_refs=used_refs)
     return result, contribution
 
 

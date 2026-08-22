@@ -67,11 +67,11 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
     Split out of :func:`main` so the analysis is testable without touching the registry.
     """
     by_model = defaultdict(lambda: {"costs": [], "tests": [], "cells": 0})
-    used_ids: list[str] = []
+    used_refs: list[str] = []
 
     for d in stories:
         m = _short_model(d.get("model", "unknown"))
-        used_ids.append(record_id(d))
+        used_refs.append(record_id(d))
         summary = d.get("summary", {}) or {}
         # m2 null-not-zero: only a *captured* cost enters the average; a missing/zero cost
         # is counted but never averaged in as $0 (review P1).
@@ -136,7 +136,7 @@ def compute(stories: list[dict]) -> tuple[dict, ContributionReport]:
         },
         "models": models,
     }
-    contribution = ContributionReport.of(used_record_ids=used_ids)
+    contribution = ContributionReport.of(used_record_refs=used_refs)
     return result, contribution
 
 
