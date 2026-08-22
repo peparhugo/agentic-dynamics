@@ -1,0 +1,143 @@
+name: cap_addendum_design
+question: >-
+  Produce the design-only addendum for CAP increments I8-I10, exactly per Addendum A of
+  docs/designs/current/context_abstraction_design.md: (I8) DomainProfile + ChallengeProfile as
+  the spec-driven domain-loading layer; (I9) the `pattern` epistemic class with its enforced
+  payload; (I10) the typed SessionCheckpoint and the session_routing decision-type contract.
+  Run the repo's seeding protocol — review -> design -> verify -> adversarial critique — with
+  the review → design → verify phase shape that produced the frozen CAP design itself. This is a
+  DESIGN-ONLY spec: it adds docs under docs/designs/current/ and modifies nothing under src/,
+  scripts/, or tests/.
+version: "0.1"
+artifact_kind: workflow
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile — static filing of the domain-context gap (pre-CAP-I8). When I8
+        lands this block is replaced by the compiled profile and MUST be deleted from this spec.
+        domain: software_delivery
+        canonical_sources: [docs/designs/current/context_abstraction_design.md (frozen design
+          §§1-13 + Addendum A), docs/designs/current/context_abstraction_verify.md (F1-F6),
+          ARCHITECTURE.md §4 (reserved homes), docs/review/finding_economics_review.md (external
+          critique precedent)]
+        predicates: [spec_status, attempt_cache_hit_rate, phase_test_verified, job_model_used]
+        policies: [tests_must_pass, no_cross_plane_imports, hard_rule_3_reducers_only,
+          actuation_armed_off]
+        verification: [pytest, ruff, dependency-direction guards, doc-lifecycle guards]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile — static filing (same migration note as domain_context).
+        challenge: cross_cutting (a design that touches the control plane, the fact schema, and
+          the session runtime — three reserved homes at once)
+        context_requirements: [the frozen design's schemas, the review's audit table, the
+          post-closure primitives (measurement_coverage, lab_contract v6), the reserved homes]
+        deliberation: [map_impact, identify_invariants, choose_sequence, design in bounded
+          sections (I8, I9, I10), verify boundary, adversarial critique]
+        session_policy: fork_per_phase; resume_on same_phase + same_goal + no repo change since
+          phase start
+        verification_policy: [design-only boundary check, citation spot-checks, hard-rule sweep]
+      current_state: >-
+        Addendum A accepted (merged 657040a53) and commits I8-I10 to a follow-up design-only spec
+        in the review -> design -> verify shape, with the implement spec's deviation note
+        referencing it. Post-closure primitives are in place: measurement_coverage.py (invariant
+        m2 — null with coverage, never zero), routing.py nullable aggregates with n_cost/n_outcome,
+        lab_contract.py v6 exact contributor refs. Reserved homes exist as empty placeholders
+        (control/facts.py, control/reducers/, control/context_compiler.py, core/contracts.py,
+        control/{rules,validator,decisions}.py).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) DESIGN-ONLY: the only
+        files added/modified live under docs/designs/current/ — git status must show nothing
+        under src/, scripts/, tests/, workflows/, experiments/. (3) Every schema is a sketch, not
+        code; dataclass syntax with docstrings (repo convention). (4) A deviation from Addendum A
+        is permitted only with a one-line note in the design doc's deviation table. (5) The
+        adversarial critique (a4) is mandatory — at least 3 material findings, each re-verified
+        against the tree, each resolved in the design or logged as an accepted risk. (6) Hard
+        rules 1-7 of the frozen design still bind: deterministic reducers only, no new transport,
+        one canonical representation, observe-only supervisor, contract remains the sole gate.
+        (7) Invariants survive: Redis 6380/6379, dual Firebase. (8) PASS/FAIL checkpoint log;
+        resumable via --resume.
+      read_first: >-
+        docs/designs/current/context_abstraction_design.md (full read — §§1-13 + Addendum A),
+        docs/designs/current/context_abstraction_verify.md, docs/review/finding_economics_review.md
+        (the external-critique format a4 must follow), src/agentic_dynamics/control/routing.py,
+        src/agentic_dynamics/reporting/{measurement_coverage,lab_contract}.py,
+        src/agentic_dynamics/runtime/workflow_runner.py (PhaseResult),
+        src/agentic_dynamics/core/session_types.py
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/cap-addendum-design); each phase commits [workflow] <phase>. Resumable with
+        --resume. The four phases are long contemplation phases — spend the context budget on the
+        design, not on haste.
+    phases:
+      - name: a1_component_review
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/context_abstraction_addendum_review.md
+          ROLE: component auditor — the review phase that precedes the design, in the same shape as docs/context_abstraction/review.md was for the frozen design.
+          AUDIT, per refinement, what exists today (every claim carries file:line):
+          (1) I8 profiles: what configuration surfaces exist (spec context blocks, contract YAML, RoutingPreferences), where profile data would persist (KB source_type rows), which reserved homes fit (control/facts.py vs a new control/profiles.py), and what routing already selects (step_routing route_step).
+          (2) I9 patterns: EPISTEMIC_MAP + is_canonical() in the frozen design §3.4; the lab-contract v6 ref format (used_record_refs_sha256 etc.); how campaign results are stored today (lab artifacts, registry) — what a pattern reducer would consume.
+          (3) I10 checkpoint: PhaseResult/WorkflowRunResult fields in workflow_runner.py; ledger attempt fields (parent_attempt_id, escalation_from/to, cache_hit, tokens); the snapshot_id definition (§6.4); session_types — which checkpoint fields are DERIVABLE today vs ADVISORY.
+          END with a numbered OQ list (open questions the design must answer with schemas) and the hard-rule risks each increment carries.
+          GUARD: every "exists today" claim carries file:line; git status shows only the new doc.
+          LOG: PASS/FAIL; commit.
+      - name: a2_design
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/context_abstraction_addendum_design.md
+          ROLE: designer. Authority: Addendum A (docs/designs/current/context_abstraction_design.md). Answer every OQ from a1 with a schema.
+          DESIGN, in three bounded sections:
+          (1) I8 — DomainProfile + ChallengeProfile dataclasses (fields, versioning, where they live: propose control/profiles.py, cite the reserved-homes table), the compile_context signature change, the composition rule (the contract remains the sole gate — profiles resolve through requires_facts), profile facts as `declared` (POLICY), and the deliberation-stage table per archetype (greenfield, cross_cutting, small_change, research, incident, migration).
+          (2) I9 — the EPISTEMIC_MAP additive row, PatternPayload fields, the pattern reducer signature (consumes lab/campaign artifacts; deterministic), minting rules (hard rule 3), and source_experiment via lab-contract refs.
+          (3) I10 — SessionCheckpoint schema with per-field epistemic markers (DERIVED vs ADVISORY), the session_routing contract YAML (experiments/contexts/session_routing.yaml: allowed_actions [continue, fork, compress_and_fork, escalate], invariants incl. snapshot identity for continue and checkpoint-presence for fork, max_snapshot_age_seconds), the AUTOMATABLE_ACTIONS question (continue is automatable; are fork/compress/escalate code or proposals?), and the 4-arm evidence-seed experiment design (arms, required signals mapped to EXISTING ledger fields only — no requires on snapshot_id, which does not exist until I4).
+          END with: a deviation table (empty unless you deviate from Addendum A), the reserved-homes declaration for each increment, and the explicit scope boundary (what I8-I10 do NOT build).
+          GUARD: design-only — git status shows only the new doc; every NEW mechanism is marked NEW, every REUSE names the existing mechanism with file:line.
+          LOG: PASS/FAIL; commit.
+      - name: a3_verify
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/context_abstraction_addendum_verify.md
+          ROLE: verifier — the design-only boundary and correctness gate, in the shape of docs/designs/current/context_abstraction_verify.md.
+          CHECK: (1) V1 design-only boundary — git status --porcelain shows ONLY the three new docs under docs/designs/current/. (2) V2 Addendum A tracing — every claim of Addendum A maps to a design section; deviations appear in the deviation table. (3) V3 every OQ from a1 answered with a schema. (4) V4 hard rules 1-7 of the frozen design still hold (deterministic reducers only; no new transport; one canonical representation; supervisor untouched; contract gate intact). (5) V5 citation spot-checks — sample the file:line citations, verify against the tree (spot-check every section, not every line). (6) V6 the 4-arm experiment's requires are all produced by EXISTING measurement (the compile gate's load-bearing rule, applied by hand).
+          WRITE the verify doc: PASS/FAIL per check, findings list, verdict.
+          GUARD: git status shows only docs/designs/current/ files.
+          LOG: PASS/FAIL; commit.
+      - name: a4_adversarial_review
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial external critic — attack the design like docs/review/finding_economics_review.md attacked the measurement-contribution closure. Find at least 3 material findings; every finding re-verified against the tree; every finding resolved in the design or logged as an accepted risk.
+          ATTACK vectors (work all of them): (1) does the pattern class violate hard rule 3 anywhere (can a pattern become canonical without a deterministic reducer)? (2) can a profile widen a controller's view past its contract — find a concrete path; (3) does the SessionCheckpoint duplicate PhaseResult, and do ADVISORY narrative fields leak into canonical payload? (4) the session_routing contract vs AUTOMATABLE_ACTIONS {continue, route} — are fork/compress_and_fork/escalate applied or proposed? (5) is the 4-arm experiment's evidence sufficient — sample sizes, confounding model×session_policy, coverage semantics (null-not-zero) for every required signal; (6) does anything in I8-I10 conflict with the frozen design §11 scope boundary or the observe-only supervisor (§8.6)?
+          DELIVER: an appendix section 'Adversarial findings' in docs/designs/current/context_abstraction_addendum_design.md + the resolution of each finding (design edit with a one-line deviation note, or an accepted-risk entry with reasoning).
+          GUARD: git status shows only docs/designs/current/ files; findings count >= 3 or a documented clean sweep with the evidence for why no finding exists.
+          LOG: one line per attack vector with evidence; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: cap_addendum_designed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [review_written, design_written, design_verified, adversarial_clean]
+metrics:
+  - {name: review_written, agg: mean, over: cell}
+  - {name: design_written, agg: mean, over: cell}
+  - {name: design_verified, agg: mean, over: cell}
+  - {name: adversarial_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, a1_component_review, a2_design, a3_verify, a4_adversarial_review]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -1,0 +1,133 @@
+name: investing_domain_audit
+question: >-
+  Stage-0 seeding audit for the RRSP investing domain (options: long calls only — no naked
+  puts/calls; Canadian broker/TMX; crypto exposure): enumerate what is observable, what is
+  canonical policy, and what the framework must gain — producers, predicates, contracts,
+  adapters, workflows — before any investing policy is writable. Apply the load-bearing rule
+  literally: every candidate policy lists its requires; every requires names a producer that
+  exists or must be instrumented. Deliverables land in docs/domain/investing/ (they migrate to
+  the new repo at fork time). This is audit + design of the DOMAIN — no framework code changes.
+version: "0.1"
+artifact_kind: workflow
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile — static filing of the domain-context gap (pre-CAP-I8). When
+        the investing repo's I8 profile exists, this block is replaced by the compiled profile
+        and MUST be deleted from this spec.
+        domain: investing (personal RRSP / Canadian equities+options / crypto exposure)
+        canonical_sources: [CRA RRSP rules (registered accounts: no naked puts/calls, no margin;
+          covered calls permitted), IIROC/CIRO order rules, TMX data model (quotes, options
+          chains, greeks), crypto exchange/ETF data (spot ETFs inside RRSP; direct holdings
+          outside), operator-declared risk policy]
+        predicates: [position_delta, short_exposure, buying_power, iv_rank, dte, premium,
+          portfolio_value, realized_pnl]
+        policies: [calls_only_invariant, no_naked_exposure, registered_account_limits,
+          position_size, crypto_cap]
+        verification: [position math, delta math, chain-data integrity, policy-rule coverage]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile — static filing (same migration note as domain_context).
+        challenge: greenfield (new domain — the first seeding round: context seed, then evidence
+          seed, then policy seed)
+        context_requirements: [the framework's plane map, the knowledge producer families, the
+          ExperimentSpec/load-bearing rule, the CAP contract vocabulary]
+        deliberation: [orient, inventory observable, inventory policy, map gaps, adversarial
+          compliance review]
+        session_policy: fork_per_phase; resume_on same_phase + same_goal + no repo change since
+          phase start
+        verification_policy: [every policy cites its required signals; every signal names its
+          producer or is marked uninstrumented; authority tags on every claim]
+      current_state: >-
+        The framework (this repo) is domain-agnostic machinery; the investing repo does not exist
+        yet. The knowledge plane's repository_id scoping already supports a separate domain KB.
+        CAP I8 (DomainProfile/ChallengeProfile) is designed in Addendum A but not implemented —
+        hence the static profile blocks in this spec. No market-data adapter, no broker
+        integration, no domain producers exist. This audit is the input that seeds all of them.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) DOCS-ONLY: every
+        deliverable lands in docs/domain/investing/; nothing under src/, scripts/, tests/,
+        workflows/, experiments/ changes. (3) Authority discipline: every claim carries a tag
+        [M] measured, [C] computed, [X] external source (name the source), [P] operator policy,
+        or [H] hypothesis — and hypotheses are never written as facts. (4) The load-bearing rule
+        is applied literally in every policy inventory row: a policy whose requires are not
+        produced is UNWRITABLE — record it as pending-instrumentation, never as available. (5)
+        Compliance honesty: RRSP/TFSA eligibility rules are POLICY facts that must cite an
+        external authority (CRA/CIRO); where an authority is unclear, mark [X] to-verify — never
+        assert. (6) The adversarial review (d4) is mandatory — at least 3 material findings, each
+        resolved in the docs. (7) No investment advice, no live orders, no API keys — this is
+        measurement and control design only. (8) PASS/FAIL checkpoint log; resumable via --resume.
+      read_first: >-
+        docs/designs/current/context_abstraction_design.md (contract vocabulary, invariants,
+        load-bearing rule), docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md,
+        src/agentic_dynamics/knowledge/ (producer families), ARCHITECTURE.md (plane boundaries),
+        .opencode/instructions/mental-model.md (module map)
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/investing-domain-audit); each phase commits [workflow] <phase>. Resumable with
+        --resume.
+    phases:
+      - name: d1_observable_inventory
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/domain/investing/audit_observable.md
+          ROLE: domain auditor — inventory what the investing domain makes OBSERVABLE, so the measurement plane has a producer for every signal.
+          STRUCTURE: for each observability area — (1) market data (TMX equities, options chains with greeks/IV, crypto spot, Canadian crypto spot ETFs), (2) portfolio state (positions, buying power, realized/unrealized P/L, currency), (3) execution records (fills, expiries, assignments — including broker export formats the operator can provide), (4) decision records (theses, orders proposed vs executed, outcomes), (5) external context (earnings dates, ex-div, news) — list the concrete signals, then tag each: [M] directly measurable from a stated source, [C] derivable by a deterministic reducer (state the formula's inputs), [X] external (name the source/vendor), [P] operator-declared, [H] hypothesis. For greeks and IV: state the pricing inputs they require.
+          CONSTRAINTS: registered-account visibility — RRSP statements provide fills/positions but not intraday chains; note per-signal whether it is visible inside RRSP/TFSA accounts. No API keys, no scraping, no live calls — sources are NAMED, not connected.
+          GUARD: every signal row has a tag; no [H] row is written as if measured.
+          LOG: signal counts per area; PASS/FAIL; commit.
+      - name: d2_policy_inventory
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/domain/investing/audit_policies.md
+          ROLE: policy auditor — enumerate the candidate investing policies and apply the load-bearing rule literally.
+          STRUCTURE: one row per candidate policy: (a) calls_only_invariant — no naked puts/calls; long calls and covered calls only; (b) no_short_delta — net short delta exposure is a contract invariant, not a convention; (c) registered_account_limits — RRSP/TFSA eligibility, no margin in registered accounts; (d) position_size — requires portfolio_value + vol; (e) exit_rules — requires iv_rank + pnl_since_entry; (f) expiry_selection — requires dte + chain liquidity; (g) crypto_cap — requires portfolio weights; (h) weekly_review — requires the thesis -> outcome chain. For each row: the policy's requires list -> per-requires producer status (produced-by: d1 signal, or UNINSTRUMENTED) -> writable now? (yes only if every requires is produced — per the load-bearing rule, an unwritable policy is recorded as pending-instrumentation with its instrumentation order).
+          COMPLIANCE: tag the account rules [P] with the external authority they rest on ([X] CRA/CIRO, name the rule class); mark any rule you cannot verify as [X] to-verify — never assert. Note the enforcement question: the calls_only invariant is only enforceable if the decision engine can SEE short exposure — state which producer that requires.
+          GUARD: every requires cell names a producer or says UNINSTRUMENTED; no policy is marked writable with an unproduced requires.
+          LOG: policy count, writable vs pending; PASS/FAIL; commit.
+      - name: d3_gap_map
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/domain/investing/audit_gap_map.md
+          ROLE: framework mapper — map the audit onto this repo's machinery and state exactly what the new repo must gain.
+          STRUCTURE: (1) PRODUCERS — the knowledge producer families the domain needs (market/v1, portfolio/v1, trades/v1, thesis/v1, policy/v1) mapped to the existing producer patterns (ledger_ingestion, policy_ingestion); (2) PREDICATES — the FACT_PREDICATES candidates for the domain (from d1) with their reducers (deterministic formulas); (3) CONTRACTS — the decision-type contracts: open_long_call/v1, weekly_review/v1, session_routing reuse; (4) ADAPTERS — the market-data adapter shape (fetch -> canonicalize -> publish; no live trading); (5) WORKFLOWS/STORIES — research_ticker, backtest_strategy, weekly_review as workflow specs; (6) the provisional investing DomainProfile + ChallengeProfile blocks (the static filing that becomes profile facts when CAP I8 lands — write them as a YAML/markdown block); (7) MIGRATION — what runs in this repo vs the new repo (repository_id scoping, Redis/results separation), and the sequencing: adapter+producers (context seed) -> paper-trade ledger (evidence seed) -> shadow policies (policy seed) -> first campaign.
+          GUARD: every new kind maps to an existing mechanism or is explicitly NEW; the profile blocks mirror the static blocks in this spec.
+          LOG: gap counts per category; PASS/FAIL; commit.
+      - name: d4_adversarial_review
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial compliance + feasibility critic — attack the audit like docs/review/finding_economics_review.md attacked the measurement release. Find at least 3 material findings, each re-verified against the docs and the framework, each resolved in the docs.
+          ATTACK vectors (work all of them): (1) fact/hypothesis contamination — find any d1/d2 claim where a hypothesis is written as a measured fact, or a policy asserted without an external authority; (2) deadline_slack-class phantoms — a policy whose requires names a signal with no real producer path (e.g. a greek whose inputs the broker cannot provide, an iv_rank with no chain history); (3) enforcement gaps — the calls_only invariant: does d2's producer mapping give the decision engine the short_exposure fact it needs, or is the invariant unenforceable as designed? (4) RRSP-specific traps — direct crypto not RRSP-eligible (spot ETFs only), US-settled assignments in registered accounts, contribution-room interactions — are they in the audit? (5) observability blind spots — currency (CAD/USD), corporate actions (splits/mergers on positions and chains), assignment on short calls — missed? (6) scope honesty — did d3 claim anything the framework already does that it does not?
+          Every finding: amend the relevant doc (commit) or record an accepted limitation with reasoning.
+          LOG: one line per attack vector with evidence; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: investing_domain_audited
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [observable_inventoried, policies_inventoried, gaps_mapped, audit_adversarial_clean]
+metrics:
+  - {name: observable_inventoried, agg: mean, over: cell}
+  - {name: policies_inventoried, agg: mean, over: cell}
+  - {name: gaps_mapped, agg: mean, over: cell}
+  - {name: audit_adversarial_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, d1_observable_inventory, d2_policy_inventory, d3_gap_map, d4_adversarial_review]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

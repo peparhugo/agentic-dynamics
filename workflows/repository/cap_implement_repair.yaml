@@ -1,0 +1,124 @@
+name: cap_implement_repair
+question: >-
+  Repair and un-pause workflows/repository/context_abstraction_implement.yaml after the
+  consolidation release: re-point every stale path (10x docs/context_abstraction/design.md ->
+  docs/designs/current/context_abstraction_design.md; 20x src/instrument/* -> post-consolidation
+  plane homes), remove the CAP freeze (resume condition consolidation S6 is met), record the
+  verify-phase findings (F1-F6) and the Addendum A deviation note in the append-only
+  implementation notes, regenerate the spec lifecycle index, and adversarially audit the result.
+  This is the hard blocker for CAP I0-I7 — two prior runs already failed on unresolvable paths.
+version: "0.1"
+artifact_kind: workflow
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile — static filing of the domain-context gap (pre-CAP-I8). When I8
+        lands this block is replaced by the compiled profile and MUST be deleted from this spec.
+        domain: software_delivery
+        canonical_sources: [workflows/repository/context_abstraction_implement.yaml,
+          docs/designs/current/context_abstraction_design.md (frozen design + Addendum A),
+          docs/designs/current/context_abstraction_verify.md (F1-F6 findings),
+          ARCHITECTURE.md (reserved CAP homes table), experiments/specs/STATUS.md (lifecycle index)]
+        predicates: [spec_status, phase_status, attempt_cost_usd, test_executed_success]
+        policies: [tests_must_pass, no_cross_plane_imports, one_source_of_truth_per_path]
+        verification: [pytest, ruff, path-existence checks, spec lifecycle index]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile — static filing (same migration note as domain_context).
+        challenge: maintenance (bounded, mechanical repair of one spec file family)
+        context_requirements: [the implement spec's current content, the post-consolidation plane
+          map, the verify findings F1-F6, the index schema]
+        deliberation: [locate stale references, map to current homes, edit, verify every path
+          resolves, regenerate index, audit]
+        session_policy: fork_per_phase; resume_on same_phase + same_goal + no repo change since
+          phase start (snapshot_id approximation until CAP I4 exists)
+        verification_policy: [path-existence checks, index consistency, classification guards]
+      current_state: >-
+        Consolidation S6 complete; CAP design frozen at docs/designs/current/
+        context_abstraction_design.md with accepted Addendum A (I8-I10, out of scope here). The
+        implement spec still carries the PAUSED freeze note, status: draft, 20 src/instrument/*
+        references (shim retired), and 10 docs/context_abstraction/design.md references (doc
+        moved). Two recorded runs failed (latest 2026-08-20, $71.78 total). Reserved homes exist
+        as empty placeholders. Finding-economics closure merged at 58c684a87.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) Do NOT start
+        implementing I0-I7 — this workflow only makes the spec runnable; no src/ edits. (3) Every
+        path reference in the repaired spec must exist (verify with ls/glob, log each). (4) The
+        freeze provenance is preserved as a historical note, but the spec must parse, carry
+        status: active, and the derived index must reflect it. (5) The adversarial audit (r4) is
+        mandatory and must find at least 3 verified defects or document a clean sweep with
+        evidence. (6) docs/context_abstraction/implementation_notes.md is append-only — never
+        rewrite existing lines. (7) Invariants survive: Redis 6380/6379, dual Firebase, frozen
+        design docs. (8) PASS/FAIL checkpoint log; resumable via --resume.
+      read_first: >-
+        workflows/repository/context_abstraction_implement.yaml (all 444 lines),
+        docs/designs/current/context_abstraction_design.md (Addendum A, A.5),
+        docs/designs/current/context_abstraction_verify.md (F1-F6), ARCHITECTURE.md (CAP reserved
+        homes), scripts/spec_status.py, src/agentic_dynamics/{knowledge,control,runtime}/
+        directory listings
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/cap-implement-repair); each phase commits [workflow] <phase>. Resumable with
+        --resume.
+    phases:
+      - name: r1_repoint_paths
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: every path referenced by workflows/repository/context_abstraction_implement.yaml resolves to a file that exists in the post-consolidation tree.
+          SHAPE: no src/ edits, no I0-I7 implementation. Only the spec file changes in this phase.
+          FIX: re-point ALL 10 occurrences of docs/context_abstraction/design.md -> docs/designs/current/context_abstraction_design.md (review.md stays — docs/context_abstraction/review.md still exists). Re-point ALL 20 src/instrument/* references to their post-consolidation homes: src/agentic_dynamics/knowledge/{knowledge.py,record_factory.py,actuation_ingestion.py,...}, src/agentic_dynamics/runtime/{workflow_runner.py,test_runner.py}, src/agentic_dynamics/experiment/{experiment_spec.py,compile_experiment.py}, src/agentic_dynamics/control/{step_routing.py,supervisor.py,...}. For each reference: ls/glob to confirm the target exists; fix the fixed_semantics conventions text (src/instrument/__init__.py -> plane __init__ exports).
+          HUNT: grep the spec for ANY remaining 'src/instrument' or 'docs/context_abstraction/design.md' string — zero matches required.
+          GUARD: a path-check pass over the final file (list every referenced path; every one exists).
+          LOG: one line per re-point (old -> new, verified y/n); PASS/FAIL; commit.
+      - name: r2_unpause
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: the spec is runnable again: status: active, no active PAUSED marker, and the derived lifecycle index reflects it.
+          FIX: remove the PAUSED freeze header (the comment block + bracketed PAUSED paragraph in `question`), replace with a one-line historical provenance note ('resumed after consolidation S6 — was PAUSED per consolidation_release/stage_map §6'). Set status: active. Keep the design-path references and phase content unchanged. Run: python3 scripts/spec_status.py. Verify the regenerated experiments/specs/STATUS.md + index.json show context_abstraction_implement as active (grep + show the row).
+          GUARD: the spec parses (python3 -c yaml load); grep PAUSED in the file returns only the historical note line; index shows active.
+          LOG: the STATUS.md row before/after; PASS/FAIL; commit (including the regenerated index files).
+      - name: r3_implementation_notes
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: the design deviations the implement spec must carry are recorded, append-only, in docs/context_abstraction/implementation_notes.md.
+          FIX: create the file (it does not exist yet) with exactly these sections: (1) Addendum A reference — docs/designs/current/context_abstraction_design.md Addendum A (I8 profiles, I9 patterns, I10 checkpoint) is OUT OF SCOPE for this spec; I8-I10 are implemented under a follow-up design spec, not here. (2) F1 resolution (material): an invariant with on_missing: classify silently disables a safety constraint — invariants require halt semantics; the validator refuses a contract whose invariant lacks halt semantics (new check documented under C8); the design's max_spend_usd example is amended: either demote it from invariants to requires_facts or set on_missing: halt. (3) F2: check C5 rejects an empty facts_used. (4) F3: expected_effect scores are recorded on the decision record, never applied. (5) F4: `conflicted` is computed in the reducer (fact_state()), read by the compiler. (6) F5: OQ3/OQ7 table-form answers accepted as-is. (7) F6: source_type=fact nominal authority column is documentation only — no change.
+          GUARD: each finding F1-F6 has a one-line resolution; the file states it is append-only.
+          LOG: sections written; PASS/FAIL; commit.
+      - name: r4_adversarial_audit
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial auditor — try to break the repaired spec; find at least 3 verified defects or document a clean sweep with evidence.
+          HUNT, systematically: (1) grep the spec for any surviving stale path ('src/instrument', 'docs/context_abstraction/design.md'); (2) resolve EVERY referenced path in the spec against the tree (script the check — any miss is a defect); (3) re-read the un-paused spec end-to-end: does any phase still assume pre-consolidation layout or the frozen status? (4) check the index row is active AND the freeze note no longer present; (5) confirm implementation_notes.md contains F1-F6 + Addendum A; (6) attempt the compile/validation gate the spec lifecycle provides (scripts/spec_status.py is authoritative for indexing; a full compile of the workflow spec is NOT required — do not run its phases); (7) confirm no src/ or tests/ file was modified by r1-r3.
+          Every finding: fix it (within this workflow's scope) or log a reason-bearing FAIL. No finding may be silently dropped.
+          LOG: one line per check with evidence; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: cap_implement_repairable
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [paths_repointed, spec_unpaused, notes_recorded, audit_clean]
+metrics:
+  - {name: paths_repointed, agg: mean, over: cell}
+  - {name: spec_unpaused, agg: mean, over: cell}
+  - {name: notes_recorded, agg: mean, over: cell}
+  - {name: audit_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, r1_repoint_paths, r2_unpause, r3_implementation_notes, r4_adversarial_audit]
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

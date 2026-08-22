@@ -1,0 +1,120 @@
+name: cap_session_routing_spec
+question: >-
+  Author and gate the evidence-seed ExperimentSpec at
+  experiments/specs/cap_session_routing_evidence.yaml: the retrospective 4-arm comparison of
+  session continuation vs checkpointed forking (continue / fork_with_checkpoint / fork_blind /
+  escalate_with_checkpoint), evaluated offline over existing ledger data — the same shape as
+  routing.simulate_strategies. Per the load-bearing rule, every rule the spec declares must have
+  its requires produced by EXISTING measurement (ledger fields); the spec passes the
+  compile-gate and an adversarial internal-validity check before it may run. Until this evidence
+  exists, V_continue and any session policy stay [H] shadow — never promoted.
+version: "0.1"
+artifact_kind: workflow
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile — static filing of the domain-context gap (pre-CAP-I8). When I8
+        lands this block is replaced by the compiled profile and MUST be deleted from this spec.
+        domain: software_delivery
+        canonical_sources: [experiments/specs/ (spec schema), docs/designs/current/
+          2026-08-14_experiment-spec-and-compiler-design.md (ExperimentSpec/compiler),
+          docs/designs/current/context_abstraction_design.md Addendum A.4 (the 4-arm design),
+          src/agentic_dynamics/experiment/compile_experiment.py (the requires/produces gate)]
+        predicates: [attempt_cache_hit_rate, attempt_cost_usd, attempt_tokens_*, queue_wait_ms,
+          service_time_ms, test_executed_success]
+        policies: [null_not_zero, load_bearing_rule, coverage_over_correctness]
+        verification: [compile gate, requires/produces validator, ruff, pytest]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile — static filing (same migration note as domain_context).
+        challenge: research (a hypothesis: checkpointed forking beats blind continuation)
+        context_requirements: [the ExperimentSpec schema, the ledger field inventory, the
+          compiler's rule evaluator, prior lab data]
+        deliberation: [state null and alternative, establish measurable variables, inspect prior
+          evidence, design discriminating comparison, validate the gate, adversarial check]
+        session_policy: fork_per_phase; resume_on same_phase + same_goal + no repo change since
+          phase start
+        verification_policy: [compile gate must pass, requires must resolve to existing producers]
+      current_state: >-
+        Addendum A.4 commits the 4-arm session-routing experiment as the evidence seed gating any
+        session policy promotion. The ledger already measures: completed, cache_hit, tokens
+        in/out/reasoning/answer/explanation, cost inference/orchestration, rework_cost,
+        first_pass, evaluator_independent, queue_wait_ms, service_time_ms, attempt_number,
+        parent_attempt_id, escalation_from/to. snapshot_id is NOT measured (CAP I4 unimplemented)
+        — the spec must not require it. routing.simulate_strategies (control/routing.py) is the
+        retrospective-simulation precedent. compile_experiment.py's validate_rules enforces the
+        load-bearing rule.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) The authored spec is
+        an EXPERIMENT spec (artifact_kind: experiment) in experiments/specs/ — not a workflow.
+        (3) Every requires in every rule must resolve to a producer that exists TODAY (ledger
+        fields, story results, test_runner, or the lab pipelines) — an unresolvable requires is a
+        spec defect, not a gap to paper over: drop the rule and record the gap in the spec's
+        writeup sections. (4) No requires on snapshot_id, ControlContext, or any CAP fact — they
+        do not exist until I4. (5) Coverage semantics: every economic ratio null unless its
+        denominator is captured AND positive; arms compared over captured observations only
+        (measurement_coverage invariants). (6) The adversarial check (s3) is mandatory — at
+        least 2 material findings or a documented clean sweep. (7) Invariants survive: Redis
+        6380/6379, dual Firebase. (8) PASS/FAIL checkpoint log; resumable via --resume.
+      read_first: >-
+        docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md (schema + gate),
+        docs/designs/current/context_abstraction_design.md Addendum A.4,
+        src/agentic_dynamics/experiment/{experiment_spec,compile_experiment}.py,
+        src/agentic_dynamics/control/routing.py (simulate_strategies),
+        experiments/specs/STATUS.md (index conventions)
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/cap-session-routing-spec); each phase commits [workflow] <phase>. Resumable with
+        --resume.
+    phases:
+      - name: s1_author_spec
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: experiments/specs/cap_session_routing_evidence.yaml
+          ROLE: experiment designer. Write the ExperimentSpec for the retrospective 4-arm session-routing comparison.
+          SHAPE (from the spec/compiler design): name, question, version, artifact_kind: experiment, workflow kind experiment, factors: session_policy arm {continue, fork_with_checkpoint, fork_blind, escalate_with_checkpoint} x model (the models present in the existing ledger), design factorial, rules: measurement rules that COMPUTE per-arm outcomes from existing ledger fields (verified success, cost per verified outcome, cache utilization, rework cost, token growth) — each rule's requires must name only fields produced today (see current_state); comparison: effect_size over arm_factor session_policy, loss {cost, quality}; stop with a small budget; writeup lab_book.
+          CONSTRAINTS: no requires on snapshot_id/ControlContext/CAP facts; the arms are RETROSPECTIVE counterfactuals over attempt lineage (parent_attempt_id, attempt_number, escalation_from/to, cache_hit) — the simulation logic is described in the spec as an evaluation rule, generalizing routing.simulate_strategies; null-not-zero coverage semantics throughout; state the null hypothesis explicitly (no arm outperforms `continue` on cost per verified outcome).
+          GUARD: the spec YAML parses; every rule's requires resolves to an existing producer (name it in a comment).
+          LOG: arms, factors, rules, requires->producer mapping table; PASS/FAIL; commit.
+      - name: s2_compile_gate
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: the spec passes the requires/produces gate — no rule consumes information nothing produces.
+          FIX: run the compile-gate validation on experiments/specs/cap_session_routing_evidence.yaml (the compile_experiment.validate_rules path — invoke via python3 with the module's public API; if no standalone CLI exists, import and call the validator in a one-off). Fix every refusal. A refusal that is LEGITIMATE (the signal truly is not measured) is fixed by DROPPING the consuming rule and recording the gap in the spec's writeup sections — never by declaring a phantom producer.
+          GUARD: validation returns zero errors; the spec still parses; requires->producer mapping table updated in s1's LOG section if changed.
+          LOG: refusals before/after with resolutions; PASS/FAIL; commit.
+      - name: s3_adversarial_check
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial methodologist — attack the experiment's internal validity; find at least 2 material findings or document a clean sweep with evidence.
+          ATTACK vectors (work all of them): (1) can the four arms actually be separated with the data available — enough attempts per arm, per model, or does the comparison collapse? (2) confounding: model x session_policy interaction, story/task heterogeneity, time drift; (3) coverage: does any arm's metric divide by an uncaptured denominator, or compare over different observation sets (must be captured-only, per measurement_coverage)? (4) counterfactual soundness: does fork_blind vs fork_with_checkpoint rest on data that distinguishes them (checkpoints do not exist as records yet — is fork_with_checkpoint evaluable at all, or must it be split into a forward (I10-dependent) arm and a retrospective proxy)? (5) does the spec accidentally require any CAP fact (snapshot_id) anywhere? (6) is the null stated and is the effect size / uncertainty threshold in stop sensible?
+          Every finding: fix the spec (commit the edit) or log a reason-bearing accepted limitation in the spec's writeup.
+          LOG: one line per attack vector with evidence; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: cap_session_routing_specced
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [spec_authorized, gate_passed, validity_checked]
+metrics:
+  - {name: spec_authorized, agg: mean, over: cell}
+  - {name: gate_passed, agg: mean, over: cell}
+  - {name: validity_checked, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, s1_author_spec, s2_compile_gate, s3_adversarial_check]
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
