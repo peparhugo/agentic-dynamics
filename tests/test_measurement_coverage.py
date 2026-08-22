@@ -58,9 +58,17 @@ _ZERO_COERCION_RE = re.compile(
 
 
 def _canonical_producers() -> list[str]:
-    """The eight canonical lab scripts + ``build_data.py`` — the published-producer surface."""
+    """The eight canonical lab scripts + ``build_data.py`` + ``sync_data.py``.
+
+    ``sync_data`` writes the story parquet (a published cost/correctness surface), so it is
+    a canonical producer too — the m5 adversarial hunt found it still carried the
+    ``get("total_cost", 0) or 0`` / ``cost > 0`` class, so it is guarded here now.
+    """
     labs = [e.script for e in load_lab_manifest() if e.publication_eligible]
-    return [f"scripts/{s}" for s in sorted(labs)] + ["scripts/build_data.py"]
+    return [f"scripts/{s}" for s in sorted(labs)] + [
+        "scripts/build_data.py",
+        "scripts/sync_data.py",
+    ]
 
 
 # ---------------------------------------------------------------------------

@@ -761,3 +761,24 @@ def test_data_js_publication_contract_present_and_verifies():
     assert contract["waiver_digest"] == cc.waiver_set_digest()
     assert contract["normalization_version"] == cc.NORMALIZATION_VERSION
     assert contract["data_integrity_policy_version"] == cc.DATA_INTEGRITY_POLICY_VERSION
+
+
+def test_data_js_generator_source_tree_identity_is_current():
+    """The publication contract's generator_source_tree_identity matches a fresh recompute.
+
+    The m5 adversarial hunt found data.js stale after a build_data.py edit (the identity is
+    a hash of the generator's own source, so ANY source edit invalidates it). This guard
+    recomputes the derived dependency manifest and fails on drift, so a stale artifact can
+    never ship.
+    """
+    import json
+
+    data_js = Path(__file__).resolve().parent.parent / "apps" / "website" / "data.js"
+    if not data_js.exists():  # pragma: no cover - generated file, present in CI
+        pytest.skip("apps/website/data.js not generated")
+    text = data_js.read_text(encoding="utf-8")
+    payload = json.loads(text[text.index("{") : text.rindex("}") + 1])
+    contract = payload["publication_contract"]
+    assert contract["generator_source_tree_identity"] == build_data.generator_source_tree_identity(), (
+        "data.js's generator_source_tree_identity is stale — re-run scripts/build_data.py"
+    )

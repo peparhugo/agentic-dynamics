@@ -1,8 +1,8 @@
-/* Generated 2026-08-22 00:46:24 UTC by build_data.py */
+/* Generated 2026-08-22 00:57:16 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-22T00:46:23.238218+00:00",
+    "generated_at": "2026-08-22T00:57:14.856141+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -66,7 +66,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "1ed4f656247350dc61cebed047de73e534ec58b961ca0dee972cb88640ebf5fe"
+    "generator_source_tree_identity": "52c54b3907a5f0e242683a7938da4134e7cdf2c6a9d39c351835b635c04225a5"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -2278,7 +2278,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-22T00:46:23.400165+00:00"
+    "generated_at": "2026-08-22T00:57:15.016223+00:00"
   },
   "reviews": {
     "models": [

@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-22T00:46:24.760688+00:00",
+  "generated_at": "2026-08-22T00:57:16.378060+00:00",
   "opencode_version": "1.18.15",
-  "git_commit": "b5a3b6d6",
+  "git_commit": "dd1b6858",
   "files": {
     "canonical_inputs": {
       "inventory.json": {
@@ -16,7 +16,7 @@
     },
     "canonical_outputs": {
       "data.js": {
-        "sha256": "d59ef0cadfa123e269be31a76bcdb673633c72824b02c1261b278b9de36e9235",
+        "sha256": "1df1d4b4f01e5c4bca8af97a99cf888ddf68a8a185cafff4f33214da976282f5",
         "size_bytes": 133192
       }
     },

@@ -36,6 +36,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables  # noqa: E402
+from agentic_dynamics.reporting.measurement_coverage import cost_captured  # noqa: E402
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "experiments" / "data"
 
@@ -169,8 +170,12 @@ def _build_rows(tables) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         )
         recovered_tests = summary.get("test_count", 0) or agentic_test_floor
         recovered_loc = summary.get("code_lines", 0) or analysis_loc.get(story_id, 0)
-        story_cost = summary.get("total_cost", 0) or 0
-        cost_captured = story_cost > 0
+        # m2 null-not-zero: a cost is *captured* only when it is a finite, positive real
+        # number — inferred from the shared primitive, never from ``> 0`` (the review's P1
+        # denominator-policy split). The raw ``total_cost`` is kept (None when absent), and
+        # ``cost_captured`` flags it explicitly for the parquet reader.
+        story_cost = summary.get("total_cost")
+        cost_captured_flag = cost_captured(story_cost)
 
         # Cell identity: story × model × tier × quality × canonical condition.
         # Re-runs of the same cell share cell_key but get an increasing repetition
@@ -194,8 +199,8 @@ def _build_rows(tables) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                 "total_cache_writes": summary.get("total_cache_writes", 0),
                 "total_context_tokens": summary.get("total_context_tokens", 0),
                 "cache_hit_rate": summary.get("cache_hit_rate", 0.0),
-                "total_cost": summary.get("total_cost", 0.0),
-                "cost_captured": cost_captured,
+                "total_cost": story_cost,
+                "cost_captured": cost_captured_flag,
                 "total_duration": summary.get("total_duration", 0.0),
                 "all_successful": summary.get("all_successful", False),
                 "cascade_recovery": summary.get("cascade_recovery", False),
@@ -227,7 +232,7 @@ def _build_rows(tables) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                     "cache_write_tokens": a.get("cache_write_tokens", 0) or 0,
                     "context_tokens": a.get("context_tokens", 0) or 0,
                     "cache_hit_rate": a.get("cache_hit_rate", 0.0) or 0.0,
-                    "cost_usd": s.get("cost_usd", 0.0),
+                    "cost_usd": s.get("cost_usd"),
                     "duration_s": s.get("duration_s", 0.0),
                     "exit_code": s.get("exit_code", 0),
                     "tool_calls": a.get("tool_calls", 0) or 0,
