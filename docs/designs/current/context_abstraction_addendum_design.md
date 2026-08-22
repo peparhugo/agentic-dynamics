@@ -253,6 +253,19 @@ promoted before that (`context_abstraction_design.md:1530-1532`). A profile can 
 by a controller, but a *policy derived from a profile's performance* must still climb the
 measure-before-policy ladder.
 
+**The three non-`context_requirements` profile fields are strategy inputs, not a second gate
+(adversarial F2).** `compose_requirements` composes *only* `context_requirements`. The three
+remaining profile fields — `verification_policy`, `deliberation`, `session_policy` — are selected
+by the profile and must be bound by the same monotone rule or they become a concrete
+widening path: `verification_policy` may only **add** tools to the contract's required
+verification, never **drop** one a contract invariant depends on (monotone tightening,
+`context_abstraction_design.md:1352-1356`); `deliberation` stages may reorder but never omit a
+stage the contract's invariants rely on; `session_policy` is governed by §4.3 (fully shadow in
+v1). The contract's `invariants` — not the profile — remain the sole *safety* gate; the profile is
+a source of *strategy*, never of *constraints*. This is the precise sense in which "the contract
+remains the sole gate": sole gate for safety; the profile contributes context and strategy through
+the same resolution, never a parallel authority.
+
 ### 2.4 The `compile_context` signature change (answers OQ3's "what does it read")
 
 The frozen signature (`context_abstraction_design.md:827`) gains two profile inputs; the request
@@ -463,6 +476,17 @@ exists to prevent.
 3. **The reducer is pure** (injected clock, total order, no I/O) — so its output is reproducible
    and its `content_hash` (hence `fact_id`) is stable (REUSE the frozen §4.1 discipline).
 4. **`support`/`uncertainty` come from real records, never fabricated** (§3.3).
+5. **`is_canonical()` alone is NOT sufficient for the `pattern` class — `verify_chain()` is
+   mandatory (adversarial F1).** `is_canonical()` (`context_abstraction_design.md:403-417`) checks
+   only `epistemic_status`/`authority`/`lifecycle_state` — it does **not** check that a fact was
+   minted by a registered deterministic reducer. A `pattern` fact carrying
+   `epistemic_status="derived"` from any producer would therefore pass `is_canonical()` and enter
+   a snapshot as canonical. The structural defence is `verify_chain()` (`context_abstraction_design.md:607-637`,
+   checks 1–2: reducer registered, evidence resolves), which the compiler (step 5) and validator
+   (C6) both run. This rule makes it a hard invariant for the pattern class: the `pattern`
+   predicate's `produced_by` is exactly `("pattern/v1",)` — no other reducer, and no non-reducer
+   producer, may mint a canonical `pattern` — and any `pattern` fact entering a snapshot must pass
+   `verify_chain()`. Hard rule 3 is enforced by `verify_chain`, not by `is_canonical()` alone.
 
 ### 3.5 `source_experiment` via lab-contract refs (answers OQ5's cite-format half)
 
@@ -525,12 +549,20 @@ class SessionCheckpoint:
 | `completed` / `current_revision` / `acceptance_state` | DERIVED | DERIVED (unchanged) | Derivability verified in the review §3c. |
 
 **Are the three narrative fields ADVISORY annotations on the checkpoint record, or separate
-`source_type` rows (OQ6's second half)?** **Annotations on the checkpoint record.** The addendum
-says the narrative "rides along as ADVISORY annotations" (`context_abstraction_design.md:1563-1564`).
-Separate rows would give three more `source_type`s to register and three more supersession chains
-for no gain — the checkpoint is the handoff, and the narrative belongs *on* it, marked ADVISORY.
-This also preserves the review's authority hierarchy: the DERIVED fields are canonical, the
-ADVISORY fields ride beside them and are uncitable (hard rule 5).
+`source_type` rows (OQ6's second half)?** **Separate ADVISORY records — NOT the canonical
+checkpoint fact (adversarial F3).** `CanonicalFact` carries a SINGLE `epistemic_status`
+(`context_abstraction_design.md:232`), and the fact's canonical JSON payload is exactly what
+`content_hash` (hence `fact_id`) covers (`context_abstraction_design.md:333-361`). If the ADVISORY
+narrative rode in the same payload, two defects follow: (a) an LLM-produced `next_action` would
+re-key the CANONICAL fact's identity on every narrative edit — supersession noise driven by
+non-canonical content; and (b) `is_canonical()`/C5 operate at **fact** granularity, so a controller
+citing the checkpoint fact would receive the ADVISORY narrative as citable canonical content —
+hard rule 3 violated at field granularity. The resolution: the `session_checkpoint` fact carries
+ONLY the DERIVED fields; `open_hypotheses`/`failed_approaches`/`next_action` are emitted as
+separate ADVISORY `source_type="checkpoint_narrative"` records that `is_canonical()` excludes and
+C5 refuses. The addendum's "ride along as ADVISORY annotations" (`context_abstraction_design.md:1563-1564`)
+is honoured at the *handoff* level — the checkpoint handoff bundles the canonical fact **plus** its
+narrative records — not at the *fact* level.
 
 ### 4.2 The `session_routing` contract (answers OQ7)
 
@@ -608,15 +640,20 @@ where `continue` is the null action ("the controller ran and chose nothing",
 
 | Action | Automatable (code-applied) or proposal? | Reasoning |
 |---|---|---|
-| `continue` | **Automatable** — already in the set; it is the null action. | Its v1 invariant (goal+phase+model unchanged) is checkable against existing fields (§4.2), no snapshot needed. |
+| `continue` | **Proposal (shadow) in v1** — NOT the routing null-action `continue`. | The session-continuation `continue` is a *positive* decision (resume a session, carrying the stale-context risk the addendum prices at `context_abstraction_design.md:1587`), not the null "chose nothing" action that `AUTOMATABLE_ACTIONS`'s `continue` was designed for (`context_abstraction_design.md:1086`). Applying it would apply an unmeasured `[H]` trade. |
 | `fork` | **Proposal** (recorded, validated, surfaced as a flag — never applied by an automated path). | Reversible but its value is an *unmeasured hypothesis* `[H]` (the continue-vs-fork trade, `context_abstraction_design.md:1587`). It earns the right to act by being measured inert — the frozen §8.1 "proposal only" doctrine (`context_abstraction_design.md:1093`). |
 | `compress_and_fork` | **Proposal** | Same as `fork`, plus compression is destructive to context — strictly more consequential, so it stays inert until measured. |
 | `escalate` | **Proposal** | Changes the model — a real actuation, and model-change requires a measured `escalation` result. In `ACTUATION_KINDS` (`actuation_ingestion.py:70`) but not in `AUTOMATABLE_ACTIONS`, and it stays out. |
 
-**So `AUTOMATABLE_ACTIONS` is unchanged** — it already contains the one action (`continue`) that
-is safe to apply. `fork`/`compress_and_fork`/`escalate` are **proposals** until the evidence-seed
-experiment (§4.4) shows a non-inferior arm. The `session_routing` control rule runs in **shadow
-mode** (recorded, surfaced, never applied) until then (`context_abstraction_design.md:1594-1595`).
+**So `AUTOMATABLE_ACTIONS` is unchanged, and NO session action is applied in v1.** The routing
+null-action `continue` in `{continue, route}` (`context_abstraction_design.md:1196`) is a *different*
+action from the session-continuation `continue`; conflating them would admit an unmeasured `[H]`
+session policy under C9. The `session_routing` controller therefore runs **fully shadow in v1** —
+all four actions recorded and surfaced, none applied (the addendum's own "never applied",
+`context_abstraction_design.md:1594-1595`) — and the runner's existing fork-chain
+(`workflow_runner.py:591-597`, keyed on `prev_model == model_i`) remains the applied incumbent. A
+session action graduates to `AUTOMATABLE_ACTIONS` only after the evidence-seed experiment (§4.4)
+shows a non-inferior arm.
 
 ### 4.4 The 4-arm evidence-seed experiment (answers OQ7's "which signals")
 
@@ -629,8 +666,10 @@ question: >-
   per dollar, net of cache and context-pressure effects?
 workflow: {kind: agent_task, params: {phases: [...], fork: false}}   # arms control forking, not the runner
 factors:
-  - {name: model,       levels: [deepseek/deepseek-v4-pro]}
+  - {name: model,       levels: [deepseek/deepseek-v4-pro, deepseek/deepseek-v4-flash]}   # 2 levels:
+      # the escalate arm needs a target, and the model×policy interaction must be estimable (F5)
   - {name: session_policy, levels: [continue, fork_with_checkpoint, fork_blind, escalate_with_checkpoint]}
+  - {name: repetition,  levels: [r1, r2, r3]}      # within-cell variance for the uncertainty term (F5)
 design: factorial
 rules:
   # The outcome measurement — requires are EXISTING ledger fields ONLY. No `snapshot_id`, no
@@ -641,7 +680,10 @@ rules:
     evidence_class: "[C]"
     requires: [test_executed_success, confidence, tokens_in, tokens_out,
                tokens_answer, tokens_explanation, perturbation_strength]
-    produces: [session_verified_success, session_cost_usd, session_cache_reuse, session_context_growth]
+    produces: [session_verified_success, session_context_growth]   # v1: only the WRITTEN-signal
+        # derivable outcomes. session_cost_usd / session_cache_reuse / session_latency /
+        # session_rework are PHASE 2, gated on instrumenting cost_inference / cache_hit /
+        # service_time_ms / rework_cost (F5) — a produce may not depend on an unrequired input.
   # The shadow control arm — recorded, never applied (AUTOMATABLE_ACTIONS unchanged, §4.3).
   - name: session_policy_arm
     plane: control
@@ -649,7 +691,7 @@ rules:
     requires: [test_executed_success, confidence, tokens_in, tokens_out]
     produces: [session_policy_decision]
 comparison: {kind: effect_size, arm_factor: session_policy, loss: {cost: 1.0, quality: -5.0}}
-stop: {budget_usd: 40.0, max_attempts: 1}
+stop: {budget_usd: 40.0, max_attempts: 3}     # 3 attempts/cell → the uncertainty term is estimable (F5)
 adapt: {strategy: coordinate_descent, selection: highest_regret}
 ```
 
@@ -657,7 +699,7 @@ adapt: {strategy: coordinate_descent, selection: highest_regret}
 
 | Addendum signal (`context_abstraction_design.md:1592-1593`) | Existing ledger field | Written today? |
 |---|---|---|
-| verified success | `test_executed_success` (`experiment_spec.py:193`) | **Yes** — `workflow_runner.py:113` |
+| verified success | `test_executed_success` (`experiment_spec.py:192`) | **Yes** — `workflow_runner.py:113` |
 | total cost | `cost_inference` (`experiment_spec.py:184`) | **Declared-only** — writer is `PhaseResult.cost_usd` (`workflow_runner.py:92`); the I2 ledger reducers close this under the `attempt_cost_usd` predicate |
 | cache utilization | `cache_hit` (`experiment_spec.py:172`) | **Declared-only** — written as `cache_read_tokens`/`cache_write_tokens`/`cache_hit_rate` (`workflow_runner.py:93-95`); a naming mismatch, not a measurement gap |
 | latency | `service_time_ms` (`experiment_spec.py:171`) | **Declared-only** — raw writer is `PhaseResult.duration_s` (`workflow_runner.py:87`) |
@@ -692,9 +734,16 @@ add a second decision type") applies to session decisions exactly as it did to t
 |---|---|---|---|
 | D1 | I10 `SessionCheckpoint.verified_facts` | Addendum marks it `DERIVED` ("canonical fact ids by reference", `context_abstraction_design.md:1572`); this design **demotes it to ADVISORY `[H]` in v1**, populated from `PhaseResult.selected_evidence_ids` (`workflow_runner.py:106`). | No canonical facts exist (`control/facts.py:1-8`; no `source_type="fact"`, `knowledge.py:125-150`). Marking it DERIVED would ship a field that is empty forever — the `deadline_slack` failure (review §4.4). Demotion is the review's constraint 6. |
 | D2 | I10 `SessionCheckpoint.context_snapshot_id` | Addendum has it as a required `str` (§6.4); this design makes it **`str | None = None`** with a NEW `snapshot_available: bool = False` flag, and the `continue` invariant degrades to `goal`+`phase`+`model` equality in v1. | `snapshot_id` has no producer until I4 (`control/context_compiler.py:1-8`; [design-only] formula `context_abstraction_design.md:925-947`). An explicit absent-flag keeps "no snapshot" distinguishable from "snapshot lost" (hard rule 4). |
+| D3 | I9 minting, `is_canonical()` "unchanged" (`context_abstraction_design.md:1555`) | The design **adds** a mandatory `verify_chain()` for the `pattern` class: `is_canonical()` alone is insufficient, and `pattern.produced_by` is exactly `("pattern/v1",)`. | `is_canonical()` checks epistemic/authority/lifecycle only (`context_abstraction_design.md:403-417`); a non-reducer `derived` pattern would pass it. Deterministic-reducer enforcement lives in `verify_chain()`, which must be mandatory for a NEW DERIVED class (adversarial F1). |
+| D4 | I8 "the contract remains the sole gate" (`context_abstraction_design.md:1494-1496`) | Narrowed to "sole **safety** gate": `verification_policy`/`deliberation`/`session_policy` are strategy inputs bound by monotone tightening, never a second authority. | The profile's three non-`context_requirements` fields are not composed by `compose_requirements`; without this narrowing they are a concrete widening path past the contract (adversarial F2). |
+| D5 | I10 "narrative components ride along as ADVISORY annotations" (`context_abstraction_design.md:1563-1564`) | Implemented as **separate `checkpoint_narrative` ADVISORY records**, not same-fact annotations. | `CanonicalFact` has one `epistemic_status` and the payload is hashed into `fact_id`; a same-fact ADVISORY narrative would re-key the canonical fact and leak through C5 at fact granularity (adversarial F3). |
+| D6 | I8 "profiles are L4's producer" (`context_abstraction_design.md:1488-1490`) | v1 profiles declare L5-policy-adjacent facts + their own predicates; they do **not** declare L4 workload facts (capacity/priority/value), which stay deferred per frozen §11.5. | Declaring L4 predicates now would reproduce the `LEDGER_FIELDS` failure the frozen design explicitly refuses (`context_abstraction_design.md:1415`); "L4 producer" is deferred until budget/deadline ownership is declared (adversarial F6). |
 
-No other deviations. The `challenge`-vs-`TASK_TYPES` reconciliation (§2.5) is a **clarification
-within** the addendum's own six values, not a change to them, so it is not listed here.
+F4 (session `continue` conflation) and F5 (experiment sufficiency) are resolved by design edits that
+**align with / specify within** Addendum A (A.4's "never applied" and "4 arms") rather than change
+it, so they carry no deviation-table row; see §9. The `challenge`-vs-`TASK_TYPES` reconciliation
+(§2.5) is a **clarification within** the addendum's own six values, not a change to them, so it is
+not listed here.
 
 ---
 
@@ -759,6 +808,141 @@ belongs to the implementation spec, not this addendum's design-only scope (§7).
 | OQ5 (pattern authority + cite format) | §3.1, §3.2, §3.5 |
 | OQ6 (v1 checkpoint grades + demotion) | §4.1 |
 | OQ7 (session_routing identity/snapshot/shadow recording) | §4.2, §4.3, §4.4 |
+
+---
+
+## 9. Adversarial findings
+
+**Role:** external critic, in the shape of `docs/review/finding_economics_review.md`. Six attack
+vectors were worked; each produced at least one finding, and every finding was re-verified against
+the tree (frozen design + code) before being written. Each finding is **resolved** — by a design
+edit (with a one-line deviation note in §5) or by an accepted-risk entry with reasoning. Severity:
+**material** = fixed in this edit; **minor** = noted, safe to defer.
+
+### F1 — a `pattern` fact can be canonical without a deterministic reducer · **material** (vector 1)
+
+**Attack:** does the pattern class violate hard rule 3 anywhere? **Yes, at the `is_canonical()`
+boundary.** `is_canonical()` (`context_abstraction_design.md:403-417`) returns True for
+`epistemic_status != "advisory" AND authority >= DERIVED AND lifecycle == "current"` — it does **not**
+check that the fact was minted by a registered deterministic reducer. `verify_chain()`
+(`context_abstraction_design.md:607-637`, checks 1–2: reducer registered, evidence resolves) is the
+only place "minted by a deterministic reducer" is enforced, and it is a *separate* check. A `pattern`
+fact carrying `epistemic_status="derived"` minted by any producer (an LLM asked to "derive a
+pattern", a hand-written record) would pass `is_canonical()` and enter a snapshot as canonical. The
+addendum's `"pattern": (DERIVED, "[C]")` sits at the exact authority band where this is most
+tempting: it is *canonical by construction* while being *the compression of a judgment*.
+
+**Resolution — design edit §3.4 rule 5 + deviation D3:** the `pattern` predicate's `produced_by` is
+exactly `("pattern/v1",)`, and `verify_chain()` is mandatory for any `pattern` fact entering a
+snapshot. Hard rule 3 is enforced by `verify_chain`, not `is_canonical()` alone. (This *deviates*
+from A.3's "`is_canonical()` unchanged" — it is unchanged, but declared insufficient for this new
+class.)
+
+### F2 — a profile *can* widen a controller's view past its contract · **material** (vector 2)
+
+**Attack:** find a concrete path. `compose_requirements` (§2.3) composes **only**
+`context_requirements`. The other three `ChallengeProfile` fields — `verification_policy`,
+`deliberation`, `session_policy` — are selected by the profile and **not** routed through the
+contract's `requires_facts`/`excludes` at all. Concrete path: a challenge profile declaring
+`verification_policy=("ruff",)` where the contract's verification invariant depends on `pytest`
+would select a weaker verification regime than the contract, because nothing composes
+`verification_policy` against the contract's verification facts. The addendum's central claim
+"a profile cannot widen a controller's view" (`context_abstraction_design.md:1494-1496`) is
+therefore **false for three of the profile's four inputs** as originally specified.
+
+**Resolution — design edit §2.3 + deviation D4:** `verification_policy` may only *add* tools to the
+contract's required verification, never drop one (monotone tightening, `context_abstraction_design.md:1352-1356`);
+`deliberation` may reorder but never omit a contract-relied-on stage; `session_policy` is fully
+shadow in v1. The contract is the sole **safety** gate; the profile contributes *strategy* only.
+
+### F3 — ADVISORY narrative leaks into the canonical checkpoint payload · **material** (vector 3)
+
+**Attack:** do ADVISORY narrative fields leak into canonical payload? **Yes.** The design (pre-edit)
+placed `open_hypotheses`/`failed_approaches`/`next_action` "on the checkpoint record". `CanonicalFact`
+has a SINGLE `epistemic_status` (`context_abstraction_design.md:232`), and the payload-in-`text`
+decision makes `content_hash` (hence `fact_id`) a function of the whole payload
+(`context_abstraction_design.md:333-361`). Two defects: (a) an LLM-produced `next_action` re-keys the
+CANONICAL fact's identity on every narrative edit (supersession noise driven by non-canonical
+content); (b) `is_canonical()`/C5 operate at **fact** granularity, so a controller citing the
+checkpoint fact receives the ADVISORY narrative as citable canonical content — hard rule 3 violated
+at field granularity.
+
+*(Sub-note, vector 3's other half — PhaseResult duplication: the checkpoint's DERIVED fields
+(`completed`/`current_revision`/`acceptance_state`) re-derive values already on the execution plane
+(`_completed_phases` `workflow_runner.py:235-254`, `_git_head` `:227-232`, `test_executed_success`
+`:113`). This is **not** a hard-rule-4 violation — the checkpoint is a *different* predicate at a
+different subject/scope — but it is a redundancy the reducer must make auditable: `checkpoint/v1`'s
+`consumes` must name these artifacts so the checkpoint is a *projection*, never a competing source.)*
+
+**Resolution — design edit §4.1 + deviation D5:** the `session_checkpoint` fact carries **only** the
+DERIVED fields; the three narrative fields become separate ADVISORY `source_type="checkpoint_narrative"`
+records that `is_canonical()` excludes and C5 refuses. "Ride along as annotations" is honoured at the
+*handoff* level (fact + narrative bundle), not the *fact* level.
+
+### F4 — `continue` (session) is conflated with the routing null-action `continue` · **material** (vector 4)
+
+**Attack:** are fork/compress/escalate applied or proposed? They are proposals — but the design's
+pre-edit §4.3 labelled `continue` **Automatable** "because it is the null action". It is not: the
+session-continuation `continue` (resume a session, carrying the stale-context risk priced at
+`context_abstraction_design.md:1587`) is a *positive* `[H]` decision, whereas the `continue` in
+`AUTOMATABLE_ACTIONS = {continue, route}` was designed as the routing null action ("the controller
+ran and chose nothing", `context_abstraction_design.md:1086`). Admitting the session `continue` under
+that name would let an automated `session_routing` controller **apply** an unmeasured `[H]` policy via
+C9 — a measure-before-policy violation.
+
+**Resolution — design edit §4.3 (no deviation; aligns with A.4's "never applied"):** `session_routing`
+runs **fully shadow in v1** — all four actions recorded, none applied — and the runner's existing
+fork-chain (`workflow_runner.py:591-597`) is the applied incumbent. `AUTOMATABLE_ACTIONS` is
+unchanged; the two `continue`s are declared distinct.
+
+### F5 — the 4-arm experiment cannot do its job as specified · **material** (vector 5)
+
+**Attack:** is the evidence sufficient? Three defects, each re-verified against the spec in §4.4:
+(a) **n=1 per arm** — `max_attempts: 1` with a single `model` level and no repetition factor gives one
+observation per `session_policy` level, so the `uncertainty` term the promotion gate needs is
+un-estimable; (b) **`escalate_with_checkpoint` is undefined** — escalate requires a model change, but
+the only `model` level is `deepseek/deepseek-v4-pro`, so there is nothing to escalate *to*, and the
+model×session_policy interaction is unmeasured; (c) **`session_policy_outcome.produces` depends on
+unrequired inputs** — `session_cost_usd`/`session_cache_reuse` need `cost_inference`/`cache_hit`,
+which are neither in the rule's `requires` nor written today (`experiment_spec.py:184,172` —
+declared, zero writers), so the reducer could not compute them.
+
+**Resolution — design edit §4.4 (no deviation; specification within A.4's "4 arms"):** add a second
+`model` level (escalate target + interaction term), add a `repetition` factor (`r1,r2,r3`), set
+`max_attempts: 3`, and restrict v1 `produces` to the WRITTEN-signal-derivable outcomes
+(`session_verified_success`, `session_context_growth`); cost/cache/latency/rework outcomes are
+deferred to a phase gated on instrumentation.
+
+### F6 — "profiles are L4's producer" is reinterpreted away without a deviation note · **minor** (vector 6)
+
+**Attack:** conflict with frozen §11 scope boundary? Addendum A.1 claims "profiles are L4's producer
+— declared facts" (`context_abstraction_design.md:1488-1490`), but frozen §11.5 refuses to declare L4
+workload facts (`context_abstraction_design.md:1415`), and this design's §7.7 states v1 profiles "do
+not declare workload predicates". The tension was real but **undocumented** — a reader cannot tell
+whether the addendum's "L4 producer" claim was dropped, deferred, or redefined. (No §8.6 observe-only
+conflict: §4.3 leaves `AUTOMATABLE_ACTIONS` untouched and adds no call site to `supervise.py`/
+`supervisor.py`; shadow-mode recording through the un-armed actuation envelope is within §8.6's
+"a control rule may propose any action in the contract".)
+
+**Resolution — deviation D6 (accepted-risk):** v1 profiles declare L5-policy-adjacent facts + their
+own predicates; the L4-producer role is **deferred** until budget/deadline ownership is declared —
+exactly the frozen §11.5 posture. Documented as D6 rather than silently redefined.
+
+---
+
+### Log — one line per attack vector
+
+| Vector | Finding | Evidence (file:line) | Status |
+|---|---|---|---|
+| 1. pattern canonicity / hard rule 3 | F1 material | `is_canonical` lacks a reducer check: `context_abstraction_design.md:403-417` vs `verify_chain` `:607-637` | **resolved** — §3.4 r.5 + D3 |
+| 2. profile widens past contract | F2 material | `verification_policy`/`deliberation`/`session_policy` not in `compose_requirements` (design §2.3, pre-edit) | **resolved** — §2.3 + D4 |
+| 3. checkpoint dups PhaseResult + ADVISORY leak | F3 material | single `epistemic_status` `:232`; payload-in-`text` `:333-361`; C5 fact-granularity `:1183` | **resolved** — §4.1 + D5 |
+| 4. session_routing vs `AUTOMATABLE_ACTIONS` | F4 material | routing null-action `continue` `:1086` vs session trade `:1587` | **resolved** — §4.3 (aligns with A.4) |
+| 5. 4-arm evidence sufficiency | F5 material | `max_attempts: 1`, single model (design §4.4 pre-edit); `cost_inference`/`cache_hit` declared-not-written `experiment_spec.py:184,172` | **resolved** — §4.4 |
+| 6. frozen §11 / §8.6 conflict | F6 minor | A.1 "L4 producer" `:1488-1490` vs §11.5 `:1415` | **resolved** — D6 (accepted-risk) |
+
+**PASS** — six attack vectors worked, six findings (five material, one minor), all re-verified
+against the tree, all resolved.
 
 ---
 
