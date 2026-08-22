@@ -1,0 +1,155 @@
+name: finding_economics_closure
+question: >-
+  Execute the finding-economics closure (docs/review/finding_economics_review.md — external
+  review of main at 1ea54bbed, claims re-verified with published-data evidence) in batched stages
+  with DeepSeek Pro. The last unconverted data path — the single-task FINDING corpus — gets the
+  same coverage contract the story and lab paths now enforce: uncaptured economics become null
+  with coverage, cost/energy ratios become nullable, routing treats unmeasured economics as
+  UNAVAILABLE (never free), exact contributor-set digests bind lab contracts to the precise
+  records that produced them, Parquet verification reads actual values, metric versions bump
+  where meanings changed, and the source-tree identity resolves relative imports. The guard
+  lesson is baked in: enforce STRUCTURE (every producer routes optional fields through
+  MeasurementCoverage), not string patterns. Then the adversarial hunt + release gate, and the
+  final signoff.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      review: >-
+        READ docs/review/finding_economics_review.md FIRST — every claim carries file:line
+        evidence. P0: build_data.py:128 _finding_entry_from_run still normalizes uncaptured
+        economics to zero — :138 cost=float(run.get("cost_usd") or 0.0), :154-159 thinking_ratio/
+        escape/architecture_divergence/composite_score/energy_total_j/quality_per_joule all
+        or-0.0, :149 narration_failure always False; :443-449 + :492-493 publish
+        correctness_per_dollar / avg_quality_per_joule; published data.js carries claude-haiku
+        correctness_per_dollar 857,142,857.60 and Claude Sonnet 5 416,666,668.19 [verified],
+        Claude arms with avg_cost 0.0 / avg_correctness 1.0, and ten "?" strategy rows
+        [verified]; these entries feed compute_routing(entries). P1: attach_contribution()
+        discards used_record_ids — contracts carry counts, not WHICH records; record_id()
+        returns only the entity id so story and its analysis collide. P1: sync_data --check
+        compares expected-vs-sidecar but never hashes the actual Parquet rows. P2: four labs
+        (condition_effects, quality_frontier, story_review, verification_frontier) still at v1
+        despite changed meaning. P2: the source-tree identity does not resolve relative imports
+        and hashes path.name only.
+      prompt_contract: >-
+        PROMPT-STYLE CONTRACT (all lessons applied): every FIX phase must (1) state the invariant
+        the fix establishes; (2) give the exact shape of any new primitive with full field lists;
+        (3) hunt EXHAUSTIVELY for every expression VARIANT of the pattern class across the whole
+        tree — not just the review's cited line (grep for `or 0.0`, `or 0`, `float( ... or`,
+        `get(..., 0)` normalization on optional fields in every producer: build_data, sync_data,
+        all eight canonical labs, canonical_corpus, routing); (4) fix every occurrence; (5) add a
+        STRUCTURAL guard — assert the producer routes optional fields through the shared
+        primitive (import + usage), plus a mutation test that reintroduces a variant and proves
+        rejection; (6) LOG every instance found and fixed by name; any remaining instance FAILS
+        the phase. Regex-denylist guards are NOT acceptable as the primary defense — structure
+        first, pattern-scan second.
+      current_state: >-
+        Measurement-contribution closure merged at 1ea54bbed: MeasurementCoverage +
+        cost_coverage primitives, ContributionReport-derived contracts, verification_value v2,
+        story_arc/cache_economics v2, terminal tombstones, three-way branch protection, 1487
+        tests green. The finding corpus (64 canonical findings feeding perturbation_models,
+        strategy distribution, and compute_routing) is the last producer still normalizing
+        missing economics to zero. CAP frozen; reserved homes present; all prior signoff
+        categories YES except finding-corpus economics + exact contributor attestation.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) CLASS CLOSURE with
+        expression-variant hunting (see prompt_contract) — a remaining instance FAILS the phase.
+        (3) Null-not-zero is universal: an uncaptured economics field is null with coverage, and
+        an economic RATIO is null unless its denominator is captured AND positive — a route must
+        not treat missing cost as free execution. (4) Contracts bind the EXACT contributor set
+        (table-qualified refs + digests); ContributionReport.of rejects empty/duplicate refs,
+        negative counts, unknown reasons. (5) Version discipline: any metric whose meaning
+        changed bumps its metric_definition_version. (6) Invariants survive: Redis 6380/6379,
+        dual Firebase, CAP frozen. (7) The adversarial hunt (f5) is mandatory and must
+        cross-check the finding economics against routing recommendations and the site.
+        (8) PASS/FAIL checkpoint log; resumable via --resume.
+      read_first: >-
+        docs/review/finding_economics_review.md, scripts/build_data.py (:128-180, :440-500),
+        src/agentic_dynamics/control/routing.py, src/agentic_dynamics/reporting/
+        {measurement_coverage,lab_contract,canonical_corpus}.py, scripts/sync_data.py,
+        scripts/lab_manifest.json, apps/website/*.html
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-pro. One worktree, one branch
+        (feature/finding-economics); each phase commits [workflow] <phase>. Continuous run;
+        resumable with --resume.
+    phases:
+      - name: f1_finding_coverage
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: an uncaptured economic or optional measurement in the FINDING corpus is null with coverage — never numeric zero — and an economic ratio is null unless its denominator is captured AND positive. The finding corpus must publish the same honesty the story and lab paths now enforce.
+          SHAPE: reuse reporting.measurement_coverage.MeasurementCoverage and cost_coverage — do NOT invent new primitives. Every published operator/model/class aggregation over cost_usd, energy_j, correctness, escape_score, architecture_divergence, composite_score, quality_per_joule, thinking_ratio carries {value, n_available, n_total, coverage} (or the five-field captured-cost tuple for cost). correcteness_per_dollar is null unless cost captured AND > 0; avg_quality_per_joule null unless energy captured AND > 0.
+          FIX: rewrite build_data.py:128 _finding_entry_from_run so NONE of :138,:154-159 normalize missing to zero (None when absent; narration_failure stays absent/None, never invented). Rework the :443-449,:492-493 aggregations to coverage shapes. Make compute_routing treat cost-unavailable / outcome-unavailable observations as UNAVAILABLE — excluded from efficiency comparisons and recommendations, never modeled as zero-cost success. Fix the ten "?" strategy classifications honestly (an unknown strategy is unknown, and the distribution labels it so).
+          HUNT: grep the whole tree for every expression VARIANT on optional economics: `or 0.0`, `or 0`, `float( ... or`, `get("cost" ... 0)`, `max(cost, 1e-9)`, `missing_value_or_0`, in build_data, sync_data, all eight canonical labs, canonical_corpus, routing, and any test helper that normalizes. Fix EVERY occurrence; list them all.
+          GUARD: structural — a test asserting the finding adapter imports and uses MeasurementCoverage/cost_coverage for those fields, plus a mutation test reintroducing `float(run.get("cost_usd") or 0.0)` and proving rejection, plus a data test that the published data.js has NO finding-model row with avg_cost 0.0 alongside avg_correctness 1.0 and NO correctness_per_dollar > 1e7.
+          BUMP: the finding-corpus metric versions in lab_manifest.json where the published meaning changed.
+          LOG: every instance found and fixed by name; PASS/FAIL; commit.
+      - name: f2_contributor_attestation
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: a lab contract attests the EXACT records that produced its result — not just their count. The last step between self-reported counts and exact contribution lineage.
+          SHAPE: table-qualified record references: `story:<entity_id>:<knowledge_id>`, `analysis:<story_entity_id>:<content_digest>`, `review:<entity_id>:<knowledge_id>`, `finding:<entity_id>:<knowledge_id>`. Contract fields: used_record_refs_sha256, excluded_record_refs_sha256, used_unique_records, used_contributions. ContributionReport.of rejects empty refs, duplicate refs unless multiplicity explicitly permitted, negative exclusion counts, and unknown exclusion reasons (raise or fail loudly).
+          FIX: extend ContributionReport + attach_contribution in reporting/lab_contract.py so the IDs are HASHED INTO the contract (they are no longer discarded); fix record_id() so a story and its analysis no longer collide (table-qualified); update all eight canonical labs' computation to emit qualified refs.
+          GUARD: for every canonical lab, a test recomputes the join, builds the expected ref set, and asserts the artifact's used_record_refs_sha256 equals the recomputed digest AND used_unique_records matches the deduplicated set. Mutation tests: an altered contributor set changes the digest; a duplicate ref is rejected.
+          LOG: per-lab attestation reconciliation table; PASS/FAIL; commit.
+      - name: f3_sync_parity
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: `sync_data --check` proves the ACTUAL Parquet bytes agree with the transform — not merely that the sidecar agrees with the in-memory expectation.
+          SHAPE: read the actual Parquet rows back, canonicalize deterministically, compute actual_sessions_rows_sha256 and actual_stories_rows_sha256; compare three ways: expected-rows hash == sidecar hash == actual-rows hash.
+          FIX: implement in sync_data.py's --check; add a test that corrupts a Parquet value (or writes a modified file with unchanged row count) and proves --check fails.
+          LOG: PASS/FAIL; commit.
+      - name: f4_versions_and_identity
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: a metric's version answers "does this number mean the same thing as the previous version?" — every meaning change bumps; the source-tree identity is truly transitive.
+          FIX: (a) bump lab_manifest.json: condition_effects/v1->v2, quality_frontier/v1->v2, story_review/v1->v2, verification_frontier/v1->v2 (their meanings changed per the review), update any test pins, regenerate the four artifacts + data.js. (b) make the generator source-tree identity resolve RELATIVE imports against their package (so `from .canonical_corpus import ...` contributes its transitive dependency) and hash repo-relative path + file length + file bytes (two __init__.py files are distinct).
+          GUARD: a test with a synthetic package containing a relative import proves the identity includes the target module; a test renames a __init__.py's package and proves the hash changes.
+          LOG: PASS/FAIL per sub-item; commit.
+      - name: f5_hunt_and_verify
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial auditor — find what is still wrong and fix it (with guards) or log a reason-bearing FAIL.
+          HUNT, systematically: (1) cross-check the published finding economics against routing recommendations — no recommendation may rest on a zero-cost or ratio-superspiked observation; (2) re-grep every expression variant (`or 0.0`, `or 0`, `max(cost, 1e-9)`, `1e-9` guards, `"?"` identities) across ALL producers; (3) diff every canonical lab's attested contributor digest against a fresh recomputation; (4) static text vs public_statistics again; (5) verify the four bumped versions appear in artifacts AND manifest AND test pins consistently; (6) rerun the container core + reproduce dry-run; (7) invariant audit (Redis, Firebase, CAP frozen). Every finding: fix or reason-bearing FAIL.
+          LOG: one line per check with evidence; PASS/FAIL; commit.
+      - name: f6_release_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          FIX: release gate — coverage proof vs docs/review/finding_economics_review.md (every P0/P1/P2 finding -> a phase -> PASS; zero orphans). Re-run: full suite, all guard suites, compile-gate all specs, reproduce core dry-run + container core run, invariant audit. Write docs/review/finding_economics_verification.md with PASS/FAIL per check and the final verdict (finding-corpus economics + exact contributor attestation + public semantic consistency signoff).
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: finding_economics_closed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [economics_coverage, attestation_exact, parquet_verified, versions_bumped, hunt_clean]
+metrics:
+  - {name: economics_coverage, agg: mean, over: cell}
+  - {name: attestation_exact, agg: mean, over: cell}
+  - {name: parquet_verified, agg: mean, over: cell}
+  - {name: versions_bumped, agg: mean, over: cell}
+  - {name: hunt_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, f1_finding_coverage, f2_contributor_attestation, f3_sync_parity,
+             f4_versions_and_identity, f5_hunt_and_verify, f6_release_verify]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
