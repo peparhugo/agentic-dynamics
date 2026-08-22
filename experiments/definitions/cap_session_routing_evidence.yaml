@@ -20,16 +20,48 @@
 # CONSTRAINT HONORED: no rule requires snapshot_id, ControlContext, or any CAP fact. Every
 # `requires` names a field the ledger already emits (LEDGER_FIELDS, experiment_spec.py) or a
 # field produced by a measurement rule in this same spec.
+#
+# ── ADVERSARIAL REVIEW (methodologist pass) — findings & dispositions ─────────────────
+# (1) Arm separability — accepted limitation. The fork arms (`fork_blind`, `fork_cached`,
+#     `escalate`) are only observable on attempts with a non-null `parent_attempt_id`
+#     (re-attempts); `continue` is observable on every job's first attempt. Per-arm sample
+#     size is therefore bounded by the ledger's actual retry/fork frequency, not by the grid.
+#     The simulator must report per-arm n (observation counts) beside every metric, so a
+#     collapsed arm renders as n=0/none — never a zero value.
+# (2) Confounding — accepted limitation + control. The factorial design (session_policy ×
+#     model) isolates the model × policy interaction, but story/task heterogeneity is NOT a
+#     factor here; the simulator must stratify by task/story (as routing.simulate_strategies
+#     already groups by task) so the effect_size is within-task. Cost metrics are sensitive to
+#     pricing drift — the writeup pins pricing_version for the replayed ledger.
+# (3) Coverage / denominator — FIXED. cost_per_verified_outcome and
+#     rework_cost_per_verified_outcome compute over the CAPTURED-ONLY intersection: numerator
+#     over captured costs, denominator over non-null verified outcomes from the SAME
+#     cost-captured observation set. A captured outcome with an uncaptured cost is dropped from
+#     BOTH numerator and denominator (never zero-costed).
+# (4) Counterfactual soundness — FIXED. `checkpoint` does not exist as a ledger record (I10
+#     "typed session checkpoint" is forward-only). The former `fork_with_checkpoint` /
+#     `escalate_with_checkpoint` arms were unsound — they conflated `cache_hit` (a token-cache
+#     read) with a checkpoint (a saved execution state). They are re-specified as the measured
+#     retrospective proxies `fork_cached` (fork + cache_hit=true) and `escalate` (fork that
+#     changed model), and the true I10-dependent checkpoint arm is recorded as a forward gap
+#     (writeup `i10_checkpoint_gap`). No phantom `checkpoint` producer is declared.
+# (5) CAP-fact leak — CLEAN. No rule requires snapshot_id / ControlContext / any CAP fact
+#     (verified by grep; the only occurrences are this negation comment).
+# (6) Null + stop — FIXED. Null is explicit. stop is retrospective: budget_usd / max_attempts
+#     are nominal (no live cells execute); the operative gate is uncertainty_threshold=0.15 on
+#     the effect_size.
 name: cap_session_routing_evidence
 question: >-
-  Does a session-routing policy other than `continue` — fork_with_checkpoint, fork_blind, or
-  escalate_with_checkpoint — lower cost per verified outcome over the attempt lineage already
-  in the ledger, net of cache reuse and rework? Null hypothesis: no arm outperforms `continue`
-  on cost per verified outcome. Arms are retrospective counterfactuals over attempt lineage
-  (parent_attempt_id, attempt_number, escalation_from/to, cache_hit), simulated by an
-  evaluation rule that generalizes routing.simulate_strategies; unavailable fields are null
-  with zero coverage, never zero.
-version: "0.1"
+  Does a session-routing policy other than `continue` — fork_blind, fork_cached, or escalate —
+  lower cost per verified outcome over the attempt lineage already in the ledger, net of cache
+  reuse and rework? Null hypothesis: no arm outperforms `continue` on cost per verified
+  outcome. Arms are retrospective counterfactuals over attempt lineage (parent_attempt_id,
+  attempt_number, escalation_from/to, cache_hit), simulated by an evaluation rule that
+  generalizes routing.simulate_strategies; unavailable fields are null with zero coverage,
+  never zero. The two checkpoint arms of the original framing are re-specified as the measured
+  cache-reuse proxy (fork_cached) and escalation (escalate); true typed-session-checkpoint
+  semantics are I10 forward-only and recorded as a gap.
+version: "0.2"
 artifact_kind: experiment
 intent: measure
 side_effects:
@@ -43,9 +75,12 @@ workflow:
     source: attempt lineage (parent_attempt_id, attempt_number, escalation_from/to, cache_hit)
     simulation: session_lineage_sim evaluation rule — generalizes routing.simulate_strategies
 factors:
-  # The arm factor. `continue` is the null arm (the observed lineage, no fork/escalation);
-  # the other three are the counterfactual arms the simulator replays.
-  - {name: session_policy, levels: [continue, fork_with_checkpoint, fork_blind, escalate_with_checkpoint]}
+  # The arm factor. `continue` is the null arm (observed lineage, no fork/escalation).
+  #   fork_blind  — a re-attempt that did NOT reuse cache (cache_hit=false): re-ran from scratch.
+  #   fork_cached — a re-attempt that reused cache (cache_hit=true): the RETROSPECTIVE PROXY
+  #                 for a checkpointed resume (true typed session checkpoint = I10, forward-only).
+  #   escalate    — a re-attempt that changed model (escalation_from -> escalation_to).
+  - {name: session_policy, levels: [continue, fork_blind, fork_cached, escalate]}
   # The models present in the existing ledger (per AGENTS.md "Models in use").
   - {name: model, levels: [deepseek/deepseek-v4-flash, deepseek/deepseek-v4-pro, anthropic/claude-haiku-4-5, anthropic/claude-sonnet-5, openai/gpt-5.6-luna, openai/gpt-5.6-sol, openai/gpt-5.6-terra]}
 design: factorial
@@ -53,19 +88,18 @@ rules:
   # ── The evaluation rule: the retrospective counterfactual simulator ──
   # Generalizes routing.simulate_strategies — replays the four session_policy arms over each
   # job's observed attempt lineage instead of simulating single-model vs grit-routed arms.
-  #   continue                  -> the attempt as observed (no fork, no escalation).
-  #   fork_with_checkpoint      -> a child attempt (parent_attempt_id non-null) resumed from a
-  #                                checkpoint; cache_hit=true counts as checkpoint reuse.
-  #   fork_blind                -> a child attempt re-run from scratch (no checkpoint, no cache).
-  #   escalate_with_checkpoint  -> a child attempt that changes model (escalation_from ->
-  #                                escalation_to) with a checkpoint.
+  #   continue    -> attempt_number==1 (parent_attempt_id null): the single-session outcome.
+  #   fork_blind  -> parent_attempt_id non-null AND cache_hit=false: re-ran from scratch.
+  #   fork_cached -> parent_attempt_id non-null AND cache_hit=true: cache reuse — the
+  #                  checkpoint PROXY (true typed session checkpoint is I10, forward-only).
+  #   escalate    -> escalation_from -> escalation_to non-null (model changed across attempts).
   # requires -> producer (all are LEDGER_FIELDS, attempt-level block):
   #   parent_attempt_id, attempt_number, escalation_from, escalation_to, cache_hit
   - name: session_lineage_sim
     plane: measurement
     evidence_class: "[C]"
     requires: [parent_attempt_id, attempt_number, escalation_from, escalation_to, cache_hit]
-    produces: [arm_assignment, fork_point, escalation_point, checkpoint_reuse]
+    produces: [arm_assignment, fork_point, escalation_point, cache_reuse]
 
   # Verified success — the primary quality outcome. Null-not-zero: an attempt whose
   # test_executed_success is null (not measured) is excluded from the rate, never counted as 0.
@@ -79,8 +113,9 @@ rules:
     produces: [verified_outcome, verified_success_rate]
 
   # Cost per verified outcome — the primary economic outcome and the null-hypothesis axis.
-  # Null-not-zero: averages over captured costs only; a missing cost never yields a zero-cost
-  # verified outcome.
+  # CAPTURED-ONLY intersection: numerator over captured costs, denominator over non-null
+  # verified outcomes from the SAME cost-captured observation set. A verified outcome whose
+  # cost is uncaptured is dropped from BOTH numerator and denominator — never zero-costed.
   #   cost_inference        -> ledger
   #   cost_orchestration    -> ledger
   #   actual_cost           -> ledger
@@ -91,7 +126,8 @@ rules:
     requires: [cost_inference, cost_orchestration, actual_cost, verified_outcome]
     produces: [cost_per_verified_outcome]
 
-  # Cache utilization — does checkpointed forking actually reuse cached context?
+  # Cache utilization — does forking actually reuse cached context? cache_hit is the reuse
+  # signal (per-attempt token-cache read); the true typed session checkpoint is I10 forward-only.
   #   cache_hit -> ledger (per-attempt cache hit)
   - name: cache_utilization
     plane: measurement
@@ -129,6 +165,9 @@ comparison:
   loss: {cost: 1.0, quality: -5.0}
 writeup:
   format: lab_book
-  sections: [hypothesis, null_hypothesis, method, arms, effect_size, uncertainty, null_interpretation]
+  sections: [hypothesis, null_hypothesis, method, arms, effect_size, uncertainty,
+             null_interpretation, coverage_semantics, i10_checkpoint_gap, limitations]
+# Retrospective: no live cells execute, so budget_usd / max_attempts are nominal (analysis
+# compute only); the operative stop gate is the uncertainty_threshold on the effect_size.
 stop: {budget_usd: 5.0, max_attempts: 1, uncertainty_threshold: 0.15}
 adapt: {strategy: coordinate_descent, selection: highest_regret}
