@@ -99,7 +99,7 @@ The domain introduces **additive** `subject_type`/`scope_type` values — `instr
 | `crypto_weight` | float | portfolio | portfolio | job | `portfolio_facts/v1` | none | no |
 | `unrealized_pnl` | float (`usd`) | position | portfolio | job | `portfolio_facts/v1` | none | no |
 | `realized_pnl` | float (`usd`) | position | portfolio | job | `trade_facts/v1` | none | no |
-| `calls_only_holds` | bool | portfolio | portfolio | policy | `policy_facts/v1` | none | no |
+| `close_only_holds` | bool | portfolio | portfolio | policy | `policy_facts/v1` | none | no |
 
 ### 2B. Blocked (producer gated on the missing chain `MD-4`) — NOT declared, listed for instrumentation order
 
@@ -127,7 +127,7 @@ The four reducer modules mirror the design's `src/agentic_dynamics/control/reduc
 | `market_facts` | `market_facts/v1` | `market` records | `last_price`, `daily_ohlcv`, `realized_vol` | `realized_vol = std(ln(P_t / P_{t-1}))` over a window of `daily_ohlcv` closes |
 | `portfolio_facts` | `portfolio_facts/v1` | `portfolio` + `market` | `portfolio_value`, `position_weight`, `crypto_weight`, `unrealized_pnl`, (`net_delta` when unblocked) | `portfolio_value = Σ position_qty·last_price·fx_to_cad + Σ cash·fx_to_cad` (all-in-CAD, fx from PS-10); `position_weight = position_value / portfolio_value`; `unrealized_pnl = qty·(last_price − avg_cost_basis)·fx_to_cad` |
 | `trade_facts` | `trade_facts/v1` | `trade` records | `realized_pnl` | `realized_pnl = Σ (sale proceeds − cost − commission)` over fills per position |
-| `policy_facts` | `policy_facts/v1` | `portfolio` + `trade` + `policy` | `calls_only_holds` | `calls_only_holds = (no short put) ∧ ∀ short call: shares(underlying) ≥ multiplier·qty` — input contract: `position_qty` is **signed** (short legs negative), `multiplier` is the contract's **deliverable multiplier** (100 standard; non-standard after a corporate action, CX-6), and `EX-4` assignments re-key positions before the reducer runs |
+| `policy_facts` | `policy_facts/v1` | `portfolio` + `trade` + `policy` | `close_only_holds` | `close_only_holds = ∀ EX-1 option fill with side = sell: matched to a prior long position of the same series with held(series) ≥ qty at fill time` — input contract: `position_qty` is **signed** (short legs negative), fills are **side-qualified** (`EX-1`), `series` keys (underlying, type, strike, expiry, multiplier), and the **deliverable multiplier** (100 standard; adjusted after a corporate action, CX-6) keys the match; `EX-4` assignments re-key positions before the reducer runs |
 
 Every reducer is a **pure function** (`determinism="pure"`, injected clock via `ReducerInput.now`)
 — the same discipline as `step_routing.route_step` and the design § 4.1. `net_delta` and the
@@ -140,26 +140,26 @@ greek predicates are listed in their reducer's `produces` only **after** § 2B u
 
 Versioned YAML in `experiments/contexts/<decision_type>.yaml` (design § 6.1). Two new, one reuse.
 
-### 3a. `open_long_call/v1` (**NEW**) — the opening decision
+### 3a. `open_long_option/v1` (**NEW**) — the opening decision
 
 ```yaml
-# experiments/contexts/open_long_call.yaml
-decision_type: open_long_call
-contract_version: "open_long_call/v1"
+# experiments/contexts/open_long_option.yaml
+decision_type: open_long_option
+contract_version: "open_long_option/v1"
 decision_scope: portfolio
-allowed_actions: [open_long_call, open_covered_call, skip]
+allowed_actions: [open_long_option, close_option, skip]
 
 invariants:
-  - fact: calls_only_invariant      # L5 declared policy fact — the (a) invariant
+  - fact: no_naked_invariant        # L5 declared policy fact — the (a) invariant
     scope: portfolio
-    on_missing: halt                # no calls-only rule => refuse to open anything
+    on_missing: halt                # no no-naked rule => refuse to open anything
     on_conflict: halt
   - fact: registered_account_limits # L5 — (c) eligibility/margin
     scope: portfolio
     on_missing: halt
 
 requires_facts:
-  - fact: calls_only_holds          # derived gate (§ 2A) — proves no naked exposure pre-open
+  - fact: close_only_holds          # derived gate (§ 2A) — proves no sell-to-open pre-order
     scope: self
     max_age_seconds: 3600
     on_missing: halt
@@ -193,7 +193,7 @@ requires_facts:
   - fact: realized_pnl              # outcome leg
     scope: self
     on_missing: classify
-  - fact: calls_only_holds          # invariant still held over the week
+  - fact: close_only_holds          # invariant still held over the week
     scope: self
     on_missing: halt
 excludes: [live_telemetry, advisory_facts]
@@ -327,11 +327,11 @@ domain_profile:
     - portfolio_value
     - position_weight
     - crypto_weight
-    - calls_only_holds
+    - close_only_holds
     - contribution_room
     - thesis_exists
   policies:              # L5 policy fact ids (audit_policies.md, the 8 policies)
-    - calls_only_invariant
+    - no_naked_invariant
     - no_short_delta
     - registered_account_limits
     - position_size
@@ -354,7 +354,7 @@ challenge_profiles:
     session_policy: continue
     verification_policy: [signal_is_pure_function]
   - challenge: review                  # weekly_review
-    context_requirements: [thesis_exists, realized_pnl, calls_only_holds]
+    context_requirements: [thesis_exists, realized_pnl, close_only_holds]
     deliberation: [reconcile_theses, emit_findings]
     session_policy: continue
     verification_policy: [chain_is_complete]
@@ -386,10 +386,10 @@ reducers run from this repo against the new repo's `repository_id`.
 
 | Phase | What lands | Which mechanism | Exit criterion |
 |---|---|---|---|
-| **1. context seed** | `market/v1` + `portfolio/v1` + `trades/v1` + `thesis/v1` producers, the adapter, `policy/v1` via existing `policy_ingestion` | § 1, § 4 | named-source observations fill the new `repository_id`; `last_price`…`calls_only_holds` reducers (§ 2A) run green |
+| **1. context seed** | `market/v1` + `portfolio/v1` + `trades/v1` + `thesis/v1` producers, the adapter, `policy/v1` via existing `policy_ingestion` | § 1, § 4 | named-source observations fill the new `repository_id`; `last_price`…`close_only_holds` reducers (§ 2A) run green |
 | **2. evidence seed** | a **paper-trade ledger** — `backtest_strategy`/paper fills emit `trade` + `portfolio` + `market` records | § 5b, `trade_facts/v1` | every § 2A predicate has a populated slot; the `[H]` hypotheses have `[M]` evidence to be judged against |
 | **3. policy seed** | the 8 policies (`audit_policies.md`) run in **shadow mode** — recorded + surfaced, never applied | contracts § 3 + I6 shadow-controller pattern | each policy's outcome measured against the evidence seed; writable-vs-pending reconfirmed with data |
-| **4. first campaign** | a grid over one factor (e.g. `calls_only` arm vs a relaxed baseline) | the repo's grid → campaign loop (`compile_experiment`, reuse of `_gen_matrix_cells`/`simulate_strategies`) | one variable tweaked, results compared, `_results_summary` written |
+| **4. first campaign** | a grid over one factor (e.g. `no_naked` invariant arm vs a relaxed baseline) | the repo's grid → campaign loop (`compile_experiment`, reuse of `_gen_matrix_cells`/`simulate_strategies`) | one variable tweaked, results compared, `_results_summary` written |
 
 This is the load-bearing rule at the domain scale: **instrument (context seed) → derive (§ 2
 reducers) → policy (shadow seed) → grid (campaign)**. Each phase is gated on the previous; a
@@ -407,7 +407,7 @@ halt` refusal.
 |---|---|---|---|
 | Producers | 1 (`policy/v1`) | 4 (`market`, `portfolio`, `trade`, `thesis`) | 0 |
 | Predicates | 0 | 15 declarable-once-produced (§ 2A) | 6 (§ 2B, all gated on `MD-4` except `net_delta`) |
-| Contracts | 1 (`session_routing`) | 2 (`open_long_call/v1`, `weekly_review/v1`) | 0 |
+| Contracts | 1 (`session_routing`) | 2 (`open_long_option/v1`, `weekly_review/v1`) | 0 |
 | Adapters | 0 | 1 (`market_data`) | 0 |
 | Workflows/stories | 0 | 3 (`research_ticker`, `backtest_strategy`, `weekly_review`) | 0 |
 | Profiles | 0 | 1 `DomainProfile` + 3 `ChallengeProfile` (static filing) | 0 |

@@ -13,7 +13,7 @@ is recorded `UNINSTRUMENTED`, never silently assumed.
 **Scope.** Eight candidate policies, in two layers:
 
 - **Constraint / invariant layer** — the "contract" rules that must hold before any tactical arm
-  runs: `calls_only_invariant`, `no_short_delta`, `registered_account_limits`.
+  runs: `no_naked_invariant`, `no_short_delta`, `registered_account_limits`.
 - **Tactical / control layer** — sizing, exits, selection, allocation, and review rules:
   `position_size`, `exit_rules`, `expiry_selection`, `crypto_cap`, `weekly_review`.
 
@@ -108,7 +108,7 @@ single missing producer (`MD-4`).
 
 | # | Policy | `requires` → producer status | Writable now? | Instrumentation order |
 |---|--------|------------------------------|---------------|-----------------------|
-| a | `calls_only_invariant` — long calls + covered calls only; no naked puts/calls | `open_option_positions(side,type,qty)` → `✓ PS-1` (signed) ⊕ `EX-1`/`EX-4`; `underlying_share_holdings` → `✓ PS-1`; `covered(short_call)` → `✓ [C]` reducer | **yes** | — |
+| a | `no_naked_invariant` — buy-to-open only (calls, puts; long straddles permitted); sell-to-close only; no sell-to-open (covered calls excluded) | `open_option_positions` → `✓ PS-1` (signed, series-keyed) ⊕ `EX-1` (side-qualified) / `EX-4`; `close_only_holds` → `✓ [C]` fill-matching reducer | **yes** | — |
 | b | `no_short_delta` — net short delta is a contract invariant | `portfolio_net_delta` → `✓ [C]` reducer; `option_delta` → `✗ UNINSTRUMENTED (→ MD-5 → MD-4)` | **no** | step 3 |
 | c | `registered_account_limits` — RRSP/TFSA eligibility, no margin | `account_type` → `✓ [M]` statement header; `contribution_room` → `✓ CX-7 [X]`; eligibility/margin → `[P]` constants (rest on `[X]` CRA/CIRO) | **yes** | — |
 | d | `position_size` — size ∝ portfolio_value / vol | `portfolio_value` → `✓ PS-8 [C]`; `vol` → `✗ UNINSTRUMENTED (→ realized_vol over MD-2, or MD-6)` | **no** | step 2 |
@@ -125,28 +125,42 @@ blocked by the single missing chain producer `MD-4` (`position_size` is blocked 
 
 ## 5. Policy details and compliance
 
-### (a) `calls_only_invariant` — long calls and covered calls only
+### (a) `no_naked_invariant` — buy-to-open only; sell-to-close only
 
-**Invariant (`[P]`):** no naked calls, no naked puts; long calls and covered calls only.
+**Invariant (`[P]`, confirmed by operator 2026-08-22):** every option position must originate from
+a buy-to-open fill; sells are permitted only to close existing long positions; no sell-to-open —
+therefore no naked puts, no naked calls, and no covered calls (which require selling-to-open).
+Long straddles are permitted: both legs are bought, so no leg is ever short at origination.
+
+**Three-way split (external / broker / operator):**
+
+| Axis | Status |
+|---|---|
+| External eligibility `[X]` | Registered-account options levels permit covered calls, protective puts, cash-secured puts (CIRO level 2) — `to-verify` per broker. |
+| Broker capability `[M]` | Operator-stated: buy options, sell to close, straddles executable on *some* underlyings — enumerate the exact per-underlying capability from platform documentation once statement parsing starts. |
+| Operator-selected `[P]` | Confirmed 2026-08-22: buy-to-open calls and puts; sell-to-close only; long straddles permitted; covered calls and all sell-to-open strategies excluded. The operator rule is *stricter* than external eligibility — CAP enforces the operator rule, not the external floor. |
 
 - `requires:`
-  - `open_option_positions(underlying, side ∈ {long, short}, type ∈ {call, put}, qty)` →
-    `✓ PS-1` (signed position snapshot, `[M]`; contract: a short leg is a **negative** quantity)
-    cross-checked by a `[C]` reduction over `EX-1` fill history (`[M]`, side-qualified) and `EX-4`
-    assignment notices (`[M]`, which turn short legs into long/short share positions).
-  - `underlying_share_holdings(symbol, qty)` → `✓ PS-1` (`[M]`).
-  - `covered(short_call)` → `✓ [C]` reducer: `shares(symbol) ≥ 100 × qty(short_call)`.
+  - `open_option_positions(underlying, series, side ∈ {long, short}, type ∈ {call, put}, qty)` →
+    `✓ PS-1` (signed position snapshot, `[M]`; contract: a short leg is a **negative** quantity,
+    series-keyed) cross-checked by a `[C]` reduction over `EX-1` fill history (`[M]`,
+    side-qualified) and `EX-4` assignment notices (`[M]`).
+  - `close_only_holds(underlying, series, qty)` → `✓ [C]` reducer: **every `EX-1` option fill
+    with side = sell must match an existing long position of the same series with
+    `held(series) ≥ qty` at fill time** (lot-matching over fill order); a sell that cannot be
+    matched is a sell-to-open — the invariant is false. With sell-to-close only, short exposure
+    is structurally impossible; no share-coverage reducer is needed.
 - **Writable: yes.**
 
-**Enforcement question (answered literally).** The `calls_only` invariant is enforceable **only if
-the decision engine can see short exposure**. The producer that supplies that sight is the
-**signed open-position record** — `PS-1` interpreted with sign (short option legs negative), ⊕ the
-`[C]` reduction over `EX-1` fills, ⊕ `EX-4` assignment notices. If the operator's broker export
-flattens option legs without a long/short sign (some CSV exports list contracts unsigned), the
-invariant degrades to unverifiable: that is a **producer-contract requirement** on `PS-1`, not a
-new signal. `[P]` authority: operator rule, *stricter than* the CIRO options-level floor — CIRO
-level 2 already permits covered calls, protective puts, and long puts in a registered account; this
-policy deliberately narrows to calls only.
+**Enforcement question (answered literally).** The invariant is enforceable **only if the
+decision engine can see the fill side and the open-position series** — the producers are `EX-1`
+(side-qualified fills, `[M]`) and `PS-1` (signed, series-keyed positions, `[M]`). If the broker
+export flattens fills without a buy/sell side, the invariant degrades to unverifiable: a
+**producer-contract requirement** on `EX-1`, not a new signal. This is a *simplification* over the
+pre-confirmation draft: with sell-to-close only, the short-exposure question is answered by fill
+matching rather than share coverage — the `covered(short_call)` reducer and its corporate-action
+multiplier risks fall away except for lot-matching on adjusted series (the deliverable multiplier
+still keys the match; adversarial F5, narrowed).
 
 ### (b) `no_short_delta` — net short delta is a contract invariant, not a convention
 
@@ -158,11 +172,11 @@ policy deliberately narrows to calls only.
     is **not visible in registered accounts** (`audit_observable.md` § 1 MD-5, § 8 G-1).
 - **Writable: no → pending-instrumentation, step 3.**
 
-**Reasoning (why this is not the same as (a)).** Under (a) alone the book is restricted to long
-calls (delta ∈ (0, 1]) and covered calls (+100 shares − 100·Δ_call ∈ (0, 100)), so net delta is
-*automatically* non-negative — but (b) is asserted as an **independent** invariant (defence in
-depth). Enforcing it independently requires reading `option_delta`, which no producer supplies
-today. Until `MD-5` exists, the only enforceable surrogate is to rely on (a) holding — a
+**Reasoning (why this is not the same as (a)).** Under (a) alone the book holds long options only —
+long calls (delta ∈ (0, 1]) and long puts (delta ∈ (−1, 0)) — so net delta can be **negative
+through long puts alone**, with no nakedness at all. (b) is therefore an **independent risk
+invariant** (defence in depth), not a restatement of (a). Enforcing it independently requires
+reading `option_delta`, which no producer supplies today. Until `MD-5` exists, the only enforceable surrogate is to rely on (a) holding — a
 substitution the load-bearing rule forbids: (b) is recorded `UNINSTRUMENTED`, not "writable via
 (a)".
 
@@ -256,10 +270,10 @@ Anything in the "verification" column that this audit has not confirmed is tagge
    per-issuer qualified-investment status, per-broker options levels, and the TFSA
    carrying-on-a-business threshold are all marked `[X]` to-verify where this audit could not
    confirm them.
-3. **The `calls_only` enforcement producer is named.** Short exposure is seen via the **signed
-   open-position record** (`PS-1` sign convention, ⊕ `EX-1` reduction, ⊕ `EX-4` assignments);
-   the one way this fails is a broker export that drops the long/short sign — a producer-contract
-   requirement on `PS-1`, stated in § 5(a).
+3. **The `no_naked` enforcement producer is named.** A sell-to-open violation is seen via the
+   **side-qualified fill record** (`EX-1` buy/sell side, ⊕ `PS-1` series-keyed signed positions,
+   ⊕ `EX-4` assignments); the one way this fails is a broker export that drops the fill side — a
+   producer-contract requirement on `EX-1`, stated in § 5(a).
 4. **No policy is writable on an unproduced `requires`.** Every `✓` resolves to a produced signal
    or a named reducer over produced signals; every `✗` names the missing upstream producer and the
    instrumentation step that unblocks it.
@@ -273,7 +287,7 @@ Anything in the "verification" column that this audit has not confirmed is tagge
 | Metric | Count |
 |--------|-------|
 | Candidate policies | 8 |
-| Writable now | 4 — (a) `calls_only_invariant`, (c) `registered_account_limits`, (g) `crypto_cap`, (h) `weekly_review` |
+| Writable now | 4 — (a) `no_naked_invariant`, (c) `registered_account_limits`, (g) `crypto_cap`, (h) `weekly_review` |
 | Pending-instrumentation | 4 — (b) `no_short_delta` (step 3), (d) `position_size` (step 2), (e) `exit_rules` (step 5), (f) `expiry_selection` (step 4) |
 
 **Guard checks**
@@ -282,7 +296,7 @@ Anything in the "verification" column that this audit has not confirmed is tagge
 - [x] No policy is marked writable with an unproduced `requires`. **PASS** (verified per policy in § 5).
 - [x] Account rules tagged `[P]` with external authority `[X]` CRA/CIRO and rule classes named. **PASS.**
 - [x] Unverifiable rules marked `[X]` to-verify; none asserted. **PASS.**
-- [x] `calls_only` enforcement producer (the "see short exposure" requirement) stated. **PASS.**
+- [x] `no_naked` enforcement producer (the close-only fill-matching requirement) stated. **PASS.**
 - [x] Unwritable policies recorded pending-instrumentation with dependency-sorted order (§ 3). **PASS.**
 
 **Result: PASS** — 8 policies enumerated, 4 writable / 4 pending-instrumentation, 0 writable with

@@ -17,6 +17,30 @@ zero call sites; the CAP spec is **paused** — `workflows/repository/context_ab
 `knowledge.SOURCE_TYPES` (`knowledge.py:125-149`) has **no** `market`/`portfolio`/`trade`/`thesis`
 rows — the domain's producers are prospective, not present.
 
+## Amendment A — operator-policy confirmation (2026-08-22)
+
+The operator confirmed the actual constraint set after this review was written. It replaces the
+draft invariant ("long calls + covered calls only") and re-scopes three findings:
+
+- **Confirmed policy `[P]`:** buy-to-open calls and puts; **sell-to-close only**; long straddles
+  permitted (both legs bought); **no sell-to-open** — so no naked puts/calls, and covered calls are
+  excluded (a covered call requires selling-to-open). The broker additionally permits options only
+  "with some restrictions" and straddles on *some* underlyings — a broker-capability `[M]` axis to
+  enumerate during instrumenting.
+- **Consequence for F2 (sign contract):** still material, re-keyed — the close-only matcher needs
+  **side-qualified fills** (`EX-1`) and series-keyed signed positions (`PS-1`); the one-way failure
+  is now a broker export that drops the fill *side*, not the long/short sign.
+- **Consequence for F3 (USD-settled assignment):** narrowed — with no short legs, there is no
+  short-assignment / "called away" event; the USD-settlement concern now applies to *exercising a
+  long US-listed option*, which still settles USD and flows into PS-10 / the FX position. The
+  `[X]` to-verify caveats stand.
+- **Consequence for F5 (fixed-100 multiplier):** narrowed but not removed — the deliverable
+  multiplier now keys **lot-matching on adjusted series** in `close_only_holds` (a split-adjusted
+  series must match against the adjusted deliverable), rather than a share-coverage threshold.
+  CX-6 remains the source.
+
+`audit_policies.md` §5(a) and `audit_gap_map.md` §2C/§3a are amended accordingly.
+
 ## Verdict
 
 The three audits are disciplined on the compliance axis (every signal tagged, no `[H]`-as-measured,
@@ -62,19 +86,19 @@ note that none exists in the repo today.
 
 ---
 
-## F2 — `calls_only_holds`: the sign contract d2 flags is dropped in d3, so the invariant is unenforceable as mapped (V3)
+## F2 — `close_only_holds`: the sign contract d2 flags is dropped in d3, so the invariant is unenforceable as mapped (V3)
 
 **Claim under attack.** d2 §5(a) correctly states the enforcement producer is the **signed**
 open-position record and names the producer-contract risk ("if the broker export flattens option
 legs without a long/short sign … unverifiable"). But d3 — the framework map — defines the reducer
-as `calls_only_holds = (no short put) ∧ ∀ short call: shares(underlying) ≥ 100·qty` (§2C) over a
+as `close_only_holds = (no short put) ∧ ∀ short call: shares(underlying) ≥ 100·qty` (§2C) over a
 `position_qty` predicate (§2A) that carries **no signedness contract**, and the `portfolio`
 source_type (§1) is silent on sign. d3 therefore maps the *answer* (the reducer) but drops the
 *precondition* (signed input) that makes the answer true.
 
 **Why it is material.** The enforcement question the original brief posed — "does d2's mapping give
 the decision engine the short_exposure fact it needs?" — is answered "yes" in d2 and "unrebuilt"
-in d3. As mapped, `calls_only_holds` would compute coverage against unsigned quantities and could
+in d3. As mapped, `close_only_holds` would compute coverage against unsigned quantities and could
 certify a naked short call as covered. The invariant is enforceable *if and only if* the sign
 contract is carried into the reducer's input spec.
 
@@ -125,14 +149,14 @@ is amended to state the CAD-equivalent form.
 **Claim under attack.** d1 CX-6 lists "splits, mergers, ticker changes" and notes only "feeds PS-2
 book-value adjustments." Neither d1 nor d3 notes that a **split / merger / spin-off adjusts the
 option deliverable**: a 2:1 split turns a standard contract into 200 deliverable shares (or two
-adjusted contracts), so the `calls_only_holds` term `shares(underlying) ≥ 100·qty` is **false the
+adjusted contracts), so the `close_only_holds` term `shares(underlying) ≥ 100·qty` is **false the
 day the adjustment takes effect** even though the position is still fully covered.
 
 **Why it is material.** The invariant the whole enforcement apparatus (§F2) protects is expressed
 as a fixed-100 multiplier; a single corporate action silently invalidates it. This is a blind spot
 that is both observable (d1 CX-6 has the source) and unconnected to the reducer that needs it.
 
-**Resolution (amended).** d3 §2C's `calls_only_holds` now uses the **deliverable multiplier** (not
+**Resolution (amended).** d3 §2C's `close_only_holds` now uses the **deliverable multiplier** (not
 a fixed 100) and cites CX-6 as its source; d1 CX-6's note is amended to flag the option-deliverable
 adjustment.
 

@@ -50,7 +50,10 @@ stream, no intraday options chain, and no margin buying power in a registered ac
 RRSP do not permit margin). Options activity in a registered account is restricted to the
 permitted strategies (covered calls, protective puts, cash-secured puts where offered); only
 **fills of executed, permitted trades** appear on the statement — never a live chain of
-unexecuted strikes. Each row states one of:
+unexecuted strikes. **Operator policy narrows this further** (`[P]`, confirmed 2026-08-22):
+buy-to-open only, sell-to-close only, long straddles permitted, no sell-to-open — so the only
+permitted-strategy rows that can appear on *this* operator's statements are buy-to-open legs and
+their closing sells. Each row states one of:
 
 - `RRSP/TFSA: visible` — appears on the statement.
 - `RRSP/TFSA: partial` — appears only as a point-in-time snapshot (e.g. statement-date valuation).
