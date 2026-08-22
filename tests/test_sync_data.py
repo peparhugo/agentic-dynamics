@@ -98,3 +98,52 @@ def test_check_detects_a_stale_sidecar(tmp_path, monkeypatch):
     monkeypatch.setattr(sync_data, "SYNC_IDENTITY_PATH", path)
 
     assert sync_data.check() == 1
+
+
+def test_check_detects_a_modified_parquet_value(tmp_path, monkeypatch):
+    """A corrupted Parquet value with an *unchanged row count* makes ``check()`` fail (f3).
+
+    The three-way content parity (``expected == sidecar == actual``) is the f3 correction: the
+    pre-f3 ``--check`` compared expected-vs-sidecar and read the Parquet only for row counts,
+    so a file whose rows were altered in place still passed. This test keeps the sidecar intact
+    and corrupts ONE value in the sessions table — the row count is unchanged, so only the
+    actual-content hash can catch it.
+    """
+    if not (sync_data.DATA_DIR / "sessions.parquet").exists():  # pragma: no cover
+        pytest.skip("no parquet files — run scripts/sync_data.py first")
+
+    import pyarrow as pa
+
+    real_data = sync_data.DATA_DIR
+    real_sidecar = json.loads(sync_data.SYNC_IDENTITY_PATH.read_text(encoding="utf-8"))
+
+    fake = tmp_path / "data"
+    fake.mkdir()
+    monkeypatch.setattr(sync_data, "DATA_DIR", fake)
+    monkeypatch.setattr(sync_data, "SYNC_IDENTITY_PATH", fake / "sync_identity.json")
+
+    # A sidecar identical to the real one, so the "sidecar == expected" leg still holds — only
+    # the "actual" (on-disk Parquet) leg is broken.
+    (fake / "sync_identity.json").write_text(json.dumps(real_sidecar), encoding="utf-8")
+
+    # stories.parquet is a faithful copy; sessions.parquet is corrupted in place.
+    pq.write_table(pq.read_table(real_data / "stories.parquet"), fake / "stories.parquet")
+
+    sessions = pq.read_table(real_data / "sessions.parquet")
+    rows = sessions.to_pylist()
+    rows[0]["cost_usd"] = 12345.6789  # flip one value; the row count is untouched
+    pq.write_table(pa.Table.from_pylist(rows, schema=sessions.schema), fake / "sessions.parquet")
+
+    assert sync_data.check() == 1
+
+
+def test_actual_rows_hash_matches_the_committed_tables():
+    """``_actual_rows_hash`` round-trips the typed Parquet back to the same content hash the
+    sidecar/expected hashes carry (f3 canonicalization)."""
+    if not (sync_data.DATA_DIR / "sessions.parquet").exists():  # pragma: no cover
+        pytest.skip("no parquet files — run scripts/sync_data.py first")
+    sidecar = json.loads(sync_data.SYNC_IDENTITY_PATH.read_text(encoding="utf-8"))
+
+    actual_sha, actual_n = sync_data._actual_rows_hash(sync_data.DATA_DIR / "sessions.parquet")
+    assert actual_sha == sidecar["sessions_rows_sha256"]
+    assert actual_n == sidecar["rows"]["sessions"]
