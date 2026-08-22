@@ -17,6 +17,7 @@ Usage:
     python scripts/build_data.py --dry-run    # Print what would be written
 """
 
+import ast
 import hashlib
 import json
 import os
@@ -117,6 +118,11 @@ class CanonicalCorpus:
     story_count: int = 0
     finding_count: int = 0
     tombstoned_count: int = 0
+    #: m4: the tombstone population split by reason — the 77 contaminated early_degrade
+    #: cells vs the 10 "no usable measurement payload" retractions (cost-0 Claude stubs).
+    #: A retraction is NOT contamination, so the two must never be described together.
+    contaminated_tombstones: int = 0
+    no_measurement_tombstones: int = 0
 
 
 def _finding_entry_from_run(experiment: str, run: dict, locator: str) -> dict:
@@ -288,6 +294,20 @@ def load_canonical_corpus(
             for r in rows
             if r.get("lifecycle_state") == "tombstoned"
             and r.get("source_type") in CANONICAL_SOURCE_TYPES
+        ),
+        contaminated_tombstones=sum(
+            1
+            for r in rows
+            if r.get("lifecycle_state") == "tombstoned"
+            and r.get("source_type") in CANONICAL_SOURCE_TYPES
+            and "contaminat" in (r.get("reason") or "").lower()
+        ),
+        no_measurement_tombstones=sum(
+            1
+            for r in rows
+            if r.get("lifecycle_state") == "tombstoned"
+            and r.get("source_type") in CANONICAL_SOURCE_TYPES
+            and "no usable measurement" in (r.get("reason") or "").lower()
         ),
     )
 
@@ -1498,22 +1518,66 @@ def _assert_resolution_complete(tables, waiver_path=None) -> list[dict]:
 #: (public-truth review P1/P2). Their contents are hashed so the publication contract
 #: records *which code* produced the numbers, not just *which data*: a generator change
 #: (a new reducer, a projection change) is visible even when the input is unchanged.
-GENERATOR_SOURCES = (
-    ROOT / "scripts" / "build_data.py",
-    ROOT / "src" / "agentic_dynamics" / "reporting" / "canonical_corpus.py",
-    ROOT / "src" / "agentic_dynamics" / "reporting" / "lab_contract.py",
-    ROOT / "src" / "agentic_dynamics" / "reporting" / "lab_manifest.py",
-)
+#:
+#: m4: the file list is DERIVED from ``build_data``'s import graph
+#: (:func:`_generator_source_files`) rather than a hand-maintained tuple. The P2 finding
+#: was that the hand tuple silently omitted ``core.constants``, ``control.routing`` and
+#: ``measurement.solution`` — a derived manifest cannot omit a module build_data actually
+#: imports.
+
+
+def _generator_source_files() -> list[Path]:
+    """The direct computation-dependency manifest, DERIVED from the import graph.
+
+    Walks ``build_data.py``'s ``agentic_dynamics.*`` imports transitively and returns every
+    source file reachable from it, sorted for determinism. The list is *computed*, never
+    hand-maintained, so a newly-added computation dependency is covered automatically.
+    """
+    src_root = ROOT / "src" / "agentic_dynamics"
+    seen: dict[Path, None] = {}
+
+    def resolve(name: str) -> None:
+        if not name.startswith("agentic_dynamics"):
+            return
+        rel = name[len("agentic_dynamics.") :].replace(".", "/")
+        candidate = src_root / f"{rel}.py"
+        if candidate.is_file():
+            visit(candidate)
+            return
+        package = src_root / rel / "__init__.py"
+        if package.is_file():
+            visit(package)
+
+    def visit(path: Path) -> None:
+        path = path.resolve()
+        if path in seen:
+            return
+        seen[path] = None
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            return
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    resolve(alias.name)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                resolve(node.module)
+
+    visit(ROOT / "scripts" / "build_data.py")
+    return sorted(seen)
 
 
 def generator_source_tree_identity() -> str:
-    """``sha256`` over the generator source files (name + bytes, in a fixed order).
+    """``sha256`` over the generated source-tree dependency manifest (name + bytes).
 
     Deterministic and environment-independent: only the source file *contents* enter the
-    digest, never their absolute paths.
+    digest, never their absolute paths. The file list comes from
+    :func:`_generator_source_files` (derived from the import graph), so the identity
+    tracks the full computation surface, not a remembered subset.
     """
     h = hashlib.sha256()
-    for path in GENERATOR_SOURCES:
+    for path in _generator_source_files():
         h.update(path.name.encode("utf-8"))
         h.update(path.read_bytes())
     return h.hexdigest()
@@ -1745,7 +1809,12 @@ def build():
             "records_used": len(tables.stories),
             "unresolved_waivered": len(waivers),
             "canonical_findings": corpus.finding_count,
-            "tombstoned_excluded": corpus.tombstoned_count,
+            # ── m4: the tombstone population split by reason — a retraction (no usable
+            # ── measurement payload) is NOT contamination, so the two categories are
+            # ── published separately, never merged into a single "contaminated, excluded".
+            "contaminated_tombstones": corpus.contaminated_tombstones,
+            "no_measurement_tombstones": corpus.no_measurement_tombstones,
+            "tombstones_total": corpus.tombstoned_count,
             "_provenance": {
                 "worktrees_total": "M",
                 "sessions_total": "M",
@@ -1765,7 +1834,9 @@ def build():
                 "records_used": "C",
                 "unresolved_waivered": "M",
                 "canonical_findings": "M",
-                "tombstoned_excluded": "M",
+                "contaminated_tombstones": "M",
+                "no_measurement_tombstones": "M",
+                "tombstones_total": "M",
             },
         },
         # ── Resolution completeness (review P1) — the report + the waived rows, so the

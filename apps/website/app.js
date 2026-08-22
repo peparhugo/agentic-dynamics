@@ -80,7 +80,10 @@
       'records_used': function() { return D.summary.records_used; },
       'unresolved_waivered': function() { return D.summary.unresolved_waivered; },
       'canonical_findings': function() { return D.summary.canonical_findings; },
-      'tombstoned_excluded': function() { return D.summary.tombstoned_excluded; },
+      // m4: the tombstone population split by reason — a retraction is NOT contamination.
+      'contaminated_tombstones': function() { return D.summary.contaminated_tombstones; },
+      'no_measurement_tombstones': function() { return D.summary.no_measurement_tombstones; },
+      'tombstones_total': function() { return D.summary.tombstones_total; },
       'costgap': function() { return D.derived.cost_gap; },
       'passrate': function() { return D.derived.overall_pass_rate; },
       'deepseek_cost': function() { return fmtUSD(D.derived.total_cost_deepseek); },

@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_verification_value",
-  "generated_at": "2026-08-22T02:18:53.674096",
+  "generated_at": "2026-08-22T02:46:11.687632",
   "summary": {
     "correlation_tests_vs_worse_rate": -0.154,
     "cells": 105,
@@ -749,10 +749,11 @@
   "lab_contract": {
     "lab": "lab_verification_value.py",
     "input_dataset_id": "canonical_registry/story+review",
-    "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+    "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
     "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
     "registry_version": "data-manifest/1.0+701rows",
     "metric_definition_version": "verification_value/v2",
+    "metric_source_sha256": "503f0026ec90bf096325b621c801c6389578247061838bc8eec1307bb6599702",
     "n_resolved_records": 457,
     "n_eligible_records": 310,
     "n_used_records": 310,
@@ -764,7 +765,7 @@
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v4",
-    "generated_at": "2026-08-22T00:18:53.674412+00:00"
+    "contract_version": "lab-contract/v5",
+    "generated_at": "2026-08-22T00:46:11.687936+00:00"
   }
 }

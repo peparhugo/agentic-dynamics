@@ -200,6 +200,20 @@ def _compact_registry_index(path):
             # state this entity's own history does not actually support.
             head = rows[-1]
 
+        # Terminal-tombstone semantics (m4): a terminal tombstone closes every earlier
+        # OPEN version of its entity. An open ("current") version becomes "superseded"
+        # with valid_to = the tombstone's own valid_from (the flat index's valid_from
+        # proxy - observed_at, falling back to indexed_at, exactly as _derive_lifecycle
+        # uses for a successor's valid_from). Without this, "current, then tombstoned"
+        # leaves a stale "current" predecessor lingering in the version history alongside
+        # the tombstone (the entity 37679fe003ca retraction bug).
+        if head["lifecycle_state"] == "tombstoned":
+            tombstone_valid_from = head.get("observed_at") or head.get("indexed_at")
+            for r in rows:
+                if r["knowledge_id"] != head["knowledge_id"] and r["lifecycle_state"] == "current":
+                    r["lifecycle_state"] = "superseded"
+                    r["valid_to"] = tombstone_valid_from
+
         compacted.append({
             "entity_id": entity_id,
             "knowledge_id": head["knowledge_id"],

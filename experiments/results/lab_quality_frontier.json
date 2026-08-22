@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_quality_frontier",
-  "generated_at": "2026-08-22T02:18:54.113177",
+  "generated_at": "2026-08-22T02:46:12.088951",
   "summary": {
     "models": 7,
     "stories": 215,
@@ -243,10 +243,11 @@
   "lab_contract": {
     "lab": "lab_quality_frontier.py",
     "input_dataset_id": "canonical_registry/story+analysis",
-    "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+    "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
     "resolved_input_sha256": "58e642e6b38d847304d7f3dc8e649f53fd1126cb2222ed86c52393c0bd9c7c8f",
     "registry_version": "data-manifest/1.0+701rows",
     "metric_definition_version": "quality_frontier/v1",
+    "metric_source_sha256": "13a6f3fed0f77112ca5882856c6aa611809b1ce438a7d1a39ca1f79a874a4c85",
     "n_resolved_records": 371,
     "n_eligible_records": 312,
     "n_used_records": 312,
@@ -258,7 +259,7 @@
     "outside_analysis_population": 59,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v4",
-    "generated_at": "2026-08-22T00:18:54.113478+00:00"
+    "contract_version": "lab-contract/v5",
+    "generated_at": "2026-08-22T00:46:12.089262+00:00"
   }
 }

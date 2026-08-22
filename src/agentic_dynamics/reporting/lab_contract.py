@@ -82,6 +82,7 @@ Design notes
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
@@ -101,8 +102,10 @@ from .lab_manifest import LabEntry, load_lab_manifest
 #: when the permissive ``eligible=resolved``/``used=eligible`` defaults were removed, the
 #: eligible→used gap became explicit (``n_unused_eligible_records``), and the free-form
 #: ``exclusions`` dict became the four named exclusion-reason counts — public-truth review
-#: P1, phase p3.
-CONTRACT_VERSION = "lab-contract/v4"
+#: P1, phase p3. Bumped to v5 in m4 (measurement-contribution closure) when
+#: ``metric_source_sha256`` was added — the hash of the lab's own source file, so a
+#: contract attests to *which code* computed the metric, not just which corpus fed it.
+CONTRACT_VERSION = "lab-contract/v5"
 
 #: The key under which the contract is embedded in a lab's output JSON.
 CONTRACT_KEY = "lab_contract"
@@ -129,6 +132,7 @@ REQUIRED_FIELDS = (
     "resolved_input_sha256",
     "registry_version",
     "metric_definition_version",
+    "metric_source_sha256",
     "data_integrity_policy",
     "requires_external_service",
     "n_resolved_records",
@@ -172,6 +176,7 @@ class LabContract:
     resolved_input_sha256: str
     registry_version: str
     metric_definition_version: str
+    metric_source_sha256: str
     n_resolved_records: int
     n_eligible_records: int
     n_used_records: int
@@ -314,6 +319,17 @@ def _resolved_count(tables: CanonicalTables) -> int:
     return sum(len(tables.rows(t)) for t in tables.tables)
 
 
+def lab_source_sha256(lab_script: str) -> str:
+    """``sha256`` of the lab's own source file (m4) — the *code* that computed the metric.
+
+    Every lab lives at ``scripts/<lab_script>``. Hashing its bytes lets a contract attest
+    to *which code* produced the numbers — a metric re-implementation is visible even when
+    the corpus and the metric_definition_version are unchanged.
+    """
+    path = Path(__file__).resolve().parents[3] / "scripts" / lab_script
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def build_contract(
     lab_script: str,
     tables: CanonicalTables,
@@ -378,6 +394,7 @@ def build_contract(
         resolved_input_sha256=tables.resolved_input_sha256,
         registry_version=tables.identity.registry_version,
         metric_definition_version=entry.metric_definition_version,
+        metric_source_sha256=lab_source_sha256(lab_script),
         n_resolved_records=resolved,
         n_eligible_records=eligible,
         n_used_records=used,
@@ -521,6 +538,14 @@ def validate_contract(
                 f"{manifest_entry.script}: contract field '{field_name}' is "
                 f"{block.get(field_name)!r}, expected {expected!r}"
             )
+
+    # ── metric source identity (m4): the contract attests to WHICH code computed it ──────
+    current_source = lab_source_sha256(manifest_entry.script)
+    if str(block.get("metric_source_sha256") or "") != current_source:
+        return (
+            f"{manifest_entry.script}: metric_source_sha256 mismatch — the lab's source "
+            f"changed since the artifact was written; re-run the lab"
+        )
 
     identity = (
         current_identity

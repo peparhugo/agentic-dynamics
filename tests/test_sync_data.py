@@ -44,7 +44,7 @@ def test_atomic_write_leaves_no_tmp_behind(tmp_path):
 
 
 def test_identity_sidecar_records_the_resolver_identity(tmp_path, monkeypatch):
-    """The sidecar records WHICH canonical source produced the tables."""
+    """The sidecar records WHICH canonical source produced the tables + content hashes."""
 
     class _Identity:
         registry_identity_sha256 = "a" * 64
@@ -54,13 +54,27 @@ def test_identity_sidecar_records_the_resolver_identity(tmp_path, monkeypatch):
         resolved_input_sha256 = "b" * 64
 
     monkeypatch.setattr(sync_data, "SYNC_IDENTITY_PATH", tmp_path / "sync_identity.json")
-    sync_data._write_identity_sidecar(_FakeTables(), {"sessions": 1, "stories": 2})
+    sync_data._write_identity_sidecar(_FakeTables(), {"sessions": 1, "stories": 2}, [], [])
 
     sidecar = json.loads((tmp_path / "sync_identity.json").read_text(encoding="utf-8"))
-    assert sidecar["schema_version"] == "sync-identity/v1"
+    assert sidecar["schema_version"] == "sync-identity/v2"
     assert sidecar["registry_identity_sha256"] == "a" * 64
     assert sidecar["resolved_input_sha256"] == "b" * 64
     assert sidecar["rows"] == {"sessions": 1, "stories": 2}
+    # m4 content hashes: the row digests, the transform source hash, and the schema hash.
+    assert len(sidecar["sessions_rows_sha256"]) == 64
+    assert len(sidecar["stories_rows_sha256"]) == 64
+    assert len(sidecar["sync_transform_sha256"]) == 64
+    assert len(sidecar["schema_sha256"]) == 64
+
+
+def test_content_hashes_are_deterministic_and_sensitive():
+    """The row content hash is deterministic, and changes when the rows change."""
+    assert sync_data._content_sha256([{"a": 1}]) == sync_data._content_sha256([{"a": 1}])
+    assert sync_data._content_sha256([{"a": 1}]) != sync_data._content_sha256([{"a": 2}])
+    # the transform + schema hashes are stable across calls
+    assert sync_data._transform_sha256() == sync_data._transform_sha256()
+    assert sync_data._schema_sha256() == sync_data._schema_sha256()
 
 
 def test_check_returns_zero_when_current():

@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections import Counter
@@ -261,14 +262,54 @@ def _write_parquet_atomic(rows: list[dict[str, Any]], schema: pa.Schema, final_p
     os.replace(tmp_path, final_path)
 
 
-def _write_identity_sidecar(tables, counts: dict[str, int]) -> None:
-    """Write the source-identity sidecar alongside the parquet (atomic, like the tables)."""
+def _content_sha256(rows: list[dict[str, Any]]) -> str:
+    """Deterministic content hash of the flattened rows (m4 sidecar field).
+
+    Hashing the *rows* (not the parquet bytes) makes the hash independent of pyarrow's
+    serialization metadata, so ``--check`` can recompute it from ``_build_rows`` alone.
+    """
+    return hashlib.sha256(
+        json.dumps(rows, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+
+
+def _transform_sha256() -> str:
+    """Hash of the sync transform code — this file (m4 sidecar field)."""
+    return hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest()
+
+
+def _schema_sha256() -> str:
+    """Hash of the two table schemas, field name + type (m4 sidecar field)."""
+
+    def _fields(schema: pa.Schema) -> list[tuple[str, str]]:
+        return [(f.name, str(f.type)) for f in schema]
+
+    return hashlib.sha256(
+        json.dumps(
+            {"sessions": _fields(SESSION_SCHEMA), "stories": _fields(STORY_SCHEMA)},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _write_identity_sidecar(tables, counts: dict[str, int], session_rows, story_rows) -> None:
+    """Write the source-identity sidecar alongside the parquet (atomic, like the tables).
+
+    m4: the sidecar now carries content hashes — the sessions/stories row digests, the sync
+    transform's own source hash, and the schema hash — so ``--check`` proves not just "the
+    row counts match" but "the rows, the transform, and the schema are all unchanged".
+    """
     sidecar = {
-        "schema_version": "sync-identity/v1",
+        "schema_version": "sync-identity/v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "registry_identity_sha256": tables.identity.registry_identity_sha256,
         "resolved_input_sha256": tables.resolved_input_sha256,
         "rows": counts,
+        "sessions_rows_sha256": _content_sha256(session_rows),
+        "stories_rows_sha256": _content_sha256(story_rows),
+        "sync_transform_sha256": _transform_sha256(),
+        "schema_sha256": _schema_sha256(),
     }
     tmp_path = SYNC_IDENTITY_PATH.with_suffix(".json.tmp")
     tmp_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
@@ -288,7 +329,7 @@ def sync() -> dict[str, int]:
     _write_parquet_atomic(story_rows, STORY_SCHEMA, DATA_DIR / "stories.parquet")
 
     counts = {"sessions": len(session_rows), "stories": len(story_rows)}
-    _write_identity_sidecar(tables, counts)
+    _write_identity_sidecar(tables, counts, session_rows, story_rows)
     return counts
 
 
@@ -317,6 +358,16 @@ def check() -> int:
         problems.append("registry identity mismatch — the parquet is stale")
     if sidecar.get("resolved_input_sha256") != tables.resolved_input_sha256:
         problems.append("resolved-input identity mismatch — the parquet is stale")
+
+    # ── m4 content hashes: the rows, the transform, and the schema are all unchanged ──
+    for field, recomputed in (
+        ("sessions_rows_sha256", _content_sha256(session_rows)),
+        ("stories_rows_sha256", _content_sha256(story_rows)),
+        ("sync_transform_sha256", _transform_sha256()),
+        ("schema_sha256", _schema_sha256()),
+    ):
+        if sidecar.get(field) != recomputed:
+            problems.append(f"{field} mismatch — re-run sync (the transform/schema/rows changed)")
 
     conn = duckdb.connect()
     try:

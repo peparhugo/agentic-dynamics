@@ -1,8 +1,8 @@
-/* Generated 2026-08-22 00:19:13 UTC by build_data.py */
+/* Generated 2026-08-22 00:46:24 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-22T00:19:11.689317+00:00",
+    "generated_at": "2026-08-22T00:46:23.238218+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -24,7 +24,9 @@ window.DYNAMICS_DATA = {
     "records_used": 215,
     "unresolved_waivered": 0,
     "canonical_findings": 64,
-    "tombstoned_excluded": 87,
+    "contaminated_tombstones": 77,
+    "no_measurement_tombstones": 10,
+    "tombstones_total": 87,
     "_provenance": {
       "worktrees_total": "M",
       "sessions_total": "M",
@@ -44,7 +46,9 @@ window.DYNAMICS_DATA = {
       "records_used": "C",
       "unresolved_waivered": "M",
       "canonical_findings": "M",
-      "tombstoned_excluded": "M"
+      "contaminated_tombstones": "M",
+      "no_measurement_tombstones": "M",
+      "tombstones_total": "M"
     }
   },
   "resolution_report": {
@@ -57,12 +61,12 @@ window.DYNAMICS_DATA = {
     "waivers": []
   },
   "publication_contract": {
-    "registry_identity": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+    "registry_identity": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
     "resolved_input_identity": "077f95acc9fdb7e40a132aa89c5c27c4d48eba4ba3582dc2028234723ecf7534",
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "c8f6d99c127a92a2446850cd31bf19d81c14a4608cb98ab9dee10fa0580c5a8a"
+    "generator_source_tree_identity": "1ed4f656247350dc61cebed047de73e534ec58b961ca0dee972cb88640ebf5fe"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -2274,7 +2278,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-22T00:19:11.789587+00:00"
+    "generated_at": "2026-08-22T00:46:23.400165+00:00"
   },
   "reviews": {
     "models": [
@@ -3002,7 +3006,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-22T02:18:51.565692",
+      "generated_at": "2026-08-22T02:46:09.662069",
       "summary": {
         "models": 7,
         "stories": 215
@@ -3124,10 +3128,11 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_cache_economics.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "cache_economics/v1",
+        "metric_source_sha256": "883e8797611c1d43201535a9de4d6bb7db6448f306d5e0e62285775ad7863e80",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
@@ -3139,13 +3144,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-22T00:18:51.566285+00:00"
+        "contract_version": "lab-contract/v5",
+        "generated_at": "2026-08-22T00:46:09.662339+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-22T02:18:52.714730",
+      "generated_at": "2026-08-22T02:46:10.746498",
       "summary": {
         "conditions": 2,
         "stories": 215,
@@ -3188,10 +3193,11 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_condition_effects.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "condition_effects/v1",
+        "metric_source_sha256": "5d589f0fbf01284835ff5e155f667ee25511633b83ab96dd59585b47b3d707c1",
         "n_resolved_records": 457,
         "n_eligible_records": 370,
         "n_used_records": 370,
@@ -3203,13 +3209,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-22T00:18:52.715046+00:00"
+        "contract_version": "lab-contract/v5",
+        "generated_at": "2026-08-22T00:46:10.746783+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-22T02:18:53.258132",
+      "generated_at": "2026-08-22T02:46:11.278326",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 144,
@@ -3462,10 +3468,11 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_grit.py",
         "input_dataset_id": "canonical_registry/finding+story",
-        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "grit/v1",
+        "metric_source_sha256": "2cb68d5999571956d2d3be1a720abb18d1c934a596e813199d3dcc213e67887e",
         "n_resolved_records": 279,
         "n_eligible_records": 144,
         "n_used_records": 144,
@@ -3477,13 +3484,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-22T00:18:53.258402+00:00"
+        "contract_version": "lab-contract/v5",
+        "generated_at": "2026-08-22T00:46:11.278596+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-22T02:18:54.113177",
+      "generated_at": "2026-08-22T02:46:12.088951",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -3726,10 +3733,11 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_quality_frontier.py",
         "input_dataset_id": "canonical_registry/story+analysis",
-        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "58e642e6b38d847304d7f3dc8e649f53fd1126cb2222ed86c52393c0bd9c7c8f",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "quality_frontier/v1",
+        "metric_source_sha256": "13a6f3fed0f77112ca5882856c6aa611809b1ce438a7d1a39ca1f79a874a4c85",
         "n_resolved_records": 371,
         "n_eligible_records": 312,
         "n_used_records": 312,
@@ -3741,13 +3749,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 59,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-22T00:18:54.113478+00:00"
+        "contract_version": "lab-contract/v5",
+        "generated_at": "2026-08-22T00:46:12.089262+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-22T02:18:51.924557",
+      "generated_at": "2026-08-22T02:46:10.012103",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
@@ -3887,10 +3895,11 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_story_arc.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "story_arc/v1",
+        "metric_source_sha256": "b98fadc6867f6ebb6da573bcb9f6eb0617b0440c4af0161496f542c7b82e11e1",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
@@ -3902,13 +3911,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-22T00:18:51.924905+00:00"
+        "contract_version": "lab-contract/v5",
+        "generated_at": "2026-08-22T00:46:10.012453+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-22T02:18:52.280414",
+      "generated_at": "2026-08-22T02:46:10.369672",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -4022,10 +4031,11 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_frontier.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "verification_frontier/v1",
+        "metric_source_sha256": "6a78b794427ef7fa5882ad970b156dd26b88d86c3cd8602523f54042c387bf94",
         "n_resolved_records": 215,
         "n_eligible_records": 215,
         "n_used_records": 215,
@@ -4037,13 +4047,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-22T00:18:52.280684+00:00"
+        "contract_version": "lab-contract/v5",
+        "generated_at": "2026-08-22T00:46:10.369941+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-22T02:18:53.674096",
+      "generated_at": "2026-08-22T02:46:11.687632",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.154,
         "cells": 105,
@@ -4792,10 +4802,11 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_value.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "688d7b949481fb8775976eec5eef9c8fe9fcd59b8b21f9a02cd61a3108b2dd05",
+        "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
         "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
         "registry_version": "data-manifest/1.0+701rows",
         "metric_definition_version": "verification_value/v2",
+        "metric_source_sha256": "503f0026ec90bf096325b621c801c6389578247061838bc8eec1307bb6599702",
         "n_resolved_records": 457,
         "n_eligible_records": 310,
         "n_used_records": 310,
@@ -4807,8 +4818,8 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v4",
-        "generated_at": "2026-08-22T00:18:53.674412+00:00"
+        "contract_version": "lab-contract/v5",
+        "generated_at": "2026-08-22T00:46:11.687936+00:00"
       }
     }
   }
