@@ -1,0 +1,134 @@
+# cap_session_routing_evidence — the 4-arm session-routing evidence ExperimentSpec.
+#
+# What this is: a RETROSPECTIVE comparison of four session-routing policy arms, replayed
+# over the attempt lineage ALREADY in the ledger. No live cells, no new instrumentation —
+# each arm is a counterfactual over the observed lineage fields (parent_attempt_id,
+# attempt_number, escalation_from/to, cache_hit), simulated by an evaluation rule that
+# generalizes routing.simulate_strategies (src/agentic_dynamics/control/routing.py:127) the
+# same way compare_arms (compile_experiment.py:142) already generalizes the compare phase.
+#
+# NULL HYPOTHESIS (stated explicitly): no arm outperforms `continue` on cost per verified
+# outcome. A null here is information, not failure — it would say the existing single-session
+# lineage is already on the cost-per-verified-outcome frontier.
+#
+# COVERAGE SEMANTICS (enforced throughout): a field absent from a given attempt is NULL with
+# zero coverage — never a numeric zero. Cost averages use captured costs only; outcome rates
+# use non-null outcomes only. A missing cost is never a zero-cost success; a missing outcome
+# is never a zero-correctness failure. This mirrors the null-not-zero discipline in
+# routing.recommend_route and reporting.measurement_coverage.
+#
+# CONSTRAINT HONORED: no rule requires snapshot_id, ControlContext, or any CAP fact. Every
+# `requires` names a field the ledger already emits (LEDGER_FIELDS, experiment_spec.py) or a
+# field produced by a measurement rule in this same spec.
+name: cap_session_routing_evidence
+question: >-
+  Does a session-routing policy other than `continue` — fork_with_checkpoint, fork_blind, or
+  escalate_with_checkpoint — lower cost per verified outcome over the attempt lineage already
+  in the ledger, net of cache reuse and rework? Null hypothesis: no arm outperforms `continue`
+  on cost per verified outcome. Arms are retrospective counterfactuals over attempt lineage
+  (parent_attempt_id, attempt_number, escalation_from/to, cache_hit), simulated by an
+  evaluation rule that generalizes routing.simulate_strategies; unavailable fields are null
+  with zero coverage, never zero.
+version: "0.1"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+workflow:
+  kind: experiment
+  params:
+    mode: retrospective        # replay the existing ledger — no new cells are executed
+    source: attempt lineage (parent_attempt_id, attempt_number, escalation_from/to, cache_hit)
+    simulation: session_lineage_sim evaluation rule — generalizes routing.simulate_strategies
+factors:
+  # The arm factor. `continue` is the null arm (the observed lineage, no fork/escalation);
+  # the other three are the counterfactual arms the simulator replays.
+  - {name: session_policy, levels: [continue, fork_with_checkpoint, fork_blind, escalate_with_checkpoint]}
+  # The models present in the existing ledger (per AGENTS.md "Models in use").
+  - {name: model, levels: [deepseek/deepseek-v4-flash, deepseek/deepseek-v4-pro, anthropic/claude-haiku-4-5, anthropic/claude-sonnet-5, openai/gpt-5.6-luna, openai/gpt-5.6-sol, openai/gpt-5.6-terra]}
+design: factorial
+rules:
+  # ── The evaluation rule: the retrospective counterfactual simulator ──
+  # Generalizes routing.simulate_strategies — replays the four session_policy arms over each
+  # job's observed attempt lineage instead of simulating single-model vs grit-routed arms.
+  #   continue                  -> the attempt as observed (no fork, no escalation).
+  #   fork_with_checkpoint      -> a child attempt (parent_attempt_id non-null) resumed from a
+  #                                checkpoint; cache_hit=true counts as checkpoint reuse.
+  #   fork_blind                -> a child attempt re-run from scratch (no checkpoint, no cache).
+  #   escalate_with_checkpoint  -> a child attempt that changes model (escalation_from ->
+  #                                escalation_to) with a checkpoint.
+  # requires -> producer (all are LEDGER_FIELDS, attempt-level block):
+  #   parent_attempt_id, attempt_number, escalation_from, escalation_to, cache_hit
+  - name: session_lineage_sim
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [parent_attempt_id, attempt_number, escalation_from, escalation_to, cache_hit]
+    produces: [arm_assignment, fork_point, escalation_point, checkpoint_reuse]
+
+  # Verified success — the primary quality outcome. Null-not-zero: an attempt whose
+  # test_executed_success is null (not measured) is excluded from the rate, never counted as 0.
+  #   test_executed_success  -> ledger (test_runner.run_suite — the sole source of truth)
+  #   accepted               -> ledger
+  #   evaluator_independent  -> ledger
+  - name: verified_success
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success, accepted, evaluator_independent]
+    produces: [verified_outcome, verified_success_rate]
+
+  # Cost per verified outcome — the primary economic outcome and the null-hypothesis axis.
+  # Null-not-zero: averages over captured costs only; a missing cost never yields a zero-cost
+  # verified outcome.
+  #   cost_inference        -> ledger
+  #   cost_orchestration    -> ledger
+  #   actual_cost           -> ledger
+  #   verified_outcome      -> produced by rule `verified_success` above
+  - name: cost_per_verified_outcome
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [cost_inference, cost_orchestration, actual_cost, verified_outcome]
+    produces: [cost_per_verified_outcome]
+
+  # Cache utilization — does checkpointed forking actually reuse cached context?
+  #   cache_hit -> ledger (per-attempt cache hit)
+  - name: cache_utilization
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [cache_hit]
+    produces: [cache_hit_rate]
+
+  # Rework cost — the extra spend attributable to re-attempts beyond the first.
+  #   rework_cost        -> ledger
+  #   attempt_number     -> ledger
+  #   parent_attempt_id  -> ledger
+  - name: rework_cost
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [rework_cost, attempt_number, parent_attempt_id]
+    produces: [rework_cost_per_verified_outcome]
+
+  # Token growth — how much each arm inflates input/output tokens across the lineage.
+  #   tokens_in, tokens_out, tokens_answer, tokens_explanation -> ledger
+  #   attempt_number -> ledger
+  - name: token_growth
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [tokens_in, tokens_out, tokens_answer, tokens_explanation, attempt_number]
+    produces: [token_growth_ratio]
+metrics:
+  - {name: verified_success_rate, agg: mean, over: cell}
+  - {name: cost_per_verified_outcome, agg: ratio, over: cell}
+  - {name: cache_hit_rate, agg: ratio, over: attempt}
+  - {name: rework_cost_per_verified_outcome, agg: mean, over: cell}
+  - {name: token_growth_ratio, agg: distribution, over: cell}
+comparison:
+  kind: effect_size
+  arm_factor: session_policy
+  loss: {cost: 1.0, quality: -5.0}
+writeup:
+  format: lab_book
+  sections: [hypothesis, null_hypothesis, method, arms, effect_size, uncertainty, null_interpretation]
+stop: {budget_usd: 5.0, max_attempts: 1, uncertainty_threshold: 0.15}
+adapt: {strategy: coordinate_descent, selection: highest_regret}
