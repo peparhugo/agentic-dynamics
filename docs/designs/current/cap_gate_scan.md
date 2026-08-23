@@ -253,3 +253,92 @@ The next spec that adopts `requires_facts:`/`decision_type:` (e.g. a future rout
 built against CAP I4's context compiler) will be the first the R1-R10 rows in this gate can
 actually refuse — this scan establishes the pre-adoption baseline is clean, so that spec's refusal
 (if any) will be attributable to it, not to drift already present in the corpus.
+
+---
+
+## 5. `g2_classify_and_fix` — classification, fixes, and BLOCKED records
+
+**Guard honored:** no changes to `core/contracts.py`, `experiment_spec.py`,
+`compile_experiment.py`, or `context_compiler.py` (the validator) were made in this phase; no
+spec's intent was touched.
+
+### 5.0 Re-verification before classifying anything
+
+`git log` shows no commits landed between `g1_enumerate_and_scan` and this phase (still
+`39ad65705` at `HEAD`), and `git status --porcelain` is clean, so the corpus g1 scanned is the
+same corpus this phase classifies. Re-ran the full gate anyway rather than trusting the prior
+result blindly — a corpus scan is cheap; assuming staleness is not:
+
+```python
+paths = sorted((REPO / "experiments" / "definitions").glob("*.yaml"))  # non-recursive
+paths += sorted((REPO / "workflows").rglob("*.yaml"))                   # recursive
+for path in paths:
+    spec = ExperimentSpec.from_yaml(path)               # 0 load errors
+    errors = validate_spec_fact_contracts(spec)          # real R1-R11 gate, real registries
+    # ... tally pass/fail, collect (name, path, error) rows
+```
+```
+TOTAL=94 PASS=94 FAIL=0 LOAD_ERRORS=0
+```
+
+Confirmed: still zero refusals, zero load errors, 94/94 pass.
+
+### 5.1 Classification table
+
+| spec | spec_path | refusal | decision | reason |
+|---|---|---|---|---|
+| *(none)* | | | | |
+
+There is nothing to classify. §2.2 and §5.0 both independently establish that the R1-R11 gate and
+the classic requires/produces gate produce **zero refusal rows** across all 94 committed specs —
+the FIX-vs-RECORD decision procedure this phase exists to run has an empty input set. This is not
+a shortcut around the phase's work; it is the phase's work, done and coming up empty, which is
+itself the deliverable (a spec author six months from now who sees a FIX/RECORD table with two
+placeholder dashes and no explanation could reasonably suspect the phase was skipped — this section
+exists so they don't have to guess).
+
+### 5.2 Fixes applied
+
+**None.** No spec's `rules:` block was edited, because no rule in the corpus declares
+`requires_facts:`/`decision_type:` in the first place (§2.2) — there is no "reference only produced
+facts" edit to make when nothing references anything yet. `git diff --stat` against
+`39ad65705` (this phase's starting commit) is empty; no spec file changed.
+
+### 5.3 BLOCKED records
+
+**None.** A BLOCKED record exists to name a concrete missing producer for a refusal that is real
+but out of scope to fix (per the workflow's hard rule 3: "otherwise record BLOCKED with a reason").
+With zero refusals, there is no missing producer to name and nothing to block on.
+
+### 5.4 Index regeneration
+
+**Not run, deliberately.** The SHAPE instruction is "regenerate the index … after any spec edit" —
+conditioned on an edit having happened. None did (§5.2), so the precondition for regeneration was
+never met, and this phase does not invoke `scripts/spec_status.py` without `--dry-run` again. §2.3
+already recorded why that command is unsafe to run for-real in this worktree: it depends on the
+gitignored `experiments/results/workflows/` run-ledger, which this checkout doesn't have, so a live
+regeneration here would silently blank out real run-history (`last_run_at`/`latest_ok`/
+`latest_model`/`latest_cost_usd`/`n_runs`) that only exists in the environment that produced the
+committed index — not a mistake worth repeating a second time in the same lab book.
+`experiments/specs/index.json` remains byte-for-byte what it was after `g1` (already verified
+against a fresh in-memory derivation, §2.3) — correctly untouched.
+
+### 5.5 Log
+
+| Metric | Value |
+|---|---|
+| Refusals to classify (input to this phase) | 0 |
+| FIX | 0 |
+| RECORD (BLOCKED) | 0 |
+| Specs edited | 0 |
+| Index regenerated | no (no edit triggered it; see §5.4) |
+| Validator/gate code changed | no (guard honored) |
+| Spec intent changed | no (guard honored) |
+
+**PASS/FAIL: PASS.** The classify-and-fix phase completes with an empty ledger because its input
+— the refusal set from `g1_enumerate_and_scan` — is empty, re-confirmed independently in §5.0.
+Nothing was fixed because nothing needed fixing; nothing was recorded BLOCKED because nothing was
+blocked. `g3_adversarial_rescan` (§3, already executed as part of this same pass and re-confirmed
+in §5.0) is what actually proves the zero holds under adversarial pressure, not this phase in
+isolation — §5 exists to make the classification step auditable in its own right, per the
+workflow's DELIVER contract, even when its table has no rows.
