@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -32,18 +33,23 @@ from agentic_dynamics.adapters.opencode import (
 )
 from agentic_dynamics.core.streaming import stream_subprocess
 
-# Resolve claude binary: env override, then common install paths, then $PATH.
-_CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "")
-if _CLAUDE_BIN:
-    CLAUDE_BIN = _CLAUDE_BIN
-elif Path.home().exists():
-    _candidates = (
-        Path.home() / ".local" / "bin" / "claude",
-        Path.home() / ".claude" / "local" / "claude",
-    )
-    CLAUDE_BIN = next((str(p) for p in _candidates if p.exists()), "claude")
-else:
-    CLAUDE_BIN = "claude"
+def _resolve_claude_bin(
+    *,
+    configured: str | None = None,
+    find_executable: Callable[[str], str | None] = shutil.which,
+) -> str:
+    """Resolve Claude through the portable environment contract only.
+
+    Deployments either put ``claude`` on ``PATH`` or set ``CLAUDE_BIN``. The framework must not
+    know a user's installer-specific directory layout.
+    """
+    if configured:
+        return configured
+    return find_executable("claude") or "claude"
+
+
+# Resolve Claude CLI through the environment, never a host-specific installer path.
+CLAUDE_BIN = _resolve_claude_bin(configured=os.environ.get("CLAUDE_BIN"))
 
 
 def adapt_usage(usage: Any, total_cost_usd: float = 0.0) -> dict[str, Any]:

@@ -6,6 +6,7 @@ from agentic_dynamics.adapters import claude_adapter as module_under_test
 from agentic_dynamics.adapters.claude_adapter import (
     ClaudeStreamAdapter,
     _claude_model_arg,
+    _resolve_claude_bin,
     _resolve_claude_model,
     adapt_usage,
     run_claude_agentic,
@@ -47,6 +48,20 @@ def test_adapt_usage_handles_missing_fields():
     assert out["tokens"]["input"] == 0
     assert out["tokens"]["output"] == 0
     assert out["cost"] == 0.0
+
+
+def test_resolve_claude_bin_uses_path_lookup():
+    assert _resolve_claude_bin(find_executable=lambda name: "/usr/local/bin/claude") == (
+        "/usr/local/bin/claude"
+    )
+
+
+def test_resolve_claude_bin_honors_explicit_override():
+    assert _resolve_claude_bin(configured="/custom/claude") == "/custom/claude"
+
+
+def test_resolve_claude_bin_falls_back_to_command_name_when_path_is_missing():
+    assert _resolve_claude_bin(find_executable=lambda name: None) == "claude"
 
 
 def test_adapter_full_sequence():

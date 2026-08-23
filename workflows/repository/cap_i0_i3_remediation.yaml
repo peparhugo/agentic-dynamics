@@ -1,0 +1,142 @@
+name: cap_i0_i3_remediation
+question: >-
+  Repair and release-gate the completed Context Abstraction Plane I0-I3 implementation on
+  feature/cap-i0-i7 before any I4 Context Compiler work resumes. The prior I4 session stopped
+  because DeepSeek returned HTTP 402 Insufficient Balance; it made no code changes and is NOT
+  evidence that I4 design or code failed. This workflow addresses the actual code-review findings:
+  attempt/run identity collisions, missing-cost -> 0.0 budget-overrun fabrication, multi-run
+  workflow aggregation, ignored job status, measured-zero token loss, and incomplete raw-evidence
+  provenance. It must add focused unit and integration tests, preserve the existing knowledge
+  transport, and end with an adversarial release gate.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing; replace with a compiled profile when
+        I8 exists). domain: software_delivery / CAP implementation. Canonical sources:
+        docs/designs/current/context_abstraction_design.md; Addendum A; the accepted addendum
+        design docs; docs/context_abstraction/implementation_notes.md; ARCHITECTURE.md; the typed
+        WorkflowRunResult/PhaseResult schema; knowledge identity/registry contracts. Policies:
+        reducers are pure; facts travel through the existing KB pipe; null is not zero; no rule may
+        consume unproduced information; controller work begins only after valid facts exist.
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile (pre-CAP-I8 static filing). challenge: cross_cutting
+        remediation. Deliberation: reproduce -> specify invariants -> repair in bounded slices ->
+        add regression/integration tests -> adversarial verification. Session policy: fork per
+        phase; each phase is one coherent intent and commits independently. Verification policy:
+        targeted tests, full relevant guards, formatter/linter, no unintended I4-I7 implementation.
+      current_state: >-
+        I0 fact_schema (8989822dd), I1 spec_status_reducer (6586ccb84), I2 ledger_reducers
+        (11c25e851), and I3 workflow_reducer (de8749e65) exist only on this branch. Targeted CAP
+        tests were green, but review found semantic defects. The interrupted I4 context_compiler
+        phase made no changes: its OpenCode session received APIError HTTP 402 Insufficient Balance
+        after reading files. Do not diagnose or repair I4 in this workflow.
+      review_findings: >-
+        P0: attempt facts use cell:phase identity, so repeated runs of the same spec/model/phase
+        collide. P1: workflow_facts emits projected_budget_overrun=0.0 whenever max_spend exists
+        but cost is absent. P1: workflow_facts mixes all runs in a cell and derives status from
+        phase status while ignoring job_status. P2: attempt_facts drops measured token 0 via
+        truthiness checks. P1: lower reducers currently leave evidence_ids empty and kb_produce_facts
+        identifies every run only as workflow:<spec>, so raw-artifact provenance and re-derivation
+        identity are incomplete. These are the repair contract, not suggestions.
+      hard_rules: >-
+        (1) Scope is I0-I3 remediation only: facts.py, fact_ingestion.py, reducers/, the fact
+        producer, and tests/support code. Do NOT implement context_compiler.py, contracts,
+        validator, decisions, I4-I7, or any actuation. (2) Same persisted run artifact => same
+        fact identity/knowledge id on re-derivation; different persisted run artifacts, even with
+        identical spec/model/phase names, => distinct attempt identities and no accidental
+        supersession. Use a durable artifact identity, not wall-clock time alone. (3) Every raw
+        evidence-consuming fact cites a non-empty, resolvable artifact/evidence identity; do not
+        manufacture a fake knowledge id. (4) Null-not-zero: missing cost makes budget-overrun
+        unknown/absent, not 0.0; measured token 0 remains a fact. (5) Define and test one explicit
+        current-run selection/grouping policy. A workflow fact must never mix attempts from two
+        runs; job_status must dominate incompatible phase summaries. (6) Preserve pure reducers,
+        injected clocks, existing registry/stream transport, and append-only lineage. (7) Every
+        new behavior has a focused regression test and a full ladder integration test. (8) The
+        adversarial phase is mandatory and must find at least three attack cases or document a
+        clean sweep with executable evidence. (9) Do not edit generated .opencode/ or .claude files.
+      read_first: >-
+        docs/designs/current/context_abstraction_design.md §§3-4, §9; docs/context_abstraction/
+        implementation_notes.md; src/agentic_dynamics/control/{facts,fact_ingestion}.py;
+        src/agentic_dynamics/control/reducers/{_common,attempt_facts,job_facts,workflow_facts,
+        policy_facts}.py; scripts/kb_produce_facts.py; src/agentic_dynamics/runtime/
+        workflow_runner.py; src/agentic_dynamics/knowledge/{record_factory,spec_ingestion}.py;
+        tests/test_context_plane_{facts,reducers}.py.
+      run_shape: >-
+        Run with --model anthropic/claude-sonnet-5 --backend claude_cli. Claude Code resolves via
+        CLAUDE_BIN or PATH only; no installer-specific paths belong in this workflow. One existing worktree and branch
+        (feature/cap-i0-i7); every phase commits [workflow] <phase>. Resume only this
+        remediation workflow if interrupted; do not resume context_abstraction_implement until this
+        workflow reaches its release gate.
+    phases:
+      - name: r1_identity_and_raw_provenance
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: a CanonicalFact representing an ATTEMPT has a stable identity for one persisted workflow-run artifact, but two distinct run artifacts can never collide merely because spec/model/phase match. Raw-evidence facts cite durable, resolvable input identity.
+          REPRODUCE FIRST: construct two run JSONs with the same spec_name, model, phase name, and values but different persisted artifact identities; demonstrate the current collision. Also inspect kb_produce_facts._run_evidence and fact_ingestion persistence/re-derivation behavior.
+          DESIGN + FIX: introduce a deterministic run/artifact identity at the EvidenceItem boundary and carry it through attempt/job facts, scope paths, entity ids, and evidence_ids. The identity must survive re-derivation of the same file, distinguish different files/runs, and be citable by verify_chain. Decide explicitly whether job facts are current-per-cell summaries or per-run facts; document the choice in concise code comments/docstrings and make all scopes consistent. Do NOT key on an injected `now` value.
+          TEST: same artifact twice => byte-identical facts and records; two same-name runs => distinct attempt facts; evidence ids are non-empty and resolver validation succeeds; registry supersession only occurs for a genuine new version of the same logical slot.
+          GUARD: no new transport/store; no I4 imports/call sites.
+          LOG: state the chosen identity tuple and the old collision demonstration; PASS/FAIL; commit.
+      - name: r2_nulls_and_current_run_aggregation
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: unknown is never represented as a measured zero, workflow aggregates never mix runs, and job-level terminal status cannot be contradicted by a phase-only summary.
+          FIX: (1) replace truthiness checks that drop measured token 0 with explicit None checks; preserve a recorded zero token value. (2) Make projected_budget_overrun absent/unknown when accumulated cost is unavailable; emit a numeric zero only when a cost was captured and the measured difference is truly zero, following MeasurementCoverage semantics. (3) implement the explicit current-run/grouping policy designed in r1 so a workflow aggregation reads facts from one run only. (4) make workflow_status/health reconcile job_status as the authoritative run-level outcome; document precedence for failed job, failed phase, completed run, and incomplete run.
+          TEST: missing cost + budget => no overrun fact; captured cost below budget => 0.0 overrun fact; token in/out 0 => emitted fact value "0"; two runs with different phase outcomes cannot inflate counts or yield a mixed completed status; job_status=failed dominates all-ok intermediate phases.
+          GUARD: retain the reduction ladder and no fabricated defaults.
+          LOG: truth table for null/zero/status precedence; PASS/FAIL; commit.
+      - name: r3_persistence_and_ladder_integration
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          INVARIANT: the complete I0-I3 ladder is auditable end-to-end: typed run artifact -> evidence item -> lower facts -> finalized fact records -> workflow facts -> derivation-chain verification, with real identity and coverage semantics intact.
+          IMPLEMENT/REPAIR only what the integration evidence exposes. Add a hermetic integration test using temporary workflow-run artifacts and registry data; it must exercise kb_produce_facts derivation rather than merely calling reducers in isolation. Verify exact artifact identity, final fact_id = knowledge_id, non-empty raw evidence provenance, stable re-derivation, distinct repeated runs, correct staleness-cascade inputs, and no publication of unchanged facts.
+          CHECK: ensure fact ingestion's fingerprint/supersession behavior remains byte-stable and does not confuse content identity with run identity. Ensure the CLI/script classification remains correct if any command surface changes.
+          GUARD: no Redis/network dependency in tests; no I4-I7 implementation.
+          LOG: end-to-end input/output table and tests run; PASS/FAIL; commit.
+      - name: r4_adversarial_release_gate
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial release reviewer. Try to falsify the repaired I0-I3 contracts before I4 is allowed to begin.
+          ATTACK vectors: (1) same spec/model/phase across two runs; (2) same artifact re-derived; (3) retry/escalation lineage; (4) missing vs captured-zero cost; (5) missing vs measured-zero tokens; (6) job failed while all intermediate phases are ok; (7) duplicate/out-of-order evidence; (8) a stale/superseded lower fact; (9) tampered evidence id/digest; (10) generated-surface or dependency-direction violation.
+          For every finding: fix it with a test or record a reason-bearing accepted limitation. Run targeted CAP tests, relevant KB/CLI guards, formatting/lint, and the broadest practical pytest subset. Update docs/context_abstraction/implementation_notes.md append-only only if a true design deviation was required.
+          RELEASE VERDICT: explicitly say whether I4 may resume. It may resume only if the P0/P1/P2 repair contract is green and no I0-I3 defect remains unguarded.
+          LOG: finding table + commands/results; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules:
+  - name: cap_i0_i3_remediated
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [attempt_identity_safe, null_semantics_safe, ladder_integrated, remediation_adversarial_clean]
+metrics:
+  - {name: attempt_identity_safe, agg: mean, over: cell}
+  - {name: null_semantics_safe, agg: mean, over: cell}
+  - {name: ladder_integrated, agg: mean, over: cell}
+  - {name: remediation_adversarial_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, r1_identity_and_raw_provenance, r2_nulls_and_current_run_aggregation, r3_persistence_and_ladder_integration, r4_adversarial_release_gate]
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

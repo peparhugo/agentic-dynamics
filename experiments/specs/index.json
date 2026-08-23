@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-22T19:10:33.618996+00:00",
-  "n_specs": 88,
+  "generated_at": "2026-08-23T14:38:22.862794+00:00",
+  "n_specs": 89,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -49,13 +49,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-20T00:56:43.897968+00:00",
+      "last_run_at": "2026-08-22T20:08:26.875322+00:00",
       "latest_ok": false,
-      "latest_model": "anthropic/claude-opus-5",
-      "latest_cost_usd": 0.0,
-      "latest_git_sha": "bf05f1c82",
-      "results_pointer": "experiments/results/workflows/context_abstraction_implement/20260820T005643Z.json",
-      "n_runs": 2
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 1.171869,
+      "latest_git_sha": "de8749e65",
+      "results_pointer": "experiments/results/workflows/context_abstraction_implement/20260822T200826Z.json",
+      "n_runs": 3
     },
     {
       "name": "explanation_tax",
@@ -326,6 +326,24 @@
       "latest_git_sha": "2f3cbbbbc",
       "results_pointer": "experiments/results/workflows/agentic_dynamics_rebrand/20260814T220247Z.json",
       "n_runs": 2
+    },
+    {
+      "name": "cap_i0_i3_remediation",
+      "version": "0.1",
+      "status": "failed",
+      "spec_path": "workflows/repository/cap_i0_i3_remediation.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-23T14:38:22.837722+00:00",
+      "latest_ok": false,
+      "latest_model": "anthropic/claude-sonnet-5",
+      "latest_cost_usd": 0.0,
+      "latest_git_sha": "de8749e65",
+      "results_pointer": "experiments/results/workflows/cap_i0_i3_remediation/20260823T143822Z.json",
+      "n_runs": 1
     },
     {
       "name": "claude_background_sessions",
