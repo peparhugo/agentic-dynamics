@@ -60,6 +60,7 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("knowledge", "facts"), "kb_produce_facts.py", ()),
     (("knowledge", "worker"), "kb_worker.py", ()),
     (("knowledge", "context-report"), "context_snapshot_report.py", ()),
+    (("knowledge", "shadow-report"), "shadow_decision_report.py", ()),
     # registry — special-cased: argv[1] is forwarded to registry.py as its first positional
     (("registry", "query"), "registry.py", ("query",)),
     (("registry", "show"), "registry.py", ("show",)),

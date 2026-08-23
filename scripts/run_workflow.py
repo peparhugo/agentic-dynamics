@@ -82,6 +82,12 @@ def main() -> None:
                          "measurement — nothing consumes the snapshot yet, and a snapshot "
                          "failure never affects the run. OFF by default: this is the first CAP "
                          "hook to touch a real production run + a real Redis connection.")
+    ap.add_argument("--cap-shadow", action="store_true",
+                    help="CAP I6 (design §9): everything --cap-snapshot does, PLUS runs the "
+                         "fact-based route_next_job_v1 rule beside route_step, validates its "
+                         "proposal (C1-C10), and records it as a shadow decision artifact — "
+                         "never applied, never arms actuation. The actual route is always "
+                         "route_step's, unchanged. Implies --cap-snapshot. OFF by default.")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))
@@ -101,7 +107,19 @@ def main() -> None:
             signals = None
 
     router = route_step
-    if args.cap_snapshot:
+    if args.cap_shadow:
+        # CAP I6 seam: a drop-in Router that ALSO runs + validates + records the fact-based
+        # shadow decision (design §9 I6 row) — a superset of --cap-snapshot. Built here, at the
+        # composition root, exactly where `route_step` is injected — `runtime.workflow_runner`
+        # never imports `control` either way (Debt-2).
+        from agentic_dynamics.control.rules import make_shadow_router
+
+        router = make_shadow_router(
+            workload=spec.name,
+            cell_id=_reducer_cell_id(spec.name, args.model),
+            repository_id=cell_scope(args.workdir),
+        )
+    elif args.cap_snapshot:
         # CAP I4 seam: a drop-in Router that also compiles + records a snapshot (design §9 I4
         # row). Built here, at the composition root, exactly where `route_step` is injected —
         # `runtime.workflow_runner` never imports `control` either way (Debt-2).

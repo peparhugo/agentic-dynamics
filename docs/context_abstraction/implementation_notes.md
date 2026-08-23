@@ -160,3 +160,37 @@ may not import either):
    resolution already recorded in §2 above: an invariant with `on_missing` outside
    `{halt, escalate}` is refused. Checked for every LOADED contract (not just ones a spec's
    rules reference), because the property is of the CONTRACT, independent of who cites it.
+
+## 11. I6 — the shadow controller + validator (decisions recorded without touching the armed gate)
+
+`control/decisions.py` (`ControlDecision`/`Precondition`/`ExpectedEffect`/`AUTOMATABLE_ACTIONS`),
+`control/rules.py` (`route_next_job_v1`, `make_shadow_router`), and `control/validator.py`
+(`validate_decision`, checks C1-C10) ship the shadow controller. One material deviation from a
+literal reading of design §8.2 ("Persisted as `source_type="actuation"`... REUSE"):
+
+**A shadow decision's durable artifact is written directly; `publish_event` is never called for
+it.** `knowledge_stream.publish_event`'s actuation gate unconditionally requires
+`FINOPS_ACTUATION_ARMED=1` (or `armed=True`) for ANY `source_type="actuation"` message — there is
+no lower-privilege "record but don't arm" mode inside that function. But design §8.6's commitment
+1 is unconditional the other way: "It does not arm actuation... this design adds nothing that
+sets it." Calling `publish_event(..., armed=True)` from the shadow hook would satisfy "decisions
+get recorded" while violating "never arms actuation"; calling it unarmed would raise on every
+single shadow decision, defeating "recorded" entirely. `control.rules.record_shadow_decision`
+resolves the conflict by stopping one step earlier in the SAME pipe design §4.3/§8.2 reuses:
+`record_to_artifact` writes the durable, content-addressed, per-record JSON
+(`KB_ARTIFACT_DIR/<knowledge_id>.json`) — so a decision is a real, auditable, inspectable
+artifact — but the pointer event is never published to `kb:v1:changes`, so it never reaches the
+live registry/stream a real actuation consumer would react to, and `publish_event`'s armed gate
+is never even invoked. This is STRICTER than I4's snapshot recording (an OBSERVATION-family
+record, which has no armed gate and DOES call `publish_event`) — a shadow decision is
+discoverable only by scanning `KB_ARTIFACT_DIR` directly (`scripts/shadow_decision_report.py`
+does exactly this, filtering on `extractor_version="actuation/v1"`), never via
+`scripts/registry.py` or `experiments/data_manifest.json`. If a future increment (I7+) needs
+shadow decisions in the live registry for a UI or a lineage walk, that is a deliberate, reviewable
+widening of this file's own posture, not an oversight.
+
+F2 (an action other than `continue` with empty `facts_used` is refused, check C5) and F3
+(`decision_calibration` as a named measurement rule) are implemented verbatim per their
+resolutions in the workflow spec's own phase prompt. `AUTOMATABLE_ACTIONS = frozenset({"continue",
+"route"})` is CODE in `control/decisions.py`, imported (never re-declared) by both `rules.py` and
+`validator.py`, so there is exactly one definition to audit.
