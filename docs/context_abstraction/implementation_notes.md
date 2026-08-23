@@ -133,3 +133,30 @@ decision, consistent with I7's later apply seam being OFF by default for the sam
 procedure: pass `--cap-snapshot` to `scripts/run_workflow.py`; nothing else changes, and a
 snapshot failure (no Redis, unauthorized write) never affects the run (`record_snapshot` swallows
 every exception).
+
+## 10. I5 — fact contracts in the spec gate (`FactRequirement` gains its refusal gate)
+
+`core/contracts.py` gains `validate_fact_contracts` (refusals R1-R11) and `RuleSpec` gains
+`requires_facts`/`decision_type` (`src/agentic_dynamics/experiment/experiment_spec.py`). Two
+points worth recording, neither a deviation from the design's intent, both forced by
+`tests/test_dependency_direction.py`'s tier rules (`experiment` may not import `control`; `core`
+may not import either):
+
+1. **The compile-time gate is genuinely two-layer, not one function.**
+   `core.contracts.validate_fact_contracts` is pure and duck-typed — it takes
+   `predicates`/`reducers`/`contracts` as plain `Mapping`s (structural `Protocol`s, never a
+   concrete import of `control.facts.PredicateSpec`/`ReducerSpec` or
+   `experiment.experiment_spec.RuleSpec`) so `core` (tier 0) never imports `experiment` (tier 1)
+   or `control` (tier 2). `experiment_spec.validate_rules`/`validate_spec` gained THREE new
+   keyword-only parameters (`fact_predicates`/`fact_reducers`/`fact_contracts`), all defaulting
+   to `None` — `None` means "skip the I5 gate entirely", which is what keeps every
+   `validate_spec(spec)` call site in the codebase (including `compile_experiment.compile_spec`,
+   which stays tier 1 and therefore cannot supply the real registries) validating byte-for-byte
+   unchanged. The REAL gate — real `FACT_PREDICATES`/`REDUCERS`/loaded contracts —  is
+   `control.context_compiler.validate_spec_fact_contracts(spec)`, a `control`-tier (tier 2)
+   function that CAN see both `core` and `experiment` and is the actual "a spec requiring an
+   unproduced predicate is refused" call site the I5 gate (design §9) means.
+2. **R11 is additive to the design's own R1-R10 table** (§7.3), carrying forward the F1
+   resolution already recorded in §2 above: an invariant with `on_missing` outside
+   `{halt, escalate}` is refused. Checked for every LOADED contract (not just ones a spec's
+   rules reference), because the property is of the CONTRACT, independent of who cites it.

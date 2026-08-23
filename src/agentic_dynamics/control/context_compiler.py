@@ -956,3 +956,48 @@ def make_snapshotting_router(
         return model
 
     return _router
+
+
+# ── The REAL I5 compile-time gate (design §7.3) ───────────────────
+
+
+def load_all_contracts(*, contracts_dir: Path = CONTRACTS_DIR) -> dict[str, ContractSpec]:
+    """Load every ``experiments/contexts/*.yaml`` contract, keyed by ``decision_type``.
+
+    The registry :func:`validate_spec_fact_contracts` (R9/R10/R11) needs — a compile-time gate
+    must see every committed contract, not just the ones a given spec happens to reference,
+    because R11 (an invariant's on_missing semantics) is a property OF the contract, checked
+    independent of who references it.
+    """
+    contracts: dict[str, ContractSpec] = {}
+    if not contracts_dir.is_dir():
+        return contracts
+    for path in sorted(contracts_dir.glob("*.yaml")):
+        contract = load_contract(path.stem, contracts_dir=contracts_dir)
+        contracts[contract.decision_type] = contract
+    return contracts
+
+
+def validate_spec_fact_contracts(
+    spec: Any, *, contracts_dir: Path = CONTRACTS_DIR
+) -> list[str]:
+    """The ACTUAL CAP I5 compile-time gate — real ``FACT_PREDICATES``/``REDUCERS``/contracts.
+
+    ``core.contracts.validate_fact_contracts`` is a pure function of whatever registries it is
+    handed (tier 0 — it may not import ``control.facts``/``control.reducers``, design's
+    docstring). THIS is the composition point: a caller in ``control`` (tier 2, which may see
+    both ``core`` and ``experiment``) supplies the real registries. Callers: a spec-authoring
+    test, ``scripts/validate_session.py``-style pre-flight checks, or any future producer that
+    wants the I5 gate applied with real data — not ``compile_experiment.compile_spec`` itself,
+    which stays tier 1 and therefore cannot call this (design's own §7.3 split: "compile time
+    proves producibility" is ``experiment``'s job with an empty registry by default; a REAL
+    registry is a ``control``-tier opt-in, exactly like the I4 snapshot hook is).
+    """
+    from agentic_dynamics.experiment.experiment_spec import validate_spec
+
+    return validate_spec(
+        spec,
+        fact_predicates=FACT_PREDICATES,
+        fact_reducers=REDUCERS,
+        fact_contracts=load_all_contracts(contracts_dir=contracts_dir),
+    )
