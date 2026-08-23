@@ -1,0 +1,137 @@
+name: control_room_refresh
+question: >-
+  Refresh the Control Room portal (apps/control_room/) with a modern, sleek, premium visual
+  language — the kind of interface that makes an observer immediately want it. Audit the current
+  SPA (static/index.html + 7 JS modules + style.css), design a coherent visual system
+  (dark-first, refined typography, deliberate motion, dense-but-legible data display, responsive),
+  implement it with zero functional regression (all 28 routes, SSE event contracts, and the
+  supervisor flag surfaces must keep working), then run an adversarial polish/QA pass that tries
+  to break it. The live portal on port 8000 must NOT be interrupted — validate in the worktree on
+  a different port and leave deployment (merge + restart) as an explicit follow-up step.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile — static filing of the domain-context gap (pre-CAP-I8). When I8
+        lands this block is replaced by the compiled profile and MUST be deleted from this spec.
+        domain: software_delivery / operator portal UI
+        canonical_sources: [apps/control_room/server.py + routes/ + services/ (the API surface),
+          apps/control_room/static/ (the current SPA), scripts/CONTEXT.md (portal route
+          inventory), ARCHITECTURE.md (plane boundaries)]
+        policies: [no_functional_regression, no_build_step, no_new_runtime_dependencies,
+          vanilla_js_only, preserve_sse_contracts]
+        verification: [control-room tests, CLI/classification guards, local smoke test on a
+          separate port]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile — static filing (same migration note as domain_context).
+        challenge: UI refresh (cross-cutting within the portal surface only)
+        context_requirements: [the route/endpoint inventory, the SSE event schemas, the JS
+          module architecture, the current design tokens]
+        deliberation: [audit, design system, implement, adversarial QA]
+        session_policy: {default: fork_per_phase}
+        verification_policy: [tests pass, zero broken routes, no build step, deploy = copy files
+          + restart]
+      current_state: >-
+        The Control Room is a Flask app (server.py, 213 lines) with modular routes/, services/,
+        clients/, and a vanilla-JS SPA in static/ (index.html, app.js, shell.js, board-fleet.js,
+        control-room-core.js, detail-sheet.js, keyed-list.js, style.css). It exposes 28 routes
+        (SSE telemetry, routing, supervisor flags, design sessions, Claude background sessions)
+        and is currently running live on port 8000 (FINOPS_PORT). Prior UI workflows
+        (control_room_portal, control_room_ui_implement/rebuild/redesign, control_room_hardening)
+        established the current surface; this refresh restyles and refines it without changing
+        its contract.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) NO functional
+        regression: every route in the current inventory responds; SSE event names/payloads are
+        unchanged; supervisor flags and design sessions remain operable. (3) NO build step, NO
+        new runtime dependencies, NO CDN fetches, NO framework swap: the SPA stays vanilla JS +
+        CSS in apps/control_room/static/, deploy remains copy-files-and-restart. (4) The live
+        portal (port 8000) must never be killed or restarted by this workflow — validate on a
+        local instance on another port only. (5) Design-only work lands in
+        docs/designs/control_room_refresh_*.md; implementation lands in apps/control_room/static/
+        (server.py/routes/ only if strictly necessary — prefer zero server changes, additive
+        only). (6) The adversarial QA phase (c4) is mandatory — it must try to break the UI
+        (console errors, dead routes, SSE reconnection, empty states, narrow viewports, dark/light
+        contrast, a11y basics) and find at least 3 real issues or document a clean sweep with
+        evidence. (7) Do not edit generated surfaces (.opencode/, .claude/, agent_config is the
+        source of truth). (8) PASS/FAIL checkpoint log; resumable via --resume.
+      read_first: >-
+        apps/control_room/server.py, apps/control_room/routes/ (each route module),
+        apps/control_room/static/index.html, apps/control_room/static/style.css,
+        apps/control_room/static/*.js, scripts/CONTEXT.md (Control Room section), any existing
+        control-room tests under tests/
+      run_shape: >-
+        SINGLE-model: run with --model openai/gpt-5.6-terra --backend opencode. One worktree, one
+        branch (feature/control-room-refresh); each phase commits [workflow] <phase>. Resumable
+        with --resume.
+    phases:
+      - name: c1_audit
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/control_room_refresh_audit.md
+          ROLE: UI auditor. Map the current portal precisely before anything is restyled.
+          AUDIT: (1) route inventory — every endpoint in server.py + routes/, its method, payload shape, and which frontend module consumes it; (2) SSE — every event name, its fields, and every frontend subscription; (3) JS architecture — the module graph (shell/app/board-fleet/control-room-core/detail-sheet/keyed-list), state flow, how data renders (innerHTML vs DOM APIs), and known smells; (4) visual system — current colors/typography/spacing/motion, what feels dated, what data is shown but hard to read (matrix, flags, routing, sessions); (5) gaps — empty states, error states, loading states, responsiveness, a11y, performance.
+          GUARD: every claim maps to a file:line; the route/SSE inventory is complete and matches what server.py actually serves.
+          LOG: route count, SSE event count, module list, dated-element list; PASS/FAIL; commit.
+      - name: c2_design
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/control_room_refresh_design.md
+          ROLE: designer. Build the visual system — modern, sleek, premium ("holy fuck, I need that").
+          DESIGN, grounded in the c1 audit: (1) design tokens — dark-first palette (true blacks/deep slate, one signature accent, semantic status colors that survive deuteranopia), type scale (system font stack or one font, no CDN), spacing/radius/shadow scale, motion (150-250ms, reduced-motion respect); (2) component redesign — the matrix/status surfaces, supervisor flags, routing table, design sessions, Claude sessions, header/nav chrome, live indicators (pulsing status dots, SSE connection state); (3) layout — information hierarchy for a live ops wall at 1440p AND a laptop; (4) data visualization — the matrix as a first-class object (heatmap-ish density, condition badges, per-model color encoding); (5) empty/error/loading states for every surface (the "no data yet" portal problem); (6) micro-interactions that signal liveness (SSE heartbeat, session activity, flag toggles).
+          GUARD: design-only (no static/ edits in this phase); every token has a name+value; every redesigned component names its data source from the audit.
+          LOG: token table, component inventory, state design; PASS/FAIL; commit.
+      - name: c3_implement
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER: the refresh implemented in apps/control_room/static/ (style.css rewrite, index.html + JS module updates) per the c2 design.
+          IMPLEMENT: (1) design tokens as CSS custom properties; (2) the redesigned components with zero functional regression — every existing DOM id/class the JS uses must keep working or be migrated atomically with its consumer; (3) SSE handling preserved (same event names, same fields, reconnection UX improved); (4) loading/empty/error states for all surfaces; (5) responsive (>=360px width) + prefers-reduced-motion; (6) no build step, no new deps, no CDNs.
+          VERIFY IN-WORKTREE: boot the app on an alternate port (FINOPS_PORT=8xxx or --port) against the worktree's static files; smoke every route and event with curl and, if available, a headless check; run the existing control-room tests + CLI/classification guards.
+          GUARD: server.py/routes/ untouched unless strictly necessary (additive only); all tests green; no new files outside apps/control_room/static/ and docs/.
+          LOG: files changed, smoke-test matrix (route -> status), tests run; PASS/FAIL; commit.
+      - name: c4_adversarial_polish
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial UI QA + polish. Try to break the refresh; then polish to the "holy fuck" bar.
+          ATTACK: (1) every route responds (re-check the full inventory); (2) SSE — disconnect/reconnect, malformed frames, slow events; (3) console — zero errors across all views; (4) empty states — each surface with zero data renders beautifully, never broken; (5) responsive — 360px, 768px, 1440p; (6) contrast — status colors on the dark palette; (7) a11y — keyboard nav on flags/sessions, focus rings, aria basics, reduced motion; (8) performance — no layout thrash, no runaway intervals, SSE cleanup on view switch; (9) regression — every JS module still loads, no dead references to old ids/classes.
+          Every finding: fix it (commit) or record a reason-bearing accepted limitation. Final pass: tighten spacing/type/motion until the design intent is unmistakable.
+          RELEASE VERDICT: explicitly state the deploy steps (merge branch -> restart portal on 8000) and any follow-ups.
+          LOG: finding table, console-clean evidence, final polish notes; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-terra]}
+design: factorial
+rules:
+  - name: control_room_refreshed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [ui_audited, design_delivered, implementation_verified, adversarial_polished]
+metrics:
+  - {name: ui_audited, agg: mean, over: cell}
+  - {name: design_delivered, agg: mean, over: cell}
+  - {name: implementation_verified, agg: mean, over: cell}
+  - {name: adversarial_polished, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, c1_audit, c2_design, c3_implement, c4_adversarial_polish]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
