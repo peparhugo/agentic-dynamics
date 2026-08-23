@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room Refresh: Pre-Implementation Audit
 
 **Audit date:** 2026-08-23  

@@ -185,6 +185,32 @@
      per breakpoint. */
 
   let systemReturnFocus = null
+  const SYSTEM_FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+  /**
+   * Keep keyboard focus inside System while its scrim makes the board unavailable.
+   *
+   * Detail already has this behavior on small screens. System needs the same modal contract on
+   * every viewport because its dialog and scrim are visible together on both phone and desktop.
+   */
+  function trapSystemFocus(event) {
+    if (event.key !== "Tab") return
+    const sheet = $("#system-sheet")
+    if (!sheet || sheet.dataset.open !== "true") return
+    const focusable = Array.from(sheet.querySelectorAll(SYSTEM_FOCUSABLE)).filter(
+      (node) => !node.closest("[hidden]"),
+    )
+    if (!focusable.length) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
 
   /** Reflect the sheet's open state on both affordances that can open it. */
   function markSystemToggles(open) {
@@ -280,8 +306,11 @@
     // Escape closes the System sheet here; the Detail sheet handles its own Escape so the
     // two surfaces never fight over one key.
     document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") return
-      if ($("#system-sheet")?.dataset.open === "true") closeSystem()
+      if (event.key === "Escape" && $("#system-sheet")?.dataset.open === "true") {
+        closeSystem()
+        return
+      }
+      trapSystemFocus(event)
     })
   }
 

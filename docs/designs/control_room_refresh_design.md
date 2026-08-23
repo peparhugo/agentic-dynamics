@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Control Room Refresh: Visual System Design
 
 **Phase:** design only

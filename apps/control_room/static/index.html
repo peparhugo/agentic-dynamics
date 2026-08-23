@@ -79,13 +79,13 @@
 
       <div class="rail-actions">
         <button id="theme-toggle" class="icon-button" type="button" aria-pressed="false" title="Toggle light theme">
-          <span aria-hidden="true">◐</span><span class="sr-only">Toggle light or dark theme</span>
+          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24"><path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8Z"/></svg><span class="sr-only">Toggle light or dark theme</span>
         </button>
         <!-- Mobile reaches the System overflow from a persistent gear in the shell (design §1.4);
              desktop reaches it from the nav rail's bottom entry (#system-nav). Two affordances,
              one handler, one sheet. -->
         <button id="system-toggle" class="icon-button system-gear" type="button" aria-expanded="false" aria-controls="system-sheet">
-          <span aria-hidden="true">⚙</span><span class="sr-only">Open System: registry and queue actions</span>
+          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24"><path d="m12 2 1.3 2.7 3 .5.8 2.9 2.5 1.8-1.5 2.6 1.5 2.6-2.5 1.8-.8 2.9-3 .5L12 22l-1.3-2.7-3-.5-.8-2.9-2.5-1.8 1.5-2.6-1.5-2.6L6.9 8l.8-2.9 3-.5L12 2Zm0 6.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5Z"/></svg><span class="sr-only">Open System: registry and queue actions</span>
         </button>
       </div>
     </header>
@@ -97,30 +97,30 @@
     -->
     <nav id="destinations" class="destinations" aria-label="Control Room boards">
       <button class="destination" type="button" data-board="fleet" aria-current="page">
-        <span class="destination-glyph" aria-hidden="true">▦</span>
+        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z"/></svg></span>
         <span class="destination-label">Fleet</span>
       </button>
       <button class="destination" type="button" data-board="status">
-        <span class="destination-glyph" aria-hidden="true">$</span>
+        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-8m5 8V3"/></svg></span>
         <span class="destination-label">Status</span>
       </button>
       <button class="destination" type="button" data-board="flags">
-        <span class="destination-glyph" aria-hidden="true">▲</span>
+        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M6 21V4m0 1h11l-2 4 2 4H6"/></svg></span>
         <span class="destination-label">Flags</span>
         <!-- Mirrors #supervisor-count. A nonzero badge suggests attention; it never switches
              boards for the operator (design §4.2, [R §2.5]). -->
         <span class="destination-badge" data-mirror="supervisor-count" hidden>0</span>
       </button>
       <button class="destination" type="button" data-board="sessions">
-        <span class="destination-glyph" aria-hidden="true">◉</span>
+        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 21c.7-4 3-6 7-6s6.3 2 7 6"/></svg></span>
         <span class="destination-label">Sessions</span>
       </button>
       <button class="destination" type="button" data-board="routing">
-        <span class="destination-glyph" aria-hidden="true">⇄</span>
+        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="m7 7 3-3m-3 3 3 3M4 7h13a3 3 0 0 1 3 3v1m-3 6-3 3m3-3-3-3m3 3H7a3 3 0 0 1-3-3v-1"/></svg></span>
         <span class="destination-label">Routing</span>
       </button>
       <button id="system-nav" class="destination destination-system" type="button" aria-expanded="false" aria-controls="system-sheet">
-        <span class="destination-glyph" aria-hidden="true">⚙</span>
+        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="m12 2 1.3 2.7 3 .5.8 2.9 2.5 1.8-1.5 2.6 1.5 2.6-2.5 1.8-.8 2.9-3 .5L12 22l-1.3-2.7-3-.5-.8-2.9-2.5-1.8 1.5-2.6-1.5-2.6L6.9 8l.8-2.9 3-.5L12 2Zm0 6.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5Z"/></svg></span>
         <span class="destination-label">System</span>
       </button>
     </nav>
@@ -619,7 +619,7 @@
   -->
   <div id="scrim" class="scrim" hidden></div>
 
-  <section id="system-sheet" class="system-sheet" aria-labelledby="system-title" data-open="false" hidden>
+  <section id="system-sheet" class="system-sheet" role="dialog" aria-modal="true" aria-labelledby="system-title" data-open="false" hidden>
     <div class="sheet-handle" aria-hidden="true"></div>
     <header class="sheet-header">
       <div>
