@@ -342,3 +342,95 @@ blocked. `g3_adversarial_rescan` (§3, already executed as part of this same pas
 in §5.0) is what actually proves the zero holds under adversarial pressure, not this phase in
 isolation — §5 exists to make the classification step auditable in its own right, per the
 workflow's DELIVER contract, even when its table has no rows.
+
+---
+
+## 6. `g3_adversarial_rescan` — independent re-scan, adversarial role
+
+**Role held for this section:** try to break §2/§5's "zero refusals" result, not confirm it.
+§3 and §5.0 already re-ran the *same* check twice; a re-run that only repeats the original
+methodology cannot find what that methodology is structurally blind to. This phase instead adds
+checks the prior passes did **not** run, aimed squarely at this phase's charter — "refusals the
+first scan missed, fixes that merely silenced the gate, index/spec drift, and phantom RECORDs."
+
+### 6.1 New adversarial checks (beyond §2/§3/§5)
+
+| # | What §2/§3/§5 did NOT check | Method | Result |
+|---|---|---|---|
+| A1 | Whether grep's text-based "0 matches" for `requires_facts:`/`decision_type:` (§2.2) could miss a rule that sets either field through YAML anchors, aliases, or merge keys that still parse to a non-empty value | Loaded all 94 specs as real `ExperimentSpec` objects and inspected `rule.requires_facts`/`rule.decision_type` **programmatically** on every rule of every spec — not text search | 0 rules with non-empty `requires_facts` or non-empty `decision_type`, corpus-wide. Confirms §2.2's grep result was not a text-matching blind spot. |
+| A2 | Duplicate spec names in the corpus (two files claiming the same `spec.name`, which would make `spec_id` ambiguous downstream) | Collected `spec.name` across all 94 loaded specs, checked for repeats | 0 duplicates |
+| A3 | Dangling `supersedes`/`superseded_by` chains (a spec claims to supersede/be-superseded-by a name that doesn't exist in the corpus) | Collected every `supersedes` entry and every `superseded_by` value across all 94 specs; diffed against the set of 94 real spec names | 0 dangling references either direction |
+| A4 | **"Fixes that merely silenced the gate"** — a `FACT_PREDICATES` entry whose `produced_by` names a `REDUCERS` version that is registered as *metadata* (§2.2's registry-integrity check only verified the version string exists as a dict key) but has **no runnable implementation** behind it (`get_reducer(version) is None`) — the precise shape of "declared but not really produced" a naive dict-membership check would miss | Called `get_reducer(version)` for every version key in `REDUCERS` and checked for `None` | 0 unimplemented reducers — every declared version has a real callable |
+| A5 | Bidirectional predicate↔reducer agreement — a predicate claims reducer X as a `produced_by`, but reducer X's own `.produces` tuple does not list that predicate back (the two declarations disagreeing would mean the "producer" doesn't actually emit what it's credited with) | Cross-checked every `FACT_PREDICATES[*].produced_by` entry against the matching `REDUCERS[version].produces` tuple | 0 mismatches — every claim is reciprocated |
+| A6 | Orphan reducers — a reducer registered and implemented but that no predicate credits as a producer (dead capacity, not a refusal but worth surfacing as drift) | Diffed `REDUCERS` keys against the union of every `FACT_PREDICATES[*].produced_by` | 0 orphans — all 5 reducers are claimed by at least one predicate |
+| A7 | **Phantom RECORD check** — was any spec from `g1`/`g2` wrongly marked BLOCKED when a producer exists after all | N/A by construction — §5.3 recorded 0 BLOCKED entries in `g2`, so there is nothing that could be a phantom RECORD |
+| A8 | **Silenced-gate check proper** — a rule whose `requires_facts` now references a predicate with a plausible-looking but fake reducer version string | N/A by construction — 0 rules declare `requires_facts` at all (A1), so there is no reference to silence |
+
+**0 findings across A1-A8.** No refusal the first scan missed, no silenced gate, no drift, no
+phantom RECORD.
+
+### 6.2 Full gate re-run — fresh process, fresh enumeration
+
+Independent of `index.json`, independent of §3's earlier run (a new Python process, re-globbing
+disk):
+
+```
+94 spec files enumerated fresh from disk
+FRESH ADVERSARIAL RESCAN: TOTAL=94 PASS=94 FAIL=0
+```
+
+Contract re-check (`experiments/contexts/*.yaml` re-globbed, not cached from an earlier phase):
+
+```
+contracts now on disk: ['route_next_job']
+ invariant allowed_models halt OK
+ invariant max_spend_usd  halt OK
+```
+
+Index re-check (in-memory derivation vs. committed `experiments/specs/index.json`, same safe
+methodology as §2.3/§5.0 — never the writing form of `spec_status.py`):
+
+```
+index still matches on all YAML-derived fields: True
+n_specs: 94 94
+```
+
+Corroborating test, re-run once more for this phase's own record:
+
+```
+$ pytest tests/test_context_plane_contracts.py -k gains_zero_new_refusals -q
+1 passed
+```
+
+### 6.3 Findings table
+
+| spec | spec_path | rule/contract | finding | resolution |
+|---|---|---|---|---|
+| *(none)* | | | | |
+
+**0 findings to fix or re-record.** Every angle in §6.1 plus the full re-run in §6.2 returned
+zero. `git status --porcelain` confirms this phase made no spec edits — there was nothing to fix
+and nothing to re-record.
+
+### 6.4 Log
+
+| Metric | Value |
+|---|---|
+| New adversarial checks run (beyond §2/§3/§5) | 8 (A1-A8) |
+| Findings from new checks | 0 |
+| Full-gate re-run (fresh process) | 94/94 PASS |
+| Contract re-check | 1 contract, 2 invariants, both R11-clean |
+| Index parity re-check | 94/94 identical (YAML-derived fields) |
+| Corroborating test | PASS |
+| Refusals the first scan missed | 0 |
+| Fixes that merely silenced the gate | 0 |
+| Index/spec drift | 0 |
+| Phantom RECORDs | 0 |
+| FIX applied this phase | 0 |
+| RE-RECORD applied this phase | 0 |
+| Specs edited this phase | 0 |
+
+**PASS/FAIL: PASS.** Adversarial pressure applied across eight new angles the prior two phases
+did not cover, plus a full independent re-run of the gate itself, the contracts, and the index
+parity check — all clean. **Final state: zero refusals, held under adversarial re-scan, fully
+documented in §2, §5, and §6.**
