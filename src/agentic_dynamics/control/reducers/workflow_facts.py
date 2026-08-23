@@ -18,6 +18,17 @@ the ``evidence_ids`` — the child ``fact_id``s it consumed — but never child 
 or scope paths) in its payload. ``aggregates_from`` is declared on the predicates in
 ``FACT_PREDICATES``.
 
+**Current-run aggregation (CAP I0-I3 repair):** ``attempt_facts/v1`` mints one immutable fact PER
+RUN (§ its own docstring), so a cell with several recorded runs has several DISTINCT
+``phase_status`` facts per phase — one per run — all landing in this reducer's ``inp.facts``. A
+workflow fact must describe the cell's CURRENT state, so ``_facts_for_cell`` selects only the
+attempt facts belonging to the single most-recently-recorded run (the one with the greatest
+``observed_at`` — never ``inp.now``) before counting completed/remaining/failed phases; older
+runs' attempt facts are excluded from both the count and ``evidence_ids``. Job facts need no such
+filter by construction (they are already current-per-cell — see ``job_facts.py``), but the same
+"latest ``observed_at`` wins" rule is applied uniformly rather than trusting input order, so this
+reducer's output does not depend on how its caller ordered ``inp.facts``.
+
 Determinism (the §4.2 contract, verbatim): total order over inputs (children are sorted by
 ``fact_id`` before being folded into ``evidence_ids`` and the digest), no wall-clock read
 (``inp.now`` only), and a total function — every branch emits the four always-known facts (a
@@ -158,14 +169,40 @@ def _facts_for_cell(
     inp: ReducerInput,
 ) -> list[CanonicalFact]:
     """Emit the five workflow facts for one cell, honouring the aggregation rules."""
-    phase_status = [f for f in cell_facts if f.predicate == "phase_status"]
-    jobs = {f.predicate: f for f in cell_facts if f.scope_type == "job"}
+    # Current-run selection (module docstring): attempt facts are per-run, so a cell with N
+    # recorded runs carries N copies of each phase's facts here. Pick the run with the greatest
+    # ``observed_at`` and use ONLY its attempt facts for the phase-completion rollup — never all
+    # of them, which would double-count across reruns.
+    attempt_facts = [f for f in cell_facts if f.scope_type == "attempt"]
+    current_attempt_facts: list[CanonicalFact] = []
+    if attempt_facts:
+        latest = max(attempt_facts, key=lambda f: f.observed_at)
+        current_run = _segments(latest.scope_path).get("run")
+        current_attempt_facts = [
+            f for f in attempt_facts if _segments(f.scope_path).get("run") == current_run
+        ]
+    phase_status = [f for f in current_attempt_facts if f.predicate == "phase_status"]
+
+    # Job facts are already current-per-cell by construction (job_facts.py), but pick the
+    # greatest-``observed_at`` fact per predicate explicitly rather than trusting input order —
+    # this reducer's output must not depend on how the caller ordered ``inp.facts``.
+    jobs: dict[str, CanonicalFact] = {}
+    for f in cell_facts:
+        if f.scope_type != "job":
+            continue
+        prior = jobs.get(f.predicate)
+        if prior is None or f.observed_at >= prior.observed_at:
+            jobs[f.predicate] = f
+
     max_spend = policies.get("max_spend_usd")
 
-    # evidence_ids = the FULL input set (§3.1) the reducer consumed for this cell — every lower
-    # fact (job + attempt) plus the workload ceiling when one exists — sorted for a total order
-    # (§4.2). Empty ids are dropped (a child that was never finalized has no citable identity).
-    inputs = list(cell_facts)
+    # evidence_ids = the FULL input set (§3.1) the reducer ACTUALLY consumed for this cell's
+    # CURRENT state — the current run's attempt facts, the current job fact per predicate, and
+    # the workload ceiling when one exists — sorted for a total order (§4.2). Older runs' facts
+    # are deliberately excluded: citing an input that did not shape the value would let an
+    # unrelated old run's supersession trip this fact's staleness cascade for no reason. Empty
+    # ids are dropped (a child that was never finalized has no citable identity).
+    inputs = current_attempt_facts + list(jobs.values())
     if max_spend is not None:
         inputs.append(max_spend)
     evidence_ids = tuple(sorted(f.fact_id for f in inputs if f.fact_id))

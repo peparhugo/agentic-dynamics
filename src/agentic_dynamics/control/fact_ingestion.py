@@ -43,7 +43,7 @@ from agentic_dynamics.knowledge.knowledge_ingestion import record_to_event
 from agentic_dynamics.knowledge.record_factory import (
     build_record as build_record_from_parts,
 )
-from agentic_dynamics.knowledge.spec_ingestion import registry_head
+from agentic_dynamics.knowledge.spec_ingestion import RegistryHead, registry_head
 
 #: ``source_type`` recorded on every fact record — the ONE additive row registered in
 #: ``knowledge.SOURCE_TYPES`` (design §3.3). Observation family: a fact states what IS, never
@@ -163,27 +163,49 @@ def derive_fact_records(
     Mirrors ``spec_ingestion.derive_spec_records`` exactly, per ``fact_entity_id``:
 
     1. Build the record with no predecessor link.
-    2. Look up the entity's current head in ``registry_index.jsonl``.
+    2. Look up the entity's current head — first in THIS batch (see below), else in
+       ``registry_index.jsonl``.
     3. **No head** → first version: emit as-is (``operation="upsert"``).
     4. **Head whose content fingerprint matches** → the fact has not moved: emit nothing.
     5. **Head whose fingerprint differs** (or predates the annotation) → rebuild with
        ``supersedes=<head knowledge_id>``, giving ``generate_manifest.py`` the link it needs to
        derive ``current`` vs ``superseded``.
 
+    **In-batch chaining (CAP I0-I3 repair):** a single call can carry MULTIPLE facts that share
+    one ``fact_entity_id`` — e.g. ``job_facts/v1`` emits a current-per-cell fact per run, and a
+    batch may cover several runs of the same cell. The on-disk registry has not been written yet
+    mid-batch, so reading ONLY ``registry_head`` would have every such fact see the same stale
+    (or absent) disk head and independently decide "first version"/"supersedes X" — producing two
+    unlinked "current" rows for one slot (a ``conflicted`` fact, per ``facts.fact_state``) instead
+    of a clean chain. ``pending_head`` tracks each entity's head as this loop mutates it, so
+    facts are threaded against one another in the order given — which is why callers (e.g.
+    ``kb_produce_facts.load_run_jsons``) sort their evidence oldest-run-first: the LAST fact
+    processed for an entity is the one that ends up current.
+
     No LLM, no writes: emission is the producer's job (``scripts/kb_produce_facts.py``).
     """
     records: list[KnowledgeRecord] = []
+    pending_head: dict[str, RegistryHead] = {}
     for fact in facts:
         candidate = build_fact_record(fact)
-        head = registry_head(
-            candidate.entity_id, registry_path=registry_path, reason_prefix=REASON_PREFIX
-        )
+        head = pending_head.get(candidate.entity_id)
         if head is None:
+            head = registry_head(
+                candidate.entity_id, registry_path=registry_path, reason_prefix=REASON_PREFIX
+            )
+        if head is None:
+            pending_head[candidate.entity_id] = RegistryHead(
+                candidate.knowledge_id, fact_fingerprint(candidate)
+            )
             records.append(candidate)  # first version of this entity
             continue
         if head.fingerprint and head.fingerprint == fact_fingerprint(candidate):
+            pending_head[candidate.entity_id] = head
             continue  # unchanged since the last registration — nothing to say
         if head.knowledge_id == candidate.knowledge_id:
+            pending_head[candidate.entity_id] = head
             continue  # byte-identical first version already registered
-        records.append(build_fact_record(fact, supersedes=head.knowledge_id))
+        linked = build_fact_record(fact, supersedes=head.knowledge_id)
+        pending_head[candidate.entity_id] = RegistryHead(linked.knowledge_id, fact_fingerprint(linked))
+        records.append(linked)
     return records

@@ -38,6 +38,7 @@ import argparse
 import json
 import os
 import subprocess
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -60,6 +61,7 @@ from agentic_dynamics.control.reducers import (  # noqa: E402
     spec_status_v1,
     workflow_facts_v1,
 )
+from agentic_dynamics.control.reducers._common import run_artifact_id, run_recency_key  # noqa: E402
 from agentic_dynamics.core.paths import KB_ARTIFACT_DIR, REGISTRY_INDEX_PATH  # noqa: E402
 from agentic_dynamics.experiment.experiment_spec import load_spec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import _spec_paths  # noqa: E402
@@ -104,6 +106,14 @@ def load_run_jsons() -> list[dict]:
     Skips unreadable/non-object files — a run ledger that fails to parse must not hide the rest.
     Each returned dict is the ``WorkflowRunResult.to_dict()`` shape ``scripts/run_workflow.py:108``
     writes (spec_name / model / git_sha / ended_at / phases[] / total_cost_usd / ok / …).
+
+    Returned oldest-recorded-run-first (CAP I0-I3 repair), keyed by each run's OWN
+    ``ended_at``/``started_at`` — never the filesystem traversal order and never a wall clock —
+    so a batch covering several runs of one cell processes deterministically and
+    ``fact_ingestion.derive_fact_records``'s in-batch chaining lands on the most-recently-recorded
+    run's value as current (job facts are current-per-cell summaries, see ``job_facts.py``). Ties
+    (e.g. two runs with no timestamps) break on the run's own canonical JSON for full
+    determinism.
     """
     results_dir = REPO_ROOT / "experiments" / "results" / "workflows"
     runs: list[dict] = []
@@ -116,6 +126,7 @@ def load_run_jsons() -> list[dict]:
             continue
         if isinstance(payload, dict):
             runs.append(payload)
+    runs.sort(key=lambda r: (run_recency_key(r), json.dumps(r, sort_keys=True, default=str)))
     return runs
 
 
@@ -146,14 +157,37 @@ def load_spec_configs() -> list[dict]:
 
 
 def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
+    """Build one ``EvidenceItem`` per run, identified by its content-addressed artifact id.
+
+    CAP I0-I3 repair: the identity used to be ``f"workflow:{spec_name}"`` — spec-name-only, so
+    EVERY run of the same spec collided on the same ``evidence_id`` regardless of model, phase
+    values, or when it ran. ``run_artifact_id`` (``_common.py``) hashes the run's own recorded
+    fields, so two distinct persisted run artifacts get distinct, durable, resolvable ids (a
+    caller can look one back up via a ``{evidence_id: payload}`` index over this same sequence —
+    see ``_evidence_resolver`` below), while re-deriving from the SAME artifact reproduces the
+    same id byte-for-byte.
+    """
     return tuple(
         EvidenceItem(
             source_type="workflow_run",
-            evidence_id=f"workflow:{run.get('spec_name') or '?'}",
+            evidence_id=f"workflow_run:{run_artifact_id(run)}",
             payload=run,
         )
         for run in runs
     )
+
+
+def evidence_resolver(items: tuple[EvidenceItem, ...]) -> Callable[[str], object | None]:
+    """Return a ``verify_chain``-compatible resolver over an already-resolved evidence sequence.
+
+    Not a new store: ``ReducerInput.evidence`` is already fully resolved in-process (design
+    §4.1's "the caller resolves inputs"), so this is just a dict lookup over what is already in
+    memory — the same posture as the reducers themselves. Lets a caller (or a test) confirm that
+    every ``evidence_id`` an I2 fact cites actually resolves, per CAP I0-I3's "raw-evidence facts
+    cite durable, resolvable input identity" invariant.
+    """
+    index = {item.evidence_id: item.payload for item in items}
+    return index.get
 
 
 def _finalize(facts: list) -> list:

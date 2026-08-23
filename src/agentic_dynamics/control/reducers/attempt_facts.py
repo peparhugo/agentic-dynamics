@@ -14,10 +14,17 @@ them in via ``ReducerInput.evidence``; the reducer only maps ``run → facts``. 
 stamped run never depends on the producer clock, which is what makes re-derivation byte-for-byte
 stable (the I2 gate).
 
-Scope (task's I2 semantics): each fact is scoped ``attempt:<phase>`` under ``job:<cell>`` where
-``<cell> = wf_<spec>_<model>`` (the workflow cell, §10.1). The attempt ``scope_id`` is
-job-qualified (``<cell>:<phase>``) so two runs of the same phase name never collide on
-``fact_entity_id``.
+Scope (task's I2 semantics, CAP I0-I3 REPAIR): each fact is scoped ``attempt:<phase>`` under
+``job:<cell>`` where ``<cell> = wf_<spec>_<model>`` (the workflow cell, §10.1) — AND further
+qualified by ``run:<run_artifact_id>`` (``_common.run_artifact_id`` — a content-addressed hash of
+the run's own recorded fields, ``_common.py``). ``<cell>:<phase>`` alone is NOT enough: it collides
+whenever the same cell is run more than once, which is the normal case (nightly reruns, retries).
+**Design decision (documented here because the task requires it to be explicit): attempt facts
+are PER-RUN, never current-per-cell.** An attempt is a historical execution record — "phase X of
+run Y cost $Z" — not a mutable summary, so it must remain independently addressable and citable
+forever, even after a newer run of the same cell exists. Contrast ``job_facts.py``, which chooses
+the opposite: job facts ARE current-per-cell summaries that supersede one another as new runs
+land. Never keyed on ``inp.now`` — the run-qualifier is the artifact's own recorded content.
 
 Epistemics are a pure function of the predicate (§3.4): the measured fields are ``observed``
 (MEASURED/[M]), ``phase_test_verified`` is ``verified`` (MEASURED/[M] — the independent
@@ -45,6 +52,7 @@ from agentic_dynamics.control.reducers._common import (
     as_dict,
     cell_id,
     encode_value,
+    run_artifact_id,
 )
 
 # ── Reducer declaration ─────────────────────────────────────────
@@ -104,22 +112,29 @@ def _fact(
     inp: ReducerInput,
     predicate: str,
     value: str,
+    evidence_id: str,
 ) -> CanonicalFact:
     """Build one attempt-scoped fact for ``predicate`` (design §10's scope hierarchy).
 
     ``epistemic_status`` is derived INSIDE here (from the predicate) rather than passed alongside,
     so a call site can never disagree with the predicate's declared epistemology (§3.4).
+
+    ``evidence_id`` is the caller's ``EvidenceItem.evidence_id`` for this run — cited verbatim
+    (never re-derived) so ``evidence_ids`` always matches exactly what a resolver built over the
+    same evidence sequence would look up (CAP I0-I3: raw-evidence facts cite durable, resolvable
+    input identity).
     """
     spec = FACT_PREDICATES[predicate]
     epistemic_status = _epistemic(predicate)
     authority, evidence_class = EPISTEMIC_MAP[epistemic_status]
     cell = cell_id(str(run.get("spec_name") or ""), str(run.get("model") or ""))
+    run_id = run_artifact_id(run)
     observed_at = str(run.get("ended_at") or run.get("started_at") or inp.now)
     fact = CanonicalFact(
         fact_entity_id=compute_fact_entity_id(
             repository_id=inp.repository_id,
             scope_type="attempt",
-            scope_id=scope_id,  # job-qualified: "<cell>:<phase>"
+            scope_id=scope_id,  # run-qualified: "<cell>:<phase>:<run_artifact_id>"
             predicate=predicate,
             subject_type="attempt",
             subject_id=phase_name,
@@ -135,7 +150,7 @@ def _fact(
         scope_id=scope_id,
         scope_path=(
             f"org:{inp.repository_id}/workload:{run.get('spec_name')}"
-            f"/job:{cell}/attempt:{phase_name}"
+            f"/job:{cell}/attempt:{phase_name}/run:{run_id}"
         ),
         abstraction_level=spec.abstraction_level,
         epistemic_status=epistemic_status,
@@ -147,7 +162,7 @@ def _fact(
         expires_at=None,
         reducer="attempt_facts",
         reducer_version=VERSION,
-        evidence_ids=(),  # consumes the run artifact directly, not knowledge records
+        evidence_ids=(evidence_id,) if evidence_id else (),
         inputs_digest="",  # back-filled below from evidence_ids + reducer_version
         supersedes=None,  # the producer links a predecessor via the registry, not the reducer
         source_revision=str(run.get("git_sha") or REVISION_FALLBACK),
@@ -160,100 +175,58 @@ def _fact(
 
 
 def _facts_for_phase(
-    run: dict[str, Any], phase: dict[str, Any], inp: ReducerInput
+    run: dict[str, Any], phase: dict[str, Any], inp: ReducerInput, evidence_id: str
 ) -> list[CanonicalFact]:
     """Emit the facts one phase pins, honouring measured-or-absent semantics."""
     phase_name = str(phase.get("phase") or "")
     if not phase_name:
         return []
     cell = cell_id(str(run.get("spec_name") or ""), str(run.get("model") or ""))
-    scope_id = f"{cell}:{phase_name}"
+    run_id = run_artifact_id(run)
+    scope_id = f"{cell}:{phase_name}:{run_id}"
+
+    def fact(predicate: str, value: str) -> CanonicalFact:
+        return _fact(run, phase_name, scope_id, inp, predicate, value, evidence_id)
 
     facts: list[CanonicalFact] = []
     status = str(phase.get("status") or "")
     if status:
-        facts.append(
-            _fact(run, phase_name, scope_id, inp, "phase_status", encode_value(status, "enum"))
-        )
+        facts.append(fact("phase_status", encode_value(status, "enum")))
     commit = str(phase.get("commit_hash") or "")
     if commit:
-        facts.append(
-            _fact(run, phase_name, scope_id, inp, "phase_commit", encode_value(commit, "str"))
-        )
+        facts.append(fact("phase_commit", encode_value(commit, "str")))
 
     # Agent-phase measurements (model/tokens/cost/cache/confidence). Test phases carry none of
     # these, so gating on ``kind`` keeps an absent measurement absent rather than a defaulted 0.
     if str(phase.get("kind") or "agent") == "agent":
         model = str(phase.get("model") or "")
         if model:
-            facts.append(
-                _fact(run, phase_name, scope_id, inp, "attempt_model", encode_value(model, "str"))
-            )
+            facts.append(fact("attempt_model", encode_value(model, "str")))
         tokens = phase.get("tokens") or {}
         if isinstance(tokens, dict):
-            if tokens.get("in"):
-                facts.append(
-                    _fact(
-                        run,
-                        phase_name,
-                        scope_id,
-                        inp,
-                        "attempt_tokens_in",
-                        encode_value(tokens.get("in"), "int"),
-                    )
-                )
-            if tokens.get("out"):
-                facts.append(
-                    _fact(
-                        run,
-                        phase_name,
-                        scope_id,
-                        inp,
-                        "attempt_tokens_out",
-                        encode_value(tokens.get("out"), "int"),
-                    )
-                )
+            # Null-safe: a measured ZERO token count is a real measurement, not an absent one —
+            # only a missing/None key means "not measured". A truthiness check (`if tokens.get(...)`)
+            # would silently drop a legitimate 0, which is the CAP I0-I3 repair's null-safety fix.
+            tokens_in = tokens.get("in")
+            if tokens_in is not None:
+                facts.append(fact("attempt_tokens_in", encode_value(tokens_in, "int")))
+            tokens_out = tokens.get("out")
+            if tokens_out is not None:
+                facts.append(fact("attempt_tokens_out", encode_value(tokens_out, "int")))
         cost = phase.get("cost_usd")
-        if isinstance(cost, (int, float)):
-            facts.append(
-                _fact(run, phase_name, scope_id, inp, "attempt_cost_usd", encode_value(cost, "usd"))
-            )
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+            facts.append(fact("attempt_cost_usd", encode_value(cost, "usd")))
         cache = phase.get("cache_hit_rate")
-        if isinstance(cache, (int, float)):
-            facts.append(
-                _fact(
-                    run,
-                    phase_name,
-                    scope_id,
-                    inp,
-                    "attempt_cache_hit_rate",
-                    encode_value(cache, "float"),
-                )
-            )
+        if isinstance(cache, (int, float)) and not isinstance(cache, bool):
+            facts.append(fact("attempt_cache_hit_rate", encode_value(cache, "float")))
         confidence = phase.get("confidence")
         if confidence is not None:
-            facts.append(
-                _fact(
-                    run,
-                    phase_name,
-                    scope_id,
-                    inp,
-                    "attempt_confidence",
-                    encode_value(confidence, "float"),
-                )
-            )
+            facts.append(fact("attempt_confidence", encode_value(confidence, "float")))
 
     # Independent test verification (a bool is a real measurement; None is "not verified").
     if isinstance(phase.get("test_executed_success"), bool):
         facts.append(
-            _fact(
-                run,
-                phase_name,
-                scope_id,
-                inp,
-                "phase_test_verified",
-                encode_value(phase.get("test_executed_success"), "bool"),
-            )
+            fact("phase_test_verified", encode_value(phase.get("test_executed_success"), "bool"))
         )
     return facts
 
@@ -280,5 +253,5 @@ def attempt_facts_v1(inp: ReducerInput) -> list[CanonicalFact]:
             continue
         for phase in phases:
             if isinstance(phase, dict):
-                facts.extend(_facts_for_phase(run, phase, inp))
+                facts.extend(_facts_for_phase(run, phase, inp, item.evidence_id))
     return facts

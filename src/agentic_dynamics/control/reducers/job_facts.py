@@ -9,6 +9,19 @@ Same purity contract as its sibling (design §4.1): no I/O, no RNG; the caller r
 JSONs; the reducer only maps ``run → facts``. ``inp.now`` is a fallback for a run with no
 ``ended_at``/``started_at``. Every fact is ``observed`` (MEASURED/[M]) — the value was recorded
 by the system in the run artifact — and ``fact_id`` is finalized at persistence.
+
+**Design decision (CAP I0-I3 REPAIR, documented here because the task requires it to be
+explicit): job facts are CURRENT-PER-CELL SUMMARIES, not per-run facts.** ``fact_entity_id`` is
+keyed by ``job:<cell>`` alone (``_common.cell_id`` — spec+model, no run qualifier), matching this
+reducer's pre-existing scope. A job fact answers "what is the current cost/status/commit of this
+cell, right now" — a mutable summary — so when the SAME cell runs again, the new value's fact
+naturally SUPERSEDES the previous one through the existing registry chain
+(``fact_ingestion.derive_fact_records``): no new machinery, and "current" stays a lookup rather
+than a max-by-time scan. This is the opposite choice from ``attempt_facts.py``, whose facts are
+PER-RUN and never superseded by a later run — an attempt is a historical execution record, not a
+summary. Each job fact still cites the specific run artifact that produced it via
+``evidence_ids`` (the ``EvidenceItem.evidence_id`` handed in), so provenance is never lost even
+though identity does not include the run.
 """
 
 from __future__ import annotations
@@ -65,8 +78,14 @@ def _fact(
     inp: ReducerInput,
     predicate: str,
     value: str,
+    evidence_id: str,
 ) -> CanonicalFact:
-    """Build one job-scoped fact for ``predicate`` (design §10's scope hierarchy)."""
+    """Build one job-scoped fact for ``predicate`` (design §10's scope hierarchy).
+
+    ``evidence_id`` is the caller's ``EvidenceItem.evidence_id`` for this run — cited verbatim so
+    ``evidence_ids`` names the exact run artifact this value's current head came from, even
+    though ``fact_entity_id`` itself stays cell-scoped (current-per-cell — see module docstring).
+    """
     spec = FACT_PREDICATES[predicate]
     cell = cell_id(str(run.get("spec_name") or ""), str(run.get("model") or ""))
     observed_at = str(run.get("ended_at") or run.get("started_at") or inp.now)
@@ -99,7 +118,7 @@ def _fact(
         expires_at=None,
         reducer="job_facts",
         reducer_version=VERSION,
-        evidence_ids=(),  # consumes the run artifact directly, not knowledge records
+        evidence_ids=(evidence_id,) if evidence_id else (),
         inputs_digest="",  # back-filled below from evidence_ids + reducer_version
         supersedes=None,  # the producer links a predecessor via the registry, not the reducer
         source_revision=str(run.get("git_sha") or REVISION_FALLBACK),
@@ -108,7 +127,7 @@ def _fact(
     return replace(fact, inputs_digest=recompute_inputs_digest(fact))
 
 
-def _facts_for_run(run: dict[str, Any], inp: ReducerInput) -> list[CanonicalFact]:
+def _facts_for_run(run: dict[str, Any], inp: ReducerInput, evidence_id: str) -> list[CanonicalFact]:
     """Emit the four per-run facts, honouring measured-or-absent semantics."""
     spec_name = str(run.get("spec_name") or "")
     model = str(run.get("model") or "")
@@ -119,15 +138,17 @@ def _facts_for_run(run: dict[str, Any], inp: ReducerInput) -> list[CanonicalFact
     facts: list[CanonicalFact] = []
     git_sha = str(run.get("git_sha") or "")
     if git_sha:
-        facts.append(_fact(run, inp, "current_commit", encode_value(git_sha, "str")))
+        facts.append(_fact(run, inp, "current_commit", encode_value(git_sha, "str"), evidence_id))
     cost = run.get("total_cost_usd")
-    if isinstance(cost, (int, float)):
-        facts.append(_fact(run, inp, "job_accumulated_cost_usd", encode_value(cost, "usd")))
+    if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+        facts.append(
+            _fact(run, inp, "job_accumulated_cost_usd", encode_value(cost, "usd"), evidence_id)
+        )
     # ``ok`` is a bool; ``job_status`` is the enum reading of it ("ok" | "failed").
-    facts.append(_fact(run, inp, "job_status", "ok" if run.get("ok") else "failed"))
+    facts.append(_fact(run, inp, "job_status", "ok" if run.get("ok") else "failed", evidence_id))
     phases = run.get("phases") or []
     n_phases = len(phases) if isinstance(phases, list) else 0
-    facts.append(_fact(run, inp, "job_n_phases", encode_value(n_phases, "int")))
+    facts.append(_fact(run, inp, "job_n_phases", encode_value(n_phases, "int"), evidence_id))
     return facts
 
 
@@ -147,5 +168,5 @@ def job_facts_v1(inp: ReducerInput) -> list[CanonicalFact]:
             continue
         run = as_dict(item.payload)
         if run is not None:
-            facts.extend(_facts_for_run(run, inp))
+            facts.extend(_facts_for_run(run, inp, item.evidence_id))
     return facts

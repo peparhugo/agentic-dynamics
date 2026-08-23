@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from agentic_dynamics.control import fact_ingestion as fi
@@ -30,6 +31,7 @@ from agentic_dynamics.control.facts import (
     ReducerInput,
     compute_fact_entity_id,
     fact_state,
+    recompute_inputs_digest,
     verify_chain,
 )
 from agentic_dynamics.control.reducers import (
@@ -46,6 +48,7 @@ from agentic_dynamics.control.reducers import (
     spec_status_v1,
     workflow_facts_v1,
 )
+from agentic_dynamics.control.reducers._common import run_artifact_id
 from agentic_dynamics.control.reducers.policy_facts import tighten
 from agentic_dynamics.experiment.spec_status import SpecStatusEntry
 from agentic_dynamics.knowledge.spec_ingestion import load_index_entries, registry_head
@@ -563,6 +566,11 @@ def _run(**overrides) -> dict:
     return base
 
 
+def _run_evidence_id(run: dict) -> str:
+    """Mirror ``kb_produce_facts._run_evidence``'s content-addressed evidence_id exactly."""
+    return f"workflow_run:{run_artifact_id(run)}"
+
+
 def _runs_inp(*runs: dict, repository_id: str = REPO, now: str = NOW) -> ReducerInput:
     """Build a ReducerInput whose evidence is the given run JSONs (the I2 producer's shape)."""
     return ReducerInput(
@@ -573,7 +581,7 @@ def _runs_inp(*runs: dict, repository_id: str = REPO, now: str = NOW) -> Reducer
         evidence=tuple(
             EvidenceItem(
                 source_type="workflow_run",
-                evidence_id=f"workflow:{r.get('spec_name') or '?'}",
+                evidence_id=_run_evidence_id(r),
                 payload=r,
             )
             for r in runs
@@ -619,13 +627,18 @@ def test_attempt_facts_emit_per_phase_and_per_predicate():
 
 
 def test_attempt_fact_scope_is_job_qualified():
-    facts = attempt_facts_v1(_runs_inp(_run()))
+    run = _run()
+    run_id = run_artifact_id(run)
+    facts = attempt_facts_v1(_runs_inp(run))
     status = _by_predicate(facts)["phase_status"][0]
-    # scope attempt:<phase> under job:<workflow-cell> — the workflow cell is wf_<spec>_<model>.
+    # scope attempt:<phase> under job:<workflow-cell>, further run-qualified (CAP I0-I3 repair) —
+    # the workflow cell is wf_<spec>_<model>; the run qualifier is a content-addressed hash of
+    # the run's own recorded fields, so two runs of the same phase never collide.
     assert status.scope_type == "attempt"
-    assert status.scope_id == "wf_foo_deepseek_deepseek_v4_pro:implement"
+    assert status.scope_id == f"wf_foo_deepseek_deepseek_v4_pro:implement:{run_id}"
     assert status.scope_path == (
-        "org:agentic-dynamics/workload:foo/job:wf_foo_deepseek_deepseek_v4_pro/attempt:implement"
+        "org:agentic-dynamics/workload:foo/job:wf_foo_deepseek_deepseek_v4_pro"
+        f"/attempt:implement/run:{run_id}"
     )
     assert status.subject_type == "attempt"
     assert status.subject_id == "implement"
@@ -666,19 +679,87 @@ def test_attempt_facts_are_measured_or_absent():
 
 
 def test_attempt_fact_identity_is_time_invariant():
-    # entity_id is keyed by (repo, scope_id, subject, predicate) — never by ended_at/revision.
-    a = _by_predicate(attempt_facts_v1(_runs_inp(_run())))["attempt_cost_usd"][0]
-    b = attempt_facts_v1(_runs_inp(_run(), now="2027-01-01T00:00:00+00:00"))
+    # entity_id is keyed by (repo, scope_id, subject, predicate) — never by inp.now/revision.
+    # Two derivations of the SAME artifact (identical run dict) must agree byte-for-byte even
+    # when the injected clock differs.
+    run = _run()
+    run_id = run_artifact_id(run)
+    a = _by_predicate(attempt_facts_v1(_runs_inp(run)))["attempt_cost_usd"][0]
+    b = attempt_facts_v1(_runs_inp(run, now="2027-01-01T00:00:00+00:00"))
     b = _by_predicate(b)["attempt_cost_usd"][0]
     assert a.fact_entity_id == b.fact_entity_id
     assert a.fact_entity_id == compute_fact_entity_id(
         repository_id=REPO,
         scope_type="attempt",
-        scope_id="wf_foo_deepseek_deepseek_v4_pro:implement",
+        scope_id=f"wf_foo_deepseek_deepseek_v4_pro:implement:{run_id}",
         predicate="attempt_cost_usd",
         subject_type="attempt",
         subject_id="implement",
     )
+
+
+def test_two_distinct_runs_never_collide_on_attempt_entity_id():
+    """CAP I0-I3 repair — the reproduced bug, fixed: same spec/model/phase/values, different
+    persisted artifacts (different started_at/ended_at, as two real run JSONs on disk would
+    have), must NEVER collide on fact_entity_id or the record's knowledge_id."""
+    run_a = _run(started_at="2026-08-20T00:00:00+00:00", ended_at="2026-08-20T00:10:00+00:00")
+    run_b = _run(started_at="2026-08-22T00:00:00+00:00", ended_at="2026-08-22T00:10:00+00:00")
+    assert run_artifact_id(run_a) != run_artifact_id(run_b)
+
+    fact_a = _by_predicate(attempt_facts_v1(_runs_inp(run_a)))["attempt_cost_usd"][0]
+    fact_b = _by_predicate(attempt_facts_v1(_runs_inp(run_b)))["attempt_cost_usd"][0]
+    assert fact_a.fact_entity_id != fact_b.fact_entity_id
+
+    record_a = fi.build_fact_record(fact_a)
+    record_b = fi.build_fact_record(fact_b)
+    assert record_a.knowledge_id != record_b.knowledge_id
+
+
+def test_same_artifact_rederived_twice_is_byte_identical():
+    """The other half of the invariant: re-deriving from the literal SAME artifact (not a
+    different run) must reproduce identical identity — CAP I0-I3's identity is content-addressed,
+    not random."""
+    run = _run()
+    first = _by_predicate(attempt_facts_v1(_runs_inp(run)))["attempt_cost_usd"][0]
+    second = _by_predicate(attempt_facts_v1(_runs_inp(dict(run))))["attempt_cost_usd"][0]
+    assert first.fact_entity_id == second.fact_entity_id
+    assert fi.build_fact_record(first).knowledge_id == fi.build_fact_record(second).knowledge_id
+
+
+def test_attempt_evidence_ids_are_non_empty_and_resolve():
+    """Raw-evidence facts must cite durable, resolvable input identity (CAP I0-I3 invariant)."""
+    run = _run()
+    inp = _runs_inp(run)
+    attempt = _by_predicate(attempt_facts_v1(inp))["attempt_cost_usd"][0]
+    job = job_facts_v1(inp)[0]
+    for fact in (attempt, job):
+        assert fact.evidence_ids
+        finalized = fi.finalize_fact(fact, fi.build_fact_record(fact))
+        resolve = {item.evidence_id: item.payload for item in inp.evidence}.get
+        assert verify_chain(finalized, REDUCERS, resolve=resolve) == []
+        # A dangling evidence_id must be refused, not silently accepted.
+        broken = replace(finalized, evidence_ids=("workflow_run:doesnotexist",))
+        broken = replace(broken, inputs_digest=recompute_inputs_digest(broken))
+        assert any("does not resolve" in e for e in verify_chain(broken, REDUCERS, resolve=resolve))
+
+
+def test_attempt_tokens_null_safe_zero_is_measured_not_absent():
+    """CAP I0-I3 repair: a measured ZERO token count is a real measurement, not an absent one —
+    the old truthiness check (`if tokens.get("in")`) silently dropped it."""
+    run = _run(
+        phases=[
+            {
+                "phase": "implement",
+                "kind": "agent",
+                "status": "ok",
+                "model": "deepseek/deepseek-v4-pro",
+                "tokens": {"in": 0, "out": 0},
+            }
+        ]
+    )
+    by = _by_predicate(attempt_facts_v1(_runs_inp(run)))
+    assert by["attempt_tokens_in"][0].value == "0"
+    assert by["attempt_tokens_out"][0].value == "0"
 
 
 def test_job_facts_emit_the_four_per_run_facts():
@@ -704,6 +785,44 @@ def test_job_fact_scope_and_epistemics():
     assert fact.authority is Authority.MEASURED
     assert fact.evidence_class == "[M]"
     assert fact.source_revision == "abc123"  # the run's git_sha, not the producer's revision
+
+
+def test_job_facts_are_current_per_cell_and_chain_across_runs(tmp_path: Path):
+    """CAP I0-I3 design decision: job facts are current-per-cell summaries. Two runs of the SAME
+    cell with a DIFFERENT cost must chain (v2 supersedes v1), not both land as unlinked "current"
+    rows (the "silent conflict" failure mode the in-batch pending_head fix closes)."""
+    run_a = _run(started_at="2026-08-20T00:00:00+00:00", ended_at="2026-08-20T00:10:00+00:00")
+    run_b = _run(
+        started_at="2026-08-22T00:00:00+00:00",
+        ended_at="2026-08-22T00:10:00+00:00",
+        total_cost_usd=2.5,
+    )
+    facts = job_facts_v1(_runs_inp(run_a, run_b))
+    cost_facts = [f for f in facts if f.predicate == "job_accumulated_cost_usd"]
+    assert len(cost_facts) == 2
+    # current-per-cell: both share one fact_entity_id (no run qualifier), unlike attempt facts.
+    assert cost_facts[0].fact_entity_id == cost_facts[1].fact_entity_id
+
+    records = fi.derive_fact_records(cost_facts, registry_path=tmp_path / "r.jsonl")
+    assert len(records) == 2
+    assert records[0].supersedes is None
+    assert records[1].supersedes == records[0].knowledge_id
+
+
+def test_job_facts_from_different_cells_never_cross_supersede(tmp_path: Path):
+    """Registry supersession must only occur for a genuine new version of the SAME logical slot —
+    the in-batch pending_head map is keyed by fact_entity_id, so two DIFFERENT cells' job facts
+    (different spec_name -> different entity_id) in one batch must both land as independent first
+    versions, never chained to one another."""
+    run_a = _run(spec_name="foo", started_at="2026-08-20T00:00:00+00:00")
+    run_b = _run(spec_name="bar", started_at="2026-08-22T00:00:00+00:00")
+    facts = job_facts_v1(_runs_inp(run_a, run_b))
+    cost_facts = [f for f in facts if f.predicate == "job_accumulated_cost_usd"]
+    assert cost_facts[0].fact_entity_id != cost_facts[1].fact_entity_id
+
+    records = fi.derive_fact_records(cost_facts, registry_path=tmp_path / "r.jsonl")
+    assert len(records) == 2
+    assert all(r.supersedes is None for r in records)
 
 
 def test_job_status_is_enum_not_bool():
@@ -815,6 +934,39 @@ def _workflow(run: dict, config: dict | None = None) -> list[CanonicalFact]:
         source_revision=REVISION,
     )
     return workflow_facts_v1(wf_inp)
+
+
+def _workflow_multi(*runs: dict, config: dict | None = None) -> list[CanonicalFact]:
+    """Run the ladder over MULTIPLE runs of one cell — the current-run aggregation gate."""
+    run_inp = _runs_inp(*runs)
+    lower = attempt_facts_v1(run_inp) + job_facts_v1(run_inp)
+    if config is not None:
+        lower += policy_facts_v1(_policy_inp(config))
+    finalized = [fi.finalize_fact(f, fi.build_fact_record(f)) for f in lower]
+    wf_inp = ReducerInput(
+        scope_path=f"org:{REPO}",
+        scope_type="workflow",
+        scope_id="",
+        repository_id=REPO,
+        evidence=(),
+        facts=tuple(finalized),
+        now=NOW,
+        source_revision=REVISION,
+    )
+    return workflow_facts_v1(wf_inp)
+
+
+def test_workflow_aggregation_uses_only_the_current_run():
+    """CAP I0-I3 repair: attempt facts are per-run, so a cell with two recorded runs carries two
+    copies of each phase fact. workflow_facts/v1 must count only the most-recently-recorded run's
+    phases, never sum/double-count across reruns."""
+    run_a = _run(started_at="2026-08-20T00:00:00+00:00", ended_at="2026-08-20T00:10:00+00:00")
+    run_b = _run(started_at="2026-08-22T00:00:00+00:00", ended_at="2026-08-22T00:10:00+00:00")
+    by_single = _by_predicate(_workflow(run_b))
+    by_multi = _by_predicate(_workflow_multi(run_a, run_b))
+    # Same answer whether run_a ever existed or not — run_a must not inflate the count.
+    assert by_multi["workflow_phases_completed"][0].value == by_single["workflow_phases_completed"][0].value
+    assert by_multi["workflow_status"][0].value == by_single["workflow_status"][0].value
 
 
 def test_i3_reducers_are_registered():
