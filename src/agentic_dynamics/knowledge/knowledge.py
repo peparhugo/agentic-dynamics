@@ -145,6 +145,13 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     # Distinct from the `policy` source_type, which carries the spec YAML's leading *text*
     # excerpt for citation — this one carries the lifecycle, keyed one record per spec.
     "spec": SourceTypeSpec("observation", Authority.POLICY, "[P]"),
+    # Context Abstraction Plane I0 (context_abstraction_design.md §3.3): the ONE additive row
+    # — registration, not redesign. A fact states what IS, never an instruction to act, so it
+    # is an OBSERVATION. The nominal authority/evidence-class columns here are documentation
+    # only (the SourceTypeSpec docstring says so explicitly): each fact's real values come from
+    # the CAP epistemic mapping (§3.4) at construction time, since a fact may be derived,
+    # declared, measured, or advisory depending on its reducer.
+    "fact": SourceTypeSpec("observation", Authority.DERIVED, "[C]"),
     # Delta 3: the single actuation-family member.
     "actuation": SourceTypeSpec("actuation", Authority.POLICY, "[P]"),
 }

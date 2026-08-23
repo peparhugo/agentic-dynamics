@@ -609,3 +609,37 @@ def test_flag_autoclear_does_not_reclear_a_flag_already_tombstoned(tmp_path, mon
     handler(_observation_record(status="healthy"), operation="upsert")
 
     assert fake_redis.published == []
+
+
+# ── fact skip (CAP design §3.3) ─────────────────────────────────
+
+
+def test_kb_neo4j_v1_handler_skips_fact_records(monkeypatch):
+    # Facts are resolved by ADDRESS, never by relevance: the graph leg must not index them
+    # (CAP design §3.3). The handler returns before constructing a client.
+    _patch_neo4j_client(monkeypatch)
+    handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
+
+    handler(_record(source_type="fact"), operation="upsert")
+
+    assert _FakeNeo4jClient.instances == []  # never constructed a client
+
+
+def test_kb_chroma_v1_handler_skips_fact_records(monkeypatch):
+    # Same invariant, dense leg: the handler returns BEFORE importing ChromaStore, so the skip
+    # is provable without chromadb — a fake embeddings module whose ChromaStore raises would blow
+    # up the instant the handler tried to use it, and it must not.
+    import sys
+    import types
+
+    fake = types.ModuleType("agentic_dynamics.knowledge.embeddings")
+
+    class BoomStore:
+        def __init__(self, *a, **k):
+            raise AssertionError("ChromaStore must not be constructed for source_type='fact'")
+
+    fake.ChromaStore = BoomStore
+    monkeypatch.setitem(sys.modules, "agentic_dynamics.knowledge.embeddings", fake)
+
+    handler = kb_worker.build_handler("kb-chroma-v1", _FakeRedis())
+    handler(_record(source_type="fact"))  # returns silently — never touches ChromaStore
