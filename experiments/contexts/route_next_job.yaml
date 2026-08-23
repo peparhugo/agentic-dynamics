@@ -1,0 +1,83 @@
+# experiments/contexts/route_next_job.yaml
+#
+# The decision-type contract for "which model should execute the next workflow phase" — the
+# FIRST contract (design §6.1), chosen because the decision already exists and is already made
+# deterministically by control.step_routing.route_step (untouched — the measurement baseline,
+# design §8.4). This contract lets the plane be measured against a working incumbent instead of
+# being trusted on faith.
+#
+# F1 deviation (docs/context_abstraction/implementation_notes.md §2, already recorded): the
+# design's own §6.1 example gives `max_spend_usd` `on_missing: classify` — but an INVARIANT with
+# `on_missing: classify` silently disables a safety constraint (a constraint that degrades to
+# "unknown, decide anyway" is not a constraint). Both invariants below use `on_missing: halt`,
+# per that resolution; I5's R11 refuses any future invariant that does not.
+decision_type: route_next_job
+contract_version: "route_next_job/v1"
+
+# The scope at which this decision is made. The compiler refuses a request whose scope_type
+# differs (compile_context raises ValueError).
+decision_scope: job
+
+# The action vocabulary this decision type may emit. `route` chooses the next phase's model;
+# `continue` accepts the default. Nothing here can stop, retry, or steer anything (design §8.1 —
+# both are in AUTOMATABLE_ACTIONS, I6/I7).
+allowed_actions: [route, continue]
+
+# Maximum age of the snapshot at APPLY time (the TOCTOU guard, I6/I7's ControlValidator check
+# C7). 300s ~= 2x a typical phase gap — [H], a parameter, not a discovery.
+max_snapshot_age_seconds: 300
+
+# Invariants: L5 policy facts that CONSTRAIN the decision. Both halt — a routing decision made
+# without knowing the allowed model set, or with no visibility into the spend ceiling, is unsafe
+# to make at all (F1: an invariant may only ever halt or escalate).
+invariants:
+  - fact: allowed_models
+    scope: workload
+    on_missing: halt
+    on_conflict: halt
+  - fact: max_spend_usd
+    scope: workload
+    on_missing: halt
+    on_conflict: halt
+
+# Objectives: what the decision optimizes. Mirrors the EXISTING preferences block
+# (runtime.routing.RoutingPreferences) rather than inventing a second objective language.
+objectives:
+  - signal: correctness
+    direction: maximize
+    weight: 2.0
+  - signal: cost
+    direction: minimize
+    weight: 1.0
+
+# Required facts: the state this decision is ALLOWED and REQUIRED to see. Anything not listed
+# here is NOT in the snapshot — "a control agent must not receive all available context", made
+# mechanical.
+requires_facts:
+  - fact: job_accumulated_cost_usd
+    scope: self
+    max_age_seconds: 600
+    min_authority: MEASURED
+    on_missing: classify   # a first phase has no accumulated cost yet — legitimately unknown
+    on_conflict: halt
+
+  - fact: workflow_phases_remaining
+    scope: parent
+    max_age_seconds: 600
+    min_authority: DERIVED
+    on_missing: halt        # routing without knowing how much work remains is guesswork
+    on_conflict: halt
+
+  - fact: phase_test_verified
+    scope: self
+    max_age_seconds: 3600
+    min_authority: MEASURED
+    on_missing: classify
+    on_conflict: halt
+
+# Explicitly excluded: named so a reader can see the exclusion is deliberate, and so widening
+# the controller's view requires editing this file (a reviewable act).
+excludes:
+  - sibling_job_facts    # lateral reads are forbidden by the hierarchy (design §10.2)
+  - live_telemetry       # DB 1 is never a fact source (design §10.4)
+  - advisory_facts       # available in ControlContext.advisory, never citable (check C5, I6)

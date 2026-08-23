@@ -91,3 +91,45 @@ Also material: `workflow_status`/`workflow_health` now treat `job_status` (deriv
 literal string `"failed"` — a phase status of `"skipped"`/`"error"`/`"timeout"` would otherwise
 read as "not failed". And `projected_budget_overrun` is emitted only when BOTH a budget ceiling
 AND a measured cost are known — an unmeasured cost previously fabricated a `0.0` overrun.
+
+## 9. I4 deviations (material — the Context Compiler against the REAL reducer scope_paths)
+
+I4 (`src/agentic_dynamics/control/context_compiler.py`) resumed after the I0-I3 repair. Three
+deviations from a literal reading of design §10.1's idealized single-chain scope grammar
+(`org/.../workload/.../workflow/.../job/.../attempt`), all forced by the ACTUAL scope_paths the
+I1-I3 reducers already emit (`control/reducers/{job_facts,workflow_facts,attempt_facts}.py`),
+not by a re-reading of the design's intent:
+
+1. **`job` and `workflow` are SIBLING labels over the SAME cell id, not a nested pair.**
+   `job_facts.py` emits `workload:<w>/job:<cell>`; `workflow_facts.py` emits
+   `workload:<w>/workflow:<cell>` — same `<cell>`, same depth, different label (design §10.3
+   already says so in prose: "job scope = the workflow-level view of the cell, one rung up the
+   ladder"). `resolve_requirement_scope`'s `"parent"` keyword therefore does NOT drop the last
+   path segment generically — from a job-scoped decision it swaps the label to `workflow:<cell>`
+   (`context_compiler._parent_scope_path`), not "org:.../workload:...".
+2. **`attempt` nests TWO segments under `job`, not one.** `attempt_facts.py` emits
+   `job:<cell>/attempt:<phase>/run:<run_id>` (the `run:` segment is the I0-I3 repair's
+   content-addressed run identity, deviation 1 in §8 above). `_parent_scope_path` drops the
+   trailing `run:` segment before checking the leaf type, so an attempt scope's parent correctly
+   resolves to its owning `job:<cell>`, not `job:<cell>/attempt:<phase>`.
+3. **`scope: self` for a predicate declared ONE RUNG below the decision's own scope resolves via
+   a narrow "self-reflexive descendant" allowance, not a strict scope_path equality check.** The
+   design's own §6.1 example requires `phase_test_verified` (attempt-scoped) at `scope: self`
+   under a `job`-scoped decision — those two scope_paths are never equal by construction (per
+   deviation 2). `_resolve_requirement` falls back, ONLY for `scope: self` and ONLY when strict
+   `scope_visible()` finds nothing, to the single MOST RECENTLY OBSERVED current fact whose
+   scope_path is strictly under the decision's own scope_path. This is deliberately narrower than
+   the general "descendant peek" §10.2 forbids for aggregation (unbounded reads across children
+   with no reducer): it never returns more than one fact, and it only fires for `self`, never for
+   an ancestor/explicit scope keyword — so a sibling job's attempts, or a workflow's OTHER job's
+   facts, are still structurally unreachable.
+
+Also: the I4 hook (`context_compiler.make_snapshotting_router`, wired via `run_workflow.py
+--cap-snapshot`) is the FIRST CAP call site to touch a real production run path and a real Redis
+connection. It ships OFF by default (an explicit opt-in flag, not the default `router=`) — a
+narrower posture than the design's own "snapshots recorded beside every route_step call" phrasing
+implies literally, so the plane's first production write is a deliberate, reviewable operator
+decision, consistent with I7's later apply seam being OFF by default for the same reason. Flip
+procedure: pass `--cap-snapshot` to `scripts/run_workflow.py`; nothing else changes, and a
+snapshot failure (no Redis, unauthorized write) never affects the run (`record_snapshot` swallows
+every exception).

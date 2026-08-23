@@ -440,12 +440,15 @@ def test_fact_is_registered_as_an_observation_source_type():
 #: ``facts.py`` (and its test) is a call site the gate below must account for.
 PUBLIC_NAMES = frozenset({"CanonicalFact", "FACT_PREDICATES", "EPISTEMIC_MAP", "verify_chain"})
 
-#: The exact call sites CAP I1 authorizes — the fact-ingestion mapping and the batch producer.
-#: I0 had none (the zero-call-sites gate); I1 adds these as the schema's first consumers.
+#: The exact call sites CAP I1/I4 authorize — the fact-ingestion mapping, the batch producer,
+#: and (I4) the read-only Context Compiler, which resolves ``FACT_PREDICATES``/``FactRef``/
+#: ``Unknown``/``Conflict``/``StaleFact`` into a ``ControlContext`` snapshot. I0 had none (the
+#: zero-call-sites gate); each increment widens this allowlist explicitly, never silently.
 LEGITIMATE_CALLERS = frozenset(
     {
         "src/agentic_dynamics/control/fact_ingestion.py",
         "scripts/kb_produce_facts.py",
+        "src/agentic_dynamics/control/context_compiler.py",
     }
 )
 
