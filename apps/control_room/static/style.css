@@ -212,16 +212,17 @@
   --accent-hover: #6366f1;
   --accent-strong: #4338ca;
   --accent-ink: #ffffff;
-  --status-queued: #64748b;
-  --status-running: #0284c7;
-  --status-done: #059669;
-  --status-failed: #dc2626;
-  --status-timeout: #d97706;
-  --status-retry: #0d9488;
-  --status-unknown: #94a3b8;
-  --attention-off-track: #e11d48;
-  --attention-stalled: #d97706;
-  --attention-unknown: #334155;
+  /* Keep 11px lifecycle words at the stronger c2 contrast values above. */
+  --status-queued: var(--cr-status-queued);
+  --status-running: var(--cr-status-running);
+  --status-done: var(--cr-status-done);
+  --status-failed: var(--cr-status-failed);
+  --status-timeout: var(--cr-status-timeout);
+  --status-retry: var(--cr-status-retry);
+  --status-unknown: var(--cr-status-unknown);
+  --attention-off-track: var(--cr-attention-off-track);
+  --attention-stalled: var(--cr-attention-stalled);
+  --attention-unknown: var(--cr-attention-neutral);
 }
 
 /* Tell the UA which form controls/scrollbars to render for the resolved theme. */
@@ -575,10 +576,10 @@ pre {
   background: var(--bg-1);
 }
 
-.pipeline-stage.stage-idle { border-left-color: var(--status-queued); }
-.pipeline-stage.stage-running { border-left-color: var(--status-running); }
-.pipeline-stage.stage-done { border-left-color: var(--status-done); }
-.pipeline-stage.stage-failed { border-left-color: var(--status-failed); }
+.pipeline-stage.stage-idle { border-left-color: var(--status-queued); color: var(--status-queued); }
+.pipeline-stage.stage-running { border-left-color: var(--status-running); color: var(--status-running); }
+.pipeline-stage.stage-done { border-left-color: var(--status-done); color: var(--status-done); }
+.pipeline-stage.stage-failed { border-left-color: var(--status-failed); color: var(--status-failed); }
 
 .stage-name {
   font-size: var(--fs-eyebrow);
@@ -743,6 +744,15 @@ pre {
   color: var(--text-muted);
 }
 
+/* SVG presentation properties, not CSS box properties, paint generated telemetry geometry. */
+.cost-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .sparkline-wrap { line-height: 0; }
 
 .sparkline {
@@ -757,9 +767,7 @@ pre {
 }
 
 .token-bar {
-  height: 3px;
-  border-radius: 2px;
-  background: var(--bg-3);
+  fill: color-mix(in srgb, var(--status-running) 38%, var(--bg-3));
 }
 
 /* Compact density: the same DOM, less of it visible (design §2.3). */
@@ -1660,7 +1668,7 @@ input[type="checkbox"] {
   position: relative;
   display: block;
   width: 100%;
-  min-height: 20px;
+  min-height: var(--touch-target);
   padding: 0;
   border: 0;
   background: transparent;
@@ -1672,10 +1680,10 @@ input[type="checkbox"] {
   content: "";
   position: absolute;
   left: 50%;
-  top: 8px;
+  top: 50%;
   width: 36px;
   height: 4px;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   border-radius: 2px;
   background: var(--border-strong);
 }
@@ -1991,6 +1999,8 @@ h3, h4 {
   gap: var(--cr-space-4);
   min-height: var(--rail-height);
   padding: var(--cr-space-3) var(--cr-space-5);
+  /* The shorthand above would otherwise erase the base safe-area inset on notched devices. */
+  padding-top: max(var(--cr-space-3), env(safe-area-inset-top));
   background: color-mix(in srgb, var(--cr-surface-1) 88%, transparent);
   border-bottom-color: color-mix(in srgb, var(--cr-line-strong) 66%, transparent);
   box-shadow: var(--cr-shadow-1);
@@ -2281,6 +2291,14 @@ h3, h4 {
   background: var(--cr-surface-inset);
 }
 
+/* Interactive is a readable text state on a subtle iris wash, never accent-ink on a dark well. */
+.interactive-badge {
+  border-color: var(--cr-accent);
+  background: var(--cr-accent-wash);
+  color: var(--cr-accent-hover);
+  font-weight: var(--cr-weight-semibold);
+}
+
 .phase-badge {
   color: var(--cr-text-secondary);
 }
@@ -2553,6 +2571,10 @@ textarea:focus {
 }
 
 @media (min-width: 760px) {
+  /* At 768px, a fixed 448px Detail panel left less than one readable fleet card. Keep the dock
+     compact until the wide layout grants it the full c2 detail width. */
+  :root { --detail-width: min(320px, 38vw); }
+
   .command-rail {
     padding-right: var(--cr-space-6);
     padding-left: var(--cr-space-6);
@@ -2590,6 +2612,16 @@ textarea:focus {
 
   .fleet-grid {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+@media (forced-colors: active) {
+  :focus-visible,
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: 2px solid CanvasText;
+    outline-offset: 3px;
   }
 }
 

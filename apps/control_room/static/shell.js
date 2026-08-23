@@ -187,6 +187,11 @@
   let systemReturnFocus = null
   const SYSTEM_FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+  /** Respect the operating system motion preference for utility-form handoffs. */
+  function scrollBehavior() {
+    return root.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+  }
+
   /**
    * Keep keyboard focus inside System while its scrim makes the board unavailable.
    *
@@ -368,7 +373,7 @@
     if (form.hidden) return
     // Guarded: scrollIntoView is absent in some non-browser DOM implementations, and a missing
     // convenience must never take down the shell's boot path.
-    if (typeof form.scrollIntoView === "function") form.scrollIntoView({ block: "nearest", behavior: "smooth" })
+    if (typeof form.scrollIntoView === "function") form.scrollIntoView({ block: "nearest", behavior: scrollBehavior() })
     const field = form.querySelector("textarea, input, select")
     if (field instanceof HTMLElement) field.focus({ preventScroll: true })
   }

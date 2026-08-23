@@ -33,6 +33,9 @@
   /** The control that opened the sheet, so Escape/close can hand focus back to it. */
   let returnFocus = null
 
+  /** Board regions are inert while the phone sheet is the active modal dialog. */
+  const MODAL_BACKGROUND = ".command-rail, #destinations, .boards"
+
   /** Query one element. */
   function $(selector) {
     return document.querySelector(selector)
@@ -46,6 +49,23 @@
   /** True when the viewport renders Detail as a modal sheet rather than a docked column. */
   function isModal() {
     return typeof root.matchMedia === "function" && root.matchMedia(MODAL_QUERY).matches
+  }
+
+  /** Apply dialog semantics and background isolation only while Detail overlays the board. */
+  function setModalSemantics(modal) {
+    const node = surface()
+    if (!node) return
+    if (modal) {
+      node.setAttribute("role", "dialog")
+      node.setAttribute("aria-modal", "true")
+    } else {
+      node.removeAttribute("role")
+      node.removeAttribute("aria-modal")
+    }
+    for (const region of document.querySelectorAll(MODAL_BACKGROUND)) {
+      region.inert = modal
+      region.toggleAttribute("aria-hidden", modal)
+    }
   }
 
   /**
@@ -112,10 +132,12 @@
       // The scrim and the body scroll lock are shared with the System sheet, so they are
       // owned by the shell — this module only declares that Detail currently needs them.
       document.body.classList.add("detail-modal")
+      setModalSemantics(true)
       root.ControlRoomShell?.showScrim()
       if (!wasOpen) focusSheet()
     } else {
       document.body.classList.remove("detail-modal")
+      setModalSemantics(false)
       root.ControlRoomShell?.hideScrimIfIdle()
     }
   }
@@ -127,6 +149,7 @@
     node.dataset.open = "false"
     clearDragOffset()
     document.body.classList.remove("detail-modal")
+    setModalSemantics(false)
     root.ControlRoomShell?.hideScrimIfIdle()
     // Only restore focus if the trigger is still in the document: the fleet re-renders on
     // every poll, so the original button may already have been replaced.
@@ -280,7 +303,9 @@
       if (!target) return
       event.preventDefault()
       open(anchor)
-      if (typeof target.scrollIntoView === "function") target.scrollIntoView({ block: "start", behavior: "smooth" })
+      if (typeof target.scrollIntoView === "function") {
+        target.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" })
+      }
     })
 
     // Crossing the breakpoint changes the surface's nature (sheet <-> column), so the modal
@@ -293,6 +318,7 @@
         if (surface()?.dataset.open === "true") open(null)
         else {
           document.body.classList.remove("detail-modal")
+          setModalSemantics(false)
           root.ControlRoomShell?.hideScrimIfIdle()
         }
       }

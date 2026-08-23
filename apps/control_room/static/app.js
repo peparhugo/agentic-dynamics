@@ -294,6 +294,8 @@
       bar.setAttribute("y", String(33 - height))
       bar.setAttribute("width", "9")
       bar.setAttribute("height", String(height))
+      // SVG geometry attributes are more portable than relying on CSS `rx` support alone.
+      bar.setAttribute("rx", "2")
       bar.setAttribute("class", "token-bar")
       svg.appendChild(bar)
     })
@@ -2183,6 +2185,10 @@
       }
       if (state.selectedType === "design" && !state.designSessions.has(state.selectedId)) {
         detachSelectedStream()
+        // The selected session disappeared from the authoritative roster, so its per-draft
+        // interval must disappear with it instead of waking forever as an early-return poll.
+        if (state.draftPollTimer) window.clearInterval(state.draftPollTimer)
+        state.draftPollTimer = null
         state.selectedId = null
         state.selectedType = null
         state.draftState = null
@@ -2433,6 +2439,8 @@
     $("#supervisor-interrupt-door").addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         event.preventDefault()
+        // This is a nested door: Escape closes it, not the containing Detail sheet.
+        event.stopPropagation()
         closeSupervisorInterruptDoor()
       }
     })
@@ -2589,6 +2597,7 @@
     })
     $("#routing-drawer").addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return
+      event.stopPropagation()
       state.routingOpen = false
       $("#routing-drawer").hidden = true
       $("#routing-toggle").setAttribute("aria-expanded", "false")
@@ -2607,6 +2616,8 @@
     })
     $("#registry-drawer").addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return
+      // Keep Escape local to Registry when it sits inside the System modal.
+      event.stopPropagation()
       state.registryOpen = false
       $("#registry-drawer").hidden = true
       $("#registry-toggle").setAttribute("aria-expanded", "false")
