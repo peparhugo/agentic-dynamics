@@ -1,0 +1,33 @@
+{
+  "arms": {
+    "arm_factor": "model",
+    "arms": {
+      "anthropic/claude-sonnet-5": {
+        "avg_correctness": 1.0,
+        "avg_cost": 1.9303,
+        "n": 5,
+        "weighted_loss": -3.0697
+      },
+      "deepseek/deepseek-v4-flash": {
+        "avg_correctness": 0.0,
+        "avg_cost": 0.0,
+        "n": 3,
+        "weighted_loss": 0.0
+      }
+    },
+    "best_arm": "anthropic/claude-sonnet-5",
+    "loss": {
+      "cost": 1.0,
+      "quality": -5.0
+    },
+    "regrets": {
+      "anthropic/claude-sonnet-5": 0.0,
+      "deepseek/deepseek-v4-flash": 3.0697
+    }
+  },
+  "decision_calibration": {
+    "decision_regret": 1.0,
+    "n_decisions": 11
+  },
+  "n_executed_phases": 8
+}

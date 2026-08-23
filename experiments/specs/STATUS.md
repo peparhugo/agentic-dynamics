@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-23T23:16:44.844161+00:00`  ·  94 spec(s)
-**Work remaining:** 85 open · 9 completed/retired
+Generated at: `2026-08-23T23:42:14.409372+00:00`  ·  94 spec(s)
+**Work remaining:** 83 open · 11 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -26,7 +26,6 @@ Generated at: `2026-08-23T23:16:44.844161+00:00`  ·  94 spec(s)
 | `cap_shadow_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `claude_background_sessions` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `claude_tools_to_skills` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `code_review` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_plane` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_hardening` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -50,7 +49,6 @@ Generated at: `2026-08-23T23:16:44.844161+00:00`  ·  94 spec(s)
 | `kb_lineage_reconcile` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_producer_factory` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_record_fidelity` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `kb_write_path` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-23 23:16 | fail | anthropic/claude-sonnet-5 | $0.0000 | 2 |
 | `measurement_bug_fixes` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `measurement_contribution_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -93,6 +91,7 @@ Generated at: `2026-08-23T23:16:44.844161+00:00`  ·  94 spec(s)
 | `website_rewrite` | workflow | no | runnable | 0.3 | — | — | — | — | — | 0 |
 | `workflow_step_routing` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `routing_kb_more_itertools` | workflow | no | failed | 0.1 | — | 2026-08-23 23:16 | fail | anthropic/claude-sonnet-5 | $0.0000 | 1 |
+| `code_review` | workflow | no | completed | 0.1 | — | 2026-08-23 23:37 | ok | anthropic/claude-sonnet-5 | $8.2082 | 1 |
 | `consolidation_release` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_release_execute` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_0_architecture_spine` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
@@ -102,6 +101,7 @@ Generated at: `2026-08-23T23:16:44.844161+00:00`  ·  94 spec(s)
 | `consolidation_stage_4_instruction_surfaces` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_5_apps_realignment` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_6_verification_release` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `kb_write_path` | workflow | no | completed | 0.1 | — | 2026-08-23 23:42 | ok | anthropic/claude-sonnet-5 | $1.4435 | 1 |
 
 ## Legend
 

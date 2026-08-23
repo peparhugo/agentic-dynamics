@@ -1,0 +1,8 @@
+{
+  "metric": 1.0,
+  "produces": {
+    "decision_regret": 1.0,
+    "n_decisions": 11
+  },
+  "rule": "decision_calibration"
+}

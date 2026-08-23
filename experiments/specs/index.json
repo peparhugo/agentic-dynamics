@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-23T23:16:44.844161+00:00",
+  "generated_at": "2026-08-23T23:42:14.409372+00:00",
   "n_specs": 94,
   "specs": [
     {
@@ -314,24 +314,6 @@
       "version": "0.1",
       "status": "runnable",
       "spec_path": "workflows/repository/claude_tools_to_skills.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "code_review",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/research/code_review.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],
@@ -746,24 +728,6 @@
       "version": "0.1",
       "status": "runnable",
       "spec_path": "workflows/repository/kb_record_fidelity.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "kb_write_path",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/kb_write_path.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],
@@ -1534,6 +1498,24 @@
       "n_runs": 1
     },
     {
+      "name": "code_review",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/research/code_review.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-23T23:37:11.040401+00:00",
+      "latest_ok": true,
+      "latest_model": "anthropic/claude-sonnet-5",
+      "latest_cost_usd": 8.208239,
+      "latest_git_sha": "7f7812da1",
+      "results_pointer": "experiments/results/workflows/code_review/20260823T233711Z.json",
+      "n_runs": 1
+    },
+    {
       "name": "consolidation_release",
       "version": "0.1",
       "status": "completed",
@@ -1694,6 +1676,24 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0
+    },
+    {
+      "name": "kb_write_path",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/kb_write_path.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-23T23:42:14.335836+00:00",
+      "latest_ok": true,
+      "latest_model": "anthropic/claude-sonnet-5",
+      "latest_cost_usd": 1.443496,
+      "latest_git_sha": "30581bd10",
+      "results_pointer": "experiments/results/workflows/kb_write_path/20260823T234214Z.json",
+      "n_runs": 1
     }
   ]
 }
