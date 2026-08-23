@@ -194,3 +194,47 @@ F2 (an action other than `continue` with empty `facts_used` is refused, check C5
 resolutions in the workflow spec's own phase prompt. `AUTOMATABLE_ACTIONS = frozenset({"continue",
 "route"})` is CODE in `control/decisions.py`, imported (never re-declared) by both `rules.py` and
 `validator.py`, so there is exactly one definition to audit.
+
+## 12. I7 — the apply seam for `route` (kept OFF; the flip procedure)
+
+`control.rules.make_applying_router` (a strict superset of I6's `make_shadow_router`) is the ONLY
+function in the plane that can change what model actually executes a phase. It applies the
+fact-based rule's `route` choice INSTEAD of `step_routing.route_step`'s ONLY when a freshly
+re-compiled snapshot (the C7 TOCTOU re-check) still validates the decision through ALL of C1-C10
+AND the action is `"route"` (`"continue"`, the other `AUTOMATABLE_ACTIONS` member, always means
+"use `route_step`'s default" by construction). Any failure anywhere — an inadmissible snapshot, a
+C1-C10 refusal, a missing contract, an exception — falls back to `route_step`'s deterministic
+choice; that fallback is the SAFE path this seam is built around, not a degraded one.
+
+**Wiring is a per-spec opt-in, never a default and never a CLI flag alone.**
+`scripts/run_workflow.py` reads `spec.workflow.params.get("control_route", False)` — a field in
+the SPEC YAML, not an invocation-time switch — and only then builds `make_applying_router(...)`
+as the injected `Router`; every other spec keeps `route_step` unchanged regardless of how the
+script is invoked. This is deliberately narrower than `--cap-shadow`/`--cap-snapshot` (I6/I4's
+per-INVOCATION measurement opt-ins): applying a routing decision changes what actually executes,
+so the decision to allow it belongs to the spec's own author, committed and reviewable, not to
+whoever happens to run the script that day.
+
+**The flip procedure — what an operator does to enable this for a real spec, and what must be
+true first (design §9 I7's own gate):**
+
+1. Run the spec for a meaningful number of cycles with `--cap-shadow` (implies `--cap-snapshot`)
+   so `route_next_job_v1` proposes BESIDE `step_routing.route_step` without ever executing.
+2. Read `python scripts/shadow_decision_report.py` — the agreement rate
+   (`1 - decision_regret`) between the plane's proposals and what `step_routing` actually chose.
+3. Read `python scripts/decision_arm_comparison.py` — the REAL measured cost/quality loss per
+   model that actually ran (`compile_experiment.compare_arms`), so a divergent proposal can be
+   checked against real precedent: does the plane's typical alternative model have a worse
+   measured loss than the baseline?
+4. Only once both reports support "the plane is at least non-inferior for this spec" does the
+   operator add `workflow.params.control_route: true` to that ONE spec's YAML, in a normal,
+   reviewable commit — never a global default, never an environment variable.
+5. After flipping, keep watching `decision_arm_comparison.py` (now with `applied: true` rows
+   mixed in) — an applied decision that regresses cost/quality is exactly what the campaign loop
+   (`AdaptSpec`) exists to catch and revert.
+
+**As of this increment, step 4 has not happened for any spec** — verified in
+`tests/test_context_plane_seam.py::test_no_committed_spec_opts_into_control_route`, which checks
+the REAL committed spec corpus, not just a fixture. No campaign data exists yet to justify a
+flip; this increment ships the seam and the measurement harness that would produce that data,
+per design §9 I7's own ordering.

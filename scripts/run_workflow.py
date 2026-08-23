@@ -107,7 +107,21 @@ def main() -> None:
             signals = None
 
     router = route_step
-    if args.cap_shadow:
+    if bool(spec.workflow.params.get("control_route", False)):
+        # CAP I7 seam (design §9 I7): a PER-SPEC opt-in — only a spec that explicitly sets
+        # `workflow.params.control_route: true` ever has the plane's route choice applied, and
+        # only when a fresh validate_decision() admits it. OFF by default; no committed spec
+        # sets this field (docs/context_abstraction/implementation_notes.md's flip procedure).
+        # Takes priority over --cap-shadow/--cap-snapshot: those are per-INVOCATION measurement
+        # opt-ins, this is the per-SPEC apply opt-in.
+        from agentic_dynamics.control.rules import make_applying_router
+
+        router = make_applying_router(
+            workload=spec.name,
+            cell_id=_reducer_cell_id(spec.name, args.model),
+            repository_id=cell_scope(args.workdir),
+        )
+    elif args.cap_shadow:
         # CAP I6 seam: a drop-in Router that ALSO runs + validates + records the fact-based
         # shadow decision (design §9 I6 row) — a superset of --cap-snapshot. Built here, at the
         # composition root, exactly where `route_step` is injected — `runtime.workflow_runner`

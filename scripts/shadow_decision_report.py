@@ -25,49 +25,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from pathlib import Path
-from typing import Any
 
 try:
     import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
-from agentic_dynamics.control.actuation_ingestion import EXTRACTOR_VERSION  # noqa: E402
-from agentic_dynamics.core.paths import KB_ARTIFACT_DIR  # noqa: E402
+from agentic_dynamics.control.rules import load_shadow_decisions  # noqa: E402
 from agentic_dynamics.experiment.compile_experiment import decision_calibration  # noqa: E402
-
-
-def load_shadow_decisions(*, artifact_dir: Path = KB_ARTIFACT_DIR) -> list[dict[str, Any]]:
-    """Scan ``artifact_dir`` for recorded shadow-decision artifacts and return their
-    ``decision_calibration``-shaped rows (``{action, baseline_action, model, baseline_model}``)."""
-    if not artifact_dir.is_dir():
-        return []
-    rows: list[dict[str, Any]] = []
-    for path in sorted(artifact_dir.glob("*.json")):
-        try:
-            artifact = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        if artifact.get("source_type") != "actuation":
-            continue
-        if artifact.get("extractor_version") != EXTRACTOR_VERSION:
-            continue
-        try:
-            body = json.loads(artifact.get("text") or "{}")
-        except json.JSONDecodeError:
-            continue
-        payload = body.get("requested_action") or {}
-        parameters = payload.get("parameters") or {}
-        if "baseline_action" not in parameters:
-            continue  # an actuation artifact from a different producer, not a shadow decision
-        rows.append({
-            "action": payload.get("action"),
-            "baseline_action": parameters.get("baseline_action"),
-            "model": parameters.get("model"),
-            "baseline_model": parameters.get("baseline_model"),
-        })
-    return rows
 
 
 def main(argv: list[str] | None = None) -> int:
