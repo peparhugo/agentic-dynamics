@@ -1,0 +1,106 @@
+name: cap_gate_scan
+question: >-
+  Run the new CAP I5 requires/produces gate (validate_fact_contracts, refusals R1-R11) over ALL
+  committed specs in the lifecycle index and close every refusal: either fix the spec (in-scope)
+  or record the defect with a reason. The gate is stricter than the old validator — control rules
+  whose requires_facts reference unproduced predicates, and invariants with on_missing not in
+  {halt, escalate}, are now refused. Deliver docs/designs/current/cap_gate_scan.md with the
+  findings table, resolutions, and an adversarial re-scan proving zero remaining refusals.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / spec
+        lifecycle. canonical_sources: [src/agentic_dynamics/core/contracts.py (R1-R11),
+        src/agentic_dynamics/experiment/compile_experiment.py, experiments/specs/index.json
+        (the 90-spec corpus), FACT_PREDICATES (control/facts.py)].
+        policies: [gate_is_truth, no_phantom_producers, spec_hygiene]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: maintenance sweep.
+        deliberation: [enumerate specs, run gate, classify refusals, fix or record, re-scan,
+        adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        validate_fact_contracts is merged (R1-R11, including R11 invariant-halt resolution).
+        Specs were authored against the older gate; several may now fail. The index lists 90
+        specs across workflows/repository, workflows/operations, experiments/definitions.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) The gate is truth:
+        a refusal means the spec is unwritable as authored — never patch the validator to admit
+        a spec. (3) Fixes are in-scope only when they preserve the spec's intent (e.g. dropping
+        an unimplementable requires_facts entry with the load-bearing-rule gap recorded in the
+        spec's writeup); otherwise record BLOCKED with a reason. (4) No spec may be deleted
+        without recording it as superseded in the index. (5) The adversarial phase (g4) must
+        re-scan the full corpus independently and find zero refusals. (6) PASS/FAIL log.
+      read_first: >-
+        src/agentic_dynamics/core/contracts.py, src/agentic_dynamics/control/facts.py
+        (FACT_PREDICATES), experiments/specs/index.json, scripts/spec_status.py
+      run_shape: >-
+        SINGLE-model: --model anthropic/claude-sonnet-5 --backend claude_cli. One worktree, one
+        branch (feature/cap-gate-scan); each phase commits [workflow] <phase>.
+    phases:
+      - name: g1_enumerate_and_scan
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: load the corpus from experiments/specs/index.json; for every spec, run
+          validate_fact_contracts (via the public API with the real FACT_PREDICATES and REDUCERS
+          registries) and compile_experiment's gate. Record every refusal with: spec name,
+          rule/contract, refusal text, and the requires_facts entry involved.
+          DELIVER: the raw scan table in docs/designs/current/cap_gate_scan.md (first pass).
+          LOG: pass/fail counts per corpus; PASS/FAIL; commit.
+      - name: g2_classify_and_fix
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: for each refusal decide FIX (in-scope: adjust the spec's rules to reference only
+          produced facts, or change an invariant's on_missing to a legal value, preserving
+          intent) or RECORD (BLOCKED with the concrete missing producer/reason). Apply fixes;
+          regenerate the index (scripts/spec_status.py) after any spec edit.
+          DELIVER: the final findings table with resolution per row; every edited spec's diff
+          summarized.
+          GUARD: no validator changes; no spec intent changes beyond the refusal.
+          LOG: FIX vs RECORD counts; PASS/FAIL; commit.
+      - name: g3_adversarial_rescan
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial re-scanner. Re-run the full gate over the corpus INDEPENDENTLY
+          (fresh enumeration, same registries) and attempt to find: refusals the first scan
+          missed, fixes that merely silenced the gate (e.g. a rule whose requires_facts now
+          references a predicate with no real reducer), index/spec drift (spec edited but index
+          stale), and specs whose RECORD was a phantom (producer exists after all).
+          Every finding: fix or re-record. Final state: zero refusals, documented.
+          LOG: finding table; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules:
+  - name: cap_gate_scanned
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [corpus_scanned, refusals_closed, rescan_clean]
+metrics:
+  - {name: corpus_scanned, agg: mean, over: cell}
+  - {name: refusals_closed, agg: mean, over: cell}
+  - {name: rescan_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, g1_enumerate_and_scan, g2_classify_and_fix, g3_adversarial_rescan]
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

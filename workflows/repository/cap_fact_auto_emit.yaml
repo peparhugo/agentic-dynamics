@@ -1,0 +1,111 @@
+name: cap_fact_auto_emit
+question: >-
+  Wire automatic fact emission into workflow completion so every finished run derives its facts
+  into the KB/registry without manual kb_produce_facts invocations. The fact store must stay
+  current for the shadow controller and any policy consumption. Implement the emit hook in the
+  workflow-run completion path (run_workflow.py / workflow_runner finalize), idempotent per run
+  artifact (reusing run_artifact_id dedup), hermetic-tested, default-ON behind a disable flag,
+  and adversarially verified (double-emit, partial runs, registry unreachable, no regression to
+  the I0-I7 planes).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / CAP
+        runtime. canonical_sources: [scripts/run_workflow.py (completion path),
+        src/agentic_dynamics/runtime/workflow_runner.py (finalize), scripts/kb_produce_facts.py
+        (the producer), src/agentic_dynamics/control/fact_ingestion.py (derive_fact_records,
+        in-batch chaining), src/agentic_dynamics/control/reducers/_common.py (run_artifact_id)].
+        policies: [idempotent_emit, facts_are_measurement, no_emit_errors_block_runs]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: cross_cutting (runner + producer + registry).
+        deliberation: [design hook, implement, hermetic test, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        Facts are derived manually via scripts/kb_produce_facts.py. The reducers are pure and
+        tested; fact_ingestion.derive_fact_records has in-batch chaining; run_artifact_id gives a
+        stable per-run identity and _run_evidence dedups duplicate artifacts. The workflow
+        completion path does not emit facts automatically.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) Idempotent: re-emitting
+        the same run artifact is a byte-identical no-op (fingerprint excludes provenance; the
+        dedup guard is reused). (3) Emit failure NEVER fails the workflow run: best-effort with a
+        recorded warning (facts are measurement; the run is the source of truth). (4) Default-ON
+        with a disable flag (env or CLI) — state and document the choice. (5) No changes to
+        reducer semantics, no new transport; reuse kb_produce_facts' derivation path. (6) The
+        adversarial phase (f4) is mandatory — double-emit, partial/failed runs, registry
+        unreachable, concurrent runs, no regression to I0-I7 tests. (7) PASS/FAIL log.
+      read_first: >-
+        scripts/run_workflow.py (finalize/ledger section), scripts/kb_produce_facts.py,
+        src/agentic_dynamics/control/fact_ingestion.py, src/agentic_dynamics/control/reducers/
+        _common.py, tests/test_kb_produce_facts_integration.py
+      run_shape: >-
+        SINGLE-model: --model anthropic/claude-sonnet-5 --backend claude_cli. One worktree, one
+        branch (feature/cap-fact-auto-emit); each phase commits [workflow] <phase>.
+    phases:
+      - name: f1_hook_design
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER: the hook design in docs/designs/current/cap_fact_auto_emit_design.md —
+          WHERE completion triggers derivation (run_workflow finalize vs workflow_runner), the
+          flag surface (name, default, precedence), the failure semantics, and how repository_id/
+          scope are resolved for the emitted facts (cell_scope). No code changes in this phase.
+          GUARD: design-only; every option weighed against the existing paths.
+          LOG: chosen design + rejected alternatives; PASS/FAIL; commit.
+      - name: f2_implement
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the design: the emit hook on workflow completion, the disable flag,
+          failure-tolerant semantics (warning + record, never blocking), reusing the existing
+          derivation path (load_run_jsons -> _run_evidence -> derive_facts -> derive_fact_records)
+          scoped to the just-finished run artifact.
+          VERIFY: hermetic tests (temp registry, monkeypatched paths, no Redis) proving: emit
+          produces facts; re-emit is a no-op (byte-identical); failed run still emits its attempt
+          facts; registry-unreachable degrades to warning; flag disables emission. Run the I0-I7
+          CAP suites + guards.
+          GUARD: no reducer changes; no new transport.
+          LOG: files changed, test list; PASS/FAIL; commit.
+      - name: f3_adversarial_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier. Attack: double-emit from a copied artifact; concurrent
+          runs of one cell emitting interleaved; partial registry writes; emit of a run whose
+          phases changed after finalize; flag precedence confusion; a regression in
+          fact_ingestion's in-batch chaining or the dedup guard. Every finding: fix with a test
+          or record accepted limitation.
+          LOG: finding table; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules:
+  - name: cap_fact_auto_emit_wired
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [hook_designed, emit_implemented, emit_adversarial_clean]
+metrics:
+  - {name: hook_designed, agg: mean, over: cell}
+  - {name: emit_implemented, agg: mean, over: cell}
+  - {name: emit_adversarial_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, f1_hook_design, f2_implement, f3_adversarial_verify]
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

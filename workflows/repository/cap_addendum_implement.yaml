@@ -1,0 +1,151 @@
+name: cap_addendum_implement
+question: >-
+  Implement the CAP Addendum A increments I8-I10 per the accepted addendum design
+  (docs/designs/current/context_abstraction_addendum_design.md, authority; deviation D7 already
+  in the design): I8 DomainProfile/ChallengeProfile (control/profiles.py, declared POLICY facts,
+  contract remains the sole gate), I9 the pattern fact kind (FACT_PREDICATES entry + PatternPayload
+  + deterministic pattern reducer; NO EPISTEMIC_MAP row per D7), I10 the typed SessionCheckpoint +
+  session_routing contract (experiments/contexts/session_routing.yaml; AUTOMATABLE_ACTIONS stays
+  {continue, route}; fork/compress/escalate are proposal-only). Each increment gated with tests;
+  the workflow ends with an adversarial review and a release verdict. The I7 apply seam stays OFF.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / CAP
+        control plane. canonical_sources: [docs/designs/current/context_abstraction_addendum_
+        design.md (authority — I8 §2, I9 §3, I10 §4; reserved homes §6),
+        docs/designs/current/context_abstraction_design.md (frozen §1-13),
+        docs/context_abstraction/implementation_notes.md (append-only deviations)].
+        policies: [hard_rule_3_reducers_only, contract_is_the_gate, proposal_only_actuation,
+          apply_stays_off]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: greenfield implementation (three new planes of
+        control machinery).
+        deliberation: [I8 profiles, I9 patterns, I10 checkpoint, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        I0-I7 merged on main. The addendum design is accepted (review/design/verify docs merged;
+        D7 answered: pattern is a fact KIND via FACT_PREDICATES, not an EPISTEMIC_MAP row).
+        Reserved homes: control/profiles.py (I8, NEW), facts.py FACT_PREDICATES (I9),
+        SessionCheckpoint + experiments/contexts/session_routing.yaml (I10, NEW). The I6 shadow
+        machinery exists; AUTOMATABLE_ACTIONS = {continue, route} in control/decisions.py.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) The addendum design is
+        authority; a deviation requires a one-line note in implementation_notes.md (append-only).
+        (3) I9: pattern facts are minted ONLY by a deterministic reducer from measured evidence;
+        LLM proposals are ADVISORY and structurally uncitable (C5). No EPISTEMIC_MAP row (D7).
+        (4) I8: a profile can never widen a controller's view past its contract — profiles resolve
+        through requires_facts; composition rule per design §2.3. (5) I10: fork/compress_and_fork/
+        escalate remain proposal-only — AUTOMATABLE_ACTIONS stays {continue, route}; the
+        session_routing contract's invariants (snapshot identity for continue, checkpoint
+        presence for fork) are enforced by the validator, not convention. (6) I7 apply stays OFF.
+        (7) The adversarial phase (d4) is mandatory — at least 3 findings or clean sweep. (8) No
+        generated-surface edits. (9) PASS/FAIL log.
+      read_first: >-
+        docs/designs/current/context_abstraction_addendum_design.md (full),
+        docs/designs/current/context_abstraction_addendum_review.md,
+        docs/designs/current/context_abstraction_addendum_verify.md,
+        src/agentic_dynamics/control/{facts,decisions,context_compiler}.py,
+        src/agentic_dynamics/core/contracts.py, tests/test_context_plane_*.py
+      run_shape: >-
+        SINGLE-model: --model anthropic/claude-sonnet-5 --backend claude_cli. One worktree, one
+        branch (feature/cap-addendum-implement); each phase commits [workflow] <phase>.
+    phases:
+      - name: d1_profiles
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER: I8 — control/profiles.py with DomainProfile + ChallengeProfile frozen
+          dataclasses exactly per design §2 (fields, versioning, canonical_sources, predicates,
+          policies, patterns, verification; challenge archetypes + deliberation + session_policy),
+          compile_context gaining the profile inputs (§2.3 composition rule: contract remains the
+          sole gate), profiles declared as POLICY facts at construction, and a migration path for
+          the static profile filings in workflow specs (provide the helper + document the swap
+          procedure). Unit tests per design §2.5: profile facts resolve; a profile cannot widen a
+          contract; versioning/supersession behaves.
+          GUARD: no L4 workload-fact claims (design §2.1's honesty rule); no contract changes.
+          LOG: schema, homes, tests; PASS/FAIL; commit.
+      - name: d2_patterns
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER: I9 — the pattern fact kind per design §3: FACT_PREDICATES entry carrying
+          PatternPayload (claim, population, conditions, support, uncertainty, validity_window,
+          source_experiment); the deterministic pattern reducer (consumes lab/campaign artifacts;
+          support/uncertainty from real records — design §1's no-phantom rule); minting rules
+          (reducer-only; LLM proposals ADVISORY per C5); source_experiment citing lab-contract
+          refs. NO EPISTEMIC_MAP row (D7) — epistemic_status is the existing "derived".
+          Unit + integration tests: a pattern derived from real campaign records; an ADVISORY
+          proposal is uncitable; re-derivation stability; a pattern with no real support cannot
+          be minted.
+          GUARD: no LLM in the minting path; no new transport.
+          LOG: schema, reducer, tests; PASS/FAIL; commit.
+      - name: d3_checkpoint_and_contract
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER: I10 — SessionCheckpoint schema per design §4.1 with per-field epistemic markers
+          (DERIVED: completed/current_revision/verified_facts/acceptance_state/context_snapshot_id;
+          ADVISORY: open_hypotheses/failed_approaches/next_action); the session_routing
+          decision-type contract at experiments/contexts/session_routing.yaml (allowed_actions
+          [continue, fork, compress_and_fork, escalate]; invariants: continue requires snapshot
+          identity + unchanged goal/phase/model; fork requires a checkpoint; max_snapshot_age_seconds);
+          validator enforcement (invariant-halt semantics per R11); AUTOMATABLE_ACTIONS stays
+          {continue, route} — the new actions are proposal-only, recorded never applied (§4.3).
+          Unit tests: checkpoint field epistemic split; contract invariants enforced; a continue
+          with a stale snapshot is refused; a fork without a checkpoint is refused; proposals are
+          recorded and never actuated.
+          GUARD: apply stays OFF; no runner wiring changes (shadow-optional only).
+          LOG: schema, contract YAML, tests; PASS/FAIL; commit.
+      - name: d4_adversarial_review
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial reviewer. Attack all three increments: (1) can a profile widen a
+          controller's view past its contract (find a concrete path)? (2) can a pattern become
+          canonical without a deterministic reducer, or with fabricated support? (3) can an
+          ADVISORY checkpoint field leak into a DERIVED claim, or a proposal leak into
+          AUTOMATABLE_ACTIONS? (4) does session_routing's continue invariant hold under a
+          re-derived snapshot (TOCTOU)? (5) do the new modules respect the dependency direction
+          and tier map? (6) any regression to I0-I7 suites or the apply-stays-OFF guarantee?
+          Every finding: fix with a test or record accepted limitation. Run the CAP suites +
+          guards.
+          RELEASE VERDICT: state whether I8-I10 are merge-ready and list follow-ups (e.g. the
+          static-profile-filing migration, the prospective session-routing experiment gated on
+          checkpoint records).
+          LOG: finding table; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules:
+  - name: cap_addendum_implemented
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [profiles_implemented, patterns_implemented, checkpoint_implemented, addendum_adversarial_clean]
+metrics:
+  - {name: profiles_implemented, agg: mean, over: cell}
+  - {name: patterns_implemented, agg: mean, over: cell}
+  - {name: checkpoint_implemented, agg: mean, over: cell}
+  - {name: addendum_adversarial_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, d1_profiles, d2_patterns, d3_checkpoint_and_contract, d4_adversarial_review]
+stop: {budget_usd: 35.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
