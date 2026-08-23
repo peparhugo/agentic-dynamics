@@ -1090,6 +1090,66 @@ def test_projected_budget_overrun_is_absent_without_a_ceiling():
     assert "projected_budget_overrun" not in by
 
 
+def test_projected_budget_overrun_is_absent_when_cost_is_unmeasured():
+    """CAP I0-I3 repair: unknown is never a measured zero — a ceiling with no measured cost must
+    NOT fabricate an overrun of 0.0; the fact must be absent entirely."""
+    run = _run(total_cost_usd=None)
+    by = _by_predicate(_workflow(run, _config(budget_usd=2.0)))
+    assert "projected_budget_overrun" not in by
+
+
+def test_two_runs_with_different_outcomes_do_not_inflate_or_mix_status():
+    """CAP I0-I3 repair: current-run aggregation. An older FAILED run of a cell must not survive
+    into the count, nor may it mix with a later successful run to produce a "half completed,
+    half failed" reading — only the current run's outcome is visible."""
+    failing_phase = {
+        "phase": "implement",
+        "kind": "agent",
+        "status": "failed",
+        "model": "deepseek/deepseek-v4-pro",
+        "tokens": {"in": 10, "out": 5},
+        "cost_usd": 0.1,
+    }
+    run_a = _run(
+        ok=False,
+        started_at="2026-08-20T00:00:00+00:00",
+        ended_at="2026-08-20T00:10:00+00:00",
+        phases=[failing_phase],
+    )
+    run_b = _run(started_at="2026-08-22T00:00:00+00:00", ended_at="2026-08-22T00:10:00+00:00")
+    by = _by_predicate(_workflow_multi(run_a, run_b))
+    # run_b (the current run) is a clean 2-phase completion — the same as if run_a never existed.
+    assert by["workflow_phases_completed"][0].value == "2"
+    assert by["workflow_phases_remaining"][0].value == "0"
+    assert by["workflow_status"][0].value == "completed"
+    assert by["workflow_health"][0].value == "healthy"
+
+
+def test_job_status_failed_dominates_all_ok_phase_statuses():
+    """CAP I0-I3 repair: job-level terminal status cannot be contradicted by a phase-only summary.
+    Every individual phase reports "ok", but the run's own authoritative `ok` field is False (a
+    failure not expressed as any single phase's status) — workflow_status must still be "failed"."""
+    run = _run(
+        ok=False,
+        phases=[
+            {
+                "phase": "implement",
+                "kind": "agent",
+                "status": "ok",
+                "model": "deepseek/deepseek-v4-pro",
+                "tokens": {"in": 10, "out": 5},
+                "cost_usd": 0.1,
+            },
+            {"phase": "test", "kind": "test", "status": "ok", "test_executed_success": True},
+        ],
+    )
+    by = _by_predicate(_workflow(run))
+    # Every phase individually reported "ok" — job_status alone drives this outcome.
+    assert by["workflow_phases_completed"][0].value == "2"
+    assert by["workflow_status"][0].value == "failed"
+    assert by["workflow_health"][0].value == "at_risk"
+
+
 def test_workflow_facts_carry_evidence_ids_and_derived_epistemics():
     facts = _workflow(_run(), _config())
     for fact in facts:

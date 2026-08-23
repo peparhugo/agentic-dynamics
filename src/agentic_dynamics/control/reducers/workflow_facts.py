@@ -36,6 +36,34 @@ cell with no phases yields the empty state, not silence).
 
 Epistemics: every workflow fact is ``derived`` (DERIVED/[C]) — computed by this deterministic
 reducer from lower-level facts. ``fact_id`` is emitted empty and finalized at persistence.
+
+**``workflow_status`` precedence (CAP I0-I3 repair — job-level status is authoritative over a
+phase-only summary, per invariant).** ``job_status`` (``job_facts.py``, derived from
+``WorkflowRunResult.ok = bool(phases) and all(p.status == "ok" for p in phases)``) sees EVERY
+phase's status, not just the literal string ``"failed"`` — a phase whose status is some other
+non-``"ok"`` value (``"skipped"``, ``"error"``, ``"timeout"``, ...) would make ``job_status``
+``"failed"`` while a phase-only scan for ``value == "failed"`` misses it entirely. So the rule is:
+
+    1. ``job_status == "failed"``            -> ``"failed"``   (authoritative; dominates)
+    2. no job_status fact, but a phase failed -> ``"failed"``   (degrade gracefully — the run-level
+                                                                  signal wasn't measured for this
+                                                                  run, fall back to what was)
+    3. all phases completed, none failed      -> ``"completed"``
+    4. some phases recorded, run incomplete   -> ``"in_progress"``
+    5. nothing recorded for this cell         -> ``"unknown"``
+
+Rule 1 catches everything rule 2 would miss, so job_status is checked FIRST rather than only as a
+tiebreak; the two are expected to agree whenever both are measured for the same run (job_status is
+computed from the very same phases attempt_facts/v1 read), and disagreement never actually arises
+in practice — the ordering matters only for defensive correctness, not because it changes today's
+outputs. ``workflow_health`` reuses this same resolved ``failed`` — no separate precedence exists.
+
+**``projected_budget_overrun`` null safety (CAP I0-I3 repair — unknown is never a measured
+zero).** The fact is emitted ONLY when BOTH ``max_spend_usd`` (policy) AND
+``job_accumulated_cost_usd`` (this cell's current run) are present: cost unmeasured is
+``unknown``, not a fabricated ``0.0``. When both are present, ``0.0`` is a legitimate emitted
+value (cost is genuinely at-or-under budget) — the two cases are distinguished by whether the fact
+exists at all, never by the fact's value.
 """
 
 from __future__ import annotations
@@ -208,7 +236,19 @@ def _facts_for_cell(
     evidence_ids = tuple(sorted(f.fact_id for f in inputs if f.fact_id))
 
     completed = sum(1 for f in phase_status if f.value == "ok")
-    failed = any(f.value == "failed" for f in phase_status)
+
+    # failed: job_status is authoritative (module docstring's precedence table) — it reflects
+    # WorkflowRunResult.ok, which is False if ANY phase's status is anything other than "ok", not
+    # only the literal string "failed". A phase-only scan would miss e.g. "skipped"/"error"/
+    # "timeout". Fall back to the phase-only scan only when no job_status fact exists for this
+    # cell's current run (job_facts/v1 wasn't run over it), so a phase-level "failed" is never
+    # silently lost either.
+    job_status_fact = jobs.get("job_status")
+    failed = (
+        job_status_fact.value == "failed"
+        if job_status_fact is not None
+        else any(f.value == "failed" for f in phase_status)
+    )
 
     total_fact = jobs.get("job_n_phases")
     total = int(total_fact.value) if total_fact else len(phase_status)
@@ -225,12 +265,14 @@ def _facts_for_cell(
         status = "unknown"
 
     # Spend-against-declared-ceiling (§4.2's substitution for the unproducible deadline_slack).
+    # cost_known gates BOTH whether the fact is emitted below (never a fabricated 0.0 for an
+    # unmeasured cost) and whether it counts toward `health` — an unknown cost must not silently
+    # read as "no overrun" for the at_risk check either.
     cost_fact = jobs.get("job_accumulated_cost_usd")
-    overrun = 0.0
-    if cost_fact is not None and max_spend is not None:
-        overrun = max(0.0, float(cost_fact.value) - float(max_spend.value))
+    cost_known = cost_fact is not None and max_spend is not None
+    overrun = max(0.0, float(cost_fact.value) - float(max_spend.value)) if cost_known else 0.0
 
-    if overrun > 0.0 or failed:
+    if (cost_known and overrun > 0.0) or failed:
         health = "at_risk"
     elif status in ("in_progress", "unknown"):
         health = "degraded"
@@ -257,8 +299,10 @@ def _facts_for_cell(
         _fact(workload, cell, inp, "workflow_status", encode_value(status, "enum"), evidence_ids),
         _fact(workload, cell, inp, "workflow_health", encode_value(health, "enum"), evidence_ids),
     ]
-    # projected_budget_overrun is emitted ONLY when a ceiling exists (§5: "when inputs exist").
-    if max_spend is not None:
+    # projected_budget_overrun is emitted ONLY when BOTH a ceiling AND a measured cost exist
+    # (§5: "when inputs exist" — CAP I0-I3 repair: cost unmeasured must stay unknown, never a
+    # fabricated 0.0). ``0.0`` is a legitimate emitted value once both inputs are present.
+    if cost_known:
         facts.append(
             _fact(
                 workload,
