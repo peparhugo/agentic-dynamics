@@ -199,16 +199,26 @@ def derive_fact_records(
     mid-batch, so reading ONLY ``registry_head`` would have every such fact see the same stale
     (or absent) disk head and independently decide "first version"/"supersedes X" — producing two
     unlinked "current" rows for one slot (a ``conflicted`` fact, per ``facts.fact_state``) instead
-    of a clean chain. ``pending_head`` tracks each entity's head as this loop mutates it, so
-    facts are threaded against one another in the order given — which is why callers (e.g.
-    ``kb_produce_facts.load_run_jsons``) sort their evidence oldest-run-first: the LAST fact
-    processed for an entity is the one that ends up current.
+    of a clean chain. ``pending_head`` tracks each entity's head as this loop mutates it, so facts
+    are threaded against one another oldest-first — the LAST fact processed for an entity is the
+    one that ends up current.
+
+    **Out-of-order-evidence guard (CAP I0-I3 adversarial repair, r4, attack vector "out-of-order
+    evidence").** "Oldest-first" must be true regardless of the ORDER ``facts`` arrives in — a
+    caller building evidence out of order (or a future caller that skips
+    ``kb_produce_facts.load_run_jsons``'s own oldest-first sort) must not silently make an OLDER
+    observation the registered "current" value merely because it happened to be processed last.
+    This function is therefore the single place that GUARANTEES the ordering property, not merely
+    a beneficiary of a well-behaved caller: ``facts`` is stably sorted by ``observed_at`` ascending
+    before chaining, so "last processed" and "most recently observed" always coincide. A stable
+    sort preserves the caller's relative order for facts that tie on ``observed_at`` (including the
+    common case of a single fact per entity, where sorting is a no-op).
 
     No LLM, no writes: emission is the producer's job (``scripts/kb_produce_facts.py``).
     """
     records: list[KnowledgeRecord] = []
     pending_head: dict[str, RegistryHead] = {}
-    for fact in facts:
+    for fact in sorted(facts, key=lambda f: f.observed_at):
         candidate = build_fact_record(fact)
         head = pending_head.get(candidate.entity_id)
         if head is None:
@@ -228,6 +238,8 @@ def derive_fact_records(
             pending_head[candidate.entity_id] = head
             continue  # byte-identical first version already registered
         linked = build_fact_record(fact, supersedes=head.knowledge_id)
-        pending_head[candidate.entity_id] = RegistryHead(linked.knowledge_id, fact_fingerprint(linked))
+        pending_head[candidate.entity_id] = RegistryHead(
+            linked.knowledge_id, fact_fingerprint(linked)
+        )
         records.append(linked)
     return records

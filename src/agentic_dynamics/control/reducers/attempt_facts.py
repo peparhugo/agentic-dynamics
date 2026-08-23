@@ -205,7 +205,7 @@ def _facts_for_phase(
         tokens = phase.get("tokens") or {}
         if isinstance(tokens, dict):
             # Null-safe: a measured ZERO token count is a real measurement, not an absent one —
-            # only a missing/None key means "not measured". A truthiness check (`if tokens.get(...)`)
+            # only a missing/None key means "not measured". A truthiness check (`if tokens.get(x)`)
             # would silently drop a legitimate 0, which is the CAP I0-I3 repair's null-safety fix.
             tokens_in = tokens.get("in")
             if tokens_in is not None:

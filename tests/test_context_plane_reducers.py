@@ -986,7 +986,9 @@ def test_workflow_aggregation_uses_only_the_current_run():
     by_single = _by_predicate(_workflow(run_b))
     by_multi = _by_predicate(_workflow_multi(run_a, run_b))
     # Same answer whether run_a ever existed or not — run_a must not inflate the count.
-    assert by_multi["workflow_phases_completed"][0].value == by_single["workflow_phases_completed"][0].value
+    completed_multi = by_multi["workflow_phases_completed"][0].value
+    completed_single = by_single["workflow_phases_completed"][0].value
+    assert completed_multi == completed_single
     assert by_multi["workflow_status"][0].value == by_single["workflow_status"][0].value
 
 

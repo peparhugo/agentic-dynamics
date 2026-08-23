@@ -64,6 +64,14 @@ zero).** The fact is emitted ONLY when BOTH ``max_spend_usd`` (policy) AND
 ``unknown``, not a fabricated ``0.0``. When both are present, ``0.0`` is a legitimate emitted
 value (cost is genuinely at-or-under budget) — the two cases are distinguished by whether the fact
 exists at all, never by the fact's value.
+
+**Duplicate-evidence guard (CAP I0-I3 adversarial repair, r4).** ``workflow_facts_v1`` dedupes
+``inp.facts`` by ``fact_id`` (a content-address, §3.3) BEFORE bucketing by cell — defense-in-depth
+alongside ``kb_produce_facts._run_evidence``'s own dedup of the raw evidence one rung down. Two
+distinct runs of a cell never collide here (their attempt facts have distinct ``fact_id``s by
+construction — see ``attempt_facts.py``), so this can never drop a legitimate observation; it only
+guards against the SAME fact reaching this reducer more than once (a duplicated artifact upstream,
+or a future caller that lists a fact twice), which would otherwise silently double-count phases.
 """
 
 from __future__ import annotations
@@ -330,6 +338,7 @@ def workflow_facts_v1(inp: ReducerInput) -> list[CanonicalFact]:
     """
     by_cell: dict[str, dict[str, Any]] = {}
     policy_by_workload: dict[str, dict[str, CanonicalFact]] = {}
+    seen_fact_ids: dict[str, set[str]] = {}  # per-cell dedup set (see docstring below)
 
     for fact in inp.facts:
         seg = _segments(fact.scope_path)
@@ -339,6 +348,19 @@ def workflow_facts_v1(inp: ReducerInput) -> list[CanonicalFact]:
         cell = seg.get("job") or seg.get("workflow")
         if not cell:
             continue  # a job/attempt/workflow fact must name its cell; anything else is skipped
+        # Duplicate-evidence guard (CAP I0-I3 adversarial repair): a fact_id is a content-address
+        # (design §3.3) — two facts sharing one are THE SAME fact, however they got here (a
+        # duplicated run artifact upstream, a caller that accidentally lists a fact twice, ...).
+        # Silently keeping only the first occurrence is defense-in-depth alongside
+        # ``kb_produce_facts._run_evidence``'s dedup: this reducer must not double-count a phase
+        # merely because its input happened to repeat. A fact with no fact_id yet (unfinalized,
+        # ``""``) cannot be deduped this way — such input is malformed for this rung (§ module
+        # docstring: ``inp.facts`` must already be finalized) and is passed through unchanged.
+        if fact.fact_id:
+            cell_seen = seen_fact_ids.setdefault(cell, set())
+            if fact.fact_id in cell_seen:
+                continue
+            cell_seen.add(fact.fact_id)
         bucket = by_cell.setdefault(cell, {"workload": seg.get("workload", ""), "facts": []})
         bucket["facts"].append(fact)
 

@@ -157,7 +157,7 @@ def load_spec_configs() -> list[dict]:
 
 
 def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
-    """Build one ``EvidenceItem`` per run, identified by its content-addressed artifact id.
+    """Build one ``EvidenceItem`` per DISTINCT run, identified by its content-addressed artifact id.
 
     CAP I0-I3 repair: the identity used to be ``f"workflow:{spec_name}"`` — spec-name-only, so
     EVERY run of the same spec collided on the same ``evidence_id`` regardless of model, phase
@@ -166,15 +166,32 @@ def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
     caller can look one back up via a ``{evidence_id: payload}`` index over this same sequence —
     see ``_evidence_resolver`` below), while re-deriving from the SAME artifact reproduces the
     same id byte-for-byte.
+
+    **Duplicate-evidence guard (CAP I0-I3 adversarial repair, attack vector "duplicate evidence"):**
+    two ON-DISK FILES can carry byte-identical content (a copied/duplicated artifact, or a replay
+    that re-wrote the same result under a new timestamp-named file) — ``load_run_jsons`` would
+    legitimately hand back two separate dict entries for them. Two ``EvidenceItem``s with the same
+    ``evidence_id`` are, by this module's own identity contract, THE SAME EVIDENCE — handing both
+    to a reducer would double-count every phase/job fact they mint (a cell with one completed
+    phase would read ``workflow_phases_completed=2``). This is the one place that resolves raw
+    evidence, so it is the one place that must deduplicate it — ``derive_fact_records`` already
+    protects the FINAL persisted records from a duplicate (the "byte-identical first version
+    already registered" branch), but it never sees ``workflow_facts_v1``'s in-memory phase counts,
+    which read the raw reducer output directly. Kept the first occurrence deterministically (input
+    order is already recency-sorted by ``load_run_jsons``) — which occurrence survives is
+    immaterial since, by definition of the identity scheme, their content is identical.
     """
-    return tuple(
-        EvidenceItem(
-            source_type="workflow_run",
-            evidence_id=f"workflow_run:{run_artifact_id(run)}",
-            payload=run,
+    seen: set[str] = set()
+    items: list[EvidenceItem] = []
+    for run in runs:
+        rid = run_artifact_id(run)
+        if rid in seen:
+            continue
+        seen.add(rid)
+        items.append(
+            EvidenceItem(source_type="workflow_run", evidence_id=f"workflow_run:{rid}", payload=run)
         )
-        for run in runs
-    )
+    return tuple(items)
 
 
 def evidence_resolver(items: tuple[EvidenceItem, ...]) -> Callable[[str], object | None]:
@@ -191,7 +208,7 @@ def evidence_resolver(items: tuple[EvidenceItem, ...]) -> Callable[[str], object
 
 
 def _finalize(facts: list) -> list:
-    """Attach each fact's real ``fact_id`` (= the record's ``knowledge_id``), ready for the ladder."""
+    """Attach each fact's real ``fact_id`` (the record's ``knowledge_id``), ready for the ladder."""
     return [fi.finalize_fact(fact, fi.build_fact_record(fact)) for fact in facts]
 
 

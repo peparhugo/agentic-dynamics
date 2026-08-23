@@ -212,7 +212,7 @@ def test_end_to_end_ladder_round_trip(kpf, tmp_path):
         r.knowledge_id for r in attempt_records_1
     }
 
-    # --- persist round 1, then re-derive over the SAME artifact -> no publication of unchanged facts ---
+    # --- persist round 1, re-derive the SAME artifact -> no publication of unchanged facts ---
     _persist(kpf.REGISTRY_INDEX_PATH, *attempt_records_1, *job_records_1, *workflow_records_1)
     assert kpf.derive_facts("attempt_facts/v1", REPO, REVISION, NOW) == []
     assert kpf.derive_facts("job_facts/v1", REPO, REVISION, NOW) == []
