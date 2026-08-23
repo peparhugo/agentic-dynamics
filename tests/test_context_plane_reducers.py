@@ -809,6 +809,27 @@ def test_job_facts_are_current_per_cell_and_chain_across_runs(tmp_path: Path):
     assert records[1].supersedes == records[0].knowledge_id
 
 
+def test_job_facts_unchanged_value_across_runs_is_a_no_op_despite_different_evidence(
+    tmp_path: Path,
+):
+    """CAP I0-I3 repair (r3 CHECK): fact_fingerprint must not confuse CONTENT identity with RUN
+    identity. Two runs of one cell with the IDENTICAL cost carry DIFFERENT evidence_ids (each
+    cites its own run artifact) and therefore different knowledge_ids — but the fingerprint used
+    to decide "did this fact change" must ignore provenance and see them as unchanged, so the
+    second run does not spuriously supersede the first merely by re-confirming the same value."""
+    run_a = _run(started_at="2026-08-20T00:00:00+00:00", ended_at="2026-08-20T00:10:00+00:00")
+    run_b = _run(started_at="2026-08-22T00:00:00+00:00", ended_at="2026-08-22T00:10:00+00:00")
+    facts = job_facts_v1(_runs_inp(run_a, run_b))
+    cost_facts = [f for f in facts if f.predicate == "job_accumulated_cost_usd"]
+    assert cost_facts[0].evidence_ids != cost_facts[1].evidence_ids  # distinct run provenance
+    record_a, record_b = fi.build_fact_record(cost_facts[0]), fi.build_fact_record(cost_facts[1])
+    assert record_a.knowledge_id != record_b.knowledge_id  # distinct run identity (version)
+    assert fi.fact_fingerprint(record_a) == fi.fact_fingerprint(record_b)  # same content identity
+
+    records = fi.derive_fact_records(cost_facts, registry_path=tmp_path / "r.jsonl")
+    assert len(records) == 1  # run_b's re-confirmation publishes nothing new
+
+
 def test_job_facts_from_different_cells_never_cross_supersede(tmp_path: Path):
     """Registry supersession must only occur for a genuine new version of the SAME logical slot —
     the in-batch pending_head map is keyed by fact_entity_id, so two DIFFERENT cells' job facts

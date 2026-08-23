@@ -81,13 +81,35 @@ def fact_text(fact: CanonicalFact) -> str:
     return json.dumps(fact_payload(fact), sort_keys=True)
 
 
-def fact_fingerprint(record: KnowledgeRecord) -> str:
-    """Return the sha256 of a fact record's body — the "has the fact changed?" key.
+#: ``fact_payload`` keys that carry PROVENANCE — which run/evidence produced this value — rather
+#: than the value itself. Excluded from :func:`fact_fingerprint` (CAP I0-I3 repair: "content
+#: identity" must never be confused with "run identity"). Since r1 populated ``evidence_ids`` with
+#: a real, run-specific citation (``kb_produce_facts._run_evidence``), two runs of the SAME job
+#: cell that happen to measure the SAME value now carry DIFFERENT ``evidence_ids`` (they cite
+#: different run artifacts) and therefore a different ``inputs_digest`` (which folds
+#: ``evidence_ids`` in, see ``facts.recompute_inputs_digest``). If the fingerprint hashed those
+#: fields, every re-run — even one that changes nothing — would look like "the fact changed" and
+#: spuriously supersede, defeating the convergence guard. The fields stay on the PERSISTED record
+#: (``fact_payload``/``record.text``/``knowledge_id`` — the immutable VERSION identity still
+#: differs per run, which is correct: each derivation IS a distinct artifact) — only the
+#: supersession-worthiness *decision* ignores them.
+_PROVENANCE_KEYS = frozenset({"evidence_ids", "inputs_digest"})
 
-    Because ``fact_text`` never mentions the predecessor ``fact_id``, this is invariant to the
-    record's position in the supersession chain — the property the convergence guard depends on.
+
+def fact_fingerprint(record: KnowledgeRecord) -> str:
+    """Return the sha256 of a fact record's DECLARATIVE content — the "has the VALUE changed?" key.
+
+    Deliberately narrower than ``record.text``: provenance fields (``_PROVENANCE_KEYS``) are
+    stripped before hashing, so re-confirming an unchanged value from a NEW run's evidence
+    fingerprints identically to the run that first measured it (content identity), even though
+    their ``knowledge_id``s differ (run identity — see ``_PROVENANCE_KEYS``' docstring). Because
+    the remaining payload never mentions the predecessor ``fact_id`` either, this stays invariant
+    to the record's position in the supersession chain — the property the convergence guard
+    depends on.
     """
-    return hashlib.sha256(record.text.encode("utf-8")).hexdigest()
+    payload = json.loads(record.text)
+    content = {k: v for k, v in payload.items() if k not in _PROVENANCE_KEYS}
+    return hashlib.sha256(json.dumps(content, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def build_fact_record(
