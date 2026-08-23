@@ -568,6 +568,34 @@ FACT_PREDICATES: dict[str, PredicateSpec] = {
         volatile=False,
         inheritable=True,
     ),
+    # profile facts (CAP addendum I8, L5 policy-adjacent ONLY — deviation D6). A profile is a
+    # DECLARED strategy input (control/profiles.py); these two rows record that a given domain/
+    # challenge profile version is the one currently declared, at workload scope, exactly the
+    # same "declared, inheritable" shape as allowed_models/max_spend_usd/max_attempts above.
+    "domain_profile_version": PredicateSpec(
+        name="domain_profile_version",
+        value_type="str",
+        unit="",
+        subject_type="policy",
+        scope_type="workload",
+        abstraction_level="policy",
+        produced_by=("profiles/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        inheritable=True,
+    ),
+    "challenge_profile_version": PredicateSpec(
+        name="challenge_profile_version",
+        value_type="str",
+        unit="",
+        subject_type="policy",
+        scope_type="workload",
+        abstraction_level="policy",
+        produced_by=("profiles/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        inheritable=True,
+    ),
 }
 
 

@@ -238,3 +238,92 @@ true first (design §9 I7's own gate):**
 the REAL committed spec corpus, not just a fixture. No campaign data exists yet to justify a
 flip; this increment ships the seam and the measurement harness that would produce that data,
 per design §9 I7's own ordering.
+
+## 13. I8 — `DomainProfile`/`ChallengeProfile` (`control/profiles.py`, new home)
+
+Implements `docs/designs/current/context_abstraction_addendum_design.md` §2 against the REAL
+I0–I7 code (the addendum text predates I0–I7 landing and marks `compile_context`/
+`FactRequirement` `[design-only]`; both are real — `control/profiles.py`'s own docstring notes
+this explicitly, same posture as `context_compiler.py`'s existing note about its own module).
+
+**Schema** — `SessionPolicy`, `DomainProfile`, `ChallengeProfile` are frozen dataclasses exactly
+per §2.1/§2.6 field lists. `DELIBERATION_STAGES` (§2.5's six-archetype table) and `CHALLENGES`
+(its keys) are declared here as a compiler-owned enum, documented — never imported — against
+`core.session_types.TASK_TYPES` (the two vocabularies answer different questions and only
+partially overlap in spelling; see the module docstring for the full reasoning).
+
+**Homes** — `control/profiles.py` (new, this increment's reserved home) carries everything:
+the dataclasses, `compose_requirements`/`tighten`, the `PROFILES` registry, and — deviating
+slightly from the reserved-homes table's silence on a reducer for I8 — the `profiles/v1`
+`ReducerSpec` + `profiles_v1` pure reducer, registered into `control/reducers/__init__.py`'s
+`REDUCERS`/`_IMPLS` dicts exactly like every other reducer (I1–I3's own precedent). This was a
+deliberate choice, not an oversight: "profiles declared as POLICY facts at construction" needs
+SOME registered minter for `verify_chain` to accept the fact it produces, and hard rule 3's
+"only a registered reducer mints a fact" discipline is general, not I9-pattern-specific, so I8's
+facts are held to it too. The two new predicates themselves (`domain_profile_version`,
+`challenge_profile_version` — both `abstraction_level="policy"`, workload-scoped, `inheritable
+=True`, mirroring the existing `allowed_models`/`max_spend_usd`/`max_attempts` L5 rows) are
+declared directly in `control/facts.py`'s own `FACT_PREDICATES` literal (additive), not mutated
+into that dict from `profiles.py` — facts.py stays the one place a predicate is declared. This
+widens `tests/test_context_plane_facts.py`'s call-site allowlist (`control/profiles.py` added to
+`LEGITIMATE_CALLERS`) and its two exact-set completeness assertions (`test_predicate_registry_
+has_the_design_seed_rows`, `test_predicate_inheritance_flags_match_the_design_table`) — both
+updated in place, per that file's own "each increment widens this allowlist explicitly, never
+silently" rule.
+
+**Deviation (minor) — profile fact scope_id.** The design does not specify what scope a profile
+declaration binds to (profiles are cross-spec, unlike `policy_facts.py`'s per-spec-name scoping).
+`_profile_fact` uses the domain/challenge id itself as `scope_id` (`workload:<domain>` /
+`workload:<challenge>`) — a profile is its own workload-scope anchor, which also gives
+`compute_fact_entity_id` a stable, collision-free slot per (kind, id) independent of which spec
+happens to declare it first.
+
+**Deviation (minor) — `tighten()`'s scope taken literally from the design pseudocode.** §2.3's
+sketch types `merged` as `dict[tuple[str, str], FactRequirement]` but its own dict comprehension
+keys by `r.fact` (a bare string) — an inconsistency in the design-only sketch. Implemented as
+written (keyed by `fact` name alone, per the actual comprehension), documented here rather than
+silently "fixed" to the annotated type, since the annotation and the code it sketches disagree
+and the code is the more specific signal. `tighten()` itself additionally raises
+`ProfileCompositionError` on a `scope` or `value_type` disagreement between the contract's and
+the profile's requirement for the same fact (not specified by the design; there is no sensible
+"stricter" merge for either axis — see the module docstring's `tighten()` rationale) — these are
+new refusal cases, additive to the "raises on loosen" the design names.
+
+**`compile_context` extension (§2.3/§2.4)** — gains `domain: DomainProfile | None = None` and
+`challenge: ChallengeProfile | None = None` keyword parameters. Only `challenge.
+context_requirements` is composed (via `profiles.compose_requirements`) into the effective
+`requires_facts` BEFORE the existing 9-step resolution runs; `contract.invariants` is never
+touched (deviation D4: the contract's invariants remain the sole SAFETY gate). `domain` is
+accepted and threaded through for symmetry/future audit use but contributes no requirements in
+v1 (verified by `test_compile_context_accepts_a_domain_profile_without_changing_resolution`) —
+per D6, a `DomainProfile` declares L5-policy-adjacent facts only, and inventing an L4
+domain-contributed requirement here with no real backing would be exactly the honesty-rule
+violation §2.1 forbids. No contract YAML changed; no `ContractSpec`/`ControlContext` field added.
+
+**Seeded `PROFILES` registry** — one `DomainProfile` (`software_delivery`, this repository's own
+CAP control-plane domain) and six `ChallengeProfile`s (one per `DELIBERATION_STAGES` key), all
+`context_requirements=()`. Deliberately empty: no real decision-type contract yet names a fact
+these archetypes should add, and fabricating one to look more "complete" would violate the same
+honesty rule. A future increment adds real entries as real contracts need them, superseding
+`profile_version` when it does (§2.2's supersession model, exercised in
+`test_bumping_profile_version_supersedes_under_the_same_entity_id`).
+
+**Migration helper (the deliverable), not a rewiring** — `migrate_static_filing()` resolves
+`PROFILES` entries that supersede a workflow spec's free-text `context.domain_context`/
+`challenge_context` prose (`workflows/repository/cap_addendum_implement.yaml` lines 24-36 is
+itself an example of the pattern being superseded — written before this module existed). The
+actual spec-YAML/`run_workflow.py` rewiring that would CONSUME this helper is explicitly NOT
+done here (this increment's guard: no runner wiring changes) — the module docstring's
+"MIGRATION" section documents the three-step swap procedure for that future change. No existing
+workflow spec YAML was edited by this increment.
+
+**No L4 workload-fact claims, no contract changes** (this phase's GUARD) — verified structurally:
+every `FACT_PREDICATES` row this increment adds has `abstraction_level="policy"`
+(`test_profiles_v1_is_registered_and_declares_only_l4_never_l4_workload`), and no file under
+`experiments/contexts/` was touched.
+
+Tests: `tests/test_context_plane_profiles.py` (new, 28 cases — dataclass shape, the registry,
+the reducer/fact-minting path, versioning/supersession, `compose_requirements`/`tighten`'s
+never-widens property both as a pure function and through the real `compile_context`).
+Full suite green: `pytest tests/ -k "context_plane or dependency_direction or cap_i0_i3"` — 252
+passed. PASS.
