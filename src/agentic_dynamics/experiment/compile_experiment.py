@@ -330,9 +330,48 @@ def grit(attempts: list[dict[str, Any]]) -> RuleResult:
     )
 
 
+def decision_calibration(decisions: list[dict[str, Any]]) -> RuleResult:
+    """Measurement rule ([C], CAP I6 F3): scores shadow ``ControlDecision``s against the
+    deterministic baseline (``control.step_routing.route_step``) they ran BESIDE, producing
+    ``decision_regret`` — design §9 I6's own gate ("agreement/divergence vs step_routing
+    measurable"), expressed as a named measurement rule so it flows through the SAME
+    ``evaluate_rules``/``compare_arms`` machinery every other rule does, rather than an ad-hoc
+    report (F3, ``docs/context_abstraction/implementation_notes.md``).
+
+    ``decisions`` — one dict per recorded shadow decision:
+    ``{"action", "baseline_action", "model": <route's proposed model, if action == "route">,
+    "baseline_model": <what route_step actually chose>}`` (the shape
+    ``control.rules.make_shadow_router`` writes into ``ControlDecision.parameters``).
+    ``decision_regret`` is the fraction whose action OR proposed model diverges from the
+    baseline — 0.0 is perfect agreement. Measure-before-policy applied to the plane's own
+    controller: nothing may consume ``decision_regret`` as a policy signal until it exists,
+    exactly like every other rule in this module.
+    """
+    if not decisions:
+        return RuleResult(
+            rule="decision_calibration", metric=float("nan"), evidence_class="[C]",
+            uncertainty=1.0, produces={},
+        )
+    disagreements = sum(
+        1
+        for d in decisions
+        if d.get("action") != d.get("baseline_action")
+        or (d.get("action") == "route" and d.get("model") != d.get("baseline_model"))
+    )
+    n = len(decisions)
+    regret = disagreements / n
+    return RuleResult(
+        rule="decision_calibration",
+        metric=round(regret, 4),
+        evidence_class="[C]",
+        produces={"decision_regret": round(regret, 4), "n_decisions": n},
+    )
+
+
 MEASUREMENT_RULES: dict[str, Callable[..., RuleResult]] = {
     "first_pass_quality": first_pass_quality,
     "grit": grit,
+    "decision_calibration": decision_calibration,
 }
 # ``grit`` is re-admitted: ``perturbation_strength`` and ``test_executed_success`` are
 # now ledger-measured (LEDGER_FIELDS), so the validator accepts a spec whose grit rule

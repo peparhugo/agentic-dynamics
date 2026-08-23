@@ -91,3 +91,150 @@ Also material: `workflow_status`/`workflow_health` now treat `job_status` (deriv
 literal string `"failed"` — a phase status of `"skipped"`/`"error"`/`"timeout"` would otherwise
 read as "not failed". And `projected_budget_overrun` is emitted only when BOTH a budget ceiling
 AND a measured cost are known — an unmeasured cost previously fabricated a `0.0` overrun.
+
+## 9. I4 deviations (material — the Context Compiler against the REAL reducer scope_paths)
+
+I4 (`src/agentic_dynamics/control/context_compiler.py`) resumed after the I0-I3 repair. Three
+deviations from a literal reading of design §10.1's idealized single-chain scope grammar
+(`org/.../workload/.../workflow/.../job/.../attempt`), all forced by the ACTUAL scope_paths the
+I1-I3 reducers already emit (`control/reducers/{job_facts,workflow_facts,attempt_facts}.py`),
+not by a re-reading of the design's intent:
+
+1. **`job` and `workflow` are SIBLING labels over the SAME cell id, not a nested pair.**
+   `job_facts.py` emits `workload:<w>/job:<cell>`; `workflow_facts.py` emits
+   `workload:<w>/workflow:<cell>` — same `<cell>`, same depth, different label (design §10.3
+   already says so in prose: "job scope = the workflow-level view of the cell, one rung up the
+   ladder"). `resolve_requirement_scope`'s `"parent"` keyword therefore does NOT drop the last
+   path segment generically — from a job-scoped decision it swaps the label to `workflow:<cell>`
+   (`context_compiler._parent_scope_path`), not "org:.../workload:...".
+2. **`attempt` nests TWO segments under `job`, not one.** `attempt_facts.py` emits
+   `job:<cell>/attempt:<phase>/run:<run_id>` (the `run:` segment is the I0-I3 repair's
+   content-addressed run identity, deviation 1 in §8 above). `_parent_scope_path` drops the
+   trailing `run:` segment before checking the leaf type, so an attempt scope's parent correctly
+   resolves to its owning `job:<cell>`, not `job:<cell>/attempt:<phase>`.
+3. **`scope: self` for a predicate declared ONE RUNG below the decision's own scope resolves via
+   a narrow "self-reflexive descendant" allowance, not a strict scope_path equality check.** The
+   design's own §6.1 example requires `phase_test_verified` (attempt-scoped) at `scope: self`
+   under a `job`-scoped decision — those two scope_paths are never equal by construction (per
+   deviation 2). `_resolve_requirement` falls back, ONLY for `scope: self` and ONLY when strict
+   `scope_visible()` finds nothing, to the single MOST RECENTLY OBSERVED current fact whose
+   scope_path is strictly under the decision's own scope_path. This is deliberately narrower than
+   the general "descendant peek" §10.2 forbids for aggregation (unbounded reads across children
+   with no reducer): it never returns more than one fact, and it only fires for `self`, never for
+   an ancestor/explicit scope keyword — so a sibling job's attempts, or a workflow's OTHER job's
+   facts, are still structurally unreachable.
+
+Also: the I4 hook (`context_compiler.make_snapshotting_router`, wired via `run_workflow.py
+--cap-snapshot`) is the FIRST CAP call site to touch a real production run path and a real Redis
+connection. It ships OFF by default (an explicit opt-in flag, not the default `router=`) — a
+narrower posture than the design's own "snapshots recorded beside every route_step call" phrasing
+implies literally, so the plane's first production write is a deliberate, reviewable operator
+decision, consistent with I7's later apply seam being OFF by default for the same reason. Flip
+procedure: pass `--cap-snapshot` to `scripts/run_workflow.py`; nothing else changes, and a
+snapshot failure (no Redis, unauthorized write) never affects the run (`record_snapshot` swallows
+every exception).
+
+## 10. I5 — fact contracts in the spec gate (`FactRequirement` gains its refusal gate)
+
+`core/contracts.py` gains `validate_fact_contracts` (refusals R1-R11) and `RuleSpec` gains
+`requires_facts`/`decision_type` (`src/agentic_dynamics/experiment/experiment_spec.py`). Two
+points worth recording, neither a deviation from the design's intent, both forced by
+`tests/test_dependency_direction.py`'s tier rules (`experiment` may not import `control`; `core`
+may not import either):
+
+1. **The compile-time gate is genuinely two-layer, not one function.**
+   `core.contracts.validate_fact_contracts` is pure and duck-typed — it takes
+   `predicates`/`reducers`/`contracts` as plain `Mapping`s (structural `Protocol`s, never a
+   concrete import of `control.facts.PredicateSpec`/`ReducerSpec` or
+   `experiment.experiment_spec.RuleSpec`) so `core` (tier 0) never imports `experiment` (tier 1)
+   or `control` (tier 2). `experiment_spec.validate_rules`/`validate_spec` gained THREE new
+   keyword-only parameters (`fact_predicates`/`fact_reducers`/`fact_contracts`), all defaulting
+   to `None` — `None` means "skip the I5 gate entirely", which is what keeps every
+   `validate_spec(spec)` call site in the codebase (including `compile_experiment.compile_spec`,
+   which stays tier 1 and therefore cannot supply the real registries) validating byte-for-byte
+   unchanged. The REAL gate — real `FACT_PREDICATES`/`REDUCERS`/loaded contracts —  is
+   `control.context_compiler.validate_spec_fact_contracts(spec)`, a `control`-tier (tier 2)
+   function that CAN see both `core` and `experiment` and is the actual "a spec requiring an
+   unproduced predicate is refused" call site the I5 gate (design §9) means.
+2. **R11 is additive to the design's own R1-R10 table** (§7.3), carrying forward the F1
+   resolution already recorded in §2 above: an invariant with `on_missing` outside
+   `{halt, escalate}` is refused. Checked for every LOADED contract (not just ones a spec's
+   rules reference), because the property is of the CONTRACT, independent of who cites it.
+
+## 11. I6 — the shadow controller + validator (decisions recorded without touching the armed gate)
+
+`control/decisions.py` (`ControlDecision`/`Precondition`/`ExpectedEffect`/`AUTOMATABLE_ACTIONS`),
+`control/rules.py` (`route_next_job_v1`, `make_shadow_router`), and `control/validator.py`
+(`validate_decision`, checks C1-C10) ship the shadow controller. One material deviation from a
+literal reading of design §8.2 ("Persisted as `source_type="actuation"`... REUSE"):
+
+**A shadow decision's durable artifact is written directly; `publish_event` is never called for
+it.** `knowledge_stream.publish_event`'s actuation gate unconditionally requires
+`FINOPS_ACTUATION_ARMED=1` (or `armed=True`) for ANY `source_type="actuation"` message — there is
+no lower-privilege "record but don't arm" mode inside that function. But design §8.6's commitment
+1 is unconditional the other way: "It does not arm actuation... this design adds nothing that
+sets it." Calling `publish_event(..., armed=True)` from the shadow hook would satisfy "decisions
+get recorded" while violating "never arms actuation"; calling it unarmed would raise on every
+single shadow decision, defeating "recorded" entirely. `control.rules.record_shadow_decision`
+resolves the conflict by stopping one step earlier in the SAME pipe design §4.3/§8.2 reuses:
+`record_to_artifact` writes the durable, content-addressed, per-record JSON
+(`KB_ARTIFACT_DIR/<knowledge_id>.json`) — so a decision is a real, auditable, inspectable
+artifact — but the pointer event is never published to `kb:v1:changes`, so it never reaches the
+live registry/stream a real actuation consumer would react to, and `publish_event`'s armed gate
+is never even invoked. This is STRICTER than I4's snapshot recording (an OBSERVATION-family
+record, which has no armed gate and DOES call `publish_event`) — a shadow decision is
+discoverable only by scanning `KB_ARTIFACT_DIR` directly (`scripts/shadow_decision_report.py`
+does exactly this, filtering on `extractor_version="actuation/v1"`), never via
+`scripts/registry.py` or `experiments/data_manifest.json`. If a future increment (I7+) needs
+shadow decisions in the live registry for a UI or a lineage walk, that is a deliberate, reviewable
+widening of this file's own posture, not an oversight.
+
+F2 (an action other than `continue` with empty `facts_used` is refused, check C5) and F3
+(`decision_calibration` as a named measurement rule) are implemented verbatim per their
+resolutions in the workflow spec's own phase prompt. `AUTOMATABLE_ACTIONS = frozenset({"continue",
+"route"})` is CODE in `control/decisions.py`, imported (never re-declared) by both `rules.py` and
+`validator.py`, so there is exactly one definition to audit.
+
+## 12. I7 — the apply seam for `route` (kept OFF; the flip procedure)
+
+`control.rules.make_applying_router` (a strict superset of I6's `make_shadow_router`) is the ONLY
+function in the plane that can change what model actually executes a phase. It applies the
+fact-based rule's `route` choice INSTEAD of `step_routing.route_step`'s ONLY when a freshly
+re-compiled snapshot (the C7 TOCTOU re-check) still validates the decision through ALL of C1-C10
+AND the action is `"route"` (`"continue"`, the other `AUTOMATABLE_ACTIONS` member, always means
+"use `route_step`'s default" by construction). Any failure anywhere — an inadmissible snapshot, a
+C1-C10 refusal, a missing contract, an exception — falls back to `route_step`'s deterministic
+choice; that fallback is the SAFE path this seam is built around, not a degraded one.
+
+**Wiring is a per-spec opt-in, never a default and never a CLI flag alone.**
+`scripts/run_workflow.py` reads `spec.workflow.params.get("control_route", False)` — a field in
+the SPEC YAML, not an invocation-time switch — and only then builds `make_applying_router(...)`
+as the injected `Router`; every other spec keeps `route_step` unchanged regardless of how the
+script is invoked. This is deliberately narrower than `--cap-shadow`/`--cap-snapshot` (I6/I4's
+per-INVOCATION measurement opt-ins): applying a routing decision changes what actually executes,
+so the decision to allow it belongs to the spec's own author, committed and reviewable, not to
+whoever happens to run the script that day.
+
+**The flip procedure — what an operator does to enable this for a real spec, and what must be
+true first (design §9 I7's own gate):**
+
+1. Run the spec for a meaningful number of cycles with `--cap-shadow` (implies `--cap-snapshot`)
+   so `route_next_job_v1` proposes BESIDE `step_routing.route_step` without ever executing.
+2. Read `python scripts/shadow_decision_report.py` — the agreement rate
+   (`1 - decision_regret`) between the plane's proposals and what `step_routing` actually chose.
+3. Read `python scripts/decision_arm_comparison.py` — the REAL measured cost/quality loss per
+   model that actually ran (`compile_experiment.compare_arms`), so a divergent proposal can be
+   checked against real precedent: does the plane's typical alternative model have a worse
+   measured loss than the baseline?
+4. Only once both reports support "the plane is at least non-inferior for this spec" does the
+   operator add `workflow.params.control_route: true` to that ONE spec's YAML, in a normal,
+   reviewable commit — never a global default, never an environment variable.
+5. After flipping, keep watching `decision_arm_comparison.py` (now with `applied: true` rows
+   mixed in) — an applied decision that regresses cost/quality is exactly what the campaign loop
+   (`AdaptSpec`) exists to catch and revert.
+
+**As of this increment, step 4 has not happened for any spec** — verified in
+`tests/test_context_plane_seam.py::test_no_committed_spec_opts_into_control_route`, which checks
+the REAL committed spec corpus, not just a fixture. No campaign data exists yet to justify a
+flip; this increment ships the seam and the measurement harness that would produce that data,
+per design §9 I7's own ordering.

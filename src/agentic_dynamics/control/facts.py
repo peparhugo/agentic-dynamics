@@ -675,6 +675,30 @@ class Unknown:
     handling: str  # the contract's on_missing for this entry
 
 
+@dataclass(frozen=True)
+class Conflict:
+    """A required fact resolved to TWO OR MORE current, disagreeing values (§4.5's conflict
+    resolution ladder exhausted with neither side winning) — every candidate is kept so a reader
+    can see exactly what disagreed, never just the winner's silence about the loser."""
+
+    predicate: str
+    scope: str
+    candidates: tuple[FactRef, ...]
+    handling: str  # the contract's on_conflict for this entry
+
+
+@dataclass(frozen=True)
+class StaleFact:
+    """A required fact that resolved, but past its currency bound (§4.5's ``stale`` state, or a
+    requirement's own ``max_age_seconds`` tightening) — the value plus its age, so the compiler
+    never silently drops a value the contract nonetheless refuses to trust as-is."""
+
+    fact: FactRef
+    scope: str
+    reason: str  # "expired" | "cascade" | "max_age_exceeded"
+    handling: str  # the contract's on_missing for this entry (stale is treated as unsatisfied)
+
+
 # ── Identity helpers (§3.1, §3.3) — reuse, never re-derive ──────
 
 

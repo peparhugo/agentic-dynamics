@@ -152,6 +152,12 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     # the CAP epistemic mapping (§3.4) at construction time, since a fact may be derived,
     # declared, measured, or advisory depending on its reducer.
     "fact": SourceTypeSpec("observation", Authority.DERIVED, "[C]"),
+    # Context Abstraction Plane I4 (context_abstraction_design.md §8.5): the compiler's
+    # decision-specific snapshot, registered as an observation-family record so a later
+    # ControlDecision's single-valued `causes` (I6) can point at the EXACT facts a decision was
+    # made from via one knowledge_id, rather than an unbounded list. A snapshot states what a
+    # decision was ALLOWED to see, never an instruction to act — observation family.
+    "context_snapshot": SourceTypeSpec("observation", Authority.DERIVED, "[C]"),
     # Delta 3: the single actuation-family member.
     "actuation": SourceTypeSpec("actuation", Authority.POLICY, "[P]"),
 }

@@ -19,6 +19,12 @@ from typing import Any
 
 import yaml
 
+from agentic_dynamics.core.contracts import (
+    FactRequirement,
+    normalize_requirement,
+    validate_fact_contracts,
+)
+
 # ── Constants ───────────────────────────────────────────────────
 
 WORKFLOW_KINDS = frozenset({"story", "task", "experiment", "agent_task"})
@@ -269,13 +275,29 @@ class Factor:
 
 @dataclass
 class RuleSpec:
-    """A measurement rule (produces information) or control rule (consumes it)."""
+    """A measurement rule (produces information) or control rule (consumes it).
+
+    ``requires_facts`` (CAP I5, design §7.1) is the fact-level generalization of ``requires``:
+    a NEW, additive field — ``requires`` (legacy ledger field names) is untouched, so every spec
+    committed before this design keeps validating unchanged. A control rule binding to a
+    decision-type contract (design §7.2) also names ``decision_type`` — the contract file
+    ``experiments/contexts/<decision_type>.yaml`` the I4 Context Compiler loads.
+    """
 
     name: str
     plane: str  # measurement | control
     evidence_class: str  # [M] [C] [H] [P] [X]
     requires: list[str] = field(default_factory=list)  # information this rule CONSUMES
     produces: list[str] = field(default_factory=list)  # information this rule EMITS
+    requires_facts: list[FactRequirement] = field(default_factory=list)  # NEW (I5, design §7.1)
+    decision_type: str = ""  # NEW (I5) — binds a control rule to a context contract (design §7.2)
+
+    def __post_init__(self) -> None:
+        # Normalize on EVERY construction path, not just from_dict() — a bare string or a plain
+        # dict passed directly to the dataclass constructor (as `from_dict` itself does, and as
+        # any other caller may) still becomes a real FactRequirement, so validate_fact_contracts
+        # never has to guess at the entry's shape.
+        self.requires_facts = [normalize_requirement(e) for e in self.requires_facts]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -284,6 +306,8 @@ class RuleSpec:
             "evidence_class": self.evidence_class,
             "requires": self.requires,
             "produces": self.produces,
+            "requires_facts": [r.to_dict() for r in self.requires_facts],
+            "decision_type": self.decision_type,
         }
 
     @classmethod
@@ -297,6 +321,10 @@ class RuleSpec:
             evidence_class=d["evidence_class"],
             requires=list(d.get("requires", []) or []),
             produces=list(d.get("produces", []) or []),
+            requires_facts=[
+                normalize_requirement(e) for e in d.get("requires_facts", []) or []
+            ],
+            decision_type=str(d.get("decision_type", "") or ""),
         )
 
 
@@ -587,12 +615,30 @@ def load_spec(path: Path) -> ExperimentSpec:
 # ── The validator (the load-bearing gate) ───────────────────────
 
 
-def validate_rules(spec: ExperimentSpec) -> list[str]:
+def validate_rules(
+    spec: ExperimentSpec,
+    *,
+    fact_predicates: dict[str, Any] | None = None,
+    fact_reducers: dict[str, Any] | None = None,
+    fact_contracts: dict[str, Any] | None = None,
+) -> list[str]:
     """Validate requires/produces. Returns a list of error strings (empty = valid).
 
     The available information is the ledger schema plus the ``produces`` of every
     measurement rule in the spec. A rule whose ``requires`` are not all available is
     refused — measurement first, policy second.
+
+    The three ``fact_*`` keyword-only arguments are the CAP I5 gate (design §7.3,
+    ``core.contracts.validate_fact_contracts``'s ``predicates``/``reducers``/``contracts``).
+    They default to ``None``, which SKIPS the I5 gate entirely — ``experiment`` (tier 1) may
+    not import ``control.facts``/``control.reducers`` (tier 2;
+    ``tests/test_dependency_direction.py``'s ``test_experiment_does_not_import_control``), so
+    the real registries cannot be supplied from inside this module. This keeps every spec
+    committed before I5 validating byte-for-byte unchanged when ``validate_spec(spec)`` is
+    called with no extra arguments (as ``compile_experiment.compile_spec`` already does
+    everywhere). A caller in a tier that may see both ``core`` and ``control`` —
+    ``control.context_compiler.validate_spec_fact_contracts`` — supplies the real
+    ``FACT_PREDICATES``/``REDUCERS``/loaded contracts and is the actual I5 compile-time gate.
     """
     errors: list[str] = []
     seen: set[str] = set()
@@ -623,11 +669,33 @@ def validate_rules(spec: ExperimentSpec) -> list[str]:
                     f'rule "{rule.name}" requires {req!r} — not produced by the ledger '
                     f"or any measurement rule in this spec. Instrument it first."
                 )
+
+    if fact_predicates is not None and fact_reducers is not None:
+        errors.extend(
+            validate_fact_contracts(
+                spec,
+                predicates=fact_predicates,
+                reducers=fact_reducers,
+                contracts=fact_contracts,
+            )
+        )
     return errors
 
 
-def validate_spec(spec: ExperimentSpec) -> list[str]:
-    """Structural validation plus the requires/produces gate. Empty list = valid."""
+def validate_spec(
+    spec: ExperimentSpec,
+    *,
+    fact_predicates: dict[str, Any] | None = None,
+    fact_reducers: dict[str, Any] | None = None,
+    fact_contracts: dict[str, Any] | None = None,
+) -> list[str]:
+    """Structural validation plus the requires/produces gate. Empty list = valid.
+
+    The three ``fact_*`` keyword-only arguments thread straight through to
+    :func:`validate_rules` (see its docstring) — ``None`` (the default) skips the CAP I5 gate,
+    so every spec committed before I5 (and every existing ``validate_spec(spec)`` call site)
+    validates unchanged.
+    """
     errors: list[str] = []
 
     if spec.workflow.kind not in WORKFLOW_KINDS:
@@ -705,5 +773,12 @@ def validate_spec(spec: ExperimentSpec) -> list[str]:
                 f"or set sandboxed: true"
             )
 
-    errors.extend(validate_rules(spec))
+    errors.extend(
+        validate_rules(
+            spec,
+            fact_predicates=fact_predicates,
+            fact_reducers=fact_reducers,
+            fact_contracts=fact_contracts,
+        )
+    )
     return errors
