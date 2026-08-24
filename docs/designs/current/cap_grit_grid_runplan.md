@@ -304,3 +304,42 @@ attempts), fidelity zero violations, arm regret stratified (never averaged acros
 Tests: spec/compiler + story suites 83 passed. Realized totals: $31.27 across 9 attempts
 (over the $10 ceiling — see §8 budget-overrun finding; the writeup's `cost_envelope` must
 report it).
+
+## 10. x5 adversarial verify — PASS (independent re-computation from raw artifacts)
+
+Attack dimensions, each re-computed from RAW artifacts (ledger rows, story JSONs, worktree
+git history, mutation patches, live pytest) — not trusted from the metrics JSON:
+
+| # | attack dimension | evidence (independent) | verdict |
+|---|---|---|---|
+| 1 | cell fidelity — declared condition/strength | every worktree's git log shows the exact `[mutation] inject_bug s=0.2/0.8` commit right after `Initial seed codebase` for low/high cells; mid cells have NO mutation commit and their seed `app.py` md5 **equals** the `bad/` variant (a5e8a100…) ≠ good (868eb8da…); clean cells' seeds equal the good variant with no mutation commit. Story JSONs record `condition`/`strength` matching the ledger row-for-row. | **PASS** |
+| 2 | retry policy fidelity | only bad_seed_high × grit_retry has 2 attempts; attempt 1 ok=False, attempt 2 ok=True, `parent_attempt_id` == attempt 1's id (linkage verified); every other grit_retry cell passed attempt 1 (no retry — correct); **0 baseline cells have a second attempt**. | **PASS** |
+| 3 | coverage — missing fields / fabrication | all 9 attempts carry `actual_cost` + `test_executed_success` (coverage 9/9 both axes, reported before denominators). Failed cell independently re-verified: `pytest` on its worktree reproduces 3 failed + 3 errors (register tests) — genuine, not fabricated. Passing cells independently re-run green (47, 45 passed). | **PASS** |
+| 4 | strength provenance | `mut_3caacc977303246d` (s=0.2): single-hunk patch (`ORDER BY created_at DESC → ASC`); `mut_1957f3238ebc0f5c` (s=0.8): **3-hunk** patch (`datetime.utcnow→now`, `ORDER BY created_at DESC → ORDER BY id LIMIT 50`, `if updates:` guard removed → unconditional UPDATE). Diff of seed→mutation commit in each worktree reproduces exactly these hunks. Genuinely distinct degradations. | **PASS** |
+| 5 | model purity | all 9 story JSONs AND every session's `agentic.model` == `anthropic/claude-sonnet-5`; no other model anywhere. | **PASS** |
+| 6 | realized cost vs envelope | recomputed from raw story-JSON `summary.total_cost` (not metrics JSON): **$31.273332** vs metrics `$31.2733315` (matches to 6dp) vs **$10.00 ceiling = 3.1× overrun**. | **PASS** (overrun real) |
+
+**Additional findings (recorded, not silently dropped):**
+
+- **F5 — clean×baseline failure root-caused.** The failed cell is a genuine code defect, not an
+  environment artifact: its `limiter.reset()` (flask_limiter → Redis **DB 0**) consistently
+  raises `Connection closed by server` across multiple independent runs, while passing cells use
+  DB 1 against the SAME Redis server (both DBs ping OK). The two cells are structurally
+  different apps (different session exploration). Recorded as an accepted limitation: this is a
+  real single-attempt failure, and it directly sets G(0)=0.5 → retention>1 → grit_auc=1.4
+  (writeup limitations #4/#5 already call this out).
+- **F6 — no rework observed.** `rework_cost` is $0.00 on all cells (no continuation/subagent
+  spend) — rework axis is a constant zero in this grid, a limitation (#8 in the writeup), not a
+  contrast.
+
+**Null interpretation (restated):** the grid does NOT reject the null. Inconclusive per the
+spec's own finding 5 (7 cells at n=1/arm). The one survivor is operational: retry fidelity
+1.0 (1/1 eligible) with 0 violations, and the single retry that fired roughly doubled cell cost
+to convert failure→success — consistent with (but not proof of) the null.
+
+**RELEASE VERDICT — YES, trustworthy for the NEXT CAMPAIGN STEP (largest_effect).** The grid's
+*mechanics* are fully verified (all 6 dimensions pass), so its results are safe to build on —
+specifically the bad_seed_high stratum (+$3.75 baseline regret, the largest effect) as the
+`adapt.selection = largest_effect` expansion target. What is NOT licensed: reading any regret as
+decisive policy signal (power caveat §6 stands), and the $10 ceiling is already breached (the
+next grid must re-baseline per-story cost empirically before committing a budget).
