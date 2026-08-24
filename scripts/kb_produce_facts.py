@@ -76,6 +76,7 @@ from agentic_dynamics.experiment.spec_status import _spec_paths  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
 from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
 from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
+from agentic_dynamics.reporting import canonical_corpus as cc  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -564,8 +565,10 @@ def derive_facts(
     Each reducer names its own source: ``spec_status/v1`` reads the generated spec index (I1);
     ``attempt_facts/v1`` / ``job_facts/v1`` read the typed workflow run JSONs (I2);
     ``policy_facts/v1`` reads the declared L5 config (I3); ``workflow_facts/v1`` runs the
-    reduction LADDER over the lower reducers' finalized facts (I3). The producer resolves that
-    source and hands it to the PURE reducer — the reducer does no I/O (design §4.1).
+    reduction LADDER over the lower reducers' finalized facts (I3); ``pattern/v1`` (I9) reads
+    the canonical-corpus ``finding`` table (the reducer's one input door — design §3.3). The
+    producer resolves that source and hands it to the PURE reducer — the reducer does no I/O
+    (design §4.1).
 
     The injected ``revision``/``now`` are the fallback ``source_revision``/clock; a properly
     stamped run JSON carries its own ``git_sha``/``ended_at``, which the reducers prefer, so
@@ -578,7 +581,9 @@ def derive_facts(
     if reducer_version == "workflow_facts/v1":
         return _derive_workflow_facts(repository_id, revision, now)
 
-    if reducer_version == "policy_facts/v1":
+    if reducer_version == "pattern/v1":
+        evidence = _pattern_finding_evidence()
+    elif reducer_version == "policy_facts/v1":
         evidence = tuple(
             EvidenceItem(source_type="spec", evidence_id=f"spec:{c.get('name') or '?'}", payload=c)
             for c in load_spec_configs()
@@ -880,6 +885,29 @@ def _story_result_evidence(cells: list[dict]) -> tuple[EvidenceItem, ...]:
 def _summary_attempt_evidence(entries: list[dict]) -> tuple[EvidenceItem, ...]:
     """One ``summary_attempt`` evidence item per distinct summary ENTRY (single-phase run)."""
     return _dedup_evidence([_project_summary_attempt(e) for e in entries], "summary_attempt")
+
+
+def _pattern_finding_evidence() -> tuple[EvidenceItem, ...]:
+    """One ``EvidenceItem`` per canonical ``finding`` row — the ``pattern/v1`` input door.
+
+    The I9 reducer (CAP addendum I9, ``control/reducers/pattern.py``) consumes ONLY ``finding``
+    evidence (design §3.3 — the canonical-corpus table that carries the structured
+    ``test_executed_success`` / ``perturbation_class`` / ``_experiment`` fields a pattern needs).
+    This mirrors the reducer's own integration test (``tests/test_context_plane_pattern.py``),
+    which builds its ``ReducerInput`` from ``canonical_corpus.load_canonical_tables("finding")``
+    the same way — the ONE input door a publication lab may use, never a directory glob. An
+    empty/unresolved finding table yields an empty evidence tuple, and the reducer's coverage
+    invariant (empty slice -> NO fact) does the rest; nothing here fabricates support.
+    """
+    tables = cc.load_canonical_tables("finding")
+    return tuple(
+        EvidenceItem(
+            source_type="finding",
+            evidence_id=str(row.get("_registry", {}).get("knowledge_id") or ""),
+            payload=row,
+        )
+        for row in tables.findings
+    )
 
 
 def _family_input(

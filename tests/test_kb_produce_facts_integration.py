@@ -421,3 +421,68 @@ def test_fingerprint_ignores_run_identity_through_the_real_producer(kpf, tmp_pat
     ][0]
     assert len(cost_3) == 1
     assert cost_3[0].supersedes == cost_1.knowledge_id
+
+
+# ── 5. pattern/v1 (CAP addendum I9) through the real producer ──
+
+#: The finding-row shape the canonical resolver produces (``_table`` / ``_registry`` provenance,
+#: ``_experiment`` = the task, ``perturbation_class``, measured ``test_executed_success``) —
+#: mirrors ``tests/test_context_plane_pattern.py``'s ``_finding`` fixture. The producer's
+#: ``_pattern_finding_evidence`` reads ``cc.load_canonical_tables("finding").findings``; the stub
+#: below stands in for the (non-hermetic) real manifest read.
+PATTERN_FINDINGS = [
+    {
+        "_table": "finding",
+        "_registry": {"entity_id": f"entity_k{i}", "knowledge_id": f"kid_{i}"},
+        "_experiment": "task_manager",
+        "perturbation_class": "objective_mutation",
+        "operator": "invert_constraint",
+        "test_executed_success": i % 2 == 0,
+        "confidence": 0.5,
+        "perturbation_strength": 0.5,
+    }
+    for i in range(6)
+]
+
+
+def test_pattern_v1_producer_branch(kpf, tmp_path, monkeypatch):
+    """The ``pattern/v1`` producer branch (I9): ``derive_facts("pattern/v1", ...)`` loads the
+    canonical finding corpus as evidence, mints pattern facts through ``pattern_v1``, and derives
+    their records — DERIVED/[C], supersede-free first versions, idempotent re-derivation.
+
+    This is the producer-wiring half the pattern tests referenced (``pattern_v1`` had no call site
+    feeding it real evidence); ``derive_facts`` is that call site. Every assertion runs through
+    the ACTUAL producer entrypoint (registry-aware), not a hand-built ``ReducerInput``.
+    """
+
+    class _StubTables:
+        findings = PATTERN_FINDINGS
+
+    monkeypatch.setattr(kpf.cc, "load_canonical_tables", lambda *a, **k: _StubTables())
+
+    # --- round 1: empty registry -> every pattern fact is a first version ---
+    records = kpf.derive_facts("pattern/v1", REPO, REVISION, NOW)
+    assert records, "the pattern/v1 branch must mint facts from measured finding evidence"
+    assert all(r.supersedes is None for r in records)
+    for record in records:
+        assert record.source_type == "fact"
+        payload = json.loads(record.text)
+        assert payload["predicate"] == "pattern"
+        assert payload["reducer_version"] == "pattern/v1"
+        assert payload["abstraction_level"] == "workload"
+        # DERIVED/[C] (D7 — the existing epistemic row, never a new one).
+        assert record.authority.name == "DERIVED"
+        assert record.evidence_class == "[C]"
+        assert payload["evidence_ids"]  # every real finding row cited
+        value = json.loads(payload["value"])
+        assert value["conditions"] == ["test_executed_success=true"]
+        assert value["source_experiment"] in payload["evidence_ids"]
+
+    # --- stable re-derivation over the still-empty registry: byte-identical ids ---
+    records_b = kpf.derive_facts("pattern/v1", REPO, REVISION, NOW)
+    assert {r.knowledge_id for r in records_b} == {r.knowledge_id for r in records}
+
+    # --- persist round 1, re-derive -> no republication of unchanged facts ---
+    _persist(kpf.REGISTRY_INDEX_PATH, *records)
+    assert kpf.derive_facts("pattern/v1", REPO, REVISION, NOW) == []
+

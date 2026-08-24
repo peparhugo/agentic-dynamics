@@ -186,8 +186,54 @@ and records the skips; p3 writes the full writeup.
 
 ## 2. The minted facts (p2 — facts table)
 
-*Filled by phase p2_mint_patterns: the minted pattern facts (emitted to the KB) + the facts
-table (subject_id, fact_entity_id, value/payload, evidence_ids, source_revision).*
+Minted by the registered deterministic reducer `pattern/v1` (`src/agentic_dynamics/control/reducers/pattern.py`),
+invoked through the fact-plane producer (`scripts/kb_produce_facts.py --reducer pattern/v1`, the
+new I9 evidence branch — the producer-wiring half that closes the gap the pattern tests
+referenced). **6 facts minted, all DERIVED/[C] (D7: the EXISTING `"derived"` row — no new
+`EPISTEMIC_MAP` entry), all `is_canonical()` True, all `verify_chain` clean, all idempotently
+re-derivable to 0.** Emitted to the KB as `source_type="fact"` on `kb:v1:changes` (DB 2, 6380),
+registered in `registry_index.jsonl` with `lifecycle_state=current`, each with a durable artifact
+under `experiments/results/kb/<knowledge_id>.json` whose bytes hash to the event's `content_hash`
+(verified for all 6).
+
+Source revision (the `validity_window`, = the reducer's `inp.source_revision`): the HEAD at mint
+time — **`eceee4bba9c5e9ff5fe966296905cbd72785e563`** (p1 commit; p2 emission ran before the p2
+commit). Observed/valid timestamp: `2026-08-24T23:51:35.213950+00:00`.
+
+| # | subject_id (`pattern/<task>/<class>`) | claim | support / total | uncertainty (95% Wilson width) | knowledge_id (`fact_id`) | fact_entity_id | n evidence |
+|---|---|---|---|---|---|---|---|
+| P1 | `pattern/process_perturbation_resample/baseline` | recovers_under_baseline | 2 / 3 | 0.7308 | `34f13e44e30b6f3b…` | `801d17fe…` | 3 |
+| P2 | `pattern/process_perturbation_resample/process_perturbation` | recovers_under_process_perturbation | 7 / 12 | 0.4872 | `8f3583e6fe89b71e…` | `ad2ae876…` | 12 |
+| P3 | `pattern/task_manager/baseline` | recovers_under_baseline | 5 / 7 | 0.5588 | `47896f56ccda7d53…` | `c697b1fe…` | 7 |
+| P4 | `pattern/task_manager/objective_mutation` | recovers_under_objective_mutation | 11 / 14 | 0.4002 | `f2a9d7522d236193…` | `1fa0f6d4…` | 14 |
+| P5 | `pattern/task_manager/process_perturbation` | recovers_under_process_perturbation | 8 / 14 | 0.4603 | `febaf53ad049f5b8…` | `a7cf5403…` | 14 |
+| P6 | `pattern/task_manager/specification_corruption` | recovers_under_specification_corruption | 12 / 14 | 0.3593 | `cb6ceecb10988b21…` | `4071ac75…` | 14 |
+
+Each fact's `PatternPayload` (`conditions=("test_executed_success=true",)`; `population` =
+`finding:task=<task>,perturbation_class=<class>`; `source_experiment` = the lexicographically
+smallest lab-contract ref in its slice, which is also in `evidence_ids`) is verified against the
+registered record. **Every `evidence_id` resolves to a `current` registry `finding` row; the full
+`evidence_ids` per fact are listed in §1.3's minting table footnote.**
+
+**Mint-time verification (guard — all PASS):**
+- DERIVED/[C]: `epistemic_status="derived"`, `authority=DERIVED`, `evidence_class="[C]"` for all 6.
+- `is_canonical()` True and `verify_chain` → 0 errors for all 6 (registered reducer + declared
+  predicate + reproduces digest + epistemic consistency).
+- Entity identity: each `fact_entity_id` matches the registered row; deterministic (the same
+  evidence set always re-derives the same slot).
+- Idempotent re-derivation: `kb_produce_facts.py --reducer pattern/v1` re-run derives **0** new
+  records (converges to the registered head — the convergence guard), emits **0**.
+- Evidence resolution: every `evidence_id`'s `finding` row is `current` in the registry
+  (verified against `registry_index.jsonl`).
+
+**Skipped labs recorded (no mint — see §1.5):** `task_routing` + `correctness_premium`
+(quarantined, hard rule 4); cache_economics, condition_effects, quality_frontier, story_arc,
+story_review, verification_frontier, verification_value (contract-bearing but not finding-shaped
+for the v1 input door); escalation-premium + E4 grit-pilot numbers (inventoried, not v1-mintable).
+No hand-written facts were produced; every mint went through the reducer + producer pipe.
+
+p2 verdict: **PASS** — 6 facts minted + registered + verified; 0 skipped-without-record; the only
+code change is the producer's `pattern/v1` evidence branch (+ one hermetic integration test).
 
 ## 3. Writeup (p3)
 
