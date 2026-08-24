@@ -242,3 +242,65 @@ run; the ledger rows were auth-failure noise, not measurements.
    a re-run halts immediately instead of fabricating another grid.
 3. **Blocker to lift before x2 re-run:** restore Claude CLI auth (`claude` interactive login, or
    export a valid `ANTHROPIC_API_KEY`); confirm `CLAUDE_BIN` is set in the cell-runner env.
+
+## 9. x3 measurement — PASS (registered rules over the populated ledger)
+
+`scripts/measure_cap_grit_grid.py` ran the spec's registered measurement rules over the 9
+attempts (8 cells) in `experiments/results/cap_grit_grid_ledger.json` →
+`experiments/results/cap_grit_grid_metrics.json` (schema `cap_grit_grid_metrics/v1`). Two
+adapter fixes were made to the measure script so the numbers match the spec's declared
+contract: (1) **`actual_cost → cost` projection** before calling the compile evaluator's
+`grit()` (whose body reads `attempts["cost"]` — the spec's own grit-rule comment requires this
+projection); (2) **grid_status** derived from the ledger's `run_status.state` (the executor
+writes `run_status`, not the legacy `grid_status` key).
+
+**Coverage FIRST (m2 guard) — reported before any denominator use:**
+
+```
+COVERAGE: 9/9 cost captured (cost_coverage_ratio=1.0), 9/9 test-verified
+          (test_verification_coverage_ratio=1.0)
+```
+
+No fabricated attempts: every ratio's denominator is the same 9 captured attempts; the failed
+clean×baseline cell's `cost_per_verified_outcome` is `None` (0 verified — unmeasured, never 0).
+
+**Per-cell metric table:**
+
+| condition_strength | arm | n_attempts | verified_success_rate | cost_per_verified_outcome | rework_cost |
+|---|---|---|---|---|---|
+| clean | baseline | 1 | 0.0 | — (0 verified) | $0.00 |
+| clean | grit_retry | 1 | 1.0 | $3.10 | $0.00 |
+| bad_seed_low | baseline | 1 | 1.0 | $3.46 | $0.00 |
+| bad_seed_low | grit_retry | 1 | 1.0 | $3.27 | $0.00 |
+| bad_seed_mid | baseline | 1 | 1.0 | $3.87 | $0.00 |
+| bad_seed_mid | grit_retry | 1 | 1.0 | $4.13 | $0.00 |
+| bad_seed_high | baseline | 1 | 1.0 | $3.07 | $0.00 |
+| bad_seed_high | grit_retry | 2 | 0.5 | $6.82 | $0.00 |
+
+**Grit (compile evaluator, [M], `uncertainty=0.0`):**
+`grit(s)` = {0.0: 0.5, 0.2: 1.0, 0.5: 1.0, 0.8: 0.6667}; `retention` = {0.0: 1.0, 0.2: 2.0,
+0.5: 2.0, 0.8: 1.3333}; **`grit_auc` = 1.4**; **`recovery_premium` = 1.128** (successful
+perturbed costs 12.8% above successful baseline cost — the only genuine cross-strength signal;
+all other strengths' success rates are single-attempt and under-powered per finding 5).
+
+**Retry-policy fidelity (finding 4):** `n_retries_fired=1`, `n_failed_first_attempts=1` (the
+eligible grit_retry failure), **`retry_triggered_rate=1.0`, `retry_policy_violations=[]`** — zero
+violations. The clean×baseline cell's single-attempt failure is NOT a violation (baseline is
+`max_attempts=1`, scored unconditionally); the fidelity rule was scoped to count
+eligible-failure retries only for `grit_retry` arms.
+
+**Arm comparison (baseline vs grit_retry, stratified by condition_strength):**
+
+| condition_strength | baseline cpvo | grit_retry cpvo | regret | better arm |
+|---|---|---|---|---|
+| clean | — (0 verified) | $3.10 | — | — |
+| bad_seed_low | $3.46 | $3.27 | −$0.18 | grit_retry |
+| bad_seed_mid | $3.87 | $4.13 | +$0.26 | baseline |
+| bad_seed_high | $3.07 | $6.82 | +$3.75 | baseline |
+
+**PASS/FAIL: x3 PASS** — coverage 1.0/1.0 both axes, all 7 registered rules produced real
+numbers (grit via the compile evaluator with the required field projection, no fabricated
+attempts), fidelity zero violations, arm regret stratified (never averaged across strengths).
+Tests: spec/compiler + story suites 83 passed. Realized totals: $31.27 across 9 attempts
+(over the $10 ceiling — see §8 budget-overrun finding; the writeup's `cost_envelope` must
+report it).

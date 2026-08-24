@@ -1,0 +1,283 @@
+{
+  "schema": "cap_grit_grid_metrics/v1",
+  "spec_id": "cap_grit_strength_grid@0.1",
+  "generated_at": "2026-08-24T00:00:00+00:00",
+  "grid_status": "COMPLETED",
+  "coverage": {
+    "n_attempts": 9,
+    "cost_coverage_ratio": 1.0,
+    "test_verification_coverage_ratio": 1.0,
+    "n_cost_captured": 9,
+    "n_test_verification_captured": 9
+  },
+  "grit": {
+    "rule": "grit",
+    "metric": 1.4,
+    "uncertainty": 0.0,
+    "produces": {
+      "grit": {
+        "0.0": 0.5,
+        "0.2": 1.0,
+        "0.5": 1.0,
+        "0.8": 0.6667
+      },
+      "retention": {
+        "0.0": 1.0,
+        "0.2": 2.0,
+        "0.5": 2.0,
+        "0.8": 1.3333
+      },
+      "grit_auc": 1.4,
+      "recovery_premium": 1.1277
+    },
+    "evidence_class": "[M]"
+  },
+  "verified_success_rate_per_cell": [
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "clean",
+      "policy_arm": "baseline",
+      "n_attempts": 1,
+      "n_captured": 1,
+      "verified_success_rate": 0.0,
+      "last_attempt_ok": false
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "clean",
+      "policy_arm": "grit_retry",
+      "n_attempts": 1,
+      "n_captured": 1,
+      "verified_success_rate": 1.0,
+      "last_attempt_ok": true
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_low_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_low",
+      "policy_arm": "baseline",
+      "n_attempts": 1,
+      "n_captured": 1,
+      "verified_success_rate": 1.0,
+      "last_attempt_ok": true
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_low_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_low",
+      "policy_arm": "grit_retry",
+      "n_attempts": 1,
+      "n_captured": 1,
+      "verified_success_rate": 1.0,
+      "last_attempt_ok": true
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_mid_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_mid",
+      "policy_arm": "baseline",
+      "n_attempts": 1,
+      "n_captured": 1,
+      "verified_success_rate": 1.0,
+      "last_attempt_ok": true
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_mid_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_mid",
+      "policy_arm": "grit_retry",
+      "n_attempts": 1,
+      "n_captured": 1,
+      "verified_success_rate": 1.0,
+      "last_attempt_ok": true
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_high",
+      "policy_arm": "baseline",
+      "n_attempts": 1,
+      "n_captured": 1,
+      "verified_success_rate": 1.0,
+      "last_attempt_ok": true
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_high",
+      "policy_arm": "grit_retry",
+      "n_attempts": 2,
+      "n_captured": 2,
+      "verified_success_rate": 0.5,
+      "last_attempt_ok": true
+    }
+  ],
+  "cost_per_verified_outcome_per_cell": [
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "clean",
+      "policy_arm": "baseline",
+      "n_captured_pairs": 1,
+      "captured_total_cost": 3.5575142,
+      "n_verified": 0,
+      "cost_per_verified_outcome": null
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "clean",
+      "policy_arm": "grit_retry",
+      "n_captured_pairs": 1,
+      "captured_total_cost": 3.1009182,
+      "n_verified": 1,
+      "cost_per_verified_outcome": 3.1009182
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_low_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_low",
+      "policy_arm": "baseline",
+      "n_captured_pairs": 1,
+      "captured_total_cost": 3.4562896,
+      "n_verified": 1,
+      "cost_per_verified_outcome": 3.4562896
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_low_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_low",
+      "policy_arm": "grit_retry",
+      "n_captured_pairs": 1,
+      "captured_total_cost": 3.2722105,
+      "n_verified": 1,
+      "cost_per_verified_outcome": 3.2722105
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_mid_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_mid",
+      "policy_arm": "baseline",
+      "n_captured_pairs": 1,
+      "captured_total_cost": 3.8678193,
+      "n_verified": 1,
+      "cost_per_verified_outcome": 3.8678193
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_mid_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_mid",
+      "policy_arm": "grit_retry",
+      "n_captured_pairs": 1,
+      "captured_total_cost": 4.1296139,
+      "n_verified": 1,
+      "cost_per_verified_outcome": 4.1296139
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_high",
+      "policy_arm": "baseline",
+      "n_captured_pairs": 1,
+      "captured_total_cost": 3.0694191,
+      "n_verified": 1,
+      "cost_per_verified_outcome": 3.0694191
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_high",
+      "policy_arm": "grit_retry",
+      "n_captured_pairs": 2,
+      "captured_total_cost": 6.8195467,
+      "n_verified": 1,
+      "cost_per_verified_outcome": 6.8195467
+    }
+  ],
+  "rework_cost_report": [
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "clean",
+      "policy_arm": "baseline",
+      "rework_cost_per_cell": 0.0
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "clean",
+      "policy_arm": "grit_retry",
+      "rework_cost_per_cell": 0.0
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_low_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_low",
+      "policy_arm": "baseline",
+      "rework_cost_per_cell": 0.0
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_low_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_low",
+      "policy_arm": "grit_retry",
+      "rework_cost_per_cell": 0.0
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_mid_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_mid",
+      "policy_arm": "baseline",
+      "rework_cost_per_cell": 0.0
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_mid_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_mid",
+      "policy_arm": "grit_retry",
+      "rework_cost_per_cell": 0.0
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_high",
+      "policy_arm": "baseline",
+      "rework_cost_per_cell": 0.0
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_high",
+      "policy_arm": "grit_retry",
+      "rework_cost_per_cell": 0.0
+    }
+  ],
+  "retry_policy_fidelity": {
+    "n_attempts_total": 9,
+    "n_retries_fired": 1,
+    "n_failed_first_attempts": 1,
+    "retry_triggered_rate": 1.0,
+    "retry_policy_violations": []
+  },
+  "arm_comparison": {
+    "stratified": [
+      {
+        "condition_strength": "bad_seed_high",
+        "baseline_cost_per_verified": 3.0694191,
+        "grit_retry_cost_per_verified": 6.8195467,
+        "baseline_verified_success_rate": 1.0,
+        "grit_retry_verified_success_rate": 0.5,
+        "routing_arm_regret": 3.7501276,
+        "better_arm": "baseline"
+      },
+      {
+        "condition_strength": "bad_seed_low",
+        "baseline_cost_per_verified": 3.4562896,
+        "grit_retry_cost_per_verified": 3.2722105,
+        "baseline_verified_success_rate": 1.0,
+        "grit_retry_verified_success_rate": 1.0,
+        "routing_arm_regret": -0.1840791,
+        "better_arm": "grit_retry"
+      },
+      {
+        "condition_strength": "bad_seed_mid",
+        "baseline_cost_per_verified": 3.8678193,
+        "grit_retry_cost_per_verified": 4.1296139,
+        "baseline_verified_success_rate": 1.0,
+        "grit_retry_verified_success_rate": 1.0,
+        "routing_arm_regret": 0.2617946,
+        "better_arm": "baseline"
+      },
+      {
+        "condition_strength": "clean",
+        "baseline_cost_per_verified": null,
+        "grit_retry_cost_per_verified": 3.1009182,
+        "baseline_verified_success_rate": 0.0,
+        "grit_retry_verified_success_rate": 1.0,
+        "routing_arm_regret": null,
+        "better_arm": null
+      }
+    ],
+    "best_arm": null
+  },
+  "realized_total_cost": 31.2733315,
+  "realized_n_attempts": 9
+}

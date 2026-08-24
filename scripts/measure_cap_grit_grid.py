@@ -134,11 +134,13 @@ def retry_policy_fidelity(cells: list[dict]) -> dict:
     for c in cells:
         attempts = c.get("attempts") or []
         arm = c["policy_arm"]
-        nums = sorted(a.get("attempt_number", 0) for a in attempts)
         has_second = len(attempts) >= 2
         first = attempts[0] if attempts else None
         first_failed = bool(first) and first.get("test_executed_success") is False
-        if first_failed:
+        # Only grit_retry cells are EVER eligible for a retry (finding 4: baseline is
+        # max_attempts=1, scored unconditionally). A baseline cell whose single attempt
+        # failed is the declared policy in action, NOT a "no retry fired" violation.
+        if arm == "grit_retry" and first_failed:
             eligible_failures += 1
             if has_second:
                 retries += 1
@@ -209,18 +211,29 @@ def main():
     ledger = json.loads(LEDGER_PATH.read_text())
     cells = ledger["cells"]
     attempts = [a for c in cells for a in (c.get("attempts") or [])]
+    # grid_status: derive from the ledger's run_status.state (the x2 executor writes
+    # run_status, not grid_status) with the legacy key as a fallback.
+    grid_status = ledger.get("grid_status") or ledger.get("run_status", {}).get("state", "unknown")
 
     # ── COVERAGE FIRST (the m2 guard) ───────────────────────────
     coverage = attempt_coverage_precheck(attempts)
     if not args.json:
-        print(f"grid_status: {ledger.get('grid_status', 'unknown')}")
+        print(f"grid_status: {grid_status}")
         print(f"COVERAGE: {coverage['n_cost_captured']}/{coverage['n_attempts']} cost, "
               f"{coverage['n_test_verification_captured']}/{coverage['n_attempts']} test-verified")
 
     # ── Registered rules ────────────────────────────────────────
     # grit: reuse the compile evaluator's registered implementation (the spec's rule by name).
+    # The spec's own grit-rule comment requires the caller to PROJECT the ledger's
+    # ``actual_cost`` into the ``cost`` key grit()'s body reads — "the same kind of small,
+    # honest field-name adapter cap_coverage_routing_impact.yaml's finding_corpus_projection
+    # performs". Do that projection here (never silently in the module); the projected list is
+    # a copy, so the ledger stays untouched.
     spec = load_spec(SPEC_PATH)
-    rules = evaluate_rules(spec, attempts)
+    projected_attempts = [
+        {**a, "cost": a.get("actual_cost")} if "actual_cost" in a else a for a in attempts
+    ]
+    rules = evaluate_rules(spec, projected_attempts)
     grit_result = next((r for r in rules if r.rule == "grit"), None)
 
     verified = verified_success_rate_per_cell(cells)
@@ -233,7 +246,7 @@ def main():
         "schema": "cap_grit_grid_metrics/v1",
         "spec_id": spec.spec_id,
         "generated_at": ledger.get("generated_at", ""),
-        "grid_status": ledger.get("grid_status", "unknown"),
+        "grid_status": grid_status,
         "coverage": coverage,
         "grit": {
             "rule": "grit",
