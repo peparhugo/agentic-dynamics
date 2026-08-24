@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,15 +23,37 @@ try:
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
+# kb_produce_facts.py is a SIBLING script, not a package export — same dual-path dance as
+# `_bootstrap` above: a direct `python scripts/run_workflow.py` run has `scripts/` itself on
+# `sys.path[0]` (the bare `import` resolves); a test or caller that imports this file as
+# `scripts.run_workflow` has the repo ROOT on `sys.path` instead (the `scripts.`-qualified
+# fallback resolves). Imported here, not lazily inside `_emit_workflow_facts`, because the hook
+# is default-ON (§4 of the design doc) — it is the common path, not a conditional CAP opt-in like
+# `control.rules`/`control.context_compiler` below.
+try:
+    import kb_produce_facts  # noqa: E402  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.run_workflow — repo root is on sys.path
+    from scripts import kb_produce_facts  # noqa: E402
 
 from agentic_dynamics.control.live import LivePublisher  # noqa: E402
+from agentic_dynamics.control.reducers._common import REVISION_FALLBACK  # noqa: E402
 from agentic_dynamics.control.reducers._common import cell_id as _reducer_cell_id  # noqa: E402
 from agentic_dynamics.control.signal_store import build_signal_store, load_results  # noqa: E402
 from agentic_dynamics.control.step_routing import ModelSignals, route_step  # noqa: E402
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
+from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
+from agentic_dynamics.knowledge.knowledge_ingestion import _authorized_kb_write  # noqa: E402
+from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
 from agentic_dynamics.knowledge.spec_ingestion import emit_spec_record  # noqa: E402
 from agentic_dynamics.runtime.workflow_runner import cell_scope, run_workflow  # noqa: E402
+
+#: CAP fact auto-emit (docs/designs/current/cap_fact_auto_emit_design.md §4): the disable-flag
+#: env var. Deliberately the ONE default-ON flag in the FINOPS_* family (every other gate —
+#: FINOPS_KB_WRITE, FINOPS_ACTUATION_ARMED — is opt-in, "1"-truthy, default OFF): the fact store
+#: must stay current WITHOUT an operator remembering to run kb_produce_facts.py by hand after
+#: every run. Set to the literal string "0" to disable; any other value (including unset) is ON.
+FACT_AUTO_EMIT_ENV = "FINOPS_FACT_AUTO_EMIT"
 
 
 def _spec_declares_routing(spec: ExperimentSpec) -> bool:
@@ -88,6 +111,15 @@ def main() -> None:
                          "proposal (C1-C10), and records it as a shadow decision artifact — "
                          "never applied, never arms actuation. The actual route is always "
                          "route_step's, unchanged. Implies --cap-snapshot. OFF by default.")
+    ap.add_argument("--no-fact-emit", action="store_true",
+                    help="disable the CAP fact auto-emit hook (docs/designs/current/"
+                         "cap_fact_auto_emit_design.md) for THIS invocation only. The hook is "
+                         "default-ON — every completed run derives its own attempt/job/policy/"
+                         "workflow facts and emits them, best-effort, scoped to this run's own "
+                         "repository_id (cell_scope). Also controlled by the "
+                         f"{FACT_AUTO_EMIT_ENV}=0 environment variable (a per-process override, "
+                         "e.g. for a worker that must never write to the KB); this CLI flag "
+                         "always wins when both are set.")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))
@@ -174,6 +206,63 @@ def main() -> None:
 
     _refresh_index(spec.name)
     _emit_spec_record(spec.name, revision=result.git_sha)
+    if _fact_auto_emit_enabled(args):
+        _emit_workflow_facts(spec, args, result)
+
+
+def _fact_auto_emit_enabled(args: argparse.Namespace) -> bool:
+    """Resolve the fact auto-emit flag: CLI > env > default-ON (design §4's precedence table).
+
+    ``--no-fact-emit`` always wins when passed — an explicit per-invocation CLI flag outranks the
+    ambient environment, matching this file's existing ``--signals``-overrides-auto-built-store
+    and ``--no-commit``-overrides-``commit=True`` precedence (``run_workflow.py``'s own argparse
+    block). Absent the CLI flag, only the literal string ``"0"`` on ``FINOPS_FACT_AUTO_EMIT``
+    disables — every other value, including unset, is ON (the deliberate default-ON posture break
+    from the rest of the opt-in ``FINOPS_*`` family; see the module-level docstring above the
+    ``FACT_AUTO_EMIT_ENV`` constant).
+    """
+    if args.no_fact_emit:
+        return False
+    return os.environ.get(FACT_AUTO_EMIT_ENV) != "0"
+
+
+def _emit_workflow_facts(spec: ExperimentSpec, args: argparse.Namespace, result) -> None:
+    """Derive and emit this run's own facts into the KB. Best-effort — never fails the run.
+
+    The CAP fact-auto-emit hook (design: ``docs/designs/current/cap_fact_auto_emit_design.md``).
+    Runs AFTER ``_emit_spec_record`` on purpose — the ledger is already on disk and the spec's
+    lifecycle record is already current, so this call adds nothing new to the *run's* outcome; it
+    can only add facts to the KB. Mirrors ``_emit_spec_record``'s two-layer posture exactly (see
+    its own docstring): ``derive_run_facts`` does no I/O beyond what ``spec``/``result`` already
+    hold in memory (so it essentially cannot raise on its own), and the emission half
+    (``ks.connect`` / ``ks.publish_event``, which need a live Redis) is wrapped so a downed
+    stream, a missing ``FINOPS_KB_WRITE`` authorization, or a corrupt registry row degrades to a
+    printed warning — NEVER an exception that could change this run's exit status.
+
+    ``repository_id=cell_scope(args.workdir)`` reuses EXACTLY the value the ``--cap-snapshot``/
+    ``--cap-shadow``/``control_route`` router seams above already pass for this same ``workdir``
+    (design §3): the facts this hook emits must share their ``scope_path``'s ``org:`` root with
+    whatever THIS run's own routing calls query, or ``context_compiler.scope_visible``'s
+    ancestor-prefix match silently excludes them.
+    """
+    try:
+        records = kb_produce_facts.derive_run_facts(
+            result,
+            spec,
+            repository_id=cell_scope(args.workdir),
+            revision=result.git_sha or REVISION_FALLBACK,
+            now=_now_iso(),
+        )
+        if not records:
+            print("workflow facts: nothing to emit (unchanged or no phases)", file=sys.stderr)
+            return
+        with _authorized_kb_write():
+            r = ks.connect()
+            emitted, skipped = kb_produce_facts.emit_records(r, records)
+        print(f"workflow facts: emitted={emitted} skipped={skipped} total={len(records)}",
+              file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 — progressive path, never a gate on the run
+        print(f"warning: workflow fact emit failed ({exc}) — run itself unaffected", file=sys.stderr)
 
 
 def _refresh_index(spec_name: str) -> None:

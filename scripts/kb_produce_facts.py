@@ -32,6 +32,13 @@ written to ``experiments/results/kb/<knowledge_id>.json`` BEFORE the pointer eve
 
 Isolation (load-bearing): this producer touches only ``127.0.0.1:FINOPS_REDIS_PORT`` (default
 6380) DB 2 — never 6379 (the story sandbox) nor DB 1 (the framework queue).
+
+``derive_run_facts`` (below ``_derive_workflow_facts``) is a SECOND, narrower entry point: the
+scoped, per-run derivation the workflow-completion auto-emit hook calls
+(``scripts/run_workflow.py:_emit_workflow_facts``, design:
+``docs/designs/current/cap_fact_auto_emit_design.md``). It runs the SAME reducers and the SAME
+``fact_ingestion`` glue this CLI's ``main()`` does, but over evidence built from ONE already-loaded
+run + spec rather than a corpus-wide filesystem scan — no new transport, no reducer changes.
 """
 
 import argparse
@@ -63,7 +70,7 @@ from agentic_dynamics.control.reducers import (  # noqa: E402
 )
 from agentic_dynamics.control.reducers._common import run_artifact_id, run_recency_key  # noqa: E402
 from agentic_dynamics.core.paths import KB_ARTIFACT_DIR, REGISTRY_INDEX_PATH  # noqa: E402
-from agentic_dynamics.experiment.experiment_spec import load_spec  # noqa: E402
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import _spec_paths  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
 from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
@@ -276,6 +283,188 @@ def _derive_workflow_facts(repository_id: str, revision: str, now: str) -> list:
     )
     wf_facts = workflow_facts_v1(wf_inp)
     return fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+
+
+# ── Scoped, per-run derivation: the workflow-completion auto-emit hook ──
+#
+# CAP fact-auto-emit (docs/designs/current/cap_fact_auto_emit_design.md). `_derive_workflow_facts`
+# above is the CORPUS-WIDE batch job: it rglobs every run JSON ever written and every spec YAML in
+# the repo. That is the right shape for an operator's periodic `--reducer workflow_facts/v1` sweep;
+# it is the wrong shape for a hook firing on every single workflow completion (O(corpus) I/O paid
+# per run, and — if pointed at a per-cell `repository_id` — permanent registry fragmentation of the
+# corpus-wide `policy_facts`/`spec_status` slots, design §2). `derive_run_facts` below reuses the
+# EXACT SAME reducer functions and the EXACT SAME `fact_ingestion` glue, but is handed evidence
+# built ONLY from the run/spec the caller already holds in memory — no filesystem re-scan at all.
+
+
+def _policy_evidence_for(spec: ExperimentSpec) -> tuple[EvidenceItem, ...]:
+    """Build ONE ``policy_facts/v1`` evidence item for an already-loaded spec (no directory scan).
+
+    Mirrors ``load_spec_configs()``'s per-spec projection (``name`` / ``budget_usd`` /
+    ``max_attempts`` / ``model_pool``) field-for-field, applied to the ONE ``ExperimentSpec``
+    ``scripts/run_workflow.py`` already parsed for this run — the scoped, per-run sibling of the
+    corpus-wide ``load_spec_configs()`` used by the manual ``--reducer policy_facts/v1`` sweep.
+    """
+    pool = spec.workflow.params.get("model_pool") or spec.workflow.params.get("allowed_models")
+    config = {
+        "name": spec.name,
+        "budget_usd": spec.stop.budget_usd,
+        "max_attempts": spec.stop.max_attempts,
+        "model_pool": list(pool) if isinstance(pool, (list, tuple)) else pool,
+    }
+    return (EvidenceItem(source_type="spec", evidence_id=f"spec:{spec.name}", payload=config),)
+
+
+def _registered_observed_at(entity_id: str, *, registry_path: Path) -> str | None:
+    """Return the CURRENT (non-superseded) registry head's own ``observed_at`` for ``entity_id``.
+
+    ``None`` when there is no head yet. Mirrors ``spec_ingestion.registry_head``'s tolerant,
+    two-pass parsing exactly (missing/unreadable file -> ``None``; a malformed line is skipped,
+    not fatal — a producer must never be blocked by a damaged index) but surfaces the head row's
+    ``observed_at`` instead of its lifecycle-fingerprint ``reason``: ``RegistryHead`` (the value
+    object ``registry_head`` returns) does not carry ``observed_at``, and extending it would touch
+    ``spec_ingestion.py``, which serves BOTH the spec and fact planes — a shared-schema change is
+    out of scope for a hook-local guard (hard rule 5: no reducer/registry-schema changes). This
+    stays entirely local to ``kb_produce_facts.py``, reading the same raw file the shared helper
+    reads, so it costs nothing new: adversarial finding f3-2 (see the design doc's log) needs it
+    to detect out-of-order run completion BEFORE deciding whether to derive at all.
+    """
+    path = Path(registry_path)
+    try:
+        raw_lines = path.read_text().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    order: list[str] = []
+    lines: dict[str, dict] = {}
+    superseded: set[str] = set()
+    for raw in raw_lines:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue  # a truncated line must not hide the rest of the history
+        if not isinstance(row, dict) or row.get("entity_id") != entity_id:
+            continue
+        kid = row.get("knowledge_id")
+        if not kid:
+            continue
+        if row.get("supersedes"):
+            superseded.add(str(row["supersedes"]))
+        if row.get("lifecycle_state") == "superseded":
+            superseded.add(str(kid))
+        if kid not in lines:
+            order.append(str(kid))
+        lines[str(kid)] = row  # latest line for an id wins
+    for kid in reversed(order):
+        if kid not in superseded:
+            return lines[kid].get("observed_at")
+    return None
+
+
+def derive_run_facts(
+    result: object,
+    spec: ExperimentSpec,
+    *,
+    repository_id: str,
+    revision: str,
+    now: str,
+) -> list:
+    """Derive fact records for ONE just-finished workflow run — the auto-emit hook's derivation.
+
+    Runs every run-scoped reducer over evidence built ONLY from ``result`` (the run that just
+    finished) and ``spec`` (the one spec the caller already parsed): ``attempt_facts/v1`` and
+    ``job_facts/v1`` over the run's own evidence, ``policy_facts/v1`` over the spec's own declared
+    budget/attempts ceiling, then ``workflow_facts/v1`` over the FINALIZED lower facts (the same
+    ladder ``_derive_workflow_facts`` runs — see its docstring for why the lower rungs must be
+    finalized before ``workflow_facts_v1`` can cite their ``fact_id``s in its own ``evidence_ids``).
+
+    Unlike ``_derive_workflow_facts`` (which registers ONLY the top-of-ladder ``workflow_facts_v1``
+    output), this function registers the RAW attempt/job/policy facts too — a failed run's own
+    ``phase_status``/``job_status`` facts land in the registry as their own citable records, not
+    merely folded into the workflow-level aggregate. This is a deliberate widening within the
+    SAME unchanged reducers and the SAME ``fact_ingestion.derive_fact_records`` glue (no reducer
+    changes, no new transport — hard rule 5): one combined call lets the convergence guard and
+    in-batch chaining (``fact_ingestion.py``) do the deduplication across all four fact families at
+    once, exactly as they already do for a mixed batch.
+
+    ``spec_status/v1`` (I1, the corpus-wide spec lifecycle index) is deliberately NOT run here — it
+    has no per-run input to give and stays the manual/scheduled batch job's responsibility.
+
+    **Out-of-order-completion guard (adversarial finding f3-2, `f3_adversarial_verify`).** Unlike
+    the batch job — which loads every run for a cell in ONE call and lets
+    ``fact_ingestion.derive_fact_records``'s in-batch chaining sort them by ``observed_at`` before
+    deciding a winner — this function is called ONCE PER RUN, from a SEPARATE process invocation
+    each time. Two runs of the SAME cell that finish out of chronological order (a slow worker, a
+    delayed retry, or two workers racing) each see only their OWN run's facts; there is no shared
+    in-process list to sort. Concretely reproduced: a fast run T2 (``ended_at`` 00:20) registers
+    first; a slow run T1 (``ended_at`` 00:05, STARTED earlier but finished LATER in wall-clock
+    terms) is then processed — with nothing guarding it, ``derive_fact_records`` would silently
+    supersede T2's correct ``job_status``/``job_accumulated_cost_usd`` with T1's stale values,
+    because it only ever compares CONTENT (has the value changed?), never RECENCY (is this
+    observation older than what's already registered?) across separate calls. Guarded below by
+    checking the incoming run's own ``job_status`` ``observed_at`` against the currently-registered
+    head's ``observed_at`` for that SAME cell/entity (``_registered_observed_at``, a hook-local
+    helper — no reducer or registry-schema change) and skipping the ENTIRE derivation (not just the
+    job facts) for a run that is strictly older than what is already registered: every fact this
+    function derives from ONE run shares that run's provenance, so a stale run must not be allowed
+    to set ANY of the cell's "current" state, not merely the job-level rungs.
+
+    No I/O beyond what ``result``/``spec`` already hold in memory — save the ONE registry read the
+    guard above performs, which reuses the same tolerant, never-blocking read shape
+    ``registry_head`` already has. Safe to call from a hot completion path.
+    """
+    run = result.to_dict() if hasattr(result, "to_dict") else result
+    workload_scope = f"org:{repository_id}/workload:{spec.name}"
+
+    run_inp = ReducerInput(
+        scope_path=workload_scope,
+        scope_type="workload",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=_run_evidence([run]),
+        facts=(),
+        now=now,
+        source_revision=revision,
+    )
+    attempt = attempt_facts_v1(run_inp)
+    job = job_facts_v1(run_inp)
+
+    job_status = next((f for f in job if f.predicate == "job_status"), None)
+    if job_status is not None:
+        registered_at = _registered_observed_at(
+            job_status.fact_entity_id, registry_path=REGISTRY_INDEX_PATH
+        )
+        if registered_at is not None and job_status.observed_at < registered_at:
+            return []  # this run is older than the cell's already-registered state — drop it
+
+    policy_inp = ReducerInput(
+        scope_path=workload_scope,
+        scope_type="workload",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=_policy_evidence_for(spec),
+        facts=(),
+        now=now,
+        source_revision=revision,
+    )
+    policy = policy_facts_v1(policy_inp)
+
+    lower = attempt + job + policy
+    wf_inp = ReducerInput(
+        scope_path=workload_scope,
+        scope_type="workflow",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=(),
+        facts=tuple(_finalize(lower)),
+        now=now,
+        source_revision=revision,
+    )
+    wf_facts = workflow_facts_v1(wf_inp)
+
+    return fi.derive_fact_records(lower + wf_facts, registry_path=REGISTRY_INDEX_PATH)
 
 
 def derive_facts(

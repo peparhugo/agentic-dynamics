@@ -1,0 +1,14 @@
+{
+  "admissibility_rate": 0.0,
+  "conflict_rate": 0.0,
+  "n_snapshots": 5,
+  "stale_rate": 0.0,
+  "unknown_predicates": {
+    "allowed_models": 5,
+    "job_accumulated_cost_usd": 5,
+    "max_spend_usd": 5,
+    "phase_test_verified": 5,
+    "workflow_phases_remaining": 5
+  },
+  "unknown_rate": 1.0
+}
