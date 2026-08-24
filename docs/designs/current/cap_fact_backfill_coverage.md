@@ -5,7 +5,7 @@ status: accepted
 
 **Spec:** `workflows/repository/cap_fact_backfill.yaml` (phase `p1_corpus_inventory`)
 **Branch:** `feature/cap-fact-backfill`
-**Date:** 2026-08-24 · **Model:** deepseek/deepseek-v4-flash (single-model, `--backend opencode`)
+**Date:** 2026-08-24 (re-audit 2026-08-24) · **Model:** deepseek/deepseek-v4-flash (single-model, `--backend opencode`)
 **Question:** Enumerate the full experiment corpus exhaustively — workflow runs, story cells,
 summary entries — record shape variance per source, and publish the master artifact table.
 
@@ -245,6 +245,13 @@ phases' cost as `None`/uncaptured) is a p4 concern; p1 only measures the exposur
 **PASS** — corpus enumerated exhaustively; every count reproduced from the census command; shape
 variance recorded (F1 exposure, story-condition dirt, nested-vs-flat tokens, missing attempt
 structure in the summary family, E4 ledger coverage). In-flight worktrees untouched.
+
+**Re-audit (2026-08-24):** the census was re-run against the live corpus and every §1/§2 count is
+confirmed unchanged — 125 workflow runs (96 `ok`, 455 phases = 427 ok + 28 failed; 448 agent + 7
+test kind), 227 story cells (1112 sessions; 10 cells with non-empty `error`; 9 `continuation_used`;
+11 `subagent_sessions`; 445 sessions with `confidence`, 44 explicit nulls; 9 condition-dirty cells
+— 6 `""` + 3 `"None"`, all deepseek-v4-pro), 144 summary entries (0 attempts), E4 grid 8 cells /
+9 attempts ($31.27 realized). Reproducible from the §1 census command.
 
 ---
 
