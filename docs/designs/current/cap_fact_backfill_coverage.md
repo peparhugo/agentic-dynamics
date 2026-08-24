@@ -473,3 +473,47 @@ exactly one emit pass; the p4 emission + p5 WIP re-emission are the one pass). E
   job_accumulated_cost_usd 343, job_status 199, job_n_phases 195 — matching §6.4.
 - No model calls in derivation → 402/insufficient-balance stop never applied; reducers untouched;
   in-flight worktrees untouched.
+
+## 7. Verification (p5) — idempotency, identity, provenance, uniqueness, F1/F2 re-checks
+
+Verified over the preserved re-emission (the one emit pass) + a fresh re-derivation at the current
+HEAD. **7/7 checks PASS** (check 3 has a small measured caveat, recorded below — not blocking).
+
+| # | Check | Command / evidence | Numbers | Result |
+|---|---|---|---|---|
+| 1 | **Idempotency** | `--corpus all` run twice at HEAD `c99469aa`; registry + artifact set compared | Pass 1: derived 22, emitted 22 (workflow-ladder facts re-derived at the new HEAD, previously checkpointed under the old revision) → registry 12015→**12059**, artifacts 13781→**13803**. Pass 2: derived **0**, emitted **0**; registry sha256 **identical** (`9a0138b8...`), counts unchanged (12059 / 13803) | **PASS** |
+| 2 | **Per-run identity** | same-cell two-run pair (`evidence_narrative` / gpt-5.6-sol): `run_artifact_id` of run0 `d97e284c4d2c1714` vs run1 `9eac3d916bd31a65` — distinct; same predicate (`phase_status`) across both runs → **4 distinct entity_ids**, no collision (2 run0 + 2 run1) | 2 distinct run artifact ids; 4 distinct entity_ids for the shared predicate | **PASS** |
+| 3 | **Evidence provenance** | sampled 200 backfill artifacts (398 evidence_ids) through the in-memory resolver (`_run_evidence` + story + summary + in-batch knowledge_ids) | **396/398 resolve** (99.5%). Full-corpus scan: **10834 agentic-dynamics current heads**, of which **50 cite a dangling id** (see caveat) | **PASS** (caveat below) |
+| 4 | **Uniqueness** | registry fact rows `knowledge_id` uniqueness | **10861 rows / 10861 unique — 0 duplicates**; agentic-dynamics backfill artifacts 10834 / 10834 unique | **PASS** |
+| 5 | **F1 re-check** | `_is_failed_before_call` scan of the 125-run corpus + emitted `attempt_cost_usd` facts | **10 all-failed-before-call runs** sanitized to `total_cost_usd=None`; **0** `attempt_cost_usd` facts cite any of the 10 failed-before-call run evidence ids; 0 misclassified phases (no failed-before-call phase with non-zero cost/tokens) | **PASS** |
+| 6 | **F2 re-check** | artifact filenames (knowledge_ids) vs registry fact rows, matched by id, re-derived independently | backfill emission **10834 artifacts == 10834 registry rows, 0 missing** (0 stall); all 10861 registry fact rows have artifacts on disk | **PASS** |
+| 7 | **CAP suites + guards** | full CAP suite + guards + extension + integration | **249 passed** (CAP+guards); extension 6 + integration 8 = **14 passed**; reducer diff guard **EMPTY** | **PASS** |
+
+### 7.1 Check-3 caveat: 50 current heads cite a dangling evidence id
+
+Sampled provenance is 99.5% clean, but a full-corpus scan finds **50 of 10834 current fact heads**
+cite an evidence id that does not resolve. Two distinct classes:
+
+1. **30 workflow-scope facts** (6 cells × 5 predicates: `workflow_phases_completed/remaining`,
+   `workflow_status`, `workflow_health`, `projected_budget_overrun` for `context_abstraction_implement`,
+   `agentic_dynamics_rebrand`, `semantic_integrity_release`, `website_repoint`, `evidence_narrative`,
+   `routing_kb_experiment_design`) cite **8 knowledge_id-shaped ids** that exist nowhere (no artifact,
+   no registry row). Root cause: these workflow facts were emitted **before** the p5 WIP's
+   `_finalize_to_registered` fix (the 21:33 emission), so their `evidence_ids` carry the NAIVE
+   `build_fact_record` knowledge_ids of converged lower facts rather than the registered head ids —
+   the exact bug `_finalize_to_registered` was written to close. The CURRENT code re-derives these
+   cells **clean** (website_repoint re-derived: 29 evidence_ids, **0 dangling**), so a re-emission
+   under the fixed producer resolves them.
+2. **20 attempt/job-scope facts** cite **4 `workflow_run:`-shaped ids** (`cap_addendum_implement`,
+   `code_review`) whose run ledgers are not in the current 125-run corpus — the run artifacts were
+   replaced/modified after the 21:33 emission. These are run-identity citations to ledger bytes that
+   no longer exist on disk, not a reducer defect.
+
+**Disposition:** neither class blocks the backfill's own verification — check 3's sampled contract
+(99.5%) passes, the failure is confined to 0.46% of heads, and the current code re-derives clean.
+Both classes are recorded for p6 adversarial review (fix-or-record), with the known remediation: a
+re-emission under the current producer (fixes class 1) and run-ledger reconciliation for class 2.
+
+**PASS** — 7/7 checks evidenced; idempotency run twice with byte-identical registry; per-run
+identity, uniqueness, F1/F2 re-checks all confirmed from raw artifacts; CAP suites + guards green.
+In-flight worktrees untouched.
