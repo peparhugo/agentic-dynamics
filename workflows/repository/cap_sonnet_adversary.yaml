@@ -1,0 +1,115 @@
+name: cap_sonnet_adversary
+question: >-
+  Sonnet-5 adversarial review of the four parallel flash workstream branches — cap_e2_cascade_run,
+  cap_pattern_minting, cap_story_bridge, cap_test_runner_wiring — per the adversarial convention:
+  each review finds and re-verifies issues against the tree, and MUST deliver the attempted-
+  attacks/known-safe list (what was tried, why it didn't apply) alongside the findings. One
+  phase per branch; each phase runs AFTER its branch has committed its work (check the branch
+  exists and has the expected [workflow] commits; if not, FAIL the phase cleanly).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery /
+        adversarial review. canonical_sources: [the four target branches, agent_config/
+        conventions.md (the adversarial convention: findings verified + known-safe list),
+        the specs that drove each branch (cap_e2_cascade_run, cap_pattern_minting,
+        cap_story_bridge, cap_test_runner_wiring)].
+        policies: [findings_are_verified, known_safe_list_required, no_bare_pass]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: adversarial review.
+        deliberation: [review E2/E3 branch, review patterns branch, review story bridge, review
+        test-runner wiring]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        Four flash workflows run in parallel on their own branches. This workflow reviews each
+        after it lands. Each branch's spec names its expected deliverables; the review checks
+        them against the tree and the conventions.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with the review findings + known-safe list.
+        (2) Per the convention: every finding is RE-VERIFIED against the tree (re-derived from
+        raw sources, never imagined); every phase delivers the attempted-attacks/known-safe list;
+        no bare PASS — a clean sweep is the known-safe list with evidence. (3) If a target
+        branch does not exist yet or lacks its expected [workflow] commits, FAIL the phase
+        cleanly with the reason (do NOT review a partial branch). (4) Sonnet-5 only — this is the
+        adversary's workflow. (5) No code changes to the reviewed branches except a review
+        record doc if the convention requires one. (6) PASS/FAIL log.
+      read_first: >-
+        agent_config/conventions.md (Adversarial Phases section), the four specs, the four
+        branches' deliverables once they land
+      run_shape: >-
+        SINGLE-model: --model anthropic/claude-sonnet-5 --backend claude_cli (CLAUDE_BIN). One
+        worktree, one branch (feature/cap-sonnet-adversary); each phase commits [workflow] <phase>.
+    phases:
+      - name: a1_review_e2_e3
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          TARGET: feature/cap-e2-cascade-run. FIRST verify the branch exists and has committed
+          its phases (git log). Review per the conventions: attack the cascade simulation
+          (coverage pre-check actually reported? counterfactual-only? thresholds honest?),
+          the E3 change-rate table (recomputed from the registry, not trusted), and the writeup
+          (every number traces; inconclusive recorded as inconclusive). DELIVER: findings
+          (re-verified) + the known-safe list + verdict (PASS/FAIL with mandatory fixes).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+      - name: a2_review_patterns
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          TARGET: feature/cap-pattern-minting. Verify the branch state first. Attack: reducer-
+          mint-only (any hand-written pattern fact? D7 violated anywhere? support fabricated or
+          estimated?), idempotency re-derived, entity identity correct, skipped labs recorded
+          honestly, source_experiment refs real. DELIVER: findings + known-safe list + verdict.
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+      - name: a3_review_story_bridge
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          TARGET: feature/cap-story-bridge. Verify the branch state first. Attack: zero diffs to
+          existing reducers (git diff reducers minus the new story_facts.py — must be empty);
+          token-split instrumentation additive (absent splits stay absent); story_facts/v1
+          follows attempt_facts/v1's identity + null-not-zero; hermetic + idempotent tests exist
+          and pass; predicate vocabulary from FACT_PREDICATES only. DELIVER: findings +
+          known-safe list + verdict.
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+      - name: a4_review_test_runner
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          TARGET: feature/cap-test-runner-wiring. Verify the branch state first. Attack:
+          test_runner is the ONLY source (any self-reported test? any defaulting of None to
+          False?), the seam mapping matches the actual code, additive-only wiring, hermetic
+          tests present/absent, the re-derivation proof (one real phase now carries a bool
+          where it was None). DELIVER: findings + known-safe list + verdict.
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules:
+  - name: sonnet_adversary_run
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [e2_e3_reviewed, patterns_reviewed, story_bridge_reviewed, test_runner_reviewed]
+metrics:
+  - {name: e2_e3_reviewed, agg: mean, over: cell}
+  - {name: patterns_reviewed, agg: mean, over: cell}
+  - {name: story_bridge_reviewed, agg: mean, over: cell}
+  - {name: test_runner_reviewed, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup: {format: lab_book, sections: [question, a1_review_e2_e3, a2_review_patterns, a3_review_story_bridge, a4_review_test_runner]}
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

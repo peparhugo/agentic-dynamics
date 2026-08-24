@@ -1,0 +1,118 @@
+name: cap_story_bridge
+question: >-
+  Close the two story-family measurement gaps the backfill census named: (1) instrument story
+  sessions to record per-session token in/out splits (currently flat total_tokens only) so
+  attempt_tokens_in/out become PRODUCED for stories; (2) implement the formal story_facts/v1
+  reducer (the gap E4's writeup named) — a first-class fact-plane bridge consuming StoryResult
+  artifacts, structurally analogous to attempt_facts/v1, so story-cell attempts become real
+  predicates (attempt_confidence, attempt_cost_usd, test_executed_success/phase_test_verified
+  analogue) instead of ledger-adaptation-only. Flash implements; a separate sonnet-5 adversary
+  reviews this branch afterwards.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / fact
+        plane. canonical_sources: [src/agentic_dynamics/runtime/story/models.py (StoryResult),
+        src/agentic_dynamics/runtime/story/orchestration.py, src/agentic_dynamics/control/
+        reducers/attempt_facts.py (the structural analogue), src/agentic_dynamics/control/
+        reducers/__init__.py (REDUCERS registry), docs/designs/current/cap_fact_backfill_coverage.md
+        (the census gaps), experiments/definitions/cap_grit_strength_grid.yaml (E4's fact_plane_gap)].
+        policies: [zero_semantic_changes, reducer_pattern_follows_attempt_facts, honest_coverage]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: instrumentation + new reducer.
+        deliberation: [instrument token split, implement story_facts/v1, test, document].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        The census says: attempt_tokens_in/out PARTIAL for stories (flat total_tokens, no
+        split); attempt_confidence PARTIAL for stories (36%); phase_test_verified 7/455
+        (agent phases stamp None). The p3 backfill bridge adapted story/summary data at the
+        ledger level; no story_facts/v1 reducer exists in REDUCERS — story attempts are not
+        first-class predicates.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) ZERO semantic changes
+        to existing reducers — story_facts/v1 is a NEW registered reducer following
+        attempt_facts/v1's shape (same predicate vocabulary, same evidence-identity discipline,
+        same null-not-zero). (3) The token-split instrumentation is additive: story sessions
+        record tokens.in/out when the backend reports them; absent splits stay absent (flat
+        total_tokens remains a valid fallback recorded as coverage-not-available). (4) The new
+        reducer must be hermetic-tested (fixtures, no Redis) and idempotent (re-derivation
+        byte-identical). (5) The sonnet-5 adversary reviews this branch separately. (6) PASS/FAIL
+        log.
+      read_first: >-
+        src/agentic_dynamics/runtime/story/models.py, src/agentic_dynamics/runtime/story/
+        orchestration.py, src/agentic_dynamics/control/reducers/attempt_facts.py,
+        src/agentic_dynamics/control/reducers/_common.py, src/agentic_dynamics/control/reducers/
+        __init__.py, tests/test_context_plane_reducers.py (fixture style)
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash --backend opencode. One worktree, one
+        branch (feature/cap-story-bridge); each phase commits [workflow] <phase>.
+    phases:
+      - name: s1_token_split_instrumentation
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: instrument the story session recording to capture tokens.in/out when the
+          backend reports them (opencode/claude usage), additive to the existing flat
+          total_tokens. Update the story models + orchestration + persistence; absent splits
+          stay absent (flat total remains, recorded as coverage-not-available).
+          VERIFY: hermetic tests (story fixture with splits present/absent); existing story
+          tests green; the census's PARTIAL story token rows would become PRODUCED on
+          re-derivation (prove with one fixture re-derivation).
+          GUARD: no semantic change to existing behavior when splits are absent.
+          LOG: files changed, tests; PASS/FAIL; commit.
+      - name: s2_story_facts_reducer
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement story_facts/v1 in src/agentic_dynamics/control/reducers/story_facts.py
+          (registered in REDUCERS), consuming StoryResult artifacts: per-attempt facts for
+          attempt_confidence, attempt_cost_usd, attempt_tokens_in/out, attempt_model,
+          test_executed_success-analogue (story-level test outcome), job-level facts — following
+          attempt_facts/v1's evidence-identity + null-not-zero discipline exactly.
+          VERIFY: hermetic tests (story fixture -> facts; re-derivation byte-identical;
+          absent fields stay absent); the CAP suites + guards green.
+          GUARD: zero diffs to existing reducers (git diff reducers minus the new file);
+          predicate vocabulary from FACT_PREDICATES only.
+          LOG: reducer API, tests; PASS/FAIL; commit.
+      - name: s3_document
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER: docs/designs/current/cap_story_bridge.md — what was instrumented, the
+          story_facts/v1 schema + identity, which predicates story attempts now produce, what
+          this unlocks (story-cell arms writable via requires_facts: the grit/confidence arms
+          move from legacy requires to the fact plane), and what remains (phase_test_verified
+          for agent phases — the test-runner wiring is a separate stream).
+          GUARD: claims trace to code/tests.
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: story_bridge_built
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [token_split_instrumented, story_facts_reducer_implemented, bridge_documented]
+metrics:
+  - {name: token_split_instrumented, agg: mean, over: cell}
+  - {name: story_facts_reducer_implemented, agg: mean, over: cell}
+  - {name: bridge_documented, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup: {format: lab_book, sections: [question, s1_token_split_instrumentation, s2_story_facts_reducer, s3_document]}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

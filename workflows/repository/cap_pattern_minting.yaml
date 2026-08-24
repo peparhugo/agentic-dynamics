@@ -1,0 +1,111 @@
+name: cap_pattern_minting
+question: >-
+  Mint the first PatternPayload facts from the lab-book corpus using the merged I9 pattern
+  reducer: task-routing (lab_task_routing), escalation premium (retro_session_routing — the
+  measured 3.1x), cache economics (lab_cache_economics), grit recovery (lab_grit), correctness
+  premium (lab_correctness_premium). Each pattern is DERIVED/[C], minted only by the
+  deterministic reducer from measured evidence (hard rule 3), carrying claim, population,
+  conditions, support, uncertainty, validity window, and source_experiment. Flash does the
+  inventory + minting + writeup; a separate sonnet-5 adversary reviews this branch afterwards.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / pattern
+        knowledge. canonical_sources: [src/agentic_dynamics/control/reducers/pattern.py (I9
+        reducer), src/agentic_dynamics/control/facts.py (PatternPayload, FACT_PREDICATES),
+        experiments/results/labs/ (contract-bearing lab outputs), the registry].
+        policies: [reducer_mints_only, no_fabricated_support, d7_no_epistemic_row]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: knowledge aggregation.
+        deliberation: [inventory labs, mint patterns, writeup]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        I9 landed on main: the pattern reducer (DERIVED/[C], D7 — no EPISTEMIC_MAP row) + the
+        pattern predicate. The lab corpus: 7 contract-bearing lab JSONs (legacy_labs quarantined,
+        never minted). The escalation-premium measurement (3.1x, n=7) exists from the session-
+        routing retrospective. E4's pilot grit numbers exist (grit curve, recovery premium 1.13x).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) REDUCER MINTS ONLY:
+        a pattern fact is created ONLY by the I9 reducer from measured evidence; the flash agent
+        prepares inputs and calls the reducer, never hand-writes pattern facts. (3) No fabricated
+        support: every PatternPayload's support/uncertainty counts real records; a lab with no
+        contract-bearing output is SKIPPED (recorded), never estimated. (4) Quarantined labs
+        (legacy_labs/) are never minted from. (5) D7 holds: no EPISTEMIC_MAP row, pattern
+        epistemic_status is the existing "derived". (6) Each minted pattern cites its
+        source_experiment via lab-contract refs. (7) The sonnet-5 adversary reviews this branch
+        separately. (8) PASS/FAIL log.
+      read_first: >-
+        src/agentic_dynamics/control/reducers/pattern.py, src/agentic_dynamics/control/facts.py
+        (PatternPayload), experiments/results/labs/*.json (the 7 contract-bearing outputs),
+        experiments/results/legacy_labs/README.md (what is quarantined and why)
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash --backend opencode. One worktree, one
+        branch (feature/cap-pattern-minting); each phase commits [workflow] <phase>.
+    phases:
+      - name: p1_inventory_labs
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: inventory the lab corpus: for each contract-bearing lab JSON, extract the
+          measurable claim, population, conditions, and the raw support counts. Record which
+          labs are mintable (real measured tables), which are skipped (no contract-bearing
+          output), and the source_experiment refs each mint would cite. Also inventory the
+          non-lab measured sources: the escalation-premium numbers (retro session-routing) and
+          E4's grit pilot metrics.
+          DELIVER: the minting table in docs/designs/current/cap_pattern_minting.md (§1).
+          GUARD: every row traces to a real artifact; no estimates.
+          LOG: mintable/skipped counts; PASS/FAIL; commit.
+      - name: p2_mint_patterns
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: for each mintable source, run the I9 pattern reducer with the prepared inputs
+          (claim text, population, conditions from the tables; support/uncertainty from the raw
+          counts; validity window dated; source_experiment citing lab-contract refs). Mint the
+          first 4-6 patterns: task_routing, escalation_premium, cache_economics, grit_recovery,
+          correctness_premium. Verify each minted fact: DERIVED/[C], idempotent re-derivation,
+          correct entity identity.
+          DELIVER: the minted pattern facts (emitted to the KB) + the facts table in the
+          minting doc (§2).
+          GUARD: reducer-mint only; no hand-written facts; skipped labs recorded.
+          LOG: minted facts + identities; PASS/FAIL; commit.
+      - name: p3_writeup
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER: complete docs/designs/current/cap_pattern_minting.md: the pattern set (claim,
+          support, uncertainty, validity window, source), what each pattern would allow a routing
+          rule to consume, which labs were skipped and why, and the D1/D2 note (patterns are now
+          mintable facts; their retrieval projection is a separate decision).
+          GUARD: every number traces; honest support.
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: patterns_minted
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [labs_inventoried, patterns_minted, minting_documented]
+metrics:
+  - {name: labs_inventoried, agg: mean, over: cell}
+  - {name: patterns_minted, agg: mean, over: cell}
+  - {name: minting_documented, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup: {format: lab_book, sections: [question, p1_inventory_labs, p2_mint_patterns, p3_writeup]}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

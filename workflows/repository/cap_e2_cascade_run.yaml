@@ -1,0 +1,110 @@
+name: cap_e2_cascade_run
+question: >-
+  Run the E2 confidence-gated cascade retrospective (experiments/definitions/
+  cap_confidence_cascade.yaml) over the backfilled fact store — now evaluable per the coverage
+  census (attempt_confidence 355/455 = 78% on the workflow family) — plus the E3 coverage-impact
+  re-run (recommend_route with coverage-corrected stats vs legacy zeros over the same store).
+  Flash executes the simulations; a separate sonnet-5 adversary workflow reviews this branch
+  afterwards. Deterministic work: no live cells, no LLM beyond the flash orchestrator.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / routing
+        evidence. canonical_sources: [experiments/definitions/cap_confidence_cascade.yaml (E2),
+        experiments/definitions/cap_coverage_routing_impact.yaml (E3),
+        experiments/results/registry_index.jsonl (the backfilled store),
+        docs/designs/current/cap_fact_backfill_coverage.md (the census)].
+        policies: [coverage_is_truth, null_not_zero, honest_nulls]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research execution (retrospective).
+        deliberation: [run E2, run E3, writeup]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        The fact store is backfilled (10,861 fact rows, verified idempotent, F1/F2 fixed). The
+        census says attempt_confidence is 78% covered on workflow runs (36% on stories) —
+        E2's cascade is evaluable at least on the workflow family. E3's prior verdict was
+        "100% coverage, zero changed decisions" — re-run against the backfilled store may change.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) RETROSPECTIVE ONLY:
+        no live cells, no model calls beyond this orchestrator; all simulations run over the
+        registry/ledger facts. (3) E2: cascade thresholds {0.3, 0.5, 0.7}; escalation is
+        counterfactual only (never applied); the confidence coverage pre-check reports first —
+        if coverage on the workflow family is not evaluable in practice, record INCONCLUSIVE
+        (the spec's honest default), never a fabricated null. (4) E3: recommendation change
+        count computed with coverage-corrected stats vs the legacy zero-default projection;
+        a null (zero changes) is information, not failure. (5) Null-not-zero everywhere; every
+        number traces to the registry. (6) The sonnet-5 adversary reviews this branch separately
+        — this workflow does NOT include its own adversarial phase. (7) PASS/FAIL log.
+      read_first: >-
+        experiments/definitions/cap_confidence_cascade.yaml, experiments/definitions/
+        cap_coverage_routing_impact.yaml, src/agentic_dynamics/control/routing.py
+        (recommend_route/simulate_strategies), docs/designs/current/cap_fact_backfill_coverage.md
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash --backend opencode. One worktree, one
+        branch (feature/cap-e2-cascade-run); each phase commits [workflow] <phase>.
+    phases:
+      - name: e1_cascade_simulation
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run E2's retrospective simulation over the backfilled facts: for theta in
+          {0.3, 0.5, 0.7}, the model_cascade arm escalates (model change) when
+          attempt_confidence < theta; compare vs single-model baseline on cost-per-verified-
+          outcome (captured-only intersection) and verified success, coverage-adjusted.
+          FIRST: the confidence coverage pre-check (n_available/n_total on the workflow family)
+          — if it is not evaluable, record INCONCLUSIVE per the spec.
+          DELIVER: experiments/results/cap_cascade_retrospective.json + the numbers appended to
+          docs/designs/current/cap_e2_e3_run.md.
+          GUARD: counterfactual only; no applied escalation; null-not-zero.
+          LOG: per-threshold table; PASS/FAIL; commit.
+      - name: e2_coverage_impact
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run E3 over the backfilled store: compute routing recommendations
+          (recommend_route) with the coverage-corrected stats vs a legacy zero-default projection
+          of the same data; count changed recommendations per task type and per model; report
+          whether the finding-economics fix moves real decisions now that the store is populated.
+          DELIVER: the change-rate table in docs/designs/current/cap_e2_e3_run.md.
+          GUARD: null (zero changes) is a result, not a failure.
+          LOG: change-rate table; PASS/FAIL; commit.
+      - name: e3_writeup
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER: docs/designs/current/cap_e2_e3_run.md — full: hypothesis, null, method,
+          coverage pre-check result, per-threshold table, change-rate table, null
+          interpretation (inconclusive is valid), limitations, and the routing implication for
+          the shadow-#2 chain.
+          GUARD: every number traces to the JSON/registry; honest nulls.
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: e2_e3_run
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [cascade_simulated, coverage_impact_measured, run_documented]
+metrics:
+  - {name: cascade_simulated, agg: mean, over: cell}
+  - {name: coverage_impact_measured, agg: mean, over: cell}
+  - {name: run_documented, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup: {format: lab_book, sections: [question, e1_cascade_simulation, e2_coverage_impact, e3_writeup]}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

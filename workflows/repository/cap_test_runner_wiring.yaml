@@ -1,0 +1,105 @@
+name: cap_test_runner_wiring
+question: >-
+  Wire the independent test runner into attempt facts so phase_test_verified becomes PRODUCED
+  for workflow agent phases (the census: 7/455 — agent phases stamp None because test outcome
+  is never captured in the workflow attempt path). The runtime.test_runner is the sole source
+  of truth for test_executed_success; this stream routes that signal into attempt_facts/v1's
+  phase_test_verified predicate so shadow admissibility (one of the 5 formerly-unknown
+  predicates) is unblocked. Flash implements; a separate sonnet-5 adversary reviews this branch.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / fact
+        plane. canonical_sources: [src/agentic_dynamics/runtime/test_runner.py (the independent
+        runner — sole source of truth), src/agentic_dynamics/control/reducers/attempt_facts.py
+        (phase_test_verified producer), src/agentic_dynamics/runtime/workflow_runner.py (where
+        test outcomes are available), docs/designs/current/cap_fact_backfill_coverage.md (the
+        7/455 gap), docs/designs/current/cap_shadow_measurement.md (the admissibility blocker)].
+        policies: [test_runner_is_truth, null_not_zero, no_self_reported_tests]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: signal wiring.
+        deliberation: [map the path, wire it, test, document]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        phase_test_verified is produced only for the 7 test-kind phases (the workflow spec's
+        explicit test phases); agent-kind phases stamp None because nothing records the
+        test_runner's outcome into their attempt. Shadow admissibility requires
+        phase_test_verified (one of the 5 unknown predicates from the shadow campaign).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) test_runner is the
+        ONLY source: never a model self-report; when the runner didn't execute for a phase, the
+        fact stays None (null-not-zero), never a default. (3) The wiring is additive to
+        attempt_facts/v1 — no semantic change to existing fields; phases without a test run keep
+        phase_test_verified None and the coverage note records why. (4) Hermetic tests with a
+        fixture phase (test-runner result present/absent). (5) The sonnet-5 adversary reviews
+        this branch separately. (6) PASS/FAIL log.
+      read_first: >-
+        src/agentic_dynamics/runtime/test_runner.py, src/agentic_dynamics/control/reducers/
+        attempt_facts.py, src/agentic_dynamics/runtime/workflow_runner.py (phase execution +
+        test gate), src/agentic_dynamics/control/facts.py (phase_test_verified predicate)
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash --backend opencode. One worktree, one
+        branch (feature/cap-test-runner-wiring); each phase commits [workflow] <phase>.
+    phases:
+      - name: t1_map_the_path
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: trace where the test_runner's outcome exists at phase completion (workflow_runner
+          phase gate) and where attempt_facts/v1 builds phase_test_verified; identify the exact
+          seam the wiring crosses. Deliver the mapping in docs/designs/current/
+          cap_test_runner_wiring.md (§1). No code changes in this phase.
+          GUARD: design-only; the seam is named, not assumed.
+          LOG: the seam; PASS/FAIL; commit.
+      - name: t2_wire_it
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the wiring per the mapping: when a phase's test gate ran the
+          test_runner, its outcome flows into the attempt record so attempt_facts/v1 emits
+          phase_test_verified; when the runner did not execute, the field stays None (never a
+          default). Additive only.
+          VERIFY: hermetic tests (fixture with runner outcome present/absent -> fact True/False/
+          None correctly); CAP suites + guards green; re-derive one real workflow phase to show
+          the predicate now carries a bool where it was None.
+          GUARD: no self-reported tests; no defaulting.
+          LOG: wiring diff, tests; PASS/FAIL; commit.
+      - name: t3_document
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER: complete docs/designs/current/cap_test_runner_wiring.md — the seam, the
+          wiring, the coverage note, and what it unblocks: shadow admissibility (phase_test_verified
+          now producible for agent phases) and the census's PARTIAL -> PRODUCED path.
+          GUARD: claims trace to code/tests.
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: test_runner_wired
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [seam_mapped, wiring_implemented, wiring_documented]
+metrics:
+  - {name: seam_mapped, agg: mean, over: cell}
+  - {name: wiring_implemented, agg: mean, over: cell}
+  - {name: wiring_documented, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup: {format: lab_book, sections: [question, t1_map_the_path, t2_wire_it, t3_document]}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
