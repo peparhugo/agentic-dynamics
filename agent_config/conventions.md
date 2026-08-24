@@ -42,6 +42,22 @@
   `routing.simulate_strategies` (`routing.py:98`) as `compare_arms` — route new grid/comparison
   work through the spec, not through direct calls to those two.
 
+## Adversarial Phases (workflow specs)
+
+- Every workflow spec's adversarial phase (the ROLE: adversarial reviewer/auditor/critic phase)
+  MUST deliver TWO outputs, not one:
+  1. **Findings** — each re-verified against the tree (never imagined; a finding that cannot be
+     re-derived from raw sources is prose, not a finding), each resolved (fixed with a regression
+     test, or recorded as an accepted limitation with reasoning).
+  2. **The attempted-attacks / known-safe list** — every attack vector that was actually
+     attempted and did NOT falsify the work, with what was tried and why it didn't apply
+     ("not falsified — strengthened" rows are the ideal form). This records what we do NOT need
+     to worry about, which is as valuable as what we do.
+- A clean sweep is not "I found nothing wrong" — it is the known-safe list with evidence of the
+  attempts. No adversarial phase may end with a bare PASS.
+- Never cite the 10%-sacrifice style of fake precision: deviations are recorded as one-line notes
+  with reasoning (the D-series convention), never as a theatrical percentage.
+
 ## Project-Specific Gotchas
 
 - `__init__.py` exports 100+ symbols. Adding a new public class means updating `__all__`.
