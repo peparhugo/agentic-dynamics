@@ -3,15 +3,18 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-24T00:44:25.603452+00:00`  ·  98 spec(s)
-**Work remaining:** 23 open · 75 completed/retired
+Generated at: `2026-08-24T00:49:52.859822+00:00`  ·  102 spec(s)
+**Work remaining:** 27 open · 75 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
-| `cap_addendum_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_fact_backfill` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_grit_strength_grid` | experiment | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
+| `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | runnable | 0.1 | — | 2026-08-23 19:16 | ok | anthropic/claude-sonnet-5 | $49.5218 | 4 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
@@ -28,6 +31,7 @@ Generated at: `2026-08-24T00:44:25.603452+00:00`  ·  98 spec(s)
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `agentic_dynamics_rebrand` | workflow | no | failed | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
+| `cap_addendum_implement` | workflow | no | failed | 0.1 | — | 2026-08-24 00:49 | fail | anthropic/claude-sonnet-5 | $18.8578 | 1 |
 | `claude_background_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
