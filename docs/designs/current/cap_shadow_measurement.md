@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # CAP I6 shadow campaign — measurement summary
 
 Ran the CAP I6 shadow loop (`--cap-shadow`, `anthropic/claude-sonnet-5` via `claude_cli`) on real
