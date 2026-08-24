@@ -177,6 +177,40 @@ def test_shadow_bookkeeping_records_the_applied_flag(tmp_path):
     assert body["requested_action"]["parameters"]["model"] == MODEL_A
 
 
+def test_shadow_decision_carries_applied_false_marker(tmp_path):
+    # A shadow decision — one whose caller did NOT stamp `applied` (the make_shadow_router path,
+    # the I6 default) — must come out STRUCTURALLY marked `applied: False` in the record body,
+    # never silently absent. This is what makes a proposed-but-never-executed decision
+    # distinguishable from a real actuation by content, not by artifact location.
+    request = ContextRequest(
+        decision_type="route_next_job", scope_type="job", scope_id=CELL, scope_path=JOB_SCOPE,
+        repository_id=REPO,
+    )
+    ctx = compile_context(request, store=_admissible_store(), now=NOW)
+    decision = route_next_job_v1(ctx, target_id=CELL, proposed_at=NOW)
+    assert "applied" not in decision.parameters  # the shadow path never stamps it
+    # make_shadow_router adds baseline bookkeeping before recording; the marker must be stamped
+    # by record_shadow_decision itself on top of that, never left to the caller.
+    decision = replace(
+        decision,
+        parameters={
+            **decision.parameters, "baseline_action": "route", "baseline_model": MODEL_B,
+        },
+    )
+    record = record_shadow_decision(
+        decision, repository_id=REPO, causes="deadbeef" * 4, artifact_dir=tmp_path
+    )
+    assert record is not None
+    artifact = json.loads((tmp_path / f"{record.knowledge_id}.json").read_text())
+    body = json.loads(artifact["text"])
+    assert body["requested_action"]["parameters"]["applied"] is False
+    # The shared reader must surface it as a shadow (non-applied) decision row.
+    from agentic_dynamics.control.rules import load_shadow_decisions
+
+    rows = load_shadow_decisions(artifact_dir=tmp_path)
+    assert any(r["action"] == "route" and r["applied"] is False for r in rows)
+
+
 def test_recording_disabled_still_applies():
     router = _router(_admissible_store(), record=False)
     chosen = _call(router, [MODEL_B, MODEL_A])

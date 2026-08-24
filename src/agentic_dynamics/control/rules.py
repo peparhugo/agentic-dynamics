@@ -245,6 +245,15 @@ def record_shadow_decision(
         from agentic_dynamics.control.actuation_ingestion import derive_actuation_record
         from agentic_dynamics.knowledge.record_factory import record_to_artifact
 
+        # Structural marker (design §9 I6 disposition): a shadow decision is PROPOSED-not-executed.
+        # Stamp `applied: False` explicitly so the record body is self-describing — a shadow
+        # decision is distinguishable from a real actuation by the field, not by its location
+        # (artifact-dir-only). The applying seam (`make_applying_router`) stamps `applied: True`
+        # when it actually applies; never override a caller that already stamped it.
+        if "applied" not in decision.parameters:
+            decision = replace(
+                decision, parameters={**decision.parameters, "applied": False}
+            )
         candidate = {
             "actuation_kind": decision.action,
             "target_session_id": decision.target_id,
