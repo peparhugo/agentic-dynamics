@@ -188,9 +188,46 @@ Independent re-enumeration and re-checks, run after m1/m2:
    an index refresh anyway: the lifecycle index tracks `name`/`kind`/`repeatable`/`status`/
    `version`/`supersedes`/`last_run`/`ok`/`model`/`cost`/`n_runs` — none of which changed (only a
    rule's `requires_facts` field did, which the index does not track). Index parity holds without
-   regeneration; forcing one in this environment would have corrupted it instead.
+   regeneration; forcing one in this environment would have corrupted it instead. Re-verified on
+   this rescan: `git diff 9a061ca65 --stat -- experiments/specs/STATUS.md experiments/specs/index.json`
+   is empty — neither commit this migration produced touched the index.
+
+### New finding this pass (7) — `requires_facts` on a bare `RuleSpec` has no runtime consumer yet
+
+Not caught in the first m3 pass: `grep -rn "\.requires_facts\b" src/` shows the field is read in
+exactly two places — `experiment_spec.py` (dataclass plumbing) and
+`core/contracts.py:validate_fact_contracts` (the compile-time R1-R11 gate). The actual runtime
+resolver, `context_compiler.py:compile_context`, reads `contract.requires_facts` — a
+**`ContractSpec`**, loaded from `experiments/contexts/<decision_type>.yaml` by `decision_type` —
+and never touches `RuleSpec.requires_facts` directly. `context_compiler.py:79`'s own comment
+states the relationship precisely: "a spec's `RuleSpec.requires_facts` (I5) is the per-spec
+binding *to* one [contract]." A rule with `requires_facts` but no `decision_type` — every rule in
+this migration, including `budget_ceiling` — is therefore not bound to anything: its
+`requires_facts` is proven producible by the compile-time gate but has **zero runtime effect**
+until a `decision_type` contract for that decision exists and is declared alongside it. This is
+consistent with the workflow's own guard #5 ("decision_type only where a contract exists... no
+phantom contracts") — no contract matches `budget_ceiling`'s decision, so leaving `decision_type`
+unset is the correct, non-phantom choice — but it means **this migration is a compile-time-only
+proof of producibility, not a live control-loop wiring.** Recorded here rather than "fixed":
+inventing a `budget_ceiling` contract file to wire it live would be exactly the kind of scope
+creep m1's methodology and guard #5 both rule out (a contract must correspond to a decision the
+system already makes deterministically, per `route_next_job`'s own precedent — no such
+incumbent exists for budget admission). Not a defect; a scope caveat worth stating plainly so a
+future reader does not assume `budget_ceiling` is now live-gated.
 
 No further findings — the migration and gate exercise are adversarially clean.
+
+### Finding table (this rescan)
+
+| # | Attack vector | Result |
+|---|---|---|
+| 1 | Independent re-enumeration + gate re-run | 0 refusals, 77 specs / 129 rules, matches m1/m2 exactly |
+| 2 | Weakened mappings (authority/scope/on_missing) | None found — `budget_ceiling` uses `POLICY`/`halt`/`halt`, the strictest legal settings |
+| 3 | Phantom `decision_type` | None found — zero rules set `decision_type` anywhere in the corpus |
+| 4 | Stretched predicates behind a "fixed" GAP | None found — exactly one real `requires_facts` key exists; the other 5 grep hits are prose |
+| 5 | In-flight specs touched | None — `git diff` against all 3, and against `9a061ca65`, is empty |
+| 6 | Index parity | Holds — confirmed untouched by either commit; regeneration deviation re-justified |
+| 7 | Runtime wiring of the migrated `requires_facts` | New finding: compile-time-only, no `compile_context` consumer without a `decision_type` contract — documented, not a defect |
 
 ## Counts
 
@@ -241,8 +278,12 @@ per-workflow deliverable checklists, correctly gated by the pre-existing legacy 
 **PASS.** m1 inventory complete (129/129 rules mapped, every row names its predicate or GAP with a
 missing-producer reason). m2 migration applied (1 honest match), the gate exercised for real (2
 refusals fired against the live registries and correctly resolved), 0 refusals on the full
-in-scope corpus. m3 adversarial rescan: 0 further findings, in-flight specs confirmed untouched,
-index-regeneration deviation recorded and justified.
+in-scope corpus. m3 adversarial rescan (two passes): first pass 0 findings beyond the recorded
+index-regeneration deviation; second pass surfaces one new, non-blocking scope caveat (finding 7:
+the migrated `requires_facts` is compile-time-only — no `decision_type` contract binds it to
+`compile_context` yet) — documented, not fixed, because fixing it would mean inventing a phantom
+contract, which guard #5 explicitly forbids. In-flight specs and the lifecycle index confirmed
+untouched across both passes.
 
 ## Full per-spec mapping table
 ## `cap_session_routing_evidence`
