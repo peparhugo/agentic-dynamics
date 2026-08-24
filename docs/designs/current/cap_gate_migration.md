@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # CAP gate migration: spec rules -> requires_facts/decision_type
 
 Workflow: `workflows/repository/cap_gate_migration.yaml`. Goal: migrate committed spec rules onto
