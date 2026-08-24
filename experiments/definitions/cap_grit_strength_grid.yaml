@@ -1,0 +1,265 @@
+# cap_grit_strength_grid — the ONLY LIVE grid in this 4-spec family: does a retry-on-failure
+# policy (grit_retry) improve cost-per-verified-outcome over the single-attempt baseline, across a
+# small perturbation_strength x condition sweep, on one BUILTIN_STORY, pinned to
+# anthropic/claude-sonnet-5? AUTHORING ONLY — this spec is gated and committed here; NOTHING is
+# enqueued or executed by this phase (matches every other spec in the family's GUARD).
+#
+# NULL HYPOTHESIS (stated explicitly, per the prompt): grit_retry does not improve cost-per-
+# verified-outcome over baseline.
+#
+# ── ADVERSARIAL REVIEW (methodologist pass) — findings & dispositions ─────────────────
+# (1) The naive 3x2x2 cross is REDUNDANT — CHECKED against runtime/story/conditions.py, not
+#     assumed. ``PerturbationCondition.CLEAN`` means "No mutation, no codebase degradation" (the
+#     module's own docstring) — condition=clean structurally FIXES perturbation_strength at 0.0
+#     regardless of any strength label crossed with it. A literal
+#     ``perturbation_strength{low,mid,high} x condition{clean,bad_seed}`` cross would therefore
+#     produce THREE operationally-identical ``clean x {low,mid,high}`` cells (all s=0.0) — not
+#     three genuine strength manipulations. FIX: the two factors are combined into ONE
+#     ``condition_strength`` factor with 4 levels — ``clean`` (single cell, s=0.0) plus
+#     ``bad_seed_low`` / ``bad_seed_mid`` / ``bad_seed_high`` (three genuine, distinct strength
+#     manipulations, all under ``condition=BAD_SEED``) — rather than 6 naive levels collapsing to
+#     4 distinct behaviors. Crossed with ``policy_arm`` (2 levels) and the pinned single-level
+#     ``model`` factor: 4 x 2 x 1 = 8 cells, comfortably inside the "12 cells max" ceiling with
+#     room to spare (not padded out to exactly 12 with redundant cells).
+# (2) The strength values themselves are DECLARED, not discovered from existing code — checked
+#     first, not invented blind. ``condition_to_mutations`` (runtime/story/conditions.py) hardcodes
+#     a SINGLE ``CONDITION_STRENGTH = 0.5`` for every degrading condition when it auto-generates a
+#     mutation — there is no native low/mid/high selector at the condition level. What DOES exist,
+#     verified by reading ``run_story``'s own signature (runtime/story/orchestration.py): a
+#     ``mutation: MutationArtifact | None`` parameter whose docstring says "Optional explicit
+#     MutationArtifact (overrides condition)" — i.e. a caller MAY bypass ``CONDITION_STRENGTH``
+#     entirely by supplying its own artifact. This spec therefore declares:
+#       bad_seed_mid  -> the STANDARD path: condition=BAD_SEED, mutation=None (auto-generates at
+#                        CONDITION_STRENGTH=0.5) — real, already-exercised code, zero new surface.
+#       bad_seed_low  -> condition=BAD_SEED, mutation=compile_mutation(spec, "bad_seed", strength=0.2,
+#                        ...) — a real function (measurement/mutation.py:164), called with an
+#                        explicit strength, passed via run_story's own documented override seam.
+#       bad_seed_high -> the same seam, strength=0.8.
+#     No new machinery is proposed; the override seam already exists and is exercised as designed.
+# (3) requires_facts — BLOCKED, named explicitly rather than stretched (the prompt's own
+#     instruction: "requires_facts: perturbation_strength, test_executed_success"). Checked against
+#     the real registries, not assumed compatible just because the names are familiar: NEITHER
+#     predicate exists for a story-cell attempt. ``perturbation_strength`` has NO entry in
+#     ``FACT_PREDICATES`` at all — it lives ONLY in the legacy ``LEDGER_FIELDS`` vocabulary
+#     (``ledger_ingestion.py`` — the mental-model doc's own citation for it). ``test_executed_success``
+#     DOES have a fact-plane analogue — ``phase_test_verified`` — but that predicate's ONLY producer,
+#     ``attempt_facts/v1`` (``control/reducers/attempt_facts.py``), consumes ``workflow_run``
+#     (typed ``WorkflowRunResult``/``agent_task`` JSON artifacts) — NOT ``StoryResult``. ``REDUCERS``
+#     (control/reducers/__init__.py) has no ``story_facts/v1`` entry; no reducer anywhere bridges a
+#     story-cell attempt into the CAP fact plane. Requiring either predicate here would be exactly
+#     the "requirement with no honest predicate mapping" hard rule 3 forbids as a stretch. Both are
+#     therefore required via the LEGACY ``requires:``/``produces:`` mechanism instead (validated
+#     against real ``LEDGER_FIELDS`` members: ``perturbation_strength``, ``test_executed_success``,
+#     ``actual_cost``, ``rework_cost``, ``policy_arm``, ``attempt_number``, ``parent_attempt_id``,
+#     ``strength``, ``condition`` — every one of which IS a real ``LEDGER_FIELDS`` entry, unlike a
+#     bare ``cost``, which is NOT — see the ``grit`` rule below's own adaptation note). This is the
+#     GUARD's own phrase, satisfied honestly: "E4 requires are honestly produced" means produced by
+#     a REAL mechanism (the ledger schema + the already-registered, already-implemented ``grit``
+#     measurement rule, ``compile_experiment.py:257``), not that a fact-plane predicate was forced
+#     into existing where none does. A ``story_facts/v1`` reducer — analogous to ``attempt_facts/v1``
+#     but consuming ``StoryResult`` — is the natural forward gap this finding names for a future
+#     CAP increment, not implemented here (authoring only).
+# (4) grit_retry's operational definition — DECLARED (evidence_class [P], a policy choice
+#     authored here, not a measured fact) since this is a NEW live policy arm with no prior
+#     ledger precedent to cite: a grit_retry job runs with ``max_attempts=2`` — if the FIRST
+#     attempt's ``test_executed_success`` is ``false``, a SECOND attempt is queued for the SAME
+#     job (``attempt_number=2``, ``parent_attempt_id`` set to the first, per the EXISTING attempt-
+#     lineage fields cap_session_routing_evidence.yaml's own arms already consume) before the job
+#     is scored; baseline runs with ``max_attempts=1`` and scores the single attempt unconditionally.
+#     No new retry MACHINERY is claimed — ``policy_arm``/``max_attempts`` are already real
+#     ``LEDGER_FIELDS`` job-level fields, and the CLI surface already exposes
+#     ``agentic-dynamics queue reinterleave`` as a retry-adjacent primitive — this spec declares the
+#     POLICY, it does not claim to have verified reinterleave's exact retry mechanics (out of scope
+#     for an authoring-only spec; the executing phase, when it exists, is the place that wires it).
+# (5) Grid size vs. effect size — an honest power caveat, not a claim of adequacy. 8 cells x
+#     (nominally 1-2 attempts each) is a SMALL grid — 12-16 attempts total. This is enough to
+#     compute the headline ratios (verified_success_rate, cost_per_verified_outcome per cell) but
+#     NOT enough for a well-powered per-cell confidence interval; ``stop.uncertainty_threshold`` is
+#     set wide (0.35) to reflect that honestly, and the writeup's ``power_caveat`` section is
+#     REQUIRED to state the realized per-cell n before any regret number is read as decisive. This
+#     grid is a PILOT, not a publication-grade sweep — sized to fit the 12-cell ceiling and this
+#     spec's stated cost envelope, not to guarantee statistical power.
+# (6) Cost envelope — ESTIMATED (evidence_class [H], explicitly not measured — no cell has run
+#     yet), grounded in real observed numbers rather than invented from nothing: the real corpus
+#     (checked while authoring cap_coverage_routing_impact.yaml) shows a 5-session
+#     deepseek/deepseek-v4-flash story costing ~$0.057 total. anthropic-sonnet5's intro pricing
+#     (measurement/efficiency.py PROVIDER_PRICING) is ~9x deepseek-flash's input rate ($2.00 vs
+#     $0.22) and ~15x its output rate ($10.00 vs $0.66) per million tokens — scaling the observed
+#     story cost by that ratio puts ONE sonnet-5 story attempt in the rough $0.3-$0.6 range. With
+#     8 cells, 4 of which (grit_retry) may run a second attempt on failure (up to 2x that cell's
+#     cost): worst case ~= 4 baseline cells x $0.6 + 4 grit_retry cells x $1.2 = $2.4 + $4.8 =
+#     $7.20. ``stop.budget_usd`` is set to $10 — a real ceiling with headroom above the estimate,
+#     not a number tuned to make the grid look cheap.
+# (7) CAP-fact leak — CLEAN by the SAME logic as finding 3: zero ``requires_facts`` entries
+#     anywhere in this spec (none legally exist for story cells), so R1-R11 cannot be leaked into
+#     even by accident.
+# (8) Null + stop — explicit. Null: grit_retry does not improve cost-per-verified-outcome over
+#     baseline (stated above). This is the ONE spec in the family whose null is genuinely testable
+#     the moment it runs (unlike cap_shadow_comparison's n=0 and cap_confidence_cascade's
+#     tautology) — precisely because it is LIVE, not retrospective over a corpus with a coverage
+#     gap. uncertainty_threshold=0.35 (finding 5) and budget_usd=10.0 (finding 6) are the two
+#     honest bounds; the writeup MUST report realized per-cell n and realized total cost before any
+#     regret number is treated as more than a pilot signal.
+name: cap_grit_strength_grid
+question: >-
+  Does a retry-on-failure policy (grit_retry -- a second attempt when the first's
+  test_executed_success is false) improve cost-per-verified-outcome over a single-attempt
+  baseline, across perturbation_strength {low=0.2, mid=0.5, high=0.8} (all under condition=
+  BAD_SEED) plus a clean (s=0.0) reference cell, on one BUILTIN_STORY (task_manager_api), pinned
+  to anthropic/claude-sonnet-5? Null hypothesis: grit_retry does not improve cost-per-verified-
+  outcome over baseline. The naive perturbation_strength{low,mid,high} x condition{clean,bad_seed}
+  cross is collapsed into one 4-level condition_strength factor (finding 1) because condition=
+  clean structurally fixes strength=0.0 regardless of any strength label crossed with it --
+  verified against runtime/story/conditions.py before writing this question, not assumed. This is
+  a SMALL PILOT grid (8 cells, ~12-16 attempts total) -- sized to the stated cost envelope
+  (~$7.20 estimated, $10 ceiling), not to guarantee statistical power (finding 5).
+version: "0.1"
+artifact_kind: experiment
+intent: mutate            # LIVE cells actually execute (git worktrees, real commits) -- unlike
+                           # the other three specs in this family, which are all intent: measure
+side_effects:
+  repository: true         # story cells clone into worktrees and commit real sessions
+  external_services: true  # real model API calls (anthropic/claude-sonnet-5)
+repeatable: false          # a live grid is a one-shot run, not an idempotent replay
+# sandboxed: true, not artifact_kind: workflow -- the gate (validate_spec) refused
+# artifact_kind=experiment + intent=mutate + side_effects.repository=true until this was set,
+# and correctly so in general (an experiment measures, it does not modify the repository) --
+# but story cells run.py/run_story.py's own isolation model already satisfies the gate's actual
+# concern: every commit lands in a DISPOSABLE git worktree (worktree_root, run_story's own
+# parameter), never the main tree. sandboxed: true is the honest, precise declaration of that
+# real isolation guarantee, not a workaround -- artifact_kind stays "experiment" because this
+# spec's PURPOSE is still measurement (does grit_retry improve cost-per-verified-outcome), the
+# repository-mutation is an execution-mechanics side effect of HOW story cells run, not what
+# this spec is FOR.
+sandboxed: true
+workflow:
+  kind: story
+  params:
+    mode: live
+    story: task_manager_api    # one BUILTIN_STORY, pinned -- not crossed as a factor (would blow
+                                # the 12-cell ceiling: 8 cells x 3 stories = 24). Story
+                                # generalization is a forward campaign step (adapt below), not
+                                # this grid's job.
+    codebase_path: >-
+      the seed codebase task_manager_api's BUILTIN_STORIES entry already points at
+      (runtime/story/builtins.py) -- not re-declared here to avoid drifting from that single
+      source of truth
+    backend: auto  # get_backend_for_model(model) resolves the backend; not hardcoded here since
+                    # this spec does not itself verify which backend anthropic/claude-sonnet-5
+                    # currently routes to (authoring only)
+factors:
+  # 4 levels, not the naive 6 (finding 1): clean is a single reference cell (s=0.0); the three
+  # non-clean levels are genuine strength manipulations, all under condition=BAD_SEED (finding 2).
+  - {name: condition_strength, levels: [clean, bad_seed_low, bad_seed_mid, bad_seed_high]}
+  # baseline = max_attempts=1 (single attempt, scored unconditionally). grit_retry = max_attempts=2
+  # (a second attempt queued only if the first's test_executed_success is false) -- finding 4.
+  - {name: policy_arm, levels: [baseline, grit_retry]}
+  # single-level factor: makes the pin explicit and machine-readable in the compiled cells,
+  # matching the outer cap_routing_evidence_specs.yaml workflow's own single-level `model` factor.
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial          # 4 x 2 x 1 = 8 cells
+rules:
+  # ── The formal Grit measurement (REAL, already-registered rule -- compile_experiment.py:257,
+  # MEASUREMENT_RULES['grit']). Reused verbatim by name, not reimplemented. Its own docstring:
+  # "Grit(s) = P(test_executed_success | perturbation_strength=s); retention R(s) = G(s)/G(0);
+  # recovery_premium = C(successful_perturbed) / C(successful_baseline)" -- recovery_premium IS
+  # this spec's "recovery cost" metric (finding: no new metric invented; the real rule already
+  # produces exactly this). ──
+  #   perturbation_strength, test_executed_success -> LEDGER_FIELDS (real, per
+  #   ledger_ingestion.py -- see finding 3's BLOCKED-not-stretched fact-plane disposition).
+  #   actual_cost -> LEDGER_FIELDS (real). grit()'s own Python body reads attempts["cost"] --
+  #   this rule's evaluator projects the ledger's actual_cost into that key before calling grit(),
+  #   the same kind of small, honest field-name adapter cap_coverage_routing_impact.yaml's
+  #   finding_corpus_projection performs (never a silent renaming left undocumented).
+  - name: grit
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts: []   # BLOCKED — no fact-plane producer for story-cell attempts (finding 3)
+    requires: [perturbation_strength, test_executed_success, actual_cost]
+    produces: [grit, retention, grit_auc, recovery_premium]
+
+  # ── Verified success rate PER CELL (condition_strength x policy_arm x model) -- the prompt's
+  # explicit metric. Distinct from grit's own per-STRENGTH-only g[s] dict: this rule reports it at
+  # the cell granularity the comparison/writeup actually needs. test_executed_success is the REAL,
+  # independently-tested signal (test_runner.run_suite) -- stronger than cap_confidence_cascade's
+  # phase_status proxy, since story cells flow through the SAME independent verifier. ──
+  #   test_executed_success -> LEDGER_FIELDS (real).
+  - name: verified_success_rate
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts: []
+    requires: [test_executed_success]
+    produces: [verified_success_rate]
+
+  # ── Cost per verified outcome PER CELL -- captured-only intersection, same house discipline as
+  # every other spec in this family: numerator over captured actual_cost, denominator over
+  # non-null test_executed_success from the SAME cost-captured set. ──
+  #   actual_cost, test_executed_success -> LEDGER_FIELDS (real).
+  - name: cost_per_verified_outcome
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts: []
+    requires: [actual_cost, test_executed_success]
+    produces: [cost_per_verified_outcome]
+
+  # ── Rework -- the prompt's explicit metric, using the EXISTING dedicated ledger field (never
+  # invented -- rework_cost already exists precisely because a prior spec in this repo's history
+  # needed it). ──
+  #   rework_cost -> LEDGER_FIELDS (real).
+  - name: rework_cost_report
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts: []
+    requires: [rework_cost]
+    produces: [rework_cost_per_cell]
+
+  # ── Operational-fidelity check: did grit_retry's declared policy (finding 4) actually trigger a
+  # second attempt only when the first's test_executed_success was false, and never for baseline
+  # (which has no second attempt to trigger at all)? Reports the REALIZED retry rate against the
+  # DECLARED policy, so a reader can see whether the live run behaved as authored rather than
+  # having to trust the declaration alone. ──
+  #   policy_arm, attempt_number, parent_attempt_id -> LEDGER_FIELDS (real, all three).
+  - name: retry_policy_fidelity
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts: []
+    requires: [policy_arm, attempt_number, parent_attempt_id]
+    produces: [retry_triggered_rate, retry_policy_violations]
+
+  # ── The evaluation rule: baseline vs grit_retry regret on cost-per-verified-outcome,
+  # generalizing compile_experiment.compare_arms(arm_factor=policy_arm), stratified by
+  # condition_strength (so a strength-dependent effect is never averaged away). ──
+  - name: arm_comparison
+    plane: measurement
+    evidence_class: "[C]"
+    requires_facts: []
+    requires: [cost_per_verified_outcome, verified_success_rate, recovery_premium, rework_cost_per_cell]
+    produces: [routing_arm_regret, best_arm, realized_n_total, realized_cost_total]
+metrics:
+  - {name: verified_success_rate, agg: mean, over: cell}
+  - {name: cost_per_verified_outcome, agg: ratio, over: cell}
+  - {name: recovery_premium, agg: ratio, over: cell}
+  - {name: rework_cost_per_cell, agg: mean, over: cell}
+  - {name: retry_triggered_rate, agg: ratio, over: cell}
+  - {name: routing_arm_regret, agg: mean, over: cell}
+comparison:
+  kind: effect_size
+  arm_factor: policy_arm
+  loss: {cost: 1.0, quality: -5.0}
+writeup:
+  format: lab_book
+  sections: [hypothesis, null_hypothesis, method, grid_design_collapse, strength_value_provenance,
+             retry_policy_definition, power_caveat, cost_envelope, arms, effect_size, uncertainty,
+             null_interpretation, fact_plane_gap, limitations]
+# LIVE grid: budget_usd is the real cost ceiling this time (finding 6, ~$7.20 estimated, $10
+# ceiling) -- not nominal like the three retrospective specs in this family. max_attempts=2
+# reflects the grit_retry arm's own declared policy (finding 4) at the SPEC level; per-cell
+# attempt counts are enforced by workflow.params / the executing phase, not by this field alone.
+# uncertainty_threshold widened to 0.35 (finding 5) -- an honest pilot-grid bound, not a
+# publication-grade one.
+stop: {budget_usd: 10.0, max_attempts: 2, uncertainty_threshold: 0.35}
+# largest_effect: the next campaign move, once this pilot's regret numbers exist, is to expand
+# whichever condition_strength cell showed the largest baseline-vs-grit_retry gap into a
+# better-powered follow-up grid (more repetitions, possibly more stories) -- not to chase
+# uncertainty first, since finding 5 already predicts every cell will start under-powered.
+adapt: {strategy: coordinate_descent, selection: largest_effect}
