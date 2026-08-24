@@ -70,13 +70,21 @@ def condition_to_mutations(
         # e.g. ".../tier1_minimal/good" -> ".../tier1_minimal/bad"
         bad_path = codebase_path.parent / "bad"
         if bad_path.exists() and any(bad_path.iterdir()):
+            # Genuine no-op artifact: the pre-generated ``bad/`` variant IS the
+            # degradation, already applied on disk (it becomes the worktree seed).
+            # ``codebase_patch`` must stay EMPTY so ``would_produce_changes()``
+            # returns False — a non-empty description string there made
+            # ``_prepare_worktree`` attempt a no-op git commit, which failed
+            # ("nothing to commit") and aborted every BAD_SEED + mutation=None
+            # story at $0 (E4 grid cells 5/6, x2). The description lives in
+            # ``original_spec`` instead, which no gate consults.
             return MutationArtifact(
                 mutation_id="bad_seed_pregen",
                 operator="bad_seed",
                 operator_class="codebase",
                 strength=CONDITION_STRENGTH,
-                original_spec="Pre-generated bad variant",
-                codebase_patch=f"Using pre-generated variant at {bad_path}",
+                original_spec=f"Pre-generated bad variant at {bad_path}",
+                codebase_patch="",
             ), {}
         return None, {}
 

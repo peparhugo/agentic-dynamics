@@ -1,0 +1,12 @@
+{
+  "mutation_id": "mut_3caacc977303246d",
+  "operator": "inject_bug",
+  "operator_class": "codebase",
+  "strength": 0.2,
+  "compiler_model": "deepseek/deepseek-v4-flash",
+  "compiler_timestamp": "2026-08-24T01:51:15.673240+00:00",
+  "original_spec": "E4 bad_seed low: verified clean patch against actual app.py",
+  "mutated_spec": "",
+  "codebase_patch": "--- a/app.py\n+++ b/app.py\n@@ -53,7 +53,7 @@\n \n def get_tasks():\n     with get_db() as conn:\n-        rows = conn.execute(\"SELECT * FROM tasks ORDER BY created_at DESC\").fetchall()\n+        rows = conn.execute(\"SELECT * FROM tasks ORDER BY created_at ASC\").fetchall()\n         return [dict(r) for r in rows]\n \n \n",
+  "hash": "3caacc977303246d"
+}

@@ -1,0 +1,12 @@
+{
+  "mutation_id": "mut_1957f3238ebc0f5c",
+  "operator": "inject_bug",
+  "operator_class": "codebase",
+  "strength": 0.8,
+  "compiler_model": "deepseek/deepseek-v4-flash",
+  "compiler_timestamp": "2026-08-24T01:51:15.703762+00:00",
+  "original_spec": "E4 bad_seed high: verified clean patch against actual app.py",
+  "mutated_spec": "",
+  "codebase_patch": "--- a/app.py\n+++ b/app.py\n@@ -37,7 +37,7 @@\n \n def create_task(title: str) -> dict:\n     with get_db() as conn:\n-        now = datetime.utcnow().isoformat()\n+        now = datetime.now().isoformat()\n         cursor = conn.execute(\n             \"INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)\",\n             (title, now),\n@@ -53,7 +53,7 @@\n \n def get_tasks():\n     with get_db() as conn:\n-        rows = conn.execute(\"SELECT * FROM tasks ORDER BY created_at DESC\").fetchall()\n+        rows = conn.execute(\"SELECT * FROM tasks ORDER BY id LIMIT 50\").fetchall()\n         return [dict(r) for r in rows]\n \n \n@@ -76,12 +76,11 @@\n         if status is not None:\n             updates.append(\"status = ?\")\n             params.append(status)\n-        if updates:\n-            params.append(task_id)\n-            conn.execute(\n-                f\"UPDATE tasks SET {', '.join(updates)} WHERE id = ?\", params\n-            )\n-            conn.commit()\n+        params.append(task_id)\n+        conn.execute(\n+            f\"UPDATE tasks SET {', '.join(updates)} WHERE id = ?\", params\n+        )\n+        conn.commit()\n     return get_task(task_id)\n \n \n",
+  "hash": "1957f3238ebc0f5c"
+}
