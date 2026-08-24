@@ -110,6 +110,24 @@ def test_text_is_the_json_body_with_all_five_fields():
     }
 
 
+def test_real_actuation_record_does_not_carry_applied_marker():
+    # CAP shadow-fact disposition (p2): the `applied: false` marker is stamped ONLY on shadow
+    # decisions, inside record_shadow_decision (control/rules.py). A REAL actuation record —
+    # constructed here with no arming, exactly as the disposition spec's "if one can be
+    # constructed without arming" clause asks — must NOT carry the field: it is a genuine,
+    # executed-actuation-shaped record, distinguishable from a proposed-never-executed shadow
+    # decision precisely by the marker's ABSENCE. This is the contrast side of
+    # test_shadow_decision_carries_applied_false_marker (test_context_plane_seam.py).
+    import json
+
+    record = ai.derive_actuation_record(_candidate())
+    body = json.loads(record.text)
+    params = (body.get("requested_action") or {}).get("parameters") or {}
+    assert "applied" not in params, (
+        "a real actuation record must not carry the shadow-only `applied` marker"
+    )
+
+
 # ── Reused artifact/event contract ──────────────────────────────
 
 
