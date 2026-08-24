@@ -245,3 +245,86 @@ phases' cost as `None`/uncaptured) is a p4 concern; p1 only measures the exposur
 **PASS** — corpus enumerated exhaustively; every count reproduced from the census command; shape
 variance recorded (F1 exposure, story-condition dirt, nested-vs-flat tokens, missing attempt
 structure in the summary family, E4 ledger coverage). In-flight worktrees untouched.
+
+---
+
+## 5. Additive derivation (p3) — story + summary facts, ZERO reducer diffs
+
+**GUARD met:** `git diff --stat src/agentic_dynamics/control/reducers/` is **EMPTY** — no semantic
+change to any existing reducer. All derivation is producer-level projection + existing reducer
+calls. In-flight worktrees untouched.
+
+### 5.1 Files changed (producer-level only)
+
+| File | Change |
+|---|---|
+| `scripts/kb_produce_facts.py` | **additive** — three evidence families (`story_session` / `story_result` / `summary_attempt`) projected onto the UNCHANGED `attempt_facts/v1` + `job_facts/v1`; `derive_story_facts` / `derive_summary_facts` / `derive_corpus_facts`; new `--corpus {story,summary,all}` CLI flag |
+| `tests/test_kb_produce_facts_extension.py` | **new** — 6 hermetic tests (story fixture + summary fixture + corpus batch) |
+| `src/agentic_dynamics/control/reducers/**` | **UNCHANGED** (guard: zero diffs) |
+
+### 5.2 Evidence families (the workflow_run pattern, per artifact level)
+
+| Family | Granularity | Projected artifact | Consumed by |
+|---|---|---|---|
+| `story_session` | one run per story SESSION (single-phase run) | session → phase; `run_artifact_id` hashes session fields + cell identity (distinct per session, byte-stable) | `attempt_facts/v1` → per-session attempt facts |
+| `story_result` | one run per story CELL (job-level + session list) | cell aggregates (`summary.total_cost`, `ok`, last-session commit) | `job_facts/v1` → per-cell job facts |
+| `summary_attempt` | one run per summary ENTRY (single-phase run) | entry → attempt; `attempt_model`/`attempt_cost_usd` always, tokens only for the 49 valid entries | `attempt_facts/v1` → per-entry attempt facts |
+
+Identity decisions (documented in the producer docstrings):
+- **Cell identity** = `wf_<story>_<condition>_<model>` — the condition folds into `spec_name`
+  (via `_common.cell_id`) so clean/bad_seed/early_degrade runs of the same story+model stay in
+  DISTINCT job cells, while multiple seeds of one cell share a job slot (current-per-cell
+  supersession, exactly like repeated workflow runs). Condition-less cells (9, all
+  deepseek-v4-pro) land in the story's unconditioned cell.
+- **Job status** is read from the raw session `exit_code`s + the cell `error` field — NOT from
+  `summary.all_successful`, which is observed `True` even for cells whose `error` records a
+  session timeout (a data-quality trap; reading the raw exits avoids trusting it).
+- **Summary is fed to `attempt_facts/v1` ONLY** — `job_facts/v1` would force a `job_status`
+  ("failed") for an entry that records no `ok`, which is exactly the fabrication null-not-zero
+  forbids.
+
+### 5.3 Hermetic tests (story + summary fixtures)
+
+`tests/test_kb_produce_facts_extension.py` — **6 passed** (hermetic `REPO_ROOT`+`REGISTRY_INDEX_PATH`
+at `tmp_path`, no Redis, registry persistence simulated):
+1. story derivation succeeds + ids **stable** (re-derivation → byte-identical `knowledge_id`s);
+   absent fields stay absent (`attempt_tokens_in/out`, `attempt_cache_hit_rate`,
+   `phase_test_verified`, and `attempt_confidence` for the `None` session are NOT emitted);
+   convergence (persist → re-derive → `[]`).
+2. sparse story session → only `phase_status`/`phase_commit`/`attempt_model`/`attempt_cost_usd`.
+3. per-run identity: clean vs bad_seed → distinct job `entity_id`s; per-session attempts distinct.
+4. summary: `attempt_model`+`attempt_cost_usd` for all; `attempt_tokens_in` only for the
+   token-carrying entry; **no** `phase_status`/`phase_commit`/`attempt_confidence`/`job_status`.
+5. corpus batch: workflow + story + summary in ONE `derive_fact_records` call; re-derivation
+   byte-identical; evidence resolves against raw evidence OR in-batch `knowledge_id`s.
+6. evidence identity: content-addressed `story_result:<run_artifact_id>`, byte-identical on-disk
+   duplicates collapse (the `_run_evidence` dedup guard).
+
+### 5.4 Dry-run smoke over the real corpus (no emission, no registry write)
+
+```
+$ python3 scripts/kb_produce_facts.py --corpus story --dry-run
+story: derived 5433 fact record(s)
+$ python3 scripts/kb_produce_facts.py --corpus summary --dry-run
+summary: derived 386 fact record(s)
+$ python3 scripts/kb_produce_facts.py --corpus all --dry-run
+all: derived 6573 fact record(s)
+```
+
+Coverage reconciliation: `all` (6573) = story (5433) + summary (386) + workflow-ladder rungs
+(754 = policy + spec_status + workflow facts). **The workflow-RUN family contributes 0 from this
+worktree** because `experiments/results/workflows/` is gitignored and absent here — the run
+ledgers live only in the main worktree (see §0). p4 must run the emission where `load_run_jsons()`
+can see them (main worktree), or the ledgers must be present, to cover the workflow attempt/job
+facts for all 125 runs.
+
+### 5.5 Suite results
+
+| Suite | Result |
+|---|---|
+| CAP suites (context plane, reducers, integration, adversarial) + guards (`test_context_plane_*`, `test_actuation_ingestion`, `test_fact_auto_emit*`, `test_kb_produce_facts_integration`, `test_kb_produce_facts_extension`, `test_kb_produce_registry`, `test_compile_experiment`, `test_experiment_spec`, `test_dependency_direction`, `test_data_flow`, `test_script_classification`) | **426 passed** |
+| Additional fact-plane suites (`test_cap_i0_i3_adversarial`, `test_artifact_identity`, `test_ledger_*`, `test_spec_ingestion`, `test_spec_status`, `test_record_factory`, `test_generate_manifest`, `test_knowledge*`, `test_doc_lifecycle`) | **261 passed** (1 env-dependent assert — `test_emit_writes_the_artifact_before_publishing` expects `FINOPS_KB_WRITE` unset; passes cleanly with `env -u FINOPS_KB_WRITE`) |
+| Reducer diff guard | **EMPTY** |
+
+**PASS** — additive story/summary derivation landed with zero reducer diffs; fixtures hermetic;
+CAP suites + guards green.
