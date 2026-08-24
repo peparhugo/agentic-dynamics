@@ -163,6 +163,57 @@ def load_spec_configs() -> list[dict]:
     return configs
 
 
+def _is_failed_before_call(phase: dict) -> bool:
+    """True when a phase is a STRUCTURAL zero-cost phase: it failed before any model call.
+
+    CAP fact backfill F1 (the m2 hazard): a phase that fails before any model call (e.g. an auth
+    failure) records ``cost_usd=0.0`` with an all-zero ``tokens`` block. That ``0.0`` is a
+    structural zero (the model was never called), not a measured zero — deriving it as a real cost
+    lets a never-executed run read as "within budget" (``projected_budget_overrun=0.0``). The
+    discriminant is exact: agent-kind + a failure status + zero cost + zero tokens in/out/total.
+    Test-kind phases are never "failed-before-call" — they run pytest (no model call by design),
+    so their ``0.0`` is a genuine measurement.
+    """
+    if phase.get("kind") not in (None, "agent"):
+        return False
+    if phase.get("status") not in ("failed", "error", "timeout", "blocked"):
+        return False
+    if phase.get("cost_usd") not in (0, 0.0):
+        return False
+    tokens = phase.get("tokens") or {}
+    if isinstance(tokens, dict):
+        return not any(tokens.get(k) for k in ("in", "out", "total"))
+    return True
+
+
+def _sanitize_run(run: dict) -> dict:
+    """Return a copy of a workflow run with F1 structural-zero costs recorded as ``None``.
+
+    Re-derivation stays byte-stable: the sanitizer is a pure, deterministic function of the raw
+    artifact, and it is applied only to the evidence PAYLOAD — ``run_artifact_id`` (the identity
+    cited in ``evidence_ids``) is computed over the RAW artifact, never the sanitized copy, so an
+    already-cited run keeps its exact identity.
+    """
+    run = dict(run)
+    phases = run.get("phases")
+    if not isinstance(phases, list) or not phases:
+        return run
+    new_phases: list = []
+    before_call = 0
+    for phase in phases:
+        if not isinstance(phase, dict):
+            new_phases.append(phase)
+            continue
+        if _is_failed_before_call(phase):
+            phase = {**phase, "cost_usd": None}  # uncaptured, not a measured zero
+            before_call += 1
+        new_phases.append(phase)
+    run["phases"] = new_phases
+    if before_call == len(new_phases) and run.get("total_cost_usd") in (0, 0.0):
+        run["total_cost_usd"] = None  # the whole run never executed — cost is unmeasured
+    return run
+
+
 def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
     """Build one ``EvidenceItem`` per DISTINCT run, identified by its content-addressed artifact id.
 
@@ -173,6 +224,11 @@ def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
     caller can look one back up via a ``{evidence_id: payload}`` index over this same sequence —
     see ``_evidence_resolver`` below), while re-deriving from the SAME artifact reproduces the
     same id byte-for-byte.
+
+    **F1 sanitization (CAP fact backfill):** the PAYLOAD handed to the reducers is the sanitized
+    copy (``_sanitize_run`` — failed-before-call costs become ``None``), while the ``evidence_id``
+    is computed over the RAW artifact (identity is a property of the persisted bytes, and an
+    already-cited run keeps its exact id). See ``_sanitize_run`` for the F1 m2-hazard rationale.
 
     **Duplicate-evidence guard (CAP I0-I3 adversarial repair, attack vector "duplicate evidence"):**
     two ON-DISK FILES can carry byte-identical content (a copied/duplicated artifact, or a replay
@@ -196,7 +252,11 @@ def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
             continue
         seen.add(rid)
         items.append(
-            EvidenceItem(source_type="workflow_run", evidence_id=f"workflow_run:{rid}", payload=run)
+            EvidenceItem(
+                source_type="workflow_run",
+                evidence_id=f"workflow_run:{rid}",
+                payload=_sanitize_run(run),
+            )
         )
     return tuple(items)
 
@@ -925,12 +985,58 @@ def build_event(record):
     return fi.fact_event(record)
 
 
+def _materialize_registry_row(record) -> None:
+    """F2 fix (CAP fact backfill): append the record's registry line(s) at EMIT time.
+
+    The ``kb-registry-v1`` consumer is the canonical registry writer, but it only runs when a
+    worker is up — artifacts were being written without registry rows (the F2 materialization
+    stall: artifacts outnumbering registry rows). Materializing the row in the emit path removes
+    the dependency on a live consumer for THIS producer's emission: every emitted artifact is
+    registry-visible immediately, so the backfill's own artifact count == its registry row count.
+    The line shape mirrors ``kb_worker.py``'s ``kb-registry-v1`` handler field-for-field
+    (append-only, operation-derived ``lifecycle_state``, the ``supersede`` predecessor line);
+    a later consumer pass appends byte-identical duplicate lines, which
+    ``generate_manifest.py``'s compaction folds away (latest-per-entity).
+    """
+    operation = fi.fact_operation(record)
+    reason = fi.fact_reason(record)
+    lifecycle = "current" if operation in ("upsert", "supersede") else "tombstoned"
+    line = {
+        "knowledge_id": record.knowledge_id,
+        "entity_id": record.entity_id,
+        "source_type": record.source_type,
+        "logical_locator": record.logical_locator,
+        "source_uri": record.source_uri,
+        "lifecycle_state": lifecycle,
+        "observed_at": record.observed_at,
+        "indexed_at": record.indexed_at,
+        "supersedes": record.supersedes,
+        "causes": record.causes,
+        "reason": reason,
+    }
+    REGISTRY_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(REGISTRY_INDEX_PATH, "a") as f:
+        f.write(json.dumps(line) + "\n")
+    if operation == "supersede" and record.supersedes:
+        predecessor_line = {
+            "knowledge_id": record.supersedes,
+            "entity_id": record.entity_id,
+            "lifecycle_state": "superseded",
+            "valid_to": record.valid_from,
+            "indexed_at": record.indexed_at,
+        }
+        with open(REGISTRY_INDEX_PATH, "a") as f:
+            f.write(json.dumps(predecessor_line) + "\n")
+
+
 def emit_records(r, records: list) -> tuple[int, int]:
     """Write each durable artifact then publish its pointer event; skip already-checkpointed ids.
 
     Returns ``(emitted, skipped)``. Ordering mirrors ``kb_produce_sources.emit_records``: the
     artifact is written before the event lands (so the consumer can always read + verify the
-    bytes the event hashes), then checkpointed.
+    bytes the event hashes), then checkpointed. The F2 registry-row materialization
+    (``_materialize_registry_row``) runs after the checkpoint so a re-run skips both the event
+    and the row.
     """
     emitted = 0
     skipped = 0
@@ -945,6 +1051,7 @@ def emit_records(r, records: list) -> tuple[int, int]:
         (KB_ARTIFACT_DIR / f"{record.knowledge_id}.json").write_bytes(artifact)
         ks.publish_event(r, build_event(record), source_type=record.source_type)
         r.hset(ks.CHECKPOINT_KEY, record.knowledge_id, record.indexed_at)
+        _materialize_registry_row(record)
         emitted += 1
     return emitted, skipped
 

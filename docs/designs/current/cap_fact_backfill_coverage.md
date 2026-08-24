@@ -328,3 +328,86 @@ facts for all 125 runs.
 
 **PASS** — additive story/summary derivation landed with zero reducer diffs; fixtures hermetic;
 CAP suites + guards green.
+
+---
+
+## 6. Backfill run record (p4) — one emit pass over the ENTIRE corpus
+
+### 6.1 Prerequisite: the gitignored workflow ledger corpus made visible
+
+`experiments/results/workflows/` is gitignored and absent from this worktree, so `load_run_jsons()`
+saw zero workflow runs (§0). The 125 run ledgers were copied from the main worktree into this
+worktree's (still gitignored, never committed) `experiments/results/workflows/` — the same path the
+producer reads — so the derivation covered the full corpus: **125 workflow runs (455 phases) + 227
+story cells (1112 sessions) + 144 summary entries**.
+
+### 6.2 The run
+
+```
+$ python3 scripts/kb_produce_facts.py --corpus all          # FINOPS_KB_WRITE=1 set at the emit step only
+all: derived 10812 fact record(s) (revision=304e66167602, repository-id='agentic-dynamics')
+all: emitted=10812 skipped=0 (already checkpointed) total=10812
+```
+
+Derivation is PURE (no write env needed — the reducers do no I/O); `FINOPS_KB_WRITE=1` is set inside
+`emit_records` for the emit step only. **Exactly one emit pass** (guard met). No model calls in the
+derivation → the 402/insufficient-balance stop never applies.
+
+### 6.3 Counts before / after
+
+| Counter | Before | After | Delta |
+|---|---|---|---|
+| KB artifact files (`experiments/results/kb/`) | 2969 | 13781 | **+10812** |
+| `registry_index.jsonl` rows | 830 | 12015 | **+11185** (10812 own rows + 373 supersede-predecessor marker lines) |
+| fact artifacts on disk | 240 | 11052 | +10812 |
+| registry fact rows | 27 | 10839 | +10812 |
+
+### 6.4 Sample of emitted fact predicates (from the KB artifact payloads)
+
+| Predicate | Count | | Predicate | Count |
+|---|---|---|---|---|
+| attempt_model | 1724 | | attempt_confidence | 773 |
+| attempt_cost_usd | 1714 | | attempt_tokens_in / out | 517 / 517 |
+| phase_status | 1587 | | attempt_cache_hit_rate | 419 |
+| phase_commit | 1365 | | current_commit | 352 |
+| job_accumulated_cost_usd | 343 | | job_status / job_n_phases | 199 / 195 |
+| workflow_health / status / phases_* | 115 each | | projected_budget_overrun | 110 |
+| max_spend_usd / max_attempts | 111 / 110 | | spec_status | 103 |
+
+### 6.5 F1 fix applied (structural-zero costs → None) — verified
+
+Producer-level sanitizer `_sanitize_run` (applied in `_run_evidence` to the evidence PAYLOAD only;
+`run_artifact_id` stays computed over the raw artifact so identity is unchanged): a phase that is
+agent-kind + failed + `cost_usd==0.0` + all-zero tokens is a **failed-before-call** phase → its cost
+is recorded `None` (uncaptured, not a measured zero); a run whose EVERY phase is failed-before-call
+gets `total_cost_usd=None` too (never executed).
+
+- 10 runs in the corpus are all-failed-before-call (auth-failure runs: `cap_i0_i3_remediation`,
+  `context_abstraction_implement`, `investing_context_seed_remediation`, `routing_kb_experiment_design`,
+  `semantic_integrity_release`, `canonical_state_design`); **0 `attempt_cost_usd` / `attempt_tokens_*`
+  facts cite them** (attempt-level verified by run_artifact_id), and no `projected_budget_overrun`
+  derives from a never-executed run.
+- All 10 cells have a cost-carrying sibling run, so their `job_accumulated_cost_usd` current heads
+  are the real, non-zero sibling costs (32.79 / 34.36 / 6.34 / 50.15 / 49.52 / 71.78 / 4.84 …) —
+  the never-executed run's `0.0` was never registered as a measured zero.
+- Reducer diff guard still EMPTY (the sanitizer is producer-level).
+
+### 6.6 F2 fix applied (registry rows materialized in the emit path) — verified
+
+`emit_records` now appends the `kb-registry-v1` line shape (same fields, operation-derived
+`lifecycle_state`, supersede-predecessor marker) for every emitted record, so an artifact is
+registry-visible the moment it is written — no dependency on a running consumer.
+
+- **Backfill's own emission: 10812 emitted artifacts → 10812 registry fact rows, 0 missing**
+  (artifact count == registry row count for the backfill's emission, verified independently over
+  `repository_id=agentic-dynamics` artifacts).
+- Residual stall: **213 fact artifacts with `self-wt_*` repository_ids** (emitted at 19:24 today by
+  OTHER worktrees' auto-emit hooks — `self-wt_addendum_implement`, `self-wt_paper_journal`,
+  `self-wt_flash_vs_luna_*`, `self-wt_grit_grid`) predate this backfill and are **not** part of its
+  emission. They belong to in-flight worktrees' scopes (never-touch-inflight) — recorded as a
+  pre-existing, other-scope residual, out of scope for this fact backfill. 1948 non-fact artifacts
+  (code/story/review/spec…) likewise predate and are untouched.
+
+**PASS** — exactly one emit pass over the entire corpus; F1 structural-zero fix applied and
+verified at the attempt level; F2 materialization closes the stall for the backfill's own emission
+(10812 == 10812). Reducers untouched; in-flight worktrees untouched.
