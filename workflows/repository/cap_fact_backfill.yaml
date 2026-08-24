@@ -1,0 +1,220 @@
+name: cap_fact_backfill
+question: >-
+  Complete Stage 0 (prerequisites) acceptance and Stage 1 (retroactive fact backfill) per
+  docs/designs/current/cap_stage0_stage1_prompt.md. Stage 0: verify — with evidence, not
+  assertion — that the disposition branch is merged (applied:false marker + fact-flow proof),
+  FINOPS_KB_WRITE=1 is set and smoke-tested, the gate migration is merged (requires_facts live
+  corpus-wide), the routing evidence specs are merged (E1-E4 compile), and the addendum I8-I10
+  is merged (pattern reducer present). STOP if any check fails. Stage 1: inventory the full
+  experiment corpus (workflow runs, story cells, summary attempts) with shape variance, publish
+  the per-predicate coverage table with PRODUCED/PARTIAL/UNOBSERVED verdicts and the E1-E4
+  evaluability verdict, extend the producer additively to stories/summaries (ZERO reducer
+  diffs), run the backfill with FINOPS_KB_WRITE=1, and verify idempotency, per-run identity,
+  evidence provenance, and uniqueness — then an adversarial review with a release verdict.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / CAP
+        fact pipeline. canonical_sources: [docs/designs/current/cap_stage0_stage1_prompt.md
+        (the authority — every check below maps to it), src/agentic_dynamics/control/facts.py
+        (FACT_PREDICATES, 29 predicates), scripts/kb_produce_facts.py (load_run_jsons,
+        _run_evidence, derive_run_facts), src/agentic_dynamics/control/fact_ingestion.py
+        (derive_fact_records, in-batch chaining), src/agentic_dynamics/control/reducers/
+        _common.py (run_artifact_id), experiments/results/{workflows,stories,_results_summary.json}].
+        policies: [facts_need_kb_write, coverage_is_truth, null_not_zero, zero_reducer_diffs,
+          never_touch_inflight]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: maintenance sweep + additive instrumentation.
+        deliberation: [prereq check, inventory, coverage, extend, run, verify, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        Four workstreams are in flight on separate branches (feature/cap-shadow-fact-disposition,
+        feature/cap-gate-migration, feature/cap-routing-evidence-specs,
+        feature/cap-addendum-implement). Their runners may resume at any time — their worktrees
+        and branches are UNTOUCHABLE. This workflow may launch before they land; p0's gate
+        handles that by stopping politely. The fact store is not yet populated retroactively;
+        auto-emit covers only NEW runs; stories/summaries have no derivation path at all.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) NEVER touch the four
+        in-flight worktrees/branches or their files — a diff involving them is an instant FAIL.
+        (3) Stage 0 is verified with EVIDENCE: commands run and output shown (git log, grep,
+        ls counts, curl/registry rows), never asserted. Any failed check = STOP, log the reason,
+        do NOT proceed to Stage 1. (4) ZERO semantic changes to reducers: git diff of
+        src/agentic_dynamics/control/reducers/ must be empty; story/summary support is
+        adapter/extractor-level only. (5) Coverage is truth: a predicate with zero recorded
+        observations is UNOBSERVED — recorded as a finding with the instrumentation gap named,
+        never force-derived. (6) Null-not-zero everywhere; absent fields stay absent. (7)
+        FINOPS_KB_WRITE=1 is set only for the emit step; derivation stays pure. (8) If the model
+        provider returns 402/insufficient-balance: STOP and record; no silent provider switch.
+        (9) The adversarial phase (p6) is mandatory — at least 3 findings or clean sweep.
+        (10) PASS/FAIL log; resumable via --resume.
+      read_first: >-
+        docs/designs/current/cap_stage0_stage1_prompt.md (the authority — 1:1 mapping),
+        scripts/kb_produce_facts.py, src/agentic_dynamics/control/facts.py (FACT_PREDICATES),
+        src/agentic_dynamics/control/fact_ingestion.py, src/agentic_dynamics/control/reducers/
+        _common.py, experiments/results/stories/*.json + _results_summary.json (shapes),
+        tests/test_kb_produce_facts_integration.py (hermetic-test precedent)
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash --backend opencode. One worktree, one
+        branch (feature/cap-fact-backfill); each phase commits [workflow] <phase>.
+    phases:
+      - name: p0_prereq_acceptance
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: acceptance auditor — Stage 0 is CHECKED, not assumed. For each check, run the
+          command and show its output:
+          (0.1) disposition merged: git log main shows feature/cap-shadow-campaign +
+          feature/cap-fact-auto-emit reachable; grep for applied in control/rules.py + a test
+          asserting it; docs/designs/current/cap_shadow_fact_disposition.md exists with the
+          fact-flow evidence.
+          (0.2) FINOPS_KB_WRITE: echo the env var; if unset, note it as a FAIL for this stage
+          (do not set it globally — the operator does that).
+          (0.3) gate migration merged: grep -rn "requires_facts:" workflows/
+          experiments/definitions/ returns matches; validate_fact_contracts passes on the
+          migrated specs (spot-check 3).
+          (0.4) routing evidence specs: the four YAMLs exist in experiments/definitions/ and
+          compile.
+          (0.5) addendum merged: control/profiles.py exists; FACT_PREDICATES contains a pattern
+          entry; experiments/contexts/session_routing.yaml exists.
+          DELIVER: docs/designs/current/cap_fact_backfill_prereq.md — check table (check,
+          command, output summary, PASS/FAIL).
+          GUARD: any FAIL => commit the doc and STOP (no further phases). In-flight branches
+          remain untouched.
+          LOG: PASS/FAIL per check; commit.
+      - name: p1_corpus_inventory
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: enumerate the corpus exhaustively and record shape variance:
+          (1) experiments/results/workflows/**/*.json — per run: spec_name, model, git_sha,
+          started_at/ended_at, ok, total_cost_usd, phases[] (phase, kind, status, model, tokens,
+          cost_usd, cache_read_tokens, session_id, commit_hash, confidence).
+          (2) experiments/results/stories/*.json — per cell: story, condition, model, sessions[]
+          with tokens/cost/status/session_id.
+          (3) experiments/results/_results_summary.json — per entry: config/model/operators,
+          attempts[] with tokens/cost/status/confidence.
+          VARIANCE REPORT: which sources carry confidence / cache_read_tokens /
+          test_executed_success / perturbation_strength; flat vs nested tokens; cost present or
+          None. Count runs/sessions/attempts per family.
+          DELIVER: the master artifact table in docs/designs/current/cap_fact_backfill_coverage.md
+          (§1) + the variance report (§2).
+          GUARD: every count reproducible from a shown command; in-flight worktrees untouched.
+          LOG: counts per family; PASS/FAIL; commit.
+      - name: p2_coverage_precheck
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: for each of the 29 FACT_PREDICATES, compute n_available/n_total over the
+          corpus per family (workflow/story/summary). Minimum predicates to cover:
+          spec_status, phase_status, attempt_cost_usd, attempt_tokens_in, attempt_tokens_out,
+          attempt_model, attempt_confidence, attempt_cache_hit_rate, phase_test_verified,
+          job_status, job_accumulated_cost_usd, current_commit, phase_commit.
+          VERDICT per predicate: PRODUCED / PARTIAL / UNOBSERVED (zero observations = finding +
+          named instrumentation gap; never force-derive).
+          EVALUABILITY: state per experiment E1/E2/E3/E4 whether the coverage makes it
+          evaluable, inconclusive-by-design, or blocked — with the blocking predicate named.
+          DELIVER: the coverage table + verdicts + evaluability in the coverage doc (§3-§4).
+          GUARD: numbers only from the master table; no invented observations.
+          LOG: verdict counts; PASS/FAIL; commit.
+      - name: p3_extend_derivation
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: extend the producer additively so story and summary artifacts derive facts:
+          (1) add evidence families for story_session / story_result / summary_attempt following
+          the workflow_run pattern (content-addressed run_artifact_id per artifact; _run_evidence
+          dedup; per-run identity); (2) reuse the EXISTING reducer vocabulary and signatures
+          where fields align; absent fields => fact simply not emitted (null-not-zero);
+          (3) hermetic tests: one story fixture + one summary fixture — derivation succeeds, ids
+          stable, re-derivation byte-identical, absent fields stay absent; (4) run the full
+          CAP suites (context plane, reducers, integration, adversarial) + guards.
+          GUARD: git diff of src/agentic_dynamics/control/reducers/ is EMPTY; no semantic change
+          to any existing reducer; in-flight worktrees untouched.
+          DELIVER: the additive adapter + tests + a diff summary in the coverage doc (§5).
+          LOG: files changed (producer-level only), test results; PASS/FAIL; commit.
+      - name: p4_run_backfill
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the derivation over the ENTIRE corpus with FINOPS_KB_WRITE=1 set for the
+          emit step only (derivation stays pure). Record: kb artifact count before/after,
+          registry_index.jsonl row count before/after, and a sample of emitted fact predicates.
+          DELIVER: the run record in the coverage doc (§6).
+          GUARD: exactly one emit pass; on 402/insufficient-balance STOP and record.
+          LOG: counts + sample; PASS/FAIL; commit.
+      - name: p5_verify
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: verify the backfill with evidence:
+          (1) IDEMPOTENCY: re-run the backfill; registry row count and artifact set unchanged —
+          run twice, show both counts.
+          (2) PER-RUN IDENTITY: two distinct artifacts with identical spec/model/phase names
+          produce DISTINCT fact entity ids (spot-check a same-cell two-run pair if the corpus
+          has one).
+          (3) EVIDENCE PROVENANCE: every sampled fact's evidence_ids resolves against its source
+          artifact via the in-memory index (verify_chain contract).
+          (4) UNIQUENESS: no duplicate knowledge_id in the backfill's registry rows.
+          (5) CAP suites + guards green on the branch.
+          DELIVER: the verification table (§7) with numbers for each check.
+          LOG: check results; PASS/FAIL; commit.
+      - name: p6_adversarial_review
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial reviewer. Attack: (1) the prereq gate — was any Stage 0 check
+          asserted rather than evidenced? (2) the coverage doc — any predicate marked PRODUCED
+          without n_available>0? any evaluability verdict that overclaims? (3) the derivation
+          extension — any reducer diff (git diff proof)? any field fabricated from an absent
+          source field? any story/summary fact colliding with a workflow fact's entity id?
+          (4) the backfill — idempotency re-derived independently (not trusted from p5); dupes
+          by knowledge_id re-counted; (5) the verification — per-run identity proven, not
+          asserted; (6) in-flight worktrees still untouched (git worktree list + status).
+          Every finding: fix or record accepted limitation.
+          RELEASE VERDICT: state whether the backfill is merge-ready to main and what the
+          operator must do next (review coverage doc; set FINOPS_KB_WRITE=1 if not already;
+          then Stage 2 pattern minting may begin).
+          DELIVER: finding table + verdict appended to the coverage doc (§8).
+          LOG: finding table; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: cap_fact_backfilled
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [prereqs_accepted, corpus_inventoried, coverage_documented, derivation_extended, store_populated, backfill_verified, backfill_adversarial_clean]
+metrics:
+  - {name: prereqs_accepted, agg: mean, over: cell}
+  - {name: corpus_inventoried, agg: mean, over: cell}
+  - {name: coverage_documented, agg: mean, over: cell}
+  - {name: derivation_extended, agg: mean, over: cell}
+  - {name: store_populated, agg: mean, over: cell}
+  - {name: backfill_verified, agg: mean, over: cell}
+  - {name: backfill_adversarial_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_prereq_acceptance, p1_corpus_inventory, p2_coverage_precheck, p3_extend_derivation, p4_run_backfill, p5_verify, p6_adversarial_review]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
