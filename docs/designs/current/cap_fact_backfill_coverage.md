@@ -334,9 +334,7 @@ $ python3 scripts/kb_produce_facts.py --corpus summary --dry-run
 summary: derived 386 fact record(s)
 $ python3 scripts/kb_produce_facts.py --corpus all --dry-run
 all: derived 6573 fact record(s)
-```
-
-Coverage reconciliation: `all` (6573) = story (5433) + summary (386) + workflow-ladder rungs
+```Coverage reconciliation: `all` (6573) = story (5433) + summary (386) + workflow-ladder rungs
 (754 = policy + spec_status + workflow facts). **The workflow-RUN family contributes 0 from this
 worktree** because `experiments/results/workflows/` is gitignored and absent here — the run
 ledgers live only in the main worktree (see §0). p4 must run the emission where `load_run_jsons()`
@@ -353,6 +351,18 @@ facts for all 125 runs.
 
 **PASS** — additive story/summary derivation landed with zero reducer diffs; fixtures hermetic;
 CAP suites + guards green.
+
+**Re-audit (2026-08-24):** the full CAP suite re-ran at **249 passed** (was 247 pass + 2 fail)
+after repairing two regressions the p5 WIP commit `68760f4c0` had introduced: (1)
+`derive_corpus_facts` referenced undefined `_story_facts_records`/`_summary_facts_records` — fixed
+to call the existing `derive_story_facts`/`derive_summary_facts`; (2) the p5 ladder refactor made
+`derive_facts("workflow_facts/v1")` return `lower_records + wf_records`, so two integration tests
+were updated: `test_end_to_end_ladder_round_trip` now selects the workflow-scope records out of the
+full ladder, and `test_multi_run_workflow_fact_cites_registered_lower_ids` now finalizes lower
+facts through the producer's registered-id path (`_finalize_to_registered`) instead of the naive
+`build_fact_record` path. No reducer was touched (guard still EMPTY). Fresh-registry re-derivation
+confirms the original counts — **story 5433, summary 386** — and the now-populated registry makes
+the real dry-run converge to 0 (idempotent, p5's exact check).
 
 ---
 

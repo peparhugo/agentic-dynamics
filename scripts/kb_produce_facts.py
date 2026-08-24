@@ -979,9 +979,9 @@ def derive_corpus_facts(repository_id: str, revision: str, now: str) -> list:
     )
     wf_facts = workflow_facts_v1(wf_inp)
     wf_records = fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
-    all_facts = lower_records + wf_records + _story_facts_records(
+    all_facts = lower_records + wf_records + derive_story_facts(
         repository_id, revision, now
-    ) + _summary_facts_records(repository_id, revision, now)
+    ) + derive_summary_facts(repository_id, revision, now)
     return all_facts
 
 

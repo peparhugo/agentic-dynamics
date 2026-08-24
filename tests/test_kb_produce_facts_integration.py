@@ -200,8 +200,16 @@ def test_end_to_end_ladder_round_trip(kpf, tmp_path):
 
     # The workflow fact's evidence_ids must cite REAL lower fact_ids that were actually finalized
     # this round — the staleness-cascade backbone must be genuinely traceable, not just non-empty.
+    # ``derive_facts("workflow_facts/v1")`` returns the FULL ladder (lower_records + wf_records,
+    # the p5 registered-id refactor), so pick the workflow-scope records out of it.
+    wf_records_1 = [
+        r for r in workflow_records_1
+        if json.loads(r.text)["predicate"].startswith("workflow_")
+        or json.loads(r.text)["predicate"] == "projected_budget_overrun"
+    ]
+    assert wf_records_1
     lower_ids = {r.knowledge_id for r in attempt_records_1 + job_records_1}
-    wf_payload = json.loads(workflow_records_1[0].text)
+    wf_payload = json.loads(wf_records_1[0].text)
     assert wf_payload["evidence_ids"]
     assert set(wf_payload["evidence_ids"]) <= lower_ids
     assert set(wf_payload["evidence_ids"]) & lower_ids  # genuinely overlaps, not disjoint
@@ -292,9 +300,15 @@ def test_multi_run_workflow_fact_cites_registered_lower_ids(kpf, tmp_path):
         source_revision=REVISION,
     )
     lower = attempt_facts_v1(run_inp) + job_facts_v1(run_inp)
-    lower_records = fi.derive_fact_records(lower, registry_path=kpf.REGISTRY_INDEX_PATH)
+    # Use the producer's actual finalization (registered-id mapping via ``identity_out``), not the
+    # naive ``build_fact_record`` path: a current-per-cell job fact is registered under its content
+    # identity, and the naive path mints an UNREGISTERED knowledge_id for the converged case.
+    identity_out: dict[int, str] = {}
+    lower_records = fi.derive_fact_records(
+        lower, registry_path=kpf.REGISTRY_INDEX_PATH, identity_out=identity_out
+    )
     registered_ids = {r.knowledge_id for r in lower_records}
-    finalized = [fi.finalize_fact(f, fi.build_fact_record(f)) for f in lower]
+    finalized = kpf._finalize_to_registered(lower, identity_out)
     wf_inp = ReducerInput(
         scope_path=f"org:{REPO}",
         scope_type="workflow",
