@@ -15,8 +15,35 @@
       "strength": 0.0,
       "max_attempts": 1,
       "retry_rule": "baseline: score the single attempt unconditionally (no retry)",
-      "status": "pending",
-      "attempts": []
+      "status": "failed",
+      "attempts": [
+        {
+          "job_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+          "spec_id": "cap_grit_strength_grid@0.1",
+          "policy_arm": "baseline",
+          "model": "anthropic/claude-sonnet-5",
+          "condition": "clean",
+          "strength": 0.0,
+          "perturbation_strength": 0.0,
+          "attempt_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_baseline_model_anthropic_claude_sonnet_5_a1",
+          "attempt_number": 1,
+          "parent_attempt_id": null,
+          "retry_reason": "",
+          "started_at": "2026-08-24T13:17:31.338004+00:00",
+          "ended_at": "2026-08-24T13:31:46.874415+00:00",
+          "actual_cost": 3.5575142,
+          "rework_cost": 0.0,
+          "test_executed_success": false,
+          "status": "failed",
+          "story_id": "c0e0d6871f69",
+          "worktree": "/tmp/story_c0e0d6871f69",
+          "mutation_id": "",
+          "result_path": "experiments/results/stories/task_manager_api_claude_sonnet_5_clean_c0e0d6871f69.json"
+        }
+      ],
+      "realized_cost": 3.5575142,
+      "realized_duration_s": 1155.6,
+      "completed_at": "2026-08-24T13:36:46.985486+00:00"
     },
     {
       "cell_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
