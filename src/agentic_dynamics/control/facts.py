@@ -672,6 +672,106 @@ FACT_PREDICATES: dict[str, PredicateSpec] = {
         volatile=False,
         inheritable=True,
     ),
+    # session-checkpoint facts (CAP addendum I10, design §4.1/§4.2). All job-scoped, all produced
+    # by the single ``checkpoint/v1`` reducer (``control/reducers/checkpoint.py``). Two families:
+    #
+    # (a) the raw checkpoint payload — ``session_checkpoint`` — the fact's ``value`` is the
+    #     canonical JSON of ONLY the DERIVED-grade ``SessionCheckpoint`` fields (D5: the three
+    #     ADVISORY narrative fields never ride in this payload — see ``control/checkpoint.py``).
+    #
+    # (b) five POSITIVE-MARKER booleans the ``session_routing`` contract's decision logic reads.
+    #     Each is emitted ONLY as ``"true"`` when the reducer has REAL evidence for it; a false/
+    #     changed/unmeasured condition is represented by the fact's ABSENCE, never by an emitted
+    #     ``"false"`` value (documented in the reducer). This is what lets each of these live
+    #     under ``requires_facts`` (not ``invariants`` — see the session_routing.yaml contract's
+    #     own header comment for why an unconditional blanket invariant across four MUTUALLY
+    #     EXCLUSIVE actions is unsound) while still cleanly driving per-action refusal via C5:
+    #     a decision that cites a marker fact which never resolved is refused for citing a
+    #     non-canonical fact, exactly the mechanism ``checkpoint_present``/``checkpoint_*_
+    #     unchanged`` need.
+    "session_checkpoint": PredicateSpec(
+        name="session_checkpoint",
+        value_type="str",
+        unit="",
+        subject_type="job",
+        scope_type="job",
+        abstraction_level="job",
+        produced_by=("checkpoint/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+    ),
+    "checkpoint_present": PredicateSpec(
+        name="checkpoint_present",
+        value_type="bool",
+        unit="",
+        subject_type="job",
+        scope_type="job",
+        abstraction_level="job",
+        produced_by=("checkpoint/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+    ),
+    "checkpoint_goal_unchanged": PredicateSpec(
+        name="checkpoint_goal_unchanged",
+        value_type="bool",
+        unit="",
+        subject_type="job",
+        scope_type="job",
+        abstraction_level="job",
+        produced_by=("checkpoint/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+    ),
+    "checkpoint_phase_unchanged": PredicateSpec(
+        name="checkpoint_phase_unchanged",
+        value_type="bool",
+        unit="",
+        subject_type="job",
+        scope_type="job",
+        abstraction_level="job",
+        produced_by=("checkpoint/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+    ),
+    "checkpoint_model_unchanged": PredicateSpec(
+        name="checkpoint_model_unchanged",
+        value_type="bool",
+        unit="",
+        subject_type="job",
+        scope_type="job",
+        abstraction_level="job",
+        produced_by=("checkpoint/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+    ),
+    "model_change_required": PredicateSpec(
+        name="model_change_required",
+        value_type="bool",
+        unit="",
+        subject_type="job",
+        scope_type="job",
+        abstraction_level="job",
+        produced_by=("checkpoint/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+    ),
+    # v1 STRUCTURALLY NEVER EMITTED (D2: no snapshot producer exists, control/context_compiler.py
+    # owns `snapshot_id` and has not built one yet) — declared here (non-empty `produced_by` is
+    # the FACT_PREDICATES invariant) so the `session_routing` contract's `requires_facts` entry
+    # for it is representable and legitimately degrades via `on_missing: classify`, exactly the
+    # same "declared producer, v1 never actually emits it" posture `context_snapshot_id` itself
+    # takes on the `SessionCheckpoint` dataclass (`snapshot_available=False` always in v1).
+    "checkpoint_snapshot_identity": PredicateSpec(
+        name="checkpoint_snapshot_identity",
+        value_type="bool",
+        unit="",
+        subject_type="job",
+        scope_type="job",
+        abstraction_level="job",
+        produced_by=("checkpoint/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+    ),
 }
 
 

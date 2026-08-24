@@ -1,4 +1,4 @@
-"""CAP I1–I3, I8, I9 — the fact reducers package: the ``REDUCERS`` registry, its only public
+"""CAP I1–I3, I8, I9, I10 — the fact reducers package: the ``REDUCERS`` registry, its only public
 surface.
 
 Per design §4.1, reducers live here and are exposed through ONE surface — :data:`REDUCERS`
@@ -15,9 +15,10 @@ increment's own reserved home (design §6) — not under this package's director
 registered here, the same as every other reducer, so ``verify_chain`` and
 ``scripts/kb_produce_facts.py`` need only ever consult this one surface.
 
-``PATTERN_V1``/``pattern_v1`` (CAP addendum I9, D7) DO live under this package
-(``control/reducers/pattern.py``) — the design's own reserved-homes table (§6) puts I9's reducer
-in the reducers package proper, unlike I8's ``profiles.py``.
+``PATTERN_V1``/``pattern_v1`` (CAP addendum I9, D7) and ``CHECKPOINT_V1``/``checkpoint_v1`` (CAP
+addendum I10) DO live under this package (``control/reducers/{pattern,checkpoint}.py``) — the
+design's own reserved-homes table (§6) puts both increments' reducers in the reducers package
+proper, unlike I8's ``profiles.py``.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from __future__ import annotations
 from agentic_dynamics.control.facts import Reducer, ReducerSpec
 from agentic_dynamics.control.profiles import PROFILES_V1, profiles_v1
 from agentic_dynamics.control.reducers.attempt_facts import ATTEMPT_FACTS_V1, attempt_facts_v1
+from agentic_dynamics.control.reducers.checkpoint import CHECKPOINT_V1, checkpoint_v1
 from agentic_dynamics.control.reducers.job_facts import JOB_FACTS_V1, job_facts_v1
 from agentic_dynamics.control.reducers.pattern import PATTERN_V1, pattern_v1
 from agentic_dynamics.control.reducers.policy_facts import POLICY_FACTS_V1, policy_facts_v1
@@ -40,6 +42,7 @@ REDUCERS: dict[str, ReducerSpec] = {
     POLICY_FACTS_V1.version: POLICY_FACTS_V1,
     PROFILES_V1.version: PROFILES_V1,
     PATTERN_V1.version: PATTERN_V1,
+    CHECKPOINT_V1.version: CHECKPOINT_V1,
 }
 
 #: version → pure reducer callable — what ``scripts/kb_produce_facts.py`` invokes.
@@ -51,6 +54,7 @@ _IMPLS: dict[str, Reducer] = {
     POLICY_FACTS_V1.version: policy_facts_v1,
     PROFILES_V1.version: profiles_v1,
     PATTERN_V1.version: pattern_v1,
+    CHECKPOINT_V1.version: checkpoint_v1,
 }
 
 
@@ -76,4 +80,6 @@ __all__ = [
     "profiles_v1",
     "PATTERN_V1",
     "pattern_v1",
+    "CHECKPOINT_V1",
+    "checkpoint_v1",
 ]

@@ -27,8 +27,15 @@ AUTOMATABLE_ACTIONS: frozenset[str] = frozenset({"continue", "route"})
 #: The full action vocabulary a decision may ever propose (design §8.1's table) — a superset of
 #: AUTOMATABLE_ACTIONS. `retry`/`escalate`/`stop` are "proposal only": constructed, validated,
 #: durably recorded, and surfaced as a flag for a human — never applied by an automated path.
+#: `fork`/`compress_and_fork` are CAP addendum I10 additions (design §4.2/§4.3,
+#: `experiments/contexts/session_routing.yaml`'s `allowed_actions`) — widened explicitly here,
+#: the same "each increment grows this vocabulary, never silently" discipline
+#: `control/facts.py`'s own predicate/allowlist tables already follow. Both are proposal-only,
+#: same as `retry`/`stop`: `AUTOMATABLE_ACTIONS` (above) is UNCHANGED by this addition.
+#: `escalate` was already present (I6) — the session-routing `escalate` REUSES that same action
+#: name (a real actuation: a model change), never a second name for the same concept.
 PROPOSABLE_ACTIONS: frozenset[str] = frozenset(
-    {"continue", "route", "retry", "escalate", "stop"}
+    {"continue", "route", "retry", "escalate", "stop", "fork", "compress_and_fork"}
 )
 
 #: `Precondition.op` — the comparison vocabulary a TOCTOU re-check may use (design §8.2).

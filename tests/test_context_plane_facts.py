@@ -281,6 +281,13 @@ def test_predicate_registry_has_the_design_seed_rows():
         "domain_profile_version",
         "challenge_profile_version",
         "pattern",
+        "session_checkpoint",
+        "checkpoint_present",
+        "checkpoint_goal_unchanged",
+        "checkpoint_phase_unchanged",
+        "checkpoint_model_unchanged",
+        "model_change_required",
+        "checkpoint_snapshot_identity",
     }
 
 
