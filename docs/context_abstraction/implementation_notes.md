@@ -327,3 +327,102 @@ the reducer/fact-minting path, versioning/supersession, `compose_requirements`/`
 never-widens property both as a pure function and through the real `compile_context`).
 Full suite green: `pytest tests/ -k "context_plane or dependency_direction or cap_i0_i3"` — 252
 passed. PASS.
+
+## 14. I9 — the `pattern` fact kind (`control/reducers/pattern.py`, D7)
+
+Implements `docs/designs/current/context_abstraction_addendum_design.md` §3 (answers OQ4/OQ5)
+against the REAL I0–I8 code. Proposal-only actuation; `apply` stays OFF (unaffected — this
+increment adds no controller, no routing, no new actuation call site).
+
+**Schema (`control/facts.py`, additive, I0's own home).** `PatternPayload` (frozen dataclass:
+`claim`/`population`/`conditions`/`support`/`uncertainty`/`validity_window`/
+`source_experiment`) plus one additive `FACT_PREDICATES["pattern"]` row
+(`abstraction_level="workload"`, `scope_type="workload"`, `value_type="str"` — the canonical
+JSON of `PatternPayload`, payload-in-value, `inheritable=True`). Per D7, **no new
+`EPISTEMIC_MAP` row was added** — every `pattern` fact's `epistemic_status` is the EXISTING
+`"derived"` row (`Authority.DERIVED`, `"[C]"`); verified explicitly by
+`test_no_new_epistemic_map_row_was_added` (asserts the map's key set is exactly the original
+five). This widens `tests/test_context_plane_facts.py`'s two exact-set completeness assertions
+(`test_predicate_registry_has_the_design_seed_rows`, `test_predicate_inheritance_flags_match_
+the_design_table`) to include `"pattern"`, per that file's own "each increment widens this
+allowlist explicitly, never silently" rule (the same rule I8 followed in §13). No new call-site
+allowlist entry was needed: `control/reducers/pattern.py` falls under the reducers package's
+existing wholesale directory allowlist (`LEGITIMATE_DIRS`).
+
+**The reducer (`control/reducers/pattern.py`, new — the design's own reserved home, §6).**
+`PATTERN_V1`/`pattern_v1` is the SOLE registered producer of the `pattern` predicate
+(`FACT_PREDICATES["pattern"].produced_by == ("pattern/v1",)`) — hard rule 3 made concrete for
+this class (D3). `consumes` names the canonical-corpus tables (`finding`, `review`, `analysis` —
+review constraint 4; NOT the retired `_results_summary.json`); v1 mines only `finding` evidence,
+since that is the table carrying the structured `test_executed_success` field a pattern's
+`support`/`conditions` need — `review`/`analysis` items are accepted (never crash) but
+contribute nothing, the same "nothing to compute over → skip, never fabricate" posture as an
+empty slice.
+
+**Population slicing and the no-phantom rule (§3.3, verified against real records).** Findings
+are grouped by `(task, perturbation_class)` (`row["_experiment"]` / `row["perturbation_class"]`
+— the axes an actual finding row carries; the design's own worked example used `task`+
+`condition`, an axis story records carry that finding records do not, so this is an adaptation
+to the real schema, not a deviation from the design's intent). The coverage invariant is applied
+TWICE, both verified by dedicated tests: (a) an empty slice mints no fact
+(`test_empty_population_mints_no_fact`); (b) a row whose `test_executed_success` is not a real
+`bool` is excluded from the slice entirely — never coerced into a "non-match"
+(`test_unmeasured_outcomes_alone_mint_no_fact`) — the same null-is-not-zero rule
+`measurement_coverage.py` enforces for cost/quality averages, applied here to a proportion's
+population. `support` is a plain COUNT over deduplicated real rows (never an estimate); a
+duplicate input row (the same lab-contract ref handed in twice) is deduped before counting,
+mirroring `workflow_facts_v1`'s own r4 precedent (`test_duplicate_finding_records_are_deduped_
+not_double_counted`). `uncertainty` is a 95% Wilson interval width, computed only at
+`total >= MIN_SUPPORT_FOR_UNCERTAINTY = 3` (the same repetition floor the design's own F5 fix
+uses, §4.4: "3 attempts/cell → the uncertainty term is estimable") — `None` below it, never a
+fabricated number.
+
+**`source_experiment` via lab-contract refs (§3.5) — REUSE, not a new cite format.**
+`reporting.lab_contract.record_id(row)` yields the `"finding:<entity_id>:<knowledge_id>"` ref
+per the design's own example; the reducer cites the lexicographically smallest ref among the
+slice's records as `source_experiment` (deterministic) while `evidence_ids` carries the full
+supporting set. `inputs_digest` is NOT recomputed via a second hash primitive
+(`lab_contract.refs_digest`) — it uses the EXISTING `facts.recompute_inputs_digest` every other
+reducer's fact uses (sha256 over sorted `evidence_ids` + `reducer_version`), which is not
+optional: `verify_chain`'s check 3 always recomputes a fact's digest with that ONE formula
+regardless of which reducer produced it, so a second formula would simply fail verification.
+This is the same "no new hash, no new format" reuse the design asks for, achieved through the
+schema's own existing helper rather than importing `lab_contract.refs_digest` a second time.
+
+**Minting rules — hard rule 3 made executable, exercised end to end.** An LLM-proposed pattern
+(`epistemic_status="advisory"`, a `reducer_version` that is not `pattern/v1`) is (a) never
+`is_canonical()` (`test_advisory_pattern_is_never_canonical`), (b) refused by `verify_chain`
+as belt-and-braces (`test_advisory_pattern_fails_verify_chain_too`), and (c) refused by the
+REAL validator check C5 when cited in a `ControlDecision.facts_used`
+(`test_advisory_pattern_proposal_is_uncitable_by_validate_decision_c5` — builds a minimal
+synthetic `ContractSpec`/`ControlContext` directly, since no committed contract requires the
+`pattern` predicate yet; C1–C4 are satisfied so the assertion exercises C5 itself, not an
+earlier short-circuit).
+
+**Minor defensive addition (not a deviation, not requested by the design): identity
+sanitization.** `_slug()` sanitizes `task`/`perturbation_class` (non-alnum → `_`) before joining
+them into the fact's `subject_id`/`scope_id`, mirroring `_common.cell_id`'s existing
+sanitization for spec name + model — closes a theoretical `fact_entity_id` collision if either
+axis ever contained a `/` (real corpus values today are simple identifiers, so this is
+defense-in-depth, not a fix for an observed bug).
+
+**Deliberately NOT done — the producer wiring gap (mirrors I8's own deferral, §13).**
+`scripts/kb_produce_facts.py`'s `derive_facts()` dispatcher has no branch for `pattern/v1` (the
+same gap I8 already left for `profiles/v1` — the CLI's `choices=tuple(REDUCERS)` accepts it, but
+the dispatcher would fall through to the `spec_status/v1` evidence-loading branch and hand
+`pattern_v1` spec-index evidence it correctly ignores, `source_type != "finding"`, yielding zero
+facts rather than crashing). Wiring a real `finding`-evidence loader into that script is
+producer-wiring work, out of this increment's reserved home (§6 lists only
+`control/reducers/pattern.py` and the additive `control/facts.py` rows) and out of the GUARD
+("no new transport") — left for the same future increment that will wire I8's producer.
+
+Tests: `tests/test_context_plane_pattern.py` (new, 18 cases) — the fact-kind/no-new-map-row
+check, reducer registration, a pattern derived from real fixture records AND from the REAL
+canonical corpus (`canonical_corpus.load_canonical_tables("finding")`, skips gracefully if
+unresolved rather than fabricating), grouping independence, the uncertainty estimability floor,
+the two coverage-invariant no-phantom cases, non-`finding` evidence being ignored, duplicate-row
+dedup, re-derivation byte-stability (forward and reversed input order) and idempotence,
+`verify_chain` refusing an unregistered reducer, and the three-layer ADVISORY-uncitability
+proof. `tests/test_context_plane_facts.py` widened (2 exact-set assertions +1 row each).
+Full suite green: `pytest tests/ -k "context_plane or dependency_direction"` — 257 passed
+(239 pre-existing + 18 new). `ruff check` clean on every touched file. PASS.

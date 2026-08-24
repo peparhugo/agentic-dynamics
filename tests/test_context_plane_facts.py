@@ -280,6 +280,7 @@ def test_predicate_registry_has_the_design_seed_rows():
         "max_attempts",
         "domain_profile_version",
         "challenge_profile_version",
+        "pattern",
     }
 
 
@@ -315,6 +316,7 @@ def test_predicate_inheritance_flags_match_the_design_table():
         "max_attempts",
         "domain_profile_version",
         "challenge_profile_version",
+        "pattern",
     }
     # Only the workflow aggregates declare ``aggregates_from`` (the legal upward roll-up path,
     # §10.2.3); every other predicate defaults it to "" (no implicit upward rollup).

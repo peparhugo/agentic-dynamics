@@ -219,6 +219,59 @@ class PredicateSpec:
     """When set, the child predicate this one rolls up from — the only legal upward path."""
 
 
+# ── PatternPayload (§3.2, CAP addendum I9) ──────────────────────
+
+
+@dataclass(frozen=True)
+class PatternPayload:
+    """The typed body of every ``pattern`` fact (addendum design §3.2, D7).
+
+    A ``pattern`` fact's ``value`` is the canonical JSON of this dataclass — the same
+    payload-in-value convention every other fact uses for a scalar
+    (``encode_value``/``_common.encode_value``), just for a structured value instead of a
+    string/int/float. It is declared here, in the schema module, rather than in the reducer
+    that mints it (``control/reducers/pattern.py``) because it IS the fact-kind declaration:
+    ``FACT_PREDICATES["pattern"]`` names this shape, exactly as the design's reserved-homes
+    table (§6) puts it.
+
+    Every field exists so a consumer can judge TRANSFERABILITY instead of blindly trusting the
+    claim: what the abstraction says, over what population, under what conditions, with how
+    much support, with what residual uncertainty, over what validity window, and from which
+    experiment. ``support``/``uncertainty`` MUST come from real records counted by the
+    registered ``pattern/v1`` reducer — never fabricated, never estimated by an LLM (§3.4).
+    """
+
+    claim: str
+    """The compressed abstraction, e.g. ``"recovers_under_objective_mutation"``."""
+
+    population: str
+    """The exact corpus slice this pattern was learned over, e.g.
+    ``"finding:task=task_manager,perturbation_class=objective_mutation"`` — a human-readable,
+    reproducible slice descriptor, never an opaque id."""
+
+    conditions: tuple[str, ...]
+    """What a record in ``population`` must satisfy to count toward ``support`` — the exact
+    matching predicate the reducer applied, e.g. ``("test_executed_success=true",)``."""
+
+    support: int
+    """The COUNT of real records in ``population`` satisfying ``conditions`` — never an
+    estimate, never fabricated when the slice is empty (the coverage invariant: a population
+    with zero rows yields NO fact at all, not a ``support=0`` fact — §3.3)."""
+
+    uncertainty: float | None
+    """A deterministic statistic over the same rows (e.g. an interval width on the observed
+    rate). ``None`` exactly when the slice is too small to estimate — never a fabricated
+    number standing in for "unknown"."""
+
+    validity_window: str
+    """The version/revision range this pattern claims to hold over."""
+
+    source_experiment: str
+    """A lab-contract ref citing the single representative record backing this claim —
+    ``"<table>:<entity_id>:<knowledge_id>"`` (REUSE ``reporting.lab_contract.record_id``,
+    design §3.5). The full supporting set is carried by the fact's own ``evidence_ids``."""
+
+
 #: The predicate registry — the design's §3.5 seed table (16 rows). Every row names its
 #: ``produced_by`` reducer; a predicate with no producer is unrepresentable here by construction.
 FACT_PREDICATES: dict[str, PredicateSpec] = {
@@ -592,6 +645,29 @@ FACT_PREDICATES: dict[str, PredicateSpec] = {
         scope_type="workload",
         abstraction_level="policy",
         produced_by=("profiles/v1",),
+        default_ttl_seconds=None,
+        volatile=False,
+        inheritable=True,
+    ),
+    # pattern fact (CAP addendum I9, D7 — design §3.1/§3.5). Deliberately NO new EPISTEMIC_MAP
+    # row: a pattern's epistemic status is the EXISTING "derived" row (Authority.DERIVED, "[C]")
+    # because epistemic_status answers "how do we know this" (a deterministic reducer computed
+    # it from measured evidence) while the `pattern` predicate only answers "what kind of
+    # statement is this" — collapsing the two axes into one map entry would be exactly the drift
+    # EPISTEMIC_MAP's single-discriminator design (§3.4) exists to prevent. `abstraction_level=
+    # "workload"`: a pattern compresses corpus-wide campaign experience, never one job/attempt.
+    # `inheritable=True`: mirrors the L5 policy rows above — a corpus-wide pattern is visible to
+    # every descendant scope that wants to cite it, never locked to the run that minted it.
+    # `value_type="str"`: the canonical JSON of PatternPayload (payload-in-value, §3.2) — a
+    # structured value, same convention as every scalar predicate's encoded string.
+    "pattern": PredicateSpec(
+        name="pattern",
+        value_type="str",
+        unit="",
+        subject_type="workload",
+        scope_type="workload",
+        abstraction_level="workload",
+        produced_by=("pattern/v1",),
         default_ttl_seconds=None,
         volatile=False,
         inheritable=True,
