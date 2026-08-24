@@ -37,7 +37,7 @@
       "policy_arm": "baseline",
       "model": "anthropic/claude-sonnet-5",
       "condition": "bad_seed",
-      "mutation_artifact": "compile_mutation(bad_seed seam, s=0.2)",
+      "mutation_artifact": "inject_bug@0.2 (verified: mut_3caacc977303246d)",
       "strength": 0.2,
       "max_attempts": 1,
       "retry_rule": "baseline: score the single attempt unconditionally (no retry)",
@@ -50,7 +50,7 @@
       "policy_arm": "grit_retry",
       "model": "anthropic/claude-sonnet-5",
       "condition": "bad_seed",
-      "mutation_artifact": "compile_mutation(bad_seed seam, s=0.2)",
+      "mutation_artifact": "inject_bug@0.2 (verified: mut_3caacc977303246d)",
       "strength": 0.2,
       "max_attempts": 2,
       "retry_rule": "grit_retry: second attempt (attempt_number=2, parent_attempt_id=first) only if first test_executed_success is false",
@@ -89,7 +89,7 @@
       "policy_arm": "baseline",
       "model": "anthropic/claude-sonnet-5",
       "condition": "bad_seed",
-      "mutation_artifact": "compile_mutation(bad_seed seam, s=0.8)",
+      "mutation_artifact": "inject_bug@0.8 (verified: mut_1957f3238ebc0f5c)",
       "strength": 0.8,
       "max_attempts": 1,
       "retry_rule": "baseline: score the single attempt unconditionally (no retry)",
@@ -102,12 +102,17 @@
       "policy_arm": "grit_retry",
       "model": "anthropic/claude-sonnet-5",
       "condition": "bad_seed",
-      "mutation_artifact": "compile_mutation(bad_seed seam, s=0.8)",
+      "mutation_artifact": "inject_bug@0.8 (verified: mut_1957f3238ebc0f5c)",
       "strength": 0.8,
       "max_attempts": 2,
       "retry_rule": "grit_retry: second attempt (attempt_number=2, parent_attempt_id=first) only if first test_executed_success is false",
       "status": "pending",
       "attempts": []
     }
-  ]
+  ],
+  "findings_resolution": {
+    "F1_F2": "bad_seed not a compilable operator + run_story mutation seam was gate-only; wired the seam in orchestration.py and use verified inject_bug artifacts at declared strengths (deviation recorded, runplan 3.3).",
+    "F3": "perturbation_strength patched to declared cell strength in ledger attempt rows.",
+    "F4": "low/high use explicit compiled+verified codebase mutations; mid uses the standard on-disk bad variant."
+  }
 }

@@ -95,9 +95,17 @@ def run_story(
     # Resolve condition to mutations
     codebase_path_obj = Path(codebase_path)
 
-    # BAD_SEED condition: use the pre-generated bad variant on disk
+    # BAD_SEED condition: use the pre-generated bad variant on disk, UNLESS the caller
+    # supplies an explicit mutation artifact (the documented override seam — "overrides
+    # condition"). When ``mutation`` is provided it REPLACES the condition's own
+    # degradation entirely: the good codebase is used as the seed and the artifact is
+    # applied on top (its strength becomes ``perturbation_strength``). Previously the
+    # parameter was only read as a gate (`if mutation is None and ...`) and the supplied
+    # artifact was never applied to the worktree — the docstring promised an override that
+    # the implementation dropped. See docs/designs/current/cap_grit_grid_runplan.md finding
+    # F2 (E4 run plan, x1).
     actual_codebase_path = codebase_path
-    if condition == PerturbationCondition.BAD_SEED:
+    if condition == PerturbationCondition.BAD_SEED and mutation is None:
         bad_path = codebase_path_obj.parent / "bad"
         if bad_path.exists() and any(bad_path.iterdir()):
             actual_codebase_path = str(bad_path)
@@ -105,12 +113,25 @@ def run_story(
     story_specs = [s.prompt for s in story.sessions]
     codebase_mutation = None
     spec_mutations = {}
-    if mutation is None and condition != PerturbationCondition.CLEAN:
+    if mutation is not None:
+        codebase_mutation = mutation
+    elif condition != PerturbationCondition.CLEAN:
         codebase_mutation, spec_mutations = condition_to_mutations(
             condition,
             codebase_path_obj,
             story_specs,
         )
+
+    # The strength axis follows the effective degradation: an explicit mutation's own
+    # strength, else the condition's canonical value (0.0 for CLEAN, CONDITION_STRENGTH
+    # for every degrading condition). Previously always CONDITION_STRENGTH for any
+    # non-CLEAN condition even when an explicit artifact carried a different strength
+    # (runplan finding F3).
+    perturbation_strength = (
+        mutation.strength
+        if mutation is not None
+        else (0.0 if condition == PerturbationCondition.CLEAN else CONDITION_STRENGTH)
+    )
 
     result = StoryResult(
         story_name=story.name,
@@ -118,9 +139,9 @@ def run_story(
         codebase_path=codebase_path,
         language=story.language,
         model=model,
-        mutation_id="",
+        mutation_id=mutation.mutation_id if mutation is not None else "",
         perturbation_condition=condition.value,
-        perturbation_strength=0.0 if condition == PerturbationCondition.CLEAN else CONDITION_STRENGTH,
+        perturbation_strength=perturbation_strength,
         started_at=datetime.now(timezone.utc).isoformat(),
         worktree=str(worktree),
     )
