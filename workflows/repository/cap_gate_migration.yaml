@@ -1,0 +1,132 @@
+name: cap_gate_migration
+question: >-
+  Migrate committed spec rules onto the CAP I5 requires_facts/decision_type vocabulary so the
+  R1-R11 gate is exercised for real. The gate scan proved the validator is correct but vacuous:
+  0 of 131 rules across 94 specs declare the new vocabulary, so the load-bearing rule has never
+  fired on a real spec. This workflow translates every in-scope rule's information requirements
+  into requires_facts entries mapped against the REAL FACT_PREDICATES registry (29 predicates),
+  re-runs validate_fact_contracts until the gate actually fires (positive refusals for unmappable
+  requirements) or passes (correctly-migrated rules), records unmappable requirements as BLOCKED
+  with the missing producer named (the instrumentation backlog), and adversarially re-scans to
+  zero. Skip the three in-flight workflows (cap_shadow_campaign, cap_fact_auto_emit,
+  cap_addendum_implement — never edit a spec whose runner may resume it). Deliver
+  docs/designs/current/cap_gate_migration.md with the full mapping table + gap list.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / spec
+        lifecycle. canonical_sources: [src/agentic_dynamics/core/contracts.py (R1-R11 gate),
+        src/agentic_dynamics/control/facts.py (FACT_PREDICATES — the closed 29-predicate
+        vocabulary), src/agentic_dynamics/experiment/experiment_spec.py (RuleSpec: requires_facts,
+        decision_type), experiments/specs/index.json (the 94-spec corpus)].
+        policies: [gate_is_truth, intent_preserving_migration, never_edit_inflight_specs]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: cross_cutting migration.
+        deliberation: [inventory requirements, map to predicates, migrate, gate, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        validate_fact_contracts (R1-R11) merged; the gate scan reproduced 0 refusals because no
+        rule declares the new vocabulary. FACT_PREDICATES holds 29 real predicates (spec_status,
+        phase_status, attempt_cost_usd, attempt_confidence, job_status, attempt_cache_hit_rate,
+        ...). In-flight workflows (cap_shadow_campaign, cap_fact_auto_emit,
+        cap_addendum_implement) must NOT be touched — their runners may resume and re-read the
+        spec file.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) NEVER edit the three
+        in-flight specs (cap_shadow_campaign, cap_fact_auto_emit, cap_addendum_implement) nor any
+        spec whose workflow has a live runner; skip them and say so in the doc. (3) The gate is
+        truth: a refusal means the requirement is unmappable — fix by correct mapping or honest
+        removal preserving intent; a requirement with NO real predicate becomes a BLOCKED row
+        naming the missing producer (this IS the load-bearing rule firing — record each firing).
+        (4) Migrations are intent-preserving: the new requires_facts/decision_type must express
+        exactly what the legacy requires/produces meant; a weakened requirement (e.g. min_authority
+        lowered to sneak through) is a defect. (5) decision_type only where a contract exists or
+        is declared alongside; no phantom contracts. (6) Regenerate the spec index (spec_status)
+        after any spec edit. (7) No edits to contracts.py/facts.py — the gate and vocabulary are
+        fixed. (8) The adversarial phase (m3) is mandatory — at least 3 findings or clean sweep.
+        (9) PASS/FAIL log.
+      read_first: >-
+        src/agentic_dynamics/core/contracts.py, src/agentic_dynamics/control/facts.py
+        (FACT_PREDICATES), src/agentic_dynamics/experiment/experiment_spec.py (RuleSpec fields),
+        docs/designs/current/cap_gate_scan.md (prior findings), experiments/specs/index.json
+      run_shape: >-
+        SINGLE-model: --model anthropic/claude-sonnet-5 --backend claude_cli. One worktree, one
+        branch (feature/cap-gate-migration); each phase commits [workflow] <phase>.
+    phases:
+      - name: m1_inventory_and_map
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER: the migration mapping table in docs/designs/current/cap_gate_migration.md —
+          for EVERY rule in the corpus (minus the three in-flight specs): spec, rule, plane,
+          legacy requires/produces, proposed requires_facts entries (fact -> scope -> min_authority
+          -> on_missing), mapped predicate from FACT_PREDICATES or GAP.
+          SHAPE: load each spec via ExperimentSpec.from_dict; enumerate rules; for each legacy
+          requirement name the nearest real predicate (read FACT_PREDICATES; a requirement with no
+          honest mapping is a GAP, never a stretch). Count: rules migrated, rules with GAPs.
+          GUARD: every mapping row names the predicate and shows the FACT_PREDICATES entry;
+          in-flight specs listed as SKIPPED, not mapped.
+          LOG: mapping counts; PASS/FAIL; commit.
+      - name: m2_migrate_and_gate
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: apply the migrations to the in-scope specs (edit the YAML rules: requires_facts
+          with proper FactRequirement fields, decision_type where a contract exists). Then run
+          validate_fact_contracts over every migrated spec with the REAL FACT_PREDICATES/REDUCERS.
+          Every firing is a finding: either the mapping was wrong (fix it) or the requirement
+          genuinely has no producer (drop it with an intent-preserving note in the spec's writeup
+          and record the BLOCKED row naming the missing producer). Continue until the gate passes
+          on every in-scope spec. Regenerate the index.
+          GUARD: rules still mean what they meant; no weakened authorities; no phantom decision
+          types.
+          LOG: fires observed (this is the load-bearing rule's first real enforcement — log each),
+          fixes, BLOCKED rows; PASS/FAIL; commit.
+      - name: m3_adversarial_rescan
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial re-scanner. Attack the migration: (1) re-enumerate the corpus
+          independently and re-run the gate to zero refusals on in-scope specs; (2) hunt weakened
+          mappings (min_authority lowered vs the legacy intent, scope widened, on_missing
+          classified where it was halt); (3) hunt phantom decision_types (contract referenced but
+          not declared); (4) hunt GAP rows that were secretly "fixed" by stretching a predicate
+          that is not produced in the requirement's scope; (5) confirm the three in-flight specs
+          are untouched (git diff clean for them); (6) confirm index parity.
+          Every finding: fix or re-record. Final state: zero refusals on in-scope specs, every GAP
+          named with its missing producer (the instrumentation backlog), doc updated.
+          LOG: finding table; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules:
+  - name: cap_gate_migrated
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [inventory_documented, specs_migrated, gate_fired, migration_adversarial_clean]
+metrics:
+  - {name: inventory_documented, agg: mean, over: cell}
+  - {name: specs_migrated, agg: mean, over: cell}
+  - {name: gate_fired, agg: mean, over: cell}
+  - {name: migration_adversarial_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, m1_inventory_and_map, m2_migrate_and_gate, m3_adversarial_rescan]
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
