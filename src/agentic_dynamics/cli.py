@@ -22,6 +22,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # experiment
     ("experiment", "run"): "run.py",
     ("experiment", "cap-grit-grid"): "run_cap_grit_grid.py",
+    ("experiment", "cap-grit-measure"): "measure_cap_grit_grid.py",
     ("experiment", "sweep-parallel"): "sweep_parallel.py",
     ("experiment", "sweep-silent"): "sweep_silent_mode.py",
     ("experiment", "batch"): "batch_run.py",
