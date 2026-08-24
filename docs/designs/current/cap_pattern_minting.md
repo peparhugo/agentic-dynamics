@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # CAP pattern minting — inventory, minting table, writeup
 
 **Status:** p1_inventory_labs (this file's §1 is the p1 deliverable; §2–§3 are written by the
@@ -237,7 +240,117 @@ code change is the producer's `pattern/v1` evidence branch (+ one hermetic integ
 
 ## 3. Writeup (p3)
 
-*Filled by phase p3_writeup: the pattern set (claim, support, uncertainty, validity window,
-source), what each pattern would allow a routing rule to consume, which labs were skipped and
-why, and the D1/D2 note (patterns are now mintable facts; their retrieval projection is a
-separate decision).*
+### 3.1 The pattern set — what was minted and what it claims
+
+Six `pattern` facts are minted and registered (§2, all DERIVED/[C], all verified). Every number
+below is the registered fact's own payload, re-read from `experiments/results/registry_index.jsonl`
++ the durable artifacts (`experiments/results/kb/<knowledge_id>.json`); nothing is recomputed or
+estimated here.
+
+| Pattern | Claim | Support / total | Uncertainty (95% Wilson width) | Validity window (`source_revision`) | Source |
+|---|---|---|---|---|---|
+| `pattern/process_perturbation_resample/baseline` | recovers_under_baseline | 2 / 3 | 0.7308 | `eceee4bba9c5…` | canonical finding corpus (3 rows) |
+| `pattern/process_perturbation_resample/process_perturbation` | recovers_under_process_perturbation | 7 / 12 | 0.4872 | `eceee4bba9c5…` | canonical finding corpus (12 rows) |
+| `pattern/task_manager/baseline` | recovers_under_baseline | 5 / 7 | 0.5588 | `eceee4bba9c5…` | canonical finding corpus (7 rows) |
+| `pattern/task_manager/objective_mutation` | recovers_under_objective_mutation | 11 / 14 | 0.4002 | `eceee4bba9c5…` | canonical finding corpus (14 rows) |
+| `pattern/task_manager/process_perturbation` | recovers_under_process_perturbation | 8 / 14 | 0.4603 | `eceee4bba9c5…` | canonical finding corpus (14 rows) |
+| `pattern/task_manager/specification_corruption` | recovers_under_specification_corruption | 12 / 14 | 0.3593 | `eceee4bba9c5…` | canonical finding corpus (14 rows) |
+
+Every pattern shares one `conditions = ("test_executed_success=true",)` (the reducer's v1 matching
+predicate — design §3.3) and one population shape
+(`finding:task=<task>,perturbation_class=<class>`). The claims are all of one family — **grit
+recovery**: "within this task × perturbation-class slice, test-executed success is observed at
+support/total, with the stated 95% Wilson-interval width." The honest reading of the weakest
+facts: P1 (`recovers_under_baseline` at 2/3, resample) and P3 (`recovers_under_baseline` at 5/7)
+are small-n baseline slices — their uncertainty widths (0.73, 0.56) say these are weak, high-
+variance statements, exactly as the coverage invariant intends. The `task_manager` perturbed-class
+patterns (P4–P6, n=14 each, widths 0.36–0.46) are the strongest minted claims.
+
+### 3.2 What each pattern would allow a routing rule to consume
+
+A `pattern` fact is a **workload-scoped, inheritable, DERIVED fact**
+(`FACT_PREDICATES["pattern"]`: `scope_type="workload"`, `abstraction_level="workload"`,
+`inheritable=True`, `produced_by=("pattern/v1",)`, `value_type="str"`). That is precisely the
+shape a routing rule may already require:
+
+- **`requires_facts` availability.** A decision-type contract (e.g. `experiments/contexts/route_next_job.yaml`,
+  `session_routing.yaml`) can declare `- fact: pattern` with `scope: parent`,
+  `min_authority: DERIVED` (the default — satisfied: patterns are DERIVED), and any
+  `on_missing`/`on_conflict` policy. The compiler resolves it via the existing machinery
+  (`context_compiler.compile_context` → `_resolve_requirement` → `FactStore.current_facts`,
+  `scope_visible` honors `inheritable=True` for descendant scopes). **No new capability was
+  needed** — the minting makes the predicate *resolvable*; the contract side was already written
+  (I4/I5).
+- **What a rule reads.** A rule that requires `pattern` receives the fact's `FactRef.value` — the
+  canonical JSON of `PatternPayload` — and decodes it with the single public decoder
+  `control.reducers.pattern.decode_pattern_payload`. It can branch on `claim` (which
+  perturbation class the recovery claim is about), `population` (which task), `support`/`total`
+  and `uncertainty` (how strong the evidence is), `validity_window` (which revision it holds
+  over), and `source_experiment` (the lab-contract ref to cite). This is the same
+  "read the value, branch in the rule function" pattern `route_next_job_v1`/`session_routing_v1`
+  already use for `workflow_phases_remaining`/`allowed_models` (soft `requires_facts`, rule-level
+  branching — see `experiments/contexts/session_routing.yaml` header).
+- **Concretely, a routing rule could now:**
+  - gate an **escalation** decision on a weak recovery pattern (e.g. escalate a `task_manager`
+    job when the relevant slice's `uncertainty` is wide or `support/total` is low) — a
+    measured, citable reason to escalate instead of a heuristic;
+  - **refuse** a "route to cheaper model" action (check C5/C6-clean, DERIVED) when the
+    task's recovery pattern says the cheaper slice recovers poorly;
+  - surface the pattern's `source_experiment`/`evidence_ids` in the decision's
+    `facts_used`/rationale, so the decision traces to the exact finding rows.
+- **Honest limits of v1.** (1) All six claims are the single `recovers_under_*` family — the
+  named non-finding patterns (task_routing, escalation_premium, cache_economics,
+  correctness_premium) are NOT yet mintable (§3.3); a routing rule wanting them stays blocked.
+  (2) The claim is over a `(task, perturbation_class)` slice, not over a *model* — a
+  model-cascade rule needs the model dimension, which `pattern/v1` does not slice on (a future
+  reducer increment). (3) No committed contract currently requires `pattern`; this writeup says
+  what is *possible*, not what is *wired*.
+
+### 3.3 Which labs were skipped and why
+
+Honest support means recording what was NOT minted, and why — no estimate stood in for a real
+table:
+
+1. **Quarantined (hard rule 4 — never minted from): `lab_task_routing`, `lab_correctness_premium`.**
+   Both read the RETIRED `experiments/results/_results_summary.json`
+   (`scripts/lab_manifest.json`, `lab_status: quarantined`; files live in
+   `experiments/results/legacy_labs/`). Their numbers are historical and are not current
+   measurements, so they are excluded regardless of how the named workflow targets wanted them.
+2. **Contract-bearing but not finding-shaped (the `pattern/v1` input door): 7 labs.**
+   `lab_cache_economics`, `lab_condition_effects`, `lab_quality_frontier`, `lab_story_arc`,
+   `lab_story_review`, `lab_verification_frontier`, `lab_verification_value` all carry valid
+   contracts (registry `data-manifest/1.0+701rows`) and real measured tables (§1.2), but their
+   claims are computed over story/review/analysis rows — none carry the structured
+   `test_executed_success`/`perturbation_class`/`_experiment` finding fields `pattern/v1` reads.
+   Their measured numbers are inventoried (§1.2) so a future reducer increment with those input
+   doors can mint them; they are recorded, never guessed.
+3. **Non-lab measured sources inventoried, not v1-mintable.** The escalation premium
+   (`session_routing_retrospective.json`: escalate 7/7 verified, cost-per-verified $3.9238 vs
+   fork_cached $1.2658 → **3.10×**) and E4's grit pilot (`cap_grit_grid_metrics.json`: grit curve
+   {0.0:0.5, 0.2:1.0, 0.5:1.0, 0.8:0.6667}, grit_auc 1.4, recovery_premium 1.1277, 8 cells/9
+   attempts). Both are real measured artifacts, but neither is a canonical-corpus `finding` table;
+   minting them needs a different reducer input door (arm-level and grid-ledger evidence).
+
+**Counts:** 1 mintable source → **6 facts minted**; **2 skipped** (quarantined); **7 skipped**
+(contract-bearing, wrong evidence shape); **2 inventoried** (non-lab measured, not v1-mintable).
+
+### 3.4 D1/D2 note — mintable facts vs their retrieval projection
+
+Patterns are now **mintable facts** (this phase's deliverable: the `pattern` predicate is
+registered in `FACT_PREDICATES` with a single registered producer, and six facts exist in the
+registry as DERIVED/[C], citable, verifiable). That is the *producer-side* half of the design's
+contract (§3.3–§3.5 of `context_abstraction_addendum_design.md`, D7: no new `EPISTEMIC_MAP` row).
+
+The **retrieval projection** is a separate decision, deliberately NOT made here: *which* pattern
+facts reach *which* decision contexts, under what freshness policy, and through which contract's
+`requires_facts` — the consumer side (design §10.2 inheritance/scope, §4.5 staleness). Concretely,
+this phase did not (a) add `fact: pattern` to any committed contract, (b) wire any routing rule to
+read a pattern, or (c) decide the retrieval policy (scope/`max_age_seconds`/`on_missing`) under
+which a pattern surfaces. Those are follow-on decisions that can now be made honestly because the
+facts exist and are verifiable — but minting a fact and projecting it into a decision are two
+different steps, and this writeup does not conflate them.
+
+---
+
+*Generated by phase p3_writeup of `cap_pattern_minting` (deepseek-v4-flash). p1 inventory §1,
+p2 minted facts §2, p3 writeup §3. Verdicts: p1 PASS, p2 PASS, p3 PASS.*
