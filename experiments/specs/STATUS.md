@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-23T23:42:14.409372+00:00`  ·  94 spec(s)
-**Work remaining:** 83 open · 11 completed/retired
+Generated at: `2026-08-24T00:31:55.466676+00:00`  ·  97 spec(s)
+**Work remaining:** 87 open · 10 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -18,12 +18,15 @@ Generated at: `2026-08-23T23:42:14.409372+00:00`  ·  94 spec(s)
 | `cap_addendum_design` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_addendum_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_fact_auto_emit` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_gate_migration` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_gate_scan` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_i0_i3_remediation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_implement_repair` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_routing_evidence_specs` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_session_routing_spec` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_shadow_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_shadow_fact_disposition` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `claude_background_sessions` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `claude_tools_to_skills` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -49,7 +52,8 @@ Generated at: `2026-08-23T23:42:14.409372+00:00`  ·  94 spec(s)
 | `kb_lineage_reconcile` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_producer_factory` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_record_fidelity` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-23 23:16 | fail | anthropic/claude-sonnet-5 | $0.0000 | 2 |
+| `kb_write_path` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `labbook_refresh` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `measurement_bug_fixes` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `measurement_contribution_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `opencode_docs_refresh` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -77,6 +81,7 @@ Generated at: `2026-08-23T23:42:14.409372+00:00`  ·  94 spec(s)
 | `routing_kb_dispatch` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_experiment_design` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_experiment_design_research` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `routing_kb_more_itertools` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_wiring` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -90,8 +95,7 @@ Generated at: `2026-08-23T23:42:14.409372+00:00`  ·  94 spec(s)
 | `website_repoint` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `website_rewrite` | workflow | no | runnable | 0.3 | — | — | — | — | — | 0 |
 | `workflow_step_routing` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
-| `routing_kb_more_itertools` | workflow | no | failed | 0.1 | — | 2026-08-23 23:16 | fail | anthropic/claude-sonnet-5 | $0.0000 | 1 |
-| `code_review` | workflow | no | completed | 0.1 | — | 2026-08-23 23:37 | ok | anthropic/claude-sonnet-5 | $8.2082 | 1 |
+| `code_review` | workflow | no | completed | 0.1 | — | 2026-08-24 00:31 | ok | deepseek/deepseek-v4-flash | $0.0342 | 1 |
 | `consolidation_release` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_release_execute` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_0_architecture_spine` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
@@ -101,7 +105,6 @@ Generated at: `2026-08-23T23:42:14.409372+00:00`  ·  94 spec(s)
 | `consolidation_stage_4_instruction_surfaces` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_5_apps_realignment` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_6_verification_release` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
-| `kb_write_path` | workflow | no | completed | 0.1 | — | 2026-08-23 23:42 | ok | anthropic/claude-sonnet-5 | $1.4435 | 1 |
 
 ## Legend
 

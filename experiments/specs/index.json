@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-23T23:42:14.409372+00:00",
-  "n_specs": 94,
+  "generated_at": "2026-08-24T00:31:55.466676+00:00",
+  "n_specs": 97,
   "specs": [
     {
       "name": "agentic_dynamics_rebrand",
@@ -184,6 +184,24 @@
       "n_runs": 0
     },
     {
+      "name": "cap_gate_migration",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_gate_migration.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
       "name": "cap_gate_scan",
       "version": "0.1",
       "status": "runnable",
@@ -238,6 +256,24 @@
       "n_runs": 0
     },
     {
+      "name": "cap_routing_evidence_specs",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_routing_evidence_specs.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
       "name": "cap_session_routing_evidence",
       "version": "0.2",
       "status": "runnable",
@@ -278,6 +314,24 @@
       "version": "0.1",
       "status": "runnable",
       "spec_path": "workflows/repository/cap_shadow_campaign.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "cap_shadow_fact_disposition",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_shadow_fact_disposition.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],
@@ -742,6 +796,24 @@
       "n_runs": 0
     },
     {
+      "name": "kb_write_path",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/kb_write_path.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
       "name": "labbook_refresh",
       "version": "0.1",
       "status": "runnable",
@@ -751,13 +823,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-23T23:16:42.203793+00:00",
-      "latest_ok": false,
-      "latest_model": "anthropic/claude-sonnet-5",
-      "latest_cost_usd": 0.0,
-      "latest_git_sha": "5b76b5bb3",
-      "results_pointer": "experiments/results/workflows/labbook_refresh/20260823T231642Z.json",
-      "n_runs": 2
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
     },
     {
       "name": "measurement_bug_fixes",
@@ -1246,6 +1318,24 @@
       "n_runs": 0
     },
     {
+      "name": "routing_kb_more_itertools",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/research/routing_kb_more_itertools.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
       "name": "routing_kb_wiring",
       "version": "0.1",
       "status": "runnable",
@@ -1480,24 +1570,6 @@
       "n_runs": 0
     },
     {
-      "name": "routing_kb_more_itertools",
-      "version": "0.1",
-      "status": "failed",
-      "spec_path": "workflows/research/routing_kb_more_itertools.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-23T23:16:44.815678+00:00",
-      "latest_ok": false,
-      "latest_model": "anthropic/claude-sonnet-5",
-      "latest_cost_usd": 0.0,
-      "latest_git_sha": "5b76b5bb3",
-      "results_pointer": "experiments/results/workflows/routing_kb_more_itertools/20260823T231644Z.json",
-      "n_runs": 1
-    },
-    {
       "name": "code_review",
       "version": "0.1",
       "status": "completed",
@@ -1507,12 +1579,12 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-23T23:37:11.040401+00:00",
+      "last_run_at": "2026-08-24T00:31:55.420001+00:00",
       "latest_ok": true,
-      "latest_model": "anthropic/claude-sonnet-5",
-      "latest_cost_usd": 8.208239,
-      "latest_git_sha": "7f7812da1",
-      "results_pointer": "experiments/results/workflows/code_review/20260823T233711Z.json",
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.03422,
+      "latest_git_sha": "3e938faf6",
+      "results_pointer": "experiments/results/workflows/code_review/20260824T003155Z.json",
       "n_runs": 1
     },
     {
@@ -1676,24 +1748,6 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0
-    },
-    {
-      "name": "kb_write_path",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/kb_write_path.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-23T23:42:14.335836+00:00",
-      "latest_ok": true,
-      "latest_model": "anthropic/claude-sonnet-5",
-      "latest_cost_usd": 1.443496,
-      "latest_git_sha": "30581bd10",
-      "results_pointer": "experiments/results/workflows/kb_write_path/20260823T234214Z.json",
-      "n_runs": 1
     }
   ]
 }
