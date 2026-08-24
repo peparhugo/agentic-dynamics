@@ -62,7 +62,12 @@ workflow:
         total realized cost tracked against the $10 ceiling; if Claude returns usage-cap errors,
         commit any in-flight work and FAIL the phase (exit non-zero) so the WORKFLOW halts — a
         cap-stop is never a phase completion; a subsequent --resume re-runs the phase from the
-        committed state. (7) x3 refuses an empty ledger: if zero cells have attempts
+        committed state. (7) COST RE-BASELINE (post-E4 lesson): BEFORE committing a budget
+        ceiling, a future live grid must measure one representative story attempt's realized
+        cost empirically (the E4 pilot's $0.30–0.60/story heuristic estimate was ~10× low —
+        realized $3.07–4.13/story, total 3.1× over the ceiling). Scale the ceiling from the
+        measured per-story cost × cells × max attempts; a heuristic is never a budget.
+        (8) x3 refuses an empty ledger: if zero cells have attempts
         (grid_status != "complete"), x3 FAILS rather than computing metrics over nothing. (8) The adversarial phase (x5) is
         mandatory. (8) PASS/FAIL log.
       read_first: >-
