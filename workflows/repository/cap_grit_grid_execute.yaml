@@ -60,7 +60,10 @@ workflow:
         first: if an attempt lacks actual_cost or test_executed_success, the coverage rule reports
         it — never fabricate. (6) Stop discipline: per-cell realized cost logged before each run;
         total realized cost tracked against the $10 ceiling; if Claude returns usage-cap errors,
-        commit progress and STOP cleanly (resumable). (7) The adversarial phase (x5) is
+        commit any in-flight work and FAIL the phase (exit non-zero) so the WORKFLOW halts — a
+        cap-stop is never a phase completion; a subsequent --resume re-runs the phase from the
+        committed state. (7) x3 refuses an empty ledger: if zero cells have attempts
+        (grid_status != "complete"), x3 FAILS rather than computing metrics over nothing. (8) The adversarial phase (x5) is
         mandatory. (8) PASS/FAIL log.
       read_first: >-
         experiments/definitions/cap_grit_strength_grid.yaml (full — the 9 findings are the
@@ -100,8 +103,8 @@ workflow:
           is false, run the second attempt (attempt_number=2, parent_attempt_id=first) before
           scoring; record LEDGER_FIELDS-compliant attempt rows into the grid ledger; commit
           progress per cell.
-          GUARD: sequential; per-cell cost tracked; on Claude usage-cap errors commit + STOP
-          (resumable); no cell run on a model other than sonnet-5.
+          GUARD: sequential; per-cell cost tracked; on Claude usage-cap errors commit any
+          in-flight work and FAIL the phase (exit non-zero) so the workflow halts; no cell run on a model other than sonnet-5.
           DELIVER: the populated grid ledger (all 8 cells or the committed prefix).
           LOG: per-cell cost/duration/ok table; PASS/FAIL; commit.
       - name: x3_measure
