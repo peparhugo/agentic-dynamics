@@ -1,7 +1,7 @@
 ---
 status: accepted
 ---
-# E4 cap_grit_strength_grid — run plan (x1_compile_and_setup, updated post-F2/F3-fix)
+# E4 cap_grit_strength_grid — run plan (x1_compile_and_setup + x2 FAIL record)
 
 Phase x1 of `cap_grit_grid_execute`: compile the spec, verify the 8-cell matrix, declare exact
 per-cell run parameters from the spec's 9 findings, prepare the results-ledger skeleton, and
@@ -150,4 +150,40 @@ populated ledger; both wired as `agentic-dynamics experiment cap-grit-grid` /
 - Declared-seam verification: **PASS** — F1–F4 all resolved in code; artifacts load; executor
   dry-run confirms cell params.
 - Tests: **PASS** (dependency/data-flow/classification 16, spec/compiler 49).
-- Overall: **PASS** (x1 complete; grid ready for x2 execution).
+- **x2 execution: FAIL** — see §8. Grid is re-runnable once Claude auth is restored.
+
+## 8. x2 run record — FAIL (auth blocker, not a cap error)
+
+x2 executed all 8 cells sequentially via `scripts/run_cap_grit_grid.py` (PID 2688955, log
+`/tmp/cap_grit_grid_run.log`). **Every attempt failed in ~6s at $0.0 with exit code 1** — the
+`claude_cli` backend could not authenticate: `~/.claude/.credentials.json` holds empty OAuth
+tokens (`accessToken=''`, `expiresAt=0`), `claude auth status` → `loggedIn: false`, and
+`claude -p` → `Failed to authenticate: OAuth session expired and could not be refreshed`.
+No `ANTHROPIC_API_KEY` is exported. **No genuine model invocation occurred** — the grid did not
+run; the ledger rows were auth-failure noise, not measurements.
+
+**Per-cell realized record (all attempts auth-failed, $0.0, ~6s):**
+
+| # | cell | attempt 1 ok | retry fired | attempt 2 ok | realized cost |
+|---|---|---|---|---|---|
+| 1 | clean × baseline | false | — | — | $0.00 |
+| 2 | clean × grit_retry | false | yes (first failed) | false | $0.00 |
+| 3 | bad_seed_low × baseline | false | — | — | $0.00 |
+| 4 | bad_seed_low × grit_retry | false | yes (first failed) | false | $0.00 |
+| 5 | bad_seed_mid × baseline | false | — | — | $0.00 |
+| 6 | bad_seed_mid × grit_retry | false | yes (first failed) | false | $0.00 |
+| 7 | bad_seed_high × baseline | false | — | — | $0.00 |
+| 8 | bad_seed_high × grit_retry | false | yes (first failed) | false | $0.00 |
+
+**Disposition (the phase FAILS per the GUARD, and the ledger must not carry fabricated data):**
+
+1. The executor committed per-cell progress (8 commits), but those rows are auth noise, not
+   results. The ledger was **restored to the pending 8-cell skeleton** with a `run_status:
+   {state: FAILED, reason, recovered}` block, and the 12 poisoned story JSONs were **removed**
+   from `experiments/results/stories/` — x3 must never measure a grid that never ran (the m2
+   defect this framework exists to prevent).
+2. `scripts/run_cap_grit_grid.py` gained a **pre-flight `check_backend_auth()`** guard: it probes
+   `claude auth status` and exits non-zero (FAIL) before running any cell when `loggedIn: false` —
+   a re-run halts immediately instead of fabricating another grid.
+3. **Blocker to lift before x2 re-run:** restore Claude CLI auth (`claude` interactive login, or
+   export a valid `ANTHROPIC_API_KEY`); confirm `CLAUDE_BIN` is set in the cell-runner env.

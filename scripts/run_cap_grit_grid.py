@@ -101,6 +101,30 @@ def is_cap_error(text: str) -> bool:
     return any(h in lower for h in CAP_ERROR_HINTS)
 
 
+def check_backend_auth() -> None:
+    """Fail-fast pre-flight: the claude_cli backend must be able to authenticate.
+
+    The E4 x2 run discovered that a dead OAuth session (~/.claude/.credentials.json with
+    empty tokens) makes every ``claude`` invocation fail in ~6s at $0 — 8 cells of
+    auth-failure noise that looks like a real grid run and would poison x3 measurement.
+    This guard exits non-zero BEFORE running any cell when the binary cannot authenticate,
+    so a re-run halts the workflow instead of fabricating a grid.
+    """
+    if not CLAUDE_BIN:
+        return
+    probe = subprocess.run(
+        [CLAUDE_BIN, "auth", "status"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    out = (probe.stdout or "") + (probe.stderr or "")
+    if "loggedIn" in out and "false" in out:
+        print("  !! claude_cli backend is NOT authenticated — refusing to run the grid", file=sys.stderr)
+        print(f"  !! {out.strip()[:300]}", file=sys.stderr)
+        sys.exit(1)
+
+
 def build_attempt_row(
     cell: dict, result, attempt_number: int, parent_attempt_id: str | None, retry_reason: str,
 ) -> dict:
@@ -252,6 +276,9 @@ def main():
     ledger = load_ledger()
     cells = ledger["cells"]
 
+    if not args.dry_run:
+        check_backend_auth()
+
     if args.dry_run:
         for c in cells:
             m = pick_mutation(c["condition_strength"])
@@ -262,6 +289,7 @@ def main():
 
     indices = [args.cell] if args.cell >= 0 else [i for i, c in enumerate(cells) if c["status"] == "pending"]
 
+    cap_failed = False
     for idx in indices:
         cell = cells[idx]
         if cell["status"] not in ("pending", "paused_cap"):
@@ -271,6 +299,15 @@ def main():
         write_ledger(ledger)
         git_commit_per_cell(cell["cell_id"], f"status={cell['status']} cost=${cell.get('realized_cost','?')} "
                                              f"attempts={len(cell.get('attempts', []))}")
+        # GUARD (E4 x2): a Claude usage-cap error commits the in-flight cell, then FAILS the
+        # phase (exit non-zero) so the workflow halts — no further cells run this invocation.
+        if cell["status"] == "paused_cap":
+            print("  !! usage-cap — halting grid run (in-flight work committed)", file=sys.stderr)
+            cap_failed = True
+            break
+
+    if cap_failed:
+        sys.exit(1)
 
     if args.cell < 0:
         pending = [c for c in cells if c["status"] == "pending"]
