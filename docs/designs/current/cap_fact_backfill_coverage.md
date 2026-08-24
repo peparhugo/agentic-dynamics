@@ -28,7 +28,16 @@ when 0 < n_available < n_total (gap named); **UNOBSERVED** when n_available == 0
 named instrumentation gap; for workload predicates a *structural zero* — e.g. no spec is
 superseded — is recorded as such, never fabricated). Every n_available/n_total is reproduced from
 the §1 census command (workflow: 455 phases / 125 runs; story: 1112 sessions / 227 cells; summary:
-144 entries; spec index: 103 specs).
+144 entries; spec index: 103 specs). For emit-gated predicates (facts emitted only on a non-empty
+value), n_available counts the **emit-ready** units — the count the reducer will actually produce —
+not bare key presence.
+
+**Re-audit corrections (2026-08-24, against the live corpus + reducers):** §3a `phase_commit`
+downgraded PRODUCED → **PARTIAL** (reducer `attempt_facts.py:195` emits only on non-empty
+`commit_hash`; 207/455 workflow phases carry an empty string — 179 ok + 28 failed — and 1/1112
+story session has none); §3b `current_commit` count 224/227 stands but the 3 gap cells are
+**claude-sonnet-5 zero-session cells** (mutation commit failure), not deepseek-v4-pro; §3d
+`allowed_models` is **16/103** (was 11/103). All other verdicts unchanged.
 
 ### 3a. Attempt-scope predicates (`attempt_facts/v1`)
 
@@ -40,7 +49,7 @@ the §1 census command (workflow: 455 phases / 125 runs; story: 1112 sessions / 
 | **★ attempt_tokens_in** | 448/455 (`tokens.in`) | 0/1112 | 0 | **PARTIAL** | story sessions record flat `total_tokens`, no in/out split; 7 test-kind phases have `tokens={}` |
 | **★ attempt_tokens_out** | 448/455 (`tokens.out`) | 0/1112 | 0 | **PARTIAL** | same as above |
 | **★ attempt_model** | 455/455 | 1112/1112 (via cell, 227/227) | 144/144 | **PRODUCED** | — |
-| **★ phase_commit** | 455/455 (`commit_hash`) | 1112/1112 (`commit_hash`) | 0 | **PRODUCED** | — |
+| **★ phase_commit** | 248/455 (`commit_hash` non-empty; 207 empty-string) | 1111/1112 (1 session empty) | 0 | **PARTIAL** | reducer emits only on non-empty commit; 207 workflow phases (179 ok + 28 failed) + 1 story session record no commit |
 | **★ attempt_cache_hit_rate** | 401/455 (`cache_hit_rate`; 388 non-zero) | 227/227 cells (summary rollup) | 0 | **PARTIAL** | 54 pre-instrumentation workflow phases lack cache fields; story value is a cell-level rollup, not per-session |
 | **★ attempt_confidence** | 355/455 (78%) | 401/1112 (36%; 44 explicit nulls) | 0 | **PARTIAL** | 100 workflow phases (failed-before-call + pre-instrumentation) + 711 story sessions lack confidence |
 
@@ -51,7 +60,7 @@ the §1 census command (workflow: 455 phases / 125 runs; story: 1112 sessions / 
 | **★ job_status** | 125/125 (`ok`) | 227/227 (`summary.all_successful`) | 0/144 | **PRODUCED** | summary entries have no ok/status field |
 | **★ job_accumulated_cost_usd** | 125/125 (`total_cost_usd`) | 227/227 (`summary.total_cost`) | 144/144 (`cost`) | **PRODUCED** | — |
 | job_n_phases | 125/125 (`phases`) | 227/227 (`sessions`) | 0/144 | **PRODUCED** | — |
-| **★ current_commit** | 125/125 (`git_sha`) | 224/227 (last session `commit_hash`) | 0/144 | **PRODUCED** | 3 deepseek-v4-pro cells have no session commit hash |
+| **★ current_commit** | 125/125 (`git_sha`) | 224/227 (last non-empty session `commit_hash`; 3 cells have zero sessions — mutation commit failure, claude-sonnet-5 bad_seed) | 0/144 | **PRODUCED** | the 3 gap cells (`task_manager_api_claude_sonnet_5_bad_seed_{d2699ca6122b,b0a1988763f8,8a623367c3f4}`) never got a session, so no commit exists to cite |
 
 ### 3c. Workflow-scope predicates (`workflow_facts/v1`) — derived from run phases, 125/125 PRODUCED
 
@@ -77,7 +86,7 @@ the §1 census command (workflow: 455 phases / 125 runs; story: 1112 sessions / 
 | spec_superseded_by | spec index (103) | 0/103 | **UNOBSERVED** | structural zero — no spec is superseded |
 | max_spend_usd | spec YAMLs (103) | 103/103 | **PRODUCED** | — |
 | max_attempts | spec YAMLs (103) | 102/103 | **PARTIAL** | 1 spec declares no max_attempts |
-| allowed_models | spec YAMLs (103) | 11/103 | **PARTIAL** | only 11 specs declare `model_pool`/`allowed_models` |
+| allowed_models | spec YAMLs (103) | 16/103 | **PARTIAL** | 16 specs declare `model_pool`/`allowed_models` (`workflows/operations`×3, `workflows/repository`×11, `workflows/research`×2) |
 | domain_profile_version | profiles/v1 | 0 | **UNOBSERVED** | profiles/v1 has no producer call site (only declarations in `control/profiles.py`) |
 | challenge_profile_version | profiles/v1 | 0 | **UNOBSERVED** | same |
 | pattern | pattern/v1 | 0 | **UNOBSERVED** | pattern/v1 has no minting call site — nothing learns patterns yet |
@@ -93,16 +102,17 @@ the §1 census command (workflow: 455 phases / 125 runs; story: 1112 sessions / 
 
 | Verdict | Count | Predicates |
 |---|---|---|
-| **PRODUCED** | 16 | phase_status, attempt_cost_usd, attempt_model, phase_commit, job_status, job_accumulated_cost_usd, job_n_phases, current_commit, workflow_status, workflow_health, workflow_phases_completed, workflow_phases_remaining, projected_budget_overrun, spec_status, spec_n_runs, max_spend_usd |
-| **PARTIAL** | 11 | phase_test_verified, attempt_tokens_in, attempt_tokens_out, attempt_cache_hit_rate, attempt_confidence, spec_last_run_at, spec_latest_ok, spec_latest_model, spec_latest_cost_usd, max_attempts, allowed_models |
+| **PRODUCED** | 15 | phase_status, attempt_cost_usd, attempt_model, job_status, job_accumulated_cost_usd, job_n_phases, current_commit, workflow_status, workflow_health, workflow_phases_completed, workflow_phases_remaining, projected_budget_overrun, spec_status, spec_n_runs, max_spend_usd |
+| **PARTIAL** | 12 | phase_test_verified, attempt_tokens_in, attempt_tokens_out, attempt_cache_hit_rate, attempt_confidence, phase_commit, spec_last_run_at, spec_latest_ok, spec_latest_model, spec_latest_cost_usd, max_attempts, allowed_models |
 | **UNOBSERVED** | 12 | spec_supersedes, spec_superseded_by, domain_profile_version, challenge_profile_version, pattern, session_checkpoint, checkpoint_present, checkpoint_goal_unchanged, checkpoint_phase_unchanged, checkpoint_model_unchanged, model_change_required, checkpoint_snapshot_identity |
 
-Of the 13 minimum predicates: **9 PRODUCED, 4 PARTIAL** (attempt_tokens_in/out, attempt_confidence,
-attempt_cache_hit_rate, phase_test_verified), **0 UNOBSERVED**. The two genuinely missing *observable*
+Of the 13 minimum predicates: **8 PRODUCED, 5 PARTIAL** (attempt_tokens_in/out, attempt_confidence,
+attempt_cache_hit_rate, phase_test_verified, phase_commit), **0 UNOBSERVED**. The two genuinely missing *observable*
 predicates (spec_supersedes/spec_superseded_by) are structural zeros of the corpus, not
 instrumentation gaps. The three named instrumentation gaps for the backfill's additive work:
 **story-session token split** (flat `total_tokens` only), **per-session test_executed_success**
-(cell-level only, 92/227), **per-session confidence** (401/1112, 36%).
+(cell-level only, 92/227), **per-session confidence** (401/1112, 36%) — plus the empty-string
+`commit_hash` on 207 workflow phases (emit-gated `phase_commit`).
 
 ## 4. E1-E4 evaluability (p2)
 
@@ -130,6 +140,14 @@ Per routing-evidence spec (E1 `cap_shadow_comparison`, E2 `cap_confidence_cascad
 **PASS** — coverage table + verdicts + evaluability grounded entirely in the §1 master table
 (no invented observations; every n_available/n_total reproduced by a shown command). In-flight
 worktrees untouched.
+
+**Re-audit (2026-08-24):** every n_available/n_total re-derived against the live corpus + reducer
+emit-gates. §4 verdicts stand unchanged: E1 inconclusive-by-design (its own run's 3 phases are all
+agent-kind, `phase_test_verified` 0/3 — verified from `cap_shadow_campaign/20260824T000708Z.json`),
+E2 evaluable-with-caveat (355/455 confidence, 78%), E3 evaluable (not fact-gated), E4 evaluable
+(in-ledger 9/9 `perturbation_strength` + 9/9 `test_executed_success`, 8 cells / 9 attempts /
+$31.27). Corrections landed: `phase_commit` PARTIAL (248/455 workflow, 1111/1112 story),
+`current_commit` gap attribution = 3 claude-sonnet-5 zero-session cells, `allowed_models` 16/103.
 
 ---
 
