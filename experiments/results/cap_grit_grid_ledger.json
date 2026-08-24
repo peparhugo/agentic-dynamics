@@ -278,8 +278,35 @@
       "strength": 0.8,
       "max_attempts": 1,
       "retry_rule": "baseline: score the single attempt unconditionally (no retry)",
-      "status": "pending",
-      "attempts": []
+      "status": "accepted",
+      "attempts": [
+        {
+          "job_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+          "spec_id": "cap_grit_strength_grid@0.1",
+          "policy_arm": "baseline",
+          "model": "anthropic/claude-sonnet-5",
+          "condition": "bad_seed",
+          "strength": 0.8,
+          "perturbation_strength": 0.8,
+          "attempt_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_baseline_model_anthropic_claude_sonnet_5_a1",
+          "attempt_number": 1,
+          "parent_attempt_id": null,
+          "retry_reason": "",
+          "started_at": "2026-08-24T14:13:36.274111+00:00",
+          "ended_at": "2026-08-24T14:24:42.006252+00:00",
+          "actual_cost": 3.0694191,
+          "rework_cost": 0.0,
+          "test_executed_success": true,
+          "status": "accepted",
+          "story_id": "51662084171e",
+          "worktree": "/tmp/story_51662084171e",
+          "mutation_id": "mut_1957f3238ebc0f5c",
+          "result_path": "experiments/results/stories/task_manager_api_claude_sonnet_5_bad_seed_51662084171e.json"
+        }
+      ],
+      "realized_cost": 3.0694191,
+      "realized_duration_s": 678.2,
+      "completed_at": "2026-08-24T14:24:54.452158+00:00"
     },
     {
       "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
