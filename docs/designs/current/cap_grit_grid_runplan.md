@@ -15,6 +15,13 @@ verify `CLAUDE_BIN` + backend resolution. **Flash orchestrates; cells run sonnet
 > (`experiments/results/cap_grit_grid_mutations/mut_3caacc977303246d.json` s=0.2,
 > `mut_1957f3238ebc0f5c.json` s=0.8). The ledger carries a `findings_resolution` block recording
 > the deviation. This section is the live, accurate state of the plan.
+>
+> **Update (x1 re-verify):** x1 re-ran clean after the x2 auth failure — compile gate 0 errors,
+> matrix exactly 8 (4×2×1), ledger skeleton 8 pending cells, both mutation artifacts load,
+> executor dry-run resolves all 8 cells. **Claude auth is now RESTORED**
+> (`claude auth status` → `loggedIn: true`, `authMethod: claude.ai`, `subscriptionType: max`),
+> lifting the sole x2 blocker. `CLAUDE_BIN=/home/drseuss/.local/bin/claude` (Claude Code
+> **2.1.228**) confirmed runnable. The grid is re-runnable in §2's cell order.
 
 ## 1. Compile + matrix check — PASS
 
@@ -151,6 +158,9 @@ populated ledger; both wired as `agentic-dynamics experiment cap-grit-grid` /
   dry-run confirms cell params.
 - Tests: **PASS** (dependency/data-flow/classification 16, spec/compiler 49).
 - **x2 execution: FAIL** — see §8. Grid is re-runnable once Claude auth is restored.
+- **x1 re-verify (this phase): PASS** — compile 0 errors, matrix 8, ledger skeleton 8 pending,
+  artifacts load, executor dry-run resolves all 8 cells, and **Claude auth is now RESTORED**
+  (`loggedIn: true`) — the §8 blocker is lifted; the grid is re-runnable in §2's cell order.
 
 ## 8. x2 run record — FAIL (auth blocker, not a cap error)
 
