@@ -31,6 +31,7 @@ try:
 except ImportError:
     from scripts import _bootstrap  # noqa: E402,F401
 
+from agentic_dynamics.adapters.claude_adapter import CLAUDE_BIN
 from agentic_dynamics.core.constants import SESSION_TIMEOUT, model_slug
 from agentic_dynamics.measurement.mutation import MutationArtifact
 from agentic_dynamics.runtime.story import (
