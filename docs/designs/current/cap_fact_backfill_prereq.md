@@ -5,7 +5,7 @@ status: accepted
 
 **Spec:** `workflows/repository/cap_fact_backfill.yaml` (phase `p0_prereq_acceptance`)
 **Branch:** `feature/cap-fact-backfill`
-**Date:** 2026-08-24 · **Model:** deepseek/deepseek-v4-flash (single-model, `--backend opencode`)
+**Date:** 2026-08-24 (re-audit 2026-08-24) · **Model:** deepseek/deepseek-v4-flash (single-model, `--backend opencode`)
 **Question:** Stage 0 is CHECKED, not assumed — verify with evidence (commands run, output shown)
 that the five prerequisites for the retroactive fact backfill are merged and live before any
 Stage 1 phase begins. Any FAIL => commit this doc and STOP.
@@ -16,7 +16,7 @@ Stage 1 phase begins. Any FAIL => commit this doc and STOP.
 |---|---|---|---|---|
 | 0.1 | Disposition merged | `git merge-base --is-ancestor feature/cap-shadow_campaign main`; same for `feature/cap-fact_auto_emit`; `grep applied` in `control/rules.py` + tests; `ls docs/designs/current/cap_shadow_fact_disposition.md` | Both branches **REACHABLE from main**; `applied: False` shadow marker stamped in `rules.py:400-406`; 3 asserting tests pass (84-test suite green); disposition doc exists with fact-flow evidence (27 facts, idempotency re-derived to 0) | **PASS** |
 | 0.2 | FINOPS_KB_WRITE | `echo $FINOPS_KB_WRITE` | `FINOPS_KB_WRITE=[1]` (set to `1`, plus `FINOPS_CELL_ID=wf_cap_fact_backfill_deepseek_deepseek_v4_flash`) | **PASS** |
-| 0.3 | Gate migration merged | `grep -rn "requires_facts:" workflows/ experiments/definitions/`; `validate_fact_contracts` spot-check 3 | Matches in `workflows/repository/cap_routing_evidence_specs.yaml` + 6 spec files under `experiments/definitions/`; real gate (`validate_spec_fact_contracts`) clean — 0 errors on `cap_shadow_comparison`, `cap_confidence_cascade`, `routing_regret_under_degradation` | **PASS** |
+| 0.3 | Gate migration merged | `grep -rn "requires_facts:" workflows/ experiments/definitions/`; `validate_fact_contracts` spot-check 3 | Matches in `workflows/repository/cap_routing_evidence_specs.yaml` + 6 spec files under `experiments/definitions/`; real gate (`validate_spec_fact_contracts`) clean — 0 errors on `cap_shadow_comparison`, `cap_confidence_cascade`, `cap_coverage_routing_impact` | **PASS** |
 | 0.4 | Routing evidence specs | `ls experiments/definitions/{cap_shadow_comparison,cap_confidence_cascade,cap_coverage_routing_impact,cap_grit_strength_grid}.yaml`; `load_spec` + `validate_spec` + `validate_spec_fact_contracts` + `compile_spec` | All four exist; each loads, baseline-validates clean, passes the real fact-contract gate (0 errors), and compiles a full 7-phase DAG (validate → cells → execute → measure → compare → writeup → adapt) | **PASS** |
 | 0.5 | Addendum merged | `test -f src/agentic_dynamics/control/profiles.py`; `grep pattern FACT_PREDICATES`; `test -f experiments/contexts/session_routing.yaml` | `profiles.py` **exists**; `FACT_PREDICATES["pattern"]` declared (`facts.py:663-674`, produced by `pattern/v1`, inheritable, workload-scoped); `session_routing.yaml` **exists**; addendum suites green (`test_context_plane_profiles/contracts/seam` + `test_actuation_ingestion`: 84 passed) | **PASS** |
 
@@ -87,9 +87,10 @@ the real spec gate via `control.context_compiler.validate_spec_fact_contracts` (
 
 **Spot-check 3 migrated specs through the real gate — 0 errors each:**
 ```
-cap_shadow_comparison:         gate_errors=[]  -> PASS
-cap_confidence_cascade:        gate_errors=[]  -> PASS
-routing_regret_under_degradation: gate_errors=[] -> PASS
+$ python3 -c "... validate_spec_fact_contracts(load_spec(p)) ..."
+cap_confidence_cascade.yaml     -> PASS (0 errors)
+cap_shadow_comparison.yaml      -> PASS (0 errors)
+cap_coverage_routing_impact.yaml -> PASS (0 errors)
 ```
 
 ### 0.4 — Routing evidence specs — PASS
