@@ -58,6 +58,22 @@
 - Never cite the 10%-sacrifice style of fake precision: deviations are recorded as one-line notes
   with reasoning (the D-series convention), never as a theatrical percentage.
 
+## Long-Running Agent Sessions (operational lessons, logged 2026-08-24)
+
+- **Do NOT declare a session stalled on wall-clock silence alone.** A busy agent runs long
+  subprocesses (test suites, corpus re-derivations) that produce NO opencode steps for long
+  stretches. Before killing: check CPU (a hung process is ~0%; 50%+ means it is computing) and
+  the child process tree (`ps --forest`) for a live subprocess. The backfill p5 pass was killed
+  at 51% CPU mid-verification — the error that produced this rule.
+- **Mid-phase kills + ledger-based resume = re-walk of prior phases.** The runner's resume keys
+  off the last run ledger; a phase killed before its ledger record is written counts as
+  uncomplete, so a resume re-runs every earlier phase (the backfill re-audited p0/p1/p2 after
+  the kill). Durable fix (runner-level, not yet built): record each completed phase in the
+  ledger as it commits, so resume skips completed phases even after a mid-run kill. Until then,
+  expect and budget the re-walk; preserve in-flight work as a non-phase commit before killing.
+- **A quiet-but-busy agent is working; killing on silence costs momentum.** The work itself is
+  preserved (non-phase commit), but the near-finished phase is lost.
+
 ## Project-Specific Gotchas
 
 - `__init__.py` exports 100+ symbols. Adding a new public class means updating `__all__`.
