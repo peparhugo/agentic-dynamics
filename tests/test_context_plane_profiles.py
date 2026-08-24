@@ -15,7 +15,7 @@ violate.
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
@@ -27,10 +27,10 @@ from agentic_dynamics.control.context_compiler import (
     load_contract,
 )
 from agentic_dynamics.control.facts import (
+    EPISTEMIC_MAP,
     FACT_PREDICATES,
     Authority,
     CanonicalFact,
-    EPISTEMIC_MAP,
     is_canonical,
     recompute_inputs_digest,
     verify_chain,
@@ -42,7 +42,6 @@ from agentic_dynamics.control.profiles import (
     PROFILES,
     PROFILES_V1,
     ChallengeProfile,
-    DomainProfile,
     ProfileCompositionError,
     SessionPolicy,
     compose_requirements,
@@ -73,7 +72,7 @@ def test_domain_profile_fields_match_design_2_1():
     assert isinstance(profile.policies, tuple)
     assert isinstance(profile.patterns, tuple)
     assert isinstance(profile.verification, tuple)
-    with pytest.raises(Exception):  # frozen — FrozenInstanceError
+    with pytest.raises(FrozenInstanceError):
         profile.domain = "other"  # type: ignore[misc]
 
 
@@ -85,7 +84,7 @@ def test_challenge_profile_fields_match_design_2_1_and_2_6():
     assert profile.deliberation == DELIBERATION_STAGES["greenfield"]
     assert isinstance(profile.session_policy, SessionPolicy)
     assert isinstance(profile.verification_policy, tuple)
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         profile.challenge = "other"  # type: ignore[misc]
 
 
@@ -100,14 +99,14 @@ def test_session_policy_defaults_shadow_only_true():
 
 
 def test_deliberation_table_covers_all_six_archetypes():
-    assert CHALLENGES == {
+    assert {
         "greenfield",
         "cross_cutting",
         "small_change",
         "research",
         "incident",
         "migration",
-    }
+    } == CHALLENGES
     for challenge in CHALLENGES:
         assert len(DELIBERATION_STAGES[challenge]) >= 4  # every archetype has a real sequence
 
@@ -267,14 +266,20 @@ def test_compose_requirements_is_a_noop_when_challenge_is_none():
 
 
 def test_compose_requirements_adds_a_new_fact_the_contract_did_not_require():
+    # NOTE: the profile's OWN entry ("workflow_phases_remaining") must be a REAL, registered
+    # predicate — see _validate_context_requirement's R1/R2 mirror, added after an adversarial
+    # pass found a profile's context_requirements never passed through the R1-R8 spec gate at
+    # all (docs/context_abstraction/implementation_notes.md §17). The CONTRACT's own fictional
+    # "a" is untouched by that check (only PROFILE-supplied requirements are validated here).
     contract = _Contract(requires_facts=(_req(fact="a"),))
     challenge = ChallengeProfile(
         challenge="research", profile_version="challenge/research/v1",
-        context_requirements=(_req(fact="b"),), deliberation=DELIBERATION_STAGES["research"],
+        context_requirements=(_req(fact="workflow_phases_remaining"),),
+        deliberation=DELIBERATION_STAGES["research"],
         session_policy=SessionPolicy(policy="continue_default"), verification_policy=(),
     )
     merged = compose_requirements(contract, challenge)
-    assert {r.fact for r in merged} == {"a", "b"}
+    assert {r.fact for r in merged} == {"a", "workflow_phases_remaining"}
 
 
 def test_compose_requirements_refuses_an_excluded_fact():
@@ -290,11 +295,17 @@ def test_compose_requirements_refuses_an_excluded_fact():
 
 
 def test_compose_requirements_never_loosens_min_authority():
-    contract = _Contract(requires_facts=(_req(fact="a", min_authority="POLICY"),))
+    # "checkpoint_present" (job-scoped, produced_by=("checkpoint/v1",)) stands in for the
+    # fictional "a" used elsewhere in this file — here the SAME fact must be REAL because it
+    # appears in the profile's own context_requirements, which _validate_context_requirement
+    # now checks (R1/R2/R5 mirror; see the note on the "adds_a_new_fact" test above).
+    contract = _Contract(
+        requires_facts=(_req(fact="checkpoint_present", min_authority="POLICY"),)
+    )
     challenge = ChallengeProfile(
         challenge="research", profile_version="challenge/research/v1",
         # profile asks for a WEAKER floor — must not win.
-        context_requirements=(_req(fact="a", min_authority="DERIVED"),),
+        context_requirements=(_req(fact="checkpoint_present", min_authority="DERIVED"),),
         deliberation=DELIBERATION_STAGES["research"],
         session_policy=SessionPolicy(policy="continue_default"), verification_policy=(),
     )
@@ -304,12 +315,14 @@ def test_compose_requirements_never_loosens_min_authority():
 
 def test_compose_requirements_never_loosens_max_age_or_on_missing():
     contract = _Contract(
-        requires_facts=(_req(fact="a", max_age_seconds=60, on_missing="halt"),)
+        requires_facts=(_req(fact="checkpoint_present", max_age_seconds=60, on_missing="halt"),)
     )
     challenge = ChallengeProfile(
         challenge="research", profile_version="challenge/research/v1",
         # profile asks for a LOOSER age bound and a non-halting degrade — must not win.
-        context_requirements=(_req(fact="a", max_age_seconds=6000, on_missing="classify"),),
+        context_requirements=(
+            _req(fact="checkpoint_present", max_age_seconds=6000, on_missing="classify"),
+        ),
         deliberation=DELIBERATION_STAGES["research"],
         session_policy=SessionPolicy(policy="continue_default"), verification_policy=(),
     )
@@ -319,15 +332,117 @@ def test_compose_requirements_never_loosens_max_age_or_on_missing():
 
 
 def test_compose_requirements_does_tighten_when_the_profile_is_stricter():
-    contract = _Contract(requires_facts=(_req(fact="a", max_age_seconds=6000),))
+    contract = _Contract(
+        requires_facts=(_req(fact="checkpoint_present", max_age_seconds=6000),)
+    )
     challenge = ChallengeProfile(
         challenge="research", profile_version="challenge/research/v1",
-        context_requirements=(_req(fact="a", max_age_seconds=60),),
+        context_requirements=(_req(fact="checkpoint_present", max_age_seconds=60),),
         deliberation=DELIBERATION_STAGES["research"],
         session_policy=SessionPolicy(policy="continue_default"), verification_policy=(),
     )
     merged = compose_requirements(contract, challenge)
     assert merged[0].max_age_seconds == 60  # the tighter of the two wins
+
+
+# ── Adversarial release verdict (implementation_notes.md §17): attack 1 — a profile widening a
+# controller's view past its contract via an ILLEGAL FactRequirement field, not merely a looser
+# value for a field the contract already governs. tighten()'s rank-based defense (above) only
+# activates when the SAME fact is already present in the contract's own requires_facts; a
+# BRAND-NEW fact a profile introduces skips tighten() entirely (compose_requirements does
+# `merged[req.fact] = req` directly) — so nothing previously validated that req itself is
+# well-formed. _validate_context_requirement closes that gap; these tests prove it end to end. ──
+
+
+def test_compose_requirements_refuses_an_advisory_min_authority_on_a_new_fact():
+    """The concrete exploit found in this pass: a profile requiring a BRAND-NEW fact (the
+    contract does not already require it, so tighten()'s comparison never runs) with
+    ``min_authority="ADVISORY"``. Before the fix, this composed cleanly and — verified by hand
+    against the real ``compile_context`` — let an ADVISORY-graded fact resolve into
+    ``ControlContext.job`` (the "citable" bucket), duplicated into ``ControlContext.advisory``
+    too. A decision citing it was still refused by check C5 (which independently re-derives
+    advisory-ness from the fact's own epistemic_status), but nothing stopped a control RULE from
+    reading the wrongly-admitted value out of ``ctx.job`` to inform its branching without ever
+    citing the fact_id — a silent, untraceable influence path. Now refused at composition time."""
+    contract = _Contract(requires_facts=())
+    challenge = ChallengeProfile(
+        challenge="research", profile_version="challenge/research/v1",
+        context_requirements=(
+            _req(fact="checkpoint_present", min_authority="ADVISORY", on_missing="classify"),
+        ),
+        deliberation=DELIBERATION_STAGES["research"],
+        session_policy=SessionPolicy(policy="continue_default"), verification_policy=(),
+    )
+    with pytest.raises(ProfileCompositionError, match="min_authority"):
+        compose_requirements(contract, challenge)
+
+
+def test_compose_requirements_refuses_an_unknown_predicate_on_a_new_fact():
+    """R1's mirror: a profile may not require a fact FACT_PREDICATES has never heard of — that
+    name can never resolve to anything, canonical or otherwise, so silently accepting it would
+    only defer the failure to a confusing runtime "Unknown" rather than a clear composition-time
+    refusal naming the actual problem."""
+    contract = _Contract(requires_facts=())
+    challenge = ChallengeProfile(
+        challenge="research", profile_version="challenge/research/v1",
+        context_requirements=(_req(fact="totally_made_up_predicate_xyz"),),
+        deliberation=DELIBERATION_STAGES["research"],
+        session_policy=SessionPolicy(policy="continue_default"), verification_policy=(),
+    )
+    with pytest.raises(ProfileCompositionError, match="no such predicate"):
+        compose_requirements(contract, challenge)
+
+
+def test_compose_requirements_refuses_an_illegal_on_missing_on_a_new_fact():
+    contract = _Contract(requires_facts=())
+    challenge = ChallengeProfile(
+        challenge="research", profile_version="challenge/research/v1",
+        context_requirements=(_req(fact="checkpoint_present", on_missing="retry_forever"),),
+        deliberation=DELIBERATION_STAGES["research"],
+        session_policy=SessionPolicy(policy="continue_default"), verification_policy=(),
+    )
+    with pytest.raises(ProfileCompositionError, match="on_missing"):
+        compose_requirements(contract, challenge)
+
+
+def test_advisory_fact_cannot_be_smuggled_into_ctx_job_via_a_profile_end_to_end():
+    """The full end-to-end proof, through the REAL ``compile_context`` (not just the pure
+    ``compose_requirements`` unit above): with the fix, the malformed profile is refused before
+    ``compile_context`` ever runs, so an ADVISORY fact can never appear in ``ctx.job``. This is
+    the "concrete path" attack 1's own charge asks for — found, reproduced, and now closed."""
+    advisory_fact = CanonicalFact(
+        fact_entity_id="e_advisory_present", fact_id="f_advisory_present",
+        subject_type="job", subject_id=CELL, predicate="checkpoint_present",
+        value="true", value_type="bool", unit="",
+        scope_type="job", scope_id=CELL, scope_path=JOB_SCOPE,
+        abstraction_level="job", epistemic_status="advisory",
+        authority=Authority.ADVISORY, evidence_class="[H]",
+        observed_at=NOW, valid_from=NOW, valid_to=None, expires_at=None,
+        reducer="checkpoint", reducer_version="checkpoint/v1",
+        evidence_ids=(), inputs_digest="",
+        supersedes=None, source_revision="abc123", repository_id=REPO,
+    )
+    advisory_fact = replace(advisory_fact, inputs_digest=recompute_inputs_digest(advisory_fact))
+    store = InMemoryFactStore(facts=(advisory_fact,))
+
+    # The REAL route_next_job contract (module-level CONTRACT, defined below — Python resolves
+    # module globals at call time, not definition order, so this forward reference is safe).
+    # It does not already require checkpoint_present, so this is a genuinely NEW requirement —
+    # exactly the path that skips tighten()'s rank-comparison defense.
+    challenge = ChallengeProfile(
+        challenge="research", profile_version="challenge/research/v1",
+        context_requirements=(
+            _req(fact="checkpoint_present", min_authority="ADVISORY", on_missing="classify"),
+        ),
+        deliberation=DELIBERATION_STAGES["research"],
+        session_policy=SessionPolicy(policy="continue_default"), verification_policy=(),
+    )
+    request = ContextRequest(
+        decision_type="route_next_job", scope_type="job", scope_id=CELL, scope_path=JOB_SCOPE,
+        repository_id=REPO,
+    )
+    with pytest.raises(ProfileCompositionError):
+        compile_context(request, store=store, now=NOW, contract=CONTRACT, challenge=challenge)
 
 
 def test_tighten_raises_on_scope_mismatch():

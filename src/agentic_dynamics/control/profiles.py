@@ -82,7 +82,14 @@ from agentic_dynamics.control.facts import (
     compute_fact_entity_id,
     recompute_inputs_digest,
 )
-from agentic_dynamics.core.contracts import ContractLike, FactRequirement
+from agentic_dynamics.core.contracts import (
+    MIN_AUTHORITY_LEVELS,
+    ON_CONFLICT,
+    ON_MISSING,
+    SCOPE_KEYWORDS,
+    ContractLike,
+    FactRequirement,
+)
 
 # ── §2.1 — the two declared-profile dataclasses ──────────────────
 
@@ -285,6 +292,72 @@ def tighten(existing: FactRequirement, addition: FactRequirement) -> FactRequire
     )
 
 
+def _validate_context_requirement(challenge: ChallengeProfile, req: FactRequirement) -> None:
+    """Reject a profile-supplied :class:`FactRequirement` that violates the SAME closed
+    vocabularies ``core.contracts.validate_fact_contracts`` (R1/R2/R5/R7) enforces for every
+    OTHER ``requires_facts`` entry in this plane.
+
+    WHY THIS EXISTS (adversarial finding, this pass's attack 1 — "can a profile widen a
+    controller's view past its contract?"): a ``ChallengeProfile.context_requirements`` entry
+    NEVER passes through ``validate_fact_contracts`` — that function only iterates
+    ``spec.rules`` (an ``ExperimentSpec``'s own authored rules) and each loaded contract's
+    ``invariants``; a profile's requirements are composed at ``compile_context`` RUNTIME
+    (:func:`compose_requirements`, called from ``context_compiler.compile_context``), a path
+    that gate was never wired to see. Without this check, a profile could declare a BRAND-NEW
+    fact requirement (one the contract does not already require, so :func:`tighten`'s
+    rank-comparison defense never fires — that defense only activates when the SAME fact is
+    already present in the contract's own ``requires_facts``) with ``min_authority="ADVISORY"``.
+    Verified exploitable end to end before this fix: an ADVISORY-graded fact would then resolve
+    into ``ControlContext.job``/``.workload``/etc — the buckets ``compile_context``'s own
+    docstring documents as the decision's citable context — even though ``ControlContext.
+    advisory`` is meant to be the ONLY home for an advisory-authority fact (that bucket's own
+    "surfaced for a human/researcher to read but never citable" docstring, §6.3). Check C5 in
+    the validator happens to catch the worst consequence today (a decision that CITES the
+    fact_id is still refused, because C5 independently re-derives "is this fact advisory" from
+    the fact's own ``epistemic_status``, never from which bucket it landed in) — but nothing
+    forces a control RULE to cite every fact_id it reads from ``ctx.job`` in its own
+    ``facts_used``; a rule that only used the value to branch, without recording provenance,
+    would be silently influenced by an unverified judgment with zero trace and zero refusal.
+    This closes the gap at composition time — the earliest point a malformed requirement can be
+    caught — rather than relying solely on that downstream coincidence. (A regression test for
+    the exact scenario above lives in ``tests/test_context_plane_profiles.py``.)
+    """
+    if req.min_authority not in MIN_AUTHORITY_LEVELS:
+        raise ProfileCompositionError(
+            f"challenge profile {challenge.challenge!r} requires {req.fact!r} at "
+            f"min_authority {req.min_authority!r} — not one of {sorted(MIN_AUTHORITY_LEVELS)} "
+            f"(ADVISORY is deliberately excluded — mirrors core.contracts's own R5: a profile "
+            f"may never smuggle an advisory value into a decision's citable context)"
+        )
+    if req.on_missing not in ON_MISSING:
+        raise ProfileCompositionError(
+            f"challenge profile {challenge.challenge!r} requires {req.fact!r} with on_missing "
+            f"{req.on_missing!r} — not one of {sorted(ON_MISSING)}"
+        )
+    if req.on_conflict not in ON_CONFLICT:
+        raise ProfileCompositionError(
+            f"challenge profile {challenge.challenge!r} requires {req.fact!r} with on_conflict "
+            f"{req.on_conflict!r} — not one of {sorted(ON_CONFLICT)}"
+        )
+    if req.scope not in SCOPE_KEYWORDS:
+        raise ProfileCompositionError(
+            f"challenge profile {challenge.challenge!r} requires {req.fact!r} at scope "
+            f"{req.scope!r} — not one of {sorted(SCOPE_KEYWORDS)}"
+        )
+    predicate_spec = FACT_PREDICATES.get(req.fact)
+    if predicate_spec is None:
+        raise ProfileCompositionError(
+            f"challenge profile {challenge.challenge!r} requires fact {req.fact!r} — no such "
+            f"predicate is declared in FACT_PREDICATES. Declare it with a producing reducer "
+            f"first (mirrors R1)."
+        )
+    if not predicate_spec.produced_by:
+        raise ProfileCompositionError(
+            f"challenge profile {challenge.challenge!r} requires {req.fact!r} — declared but "
+            f"produced by no reducer. Instrument it first (mirrors R2)."
+        )
+
+
 def compose_requirements(
     contract: ContractLike,
     challenge: ChallengeProfile | None,
@@ -298,18 +371,30 @@ def compose_requirements(
     (§2.4's own resolution step). Deliberately does NOT touch ``contract.invariants``: the
     contract's invariants remain the sole SAFETY gate (deviation D4) — this function only ever
     widens the "context a decision may see" set, and only within the bound :func:`tighten`
-    enforces.
+    enforces. Every profile-supplied requirement is ALSO validated against the plane's closed
+    vocabularies before it is merged (:func:`_validate_context_requirement`) — a gate the R1-R8
+    spec-compile check never applies to a profile's own requirements (see that function's
+    docstring for the adversarial finding this closes).
     """
     merged: dict[str, FactRequirement] = {r.fact: r for r in contract.requires_facts}
     if challenge is None:
         return tuple(merged.values())
     excluded = set(contract.excludes)
     for req in challenge.context_requirements:
+        # Exclusion is checked FIRST: a contract-authored refusal ("this decision type may
+        # never see X") is the more specific, more decision-relevant reason a requirement is
+        # rejected, and should surface as such even for a fact name that also happens to fail
+        # the general well-formedness check below (e.g. this plane's own `excludes:` convention
+        # names CATEGORY labels — `live_telemetry`/`sibling_job_facts`/`advisory_facts` — that
+        # are deliberately never real FACT_PREDICATES rows; see `session_routing.yaml`'s own
+        # `excludes:` block). Both checks raise the SAME `ProfileCompositionError` either way —
+        # order only affects which message the caller sees, never whether the operation blocks.
         if req.fact in excluded:
             raise ProfileCompositionError(
                 f"challenge profile {challenge.challenge!r} requires fact {req.fact!r}; "
                 f"contract {contract.decision_type!r} excludes it"
             )
+        _validate_context_requirement(challenge, req)
         if req.fact in merged:
             merged[req.fact] = tighten(merged[req.fact], req)
         else:

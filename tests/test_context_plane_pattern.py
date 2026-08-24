@@ -462,3 +462,63 @@ def test_advisory_pattern_proposal_is_uncitable_by_validate_decision_c5():
     assert result.admitted is False
     assert result.check == "C5"
     assert "ADVISORY" in result.reason
+
+
+# ── ACCEPTED LIMITATION (adversarial release verdict, attack 2 — implementation_notes.md §17):
+# verify_chain never re-derives a fact's VALUE from its cited evidence, so a fabricated
+# support/uncertainty riding on genuine evidence_ids/reducer_version passes every structural
+# check. This is an INHERITED I0 property (`facts.recompute_inputs_digest`'s own docstring: "the
+# design's formula is sha256(evidence_ids | reducer_version | input VALUES)... I0 hashes [only]
+# the input IDENTITIES... the 'input values' term... is not part of this self-contained check"),
+# not something D3's mandatory-verify_chain rule closes — D3 only makes verify_chain MANDATORY
+# for the pattern class, it does not change what verify_chain itself checks. Documented here,
+# not fixed: closing it needs a resolver that returns full evidence PAYLOADS (not just registry
+# metadata) so pattern_v1 could be re-run and compared — that resolver doesn't exist anywhere in
+# this plane yet (the same producer-wiring gap already noted for pattern_v1 itself, module
+# docstring's "Deliberately NOT done" section) — building one is out of I9's reserved home
+# (`control/reducers/pattern.py`, `control/facts.py`'s additive rows) and would touch shared I0
+# infrastructure (`facts.verify_chain`/`recompute_inputs_digest`) well beyond this review's scope.
+
+
+def test_known_limitation_verify_chain_does_not_catch_a_fabricated_value_on_real_evidence_ids():
+    """Pins the gap so a future fix to ``verify_chain``/``recompute_inputs_digest`` is forced to
+    either update this test or close the gap on purpose — never silently regress it further.
+
+    Builds a REAL pattern fact via ``pattern_v1`` (support=1 of 4, per the reducer's own honest
+    count), then constructs a FABRICATED sibling that keeps the real fact's ``evidence_ids``/
+    ``reducer_version``/``epistemic_status``/``authority`` verbatim (so every structural check
+    that ``verify_chain``/``is_canonical`` actually performs stays internally consistent) but
+    swaps in a claim of ``support=4`` (all four records "succeeded") — the opposite of what the
+    cited evidence shows. If this assertion ever starts FAILING (i.e. ``verify_chain`` starts
+    reporting errors, or ``is_canonical`` starts returning ``False``), the limitation has been
+    closed — update this test's docstring/assertions to match, do not just delete it.
+    """
+    from agentic_dynamics.control.reducers.pattern import _payload_to_json
+
+    rows = [
+        _finding(knowledge_id="k1", test_executed_success=True),
+        _finding(knowledge_id="k2", test_executed_success=False),
+        _finding(knowledge_id="k3", test_executed_success=False),
+        _finding(knowledge_id="k4", test_executed_success=False),
+    ]
+    real_fact = pattern_v1(_reducer_input(rows))[0]
+    real_payload = decode_pattern_payload(real_fact.value)
+    assert real_payload.support == 1  # the honest count: 1 of 4 rows measured True
+
+    fabricated_payload = PatternPayload(
+        claim=real_payload.claim,
+        population=real_payload.population,
+        conditions=real_payload.conditions,
+        support=4,  # FABRICATED — claims all 4 succeeded; the real count is 1
+        uncertainty=0.01,  # FABRICATED — a suspiciously tight interval to match the false claim
+        validity_window=real_payload.validity_window,
+        source_experiment=real_payload.source_experiment,
+    )
+    fabricated = replace(real_fact, value=_payload_to_json(fabricated_payload))
+    # evidence_ids/reducer_version were NEVER touched, so the digest — which hashes only those,
+    # never `value` — still "reproduces": the tamper is invisible to check 3.
+    assert recompute_inputs_digest(fabricated) == fabricated.inputs_digest
+
+    # KNOWN LIMITATION: both of these SHOULD ideally refuse the fabricated fact; neither does.
+    assert verify_chain(fabricated, REDUCERS) == []
+    assert is_canonical(fabricated) is True

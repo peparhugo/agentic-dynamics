@@ -558,6 +558,83 @@ def test_session_routing_v1_is_deterministic():
     assert a == b
 
 
+# ── Adversarial release verdict (attack 4, implementation_notes.md §17): the `continue`
+# invariant must hold under a RE-DERIVED (fresh) snapshot, not just a not-too-old one ──
+
+
+def test_continue_decision_carries_toctou_preconditions_for_every_equality_marker():
+    """The fix itself, asserted directly on the decision object: without a `preconditions`
+    entry per equality marker, check C7's fresh-snapshot re-check
+    (`validator._c7_freshness_and_preconditions`) has nothing to re-verify and silently
+    degrades to a pure snapshot-AGE check — catching "too old" but not "the world changed
+    within the freshness window". `route_next_job_v1` already sets this for its own `route`
+    proposal (`workflow_phases_remaining`); `session_routing_v1`'s `continue` needed the same
+    treatment and, before this pass, did not have it."""
+    ctx = _ctx((
+        _marker_fact("checkpoint_present"), _marker_fact("checkpoint_goal_unchanged"),
+        _marker_fact("checkpoint_phase_unchanged"), _marker_fact("checkpoint_model_unchanged"),
+        _phases_remaining_fact(),
+    ))
+    decision = session_routing_v1(ctx, target_id=CELL, proposed_at=NOW)
+    assert decision.action == "continue"
+    assert {p.fact for p in decision.preconditions} == {
+        "checkpoint_goal_unchanged", "checkpoint_phase_unchanged", "checkpoint_model_unchanged",
+    }
+    assert all(p.op == "is_true" for p in decision.preconditions)
+
+
+def test_continue_is_refused_under_a_fresh_snapshot_where_the_goal_changed():
+    """The end-to-end TOCTOU proof: a `continue` decision compiled from an admissible snapshot
+    (goal/phase/model all provably unchanged AT COMPILE TIME) must be REFUSED when re-checked
+    against a FRESH snapshot in which the goal has since changed — even though the ORIGINAL
+    snapshot is still well within `max_snapshot_age_seconds` (a pure age check would never catch
+    this; only the precondition re-check can). Before the fix (`preconditions=()`), this exact
+    scenario was wrongly ADMITTED — verified by hand while diagnosing this finding."""
+    original = _ctx((
+        _marker_fact("checkpoint_present"), _marker_fact("checkpoint_goal_unchanged"),
+        _marker_fact("checkpoint_phase_unchanged"), _marker_fact("checkpoint_model_unchanged"),
+        _phases_remaining_fact(),
+    ))
+    decision = session_routing_v1(original, target_id=CELL, proposed_at=NOW)
+    assert decision.action == "continue"
+
+    # The world moved on: the goal changed, so checkpoint_goal_unchanged no longer resolves in
+    # a freshly compiled snapshot. Still well within the 300s max_snapshot_age_seconds window —
+    # only the precondition re-check (not the age check) can catch this.
+    fresh = _ctx((
+        _marker_fact("checkpoint_present"),
+        _marker_fact("checkpoint_phase_unchanged"), _marker_fact("checkpoint_model_unchanged"),
+        _phases_remaining_fact(),
+    ))
+    result = validate_decision(
+        decision, snapshot=original, fresh_snapshot=fresh, contract=CONTRACT, now=NOW
+    )
+    assert result.admitted is False
+    assert result.check == "C7"
+    assert "checkpoint_goal_unchanged" in result.reason
+
+
+def test_continue_still_admitted_under_a_fresh_snapshot_where_nothing_changed():
+    """The non-regression half: the SAME `continue` decision, re-checked against a fresh
+    snapshot compiled from IDENTICAL facts, is still admitted — the TOCTOU guard must not turn
+    into a guard that refuses everything."""
+    ctx = _ctx((
+        _marker_fact("checkpoint_present"), _marker_fact("checkpoint_goal_unchanged"),
+        _marker_fact("checkpoint_phase_unchanged"), _marker_fact("checkpoint_model_unchanged"),
+        _phases_remaining_fact(),
+    ))
+    decision = session_routing_v1(ctx, target_id=CELL, proposed_at=NOW)
+    fresh = _ctx((
+        _marker_fact("checkpoint_present"), _marker_fact("checkpoint_goal_unchanged"),
+        _marker_fact("checkpoint_phase_unchanged"), _marker_fact("checkpoint_model_unchanged"),
+        _phases_remaining_fact(),
+    ))
+    result = validate_decision(
+        decision, snapshot=ctx, fresh_snapshot=fresh, contract=CONTRACT, now=NOW
+    )
+    assert result.admitted is True
+
+
 # ── DELIVER: "a continue with a stale snapshot is refused" ──────
 
 
@@ -733,6 +810,36 @@ def test_escalate_and_fork_proposals_are_also_recorded_never_actuated(tmp_path):
         decision, repository_id=REPO, causes="c0ffee" * 4, artifact_dir=tmp_path,
     )
     assert record is not None
+
+
+def test_recording_is_unconditional_even_for_a_decision_c9_would_refuse(tmp_path):
+    """Adversarial release verdict (attack 3, implementation_notes.md §17): makes explicit a
+    property the rest of this file only relies on implicitly — ``record_shadow_decision`` does
+    NOT call ``validate_decision`` first. "Recorded, never applied" means recording is
+    UNCONDITIONAL (every proposal becomes a durable, auditable artifact, precisely so a human
+    can later ask "what would the plane have proposed here") while APPLICATION is gated
+    separately and does not exist for ``session_routing`` at all (no
+    ``make_applying_router``-equivalent — grep confirms zero call sites). Demonstrated directly:
+    the SAME automated ``fork`` decision that check C9 refuses to ADMIT (proven above by
+    ``test_real_rule_never_proposes_fork_without_citing_checkpoint_present``) is still
+    successfully RECORDED here — the two are independent, by design, not by omission.
+    """
+    ctx = _ctx((_marker_fact("checkpoint_present"), _phases_remaining_fact()))
+    decision = session_routing_v1(ctx, target_id=CELL, proposed_at=NOW)
+    assert decision.action == "fork"
+    assert decision.proposed_by == "policy_rule:session_routing"  # NOT an "operator:" human
+
+    # Confirm this exact decision WOULD be refused if checked (the property being contrasted).
+    validated = validate_decision(decision, snapshot=ctx, fresh_snapshot=ctx, contract=CONTRACT, now=NOW)
+    assert validated.admitted is False
+    assert validated.check == "C9"
+
+    # ...yet recording it succeeds regardless — recording and admission are independent gates.
+    record = record_shadow_decision(
+        decision, repository_id=REPO, causes="deadbeef" * 4, artifact_dir=tmp_path,
+    )
+    assert record is not None
+    assert (tmp_path / f"{record.knowledge_id}.json").is_file()
 
 
 # ── (6) AUTOMATABLE_ACTIONS is untouched; PROPOSABLE_ACTIONS grows explicitly ─

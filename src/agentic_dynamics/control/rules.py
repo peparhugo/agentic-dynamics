@@ -275,11 +275,33 @@ def session_routing_v1(
 
     if goal_ok is not None and phase_ok is not None and model_ok is not None:
         cited = tuple(f.fact_id for f in (present, goal_ok, phase_ok, model_ok))
+        # TOCTOU guard (adversarial release verdict, attack 4 — implementation_notes.md §17):
+        # a `continue` claim is "the session's context is provably unchanged" — a claim about
+        # the WORLD, not just about what THIS snapshot happened to resolve. Without a
+        # `preconditions` entry per equality marker, check C7's fresh-snapshot re-check
+        # (`validator._c7_freshness_and_preconditions`) degrades to a pure AGE check (was the
+        # snapshot compiled too long ago) and does NOTHING to catch "the world changed within
+        # the freshness window" — e.g. the goal changed 5 seconds ago but the snapshot was
+        # compiled 250 seconds ago, well inside `max_snapshot_age_seconds: 300`. Mirrors
+        # `route_next_job_v1`'s own established pattern (`workflow_phases_remaining` above):
+        # every marker this decision's SAFETY rests on is re-checked, at apply time, against a
+        # FRESH compile — `op="is_true"` matches this reducer's own positive-marker convention
+        # (`control/reducers/checkpoint.py`: the fact is present-and-"true", or absent; there is
+        # no "false" value to compare against). If the world changed enough that a marker no
+        # longer resolves in the fresh snapshot, C7's `fresh is None` branch refuses the stale
+        # `continue` outright — exactly the behavior a re-derived snapshot must enforce.
+        preconditions = tuple(
+            Precondition(fact=marker, scope="self", op="is_true", value="true", max_age_seconds=600)
+            for marker in (
+                "checkpoint_goal_unchanged", "checkpoint_phase_unchanged", "checkpoint_model_unchanged",
+            )
+        )
         return ControlDecision(
             decision_id=decision_id,
             action="continue",
             parameters={},
             facts_used=cited,
+            preconditions=preconditions,
             rationale="checkpoint present and goal/phase/model provably unchanged",
             **base,
         )
