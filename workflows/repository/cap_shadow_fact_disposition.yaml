@@ -1,0 +1,151 @@
+name: cap_shadow_fact_disposition
+question: >-
+  Land the two reviewed CAP workstreams (feature/cap-shadow-campaign and
+  feature/cap-fact-auto-emit) and close their two known anti-pattern edges: (1) merge both
+  branches into this disposition branch (resolving any conflicts, keeping both sides' content),
+  (2) add an explicit `applied: false` marker field to shadow decision records so a shadow
+  (proposed, never executed) decision is structurally distinguishable from a real actuation,
+  with a regression test, (3) verify end-to-end fact flow: run ONE tiny workflow with
+  FINOPS_KB_WRITE=1 and auto-emit enabled, confirm fact records actually land in the KB
+  artifact dir/registry (not just derive), and document the ops requirement (facts do NOT flow
+  without FINOPS_KB_WRITE=1), (4) adversarial review of the merge, the marker, and the
+  verification. Deliver docs/designs/current/cap_shadow_fact_disposition.md with the merge
+  summary, the marker change, the fact-flow evidence, and the release verdict. The three
+  in-flight workflows (cap_addendum_implement, cap_gate_migration, cap_routing_evidence_specs)
+  are NEVER touched or merged by this task.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / CAP
+        disposition. canonical_sources: [feature/cap-shadow-campaign (measurement doc + s4
+        verdict), feature/cap-fact-auto-emit (hook + f3 adversarial), src/agentic_dynamics/
+        control/rules.py (record_shadow_decision), scripts/run_workflow.py (auto-emit hook +
+        FINOPS_KB_WRITE gate), docs/designs/current/cap_shadow_measurement.md].
+        policies: [apply_stays_off, facts_need_kb_write, shadow_is_structurally_marked]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: cross_cutting disposition.
+        deliberation: [merge, marker fix, fact-flow verification, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        Both branches are verified and merge-worthy. Shadow decisions are persisted as
+        source_type=actuation artifacts with NO marker distinguishing them from executed
+        actuations (the discriminator is positional: artifact-dir-only, never published to the
+        live stream). FINOPS_KB_WRITE is unset in the environment, so auto-emit derives but
+        facts do not reach the stream. DeepSeek credits may be limited — the tiny verification
+        sub-run is the only paid work; keep it to ONE workflow with the smallest spec available.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) NEVER touch or merge
+        the three in-flight branches (feature/cap-addendum-implement, feature/cap-gate-migration,
+        feature/cap-routing-evidence-specs) nor their worktrees — a conflict or merge involving
+        them is an instant FAIL with the reason logged. (3) The marker fix is minimal and
+        additive: an `applied: false` field in the shadow decision record body (rules.py
+        record_shadow_decision's candidate), a test asserting shadow records carry it, and no
+        change to real actuation records or the report scripts' reading of the field unless the
+        tests demand it. (4) Fact-flow verification: exactly ONE tiny workflow sub-run with
+        FINOPS_KB_WRITE=1; then PROVE the facts landed (KB artifact files + registry rows
+        present, content-addressed) and document that without FINOPS_KB_WRITE=1 facts do not
+        flow. If the provider returns 402/insufficient-balance, record it and STOP — do not
+        silently switch providers. (5) If merging produces conflicts, resolve them keeping BOTH
+        sides' content (e.g. maintained-script lists); never delete a branch's work. (6) The
+        adversarial phase (p4) is mandatory — at least 3 findings or clean sweep. (7) PASS/FAIL
+        log.
+      read_first: >-
+        docs/designs/current/cap_shadow_measurement.md (verdict + prerequisites),
+        src/agentic_dynamics/control/rules.py (record_shadow_decision + decision_payload),
+        scripts/run_workflow.py (_emit_workflow_facts + FINOPS_KB_WRITE gate),
+        docs/designs/current/cap_fact_auto_emit_design.md, git log of both branches
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash --backend opencode. One worktree, one
+        branch (feature/cap-shadow-fact-disposition); each phase commits [workflow] <phase>.
+    phases:
+      - name: p1_merge_branches
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: verify the two branches exist and are not the three in-flight ones; then
+          git merge feature/cap-shadow-campaign and feature/cap-fact-auto-emit into the current
+          branch (one at a time). Resolve any conflicts keeping BOTH sides' content; run the
+          full relevant test suite (control plane, fact auto-emit, shadow-related, guards) to
+          prove the merge is clean.
+          DELIVER: the merge summary (commits brought in, conflicts resolved, files changed).
+          GUARD: the three in-flight branches never appear in any merge; tests green.
+          LOG: merge log + test results; PASS/FAIL; commit.
+      - name: p2_applied_false_marker
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: add an `applied: false` field to the shadow decision record body in
+          record_shadow_decision (rules.py) so a shadow decision is STRUCTURALLY marked as
+          proposed-not-executed, not just positionally (artifact-only). Add a regression test:
+          a shadow decision record carries applied=false; a real actuation record (if one can be
+          constructed without arming) does not carry it or carries true. Ensure the I6 report
+          scripts (context_snapshot_report/shadow_decision_report/decision_arm_comparison) still
+          read the records correctly — update them only if a test proves they break.
+          GUARD: minimal additive change; no real actuation path touched; report round-trip tests
+          pass.
+          LOG: diff summary + test names; PASS/FAIL; commit.
+      - name: p3_fact_flow_verification
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: pick the SMALLEST workflow spec available in the index. Run it once with
+          FINOPS_KB_WRITE=1 (and auto-emit on) via run_workflow.py in a temp worktree. Then
+          prove the facts landed: check the KB artifact dir and the registry index for the
+          run's fact records (content-addressed, per-run identity), and confirm a re-run of the
+          same artifact does NOT duplicate rows (idempotency). Record the ops requirement:
+          without FINOPS_KB_WRITE=1 facts derive but never flow.
+          GUARD: exactly ONE sub-run; on 402/insufficient-balance record and STOP (no provider
+          switching); no changes to emit code unless a defect is proven.
+          DELIVER: the evidence table (run id, artifacts, registry rows) into the disposition doc.
+          LOG: evidence + ops note; PASS/FAIL; commit.
+      - name: p4_adversarial_review
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial reviewer. Attack: (1) the merge — any in-flight branch touched? any
+          branch content silently dropped in conflict resolution? (2) the marker — is there any
+          code path where a shadow decision record is produced WITHOUT the marker, or where the
+          report scripts now break? does the marker survive the record_to_artifact round trip?
+          (3) the fact-flow verification — did facts actually reach the registry (not just the
+          artifact dir)? is the idempotency claim re-derived, not asserted? (4) the docs — does
+          the disposition doc state FINOPS_KB_WRITE=1 as a hard ops requirement?
+          Every finding: fix or record accepted limitation.
+          RELEASE VERDICT: state whether the disposition branch is merge-ready to main and what
+          the operator must do after merge (set FINOPS_KB_WRITE=1; re-run the shadow campaign
+          for the real I7 gate test).
+          LOG: finding table; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: cap_shadow_fact_disposed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [branches_merged, marker_landed, fact_flow_proven, disposition_adversarial_clean]
+metrics:
+  - {name: branches_merged, agg: mean, over: cell}
+  - {name: marker_landed, agg: mean, over: cell}
+  - {name: fact_flow_proven, agg: mean, over: cell}
+  - {name: disposition_adversarial_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, p1_merge_branches, p2_applied_false_marker, p3_fact_flow_verification, p4_adversarial_review]
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
