@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-24T15:54:10.578550+00:00",
+  "generated_at": "2026-08-24T23:01:23.747010+00:00",
   "n_specs": 103,
   "specs": [
     {
@@ -46,24 +46,6 @@
       "spec_path": "experiments/definitions/cap_coverage_routing_impact.yaml",
       "artifact_kind": "experiment",
       "repeatable": true,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "cap_fact_backfill",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/cap_fact_backfill.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
@@ -613,6 +595,24 @@
       "latest_cost_usd": 6.256375,
       "latest_git_sha": "2bdba509d",
       "results_pointer": "experiments/results/workflows/cap_fact_auto_emit/20260824T000620Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "cap_fact_backfill",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_fact_backfill.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-24T23:01:23.428058+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.355326,
+      "latest_git_sha": "cc26b302e",
+      "results_pointer": "experiments/results/workflows/cap_fact_backfill/20260824T230123Z.json",
       "n_runs": 1
     },
     {

@@ -3,15 +3,14 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-24T15:54:10.578550+00:00`  ·  103 spec(s)
-**Work remaining:** 26 open · 77 completed/retired
+Generated at: `2026-08-24T23:01:23.747010+00:00`  ·  103 spec(s)
+**Work remaining:** 25 open · 78 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
 | `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_fact_backfill` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_grit_strength_grid` | experiment | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -42,6 +41,7 @@ Generated at: `2026-08-24T15:54:10.578550+00:00`  ·  103 spec(s)
 | `cap_addendum_design` | workflow | no | completed | 0.1 | — | 2026-08-22 18:15 | ok | deepseek/deepseek-v4-pro | $0.4667 | 1 |
 | `cap_addendum_implement` | workflow | no | completed | 0.1 | — | 2026-08-24 14:07 | ok | anthropic/claude-sonnet-5 | $27.9867 | 2 |
 | `cap_fact_auto_emit` | workflow | no | completed | 0.1 | — | 2026-08-24 00:06 | ok | anthropic/claude-sonnet-5 | $6.2564 | 1 |
+| `cap_fact_backfill` | workflow | no | completed | 0.1 | — | 2026-08-24 23:01 | ok | deepseek/deepseek-v4-flash | $0.3553 | 1 |
 | `cap_gate_migration` | workflow | no | completed | 0.1 | — | 2026-08-24 00:30 | ok | anthropic/claude-sonnet-5 | $13.7720 | 1 |
 | `cap_gate_scan` | workflow | no | completed | 0.1 | — | 2026-08-23 23:24 | ok | anthropic/claude-sonnet-5 | $7.2482 | 1 |
 | `cap_grit_grid_execute` | workflow | no | completed | 0.1 | — | 2026-08-24 15:54 | ok | deepseek/deepseek-v4-flash | $0.1330 | 1 |
