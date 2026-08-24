@@ -49,6 +49,7 @@ from agentic_dynamics.control.facts import (
     fact_state,
     verify_chain,
 )
+from agentic_dynamics.control.profiles import ChallengeProfile, DomainProfile, compose_requirements
 from agentic_dynamics.control.reducers import REDUCERS
 from agentic_dynamics.core.contracts import (
     FactRequirement,
@@ -720,16 +721,26 @@ def compile_context(
     now: str,
     contract: ContractSpec | None = None,
     contracts_dir: Path = CONTRACTS_DIR,
+    domain: DomainProfile | None = None,
+    challenge: ChallengeProfile | None = None,
 ) -> ControlContext:
     """Build the decision-specific snapshot (design §6.2). Deterministic; no LLM; no network
     beyond ``store``. ``contract`` may be pre-loaded (tests); production resolves it from
     ``contracts_dir`` by ``request.decision_type``.
 
-    Algorithm: load the contract -> resolve every ``requires_facts``/``invariants`` entry against
-    ``store`` -> bucket each ``FactRef`` by its OWN scope_type (workload/workflow/job/resource) ->
-    every advisory-authority current fact for a required predicate lands in ``.advisory`` too
-    (visible, never citable — check C5 in I6) -> apply ``on_missing``/``on_conflict`` to compute
-    ``admissible`` -> compute ``snapshot_id`` and freeze.
+    ``domain``/``challenge`` are the CAP addendum I8 profile inputs (design §2.3/§2.4). THE
+    CONTRACT REMAINS THE SOLE GATE: step 0 (new, before resolution) composes ``challenge``'s
+    ``context_requirements`` into ``contract.requires_facts`` via
+    ``profiles.compose_requirements`` — contract-wins, never-widens (deviation D4) — and THAT
+    composed tuple, not the raw contract field, is what steps 1-9 resolve against.
+    ``contract.invariants`` is deliberately NEVER touched by composition: the safety gate stays
+    exactly what the contract alone declares. ``domain`` is accepted here for symmetry and future
+    declaration/audit use (a caller may want to record which domain governed a decision) but
+    contributes NO ``FactRequirement`` entries in v1 — only a :class:`ChallengeProfile` carries
+    ``context_requirements`` (§2.1); a :class:`DomainProfile` does not, so passing one changes
+    nothing about what gets resolved (§2.1's honesty rule: no L4/undeclared claim is implied by
+    accepting the parameter). An absent/unknown ``challenge`` (``None``, the default) is a
+    no-op — the contract alone governs, unchanged from every pre-I8 caller.
     """
     contract = contract or load_contract(request.decision_type, contracts_dir=contracts_dir)
     if request.scope_type != contract.decision_scope:
@@ -737,6 +748,9 @@ def compile_context(
             f"contract {contract.decision_type!r} is scoped at {contract.decision_scope!r}; "
             f"request is scoped at {request.scope_type!r}"
         )
+    effective_requires_facts = compose_requirements(contract, challenge)
+    _ = domain  # accepted for future declaration/audit use only — see docstring above; not
+    # consumed in v1 (only a ChallengeProfile carries context_requirements — §2.1's honesty rule)
 
     unknowns: list[Unknown] = []
     conflicts: list[Conflict] = []
@@ -774,7 +788,7 @@ def compile_context(
         if ref is not None:
             invariant_refs.append(ref)
 
-    for req in contract.requires_facts:
+    for req in effective_requires_facts:
         res = _resolve_requirement(
             req, decision_scope_path=request.scope_path, store=store, now=now
         )
@@ -789,7 +803,7 @@ def compile_context(
     # Advisory context (§6.3): every ADVISORY-authority current fact for a required predicate,
     # visible in scope, surfaced for a human/researcher to read but never citable (C5, I6).
     advisory: list[FactRef] = []
-    for req in contract.requires_facts:
+    for req in effective_requires_facts:
         target_scope_path = resolve_requirement_scope(req.scope, request.scope_path)
         if target_scope_path is None:
             continue

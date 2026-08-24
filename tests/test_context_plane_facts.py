@@ -278,6 +278,16 @@ def test_predicate_registry_has_the_design_seed_rows():
         "allowed_models",
         "max_spend_usd",
         "max_attempts",
+        "domain_profile_version",
+        "challenge_profile_version",
+        "pattern",
+        "session_checkpoint",
+        "checkpoint_present",
+        "checkpoint_goal_unchanged",
+        "checkpoint_phase_unchanged",
+        "checkpoint_model_unchanged",
+        "model_change_required",
+        "checkpoint_snapshot_identity",
     }
 
 
@@ -311,6 +321,9 @@ def test_predicate_inheritance_flags_match_the_design_table():
         "allowed_models",
         "max_spend_usd",
         "max_attempts",
+        "domain_profile_version",
+        "challenge_profile_version",
+        "pattern",
     }
     # Only the workflow aggregates declare ``aggregates_from`` (the legal upward roll-up path,
     # §10.2.3); every other predicate defaults it to "" (no implicit upward rollup).
@@ -440,12 +453,14 @@ def test_fact_is_registered_as_an_observation_source_type():
 #: ``facts.py`` (and its test) is a call site the gate below must account for.
 PUBLIC_NAMES = frozenset({"CanonicalFact", "FACT_PREDICATES", "EPISTEMIC_MAP", "verify_chain"})
 
-#: The exact call sites CAP I1/I4/I6 authorize — the fact-ingestion mapping, the batch
+#: The exact call sites CAP I1/I4/I6/I8 authorize — the fact-ingestion mapping, the batch
 #: producer, (I4) the read-only Context Compiler, which resolves ``FACT_PREDICATES``/
-#: ``FactRef``/``Unknown``/``Conflict``/``StaleFact`` into a ``ControlContext`` snapshot, and
-#: (I6) the shadow controller rule + validator, which cite ``FactRef``/``verify_chain`` while
-#: proposing and admitting decisions. I0 had none (the zero-call-sites gate); each increment
-#: widens this allowlist explicitly, never silently.
+#: ``FactRef``/``Unknown``/``Conflict``/``StaleFact`` into a ``ControlContext`` snapshot, (I6)
+#: the shadow controller rule + validator, which cite ``FactRef``/``verify_chain`` while
+#: proposing and admitting decisions, and (I8) ``control/profiles.py``, which declares
+#: ``DomainProfile``/``ChallengeProfile`` as POLICY facts (``domain_profile_version``/
+#: ``challenge_profile_version``) via its own registered ``profiles/v1`` reducer. I0 had none
+#: (the zero-call-sites gate); each increment widens this allowlist explicitly, never silently.
 LEGITIMATE_CALLERS = frozenset(
     {
         "src/agentic_dynamics/control/fact_ingestion.py",
@@ -453,6 +468,7 @@ LEGITIMATE_CALLERS = frozenset(
         "src/agentic_dynamics/control/context_compiler.py",
         "src/agentic_dynamics/control/rules.py",
         "src/agentic_dynamics/control/validator.py",
+        "src/agentic_dynamics/control/profiles.py",
     }
 )
 

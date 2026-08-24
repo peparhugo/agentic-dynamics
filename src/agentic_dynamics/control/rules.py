@@ -180,6 +180,157 @@ def route_next_job_v1(
     )
 
 
+# ── CAP addendum I10 — the session_routing shadow control rule (design §4.2/§4.3) ─
+
+
+def session_routing_v1(
+    ctx: ControlContext,
+    *,
+    target_type: str = "job",
+    target_id: str,
+    proposed_at: str,
+    proposed_by: str = "policy_rule:session_routing",
+) -> ControlDecision:
+    """Propose ``{continue, fork, compress_and_fork, escalate}`` for one session from a compiled
+    ``session_routing`` :class:`ControlContext`.
+
+    **Fully shadow, always — this function's own action space is entirely OUTSIDE
+    ``AUTOMATABLE_ACTIONS`` (design §4.3, F4's resolution).** The session-continuation
+    ``"continue"`` this function may propose is a DIFFERENT decision from the routing null-action
+    ``"continue"`` ``route_next_job_v1`` proposes above — same string, different meaning (resuming
+    a session is a positive, unmeasured `[H]` trade; the routing ``continue`` is "chose nothing").
+    Conflating them under ``AUTOMATABLE_ACTIONS`` would let an automated path apply an unmeasured
+    session policy; ``control/decisions.py``'s own comment on ``AUTOMATABLE_ACTIONS`` and this
+    module's docstring both say the same thing for exactly this reason. Every proposal this
+    function returns is only ever recorded (:func:`record_shadow_decision`, reused verbatim —
+    NO new recording path for this decision type) and surfaced — never applied by any code path.
+
+    **Per-action gating happens HERE, not in ``session_routing.yaml``'s ``invariants:``** — see
+    that file's own header comment for why combining these five facts as blanket, unconditional
+    invariants is logically unsatisfiable (a real adversarial finding, not a style choice). This
+    function reads the (possibly-absent) marker facts ``compile_context`` resolved under
+    ``requires_facts`` and decides which action to propose, the SAME "soft facts + rule-level
+    branching" pattern :func:`route_next_job_v1` already uses for ``workflow_phases_remaining``/
+    ``allowed_models`` above.
+
+    Decision policy (v1 — deliberately simple, a first measurable baseline, never front-loaded
+    sophistication; sharpened only once the design's own evidence-seed experiment, §4.4, measures
+    it against the runner's existing fork-chain incumbent, ``workflow_runner.py:591-597``):
+
+    1. **No checkpoint present at all** (a first phase) → ``continue``. The only safe proposal —
+       forking with nothing to fork FROM is refused by construction (there is no ``fork``
+       evidence to cite), never attempted.
+    2. **Checkpoint present AND goal/phase/model all provably unchanged** (all three marker facts
+       resolved) → ``continue``. This is the ONLY case ``continue`` is proposed once a checkpoint
+       exists — the addendum's own "requires unchanged goal/phase/model" made mechanical.
+    3. **Checkpoint present AND a model change is evidenced** (``model_change_required``
+       resolved) → ``escalate``. Never inferred, never assumed from "goal changed" — a model
+       change must be a REAL supplied fact.
+    4. **Checkpoint present, but goal/phase/model did not all verify unchanged, and no evidenced
+       model change** → ``fork``. The safe default once continuation cannot be proven safe.
+    5. ``compress_and_fork`` is NEVER proposed by v1. Its trigger (context-token growth past a
+       threshold, design §4.4's ``session_context_growth``) has no measured signal yet
+       (``cost_inference``/``cache_hit`` etc. are declared-not-written, per the design's own F5
+       table) — fabricating a threshold with no real backing would violate the exact
+       no-phantom discipline ``control/reducers/pattern.py`` (I9) already established. The
+       contract still ALLOWS the action (an operator or a future, evidenced v2 rule may propose
+       it); v1's automatic rule simply never reaches for it.
+    """
+    decision_id = _decision_id(ctx.snapshot_id, "continue", target_id, proposed_at)
+    base = dict(
+        snapshot_id=ctx.snapshot_id,
+        decision_type=ctx.decision_type,
+        contract_version=ctx.contract_version,
+        target_type=target_type,
+        target_id=target_id,
+        proposed_by=proposed_by,
+        proposed_at=proposed_at,
+    )
+
+    if not ctx.admissible:
+        return ControlDecision(
+            decision_id=decision_id,
+            action="continue",
+            parameters={},
+            facts_used=(),
+            rationale=f"snapshot inadmissible: {ctx.refusal}",
+            **base,
+        )
+
+    present = _find(ctx.job, "checkpoint_present")
+    if present is None:
+        return ControlDecision(
+            decision_id=decision_id,
+            action="continue",
+            parameters={},
+            facts_used=(),
+            rationale="no checkpoint present — continuing is the only safe proposal",
+            **base,
+        )
+
+    goal_ok = _find(ctx.job, "checkpoint_goal_unchanged")
+    phase_ok = _find(ctx.job, "checkpoint_phase_unchanged")
+    model_ok = _find(ctx.job, "checkpoint_model_unchanged")
+    model_change = _find(ctx.job, "model_change_required")
+
+    if goal_ok is not None and phase_ok is not None and model_ok is not None:
+        cited = tuple(f.fact_id for f in (present, goal_ok, phase_ok, model_ok))
+        # TOCTOU guard (adversarial release verdict, attack 4 — implementation_notes.md §17):
+        # a `continue` claim is "the session's context is provably unchanged" — a claim about
+        # the WORLD, not just about what THIS snapshot happened to resolve. Without a
+        # `preconditions` entry per equality marker, check C7's fresh-snapshot re-check
+        # (`validator._c7_freshness_and_preconditions`) degrades to a pure AGE check (was the
+        # snapshot compiled too long ago) and does NOTHING to catch "the world changed within
+        # the freshness window" — e.g. the goal changed 5 seconds ago but the snapshot was
+        # compiled 250 seconds ago, well inside `max_snapshot_age_seconds: 300`. Mirrors
+        # `route_next_job_v1`'s own established pattern (`workflow_phases_remaining` above):
+        # every marker this decision's SAFETY rests on is re-checked, at apply time, against a
+        # FRESH compile — `op="is_true"` matches this reducer's own positive-marker convention
+        # (`control/reducers/checkpoint.py`: the fact is present-and-"true", or absent; there is
+        # no "false" value to compare against). If the world changed enough that a marker no
+        # longer resolves in the fresh snapshot, C7's `fresh is None` branch refuses the stale
+        # `continue` outright — exactly the behavior a re-derived snapshot must enforce.
+        preconditions = tuple(
+            Precondition(fact=marker, scope="self", op="is_true", value="true", max_age_seconds=600)
+            for marker in (
+                "checkpoint_goal_unchanged", "checkpoint_phase_unchanged", "checkpoint_model_unchanged",
+            )
+        )
+        return ControlDecision(
+            decision_id=decision_id,
+            action="continue",
+            parameters={},
+            facts_used=cited,
+            preconditions=preconditions,
+            rationale="checkpoint present and goal/phase/model provably unchanged",
+            **base,
+        )
+
+    if model_change is not None:
+        escalate_id = _decision_id(ctx.snapshot_id, "escalate", target_id, proposed_at)
+        return ControlDecision(
+            decision_id=escalate_id,
+            action="escalate",
+            parameters={},
+            facts_used=(present.fact_id, model_change.fact_id),
+            rationale="checkpoint present and a model change is evidenced",
+            **base,
+        )
+
+    fork_id = _decision_id(ctx.snapshot_id, "fork", target_id, proposed_at)
+    return ControlDecision(
+        decision_id=fork_id,
+        action="fork",
+        parameters={},
+        facts_used=(present.fact_id,),
+        rationale=(
+            "checkpoint present but goal/phase/model did not all verify unchanged — "
+            "proposing fork"
+        ),
+        **base,
+    )
+
+
 # ── Shadow-mode recording (design §8.1: "proposal only" — recorded, never applied) ─
 
 
