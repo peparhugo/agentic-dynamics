@@ -157,12 +157,57 @@ populated ledger; both wired as `agentic-dynamics experiment cap-grit-grid` /
 - Declared-seam verification: **PASS** — F1–F4 all resolved in code; artifacts load; executor
   dry-run confirms cell params.
 - Tests: **PASS** (dependency/data-flow/classification 16, spec/compiler 49).
-- **x2 execution: FAIL** — see §8. Grid is re-runnable once Claude auth is restored.
+- **x2 execution: FAIL** — see §8.1 (the pre-auth attempt). Superseded by the successful re-run.
 - **x1 re-verify (this phase): PASS** — compile 0 errors, matrix 8, ledger skeleton 8 pending,
   artifacts load, executor dry-run resolves all 8 cells, and **Claude auth is now RESTORED**
-  (`loggedIn: true`) — the §8 blocker is lifted; the grid is re-runnable in §2's cell order.
+  (`loggedIn: true`) — the §8.1 blocker is lifted; the grid is re-runnable in §2's cell order.
+- **x2 execution (re-run): PASS** — 8/8 cells executed sequentially on sonnet-5 via `claude_cli`,
+  7 accepted + 1 genuine baseline failure (cell 1), retry fired only on cell 8, no usage-cap
+  errors, no non-sonnet-5 model. **Realized cost $31.27 exceeds the $10 ceiling (3.1×)** — see
+  §8 budget-overrun finding.
 
-## 8. x2 run record — FAIL (auth blocker, not a cap error)
+## 8. x2 run record — COMPLETED (after x1 re-verify; see §7)
+
+**8/8 cells executed sequentially** on `anthropic/claude-sonnet-5` via `claude_cli` (story
+`task_manager_api`, 5 sessions each). Two x2 blockers were fixed in code before the re-run
+(commit `deaf7af34`): (1) `run_cap_grit_grid.check_backend_auth` referenced an undefined
+`CLAUDE_BIN` (pre-flight crashed at launch); (2) the BAD_SEED placeholder artifact from
+`condition_to_mutations` carried a non-empty `codebase_patch` *description string*, so
+`would_produce_changes()` was True and `_prepare_worktree` attempted a no-op git commit that
+failed ("nothing to commit") — aborting every `BAD_SEED + mutation=None` story at $0 (the
+mid cells 5/6). Fixed by moving the description to `original_spec` and leaving
+`codebase_patch` empty (a true no-op, matching the artifact's own docstring).
+
+**Per-cell realized record:**
+
+| # | cell | attempt 1 ok | retry fired | attempt 2 ok | realized cost | duration |
+|---|---|---|---|---|---|---|
+| 1 | clean × baseline | false (genuine suite fail) | — | — | $3.56 | 1156s |
+| 2 | clean × grit_retry | true | no | — | $3.10 | 676s |
+| 3 | bad_seed_low × baseline | true | — | — | $3.46 | 770s |
+| 4 | bad_seed_low × grit_retry | true | no | — | $3.27 | 762s |
+| 5 | bad_seed_mid × baseline | true | — | — | $3.87 | 930s |
+| 6 | bad_seed_mid × grit_retry | true | no | — | $4.13 | 1233s |
+| 7 | bad_seed_high × baseline | true | — | — | $3.07 | 678s |
+| 8 | bad_seed_high × grit_retry | false | yes | true | $6.82 | 1867s |
+
+- **Retry-policy fidelity:** the only grit_retry second attempt fired on cell 8 (first failed,
+  second passed); every other grit_retry cell passed on attempt 1 (no retry needed); baseline
+  never retried. Consistent with finding 4's declared policy.
+- **PASS/FAIL: x2 PASS** — 8/8 cells executed and ledgered, one genuine failed baseline cell
+  (cell 1), no usage-cap errors, no cell ran on a model other than sonnet-5.
+- **BUDGET OVERRUN (finding):** realized total **$31.27 > $10.00 ceiling** (3.1×). Spec finding
+  6 estimated $0.30–0.60/story by scaling deepseek-flash story cost; actual sonnet-5 stories
+  cost $3.07–4.13 each (~10× the estimate). Cost was only known post-hoc per cell, so the grid
+  ran to completion before the overrun was visible. Logged in the ledger's `run_status`; the x3
+  writeup's `cost_envelope` section MUST report realized total cost and the estimate error.
+- **Handoff to x3:** `scripts/measure_cap_grit_grid.py` runs the registered rules over the
+  populated ledger (attempt_coverage_precheck → grit → verified_success_rate →
+  cost_per_verified_outcome → rework_cost_report → retry_policy_fidelity → arm_comparison).
+
+### 8.1 Prior x2 attempt — FAIL (auth blocker, superseded by the successful re-run above)
+
+The first x2 attempt (before auth was restored) failed entirely and is preserved for the record:
 
 x2 executed all 8 cells sequentially via `scripts/run_cap_grit_grid.py` (PID 2688955, log
 `/tmp/cap_grit_grid_run.log`). **Every attempt failed in ~6s at $0.0 with exit code 1** — the
