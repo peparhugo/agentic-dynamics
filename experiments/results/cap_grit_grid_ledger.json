@@ -1,0 +1,113 @@
+{
+  "schema": "cap_grit_grid_ledger/v1",
+  "spec_id": "cap_grit_strength_grid@0.1",
+  "generated_at": "2026-08-24T00:00:00+00:00",
+  "budget_usd": 10.0,
+  "max_attempts": 2,
+  "cells": [
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "clean",
+      "policy_arm": "baseline",
+      "model": "anthropic/claude-sonnet-5",
+      "condition": "clean",
+      "mutation_artifact": null,
+      "strength": 0.0,
+      "max_attempts": 1,
+      "retry_rule": "baseline: score the single attempt unconditionally (no retry)",
+      "status": "pending",
+      "attempts": []
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_clean_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "clean",
+      "policy_arm": "grit_retry",
+      "model": "anthropic/claude-sonnet-5",
+      "condition": "clean",
+      "mutation_artifact": null,
+      "strength": 0.0,
+      "max_attempts": 2,
+      "retry_rule": "grit_retry: second attempt (attempt_number=2, parent_attempt_id=first) only if first test_executed_success is false",
+      "status": "pending",
+      "attempts": []
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_low_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_low",
+      "policy_arm": "baseline",
+      "model": "anthropic/claude-sonnet-5",
+      "condition": "bad_seed",
+      "mutation_artifact": "compile_mutation(bad_seed seam, s=0.2)",
+      "strength": 0.2,
+      "max_attempts": 1,
+      "retry_rule": "baseline: score the single attempt unconditionally (no retry)",
+      "status": "pending",
+      "attempts": []
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_low_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_low",
+      "policy_arm": "grit_retry",
+      "model": "anthropic/claude-sonnet-5",
+      "condition": "bad_seed",
+      "mutation_artifact": "compile_mutation(bad_seed seam, s=0.2)",
+      "strength": 0.2,
+      "max_attempts": 2,
+      "retry_rule": "grit_retry: second attempt (attempt_number=2, parent_attempt_id=first) only if first test_executed_success is false",
+      "status": "pending",
+      "attempts": []
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_mid_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_mid",
+      "policy_arm": "baseline",
+      "model": "anthropic/claude-sonnet-5",
+      "condition": "bad_seed",
+      "mutation_artifact": null,
+      "strength": 0.5,
+      "max_attempts": 1,
+      "retry_rule": "baseline: score the single attempt unconditionally (no retry)",
+      "status": "pending",
+      "attempts": []
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_mid_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_mid",
+      "policy_arm": "grit_retry",
+      "model": "anthropic/claude-sonnet-5",
+      "condition": "bad_seed",
+      "mutation_artifact": null,
+      "strength": 0.5,
+      "max_attempts": 2,
+      "retry_rule": "grit_retry: second attempt (attempt_number=2, parent_attempt_id=first) only if first test_executed_success is false",
+      "status": "pending",
+      "attempts": []
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_high",
+      "policy_arm": "baseline",
+      "model": "anthropic/claude-sonnet-5",
+      "condition": "bad_seed",
+      "mutation_artifact": "compile_mutation(bad_seed seam, s=0.8)",
+      "strength": 0.8,
+      "max_attempts": 1,
+      "retry_rule": "baseline: score the single attempt unconditionally (no retry)",
+      "status": "pending",
+      "attempts": []
+    },
+    {
+      "cell_id": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+      "condition_strength": "bad_seed_high",
+      "policy_arm": "grit_retry",
+      "model": "anthropic/claude-sonnet-5",
+      "condition": "bad_seed",
+      "mutation_artifact": "compile_mutation(bad_seed seam, s=0.8)",
+      "strength": 0.8,
+      "max_attempts": 2,
+      "retry_rule": "grit_retry: second attempt (attempt_number=2, parent_attempt_id=first) only if first test_executed_success is false",
+      "status": "pending",
+      "attempts": []
+    }
+  ]
+}
