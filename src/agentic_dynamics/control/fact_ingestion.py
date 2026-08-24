@@ -175,10 +175,75 @@ def finalize_fact(fact: CanonicalFact, record: KnowledgeRecord) -> CanonicalFact
     return replace(fact, fact_id=record.knowledge_id)
 
 
+def _registry_state_map(
+    registry_path: Path | str, *, cache: dict
+) -> dict[str, tuple[str | None, frozenset[str]]]:
+    """Build, once per ``derive_fact_records`` call, the per-entity registry state map.
+
+    The stale-observation guard's data source. ``RegistryHead`` deliberately does not carry
+    ``observed_at`` (a shared-schema extension was rejected — see ``kb_produce_facts._registered_observed_at``'s
+    docstring), so this tolerant read of the SAME append-only file ``registry_head`` parses, for
+    EVERY entity, (a) the CURRENT head's own recorded observation time and (b) the content
+    fingerprints of every row in the entity's chain — the set a re-derived value is matched
+    against. A missing/unreadable file or a malformed line degrades to ``None``/skip — a producer
+    must never be blocked by a damaged index. Built lazily on the guard's first use and cached for
+    the whole call (``cache``), so a batch of stale candidates pays ONE registry scan, never one
+    per candidate.
+    """
+    built = cache.get("_built")
+    if built:
+        return cache["_map"]
+    state_map: dict[str, tuple[str | None, frozenset[str]]] = {}
+    path = Path(registry_path)
+    try:
+        raw_lines = path.read_text().splitlines()
+    except (OSError, UnicodeDecodeError):
+        raw_lines = []
+    per_entity: dict[str, dict] = {}
+    for raw in raw_lines:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        kid = row.get("knowledge_id")
+        entity_id = row.get("entity_id")
+        if not kid or not entity_id:
+            continue
+        bucket = per_entity.setdefault(
+            entity_id, {"order": [], "lines": {}, "superseded": set(), "fingerprints": set()}
+        )
+        if row.get("supersedes"):
+            bucket["superseded"].add(str(row["supersedes"]))
+        if row.get("lifecycle_state") == "superseded":
+            bucket["superseded"].add(str(kid))
+        if kid not in bucket["lines"]:
+            bucket["order"].append(str(kid))
+        bucket["lines"][str(kid)] = row  # latest line for an id wins
+        reason = str(row.get("reason") or "")
+        if reason.startswith(REASON_PREFIX):
+            bucket["fingerprints"].add(reason[len(REASON_PREFIX):])
+    for entity_id, bucket in per_entity.items():
+        head_observed_at: str | None = None
+        for kid in reversed(bucket["order"]):
+            if kid not in bucket["superseded"]:
+                head_observed_at = bucket["lines"][kid].get("observed_at")
+                break
+        state_map[entity_id] = (head_observed_at, frozenset(bucket["fingerprints"]))
+    cache["_built"] = True
+    cache["_map"] = state_map
+    return state_map
+
+
 def derive_fact_records(
     facts: list[CanonicalFact] | tuple[CanonicalFact, ...],
     *,
     registry_path: Path | str = REGISTRY_INDEX_PATH,
+    identity_out: dict[int, str] | None = None,
 ) -> list[KnowledgeRecord]:
     """Derive one ``source_type="fact"`` record per fact whose value needs registering.
 
@@ -214,10 +279,34 @@ def derive_fact_records(
     sort preserves the caller's relative order for facts that tie on ``observed_at`` (including the
     common case of a single fact per entity, where sorting is a no-op).
 
+    **Stale-observation guard (CAP fact backfill p5 — re-derivation idempotency).** Re-running the
+    producer over ALREADY-REGISTERED evidence re-derives every per-run fact, including an OLDER
+    run of a multi-run cell whose current-per-cell fact (``job_facts``) was superseded by a NEWER
+    run in a previous batch. Without a guard, that older fact sees the NEWER registered head,
+    fingerprints differ, and it re-chains ``supersedes=<newer head>`` — minting a fresh
+    ``knowledge_id`` every pass (the supersede link is part of the hashed artifact) and flapping
+    the cell's current value back to a stale observation. The guard, applied ONLY when the head
+    came from the REGISTRY (the in-batch ``pending_head`` chain is already oldest-first-sorted):
+    a candidate that is BOTH strictly older than the registered current head AND whose value
+    fingerprint is already registered (in any chain position — a re-derived, already-superseded
+    observation) is a no-op; the head stands. A genuinely new value supersedes exactly as before —
+    whether it is newer (a fresh run) or older-but-never-registered (a backfilled spec index entry
+    whose ``last_run_at`` predates the head, which the ``observed_at`` check alone would wrongly
+    suppress).
+
     No LLM, no writes: emission is the producer's job (``scripts/kb_produce_facts.py``).
-    """
+
+    ``identity_out`` (CAP fact backfill p5 — the workflow ladder's citation fix): when supplied,
+    filled with ``id(fact) -> knowledge_id`` for EVERY input fact — the id the fact is ACTUALLY
+    registered under (its first-version record, its linked record, or — for a converged fact — the
+    registered head it converged to). ``workflow_facts/v1`` cites the lower facts' ``fact_id``s, so
+    the producer finalizes the lower facts with THESE ids (not the naive unlinked
+    ``build_fact_record`` id, which names a knowledge_id never registered when the fact converged
+    to an earlier run's identical value)."""
     records: list[KnowledgeRecord] = []
     pending_head: dict[str, RegistryHead] = {}
+    registry_state: dict = {}
+    identity_out = identity_out if identity_out is not None else {}
     for fact in sorted(facts, key=lambda f: f.observed_at):
         candidate = build_fact_record(fact)
         head = pending_head.get(candidate.entity_id)
@@ -230,16 +319,40 @@ def derive_fact_records(
                 candidate.knowledge_id, fact_fingerprint(candidate)
             )
             records.append(candidate)  # first version of this entity
+            identity_out[id(fact)] = candidate.knowledge_id
             continue
         if head.fingerprint and head.fingerprint == fact_fingerprint(candidate):
             pending_head[candidate.entity_id] = head
+            identity_out[id(fact)] = head.knowledge_id  # converged — registered under the head
             continue  # unchanged since the last registration — nothing to say
         if head.knowledge_id == candidate.knowledge_id:
             pending_head[candidate.entity_id] = head
+            identity_out[id(fact)] = head.knowledge_id
             continue  # byte-identical first version already registered
+        # Stale-observation guard (module docstring): a candidate that is OLDER than the REGISTERED
+        # current head AND whose value fingerprint is already registered (in any chain position) is
+        # a re-derived, already-superseded observation — it must never supersede the newer head.
+        # Applied unconditionally (not only when the head came from the registry): the in-batch
+        # pending chain is oldest-first-sorted, so a within-batch successor is never "older than
+        # the registered head" — only a re-derived stale observation is.
+        state_map = _registry_state_map(registry_path, cache=registry_state)
+        registered_head_at, registered_fingerprints = state_map.get(
+            candidate.entity_id, (None, frozenset())
+        )
+        if (
+            registered_head_at
+            and fact.observed_at
+            and fact.observed_at < registered_head_at
+            and fact_fingerprint(candidate) in registered_fingerprints
+        ):
+            pending_head[candidate.entity_id] = head
+            identity_out[id(fact)] = head.knowledge_id
+            continue  # already superseded in a previous batch — re-derivation is a no-op
         linked = build_fact_record(fact, supersedes=head.knowledge_id)
         pending_head[candidate.entity_id] = RegistryHead(
             linked.knowledge_id, fact_fingerprint(linked)
         )
         records.append(linked)
+        if identity_out is not None:
+            identity_out[id(fact)] = linked.knowledge_id
     return records

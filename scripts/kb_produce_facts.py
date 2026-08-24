@@ -46,6 +46,7 @@ import json
 import os
 import subprocess
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -279,14 +280,34 @@ def _finalize(facts: list) -> list:
     return [fi.finalize_fact(fact, fi.build_fact_record(fact)) for fact in facts]
 
 
+def _finalize_to_registered(lower: list, identity_out: dict[int, str]) -> list:
+    """Finalize the lower facts with the ids they are ACTUALLY registered under.
+
+    ``workflow_facts_v1`` cites the lower facts' ``fact_id``s (the staleness-cascade backbone), and
+    the citation must resolve to a REGISTERED row. ``derive_fact_records``' ``identity_out`` maps
+    each fact to its registered knowledge_id — its first-version record, its linked record, or (for
+    a fact that converged to an earlier run's identical value) the head it converged to. The naive
+    unlinked ``build_fact_record`` id names a knowledge_id that is NEVER registered in the converged
+    case, which minted dangling workflow-fact citations for every multi-run cell.
+    """
+    finalized: list = []
+    for fact in lower:
+        rid = identity_out.get(id(fact))
+        if rid is None:  # a fact the batch did not touch (defensive — identity_out is total)
+            rid = fi.build_fact_record(fact).knowledge_id
+        record = replace(fi.build_fact_record(fact), knowledge_id=rid)
+        finalized.append(fi.finalize_fact(fact, record))
+    return finalized
+
+
 def _derive_workflow_facts(repository_id: str, revision: str, now: str) -> list:
     """Run the reduction LADDER: lower reducers → finalize → workflow_facts/v1 → records.
 
     ``workflow_facts/v1`` is the first reducer that consumes FACTS, not evidence. The producer
     therefore runs the lower rungs (attempt/job over the run JSONs, policy over the spec configs,
-    spec_status over the index), finalizes each lower fact (so it carries a citable ``fact_id``),
-    then hands the FINALIZED lower facts to ``workflow_facts_v1`` — which folds their ``fact_id``s
-    into its own ``evidence_ids``. That is the backbone of the §4.5 staleness cascade.
+    spec_status over the index), registers the lower facts (so the citations ``workflow_facts/v1``
+    folds into its ``evidence_ids`` resolve against REGISTERED rows), then finalizes them with
+    their registered ids and hands them up — that is the backbone of the §4.5 staleness cascade.
     """
     runs = load_run_jsons()
     run_inp = ReducerInput(
@@ -331,18 +352,21 @@ def _derive_workflow_facts(repository_id: str, revision: str, now: str) -> list:
     )
     lower += spec_status_v1(spec_inp)
 
+    identity_out: dict[int, str] = {}
+    lower_records = fi.derive_fact_records(lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out)
     wf_inp = ReducerInput(
         scope_path=f"org:{repository_id}",
         scope_type="workflow",
         scope_id="",
         repository_id=repository_id,
         evidence=(),
-        facts=tuple(_finalize(lower)),
+        facts=tuple(_finalize_to_registered(lower, identity_out)),
         now=now,
         source_revision=revision,
     )
     wf_facts = workflow_facts_v1(wf_inp)
-    return fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    wf_records = fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    return lower_records + wf_records
 
 
 # ── Scoped, per-run derivation: the workflow-completion auto-emit hook ──
@@ -512,19 +536,21 @@ def derive_run_facts(
     policy = policy_facts_v1(policy_inp)
 
     lower = attempt + job + policy
+    identity_out: dict[int, str] = {}
+    lower_records = fi.derive_fact_records(lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out)
     wf_inp = ReducerInput(
         scope_path=workload_scope,
         scope_type="workflow",
         scope_id="",
         repository_id=repository_id,
         evidence=(),
-        facts=tuple(_finalize(lower)),
+        facts=tuple(_finalize_to_registered(lower, identity_out)),
         now=now,
         source_revision=revision,
     )
     wf_facts = workflow_facts_v1(wf_inp)
-
-    return fi.derive_fact_records(lower + wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    wf_records = fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    return lower_records + wf_records
 
 
 def derive_facts(
@@ -939,21 +965,24 @@ def derive_corpus_facts(repository_id: str, revision: str, now: str) -> list:
         ),
     )
     lower += spec_status_v1(spec_inp)
+    identity_out: dict[int, str] = {}
+    lower_records = fi.derive_fact_records(lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out)
     wf_inp = ReducerInput(
         scope_path=f"org:{repository_id}",
         scope_type="workflow",
         scope_id="",
         repository_id=repository_id,
         evidence=(),
-        facts=tuple(_finalize(lower)),
+        facts=tuple(_finalize_to_registered(lower, identity_out)),
         now=now,
         source_revision=revision,
     )
     wf_facts = workflow_facts_v1(wf_inp)
-    all_facts = lower + wf_facts + _story_facts(repository_id, revision, now) + _summary_facts(
+    wf_records = fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    all_facts = lower_records + wf_records + _story_facts_records(
         repository_id, revision, now
-    )
-    return fi.derive_fact_records(all_facts, registry_path=REGISTRY_INDEX_PATH)
+    ) + _summary_facts_records(repository_id, revision, now)
+    return all_facts
 
 
 # ── Emission (identical logic to kb_produce_sources.py) ─────────

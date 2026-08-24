@@ -243,6 +243,75 @@ def test_end_to_end_ladder_round_trip(kpf, tmp_path):
     assert job_cost_2[0].entity_id == job_cost_1.entity_id  # same logical slot
 
 
+def test_re_derivation_over_registered_multi_run_cell_is_idempotent(kpf, tmp_path):
+    """CAP fact backfill p5 idempotency: re-deriving a MULTI-RUN cell's current-per-cell job facts
+    after they were already registered must publish NOTHING (the stale-observation guard). Without
+    the guard, the OLDER run's fact re-chains onto the newer registered head and mints fresh
+    knowledge_ids every pass (the supersede link is hashed into the artifact)."""
+    # Two runs of the SAME cell: older cost 5, newer cost 9.
+    _write_run(tmp_path, "demo", "20260820T000000Z", total_cost_usd=5.0)
+    _write_run(tmp_path, "demo", "20260822T000000Z", total_cost_usd=9.0)
+
+    # Round 1: fresh registry -> the older run is the first version, the newer supersedes it.
+    round_1 = kpf.derive_facts("job_facts/v1", REPO, REVISION, NOW)
+    _persist(kpf.REGISTRY_INDEX_PATH, *round_1)
+
+    # Round 2: re-derive BOTH runs over the now-populated registry -> the current value is
+    # unchanged, so NOTHING is published (idempotent re-derivation, not a fresh re-chain).
+    assert kpf.derive_facts("job_facts/v1", REPO, REVISION, NOW) == []
+
+    # A genuinely NEW run (newer still, cost 12) still supersedes the current head normally.
+    _write_run(tmp_path, "demo", "20260824T000000Z", total_cost_usd=12.0)
+    round_3 = kpf.derive_facts("job_facts/v1", REPO, REVISION, NOW)
+    cost_3 = [
+        r for r in round_3 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"
+    ]
+    assert len(cost_3) == 1
+    # It supersedes round 1's current head (the newest run), not the stale older run.
+    current_head = [r for r in round_1 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"][-1]
+    assert cost_3[0].supersedes == current_head.knowledge_id
+
+
+def test_multi_run_workflow_fact_cites_registered_lower_ids(kpf, tmp_path):
+    """CAP fact backfill p5 provenance: a multi-run cell's workflow facts must cite the LOWER
+    facts' REGISTERED knowledge_ids. A current-per-cell job fact is registered under its content
+    identity (the supersede link is a chain position, not content — see the linked-record fix in
+    ``fact_ingestion.derive_fact_records``), so ``workflow_facts/v1``'s citation of that id
+    resolves against the records actually registered in the same batch."""
+    _write_run(tmp_path, "demo", "20260820T000000Z", total_cost_usd=5.0)
+    _write_run(tmp_path, "demo", "20260822T000000Z", total_cost_usd=9.0)
+
+    run_inp = ReducerInput(
+        scope_path=f"org:{REPO}",
+        scope_type="workload",
+        scope_id="",
+        repository_id=REPO,
+        evidence=kpf._run_evidence(kpf.load_run_jsons()),
+        facts=(),
+        now=NOW,
+        source_revision=REVISION,
+    )
+    lower = attempt_facts_v1(run_inp) + job_facts_v1(run_inp)
+    lower_records = fi.derive_fact_records(lower, registry_path=kpf.REGISTRY_INDEX_PATH)
+    registered_ids = {r.knowledge_id for r in lower_records}
+    finalized = [fi.finalize_fact(f, fi.build_fact_record(f)) for f in lower]
+    wf_inp = ReducerInput(
+        scope_path=f"org:{REPO}",
+        scope_type="workflow",
+        scope_id="",
+        repository_id=REPO,
+        evidence=(),
+        facts=tuple(finalized),
+        now=NOW,
+        source_revision=REVISION,
+    )
+    wf_facts = workflow_facts_v1(wf_inp)
+    # Every workflow-fact evidence_id must name a lower fact that is REGISTERED this batch.
+    for f in wf_facts:
+        assert f.evidence_ids
+        assert set(f.evidence_ids) <= registered_ids
+
+
 def test_workflow_facts_use_only_the_current_run(kpf, tmp_path):
     """Current-run aggregation, through the real producer: adding an OLDER failed run of the SAME
     cell must not retroactively appear in a re-derived workflow fact once a newer run exists."""
