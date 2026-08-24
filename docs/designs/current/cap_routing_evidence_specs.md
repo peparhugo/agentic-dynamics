@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # CAP routing-evidence specs — gate results, adversarial review, release verdict
 
 **Status:** authored, gated, adversarially reviewed. **Nothing has been run.** Every spec below

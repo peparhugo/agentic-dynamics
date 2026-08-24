@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Stage 0 + Stage 1 — Completion Prompt: unlock + backfill the fact store
 
 > Author: operator. Purpose: the exact work that must be COMPLETE before the
