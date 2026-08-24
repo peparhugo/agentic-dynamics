@@ -446,3 +446,30 @@ registry-visible the moment it is written — no dependency on a running consume
 **PASS** — exactly one emit pass over the entire corpus; F1 structural-zero fix applied and
 verified at the attempt level; F2 materialization closes the stall for the backfill's own emission
 (10812 == 10812). Reducers untouched; in-flight worktrees untouched.
+
+**Re-audit (2026-08-24):** the preserved emission was verified in place — NOT re-emitted (guard:
+exactly one emit pass; the p4 emission + p5 WIP re-emission are the one pass). Evidence:
+- **Corpus visible:** 125 workflow ledgers present in this worktree's (gitignored)
+  `experiments/results/workflows/`; `FINOPS_KB_WRITE=1` set by the operator; Redis 6380 reachable.
+- **Counts hold:** KB artifacts 13781, registry 12015 rows, fact artifacts 11052, registry fact
+  rows 10839 — all matching §6.3.
+- **Idempotent re-derivation (not asserted — measured):** re-deriving over the populated registry
+  converges — `--corpus all --dry-run` derives 0 would-emit (all 10812 checkpointed; the workflow
+  ladder alone re-derives 22 already-registered records in ~400 s, the stale-observation guard's
+  cost of scanning 12k rows). Fresh-registry derivation reproduces the p3 counts (story 5433 +
+  summary 386) plus the workflow ladder.
+- **F1 verified:** 10 all-failed-before-call runs (`_sanitize_run` → `total_cost_usd=None`);
+  **0 `attempt_cost_usd` facts cite any of the 10 failed-before-call run evidence ids**; 0
+  misclassified phases (no failed-before-call phase carries non-zero cost/tokens).
+- **F2 verified:** backfill's own emission 10812 artifacts == 10812 registry rows (**0 missing**,
+  matched by knowledge_id across artifact filenames and registry rows); all 10839 registry fact
+  rows have artifacts on disk. The 27 rows not in the backfill's 10812 are the disposition run's
+  `code_review` facts (`self-wf_cap_shadow_fact_disposition...`, 27 artifacts on disk) — a
+  separate, pre-existing scope, not a stall. The 213 `self-wt_*` residual facts remain as
+  documented (other worktrees' scopes).
+- **Predicate sample re-derived from artifact payloads** (all-scope): attempt_model 1724,
+  attempt_cost_usd 1714, phase_status 1587, phase_commit 1365, attempt_confidence 773,
+  attempt_tokens_in/out 517/517, attempt_cache_hit_rate 419, current_commit 352,
+  job_accumulated_cost_usd 343, job_status 199, job_n_phases 195 — matching §6.4.
+- No model calls in derivation → 402/insufficient-balance stop never applied; reducers untouched;
+  in-flight worktrees untouched.
