@@ -1,0 +1,162 @@
+name: cap_routing_evidence_specs
+question: >-
+  Author the four "start-now" policy-routing evidence ExperimentSpecs in
+  experiments/definitions/, grounded in the real registries (FACT_PREDICATES, the I5 gate
+  vocabulary, routing.py's coverage-corrected machinery): (E1) cap_shadow_comparison —
+  retrospective shadow-rule (route_next_job_v1) vs step_routing over the workflow-run corpus;
+  (E2) cap_confidence_cascade — retrospective confidence-gated model-cascade simulation over
+  recorded attempts; (E3) cap_coverage_routing_impact — how many route recommendations change
+  under coverage-corrected vs legacy stats; (E4) cap_grit_strength_grid — a LIVE story grid
+  (perturbation_strength x condition x retry-policy arm) seeding the grit policy. Every authored
+  spec must pass the requires/produces gate (post-migration vocabulary) against the real
+  registries, state its null hypothesis, carry coverage pre-checks, and survive an adversarial
+  validity attack. AUTHORING ONLY — none of the experiments run here.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery /
+        policy-routing measurement. canonical_sources: [src/agentic_dynamics/control/facts.py
+        (FACT_PREDICATES — 29 predicates), src/agentic_dynamics/core/contracts.py (R1-R11 gate),
+        src/agentic_dynamics/control/routing.py (recommend_route/simulate_strategies,
+        coverage-corrected), src/agentic_dynamics/control/rules.py (route_next_job_v1),
+        scripts/{decision_arm_comparison,shadow_decision_report}.py, scripts/retro_session_routing.py
+        (the retrospective-mode precedent), the story/perturbation machinery for E4].
+        policies: [gate_is_truth, null_not_zero, coverage_precheck, honest_nulls]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: greenfield experiment design.
+        deliberation: [author E1, author E2, author E3+E4, gate + adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        I0-I7 merged; gate migration in flight (specs must use requires_facts/decision_type
+        vocabulary); shadow machinery merged but its campaign reports are still being produced;
+        attempt_confidence is a real predicate (coverage unknown — pre-checks required); routing
+        is coverage-corrected (n_cost/n_outcome, null-not-zero); DeepSeek credits exhausted —
+        E4's cells will run claude-sonnet-5; session-routing retrospective proved continuation
+        unobservable (the coverage-lesson: never assume a predicate was recorded).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) AUTHORING ONLY: do
+        NOT run any experiment, do NOT enqueue cells, do NOT invoke the shadow seam — deliver the
+        four YAMLs and nothing executed. (3) Every authored spec is artifact_kind: experiment in
+        experiments/definitions/ and must pass the requires/produces gate with the REAL
+        FACT_PREDICATES/REDUCERS registries (use the post-migration requires_facts vocabulary);
+        a requirement with no honest predicate mapping is a BLOCKED row naming the missing
+        producer — never a stretch. (4) Every spec states its null hypothesis explicitly and
+        includes a coverage pre-check rule (a metric reporting n_available/n_total per required
+        signal — the session-routing n=0 lesson). (5) E1-E3 are mode: retrospective over existing
+        ledgers/facts (no new cells); E4 is the only live grid — model pinned to
+        anthropic/claude-sonnet-5 for measurement consistency, factors limited to a small grid
+        (3 strengths x 2 conditions x 2 retry arms). (6) Null-not-zero coverage semantics in every
+        metric. (7) The adversarial phase (r4) is mandatory — at least 3 findings or clean sweep.
+        (8) No edits to the in-flight specs (cap_shadow_campaign, cap_fact_auto_emit,
+        cap_addendum_implement, cap_gate_migration). (9) PASS/FAIL log.
+      read_first: >-
+        src/agentic_dynamics/control/facts.py (FACT_PREDICATES), src/agentic_dynamics/core/
+        contracts.py, src/agentic_dynamics/experiment/experiment_spec.py (RuleSpec + FactRequirement
+        shape), src/agentic_dynamics/control/{routing,rules}.py, scripts/retro_session_routing.py
+        (retrospective-mode template), experiments/definitions/cap_session_routing_evidence.yaml
+        (the compile-clean precedent), the story/perturbation config shape for E4
+      run_shape: >-
+        SINGLE-model: --model anthropic/claude-sonnet-5 --backend claude_cli. One worktree, one
+        branch (feature/cap-routing-evidence-specs); each phase commits [workflow] <phase>.
+    phases:
+      - name: r1_shadow_comparison_spec
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER: experiments/definitions/cap_shadow_comparison.yaml
+          SHAPE: retrospective experiment over the workflow-run corpus + shadow decision records.
+          Arms: shadow_rule (counterfactual route_next_job_v1 decisions) vs step_routing (actual).
+          Metrics: agreement rate, cost-per-verified-outcome per arm (coverage-adjusted),
+          rejected-decision count. Null: shadow_rule is not inferior on cost-per-verified-outcome.
+          requires_facts must map to REAL predicates (attempt_cost_usd, phase_status, ...) — read
+          the registry; a requirement without a predicate is BLOCKED. Include a coverage pre-check
+          rule (n_available/n_total for cost and status). evaluation rule generalizes
+          decision_arm_comparison.
+          GUARD: parses; gate passes; no new cells.
+          LOG: arms, requires->predicate map, null; PASS/FAIL; commit.
+      - name: r2_confidence_cascade_spec
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER: experiments/definitions/cap_confidence_cascade.yaml
+          SHAPE: retrospective simulation over recorded attempts: for confidence thresholds
+          theta in {0.3, 0.5, 0.7}, the model_cascade arm escalates (attempt_model change) when
+          attempt_confidence < theta; compare vs single-model baseline on cost-per-verified-outcome
+          and verified success. Null: no threshold improves cost-per-verified-outcome over
+          baseline. FIRST a coverage pre-check rule on attempt_confidence (the n=0 lesson) — if
+          coverage is near zero the experiment is INCONCLUSIVE, recorded as such, not a null.
+          requires_facts: attempt_confidence, attempt_cost_usd, attempt_model, phase_status,
+          job_status — verify each against FACT_PREDICATES.
+          GUARD: parses; gate passes; escalation is counterfactual only (never applied).
+          LOG: arms, threshold table, coverage rule; PASS/FAIL; commit.
+      - name: r3_coverage_and_grit_specs
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVER: experiments/definitions/cap_coverage_routing_impact.yaml AND
+          experiments/definitions/cap_grit_strength_grid.yaml
+          E3 SHAPE: retrospective — compare routing recommendations (recommend_route) computed
+          with coverage-corrected stats vs the legacy zero-default stats over the same corpus;
+          primary metric: count + rate of changed recommendations (per task type, per model);
+          secondary: whether changed recs move toward lower-cost models. Null: zero changes.
+          E4 SHAPE: LIVE grid — factors: perturbation_strength {low, mid, high} x condition
+          {clean, bad_seed} x policy_arm {baseline, grit_retry}; story cells; model pinned
+          anthropic/claude-sonnet-5; requires_facts: perturbation_strength, test_executed_success
+          (both measured on attempts); metrics: verified success rate, recovery cost, rework;
+          null: grit_retry does not improve cost-per-verified-outcome. Grid must stay small
+          (12 cells max) and state its cost envelope.
+          GUARD: both parse; both pass the gate; E4 requires are honestly produced.
+          LOG: per-spec arms/factors/metrics; PASS/FAIL; commit.
+      - name: r4_gate_and_adversarial
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run validate_fact_contracts + compile_spec over all four authored specs with the
+          REAL registries; fix every refusal (correct mapping or honest BLOCKED row).
+          ROLE: adversarial methodologist — attack all four: (1) arms actually discriminable from
+          the data (E1: do shadow records exist for the chosen corpus? E2: is confidence recorded
+          at all?); (2) confounding (model x threshold, condition x strength); (3) coverage
+          (any metric dividing by an uncaptured denominator); (4) counterfactual soundness
+          (escalation simulated on runs where escalation never happened — is the proxy valid?);
+          (5) E4's grid size vs effect size (is 12 cells enough to detect the claimed effect, or
+          is the spec honest about power?); (6) gate vocabulary (any legacy requires: leaks in).
+          Every finding: fix the spec or record accepted limitation.
+          DELIVER: docs/designs/current/cap_routing_evidence_specs.md — the four-spec summary
+          table (arms, nulls, coverage pre-checks, cost envelopes) + adversarial findings +
+          RELEASE VERDICT (specs ready to run, and in what order).
+          LOG: finding table; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules:
+  - name: cap_routing_evidence_specced
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [shadow_spec_authorized, cascade_spec_authorized, coverage_and_grit_authorized, specs_gated_clean]
+metrics:
+  - {name: shadow_spec_authorized, agg: mean, over: cell}
+  - {name: cascade_spec_authorized, agg: mean, over: cell}
+  - {name: coverage_and_grit_authorized, agg: mean, over: cell}
+  - {name: specs_gated_clean, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, r1_shadow_comparison_spec, r2_confidence_cascade_spec, r3_coverage_and_grit_specs, r4_gate_and_adversarial]
+stop: {budget_usd: 25.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
