@@ -477,3 +477,62 @@ than data loss — either outcome is a finding `f3` must produce, not one `f1` m
 | `repository_id` = flat `REPOSITORY_ID` ("agentic-dynamics") | Proven invisible to that same run's own `--cap-shadow`/`--cap-snapshot`/`control_route` queries via `scope_visible`'s ancestor-prefix matching (§3) |
 | `FINOPS_DISABLE_FACT_EMIT=1` (opt-out styled as opt-in "=1") | Reads backwards at the call site for no consistency gain; the feature's default-ON posture is already the deliberate exception in this flag family (§4) |
 | Inject a fact-emit `Callable` through `run_workflow()`'s parameters (mirroring `router`) | No per-phase behavior to inject — fires once, post-run, over an already-persisted immutable artifact; adds a parameter/test surface for no behavioral gain (§1) |
+
+---
+
+## 12. `f3_adversarial_verify` — findings log
+
+**Role:** adversarial verifier. Attacked the six vectors named in the spec's hard rule (6)
+against the `f2_implement` code (`5f589de78`), independently of the design's own §9 predictions —
+re-deriving expected behavior from the actual shipped code and code-reading + reproducing
+suspected defects with standalone probes before writing any test.
+
+### 12.1 Finding table
+
+| # | Attack | Finding | Resolution |
+|---|---|---|---|
+| 1 | Double-emit from a copied artifact | No defect. Idempotence is content-addressed (`run_artifact_id` → `fact_fingerprint`), re-verified with an INDEPENDENTLY CONSTRUCTED object (`result_a is not result_b`), not merely the same Python object `f2`'s own no-op test reused. | **PASS** — `test_attack1_double_emit_from_an_independently_constructed_copy` |
+| 2a | Concurrent runs of one cell — out-of-order **completion** | **DEFECT FOUND**, deterministic, no true concurrency needed. `attempt_facts_v1`/`job_facts_v1` key `observed_at` off the RUN's own `ended_at`/`started_at` (`facts.py`: "when the underlying evidence was observed, NOT when reduced"). `derive_run_facts` is called ONCE PER RUN from separate process invocations; each call only compares CONTENT against the registered head, never RECENCY, across calls. A run that STARTED earlier but FINISHED later (a slow worker, a delayed retry) silently overwrote a newer run's correct `job_status`/`job_accumulated_cost_usd`/`workflow_status` with stale values the moment its hook fired — reproduced with a standalone probe before any test was written (T2 registers `job_accumulated_cost_usd=9.0`/`workflow_status=completed`; T1, chronologically older but processed second, silently overwrote both with `1.0`/`failed`). | **FIXED** in `scripts/kb_produce_facts.py` — new `_registered_observed_at()` (a hook-local, tolerant registry-line reader, same shape as `spec_ingestion.registry_head`, surfacing `observed_at` instead of the fingerprint `reason`) + a guard at the top of `derive_run_facts()` that drops the ENTIRE derivation (returns `[]`) for a run whose own `job_status` `observed_at` is older than the cell's currently-registered head. Zero reducer/registry-schema changes (hard rule 5). Verified: `test_attack2a_out_of_order_completion_previously_regressed_current_state_now_guarded` (reproduces the exact T1/T2 scenario, proves the guard fires, proves a genuinely newer T3 still supersedes normally) + `test_attack2a_guard_only_fires_when_a_head_is_already_registered` (proves the guard cannot suppress a cell's first-ever emission). |
+| 2b | Concurrent runs of one cell — registry-**write** race | Confirmed OPEN, exactly as the design's §9/§10 flagged (not new — the identical race exists in `kb_produce_facts.py`'s own batch `main()` across two concurrently-run processes today, unrelated to this hook). Two GENUINELY simultaneous completions (identical `observed_at`, so 2a's guard correctly does not apply) both call `derive_run_facts` before EITHER's registry line is durably written (the `kb-registry-v1` consumer appends asynchronously, off the Redis stream — not synchronously inside `emit_records`). Both read the SAME stale head and both link `supersedes=<that head>`, producing two distinct, valid records that share one `fact_entity_id` with neither superseding the other. | **ACCEPTED LIMITATION**, verified to degrade safely rather than corrupt: no exception at derive time, no data loss at persist time, and `facts.fact_state()` — read with a `current_versions` resolver — correctly classifies the pair as `"conflicted"`, the state the plane was built to represent this exact case (design's §4.5 vocabulary). A durable fix (an optimistic registry-write CAS, or moving the head-decision into the synchronous `kb-registry-v1` consumer) is out of scope for a hook-local, no-new-transport phase (hard rule 5) and is recorded here as follow-up work, not silently assumed safe. Verified: `test_attack2b_simultaneous_racing_derivations_converge_to_conflicted_not_corruption`. |
+| 3 | Partial registry writes | No defect. `_registered_observed_at`'s parsing (mirroring `registry_head`'s existing, unchanged tolerant shape) already skips a truncated/malformed line without losing an earlier well-formed line for the same entity, and degrades a missing file OR a missing parent directory to "no head" — never raises. | **PASS** — `test_attack3_truncated_last_line_degrades_to_no_head_not_a_crash`, `test_attack3_missing_registry_file_and_missing_parent_directory_is_a_first_version_not_a_crash` |
+| 4 | Emit of a run whose phases changed after finalize | No defect, verified by construction (not merely asserted, per the design's own §9 framing of this exact item). `_emit_workflow_facts(spec, args, result)` is called synchronously, in-process, on the SAME `result` object `run_workflow()` just returned; the two lines between (`_refresh_index`, `_emit_spec_record`) never read or reassign `result`. No mutation window exists in the shipped code. | **PASS** — `test_attack4_no_mutation_window_between_run_completion_and_fact_emission` (a structural source-adjacency check that fails loudly if a future edit inserts phase-mutating code into that span, rather than re-asserting a runtime property that has no reachable trigger today) |
+| 5 | Flag precedence confusion | No defect. Adversarial values an implementer might accidentally treat as falsy/disabling if they reached for `bool(...)`/`int(...)` instead of exact string equality — `""`, `"0.0"`, `" 0"`, `"0 "`, `"00"`, `"False"`, `"no"`, `"0x0"` — all correctly stay ON; only the exact literal `"0"` disables, per §4's precedence table. | **PASS** — `test_attack5_only_the_exact_literal_zero_disables` |
+| 6 | Regression in `fact_ingestion`'s in-batch chaining or dedup guard | No defect. `git diff 814c94591..HEAD -- control/fact_ingestion.py control/reducers/ knowledge/knowledge_stream.py knowledge/spec_ingestion.py` is EMPTY — even after the 2a fix, which stayed entirely inside `kb_produce_facts.py`. The full CAP suite (154 tests: this file + `test_fact_auto_emit.py` + `test_context_plane_reducers.py` + `test_kb_produce_facts_integration.py` + `test_cap_i0_i3_adversarial.py` + `test_workflow_runner.py` + `test_supervise.py` + `test_dependency_direction.py`) is green. | **PASS** — `test_attack6_in_batch_chaining_still_dedupes_across_the_four_fact_families_in_one_call` + the full-suite run |
+
+### 12.2 Files changed this phase
+
+```
+scripts/kb_produce_facts.py           +50/-0   NEW _registered_observed_at(); guard in derive_run_facts()
+tests/test_fact_auto_emit_adversarial.py  NEW  9 tests, one block per attack vector
+```
+
+### 12.3 Test list (all green)
+
+```
+tests/test_fact_auto_emit_adversarial.py::test_attack1_double_emit_from_an_independently_constructed_copy
+tests/test_fact_auto_emit_adversarial.py::test_attack2a_out_of_order_completion_previously_regressed_current_state_now_guarded
+tests/test_fact_auto_emit_adversarial.py::test_attack2a_guard_only_fires_when_a_head_is_already_registered
+tests/test_fact_auto_emit_adversarial.py::test_attack2b_simultaneous_racing_derivations_converge_to_conflicted_not_corruption
+tests/test_fact_auto_emit_adversarial.py::test_attack3_truncated_last_line_degrades_to_no_head_not_a_crash
+tests/test_fact_auto_emit_adversarial.py::test_attack3_missing_registry_file_and_missing_parent_directory_is_a_first_version_not_a_crash
+tests/test_fact_auto_emit_adversarial.py::test_attack4_no_mutation_window_between_run_completion_and_fact_emission
+tests/test_fact_auto_emit_adversarial.py::test_attack5_only_the_exact_literal_zero_disables
+tests/test_fact_auto_emit_adversarial.py::test_attack6_in_batch_chaining_still_dedupes_across_the_four_fact_families_in_one_call
+```
+
+Plus the pre-existing suites re-run green, unmodified: `tests/test_fact_auto_emit.py` (12),
+`tests/test_context_plane_reducers.py`, `tests/test_kb_produce_facts_integration.py`,
+`tests/test_cap_i0_i3_adversarial.py`, `tests/test_workflow_runner.py`, `tests/test_supervise.py`,
+`tests/test_dependency_direction.py` — 154 tests total across the combined run.
+
+### 12.4 PASS/FAIL
+
+**Overall: PASS.** One genuine defect found and fixed (2a — out-of-order completion silently
+regressing a cell's registered current state); one item confirmed and left as an explicitly
+documented, pre-existing accepted limitation with a recommended follow-up (2b — the registry-write
+race, which the design's own §9/§10 had already flagged as open rather than assumed-safe); the
+remaining four attacks (1, 3, 4, 5) found no defect and are now regression-guarded by tests; attack
+6's regression check (fact_ingestion/reducers/transport untouched, full suite green) holds. No
+finding was hand-waved — every one of the six named attacks has either a fix + test, or an
+accepted-limitation entry with its own reasoning and a test proving the degraded (not corrupted)
+outcome.

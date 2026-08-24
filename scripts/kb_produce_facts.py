@@ -315,6 +315,54 @@ def _policy_evidence_for(spec: ExperimentSpec) -> tuple[EvidenceItem, ...]:
     return (EvidenceItem(source_type="spec", evidence_id=f"spec:{spec.name}", payload=config),)
 
 
+def _registered_observed_at(entity_id: str, *, registry_path: Path) -> str | None:
+    """Return the CURRENT (non-superseded) registry head's own ``observed_at`` for ``entity_id``.
+
+    ``None`` when there is no head yet. Mirrors ``spec_ingestion.registry_head``'s tolerant,
+    two-pass parsing exactly (missing/unreadable file -> ``None``; a malformed line is skipped,
+    not fatal — a producer must never be blocked by a damaged index) but surfaces the head row's
+    ``observed_at`` instead of its lifecycle-fingerprint ``reason``: ``RegistryHead`` (the value
+    object ``registry_head`` returns) does not carry ``observed_at``, and extending it would touch
+    ``spec_ingestion.py``, which serves BOTH the spec and fact planes — a shared-schema change is
+    out of scope for a hook-local guard (hard rule 5: no reducer/registry-schema changes). This
+    stays entirely local to ``kb_produce_facts.py``, reading the same raw file the shared helper
+    reads, so it costs nothing new: adversarial finding f3-2 (see the design doc's log) needs it
+    to detect out-of-order run completion BEFORE deciding whether to derive at all.
+    """
+    path = Path(registry_path)
+    try:
+        raw_lines = path.read_text().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    order: list[str] = []
+    lines: dict[str, dict] = {}
+    superseded: set[str] = set()
+    for raw in raw_lines:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue  # a truncated line must not hide the rest of the history
+        if not isinstance(row, dict) or row.get("entity_id") != entity_id:
+            continue
+        kid = row.get("knowledge_id")
+        if not kid:
+            continue
+        if row.get("supersedes"):
+            superseded.add(str(row["supersedes"]))
+        if row.get("lifecycle_state") == "superseded":
+            superseded.add(str(kid))
+        if kid not in lines:
+            order.append(str(kid))
+        lines[str(kid)] = row  # latest line for an id wins
+    for kid in reversed(order):
+        if kid not in superseded:
+            return lines[kid].get("observed_at")
+    return None
+
+
 def derive_run_facts(
     result: object,
     spec: ExperimentSpec,
@@ -344,8 +392,28 @@ def derive_run_facts(
     ``spec_status/v1`` (I1, the corpus-wide spec lifecycle index) is deliberately NOT run here — it
     has no per-run input to give and stays the manual/scheduled batch job's responsibility.
 
-    No I/O beyond what ``result``/``spec`` already hold in memory: safe to call from a hot
-    completion path without touching disk beyond what the caller already persisted.
+    **Out-of-order-completion guard (adversarial finding f3-2, `f3_adversarial_verify`).** Unlike
+    the batch job — which loads every run for a cell in ONE call and lets
+    ``fact_ingestion.derive_fact_records``'s in-batch chaining sort them by ``observed_at`` before
+    deciding a winner — this function is called ONCE PER RUN, from a SEPARATE process invocation
+    each time. Two runs of the SAME cell that finish out of chronological order (a slow worker, a
+    delayed retry, or two workers racing) each see only their OWN run's facts; there is no shared
+    in-process list to sort. Concretely reproduced: a fast run T2 (``ended_at`` 00:20) registers
+    first; a slow run T1 (``ended_at`` 00:05, STARTED earlier but finished LATER in wall-clock
+    terms) is then processed — with nothing guarding it, ``derive_fact_records`` would silently
+    supersede T2's correct ``job_status``/``job_accumulated_cost_usd`` with T1's stale values,
+    because it only ever compares CONTENT (has the value changed?), never RECENCY (is this
+    observation older than what's already registered?) across separate calls. Guarded below by
+    checking the incoming run's own ``job_status`` ``observed_at`` against the currently-registered
+    head's ``observed_at`` for that SAME cell/entity (``_registered_observed_at``, a hook-local
+    helper — no reducer or registry-schema change) and skipping the ENTIRE derivation (not just the
+    job facts) for a run that is strictly older than what is already registered: every fact this
+    function derives from ONE run shares that run's provenance, so a stale run must not be allowed
+    to set ANY of the cell's "current" state, not merely the job-level rungs.
+
+    No I/O beyond what ``result``/``spec`` already hold in memory — save the ONE registry read the
+    guard above performs, which reuses the same tolerant, never-blocking read shape
+    ``registry_head`` already has. Safe to call from a hot completion path.
     """
     run = result.to_dict() if hasattr(result, "to_dict") else result
     workload_scope = f"org:{repository_id}/workload:{spec.name}"
@@ -362,6 +430,14 @@ def derive_run_facts(
     )
     attempt = attempt_facts_v1(run_inp)
     job = job_facts_v1(run_inp)
+
+    job_status = next((f for f in job if f.predicate == "job_status"), None)
+    if job_status is not None:
+        registered_at = _registered_observed_at(
+            job_status.fact_entity_id, registry_path=REGISTRY_INDEX_PATH
+        )
+        if registered_at is not None and job_status.observed_at < registered_at:
+            return []  # this run is older than the cell's already-registered state — drop it
 
     policy_inp = ReducerInput(
         scope_path=workload_scope,
