@@ -1,0 +1,173 @@
+name: cap_grit_grid_execute
+question: >-
+  Execute the E4 live grid (experiments/definitions/cap_grit_strength_grid.yaml) per its 9
+  adversarial findings: compile the spec to its 8 cells (condition_strength {clean,
+  bad_seed_low, bad_seed_mid, bad_seed_high} x policy_arm {baseline, grit_retry} x model
+  {anthropic/claude-sonnet-5}), run each cell as a task_manager_api story via the Python API
+  (the mutation override seam for low=0.2/high=0.8 per finding 2; the retry policy for
+  grit_retry per finding 4 — second attempt only when the first's test_executed_success is
+  false, with parent_attempt_id lineage), record LEDGER_FIELDS-compliant attempt rows, evaluate
+  the registered measurement rules (attempt_coverage_precheck, grit, verified_success_rate,
+  cost_per_verified_outcome, rework_cost_report, retry_policy_fidelity, arm_comparison), and
+  produce the lab_book writeup with the REQUIRED power caveat and realized cost envelope. Cells
+  run on anthropic/claude-sonnet-5 via claude_cli; this orchestrator runs flash. A final
+  adversarial pass verifies the execution behaved as authored.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery / live
+        experiment execution. canonical_sources: [experiments/definitions/cap_grit_strength_grid.yaml
+        (the authority — 9 findings), src/agentic_dynamics/experiment/compile_experiment.py
+        (compile_spec, the registered measurement rules incl. grit at :257), src/agentic_dynamics/
+        runtime/story/orchestration.py (run_story, mutation override seam at :50),
+        src/agentic_dynamics/measurement/mutation.py (compile_mutation at :164), scripts/run_story.py].
+        policies: [cell_policy_fidelity, coverage_first, ledger_vocabulary_only, null_honesty]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research execution.
+        deliberation: [compile cells, run cells, measure, writeup, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        E4 is authored and gate-clean (8 cells, budget ceiling $10). No executor exists — the
+        spec's finding 4 defers the retry wiring to "the executing phase, when it exists." The
+        mutation strength override is Python-only (run_story(mutation=...) overrides condition;
+        CLI exposes only --condition). DeepSeek flash runs this orchestrator; cells run
+        anthropic/claude-sonnet-5 via claude_cli (CLAUDE_BIN env) — the Claude usage window is a
+        real constraint: run cells SEQUENTIALLY (never parallel) and record per-cell cost before
+        each run; if the window hits mid-grid, commit progress and STOP (resume later).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) Cells run
+        SEQUENTIALLY on anthropic/claude-sonnet-5 via claude_cli (CLAUDE_BIN); the orchestrator
+        runs deepseek/deepseek-v4-flash. (3) Cell fidelity per the spec's findings: clean -> no
+        mutation (strength 0.0); bad_seed_mid -> condition=BAD_SEED, mutation=None (the standard
+        CONDITION_STRENGTH=0.5 path); bad_seed_low -> explicit compile_mutation(..., strength=0.2);
+        bad_seed_high -> explicit strength=0.8. grit_retry -> max_attempts=2 with a second
+        attempt ONLY when the first's test_executed_success is false (parent_attempt_id set);
+        baseline -> max_attempts=1. A deviation is a finding, not a silent choice. (4) Every
+        attempt row uses the LEDGER_FIELDS vocabulary (actual_cost, rework_cost,
+        perturbation_strength, test_executed_success, policy_arm, attempt_number,
+        parent_attempt_id, condition, strength) — no fact-plane stretch (finding 3). (5) Coverage
+        first: if an attempt lacks actual_cost or test_executed_success, the coverage rule reports
+        it — never fabricate. (6) Stop discipline: per-cell realized cost logged before each run;
+        total realized cost tracked against the $10 ceiling; if Claude returns usage-cap errors,
+        commit progress and STOP cleanly (resumable). (7) The adversarial phase (x5) is
+        mandatory. (8) PASS/FAIL log.
+      read_first: >-
+        experiments/definitions/cap_grit_strength_grid.yaml (full — the 9 findings are the
+        execution contract), src/agentic_dynamics/runtime/story/orchestration.py (run_story
+        signature + mutation seam), src/agentic_dynamics/measurement/mutation.py (compile_mutation),
+        src/agentic_dynamics/experiment/compile_experiment.py (compile_spec + rule evaluator),
+        src/agentic_dynamics/runtime/story/conditions.py (CONDITION_STRENGTH), scripts/run_story.py
+      run_shape: >-
+        SINGLE-orchestrator: --model deepseek/deepseek-v4-flash --backend opencode. Cells:
+        anthropic/claude-sonnet-5 --backend claude_cli (CLAUDE_BIN). One worktree, one branch
+        (feature/cap-grit-grid-execute); each phase commits [workflow] <phase>.
+    phases:
+      - name: x1_compile_and_setup
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: compile experiments/definitions/cap_grit_strength_grid.yaml via compile_spec;
+          verify the cell matrix is exactly 8 (condition_strength 4 x policy_arm 2 x model 1);
+          for each cell declare the exact run parameters (condition, mutation artifact or None,
+          strength value, max_attempts, retry rule) per the spec's findings; prepare the results
+          ledger skeleton (experiments/results/stories/ + the grid ledger JSON with one entry per
+          cell); verify CLAUDE_BIN + backend resolution for the cell model.
+          DELIVER: docs/designs/current/cap_grit_grid_runplan.md — the cell table (cell, params,
+          expected mutation strength, retry rule, est cost).
+          GUARD: 8 cells exactly; no params invented beyond the spec.
+          LOG: cell table; PASS/FAIL; commit.
+      - name: x2_run_cells
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the 8 cells SEQUENTIALLY per the run plan. For each: log realized cost
+          before/after; invoke run_story via the Python API with the cell's params (condition +
+          mutation override where specified, model anthropic/claude-sonnet-5, backend claude_cli);
+          for grit_retry cells apply the retry policy: if the first attempt's test_executed_success
+          is false, run the second attempt (attempt_number=2, parent_attempt_id=first) before
+          scoring; record LEDGER_FIELDS-compliant attempt rows into the grid ledger; commit
+          progress per cell.
+          GUARD: sequential; per-cell cost tracked; on Claude usage-cap errors commit + STOP
+          (resumable); no cell run on a model other than sonnet-5.
+          DELIVER: the populated grid ledger (all 8 cells or the committed prefix).
+          LOG: per-cell cost/duration/ok table; PASS/FAIL; commit.
+      - name: x3_measure
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the registered measurement rules over the grid ledger via the compile
+          evaluator: attempt_coverage_precheck (cost + test-verification coverage ratios),
+          grit (grit/retention/grit_auc/recovery_premium), verified_success_rate per cell,
+          cost_per_verified_outcome (captured-only intersection), rework_cost_report,
+          retry_policy_fidelity (realized retry rate vs declared policy; violations count), and
+          arm_comparison (baseline vs grit_retry regret stratified by condition_strength).
+          DELIVER: experiments/results/cap_grit_grid_metrics.json + the numbers appended to the
+          runplan doc.
+          GUARD: coverage ratios reported before any denominator use; no fabricated attempts.
+          LOG: metric table; PASS/FAIL; commit.
+      - name: x4_writeup
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER: experiments/results/cap_grit_grid_writeup.md — ALL of the spec's required
+          sections: hypothesis, null_hypothesis, method, grid_design_collapse,
+          strength_value_provenance, retry_policy_definition, power_caveat (REQUIRED: realized
+          per-cell n stated before any regret number is read as decisive), cost_envelope
+          (REQUIRED: realized total cost vs the $10 ceiling), arms, effect_size, uncertainty,
+          null_interpretation, fact_plane_gap (story_facts/v1 forward gap), limitations.
+          GUARD: every number traces to the metrics JSON; the null interpretation is honest
+          (inconclusive is a valid outcome — the spec's own finding 5 predicts under-power).
+          LOG: sections written; PASS/FAIL; commit.
+      - name: x5_adversarial_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier. Attack the execution: (1) cell fidelity — did every cell
+          run with the DECLARED condition/strength (verify the mutation artifacts / story params,
+          not just trust the ledger)? (2) retry policy fidelity — did grit_retry trigger a second
+          attempt only on test_executed_success=false, and never for baseline? (3) coverage —
+          any attempt missing actual_cost/test_executed_success, and was it reported not
+          fabricated? (4) strength provenance — low=0.2/high=0.8 actually applied (inspect the
+          compiled mutation artifacts)? (5) model purity — any cell on a non-sonnet model?
+          (6) realized cost vs envelope — recomputed from raw ledgers, not the metrics JSON.
+          Every finding: fix or record accepted limitation. Re-state the null interpretation.
+          RELEASE VERDICT: is the pilot grid's result trustworthy enough to inform the next
+          campaign step (largest_effect expansion)?
+          LOG: finding table; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: grit_grid_executed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [cells_compiled, cells_run, metrics_computed, writeup_delivered, execution_verified]
+metrics:
+  - {name: cells_compiled, agg: mean, over: cell}
+  - {name: cells_run, agg: mean, over: cell}
+  - {name: metrics_computed, agg: mean, over: cell}
+  - {name: writeup_delivered, agg: mean, over: cell}
+  - {name: execution_verified, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, x1_compile_and_setup, x2_run_cells, x3_measure, x4_writeup, x5_adversarial_verify]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: largest_effect}
