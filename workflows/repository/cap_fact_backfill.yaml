@@ -45,6 +45,21 @@ workflow:
         and branches are UNTOUCHABLE. This workflow may launch before they land; p0's gate
         handles that by stopping politely. The fact store is not yet populated retroactively;
         auto-emit covers only NEW runs; stories/summaries have no derivation path at all.
+      known_findings: >-
+        Two measurement-integrity findings from the 2026-08-24 addendum failed-run emissions must
+        be addressed or explicitly verified-fixed by this workflow's run/verify phases:
+        F1 — FAILED-BEFORE-CALL COST SEMANTICS: a phase that fails before any model call (e.g.
+        auth failure) records cost_usd=0.0, so workflow facts emit projected_budget_overrun=0.0
+        ("within budget") for runs that never executed — a structural zero misread as a measured
+        zero (the m2 hazard). Expected fix: the emit/derivation path records cost as None
+        (uncaptured) for phases that failed before a model call; verify the emitted facts for
+        such runs carry no overrun fact rather than 0.0.
+        F2 — REGISTRY MATERIALIZATION STALL: auto-emit writes KB artifacts + pointer events, but
+        registry rows only appear when the kb-registry-v1 consumer runs; observed artifacts
+        without registry rows (830-row registry stalled while the artifact dir grew). Expected
+        fix: run the consumer (or materialize rows in the emit path) so every artifact is
+        registry-visible; p5's verification must assert artifact-count == registry-row-count for
+        the backfill's own emission.
       hard_rules: >-
         (1) Every phase commits '[workflow] <phase>' with green checks. (2) NEVER touch the four
         in-flight worktrees/branches or their files — a diff involving them is an instant FAIL.
@@ -156,6 +171,10 @@ workflow:
           SHAPE: run the derivation over the ENTIRE corpus with FINOPS_KB_WRITE=1 set for the
           emit step only (derivation stays pure). Record: kb artifact count before/after,
           registry_index.jsonl row count before/after, and a sample of emitted fact predicates.
+          Apply the known_findings F1 fix if the emission shows failed-before-call phases
+          recording cost 0.0 (the fix: record such phases' cost as None/uncaptured — a
+          structural zero is not a measured zero); apply the F2 fix by running the registry
+          consumer (or materializing rows in the emit path) so artifacts are registry-visible.
           DELIVER: the run record in the coverage doc (§6).
           GUARD: exactly one emit pass; on 402/insufficient-balance STOP and record.
           LOG: counts + sample; PASS/FAIL; commit.
@@ -173,7 +192,12 @@ workflow:
           (3) EVIDENCE PROVENANCE: every sampled fact's evidence_ids resolves against its source
           artifact via the in-memory index (verify_chain contract).
           (4) UNIQUENESS: no duplicate knowledge_id in the backfill's registry rows.
-          (5) CAP suites + guards green on the branch.
+          (5) F1 RE-CHECK: no emitted fact for a failed-before-call phase carries a cost of 0.0
+          (or an overrun fact) — such phases are uncaptured (None), verified from the raw
+          artifacts.
+          (6) F2 RE-CHECK: for the backfill's own emission, artifact count == registry row count
+          (every artifact materialized, no stall), re-derived independently.
+          (7) CAP suites + guards green on the branch.
           DELIVER: the verification table (§7) with numbers for each check.
           LOG: check results; PASS/FAIL; commit.
       - name: p6_adversarial_review
