@@ -1,0 +1,436 @@
+---
+status: accepted
+---
+# CAP I5 Gate Scan — R1-R11 requires/produces gate over the committed spec corpus
+
+**Spec:** `workflows/repository/cap_gate_scan.yaml`
+**Date:** 2026-08-24 · **Model:** anthropic/claude-sonnet-5 · **Branch:** `feature/cap-gate_scan`
+**Gate under test:** `agentic_dynamics.control.context_compiler.validate_spec_fact_contracts`
+(real `FACT_PREDICATES`/`REDUCERS`/`experiments/contexts/*.yaml`, refusals R1-R11) composed with
+`agentic_dynamics.experiment.compile_experiment.compile_spec`'s classic requires/produces +
+structural gate.
+
+---
+
+## 0. Method
+
+Every check below was **executed**, not asserted.
+
+1. **Corpus enumeration.** Loaded `experiments/specs/index.json` (`n_specs: 94`) and resolved each
+   entry's `spec_path` against disk. Independently cross-checked (adversarial phase, §3) by
+   re-globbing `experiments/definitions/*.yaml` (non-recursive — `configs/` is a different schema,
+   not `ExperimentSpec`) + `workflows/**/*.yaml` (recursive) directly from the filesystem, bypassing
+   the index entirely.
+2. **Per-spec scan.** For every spec: `ExperimentSpec.from_yaml(path)`, then (a)
+   `compile_experiment.compile_spec(spec)` — the classic requires/produces + structural gate
+   (tier-1, skips R1-R11 by construction: `experiment` may not import `control.facts`/
+   `control.reducers`), and (b) `control.context_compiler.validate_spec_fact_contracts(spec)` — the
+   real I5 gate, which threads the real `FACT_PREDICATES` (29 predicates), `REDUCERS` (5 reducer
+   versions), and every loaded `experiments/contexts/*.yaml` contract through
+   `experiment_spec.validate_spec`. (b) is a strict superset of (a): both are recorded for every
+   spec so a refusal's origin (classic vs. R1-R11) is traceable.
+3. **Gate-mechanics sanity check.** Before trusting a zero-refusal scan, the gate was proven live
+   against a deliberately broken spec (a control rule with `requires: ["nonexistent_field"]` and
+   another with `requires_facts: ["nonexistent_predicate"]`) — see §2.1. It correctly refused both
+   (one classic error, one `(R1)` error), ruling out a silently-broken scan harness.
+4. **Registry integrity.** Beyond per-spec refusals, checked the registries themselves for phantom
+   producers: every `FACT_PREDICATES[*].produced_by` entry resolves in `REDUCERS`, every
+   `REDUCERS[*].produces` entry is a declared predicate, and every reducer's `consumes` chain
+   bottoms out at a producing reducer (the R3 reduction-ladder check, applied registry-wide instead
+   of only through a spec that happens to reference it).
+5. **Index-drift check.** Derived a fresh index **in-memory only** (`spec_status.collect_entries`
+   + `build_index`, never the `spec_status.py --json` CLI form without `--dry-run` — that form
+   writes both artifacts for real; see the correction note in §2.3) and diffed the fields
+   derivable purely from the committed spec YAMLs (`name`, `version`, `spec_path`,
+   `artifact_kind`, `repeatable`, `supersedes`, `superseded_by`) against the committed index.
+
+---
+
+## 1. Summary — PASS/FAIL
+
+| # | Check | Status | Evidence |
+|---|---|---|---|
+| **G1** | Every committed spec resolves and loads (`spec_path` exists, YAML parses into `ExperimentSpec`) | **PASS** | §2 — 94/94 loaded, 0 load errors |
+| **G2** | Classic requires/produces + structural gate (`compile_spec`) — 0 refusals | **PASS** | §2 — 94/94 |
+| **G3** | Real R1-R11 fact-contracts gate (`validate_spec_fact_contracts`) — 0 refusals | **PASS** | §2 — 94/94 |
+| **G4** | Registry integrity: no phantom producers, complete reduction ladder | **PASS** | §2.2 — 29 predicates / 5 reducers, 0 issues |
+| **G5** | Contract integrity: every loaded invariant's `on_missing` is `halt`/`escalate` (R11) | **PASS** | §2.2 — 1 contract (`route_next_job/v1`), 2 invariants, both `halt` |
+| **G6** | Index matches disk for every spec-YAML-derived field (no drift in name/path/supersession) | **PASS** | §2.3 |
+| **G7** | Adversarial re-scan (independent enumeration, fresh process) reproduces 0 refusals | **PASS** | §3 |
+
+**Overall: PASS — 94/94 specs, zero refusals, nothing to fix or record as BLOCKED.**
+
+This is a **real, verified finding, not a scan gap**: §2.1 proves the harness catches genuine
+refusals, and the result is independently corroborated by a pre-existing repo test,
+`tests/test_context_plane_contracts.py::test_committed_spec_corpus_gains_zero_new_refusals_from_the_i5_gate`,
+which asserts exactly this invariant (`validate_spec_fact_contracts(spec) == validate_spec(spec)`
+for every spec in the corpus) and already passes on `main`.
+
+---
+
+## 2. G1-G6 — the raw scan (first pass)
+
+### 2.1 Gate-mechanics sanity check
+
+Ran before trusting any zero-refusal result, against a hand-built spec that is not part of the
+committed corpus:
+
+```
+rules=[
+    RuleSpec(name="bad_classic", plane="control", evidence_class="[H]",
+             requires=["nonexistent_field"]),
+    RuleSpec(name="bad_fact", plane="control", evidence_class="[H]",
+             requires_facts=["nonexistent_predicate"]),
+]
+```
+
+```
+compile_spec(spec)  ->  SpecError:
+  rule "bad_classic" requires 'nonexistent_field' — not produced by the ledger or any
+  measurement rule in this spec. Instrument it first.
+
+validate_spec_fact_contracts(spec)  ->
+  rule "bad_classic" requires 'nonexistent_field' — not produced by the ledger or any
+  measurement rule in this spec. Instrument it first.
+  rule "bad_fact" requires fact 'nonexistent_predicate' — no such predicate is declared.
+  Declare it with a producing reducer first. (R1)
+```
+
+Both refusal paths fire correctly. The harness is live.
+
+### 2.2 Corpus scan — findings table
+
+| spec | spec_path | rule/contract | refusal text | requires_facts entry |
+|---|---|---|---|---|
+| *(none)* | | | | |
+
+**0 rows.** All 94 specs in `experiments/specs/index.json` loaded without error and produced
+**zero** entries from either `compile_spec` or `validate_spec_fact_contracts`.
+
+Root cause of the zero count (verified, not assumed): as of this branch, **no committed spec
+declares a real `requires_facts:` or `decision_type:` key on any rule** —
+
+```
+$ grep -rn "requires_facts:" workflows/ experiments/definitions/   # 0 matches
+$ grep -rn "decision_type:"  workflows/ experiments/definitions/   # 0 matches
+```
+
+(Free-text mentions of the words "requires_facts" / "decision_type" exist in four workflow
+prompts — `cap_addendum_implement.yaml`, `cap_implement_repair.yaml`, `cap_addendum_design.yaml`,
+`cap_gate_scan.yaml` — but none are YAML keys under a `rules:` entry, so R1-R10 have nothing to
+check per-spec.) R1-R10 only fire for a rule that *declares* `requires_facts`/`decision_type`;
+since none do, the corpus is structurally incapable of tripping R1-R10 today. R11 is a property of
+the *contract*, independent of spec references — checked anyway (below) and clean.
+
+**Registry integrity (G4):**
+
+```
+29 predicates in FACT_PREDICATES, 5 reducers in REDUCERS
+0 registry-level integrity issues
+  (every produced_by resolves in REDUCERS; every reducer.produces is a declared predicate;
+   every reducer.consumes entry that names a predicate has a non-empty produced_by — the R3
+   reduction ladder is complete registry-wide)
+```
+
+**Contract integrity (G5):** `experiments/contexts/` has exactly one committed contract,
+`route_next_job/v1`. Both its invariants:
+
+```
+invariant 'allowed_models'   on_missing='halt' -> ok
+invariant 'max_spend_usd'    on_missing='halt' -> ok
+```
+
+satisfy R11 (`on_missing` ∈ `{halt, escalate}`). No `(R11)` refusal is possible today.
+
+### 2.3 Index-drift check (G6)
+
+**Correction recorded in the interest of an honest scan log:** the first attempt at this check ran
+`python scripts/spec_status.py --json > /tmp/index_regen.json` **without** `--dry-run`. Per the
+script's own argument parser, `--json` is additive to the default action, not a substitute for
+`--dry-run` — the command silently **regenerated and overwrote the real, committed**
+`experiments/specs/index.json` **and** `experiments/specs/STATUS.md` on disk before printing. The
+resulting diff (`git status`) showed 75/94 entries changed — not spec drift, but data loss: this
+worktree checkout has no `experiments/results/workflows/` directory (`.gitignore:27` — it is
+correctly untracked, local run-artifact output) and no Redis/registry backing it either, so
+`collect_entries()` derived `status`/`last_run_at`/`latest_ok`/`latest_model`/`latest_cost_usd`/
+`latest_git_sha`/`results_pointer`/`n_runs` as empty for every spec whose run history the committed
+index recorded from the environment that produced it (`main`, or wherever those local result files
+actually live). Caught immediately via `git diff --stat` before this pass moved on; reverted with
+`git restore experiments/specs/index.json experiments/specs/STATUS.md` before anything was
+committed. **No data was lost** — this note exists so a future run of this same command in a fresh
+worktree does not repeat the mistake.
+
+The check was then redone safely — **in-memory only**, no CLI, no writes — comparing just the
+fields a spec's own committed YAML determines (independent of the gitignored run ledger):
+
+```python
+from agentic_dynamics.experiment.spec_status import collect_entries, build_index
+fresh = build_index(collect_entries(root=Path(".").resolve()))
+committed = json.load(open("experiments/specs/index.json"))
+
+PURE = ("name", "version", "spec_path", "artifact_kind", "repeatable", "supersedes", "superseded_by")
+an = {s["name"]: {k: s[k] for k in PURE} for s in committed["specs"]}
+bn = {s["name"]: {k: s[k] for k in PURE} for s in fresh["specs"]}
+print("pure-YAML-derived fields identical for all 94:", an == bn)   # -> True
+print("diffs:", [n for n in an if an[n] != bn[n]])                   # -> []
+```
+
+Result: **all 94 entries identical** on every field the committed spec YAMLs alone determine — no
+spec was added, removed, moved, or resuperseded that the index doesn't already reflect. The only
+fields that differ between a from-scratch derivation in this worktree and the committed index are
+the **run-history fields**, and only because this worktree lacks the gitignored
+`experiments/results/workflows/` ledger the committed index was built against — an environment gap,
+not a spec/index drift the gate cares about. **No regeneration was performed or committed this
+pass**; the committed index remains authoritative.
+
+---
+
+## 3. G7 — Adversarial re-scan (independent, fresh enumeration)
+
+Re-ran the full gate in a **separate process**, enumerating the corpus **directly from disk**
+instead of trusting `experiments/specs/index.json`, per the spec's own instruction to look for
+"refusals the first scan missed, fixes that merely silenced the gate, index/spec drift, and
+phantom RECORDs":
+
+```python
+paths = sorted((REPO / "experiments" / "definitions").glob("*.yaml"))   # non-recursive;
+                                                                          # configs/ excluded —
+                                                                          # different schema
+paths += sorted((REPO / "workflows").rglob("*.yaml"))                   # recursive
+```
+
+| Adversarial check | Result |
+|---|---|
+| File-count parity: independent glob vs. `index.json`'s 94 entries | **94 == 94** — no spec exists on disk that the index misses, and no index entry points at a missing file |
+| Silenced-gate check: any rule whose `requires_facts` now references a predicate with a real-looking but unregistered reducer | N/A — 0 specs declare `requires_facts` on a rule (§2.2); nothing to silence |
+| Phantom RECORD check: is there any spec this pass could have wrongly marked BLOCKED | N/A — §2 found 0 refusals, so 0 RECORDs were made in the first place; nothing to re-check |
+| Full gate re-run over the independently-enumerated 94 files | **0 refusals** — identical to §2 |
+| Cross-check against the pre-existing repo test | `pytest tests/test_context_plane_contracts.py::test_committed_spec_corpus_gains_zero_new_refusals_from_the_i5_gate` — **PASS** (see below) |
+
+```
+$ pytest tests/test_context_plane_contracts.py -k gains_zero_new_refusals -q
+1 passed
+```
+
+**Final state: zero refusals, corroborated by three independent methods** (this scan's first
+pass, this scan's independent re-enumeration, and the pre-existing committed test suite). No spec
+required a fix. No spec required a BLOCKED record.
+
+---
+
+## 4. Log
+
+| Metric | Value |
+|---|---|
+| Specs in corpus (index) | 94 |
+| Specs in corpus (independent disk enumeration) | 94 |
+| Load errors | 0 |
+| Classic gate (`compile_spec`) refusals | 0 |
+| Real R1-R11 gate (`validate_spec_fact_contracts`) refusals | 0 |
+| Registry integrity issues | 0 |
+| Contract (R11) violations | 0 |
+| Index drift (spec-YAML-derived fields) | none — 94/94 identical (§2.3) |
+| FIX applied | 0 |
+| RECORDed as BLOCKED | 0 |
+| Adversarial re-scan refusals found | 0 |
+
+**PASS/FAIL: PASS.** 94/94 specs clear both gates; the corpus needed no changes this pass, so
+`experiments/specs/index.json` was left untouched — it already matches a fresh derivation on every
+field a spec's own committed YAML determines (§2.3); this worktree simply lacks the gitignored
+run-ledger files needed to safely regenerate the run-history fields, so no regeneration was
+committed.
+
+### Why this task found nothing to fix (context for future runs)
+
+The I5 gate (R1-R11) is **additive**: it only inspects a rule's `requires_facts`/`decision_type`
+fields, which are new, opt-in fields on `RuleSpec` (design §7.1) that no committed spec has adopted
+yet. Every spec in the corpus still expresses its information dependencies through the legacy
+`requires:` (bare ledger-field names), which the classic gate already validated before I5 shipped.
+The I5 gate is therefore currently a no-op over the committed corpus **by construction**, not
+because every spec happens to satisfy nontrivial fact contracts — there are no fact contracts in
+play yet outside the one demonstration contract (`route_next_job/v1`), and no rule references it.
+The next spec that adopts `requires_facts:`/`decision_type:` (e.g. a future routing-policy arm
+built against CAP I4's context compiler) will be the first the R1-R10 rows in this gate can
+actually refuse — this scan establishes the pre-adoption baseline is clean, so that spec's refusal
+(if any) will be attributable to it, not to drift already present in the corpus.
+
+---
+
+## 5. `g2_classify_and_fix` — classification, fixes, and BLOCKED records
+
+**Guard honored:** no changes to `core/contracts.py`, `experiment_spec.py`,
+`compile_experiment.py`, or `context_compiler.py` (the validator) were made in this phase; no
+spec's intent was touched.
+
+### 5.0 Re-verification before classifying anything
+
+`git log` shows no commits landed between `g1_enumerate_and_scan` and this phase (still
+`39ad65705` at `HEAD`), and `git status --porcelain` is clean, so the corpus g1 scanned is the
+same corpus this phase classifies. Re-ran the full gate anyway rather than trusting the prior
+result blindly — a corpus scan is cheap; assuming staleness is not:
+
+```python
+paths = sorted((REPO / "experiments" / "definitions").glob("*.yaml"))  # non-recursive
+paths += sorted((REPO / "workflows").rglob("*.yaml"))                   # recursive
+for path in paths:
+    spec = ExperimentSpec.from_yaml(path)               # 0 load errors
+    errors = validate_spec_fact_contracts(spec)          # real R1-R11 gate, real registries
+    # ... tally pass/fail, collect (name, path, error) rows
+```
+```
+TOTAL=94 PASS=94 FAIL=0 LOAD_ERRORS=0
+```
+
+Confirmed: still zero refusals, zero load errors, 94/94 pass.
+
+### 5.1 Classification table
+
+| spec | spec_path | refusal | decision | reason |
+|---|---|---|---|---|
+| *(none)* | | | | |
+
+There is nothing to classify. §2.2 and §5.0 both independently establish that the R1-R11 gate and
+the classic requires/produces gate produce **zero refusal rows** across all 94 committed specs —
+the FIX-vs-RECORD decision procedure this phase exists to run has an empty input set. This is not
+a shortcut around the phase's work; it is the phase's work, done and coming up empty, which is
+itself the deliverable (a spec author six months from now who sees a FIX/RECORD table with two
+placeholder dashes and no explanation could reasonably suspect the phase was skipped — this section
+exists so they don't have to guess).
+
+### 5.2 Fixes applied
+
+**None.** No spec's `rules:` block was edited, because no rule in the corpus declares
+`requires_facts:`/`decision_type:` in the first place (§2.2) — there is no "reference only produced
+facts" edit to make when nothing references anything yet. `git diff --stat` against
+`39ad65705` (this phase's starting commit) is empty; no spec file changed.
+
+### 5.3 BLOCKED records
+
+**None.** A BLOCKED record exists to name a concrete missing producer for a refusal that is real
+but out of scope to fix (per the workflow's hard rule 3: "otherwise record BLOCKED with a reason").
+With zero refusals, there is no missing producer to name and nothing to block on.
+
+### 5.4 Index regeneration
+
+**Not run, deliberately.** The SHAPE instruction is "regenerate the index … after any spec edit" —
+conditioned on an edit having happened. None did (§5.2), so the precondition for regeneration was
+never met, and this phase does not invoke `scripts/spec_status.py` without `--dry-run` again. §2.3
+already recorded why that command is unsafe to run for-real in this worktree: it depends on the
+gitignored `experiments/results/workflows/` run-ledger, which this checkout doesn't have, so a live
+regeneration here would silently blank out real run-history (`last_run_at`/`latest_ok`/
+`latest_model`/`latest_cost_usd`/`n_runs`) that only exists in the environment that produced the
+committed index — not a mistake worth repeating a second time in the same lab book.
+`experiments/specs/index.json` remains byte-for-byte what it was after `g1` (already verified
+against a fresh in-memory derivation, §2.3) — correctly untouched.
+
+### 5.5 Log
+
+| Metric | Value |
+|---|---|
+| Refusals to classify (input to this phase) | 0 |
+| FIX | 0 |
+| RECORD (BLOCKED) | 0 |
+| Specs edited | 0 |
+| Index regenerated | no (no edit triggered it; see §5.4) |
+| Validator/gate code changed | no (guard honored) |
+| Spec intent changed | no (guard honored) |
+
+**PASS/FAIL: PASS.** The classify-and-fix phase completes with an empty ledger because its input
+— the refusal set from `g1_enumerate_and_scan` — is empty, re-confirmed independently in §5.0.
+Nothing was fixed because nothing needed fixing; nothing was recorded BLOCKED because nothing was
+blocked. `g3_adversarial_rescan` (§3, already executed as part of this same pass and re-confirmed
+in §5.0) is what actually proves the zero holds under adversarial pressure, not this phase in
+isolation — §5 exists to make the classification step auditable in its own right, per the
+workflow's DELIVER contract, even when its table has no rows.
+
+---
+
+## 6. `g3_adversarial_rescan` — independent re-scan, adversarial role
+
+**Role held for this section:** try to break §2/§5's "zero refusals" result, not confirm it.
+§3 and §5.0 already re-ran the *same* check twice; a re-run that only repeats the original
+methodology cannot find what that methodology is structurally blind to. This phase instead adds
+checks the prior passes did **not** run, aimed squarely at this phase's charter — "refusals the
+first scan missed, fixes that merely silenced the gate, index/spec drift, and phantom RECORDs."
+
+### 6.1 New adversarial checks (beyond §2/§3/§5)
+
+| # | What §2/§3/§5 did NOT check | Method | Result |
+|---|---|---|---|
+| A1 | Whether grep's text-based "0 matches" for `requires_facts:`/`decision_type:` (§2.2) could miss a rule that sets either field through YAML anchors, aliases, or merge keys that still parse to a non-empty value | Loaded all 94 specs as real `ExperimentSpec` objects and inspected `rule.requires_facts`/`rule.decision_type` **programmatically** on every rule of every spec — not text search | 0 rules with non-empty `requires_facts` or non-empty `decision_type`, corpus-wide. Confirms §2.2's grep result was not a text-matching blind spot. |
+| A2 | Duplicate spec names in the corpus (two files claiming the same `spec.name`, which would make `spec_id` ambiguous downstream) | Collected `spec.name` across all 94 loaded specs, checked for repeats | 0 duplicates |
+| A3 | Dangling `supersedes`/`superseded_by` chains (a spec claims to supersede/be-superseded-by a name that doesn't exist in the corpus) | Collected every `supersedes` entry and every `superseded_by` value across all 94 specs; diffed against the set of 94 real spec names | 0 dangling references either direction |
+| A4 | **"Fixes that merely silenced the gate"** — a `FACT_PREDICATES` entry whose `produced_by` names a `REDUCERS` version that is registered as *metadata* (§2.2's registry-integrity check only verified the version string exists as a dict key) but has **no runnable implementation** behind it (`get_reducer(version) is None`) — the precise shape of "declared but not really produced" a naive dict-membership check would miss | Called `get_reducer(version)` for every version key in `REDUCERS` and checked for `None` | 0 unimplemented reducers — every declared version has a real callable |
+| A5 | Bidirectional predicate↔reducer agreement — a predicate claims reducer X as a `produced_by`, but reducer X's own `.produces` tuple does not list that predicate back (the two declarations disagreeing would mean the "producer" doesn't actually emit what it's credited with) | Cross-checked every `FACT_PREDICATES[*].produced_by` entry against the matching `REDUCERS[version].produces` tuple | 0 mismatches — every claim is reciprocated |
+| A6 | Orphan reducers — a reducer registered and implemented but that no predicate credits as a producer (dead capacity, not a refusal but worth surfacing as drift) | Diffed `REDUCERS` keys against the union of every `FACT_PREDICATES[*].produced_by` | 0 orphans — all 5 reducers are claimed by at least one predicate |
+| A7 | **Phantom RECORD check** — was any spec from `g1`/`g2` wrongly marked BLOCKED when a producer exists after all | N/A by construction — §5.3 recorded 0 BLOCKED entries in `g2`, so there is nothing that could be a phantom RECORD |
+| A8 | **Silenced-gate check proper** — a rule whose `requires_facts` now references a predicate with a plausible-looking but fake reducer version string | N/A by construction — 0 rules declare `requires_facts` at all (A1), so there is no reference to silence |
+
+**0 findings across A1-A8.** No refusal the first scan missed, no silenced gate, no drift, no
+phantom RECORD.
+
+### 6.2 Full gate re-run — fresh process, fresh enumeration
+
+Independent of `index.json`, independent of §3's earlier run (a new Python process, re-globbing
+disk):
+
+```
+94 spec files enumerated fresh from disk
+FRESH ADVERSARIAL RESCAN: TOTAL=94 PASS=94 FAIL=0
+```
+
+Contract re-check (`experiments/contexts/*.yaml` re-globbed, not cached from an earlier phase):
+
+```
+contracts now on disk: ['route_next_job']
+ invariant allowed_models halt OK
+ invariant max_spend_usd  halt OK
+```
+
+Index re-check (in-memory derivation vs. committed `experiments/specs/index.json`, same safe
+methodology as §2.3/§5.0 — never the writing form of `spec_status.py`):
+
+```
+index still matches on all YAML-derived fields: True
+n_specs: 94 94
+```
+
+Corroborating test, re-run once more for this phase's own record:
+
+```
+$ pytest tests/test_context_plane_contracts.py -k gains_zero_new_refusals -q
+1 passed
+```
+
+### 6.3 Findings table
+
+| spec | spec_path | rule/contract | finding | resolution |
+|---|---|---|---|---|
+| *(none)* | | | | |
+
+**0 findings to fix or re-record.** Every angle in §6.1 plus the full re-run in §6.2 returned
+zero. `git status --porcelain` confirms this phase made no spec edits — there was nothing to fix
+and nothing to re-record.
+
+### 6.4 Log
+
+| Metric | Value |
+|---|---|
+| New adversarial checks run (beyond §2/§3/§5) | 8 (A1-A8) |
+| Findings from new checks | 0 |
+| Full-gate re-run (fresh process) | 94/94 PASS |
+| Contract re-check | 1 contract, 2 invariants, both R11-clean |
+| Index parity re-check | 94/94 identical (YAML-derived fields) |
+| Corroborating test | PASS |
+| Refusals the first scan missed | 0 |
+| Fixes that merely silenced the gate | 0 |
+| Index/spec drift | 0 |
+| Phantom RECORDs | 0 |
+| FIX applied this phase | 0 |
+| RE-RECORD applied this phase | 0 |
+| Specs edited this phase | 0 |
+
+**PASS/FAIL: PASS.** Adversarial pressure applied across eight new angles the prior two phases
+did not cover, plus a full independent re-run of the gate itself, the contracts, and the index
+parity check — all clean. **Final state: zero refusals, held under adversarial re-scan, fully
+documented in §2, §5, and §6.**
