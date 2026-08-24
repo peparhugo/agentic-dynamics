@@ -426,3 +426,82 @@ dedup, re-derivation byte-stability (forward and reversed input order) and idemp
 proof. `tests/test_context_plane_facts.py` widened (2 exact-set assertions +1 row each).
 Full suite green: `pytest tests/ -k "context_plane or dependency_direction"` — 257 passed
 (239 pre-existing + 18 new). `ruff check` clean on every touched file. PASS.
+
+## 15. I9 — adversarial release verdict (independent re-verification, this increment)
+
+A second, independent pass over §14's implementation and its own self-report, re-checking every
+claim against the tree rather than trusting the prior write-up. Scope: `control/facts.py`'s
+`PatternPayload`/`FACT_PREDICATES["pattern"]`, `control/reducers/pattern.py`, and
+`tests/test_context_plane_pattern.py`, plus a regression sweep of everything a concurrent,
+unrelated I10 checkpoint WIP (`e7b5a8469`, "preserved for resume", touching the SAME
+`control/facts.py` and `control/reducers/__init__.py`) could have disturbed.
+
+**D7 (no new `EPISTEMIC_MAP` row) — verified in code, not just asserted by a test.**
+`EPISTEMIC_MAP` (`control/facts.py:83-95`) still has exactly the five original keys
+(`observed`/`verified`/`derived`/`declared`/`advisory`); `FACT_PREDICATES["pattern"]` carries no
+sixth. `test_no_new_epistemic_map_row_was_added` checks the map's key set directly, not a proxy.
+
+**D3 (`verify_chain` mandatory, `is_canonical()` insufficient) — traced through
+`control/facts.py:945-1028` line by line.** `is_canonical()` (`:945-957`) indeed checks only
+`epistemic_status`/`authority`/`lifecycle_state` — no reducer check, confirming the attack F1
+names is real absent D3's fix. `verify_chain()` check 4 (`:1011-1016`) is what actually enforces
+"minted by a reducer declared to produce this predicate": it rejects a fact whose
+`reducer_version`'s registered `ReducerSpec.produces` does not include `fact.predicate`. One
+architectural note, not a defect in this increment: `verify_chain` cross-checks against the fact's
+OWN claimed reducer's `produces`, not against `FACT_PREDICATES["pattern"].produced_by` — so the
+enforcement boundary is "only code present in the hand-authored `REDUCERS` registry
+(`control/reducers/__init__.py`) can mint," not "only exactly one named reducer can." This is the
+same trust boundary every other predicate in the plane already relies on (registration is a
+source-code change, never a runtime-reachable action for an LLM or caller), so it is not specific
+to `pattern` and not a regression this increment introduces — noted for a future increment that
+might want `produced_by`-exact enforcement, not a blocker for this one.
+
+**GUARD "no LLM in the minting path" — verified by import-graph inspection, not just absence of
+a keyword.** `pattern.py`'s import list (stdlib `json`/`math`/`dataclasses`/`typing` plus
+`control.facts`, `control.reducers._common`, `reporting.lab_contract.record_id`) contains no
+model/adapter/backend import; `record_id()` (`lab_contract.py:365-384`) is a pure string/hash
+function over an already-resolved payload's `_registry` fields — no network, no subprocess, no
+LLM call anywhere in the reducer's transitive closure.
+
+**GUARD "no new transport" — verified.** `pattern_v1` performs no Redis/knowledge-stream/file
+I/O; it is registered into the SAME `REDUCERS`/`_IMPLS` dicts every existing reducer uses
+(`control/reducers/__init__.py:44,56`), consumed by the SAME `scripts/kb_produce_facts.py`
+pipe every other reducer already goes through. No new persistence path was added.
+
+**The four required test scenarios, verified present and load-bearing (not just named):**
+"a pattern derived from real campaign records" —
+`test_pattern_derived_from_real_records` (synthetic-but-real-shaped rows) AND
+`test_pattern_derived_from_the_real_canonical_corpus` (§1b, mines
+`canonical_corpus.load_canonical_tables("finding")` for real, skips rather than fabricates when
+unresolved — actually exercised in this environment, not skipped: the corpus resolved and the
+test minted real facts). "An ADVISORY proposal is uncitable" —
+`test_advisory_pattern_proposal_is_uncitable_by_validate_decision_c5` builds a REAL
+`ContractSpec`/`ControlContext`/`ControlDecision` and calls the REAL `validate_decision`, and the
+refusal is confirmed to land on check `C5` specifically (not an earlier short-circuit — C1-C4 are
+satisfied first). "Re-derivation stability" —
+`test_re_derivation_from_the_same_evidence_is_byte_stable_regardless_of_order` compares
+`fact_entity_id`/`value`/`evidence_ids`/`inputs_digest` byte-for-byte between forward and
+reversed input order. "A pattern with no real support cannot be minted" —
+`test_empty_population_mints_no_fact` (zero rows) and
+`test_unmeasured_outcomes_alone_mint_no_fact` (rows present, no real measured outcome) both
+assert `== []`; verified this is distinct from the legitimate "real slice, zero successes" case
+(`payload.support == 0` from real rows is a permitted, non-phantom fact under §3.3 — the reducer
+does not conflate "no evidence" with "evidence of absence").
+
+**Regression sweep against the concurrent I10 WIP.** `tests/test_context_plane_checkpoint.py`
+(the I10 WIP's own test file) fails to collect (`ImportError: cannot import name
+'FactRequirement' from control.facts`) — confirmed out of scope for I9 (I10 is explicitly
+"preserved for resume", not part of this increment's DELIVER). Every other test touching the
+files the WIP commit shares with I9 (`control/facts.py`, `control/reducers/__init__.py`,
+`control/decisions.py`, `control/rules.py`) is green:
+`pytest tests/ --ignore=tests/test_context_plane_checkpoint.py -k "control or context_plane or
+dependency_direction or fact or decision or rule or validator or knowledge"` — 503 passed, 0
+failed. `pytest tests/ -k "context_plane or dependency_direction"
+--ignore=tests/test_context_plane_checkpoint.py` — 257 passed (matches §14's own count exactly,
+confirming the WIP introduced no drift into I9's surface). `ruff check
+src/agentic_dynamics/control/reducers/pattern.py src/agentic_dynamics/control/facts.py` — clean.
+
+**Verdict: PASS.** No code change required by this pass — §14's implementation holds up under
+independent adversarial re-verification. The one note above (registry-membership vs.
+`produced_by`-exact enforcement) is recorded as an accepted, plane-wide architectural property,
+not a finding against this increment.
