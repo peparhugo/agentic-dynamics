@@ -87,13 +87,25 @@
 #     requires_facts list this spec was scoped to (attempt_confidence, attempt_cost_usd,
 #     attempt_model, phase_status, job_status). Recorded as the natural next increment, not
 #     smuggled in under a different name.
-# (4) Confounding — job_status is used to STRATIFY, not silently pooled. A job whose overall run
-#     failed (job_status="failed", 28/116 = 24% of runs) may show a systematically different
-#     phase_status="ok" rate for reasons unrelated to any routing policy (e.g. an unrelated
-#     environment failure late in the run) — pooling it into the arm comparison would confound
-#     "this threshold performed worse" with "this job failed for an unrelated reason."
-#     `job_outcome_join` produces `job_ok` so `arm_comparison` can report per-job_status
-#     breakdowns, exactly as cap_shadow_comparison.yaml stratifies by `model`.
+# (4) Confounding — TWO axes, both stratified, not silently pooled.
+#     (a) job_status: a job whose overall run failed (job_status="failed", 28/116 = 24% of runs)
+#         may show a systematically different phase_status="ok" rate for reasons unrelated to any
+#         routing policy (e.g. an unrelated environment failure late in the run) — pooling it into
+#         the arm comparison would confound "this threshold performed worse" with "this job failed
+#         for an unrelated reason." `job_outcome_join` produces `job_ok` so `arm_comparison` can
+#         report per-job_status breakdowns, exactly as cap_shadow_comparison.yaml stratifies by
+#         `model`.
+#     (b) model x threshold — FIXED in the r4 adversarial pass (this dimension was not checked in
+#         the original version of this spec; the review ROLE's own checklist names it explicitly).
+#         `attempt_confidence` is a SELF-REPORT (finding 5): different models plausibly self-report
+#         on different distributions, so a pooled `escalation_trigger_rate(theta)` could conflate
+#         "this threshold is aggressive" with "the corpus mix happens to include more of a
+#         chronically low-confidence model." `arm_comparison` now also requires `attempt_model`
+#         (the same real predicate `cascade_cost_per_verified_outcome` already requires — no new
+#         instrumentation) and produces `escalation_trigger_rate_by_model_range_theta_*` — the
+#         max-min spread across models, a cheap confound-MAGNITUDE indicator. A full per-model x
+#         per-theta table (21 named metrics) is deliberately left to the writeup, not the compiled
+#         metric surface.
 # (5) CAP-fact leak — CLEAN, but with a documented exception. Every `requires_facts` entry below
 #     is a REAL, declared FACT_PREDICATES key with a real producer (attempt_facts/v1 for the four
 #     attempt-scoped facts, job_facts/v1 for job_status) — R1-R11 verified clean (see below). The
@@ -277,10 +289,26 @@ rules:
   # honest signal: false whenever `*_unmeasured_escalated_n > 0` for that theta (in practice,
   # every theta today -- 77.9% confidence coverage guarantees escalation candidates exist at
   # every threshold in {0.3, 0.5, 0.7}).
+  # NOTE (r4 adversarial pass, finding A): the original version of this rule stratified only by
+  # job_status (job_ok) -- the methodologist ROLE's own confound checklist explicitly names
+  # "model x threshold" as a distinct risk this spec had not yet checked: attempt_confidence is a
+  # SELF-REPORT (finding 5 below), and different models may self-report on very different
+  # distributions, so a pooled escalation_trigger_rate(theta) could conflate "this threshold is
+  # aggressive" with "the corpus mix happens to include more of a chronically low-confidence
+  # model." FIXED by adding attempt_model as a requires_facts entry here (the SAME real predicate
+  # `cascade_cost_per_verified_outcome` already requires above -- no new instrumentation, just a
+  # second consumer of already-required data) and one new produced field per theta:
+  # `escalation_trigger_rate_by_model_range_theta_*` = max(per-model trigger rate) - min(per-model
+  # trigger rate) for that theta -- a cheap, single-scalar confound-MAGNITUDE indicator. A full
+  # per-model x per-theta breakdown (7 models x 3 thetas = 21 named metrics) was deliberately NOT
+  # added as separate `produces` entries -- that combinatorial expansion belongs in the writeup's
+  # per-model table (computed post-hoc from the same evaluator's intermediate per-attempt rows,
+  # which already carry attempt_model), not in the compiled metric surface.
   - name: arm_comparison
     plane: measurement
     evidence_class: "[C]"
-    requires_facts: []
+    requires_facts:
+      - {fact: attempt_model, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
     requires:
       - baseline_cost_per_verified_outcome
       - cascade_theta_0_3_cost_per_verified_outcome
@@ -294,6 +322,9 @@ rules:
       - null_testable_theta_0_3
       - null_testable_theta_0_5
       - null_testable_theta_0_7
+      - escalation_trigger_rate_by_model_range_theta_0_3
+      - escalation_trigger_rate_by_model_range_theta_0_5
+      - escalation_trigger_rate_by_model_range_theta_0_7
 metrics:
   - {name: confidence_coverage_ratio, agg: ratio, over: attempt}
   - {name: status_coverage_ratio, agg: ratio, over: attempt}
@@ -308,6 +339,10 @@ metrics:
   - {name: routing_arm_regret_theta_0_3, agg: mean, over: cell}
   - {name: routing_arm_regret_theta_0_5, agg: mean, over: cell}
   - {name: routing_arm_regret_theta_0_7, agg: mean, over: cell}
+  # r4 adversarial fix A (model x threshold confound, see arm_comparison's own comment above):
+  - {name: escalation_trigger_rate_by_model_range_theta_0_3, agg: mean, over: cell}
+  - {name: escalation_trigger_rate_by_model_range_theta_0_5, agg: mean, over: cell}
+  - {name: escalation_trigger_rate_by_model_range_theta_0_7, agg: mean, over: cell}
 comparison:
   kind: effect_size
   arm_factor: cascade_arm

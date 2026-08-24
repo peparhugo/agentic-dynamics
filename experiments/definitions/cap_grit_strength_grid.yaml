@@ -100,6 +100,14 @@
 #     gap. uncertainty_threshold=0.35 (finding 5) and budget_usd=10.0 (finding 6) are the two
 #     honest bounds; the writeup MUST report realized per-cell n and realized total cost before any
 #     regret number is treated as more than a pilot signal.
+# (9) Coverage — FIXED in the r4 adversarial pass. This spec originally had no explicit coverage-
+#     reporting rule (reasoned, at authoring time, that "no cells have run yet" made one
+#     premature) — the odd one out among the four specs in this family. `attempt_coverage_precheck`
+#     now opens the rule list here too: nothing guarantees every attempt captures
+#     actual_cost/test_executed_success once cells DO run (a crashed session could leave
+#     test_executed_success uncaptured for that attempt), and the m2 defect
+#     (measurement_coverage.py) this whole framework exists to prevent is a risk at any execution
+#     stage, not only in a corpus that already exists.
 name: cap_grit_strength_grid
 question: >-
   Does a retry-on-failure policy (grit_retry -- a second attempt when the first's
@@ -159,6 +167,26 @@ factors:
   - {name: model, levels: [anthropic/claude-sonnet-5]}
 design: factorial          # 4 x 2 x 1 = 8 cells
 rules:
+  # ── FIRST: coverage pre-check (r4 adversarial fix B). The original version of this spec had no
+  # explicit coverage-reporting rule -- reasoned, at authoring time, that "no cells have run yet"
+  # made one premature. The r4 methodologist pass's dimension-3 checklist ("any metric dividing by
+  # an uncaptured denominator") applies just as much to a NOT-YET-RUN live grid as a retrospective
+  # one: nothing guarantees every attempt captures actual_cost/test_executed_success once cells DO
+  # run (e.g. a session that crashes before reaching the independent test-verification step would
+  # leave test_executed_success uncaptured for that attempt). Every OTHER spec in this family
+  # (cap_shadow_comparison, cap_confidence_cascade, cap_coverage_routing_impact) opens with exactly
+  # this rule; E4 now matches that discipline instead of being the one exception -- the m2 defect
+  # (measurement_coverage.py's own docstring) this whole framework exists to prevent is a risk at
+  # ANY execution stage, not only in a corpus that already exists. ──
+  #   actual_cost, test_executed_success -> LEDGER_FIELDS (real, per finding 3's BLOCKED-not-
+  #   stretched fact-plane disposition — same as every other requirement in this spec).
+  - name: attempt_coverage_precheck
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts: []
+    requires: [actual_cost, test_executed_success]
+    produces: [cost_coverage_ratio, test_verification_coverage_ratio]
+
   # ── The formal Grit measurement (REAL, already-registered rule -- compile_experiment.py:257,
   # MEASUREMENT_RULES['grit']). Reused verbatim by name, not reimplemented. Its own docstring:
   # "Grit(s) = P(test_executed_success | perturbation_strength=s); retention R(s) = G(s)/G(0);
@@ -236,6 +264,9 @@ rules:
     requires: [cost_per_verified_outcome, verified_success_rate, recovery_premium, rework_cost_per_cell]
     produces: [routing_arm_regret, best_arm, realized_n_total, realized_cost_total]
 metrics:
+  # r4 adversarial fix B (coverage pre-check, see attempt_coverage_precheck's own comment above):
+  - {name: cost_coverage_ratio, agg: ratio, over: attempt}
+  - {name: test_verification_coverage_ratio, agg: ratio, over: attempt}
   - {name: verified_success_rate, agg: mean, over: cell}
   - {name: cost_per_verified_outcome, agg: ratio, over: cell}
   - {name: recovery_premium, agg: ratio, over: cell}
