@@ -17,7 +17,7 @@ NEVER actuated (``record_shadow_decision``, reused verbatim — no new recording
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
@@ -31,8 +31,8 @@ from agentic_dynamics.control.checkpoint import (
 from agentic_dynamics.control.context_compiler import (
     CONTRACTS_DIR,
     ContextRequest,
-    InMemoryFactStore,
     ContractSpec,
+    InMemoryFactStore,
     compile_context,
     load_all_contracts,
     load_contract,
@@ -48,7 +48,6 @@ from agentic_dynamics.control.facts import (
     Authority,
     CanonicalFact,
     EvidenceItem,
-    FactRequirement,
     ReducerInput,
     is_canonical,
     recompute_inputs_digest,
@@ -62,7 +61,7 @@ from agentic_dynamics.control.reducers.checkpoint import (
 )
 from agentic_dynamics.control.rules import record_shadow_decision, session_routing_v1
 from agentic_dynamics.control.validator import validate_decision
-from agentic_dynamics.core.contracts import validate_fact_contracts
+from agentic_dynamics.core.contracts import FactRequirement, validate_fact_contracts
 
 NOW = "2026-08-24T00:10:00+00:00"
 REPO = "agentic-dynamics"
@@ -77,7 +76,7 @@ WORKFLOW_SCOPE = f"org:{REPO}/workload:{WORKLOAD}/workflow:{CELL}"
 
 def test_session_checkpoint_is_frozen_with_the_design_field_order():
     cp = SessionCheckpoint(goal="ship the thing")
-    with pytest.raises(Exception):  # FrozenInstanceError
+    with pytest.raises(FrozenInstanceError):
         cp.goal = "other"  # type: ignore[misc]
     # Defaults match design §4.1's v1 grades exactly.
     assert cp.completed == ()
@@ -94,21 +93,21 @@ def test_session_checkpoint_is_frozen_with_the_design_field_order():
 def test_derived_and_advisory_fields_are_disjoint_and_exhaustive():
     # The module's own import-time completeness assert already checks this; re-asserted here as
     # the DELIVER-required "checkpoint field epistemic split" unit test, explicit and readable.
-    assert DERIVED_FIELDS & ADVISORY_FIELDS == frozenset()
-    assert DERIVED_FIELDS | ADVISORY_FIELDS == {
+    assert frozenset() == DERIVED_FIELDS & ADVISORY_FIELDS
+    assert {
         "goal", "completed", "current_revision", "acceptance_state",
         "context_snapshot_id", "snapshot_available",
         "verified_facts", "open_hypotheses", "failed_approaches", "next_action",
-    }
+    } == DERIVED_FIELDS | ADVISORY_FIELDS
 
 
 def test_derived_fields_match_the_accepted_design_table():
     # design §4.1: completed/current_revision/acceptance_state/context_snapshot_id (D2's v1
     # None-default form) + goal are DERIVED-or-measured, all carried by the CANONICAL fact.
-    assert DERIVED_FIELDS == {
+    assert {
         "goal", "completed", "current_revision", "acceptance_state",
         "context_snapshot_id", "snapshot_available",
-    }
+    } == DERIVED_FIELDS
 
 
 def test_advisory_fields_include_verified_facts_per_deviation_d1():
@@ -117,9 +116,9 @@ def test_advisory_fields_include_verified_facts_per_deviation_d1():
     # accepted design — see control/checkpoint.py's module docstring for the full citation.
     assert "verified_facts" in ADVISORY_FIELDS
     assert "verified_facts" not in DERIVED_FIELDS
-    assert ADVISORY_FIELDS == {
+    assert {
         "verified_facts", "open_hypotheses", "failed_approaches", "next_action",
-    }
+    } == ADVISORY_FIELDS
 
 
 def test_derived_payload_carries_only_derived_fields():
@@ -562,15 +561,59 @@ def test_session_routing_v1_is_deterministic():
 # ── DELIVER: "a continue with a stale snapshot is refused" ──────
 
 
-def test_continue_with_a_stale_snapshot_is_refused_by_c5():
-    """The checkpoint markers are simply ABSENT (the stale-cascade / max_age_exceeded path
-    resolves them to Unknown/StaleFact exactly like an unresolved fact — §4.5's "stale is treated
-    as unsatisfied" rule, `context_compiler.py`'s own ``StaleFact`` docstring) — so a decision
-    that WRONGLY claims to have used them fails C5 for citing a non-canonical fact, exactly the
-    same mechanism ``test_c5_cites_a_fact_not_in_the_snapshot`` already proves for route_next_job.
+def test_continue_with_a_stale_snapshot_is_refused():
+    """A GENUINE staleness case (not the "absent" case — see the fix note below): the checkpoint
+    exists and was checkpoint_present at some point, but the three equality markers were observed
+    long enough ago that they exceed ``session_routing.yaml``'s own ``max_age_seconds: 600`` on
+    each ``requires_facts`` entry. ``_resolve_requirement`` (`context_compiler.py:701-706`)
+    demotes an over-age fact to a ``StaleFact`` — it is EXCLUDED from ``ctx.job`` exactly like an
+    absent one (the design's "stale is treated as unsatisfied" rule) — so ``session_routing_v1``
+    (reading ``ctx.job`` via ``_find``) cannot see the three equality markers and falls through to
+    its ``fork`` branch: the ``continue`` proposal is refused by simply never being MADE, the same
+    mechanical mechanism that already refuses fork-without-a-checkpoint below.
+
+    FIX NOTE (this increment's own adversarial finding, recorded in
+    ``docs/context_abstraction/implementation_notes.md`` §16): an EARLIER version of this test
+    used an EMPTY store (no checkpoint facts at all) and asserted ``ctx.admissible is False``,
+    treating "absent" and "stale" as the same case. They are not, and the assertion was actually
+    proving a BUG: ``session_routing.yaml`` had (at that point) left ``on_missing: halt`` on all
+    five action-specific ``requires_facts`` entries, which made `compile_context` INADMISSIBLE
+    for every real session, including a legitimate first phase — the exact unsatisfiability the
+    contract's own header comment claims to have fixed by moving the facts out of `invariants:`,
+    but had not actually fixed (`_apply` in `context_compiler.py` applies `on_missing: halt`
+    identically for `invariants` and `requires_facts` — moving section headers changes nothing).
+    Verified empirically before the fix (`admissible=False` on a bare first-phase request with
+    zero checkpoint facts) and after (`admissible=True`, `action="continue"`). The YAML now uses
+    `on_missing: classify` for all five action-specific facts, and this test exercises the
+    behavior that fix makes correct: an ADMISSIBLE snapshot that simply excludes stale evidence
+    from the facts a `continue` proposal may cite.
     """
-    ctx = _ctx((_phases_remaining_fact(),))  # no checkpoint facts resolved at all == "stale/absent"
-    assert ctx.admissible is False  # every halt-on-missing requires_facts entry is unmet
+    stale_observed_at = "2026-08-20T00:00:00+00:00"  # ~4 days before NOW — far past the 600s TTL
+
+    def _stale(predicate: str) -> CanonicalFact:
+        return replace(
+            _marker_fact(predicate), observed_at=stale_observed_at, valid_from=stale_observed_at
+        )
+
+    ctx = _ctx((
+        _marker_fact("checkpoint_present"),  # fresh — the checkpoint itself still exists
+        _stale("checkpoint_goal_unchanged"),
+        _stale("checkpoint_phase_unchanged"),
+        _stale("checkpoint_model_unchanged"),
+        _phases_remaining_fact(),
+    ))
+    assert ctx.admissible is True  # staleness degrades gracefully (classify) — never a hard halt
+    assert any(s.reason == "max_age_exceeded" for s in ctx.stale)
+
+    # (a) the RULE itself never proposes "continue" once the equality markers are unresolvable —
+    # the refusal is structural, not a validator catch.
+    decision = session_routing_v1(ctx, target_id=CELL, proposed_at=NOW)
+    assert decision.action == "fork"
+
+    # (b) belt and braces: if something HAND-CRAFTED a "continue" decision that wrongly claims to
+    # cite one of the stale (hence excluded-from-snapshot) marker fact_ids, C5 refuses it — the
+    # same citation-integrity mechanism `test_continue_citing_an_unresolved_marker_...` below
+    # proves for a never-emitted (D2) predicate.
     bogus_decision = ControlDecision(
         decision_id="d1", snapshot_id=ctx.snapshot_id, decision_type=ctx.decision_type,
         contract_version=ctx.contract_version, action="continue", target_type="job",
@@ -581,10 +624,7 @@ def test_continue_with_a_stale_snapshot_is_refused_by_c5():
         bogus_decision, snapshot=ctx, fresh_snapshot=ctx, contract=CONTRACT, now=NOW,
     )
     assert result.admitted is False
-    # C2 (inadmissible snapshot) fires before C5 here, since checks are ORDERED — still a real,
-    # mechanical refusal of the same bogus "continue" claim; test_fork_without_a_checkpoint below
-    # exercises the C5-specific citation path directly against an ADMISSIBLE snapshot.
-    assert result.check in ("C2", "C5")
+    assert result.check == "C5"
 
 
 def test_continue_citing_an_unresolved_marker_against_an_admissible_snapshot_fails_c5():
@@ -624,13 +664,31 @@ def test_fork_without_a_checkpoint_is_refused_by_c5():
 
 
 def test_real_rule_never_proposes_fork_without_citing_checkpoint_present():
-    # The RULE's own honesty check: it structurally cannot construct a fork decision that fails
-    # C5 for this reason, because it only proposes fork when checkpoint_present ACTUALLY resolved.
+    """The RULE's own honesty check: it structurally cannot construct a fork decision that fails
+    C5 for citing a checkpoint that isn't there, because it only proposes ``fork`` when
+    ``checkpoint_present`` ACTUALLY resolved — asserted directly on the decision's own
+    ``facts_used``, never inferred from whether ``validate_decision`` admits it.
+
+    ``result.admitted`` is a SEPARATE question from "did the rule cite real evidence", and for
+    ``fork`` it is correctly ``False``: `fork` is proposal-only (`AUTOMATABLE_ACTIONS` is
+    `{continue, route}`, unchanged by this increment — the GUARD, `control/decisions.py`), and
+    `session_routing_v1`'s own `proposed_by="policy_rule:session_routing"` is not a
+    `"operator:"`-prefixed human proposer, so check C9 correctly refuses to ADMIT it — the exact
+    same "an automated proposer may not have a non-automatable action applied" rule
+    ``test_c9_non_automatable_action_from_an_automated_proposer`` already establishes for
+    `route_next_job_v1`'s own `retry` proposals (`test_context_plane_controller.py`). An earlier
+    version of this test asserted ``result.admitted is True``, which is wrong: it would mean an
+    automated `fork` proposal COULD be admitted (i.e. eligible to apply) — precisely the
+    "apply stays OFF" GUARD this increment must not violate. Recorded (never applied) is proven
+    separately by ``test_escalate_and_fork_proposals_are_also_recorded_never_actuated`` below.
+    """
     ctx = _ctx((_marker_fact("checkpoint_present"), _phases_remaining_fact()))
     decision = session_routing_v1(ctx, target_id=CELL, proposed_at=NOW)
     assert decision.action == "fork"
+    assert any(fid.startswith("fact_checkpoint_present") for fid in decision.facts_used)
     result = validate_decision(decision, snapshot=ctx, fresh_snapshot=ctx, contract=CONTRACT, now=NOW)
-    assert result.admitted is True
+    assert result.admitted is False
+    assert result.check == "C9"  # refused for being an automated non-automatable proposal, not C5
 
 
 # ── (5) proposals are recorded and NEVER actuated ────────────────
@@ -681,7 +739,7 @@ def test_escalate_and_fork_proposals_are_also_recorded_never_actuated(tmp_path):
 
 
 def test_automatable_actions_is_still_exactly_continue_and_route():
-    assert AUTOMATABLE_ACTIONS == frozenset({"continue", "route"})
+    assert frozenset({"continue", "route"}) == AUTOMATABLE_ACTIONS
     for action in ("continue", "fork", "compress_and_fork", "escalate"):
         # Every session_routing action name is proposable...
         assert action in PROPOSABLE_ACTIONS
@@ -693,17 +751,33 @@ def test_automatable_actions_is_still_exactly_continue_and_route():
 
 
 def test_no_committed_spec_opts_a_control_route_into_session_routing():
-    # GUARD: "no runner wiring changes" — no workflow spec YAML references decision_type:
-    # session_routing anywhere in the committed corpus; this increment ships the contract/rule/
-    # schema only, never a call site.
-    import subprocess
+    """GUARD: "no runner wiring changes (shadow-optional only)".
 
-    result = subprocess.run(
-        ["grep", "-rl", "session_routing", "experiments/", "workflows/"],
-        capture_output=True, text=True, cwd=__file__.rsplit("/tests/", 1)[0],
-    )
-    hits = [
-        line for line in result.stdout.splitlines()
-        if not line.endswith("session_routing.yaml")
+    Reuses the EXACT check I7's own gate already established
+    (``test_context_plane_seam.py::test_no_committed_spec_opts_into_control_route``) — the real
+    wiring seam is ``workflow.params.control_route`` (what ``scripts/run_workflow.py`` reads to
+    decide whether to build an applying router at all); it is a single boolean, not scoped to a
+    particular ``decision_type``, since this increment adds no ``make_applying_router``-equivalent
+    for ``session_routing`` in the first place (only ``record_shadow_decision`` — shadow-only, no
+    apply path exists to wire even opt-in).
+
+    An EARLIER version of this test grepped the whole ``experiments/``/``workflows/`` tree for the
+    bare substring ``"session_routing"`` and asserted zero hits outside the contract YAML itself.
+    That is not what the GUARD means, and it was a false positive: the repository already
+    legitimately references ``session_routing`` as a topic/spec name in prior, unrelated CAP work
+    that predates this increment (an evidence-seed experiment definition, a retrospective
+    analysis, spec-authoring workflow documentation prose) — none of which sets
+    ``control_route: true`` or calls ``session_routing_v1``/``make_applying_router``. Verified
+    directly below, over the real committed corpus, that none of them do.
+    """
+    from pathlib import Path
+
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+
+    repo_root = Path(__file__).resolve().parent.parent
+    paths = sorted((repo_root / "experiments" / "definitions").glob("*.yaml"))
+    paths += sorted((repo_root / "workflows").rglob("*.yaml"))
+    offenders = [
+        p for p in paths if bool(load_spec(p).workflow.params.get("control_route", False))
     ]
-    assert hits == []
+    assert offenders == []

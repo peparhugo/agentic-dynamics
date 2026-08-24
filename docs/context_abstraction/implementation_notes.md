@@ -505,3 +505,183 @@ src/agentic_dynamics/control/reducers/pattern.py src/agentic_dynamics/control/fa
 independent adversarial re-verification. The one note above (registry-membership vs.
 `produced_by`-exact enforcement) is recorded as an accepted, plane-wide architectural property,
 not a finding against this increment.
+
+## 16. I10 — `SessionCheckpoint` + the `session_routing` contract (`control/checkpoint.py`,
+`control/reducers/checkpoint.py`, `experiments/contexts/session_routing.yaml`)
+
+Implements `docs/designs/current/context_abstraction_addendum_design.md` §4 (answers OQ6/OQ7)
+against the REAL I0–I9 code. Proposal-only actuation throughout; `apply` stays OFF — this
+increment adds no `make_applying_router`-equivalent for `session_routing` (only
+`record_shadow_decision`, reused verbatim), and no committed spec's `workflow.params.control_route`
+is ever `true` (verified over the real corpus, `test_no_committed_spec_opts_a_control_route_into_
+session_routing`). This section picks up a checkpoint of PARTIAL work an earlier session left
+("wip: d3 checkpoint partial work (decisions/facts/reducers) preserved for resume") — most of the
+schema/reducer/rule/contract already existed; this pass found and fixed one material defect in the
+inherited work (below) before treating the increment as done.
+
+**Schema (`control/checkpoint.py`, new reserved home per design §6).** `SessionCheckpoint` is a
+frozen dataclass with the per-field epistemic grades design §4.1's own table specifies, INCLUDING
+the two demotions the accepted design's own deviations D1/D2 require (not the addendum's literal
+wording — see the note below): `goal`/`completed`/`current_revision`/`acceptance_state` are
+DERIVED (design's grade, unchanged); `context_snapshot_id` is `str | None = None` plus a NEW
+`snapshot_available: bool = False` marker (D2 — no snapshot producer exists until I4 gains a real
+capture call site); `verified_facts` is ADVISORY, not DERIVED (D1 — no canonical `fact`
+`source_type` exists to cite); `open_hypotheses`/`failed_approaches`/`next_action` are ADVISORY
+(unchanged). `DERIVED_FIELDS`/`ADVISORY_FIELDS` are the machine-checkable form of the split, with
+an import-time completeness assert (every field graded exactly once, disjoint, exhaustive) mirroring
+`EPISTEMIC_MAP`'s own self-checking pattern. `derived_payload()`/`advisory_payload()` implement D5
+(resolving addendum design's own adversarial finding F3): the two payloads share zero keys, so an
+ADVISORY narrative edit can never re-key the canonical fact's identity, and a controller citing the
+checkpoint fact can never receive un-citable content at fact granularity.
+
+**A note on this task's own DELIVER text vs. the accepted design.** The prompt's shorthand groups
+`verified_facts`/`context_snapshot_id` under "DERIVED" — this is the addendum's OWN pre-deviation
+wording, not the design that was actually accepted after review. The accepted design's §4.1 table,
+its D1/D2 deviation-table rows, and adversarial finding F3 (§9) are unambiguous about why a literal
+DERIVED grade for these two fields is a hard-rule-4 violation (an un-produced field masquerading as
+measured/derived). Per this task's own GOAL line ("per the accepted addendum design"), the shipped
+code follows the ACCEPTED DESIGN, not the prompt's paraphrase — documented in `control/checkpoint.
+py`'s own module docstring and here, exactly as every other genuine deviation in this plane is
+recorded: explicitly, never silently.
+
+**The reducer (`control/reducers/checkpoint.py`, new — the design's own reserved home).**
+`CHECKPOINT_V1`/`checkpoint_v1` is the sole registered producer of `session_checkpoint` and five
+POSITIVE-MARKER booleans (`checkpoint_present`, `checkpoint_goal_unchanged`,
+`checkpoint_phase_unchanged`, `checkpoint_model_unchanged`, `model_change_required`) plus a sixth,
+`checkpoint_snapshot_identity`, declared in `FACT_PREDICATES` but structurally NEVER emitted in v1
+(D2 — same "declared producer, chooses not to fire" posture `context_snapshot_id` itself takes).
+Each marker is emitted ONLY as `"true"`, and ONLY when real evidence supports it — a false/changed/
+unmeasured condition is represented by the fact's ABSENCE, never a fabricated `"false"` (the same
+no-phantom discipline `control/reducers/pattern.py`, I9, already established). `checkpoint_from_run`
+derives the DERIVED fields purely from a typed `WorkflowRunResult` dict (`completed` via a
+git-I/O-free proxy — phase names with `status == "ok"` — since a pure reducer may never touch a live
+git repo; `acceptance_state` combines `ok` with any real `test_executed_success` into one of
+`verified_pass`/`verified_fail`/`unverified_ok`/`unverified_fail`). The `session_current` evidence
+tag is reducer-local (not a `knowledge.SOURCE_TYPES` row, no new transport) and is joined to its
+`workflow_run` by `spec_name` alone, deliberately narrower than the checkpoint's own `cell_id`
+(spec_name+model) join — the one join key permissive enough to let `model_change_required` detect
+the exact case (a different model in the "current" state) that predicate exists to catch.
+
+**Contract (`experiments/contexts/session_routing.yaml`, new — the design's own reserved home).**
+`allowed_actions: [continue, fork, compress_and_fork, escalate]`, `max_snapshot_age_seconds: 300`
+(REUSE the frozen design's own figure), `invariants: []`. All four actions are proposal-only:
+`AUTOMATABLE_ACTIONS` (`control/decisions.py`) stays exactly `{continue, route}`, unwidened;
+`PROPOSABLE_ACTIONS` gains `fork`/`compress_and_fork` (`escalate` already existed from I6, reused
+by name — a real actuation, a model change, never applied by this increment either).
+
+**MATERIAL FINDING, found and fixed in this pass — `on_missing: halt` under `requires_facts` is
+NOT "soft".** The addendum's own §4.2 YAML sketch groups five action-specific facts
+(`checkpoint_goal_unchanged`/`_phase_unchanged`/`_model_unchanged`/`checkpoint_present`/
+`model_change_required`) under an UNCONDITIONAL `invariants:` list — logically unsatisfiable,
+because `checkpoint_model_unchanged` and `model_change_required` are MUTUALLY EXCLUSIVE by the
+reducer's own positive-marker convention (exactly one fires per session with a checkpoint), so two
+`on_missing: halt` invariants that can never BOTH be satisfied make the contract permanently
+inadmissible — and `checkpoint_present: on_missing: halt` would ALSO permanently block a legitimate
+first phase (no checkpoint yet). The inherited WIP correctly identified this (documented in the
+contract file's own header, and proven mechanically by
+`test_the_addendums_own_literal_invariant_grouping_would_be_refused_by_r11`, which reproduces the
+addendum's literal grouping and shows R11 refuses it) and moved all five facts to `requires_facts:`
+— but LEFT `on_missing: halt` on all five. This does not fix anything: `control/context_compiler.py`'s
+`compile_context`/`_apply` helper applies `on_missing in {halt, escalate} -> admissible = False`
+IDENTICALLY for `contract.invariants` and `effective_requires_facts` (`context_compiler.py:764-801`)
+— nothing about the `requires_facts:` heading is inherently softer; only `on_missing: classify`/
+`investigate` degrade without blocking admissibility. Verified empirically before touching the YAML:
+a bare first-phase `ContextRequest` (only `workflow_phases_remaining` supplied, zero checkpoint
+facts) against the shipped contract came back `admissible=False` — the EXACT bug the file's own
+header claims to have resolved, reintroduced under a different heading, and (worse) unconditional
+for every session with a checkpoint too, since `checkpoint_model_unchanged`/`model_change_required`
+can never both resolve. **Fix:** the five action-specific facts now use `on_missing: classify` — an
+absence is recorded as an `Unknown` (visible on `ControlContext.unknowns`) but never blocks
+admissibility; `control.rules.session_routing_v1` reads their presence/absence from `ctx.job` via
+`_find()` and does the actual per-action refusal at the RULE level (continue only when all three
+equality markers resolved; escalate only when `model_change_required` resolved; fork as the safe
+default once continuation cannot be proven; continue with nothing to compare against, on a first
+phase, when no checkpoint exists at all). `workflow_phases_remaining` keeps `on_missing: halt` — it
+is the one entry that is NOT action-scoped (every action needs it), REUSE of `route_next_job.yaml`'s
+own precedent. Re-verified empirically post-fix across five scenarios (first phase, unchanged
+session, model-changed, goal-changed, and genuinely STALE equality markers past the 600s TTL): all
+five now come back `admissible=True` with the mechanically correct action proposed, including the
+stale case correctly falling through to `fork` rather than `continue`.
+
+**Validator enforcement (R11, "invariant-halt semantics").** `invariants: []` trivially satisfies
+R11 (an invariant whose `on_missing` is outside `{halt, escalate}` is refused — I5, `core/
+contracts.py`, `implementation_notes.md` §10.2); `test_shipped_session_routing_contract_never_
+fails_r11` / `test_all_committed_contracts_pass_r11_via_load_all_contracts` check this against the
+real loader over the real committed corpus. `test_the_addendums_own_literal_invariant_grouping_
+would_be_refused_by_r11` is the adversarial proof R11 would in fact catch the addendum's own
+literal (pre-deviation) invariant grouping, which is WHY this contract's real shape moves those
+facts to `requires_facts` instead.
+
+**The shadow control rule (`control.rules.session_routing_v1`, design §4.2/§4.3).** Reads the
+(possibly-absent) marker facts from a compiled `ControlContext.job` and proposes exactly one of
+`{continue, fork, escalate}` (v1 never proposes `compress_and_fork` — its trigger, context-token
+growth past a threshold, has no measured signal yet; declared in `allowed_actions` for a future,
+evidenced rule, never fabricated by this one). The session-continuation `continue` this function
+proposes is a DIFFERENT decision from `route_next_job_v1`'s routing null-action `continue` (design
+F4) — same string, different meaning — which is why `AUTOMATABLE_ACTIONS` must NOT be widened to
+admit it; `control/decisions.py`'s own comment on `AUTOMATABLE_ACTIONS` documents this explicitly.
+Every proposal is only ever recorded (`record_shadow_decision`, reused verbatim — no new recording
+path) and surfaced; an automated `policy_rule:session_routing`-sourced proposal for a
+non-automatable action (`fork`/`compress_and_fork`/`escalate`) is correctly REFUSED by check C9 in
+`validate_decision` (the same `is_human = proposed_by.startswith("operator:")` rule
+`test_c9_non_automatable_action_from_an_automated_proposer` already establishes for
+`route_next_job_v1`'s own `retry` proposals) — `result.admitted is False`, `check == "C9"`. This is
+the GUARD made mechanical, not merely asserted: an automated `fork` proposal is structurally
+ineligible to be treated as authorized, regardless of how well-evidenced its `facts_used` is.
+
+**Tests found needing a fix, and why (all in the inherited `tests/test_context_plane_checkpoint.py`,
+39 → 38 cases after consolidation).** (1) `FactRequirement` was imported from `control.facts`
+(where it does not live) instead of `core.contracts` (I5's actual home, `core/contracts.py:50`) —
+a plain `ImportError` blocking collection of the entire file; fixed by moving the import. (2) The
+original `test_continue_with_a_stale_snapshot_is_refused_by_c5` conflated "absent" with "stale":
+it built a snapshot with ZERO checkpoint facts and asserted `ctx.admissible is False` — true only
+because of the `on_missing: halt` bug above, and testing the wrong thing (the DELIVER text asks for
+STALE, not merely first-phase-absent, which is a legitimate non-refusal case covered by a separate
+test). Rewritten as `test_continue_with_a_stale_snapshot_is_refused`: genuinely stale equality
+markers (`observed_at` ~4 days before `now`, past the contract's `max_age_seconds: 600`), asserting
+(a) the rule structurally never proposes `continue` once the markers are unresolvable — it falls
+through to `fork` — and (b) a hand-crafted decision that wrongly claims to cite one of the
+excluded-as-stale fact_ids still fails C5, belt and braces. (3)
+`test_real_rule_never_proposes_fork_without_citing_checkpoint_present` asserted
+`result.admitted is True` for an automated `fork` proposal — backwards: `fork` is proposal-only by
+design, so C9 correctly refuses it, and asserting `admitted is True` would have been asserting the
+GUARD's own violation had the code actually behaved that way. Rewritten to assert the decision's
+`facts_used` genuinely cites `checkpoint_present` (the honesty property the test name promises) AND
+that `validate_decision` refuses it via C9 specifically — turning a backwards assertion into a
+positive proof of "apply stays OFF" for this action. (4)
+`test_no_committed_spec_opts_a_control_route_into_session_routing` grepped the whole `experiments/`/
+`workflows/` tree for the bare substring `"session_routing"` and asserted zero hits outside the
+contract YAML — a false positive against legitimate, unrelated prior CAP work already committed to
+this branch (an evidence-seed experiment definition, a retrospective analysis, spec-authoring
+workflow prose) that references the topic name without doing any runner wiring. Rewritten to reuse
+the EXACT check I7's own gate already established
+(`test_context_plane_seam.py::test_no_committed_spec_opts_into_control_route`): load every committed
+spec and assert `workflow.params.control_route` is never truthy — the actual wiring seam, checked
+against the real corpus, not a name collision.
+
+**Ruff.** `I001` (import ordering), five `SIM300` (Yoda-condition set-equality assertions), and one
+`B017` (blind `pytest.raises(Exception)`, narrowed to `dataclasses.FrozenInstanceError`) — all
+pre-existing style debt in the inherited test file, fixed (`ruff check --fix` plus one manual
+narrowing); `ruff check` clean on every touched file after.
+
+Tests: `tests/test_context_plane_checkpoint.py` (38 cases, 4 fixed per above) — the schema's
+epistemic split and payload separation, the reducer's positive-marker/no-phantom/D2-never-emitted/
+join-key/re-derivation-stability properties, the real contract's R11-cleanliness and the addendum's
+own literal grouping failing R11 (proving why this shape differs), `session_routing_v1`'s four-way
+branching including the stale-continue and checkpointless-fork refusals via the real validator,
+shadow-only recording (`record_shadow_decision`, never `publish_event`), and
+`AUTOMATABLE_ACTIONS`/`control_route` immutability over the real corpus.
+`tests/test_context_plane_facts.py` widened by the inherited WIP (`test_predicate_registry_has_
+the_design_seed_rows` +7 rows; `test_predicate_inheritance_flags_match_the_design_table` needed no
+change — all six new predicates are job-scoped, non-inheritable, exactly as design).
+
+Full suite green: `pytest tests/test_context_plane_checkpoint.py` — 38 passed.
+`pytest tests/ -k "control or context_plane or dependency_direction or fact or decision or rule or
+validator or knowledge or contract"` — 626 passed, 0 failed (up from I9's 503 baseline: +38
+checkpoint + the rest already counted). `pytest tests/test_dependency_direction.py` — 11 passed
+(no tier violation: `control/checkpoint.py` and `control/reducers/checkpoint.py` both stay tier-2
+control code; `core/contracts.py`, I5's existing home, was not modified — only a test's import
+path was corrected). `ruff check` clean on every touched file. A full untargeted `pytest tests/ -q`
+run exceeds this environment's practical timeout (consistent with §15's own note) — the targeted
+sweep above is the regression signal, covering every plane this increment (and the concurrent WIP
+it resumed) touches. PASS.

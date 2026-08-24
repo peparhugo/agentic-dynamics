@@ -30,15 +30,27 @@
 # YAML sketch (documented alongside D1-D7 in `docs/context_abstraction/implementation_notes.md`
 # §15) — not a stylistic preference.
 #
-# RESOLUTION: all five action-specific facts move to `requires_facts` (soft, per-entry
-# `on_missing` degradation — never a blanket admissibility gate). The per-ACTION gating the
-# addendum's prose actually wants is implemented where this architecture already puts that kind
-# of logic: inside the control RULE FUNCTION itself (`control.rules.session_routing_v1`), which
-# reads these (possibly-absent) facts from the compiled snapshot and decides which action to
-# propose — the SAME pattern `route_next_job_v1` already uses for `workflow_phases_remaining`/
-# `allowed_models` (soft `requires_facts`, rule-level branching), not a novel one. `invariants:`
-# below is empty — this contract genuinely has no fact that is a safety precondition for EVERY
-# one of its four actions.
+# RESOLUTION: all five action-specific facts move to `requires_facts` — AND, this is the part
+# that actually matters (a first pass at this fix moved the facts but left `on_missing: halt`,
+# which reproduces the identical unsatisfiability under a different heading: `compile_context`'s
+# `_apply` helper applies `on_missing in {halt, escalate} -> admissible = False` IDENTICALLY for
+# `invariants` and `requires_facts` — nothing about the `requires_facts:` heading is inherently
+# "soft"; only `on_missing: classify`/`investigate` degrade without blocking admissibility,
+# `control/context_compiler.py`'s `_apply`/`compile_context`, verified empirically: a first-phase
+# request against this contract with `on_missing: halt` on these five facts came back
+# `admissible=False` — the exact bug this file's header claims to resolve, reintroduced). The
+# actual fix: each of the five action-specific facts below is `on_missing: classify` — its
+# ABSENCE is recorded (an `Unknown`, visible on `ControlContext.unknowns`) but never blocks
+# admissibility. The per-ACTION gating the addendum's prose actually wants is implemented where
+# this architecture already puts that kind of logic: inside the control RULE FUNCTION itself
+# (`control.rules.session_routing_v1`), which reads these (possibly-absent) facts from the
+# compiled snapshot via `ctx.job` and decides which action to propose — the SAME pattern
+# `route_next_job_v1` already uses for `workflow_phases_remaining`/`allowed_models` (soft
+# `requires_facts`, rule-level branching), not a novel one. `invariants:` below is empty — this
+# contract genuinely has no fact that is a safety precondition for EVERY one of its four actions;
+# `workflow_phases_remaining` below keeps `on_missing: halt` because it IS unconditionally needed
+# by every action this decision type could ever propose (REUSE of `route_next_job.yaml`'s own
+# precedent, design §6.1's example) — it is the one entry in this list that is not action-scoped.
 decision_type: session_routing
 contract_version: "session_routing/v1"
 
@@ -64,8 +76,12 @@ max_snapshot_age_seconds: 300
 # test_shipped_session_routing_contract_never_fails_r11` checks this against the real loader.
 invariants: []
 
-# Required facts: the state this decision is ALLOWED to see, and (via each entry's own
-# on_missing) the per-action refusal the addendum's prose describes.
+# Required facts: the state this decision is ALLOWED to see. The five action-specific facts all
+# use `on_missing: classify` (never `halt`) — their absence is recorded as an Unknown but never
+# blocks THIS snapshot's admissibility; `control.rules.session_routing_v1` reads their presence/
+# absence from `ctx.job` and does the actual per-action refusal (see the file header for why
+# `halt` here would be unsatisfiable). Only `workflow_phases_remaining`, which every action
+# genuinely needs, keeps `on_missing: halt`.
 requires_facts:
   # The checkpoint's own raw payload — "a first phase has no checkpoint yet" is legitimately
   # unknown, exactly the same on_missing:classify posture route_next_job.yaml already uses for
@@ -91,43 +107,61 @@ requires_facts:
 
   # continue's gate (addendum "(1)"): each of the three equality markers is present ONLY when
   # BOTH a checkpoint and a fresh comparison state were supplied AND the value actually matches
-  # (checkpoint/v1's positive-marker convention) — so on_missing:halt here correctly captures
-  # "no checkpoint", "no fresh state to compare", AND "the value changed" as the SAME refusal,
-  # which is exactly what continue needs: a session may only be told to resume when its context
-  # is provably unchanged, never "probably" or "we don't know".
+  # (checkpoint/v1's positive-marker convention). `on_missing: classify` (NOT halt — see this
+  # file's header): a missing marker here means "continue cannot be PROVEN safe", which is a
+  # per-action refusal `session_routing_v1` implements by simply never proposing `continue` when
+  # any of the three is absent from `ctx.job` (falls through to `escalate`/`fork` instead) — it
+  # must NOT make the entire snapshot inadmissible, or `escalate`/`fork` could never be proposed
+  # either (they are evaluated from the SAME snapshot). "no checkpoint", "no fresh state to
+  # compare", and "the value changed" all resolve to the SAME absence, which is exactly what
+  # continue needs: a session may only be told to resume when its context is provably unchanged,
+  # never "probably" or "we don't know" — enforced by the rule reading `ctx.job`, not by halting.
   - fact: checkpoint_goal_unchanged
     scope: self
     max_age_seconds: 600
     min_authority: DERIVED
-    on_missing: halt
+    on_missing: classify
     on_conflict: halt
   - fact: checkpoint_phase_unchanged
     scope: self
     max_age_seconds: 600
     min_authority: DERIVED
-    on_missing: halt
+    on_missing: classify
     on_conflict: halt
   - fact: checkpoint_model_unchanged
     scope: self
     max_age_seconds: 600
     min_authority: DERIVED
-    on_missing: halt
+    on_missing: classify
     on_conflict: halt
 
   # fork / compress_and_fork's gate (addendum "(2)"): never fork blind — a checkpoint must exist.
+  # `on_missing: classify`, same reasoning as above: `session_routing_v1` reads `ctx.job` for
+  # `checkpoint_present` and proposes `continue` (not `fork`) when it is absent (module docstring
+  # of `control/rules.py`'s `session_routing_v1`, case 1) — the refusal is structural (the rule
+  # can never reach its `fork` branch without having found `checkpoint_present` first), not a
+  # halted snapshot. Halting here would ALSO make `escalate`/`continue` inadmissible on a first
+  # phase, which is the addendum's own explicitly-required case (continue must stay available).
   - fact: checkpoint_present
     scope: self
     max_age_seconds: 600
     min_authority: DERIVED
-    on_missing: halt
+    on_missing: classify
     on_conflict: halt
 
   # escalate's gate (addendum "(3)"): a checkpoint plus an EVIDENCED model change (never assumed).
+  # `on_missing: classify` for the same reason as the other four: `checkpoint_model_unchanged`
+  # and `model_change_required` are MUTUALLY EXCLUSIVE by the reducer's own positive-marker
+  # convention (`control/reducers/checkpoint.py`) — exactly one of them is present on any session
+  # that has both a checkpoint and a fresh comparison state, and the OTHER is therefore always
+  # absent. Two `on_missing: halt` entries that are mutually exclusive by construction would make
+  # this contract inadmissible for EVERY real session with a checkpoint — verified empirically
+  # while fixing this file (see header) — which is exactly why both must degrade, not halt.
   - fact: model_change_required
     scope: self
     max_age_seconds: 600
     min_authority: DERIVED
-    on_missing: halt
+    on_missing: classify
     on_conflict: halt
 
   # REUSE — the same parent-scope fact route_next_job.yaml already requires (design §6.1's own
