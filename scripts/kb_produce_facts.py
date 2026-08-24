@@ -46,6 +46,7 @@ import json
 import os
 import subprocess
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -163,6 +164,57 @@ def load_spec_configs() -> list[dict]:
     return configs
 
 
+def _is_failed_before_call(phase: dict) -> bool:
+    """True when a phase is a STRUCTURAL zero-cost phase: it failed before any model call.
+
+    CAP fact backfill F1 (the m2 hazard): a phase that fails before any model call (e.g. an auth
+    failure) records ``cost_usd=0.0`` with an all-zero ``tokens`` block. That ``0.0`` is a
+    structural zero (the model was never called), not a measured zero — deriving it as a real cost
+    lets a never-executed run read as "within budget" (``projected_budget_overrun=0.0``). The
+    discriminant is exact: agent-kind + a failure status + zero cost + zero tokens in/out/total.
+    Test-kind phases are never "failed-before-call" — they run pytest (no model call by design),
+    so their ``0.0`` is a genuine measurement.
+    """
+    if phase.get("kind") not in (None, "agent"):
+        return False
+    if phase.get("status") not in ("failed", "error", "timeout", "blocked"):
+        return False
+    if phase.get("cost_usd") not in (0, 0.0):
+        return False
+    tokens = phase.get("tokens") or {}
+    if isinstance(tokens, dict):
+        return not any(tokens.get(k) for k in ("in", "out", "total"))
+    return True
+
+
+def _sanitize_run(run: dict) -> dict:
+    """Return a copy of a workflow run with F1 structural-zero costs recorded as ``None``.
+
+    Re-derivation stays byte-stable: the sanitizer is a pure, deterministic function of the raw
+    artifact, and it is applied only to the evidence PAYLOAD — ``run_artifact_id`` (the identity
+    cited in ``evidence_ids``) is computed over the RAW artifact, never the sanitized copy, so an
+    already-cited run keeps its exact identity.
+    """
+    run = dict(run)
+    phases = run.get("phases")
+    if not isinstance(phases, list) or not phases:
+        return run
+    new_phases: list = []
+    before_call = 0
+    for phase in phases:
+        if not isinstance(phase, dict):
+            new_phases.append(phase)
+            continue
+        if _is_failed_before_call(phase):
+            phase = {**phase, "cost_usd": None}  # uncaptured, not a measured zero
+            before_call += 1
+        new_phases.append(phase)
+    run["phases"] = new_phases
+    if before_call == len(new_phases) and run.get("total_cost_usd") in (0, 0.0):
+        run["total_cost_usd"] = None  # the whole run never executed — cost is unmeasured
+    return run
+
+
 def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
     """Build one ``EvidenceItem`` per DISTINCT run, identified by its content-addressed artifact id.
 
@@ -173,6 +225,11 @@ def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
     caller can look one back up via a ``{evidence_id: payload}`` index over this same sequence —
     see ``_evidence_resolver`` below), while re-deriving from the SAME artifact reproduces the
     same id byte-for-byte.
+
+    **F1 sanitization (CAP fact backfill):** the PAYLOAD handed to the reducers is the sanitized
+    copy (``_sanitize_run`` — failed-before-call costs become ``None``), while the ``evidence_id``
+    is computed over the RAW artifact (identity is a property of the persisted bytes, and an
+    already-cited run keeps its exact id). See ``_sanitize_run`` for the F1 m2-hazard rationale.
 
     **Duplicate-evidence guard (CAP I0-I3 adversarial repair, attack vector "duplicate evidence"):**
     two ON-DISK FILES can carry byte-identical content (a copied/duplicated artifact, or a replay
@@ -196,7 +253,11 @@ def _run_evidence(runs: list[dict]) -> tuple[EvidenceItem, ...]:
             continue
         seen.add(rid)
         items.append(
-            EvidenceItem(source_type="workflow_run", evidence_id=f"workflow_run:{rid}", payload=run)
+            EvidenceItem(
+                source_type="workflow_run",
+                evidence_id=f"workflow_run:{rid}",
+                payload=_sanitize_run(run),
+            )
         )
     return tuple(items)
 
@@ -219,14 +280,34 @@ def _finalize(facts: list) -> list:
     return [fi.finalize_fact(fact, fi.build_fact_record(fact)) for fact in facts]
 
 
+def _finalize_to_registered(lower: list, identity_out: dict[int, str]) -> list:
+    """Finalize the lower facts with the ids they are ACTUALLY registered under.
+
+    ``workflow_facts_v1`` cites the lower facts' ``fact_id``s (the staleness-cascade backbone), and
+    the citation must resolve to a REGISTERED row. ``derive_fact_records``' ``identity_out`` maps
+    each fact to its registered knowledge_id — its first-version record, its linked record, or (for
+    a fact that converged to an earlier run's identical value) the head it converged to. The naive
+    unlinked ``build_fact_record`` id names a knowledge_id that is NEVER registered in the converged
+    case, which minted dangling workflow-fact citations for every multi-run cell.
+    """
+    finalized: list = []
+    for fact in lower:
+        rid = identity_out.get(id(fact))
+        if rid is None:  # a fact the batch did not touch (defensive — identity_out is total)
+            rid = fi.build_fact_record(fact).knowledge_id
+        record = replace(fi.build_fact_record(fact), knowledge_id=rid)
+        finalized.append(fi.finalize_fact(fact, record))
+    return finalized
+
+
 def _derive_workflow_facts(repository_id: str, revision: str, now: str) -> list:
     """Run the reduction LADDER: lower reducers → finalize → workflow_facts/v1 → records.
 
     ``workflow_facts/v1`` is the first reducer that consumes FACTS, not evidence. The producer
     therefore runs the lower rungs (attempt/job over the run JSONs, policy over the spec configs,
-    spec_status over the index), finalizes each lower fact (so it carries a citable ``fact_id``),
-    then hands the FINALIZED lower facts to ``workflow_facts_v1`` — which folds their ``fact_id``s
-    into its own ``evidence_ids``. That is the backbone of the §4.5 staleness cascade.
+    spec_status over the index), registers the lower facts (so the citations ``workflow_facts/v1``
+    folds into its ``evidence_ids`` resolve against REGISTERED rows), then finalizes them with
+    their registered ids and hands them up — that is the backbone of the §4.5 staleness cascade.
     """
     runs = load_run_jsons()
     run_inp = ReducerInput(
@@ -271,18 +352,21 @@ def _derive_workflow_facts(repository_id: str, revision: str, now: str) -> list:
     )
     lower += spec_status_v1(spec_inp)
 
+    identity_out: dict[int, str] = {}
+    lower_records = fi.derive_fact_records(lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out)
     wf_inp = ReducerInput(
         scope_path=f"org:{repository_id}",
         scope_type="workflow",
         scope_id="",
         repository_id=repository_id,
         evidence=(),
-        facts=tuple(_finalize(lower)),
+        facts=tuple(_finalize_to_registered(lower, identity_out)),
         now=now,
         source_revision=revision,
     )
     wf_facts = workflow_facts_v1(wf_inp)
-    return fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    wf_records = fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    return lower_records + wf_records
 
 
 # ── Scoped, per-run derivation: the workflow-completion auto-emit hook ──
@@ -452,19 +536,21 @@ def derive_run_facts(
     policy = policy_facts_v1(policy_inp)
 
     lower = attempt + job + policy
+    identity_out: dict[int, str] = {}
+    lower_records = fi.derive_fact_records(lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out)
     wf_inp = ReducerInput(
         scope_path=workload_scope,
         scope_type="workflow",
         scope_id="",
         repository_id=repository_id,
         evidence=(),
-        facts=tuple(_finalize(lower)),
+        facts=tuple(_finalize_to_registered(lower, identity_out)),
         now=now,
         source_revision=revision,
     )
     wf_facts = workflow_facts_v1(wf_inp)
-
-    return fi.derive_fact_records(lower + wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    wf_records = fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    return lower_records + wf_records
 
 
 def derive_facts(
@@ -519,6 +605,386 @@ def derive_facts(
     return fi.derive_fact_records(facts, registry_path=REGISTRY_INDEX_PATH)
 
 
+# ── Additive corpus families: story cells + summary entries (CAP fact backfill, p3) ──
+#
+# The workflow-run reducers above are UNCHANGED. This section projects the two additional corpus
+# families — story result cells (``experiments/results/stories/*.json``) and the retired summary
+# corpus (``experiments/results/_results_summary.json``) — onto the run-artifact shape
+# ``attempt_facts/v1`` and ``job_facts/v1`` already consume, so facts derive through the EXISTING
+# reducer vocabulary with ZERO reducer diffs. The three evidence families mirror the
+# ``workflow_run`` pattern (content-addressed ``run_artifact_id`` per artifact, dedup, per-run
+# identity):
+#
+#   * ``story_session``   — one run per story SESSION (a single-phase run); consumed by
+#                           ``attempt_facts/v1`` → per-session attempt facts.
+#   * ``story_result``    — one run per story CELL (job-level aggregates + the session list);
+#                           consumed by ``job_facts/v1`` → per-cell job facts.
+#   * ``summary_attempt`` — one run per summary ENTRY (a single-phase run); consumed by
+#                           ``attempt_facts/v1`` → per-entry attempt facts.
+#
+# Absent fields stay absent (null-not-zero): a story session records no in/out token split, so
+# ``attempt_tokens_in/out`` are never emitted for it; a summary entry records no status/commit/
+# confidence, so ``phase_status``/``phase_commit``/``attempt_confidence`` are never emitted for
+# it. Nothing is fabricated, and the summary family is deliberately fed to ``attempt_facts/v1``
+# ONLY — ``job_facts/v1`` would force a ``job_status`` ("failed") for an entry that records no
+# ``ok``, which is exactly the fabrication null-not-zero forbids.
+
+#: Relative paths of the two additional families (monkeypatchable in hermetic tests via
+#: ``REPO_ROOT``, exactly like ``load_run_jsons``' workflows path).
+STORY_RESULTS_DIR_REL = "experiments/results/stories"
+SUMMARY_RESULTS_FILE_REL = "experiments/results/_results_summary.json"
+
+
+def load_story_cells() -> list[dict]:
+    """Load every story result cell JSON (``experiments/results/stories/*.json``).
+
+    Mirrors ``load_run_jsons``'s tolerance: unreadable/non-object files are skipped so one broken
+    cell cannot hide the rest. Each returned dict is the ``StoryResult.to_dict()`` shape
+    (story_name / model / perturbation_condition / summary / sessions[] / ...).
+    """
+    results_dir = REPO_ROOT / STORY_RESULTS_DIR_REL
+    cells: list[dict] = []
+    if not results_dir.is_dir():
+        return cells
+    for path in sorted(results_dir.glob("*.json")):
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict):
+            cells.append(payload)
+    return cells
+
+
+def load_summary_entries() -> list[dict]:
+    """Load the summary corpus (``experiments/results/_results_summary.json``'s ``entries``)."""
+    path = REPO_ROOT / SUMMARY_RESULTS_FILE_REL
+    if not path.is_file():
+        return []
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    entries = payload.get("entries") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        return []
+    return [e for e in entries if isinstance(e, dict)]
+
+
+def _story_cell_identity(cell: dict) -> tuple[str, str]:
+    """The workload + model identity of one story cell, as attempt/job facts must see it.
+
+    The workflow cell is ``wf_<spec_name>_<model>`` (``_common.cell_id``). Story cells are
+    (story x model x condition): folding the recorded condition into ``spec_name``
+    (``<story>_<condition>``) keeps distinct conditions in DISTINCT job cells — a clean and a
+    bad_seed run of the same story+model must not supersede one another's current-per-cell job
+    facts — while multiple seeds of the SAME cell share one job slot (job facts are
+    current-per-cell: the intended supersession semantics, exactly like repeated workflow runs).
+    A condition that is empty or the string ``"None"`` is absent, so the cell is named by the
+    story alone (the 9 condition-less legacy cells land in the story's unconditioned cell).
+    """
+    story = str(cell.get("story_name") or "")
+    condition = str(cell.get("perturbation_condition") or "")
+    spec_name = f"{story}_{condition}" if condition and condition != "None" else story
+    return spec_name, str(cell.get("model") or "")
+
+
+def _cell_ok(cell: dict) -> bool:
+    """The cell's own recorded success: no cell-level error AND every session exited 0.
+
+    ``summary.all_successful`` is NOT trusted alone — observed cells with a session timeout
+    (``error`` non-empty) carry ``all_successful=True``, so success is read from the raw session
+    exit codes + the cell error field, never from the summary's boolean.
+    """
+    if cell.get("error"):
+        return False
+    sessions = cell.get("sessions") or []
+    if not isinstance(sessions, list) or not sessions:
+        return False
+    return all(
+        (s.get("exit_code") == 0 and not s.get("error")) if isinstance(s, dict) else False
+        for s in sessions
+    )
+
+
+def _project_story_session(cell: dict, session: dict) -> dict:
+    """Project ONE story session onto the run-artifact shape ``attempt_facts/v1`` consumes.
+
+    The session is a single-phase run whose ``run_artifact_id`` hashes the session's own recorded
+    fields plus the cell identity — distinct per session (per-run identity), byte-stable across
+    re-derivation. Fields the session does not record (in/out token split, cache hit rate,
+    per-session test result) are simply absent.
+    """
+    spec_name, model = _story_cell_identity(cell)
+    number = session.get("session_number")
+    phase_name = f"session{number}" if number is not None else "session"
+    phase: dict[str, Any] = {"phase": phase_name, "kind": "agent"}
+    exit_code = session.get("exit_code")
+    phase["status"] = "ok" if exit_code == 0 and not session.get("error") else "failed"
+    commit = str(session.get("commit_hash") or "")
+    if commit:
+        phase["commit_hash"] = commit
+    if model:
+        phase["model"] = model
+    cost = session.get("cost_usd")
+    if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+        phase["cost_usd"] = cost
+    confidence = session.get("confidence")
+    if confidence is not None:
+        phase["confidence"] = confidence
+    return {
+        "spec_name": spec_name,
+        "spec_id": f"{spec_name}@story",
+        "model": model,
+        "git_sha": commit,
+        "started_at": str(cell.get("started_at") or ""),
+        "ended_at": str(cell.get("completed_at") or ""),
+        "total_cost_usd": (cell.get("summary") or {}).get("total_cost"),
+        "ok": _cell_ok(cell),
+        "phases": [phase],
+    }
+
+
+def _project_story_result(cell: dict) -> dict:
+    """Project ONE story cell onto the run-artifact shape ``job_facts/v1`` consumes.
+
+    Carries the cell's aggregates (total cost, ``ok``, current commit = the LAST session's commit)
+    plus the full session list (``job_n_phases`` = session count). Its ``run_artifact_id`` hashes
+    the whole cell, so two seeds of the same cell are distinct runs whose job facts supersede
+    oldest-first (current-per-cell), exactly like repeated workflow runs.
+    """
+    spec_name, model = _story_cell_identity(cell)
+    sessions = [s for s in (cell.get("sessions") or []) if isinstance(s, dict)]
+    current_commit = ""
+    for s in reversed(sessions):
+        commit = str(s.get("commit_hash") or "")
+        if commit:
+            current_commit = commit
+            break
+    return {
+        "spec_name": spec_name,
+        "spec_id": f"{spec_name}@story",
+        "model": model,
+        "git_sha": current_commit,
+        "started_at": str(cell.get("started_at") or ""),
+        "ended_at": str(cell.get("completed_at") or ""),
+        "total_cost_usd": (cell.get("summary") or {}).get("total_cost"),
+        "ok": _cell_ok(cell),
+        "phases": [
+            {
+                "phase": (
+                    f"session{s.get('session_number')}" if s.get("session_number") is not None
+                    else "session"
+                ),
+                "kind": "agent",
+                "status": "ok" if s.get("exit_code") == 0 and not s.get("error") else "failed",
+                "commit_hash": str(s.get("commit_hash") or ""),
+                "model": model,
+            }
+            for s in sessions
+        ],
+    }
+
+
+def _project_summary_attempt(entry: dict) -> dict:
+    """Project ONE summary entry onto the run-artifact shape ``attempt_facts/v1`` consumes.
+
+    Each summary entry IS one perturbation trial (one model run), so it maps to a single-attempt
+    run. ``attempt_model``/``attempt_cost_usd`` come from every entry; ``attempt_tokens_in/out``
+    only from the valid entries that record ``tokens_input``/``tokens_output`` (absent elsewhere).
+    ``phase_status``/``phase_commit``/``attempt_confidence`` are never emitted — the entry records
+    no status/commit/confidence, and a status must not be fabricated.
+    """
+    spec_name = str(entry.get("experiment") or entry.get("worktree_name") or "summary")
+    model = str(entry.get("model") or "")
+    phase: dict[str, Any] = {
+        "phase": str(entry.get("worktree_name") or entry.get("experiment") or "run"),
+        "kind": "agent",
+        "status": "",  # no recorded status — phase_status stays absent (null-not-zero)
+        "model": model,
+    }
+    commit = str(entry.get("commit_hash") or "")
+    if commit:
+        phase["commit_hash"] = commit
+    cost = entry.get("cost")
+    if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+        phase["cost_usd"] = cost
+    tokens: dict[str, int] = {}
+    tokens_in = entry.get("tokens_input")
+    if isinstance(tokens_in, (int, float)) and not isinstance(tokens_in, bool):
+        tokens["in"] = int(tokens_in)
+    tokens_out = entry.get("tokens_output")
+    if isinstance(tokens_out, (int, float)) and not isinstance(tokens_out, bool):
+        tokens["out"] = int(tokens_out)
+    if tokens:
+        phase["tokens"] = tokens
+    confidence = entry.get("confidence")
+    if confidence is not None:
+        phase["confidence"] = confidence
+    return {
+        "spec_name": spec_name,
+        "spec_id": f"{spec_name}@summary",
+        "model": model,
+        "git_sha": commit,
+        "started_at": "",
+        "ended_at": "",
+        "total_cost_usd": cost,
+        "phases": [phase],
+    }
+
+
+def _dedup_evidence(
+    projects: list[dict], source_type: str
+) -> tuple[EvidenceItem, ...]:
+    """Mirror ``_run_evidence``'s content-addressed dedup for one projected artifact family.
+
+    Two on-disk files carrying byte-identical content (a copied/duplicated artifact) collapse to
+    ONE evidence item — the same duplicate-evidence guard ``_run_evidence`` enforces, at the same
+    single place where raw evidence is resolved.
+    """
+    seen: set[str] = set()
+    items: list[EvidenceItem] = []
+    for payload in projects:
+        rid = run_artifact_id(payload)
+        if rid in seen:
+            continue
+        seen.add(rid)
+        items.append(
+            EvidenceItem(
+                source_type=source_type,
+                evidence_id=f"{source_type}:{rid}",
+                payload=payload,
+            )
+        )
+    return tuple(items)
+
+
+def _story_session_evidence(cells: list[dict]) -> tuple[EvidenceItem, ...]:
+    """One ``story_session`` evidence item per distinct story SESSION (single-phase run)."""
+    return _dedup_evidence(
+        [
+            _project_story_session(c, s)
+            for c in cells
+            for s in (c.get("sessions") or [])
+            if isinstance(s, dict)
+        ],
+        "story_session",
+    )
+
+
+def _story_result_evidence(cells: list[dict]) -> tuple[EvidenceItem, ...]:
+    """One ``story_result`` evidence item per distinct story CELL (job-level run)."""
+    return _dedup_evidence([_project_story_result(c) for c in cells], "story_result")
+
+
+def _summary_attempt_evidence(entries: list[dict]) -> tuple[EvidenceItem, ...]:
+    """One ``summary_attempt`` evidence item per distinct summary ENTRY (single-phase run)."""
+    return _dedup_evidence([_project_summary_attempt(e) for e in entries], "summary_attempt")
+
+
+def _family_input(
+    repository_id: str,
+    revision: str,
+    now: str,
+    evidence: tuple[EvidenceItem, ...],
+) -> ReducerInput:
+    """Build the workload-scoped ``ReducerInput`` the reducers expect for one evidence family."""
+    return ReducerInput(
+        scope_path=f"org:{repository_id}",
+        scope_type="workload",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=evidence,
+        facts=(),
+        now=now,
+        source_revision=revision,
+    )
+
+
+def _story_facts(repository_id: str, revision: str, now: str) -> list:
+    """The raw story facts (attempt over ``story_session`` + job over ``story_result``)."""
+    cells = load_story_cells()
+    session_facts = attempt_facts_v1(
+        _family_input(repository_id, revision, now, _story_session_evidence(cells))
+    )
+    result_facts = job_facts_v1(
+        _family_input(repository_id, revision, now, _story_result_evidence(cells))
+    )
+    return session_facts + result_facts
+
+
+def _summary_facts(repository_id: str, revision: str, now: str) -> list:
+    """The raw summary facts (attempt over ``summary_attempt`` only)."""
+    entries = load_summary_entries()
+    return attempt_facts_v1(
+        _family_input(repository_id, revision, now, _summary_attempt_evidence(entries))
+    )
+
+
+def derive_story_facts(repository_id: str, revision: str, now: str) -> list:
+    """Derive the story corpus's fact records: per-session attempts + per-cell jobs."""
+    return fi.derive_fact_records(_story_facts(repository_id, revision, now),
+                                  registry_path=REGISTRY_INDEX_PATH)
+
+
+def derive_summary_facts(repository_id: str, revision: str, now: str) -> list:
+    """Derive the summary corpus's fact records: per-entry attempts."""
+    return fi.derive_fact_records(_summary_facts(repository_id, revision, now),
+                                  registry_path=REGISTRY_INDEX_PATH)
+
+
+def derive_corpus_facts(repository_id: str, revision: str, now: str) -> list:
+    """Derive fact records for the ENTIRE corpus in ONE batch (the backfill's derivation).
+
+    Runs the full workflow reduction LADDER over the run ledgers (attempt + job + policy +
+    spec_status lower rungs finalized, then ``workflow_facts/v1``), PLUS the story and summary
+    families — all through one ``derive_fact_records`` call so in-batch chaining (per-entity
+    pending-head threading, oldest-first) is cross-family. Every reducer here is the unchanged
+    registered one; this function only assembles evidence + glue (hard rule 5: zero reducer diffs).
+    """
+    runs = load_run_jsons()
+    lower = attempt_facts_v1(_family_input(repository_id, revision, now, _run_evidence(runs)))
+    lower += job_facts_v1(_family_input(repository_id, revision, now, _run_evidence(runs)))
+    policy_inp = _family_input(
+        repository_id,
+        revision,
+        now,
+        tuple(
+            EvidenceItem(source_type="spec", evidence_id=f"spec:{c.get('name') or '?'}", payload=c)
+            for c in load_spec_configs()
+        ),
+    )
+    lower += policy_facts_v1(policy_inp)
+    spec_inp = _family_input(
+        repository_id,
+        revision,
+        now,
+        tuple(
+            EvidenceItem(source_type="spec", evidence_id=f"spec:{e.name}", payload=e)
+            for e in si.load_index_entries(root=REPO_ROOT)
+        ),
+    )
+    lower += spec_status_v1(spec_inp)
+    identity_out: dict[int, str] = {}
+    lower_records = fi.derive_fact_records(lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out)
+    wf_inp = ReducerInput(
+        scope_path=f"org:{repository_id}",
+        scope_type="workflow",
+        scope_id="",
+        repository_id=repository_id,
+        evidence=(),
+        facts=tuple(_finalize_to_registered(lower, identity_out)),
+        now=now,
+        source_revision=revision,
+    )
+    wf_facts = workflow_facts_v1(wf_inp)
+    wf_records = fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
+    all_facts = lower_records + wf_records + derive_story_facts(
+        repository_id, revision, now
+    ) + derive_summary_facts(repository_id, revision, now)
+    return all_facts
+
+
 # ── Emission (identical logic to kb_produce_sources.py) ─────────
 
 
@@ -548,12 +1014,58 @@ def build_event(record):
     return fi.fact_event(record)
 
 
+def _materialize_registry_row(record) -> None:
+    """F2 fix (CAP fact backfill): append the record's registry line(s) at EMIT time.
+
+    The ``kb-registry-v1`` consumer is the canonical registry writer, but it only runs when a
+    worker is up — artifacts were being written without registry rows (the F2 materialization
+    stall: artifacts outnumbering registry rows). Materializing the row in the emit path removes
+    the dependency on a live consumer for THIS producer's emission: every emitted artifact is
+    registry-visible immediately, so the backfill's own artifact count == its registry row count.
+    The line shape mirrors ``kb_worker.py``'s ``kb-registry-v1`` handler field-for-field
+    (append-only, operation-derived ``lifecycle_state``, the ``supersede`` predecessor line);
+    a later consumer pass appends byte-identical duplicate lines, which
+    ``generate_manifest.py``'s compaction folds away (latest-per-entity).
+    """
+    operation = fi.fact_operation(record)
+    reason = fi.fact_reason(record)
+    lifecycle = "current" if operation in ("upsert", "supersede") else "tombstoned"
+    line = {
+        "knowledge_id": record.knowledge_id,
+        "entity_id": record.entity_id,
+        "source_type": record.source_type,
+        "logical_locator": record.logical_locator,
+        "source_uri": record.source_uri,
+        "lifecycle_state": lifecycle,
+        "observed_at": record.observed_at,
+        "indexed_at": record.indexed_at,
+        "supersedes": record.supersedes,
+        "causes": record.causes,
+        "reason": reason,
+    }
+    REGISTRY_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(REGISTRY_INDEX_PATH, "a") as f:
+        f.write(json.dumps(line) + "\n")
+    if operation == "supersede" and record.supersedes:
+        predecessor_line = {
+            "knowledge_id": record.supersedes,
+            "entity_id": record.entity_id,
+            "lifecycle_state": "superseded",
+            "valid_to": record.valid_from,
+            "indexed_at": record.indexed_at,
+        }
+        with open(REGISTRY_INDEX_PATH, "a") as f:
+            f.write(json.dumps(predecessor_line) + "\n")
+
+
 def emit_records(r, records: list) -> tuple[int, int]:
     """Write each durable artifact then publish its pointer event; skip already-checkpointed ids.
 
     Returns ``(emitted, skipped)``. Ordering mirrors ``kb_produce_sources.emit_records``: the
     artifact is written before the event lands (so the consumer can always read + verify the
-    bytes the event hashes), then checkpointed.
+    bytes the event hashes), then checkpointed. The F2 registry-row materialization
+    (``_materialize_registry_row``) runs after the checkpoint so a re-run skips both the event
+    and the row.
     """
     emitted = 0
     skipped = 0
@@ -568,6 +1080,7 @@ def emit_records(r, records: list) -> tuple[int, int]:
         (KB_ARTIFACT_DIR / f"{record.knowledge_id}.json").write_bytes(artifact)
         ks.publish_event(r, build_event(record), source_type=record.source_type)
         r.hset(ks.CHECKPOINT_KEY, record.knowledge_id, record.indexed_at)
+        _materialize_registry_row(record)
         emitted += 1
     return emitted, skipped
 
@@ -581,6 +1094,17 @@ def main(argv: list[str] | None = None) -> None:
         default="spec_status/v1",
         choices=tuple(REDUCERS),
         help="reducer version to run (default: spec_status/v1)",
+    )
+    parser.add_argument(
+        "--corpus",
+        choices=("story", "summary", "all"),
+        default=None,
+        help=(
+            "derive facts for the additive corpus families instead of --reducer: 'story' "
+            "(per-session attempt + per-cell job facts from stories/*.json), 'summary' "
+            "(per-entry attempt facts from _results_summary.json), or 'all' (the entire "
+            "corpus: workflow ladder + story + summary in one batch)"
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -608,10 +1132,19 @@ def main(argv: list[str] | None = None) -> None:
     revision = args.revision or git_head_sha()
     now = _now_iso()
 
-    # 1. Derive fact records (run the reducer, then the registry-driven supersede decision).
-    records = derive_facts(args.reducer, args.repository_id, revision, now)
+    # 1. Derive fact records (run the reducer / corpus family, then the registry-driven
+    #    supersede decision).
+    if args.corpus == "story":
+        records = derive_story_facts(args.repository_id, revision, now)
+    elif args.corpus == "summary":
+        records = derive_summary_facts(args.repository_id, revision, now)
+    elif args.corpus == "all":
+        records = derive_corpus_facts(args.repository_id, revision, now)
+    else:
+        records = derive_facts(args.reducer, args.repository_id, revision, now)
+    source_label = args.corpus or args.reducer
     log(
-        f"{args.reducer}: derived {len(records)} fact record(s) "
+        f"{source_label}: derived {len(records)} fact record(s) "
         f"(revision={revision[:12]}, repository-id={args.repository_id!r})"
     )
 
