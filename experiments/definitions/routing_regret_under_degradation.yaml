@@ -30,8 +30,19 @@ rules:
   - {name: model_cascade, plane: control, evidence_class: "[H]",
      requires: [confidence],
      produces: [escalation_decision]}
+  # budget_ceiling: CAP I5 migration (cap_gate_migration) adds requires_facts for `budget` --
+  # the one legacy requirement in this corpus with an HONEST FACT_PREDICATES mapping.
+  # policy_facts/v1 reads this very spec's own `stop.budget_usd` (declared, workload-scoped,
+  # [P]) regardless of workflow.kind, so max_spend_usd is genuinely producible for this spec's
+  # own workload. `forecast_cost` and `actual_cost` have NO honest mapping (see
+  # docs/designs/current/cap_gate_migration.md) -- both would-be predicates
+  # (job_accumulated_cost_usd / a forecast analogue) are producible only from `workflow_run`
+  # artifacts (agent_task phases), and this spec's cells write to the story ledger instead;
+  # left as legacy `requires` only, recorded BLOCKED.
   - {name: budget_ceiling, plane: control, evidence_class: "[P]",
      requires: [budget, forecast_cost, actual_cost],
+     requires_facts: [{fact: max_spend_usd, scope: parent, min_authority: POLICY,
+                        on_missing: halt, on_conflict: halt}],
      produces: [admit_or_halt]}
 metrics:
   - {name: cost_per_accepted_outcome, agg: mean, over: outcome}
