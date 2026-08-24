@@ -1,13 +1,15 @@
 ---
-status: draft
+status: accepted
 ---
 # CAP Visibility Matrix — who knows what, who can retrieve what
 
-**Status: draft.** Companion to `context_abstraction_design.md` (the two-channel rule, §6.1
-contract-bounded snapshots, §8.6 actuation rail) and the addendum design (I9 patterns, I10
-checkpoint). Every cell in the matrix must trace to an ENFORCEMENT MECHANISM, not a convention —
-this document's test of completeness is: *for each "may not" cell, name the machinery that
-refuses it.*
+**Status: accepted** — the matrix structure, enforcement trace, and cross-repo isolation rows
+are settled. The open decisions (D1–D4, §5) are review items for the addendum d4 review, not
+design uncertainty; the matrix is complete without them. Companion to
+`context_abstraction_design.md` (the two-channel rule, §6.1 contract-bounded snapshots, §8.6
+actuation rail) and the addendum design (I9 patterns, I10 checkpoint). Every cell in the matrix
+must trace to an ENFORCEMENT MECHANISM, not a convention — this document's test of completeness
+is: *for each "may not" cell, name the machinery that refuses it.*
 
 ## 1. Actors and information surfaces
 
