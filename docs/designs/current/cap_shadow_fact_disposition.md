@@ -94,7 +94,7 @@ One tiny workflow sub-run, exactly as required: the smallest spec in the index (
 | Evidence | Count | Detail |
 |---|---|---|
 | KB artifact files | **27 / 27** on disk | `experiments/results/kb/<knowledge_id>.json`, content-addressed (sha256 filename), readable, `repository_id=self-wf_cap_shadow_fact_disposition_deepseek_deepseek_v4_flash` |
-| Registry rows | **27** | `experiments/results/registry_index.jsonl`, `source_type=fact`, `lifecycle_state=current`, unique `knowledge_id`s, per-run identity `wf_code_review_deepseek_deepseek_v4_flash` |
+| Registry rows | **27** | `experiments/results/registry_index.jsonl`, `source_type=fact`, `lifecycle_state=current`, unique `knowledge_id`s (all 27 distinct `entity_id`s, none superseded). Job/workflow/policy facts carry run identity `wf_code_review_deepseek_deepseek_v4_flash`; attempt facts are per-phase — 8 rows for `code_review` phase, 8 for `architecture_review` phase (the run has 2 phases) |
 | Fact predicates | 19 | attempt (cache_hit_rate, confidence, cost_usd, model, tokens_in/out) · job (accumulated_cost_usd, n_phases, status) · policy (max_attempts, max_spend_usd) · workflow (health, phases_completed/remaining, status, projected_budget_overrun, current_commit, phase_commit, phase_status) |
 
 Flow: `_emit_workflow_facts` → `kb_produce_facts.derive_run_facts` (attempt/job/policy/workflow
@@ -131,14 +131,15 @@ their checkpoint entries, and their artifact files were removed, restoring the s
 real run's exact state (666 events, 589 checkpoints, 27 run artifacts + 1 spec record). The
 registry only ever received the real run's 27 fact rows + 1 spec record.
 
-## 4. Adversarial review (p4) — 3 findings, 0 release-blocking
+## 4. Adversarial review (p4) — 4 findings, 0 release-blocking
 
 | # | Attack vector | Result |
 |---|---|---|
 | 4-1 | Merge: in-flight branch touched? content dropped? | **Clean.** No in-flight branch in any merge parent or first-parent history. Union check: no file from either branch dropped. The only conflict-shaped issue (missing doc front matter) was an additive guard fix. |
-| 4-2 | Marker: any path producing a shadow record WITHOUT the marker? report scripts break? round-trip survives? | **Clean.** Both `record_shadow_decision` call sites flow through the single stamped choke point; `load_shadow_decisions`/`decision_calibration`/the 3 report scripts read correctly; the regression test reads the artifact back off disk (round-trip proven). One accepted limitation: 11 pre-existing on-disk shadow artifacts predate the marker (reader-safe default). |
-| 4-3 | Fact-flow: did facts reach the *registry* (not just artifact dir)? idempotency re-derived? | **Clean.** 27 registry rows (content-addressed, `lifecycle_state=current`), 27/27 artifacts, idempotency re-derived to 0 records on re-derive. |
+| 4-2 | Marker: any path producing a shadow record WITHOUT the marker? report scripts break? round-trip survives? | **Clean.** Both `record_shadow_decision` call sites flow through the single stamped choke point (the only production `derive_actuation_record` caller is `record_shadow_decision` itself, `rules.py:265` — confirmed by the data-flow guard); `load_shadow_decisions`/`decision_calibration`/the 3 report scripts read correctly; the regression test reads the artifact back off disk (round-trip proven). One accepted limitation: 11 pre-existing on-disk shadow artifacts predate the marker (reader-safe default). |
+| 4-3 | Fact-flow: did facts reach the *registry* (not just artifact dir)? idempotency re-derived? | **Clean.** 27 registry rows (content-addressed, `lifecycle_state=current`, all distinct `entity_id`s, none superseded), 27/27 artifacts, idempotency re-derived to 0 records on re-derive. |
 | 4-4 | Docs: is `FINOPS_KB_WRITE=1` stated as a hard ops requirement? | **Fixed in this document** (§3): yes, with the verified nuance that the hook self-arms while the raw transport refuses. |
+| 4-5 | Docs precision: are the run's fact rows characterized correctly? | **Fixed in re-review** (§3, registry row): the 27 rows span TWO phases — 8 attempt facts per phase (`code_review`, `architecture_review`). The original "per-run identity `wf_code_review_deepseek_deepseek_v4_flash`" phrasing was accurate only for the job/workflow-level rows; tightened to name the per-phase attempt identity explicitly. |
 
 ## 5. Release verdict — PASS, merge-ready
 
