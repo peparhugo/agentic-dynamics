@@ -161,7 +161,108 @@ untestable-by-construction — never as a confirmed non-improvement.
 
 ---
 
-## 2. E3 — coverage-impact re-run (e2_coverage_impact) — *pending*
+## 2. E3 — coverage-impact re-run (e2_coverage_impact)
 
-*E3 (`recommend_route` with coverage-corrected stats vs legacy zero-default projection) lands in
-this section in the next workflow phase.*
+### 2.1 Question
+
+Does `control.routing`'s current coverage-corrected `recommend_route`/`compute_routing`
+(excludes uncaptured cost/correctness, never zero-defaults) recommend a DIFFERENT model than the
+legacy zero-default formula (`lab_task_routing.py`'s own, quarantined — coerces a missing
+cost/correctness to 0 and averages over all n), when BOTH are applied to the SAME corpus —
+`canonical_corpus.resolve_findings()` (the 64 current `finding` rows, the live registry-governed
+replacement for the retired `_results_summary.json`)? Now that the store is backfilled, does the
+finding-economics fix move real decisions?
+
+**Null hypothesis: zero changes.** A null here is a result, not a failure.
+
+### 2.2 Method
+
+- **Corpus:** `resolve_findings()` — 64 current finding rows, 2 eligible tasks after
+  `min_models=2` (`task_manager`: 7 models / 49 entries; `process_perturbation_resample`:
+  3 models / 15 entries). The spec's finding 1 checked `resolve_stories` is the WRONG population
+  and `resolve_findings` is the correct one — both verified here by the resolver's own contract.
+- **Coverage-corrected arm:** `control.routing.compute_routing` called as-is (no re-derivation).
+- **Legacy arm:** `lab_task_routing.py`'s aggregation formula re-derived
+  (`avg = sum(e.get("x", 0))/n` over ALL n — the historical zero-default defect), applied to the
+  SAME entries with the same eligibility filter and the same decision surface — isolating the
+  aggregation-method variable from the corpus-source variable.
+- **Evaluation:** per-task recommendation diff (default_model + routing) + direction analysis.
+
+### 2.3 Entry coverage pre-check (FIRST)
+
+| Signal | n_available / n_total | Coverage |
+|---|---|---|
+| `cost_usd` (raw key presence) | 64 / 64 | 100% |
+| `correctness` | 64 / 64 | 100% |
+| **cost, operational** (`cost_captured`: positive finite only; `0.0` = no billable work — what `recommend_route` actually consumes) | **53 / 64** | **82.8%** |
+
+The operational row is the honest mechanism check (see 2.5): 11 entries carry `cost_usd == 0.0`
+(concentrated in `anthropic/claude-haiku-4-5` 1/7 and `anthropic/claude-sonnet-5` 2/7 within
+`task_manager`). The spec's finding 2 ("coverage is 100% … the formulas are MATHEMATICALLY FORCED
+TO AGREE") measured raw key presence; the operational view shows the divergence surface is NOT
+empty.
+
+### 2.4 Change-rate table (DELIVERABLE)
+
+| Task | Coverage-corrected recommendation | Legacy zero-default recommendation | Changed? |
+|---|---|---|---|
+| `task_manager` | default `deepseek-v4-flash`, escalate to `claude-haiku-4-5` | default `deepseek-v4-flash`, escalate to `claude-haiku-4-5` | **no** |
+| `process_perturbation_resample` | default `deepseek/deepseek-v4-pro` | default `deepseek/deepseek-v4-pro` | **no** |
+
+| Metric | Value |
+|---|---|
+| changed_recommendation_count | **0** |
+| changed_recommendation_rate | 0.0% (0/2 tasks) |
+| changed_by_model | {} (no model appears in a changed recommendation) |
+| moved_to_lower_cost_count | 0 (n/a — no changes to move) |
+
+### 2.5 The honest mechanism finding (deviates from the spec's prediction)
+
+The spec's finding 2 predicted the null would hold because coverage is 100% — "the two formulas
+are mathematically forced to agree." **That mechanism is wrong; the null still holds for a
+different, more informative reason.** Measured live:
+
+| task | model | corrected avg_cost (captured-only) | legacy avg_cost (zero-default) | n_cost_operational / n |
+|---|---|---|---|---|
+| `task_manager` | `anthropic/claude-haiku-4-5` | **$0.3097** | **$0.0442** (7× underpriced) | 1 / 7 |
+| `task_manager` | `anthropic/claude-sonnet-5` | **$0.6480** | **$0.1851** (3.5× underpriced) | 2 / 7 |
+
+The per-model stats DID diverge — exactly the divergence the coverage correction was built to
+close (a partially-priced model looks artificially cheap under zero-defaulting). **But zero
+recommendations changed**, because the diverging models sit off the decision boundary:
+
+- `task_manager`'s default is anchored by `deepseek-v4-flash` — fully cost-captured (7/7), so its
+  avg_cost is IDENTICAL under both formulas — and it remains the cheapest qualified model either
+  way. The escalate target is `claude-haiku-4-5` by BEST CORRECTNESS (1.0), which is unchanged by
+  the cost correction (correctness is 100% covered).
+- `process_perturbation_resample`'s models are all fully cost-captured (0 divergence), so both
+  formulas agree trivially.
+
+### 2.6 Null interpretation
+
+**Zero changes is information, not failure.** The finding-economics fix does NOT move a real
+decision on the currently-populated store — the recommendation surface is robust to the
+cost-coverage correction on this corpus. But the fix is demonstrably NOT inert: it changes the
+measured per-model economics of two partially-covered models (haiku-4-5's true cost is 7× its
+zero-defaulted figure). It gains decision teeth the moment a partially-covered model competes for
+the default or escalate slot — and the leading indicator for when that happens is
+`entry_coverage_precheck.operational.cost_coverage_ratio`, currently **82.8%** (not 100%). The
+spec's raw-key-presence pre-check (100%) would MISS that trigger; the operational view does not.
+
+### 2.7 E2 LOG (coverage-impact phase)
+
+| Check | Result |
+|---|---|
+| Coverage pre-check reported FIRST (raw + operational) | **PASS** — cost 64/64 raw (100%), operational cost 53/64 (82.8%), correctness 64/64 |
+| Coverage-corrected recommendations computed | **PASS** — `compute_routing` as-is, 2 eligible tasks |
+| Legacy zero-default recommendations computed (same corpus) | **PASS** — re-derived formula, same 2 tasks |
+| Change-rate table | **PASS** — 0/2 tasks changed (0.0%), no per-model changes |
+| Mechanism honesty | **PASS** — per-model stat divergence recorded (haiku-4-5 7×, sonnet-5 3.5×) even though no decision flipped; spec's "forced to agree" mechanism corrected |
+| Null-not-zero / null-is-result | **PASS** — 0 changes recorded as information, not failure |
+| Machine artifact | **PASS** — `experiments/results/cap_coverage_routing_impact.json` |
+| Script committed + CLI-reachable | **PASS** — `scripts/cap_coverage_routing_impact.py`, `agentic-dynamics analyze coverage-routing-impact` |
+| **Overall E3** | **PASS** — null confirmed; mechanism finding recorded (divergence without decision change) |
+
+---
+
+## 3. Writeup (e3_writeup) — *pending*
