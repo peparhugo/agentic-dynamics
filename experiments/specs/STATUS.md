@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-24T00:51:00.540105+00:00`  ·  102 spec(s)
+Generated at: `2026-08-24T01:13:36.953108+00:00`  ·  102 spec(s)
 **Work remaining:** 27 open · 75 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
@@ -51,7 +51,7 @@ Generated at: `2026-08-24T00:51:00.540105+00:00`  ·  102 spec(s)
 | `cap_shadow_campaign` | workflow | no | completed | 0.1 | — | 2026-08-24 00:07 | ok | anthropic/claude-sonnet-5 | $6.7989 | 1 |
 | `cap_shadow_fact_disposition` | workflow | no | completed | 0.1 | — | 2026-08-24 00:44 | ok | deepseek/deepseek-v4-flash | $0.2045 | 1 |
 | `claude_tools_to_skills` | workflow | no | completed | 0.1 | — | 2026-08-14 22:29 | ok | anthropic/claude-fable-5 | $8.3582 | 1 |
-| `code_review` | workflow | no | completed | 0.1 | — | 2026-08-14 05:38 | ok | anthropic/claude-fable-5 | $2.4257 | 1 |
+| `code_review` | workflow | no | completed | 0.1 | — | 2026-08-24 01:13 | ok | deepseek/deepseek-v4-flash | $0.0620 | 2 |
 | `consolidation_release` | workflow | no | completed | 0.1 | — | 2026-08-20 13:10 | ok | deepseek/deepseek-v4-pro | $0.1756 | 1 |
 | `consolidation_release_execute` | workflow | no | completed | 0.1 | — | 2026-08-20 17:28 | ok | deepseek/deepseek-v4-pro | $4.7695 | 1 |
 | `consolidation_stage_0_architecture_spine` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |

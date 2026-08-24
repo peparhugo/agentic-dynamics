@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-24T00:51:00.540105+00:00",
+  "generated_at": "2026-08-24T01:13:36.953108+00:00",
   "n_specs": 102,
   "specs": [
     {
@@ -787,13 +787,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-14T05:38:58.948688+00:00",
+      "last_run_at": "2026-08-24T01:13:36.901193+00:00",
       "latest_ok": true,
-      "latest_model": "anthropic/claude-fable-5",
-      "latest_cost_usd": 2.425703,
-      "latest_git_sha": "120a48ff4",
-      "results_pointer": "experiments/results/workflows/code_review/20260814T053858Z.json",
-      "n_runs": 1
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.062033,
+      "latest_git_sha": "eb93ad85f",
+      "results_pointer": "experiments/results/workflows/code_review/20260824T011336Z.json",
+      "n_runs": 2
     },
     {
       "name": "consolidation_release",
