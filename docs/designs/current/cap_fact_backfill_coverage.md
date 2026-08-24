@@ -517,3 +517,54 @@ re-emission under the current producer (fixes class 1) and run-ledger reconcilia
 **PASS** — 7/7 checks evidenced; idempotency run twice with byte-identical registry; per-run
 identity, uniqueness, F1/F2 re-checks all confirmed from raw artifacts; CAP suites + guards green.
 In-flight worktrees untouched.
+
+## 8. Adversarial review (p6) — finding table + release verdict
+
+Independent adversarial pass over every phase's claims. Each attack vector re-run from raw evidence
+(not trusted from the phase logs).
+
+| # | Attack vector | Attack performed | Result | Finding / disposition |
+|---|---|---|---|---|
+| 1 | **Prereq gate** — any Stage 0 check asserted rather than evidenced? | Re-ran every 0.x check: `merge-base` on both dispositions vs main (REACHABLE); `applied` marker (22 hits in `rules.py`); 3 marker-asserting tests (pass); disposition doc present; `FINOPS_KB_WRITE=1`; `requires_facts:` in 6 files; `validate_spec_fact_contracts` 0 errors on 3 specs; 4 routing YAMLs exist; `profiles.py` exists; `FACT_PREDICATES["pattern"]` key confirmed (`produced_by=("pattern/v1",)`); `session_routing.yaml` exists | **Clean** | — |
+| 2 | **Coverage doc** — PRODUCED with n_available==0? evaluability overclaim? | Re-counted every PRODUCED predicate's observations from artifact payloads — **all 15 have n_available>0** (attempt_model 1724 … spec_status 103). E1 own-run `phase_test_verified` 0/3 confirmed (3 agent-kind phases, `test_executed_success` None). E2 `attempt_confidence` 355/455 (78%) confirmed. E4 in-ledger 9/9 `perturbation_strength` + 9/9 `test_executed_success` confirmed from the 9 attempt rows | **Clean** | — |
+| 3 | **Derivation** — reducer diff? fabricated field? entity-id collision? | `git diff 304e66167 --stat -- reducers/` **EMPTY** (zero reducer changes since p3). `_project_story_session` never writes `tokens["in"]/["out"]` (flat sessions stay absent). `_project_summary_attempt` writes them ONLY when `tokens_input`/`tokens_output` present in the entry (49/144 entries carry them — real fields, not fabricated). Story/summary vs workflow entity-id collision scan: **0 cross-family collisions**. The 15 same-URI "duplicates" are the SAME run emitted under `self-wt_*` scope + `agentic-dynamics` scope (different entity_ids by design — `repository_id` is part of entity identity). The 191 multi-artifact entities are job-fact **supersede chains**; canonical compaction (`_compact_registry_index`) resolves each to exactly **one current head** | **Clean** | — |
+| 4 | **Backfill** — idempotency re-derived independently; dupes re-counted | Re-counted registry fact rows: **10861 rows / 10861 unique / 0 duplicates** (recounted independently of p5). Re-derived `derive_summary_facts` at a DIFFERENT HEAD (`8e787096f`) → **0 records**; `derive_story_facts` → **0 records** (both converge against the populated registry — idempotent, independently confirmed) | **Clean** | — |
+| 5 | **Verification** — per-run identity proven, not asserted | Independently recomputed `evidence_narrative` 2-run pair: `run_artifact_id` distinct (`d97e284c` vs `9eac3d91`); `attempt_model`/`phase_status` entity_id sets per run **disjoint with zero overlap** (run0=1, run1=3 per predicate) | **Clean** | — |
+| 6 | **In-flight worktrees** | `git worktree list` — all in-flight worktrees present (`feature/context-abstraction-implement`, `feature/cap-addendum*`, etc.); this branch (`feature/cap-fact-backfill`) clean working tree; no diff touches any in-flight branch | **Clean** | — |
+
+### 8.1 Accepted limitations (recorded, not blocking)
+
+1. **Check-3 dangling citations (p5 §7.1):** 50 of 10834 agentic-dynamics current heads cite an
+   evidence id that does not resolve in the current corpus — 30 workflow-scope facts cite 8
+   knowledge_id-shaped ids minted before the `_finalize_to_registered` fix (the 21:33 emission),
+   and 20 attempt/job facts cite 4 `workflow_run:`-shaped ids whose run ledgers were replaced
+   after that emission. **Verified: current code re-derives these cells clean** (website_repoint
+   re-derived → 29 evidence_ids, 0 dangling), so a re-emission under the current producer
+   resolves class 1; class 2 needs run-ledger reconciliation. Sampled provenance passes (396/398,
+   99.5%). **Not release-blocking** — confined to 0.46% of heads, current code is correct, and
+   the fix is a mechanical re-emit.
+2. **p4/p5 emission settled at the new HEAD:** the p5 re-run emitted 22 workflow facts not
+   previously checkpointed (re-derived at the new HEAD). Idempotency thereafter is byte-identical
+   (registry sha256 stable across subsequent passes). This is versioned re-derivation, not a
+   defect.
+3. **Gitignored workflow ledgers (§0):** `experiments/results/workflows/` is gitignored; the 125
+   ledgers exist only in the working tree. A fresh checkout has zero run ledgers — the coverage
+   and backfill numbers are not reproducible from `git clone` alone.
+
+### 8.2 Release verdict — MERGE-READY to main
+
+**PASS.** All six attack dimensions clean with zero release-blocking findings. The backfill is
+**merge-ready to main**: 10834 artifacts == 10834 registry rows, 0 duplicate knowledge_ids,
+per-run identity proven, F1 (10 failed-before-call runs never emit zero-cost facts) and F2 (no
+materialization stall) fixes verified, CAP suites + guards green (249 + 14), reducer diff EMPTY,
+in-flight worktrees untouched.
+
+**What the operator must do next:**
+1. **Review the coverage doc** (`docs/designs/current/cap_fact_backfill_coverage.md`) — §3-§4
+   coverage/evaluability, §6 run record, §7 verification, §8 this review.
+2. **Set `FINOPS_KB_WRITE=1`** in the deployment environment if not already (it is set in this
+   worktree; the raw transport refuses without it).
+3. **Optional (recommended): re-emit the 50 dangling-head cells** under the current producer to
+   close the check-3 caveat (mechanical; current code derives clean).
+4. **Then Stage 2 pattern minting may begin** — `FACT_PREDICATES["pattern"]` (`pattern/v1`) is
+   registered and the fact plane is populated to back it.
