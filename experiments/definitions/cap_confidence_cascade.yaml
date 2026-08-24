@@ -1,0 +1,363 @@
+# cap_confidence_cascade — retrospective simulation of a confidence-gated model_cascade control
+# arm (route to a stronger model when attempt_confidence < theta) against the single-model
+# baseline already in the corpus (experiments/results/workflows/**/*.json). `model_cascade` is
+# named (not yet implemented) throughout the codebase as a forward control arm gated on
+# `confidence` (experiment_spec.py's header comment, runtime/routing.py:35, adapters/opencode.py:124,
+# measurement/signal_registry.py:35) — this spec is the FIRST attempt to give it a measured shape,
+# per the load-bearing rule (measure before policy).
+#
+# NULL HYPOTHESIS (stated explicitly, per the prompt): no threshold improves cost-per-verified-
+# outcome over baseline. Read finding (2) below before trusting any `regret` number this spec
+# produces — the null, as stated, turns out NOT to be testable from this retrospective corpus by
+# construction, which is itself the headline finding, not a defect in the spec.
+#
+# "VERIFIED SUCCESS" NAMING (per the prompt's fixed requires_facts list — attempt_confidence,
+# attempt_cost_usd, attempt_model, phase_status, job_status — which deliberately does NOT include
+# phase_test_verified): in THIS spec, "verified success" means `phase_status == "ok"` (a
+# completion signal, MEASURED, produced_by attempt_facts/v1) — NOT independently-tested
+# correctness (`phase_test_verified`, the test_runner-verified signal used by
+# cap_session_routing_evidence.yaml). Checked before writing this comment (never assumed):
+# `phase_test_verified` is captured on 0 of 420 agent phases in the current corpus — the fixed
+# requires_facts list sidesteps that black hole by design, and this spec names the substitution
+# explicitly rather than letting "verified" quietly mean two different things across the two
+# specs.
+#
+# ── ADVERSARIAL REVIEW (methodologist pass) — findings & dispositions ─────────────────
+# (1) Coverage — CHECKED AGAINST THE REAL CORPUS, not assumed (the session-routing n=0 lesson).
+#     116 workflow-run JSONs / 420 agent-kind phases exist under experiments/results/workflows/.
+#     Measured coverage, per required fact:
+#       attempt_confidence : 327/420 = 77.9%  -- NOT near-zero. The confidence_coverage_precheck
+#                                                 rule below is FIRST in the rule list (as the
+#                                                 prompt requires) and reports this ratio; had it
+#                                                 come back near-zero, findings (2)-(4) would be
+#                                                 downgraded from "untestable by construction" to
+#                                                 the simpler "untestable for lack of data" and the
+#                                                 whole experiment recorded INCONCLUSIVE at the top,
+#                                                 never a confirmed null. It did not, so this spec
+#                                                 proceeds — but see (2), a DIFFERENT reason the
+#                                                 null still isn't testable today.
+#       attempt_cost_usd   : 420/420 = 100%
+#       attempt_model      : 420/420 = 100%
+#       phase_status       : 420/420 = 100%
+#       job_status         : 116/116 = 100% (run-level `ok` field, job_facts/v1's source)
+#     baseline_cost_per_verified_outcome is therefore FULLY measured (n=420, no captured-only
+#     exclusion needed) — the baseline side of this comparison is sound.
+# (2) THE HEADLINE FINDING — the null is structurally untestable from this corpus, not merely
+#     under-covered. No attempt in the recorded corpus was ever ACTUALLY escalated by a
+#     confidence-triggered policy (`model_cascade` has no implementation, no call site — grepped;
+#     the only occurrences are docstring/comment mentions of a FUTURE arm). So for any threshold
+#     theta, every attempt splits into exactly two buckets, and BOTH are uninformative about
+#     whether escalation helps:
+#       (a) confidence >= theta (would NOT escalate): the cascade arm's cost/outcome for these
+#           attempts is, by construction, IDENTICAL to baseline's (same model, same real
+#           execution) — computing "cascade cost-per-verified-outcome" over this subset alone
+#           reproduces baseline's OWN number on the same subset. That is a TAUTOLOGY, not a
+#           comparison — `cascade_theta_*_cost_per_verified_outcome` below is labeled
+#           "baseline-equivalent (non-escalated subset)" precisely so a reader never mistakes
+#           "regret = 0" for "escalation was measured and found harmless." It was never measured
+#           at all on this subset because nothing diverged.
+#       (b) confidence < theta (WOULD escalate): the escalated model was never actually run, so
+#           its cost/outcome is GENUINELY UNKNOWN — no fabricated number stands in for it.
+#           `cascade_theta_*_unmeasured_escalated_n` reports exactly how many attempts fall here
+#           per threshold (monotonically increasing with theta), so the reader sees how much of
+#           the "arm" is invisible to this proxy rather than a single misleadingly-confident ratio.
+#     Consequence: `arm_comparison`'s `routing_arm_regret_theta_*` is 0 for every theta by
+#     construction (tautology from (a)) — NEVER interpret this as "no threshold hurts."
+#     `null_testable_theta_*` is `false` whenever `unmeasured_escalated_n > 0` for that theta
+#     (in practice: always, given (1)'s 77.9% confidence coverage and >0 attempts below every
+#     theta), which is the honest signal this spec can actually produce today. What CAN be
+#     answered soundly: (i) baseline's real, fully-covered cost-per-verified-outcome (finding 1);
+#     (ii) each threshold's escalation TRIGGER RATE (a real, measured quantity — how large a
+#     fraction of the corpus a live cascade policy would touch); (iii) that the trigger-rate
+#     numbers are trustworthy because confidence coverage is 77.9%, not near-zero. Answering the
+#     null for real requires either a LIVE grid where cascade attempts actually execute (a future
+#     spec — E4-style, out of scope; GUARD forbids applying escalation here) or a natural-
+#     experiment proxy from REAL historical escalations already in the attempt LINEAGE
+#     (parent_attempt_id / escalation_from / escalation_to — the ledger fields
+#     cap_session_routing_evidence.yaml's `escalate` arm already uses) rather than this spec's
+#     workflow-run PHASE corpus, which has no such lineage. Both are named as forward gaps, not
+#     implemented here.
+# (3) A quantitatively-estimated (not fabricated) alternative was considered and DEFERRED, named
+#     here so a future reader does not have to rediscover it: PROVIDER_PRICING
+#     (measurement/efficiency.py) could turn each low-confidence attempt's OWN measured token
+#     counts into a real, computed (not fabricated) hypothetical cost under a declared escalation-
+#     target model's rates — a genuine [C] counterfactual grounded in real pricing data, not an
+#     invented number. It is deliberately NOT implemented in this spec: it requires
+#     attempt_tokens_in/attempt_tokens_out, which are real FACT_PREDICATES but OUTSIDE the fixed
+#     requires_facts list this spec was scoped to (attempt_confidence, attempt_cost_usd,
+#     attempt_model, phase_status, job_status). Recorded as the natural next increment, not
+#     smuggled in under a different name.
+# (4) Confounding — TWO axes, both stratified, not silently pooled.
+#     (a) job_status: a job whose overall run failed (job_status="failed", 28/116 = 24% of runs)
+#         may show a systematically different phase_status="ok" rate for reasons unrelated to any
+#         routing policy (e.g. an unrelated environment failure late in the run) — pooling it into
+#         the arm comparison would confound "this threshold performed worse" with "this job failed
+#         for an unrelated reason." `job_outcome_join` produces `job_ok` so `arm_comparison` can
+#         report per-job_status breakdowns, exactly as cap_shadow_comparison.yaml stratifies by
+#         `model`.
+#     (b) model x threshold — FIXED in the r4 adversarial pass (this dimension was not checked in
+#         the original version of this spec; the review ROLE's own checklist names it explicitly).
+#         `attempt_confidence` is a SELF-REPORT (finding 5): different models plausibly self-report
+#         on different distributions, so a pooled `escalation_trigger_rate(theta)` could conflate
+#         "this threshold is aggressive" with "the corpus mix happens to include more of a
+#         chronically low-confidence model." `arm_comparison` now also requires `attempt_model`
+#         (the same real predicate `cascade_cost_per_verified_outcome` already requires — no new
+#         instrumentation) and produces `escalation_trigger_rate_by_model_range_theta_*` — the
+#         max-min spread across models, a cheap confound-MAGNITUDE indicator. A full per-model x
+#         per-theta table (21 named metrics) is deliberately left to the writeup, not the compiled
+#         metric surface.
+# (5) CAP-fact leak — CLEAN, but with a documented exception. Every `requires_facts` entry below
+#     is a REAL, declared FACT_PREDICATES key with a real producer (attempt_facts/v1 for the four
+#     attempt-scoped facts, job_facts/v1 for job_status) — R1-R11 verified clean (see below). The
+#     one nuance worth recording: `attempt_confidence`'s producing reducer
+#     (control/reducers/attempt_facts.py's `_EPISTEMIC_BY_PREDICATE`) ALWAYS emits it with
+#     `epistemic_status="advisory"` (Authority.ADVISORY, evidence_class "[H]") — a self-report,
+#     never canonical (`facts.is_canonical()` hard-excludes `epistemic_status == "advisory"`).
+#     `MIN_AUTHORITY_LEVELS` (core/contracts.py) excludes ADVISORY entirely — there is NO legal
+#     `min_authority` value an attempt_confidence requirement could ever set that a live,
+#     is_canonical()-gated ControlContext (compile_context/RegistryFactStore) would resolve. R5
+#     only refuses an EXPLICIT `min_authority: ADVISORY` — it cannot see (PredicateSpec carries no
+#     authority field) that the DEFAULT `min_authority: DERIVED` used below is equally
+#     unsatisfiable at runtime for this specific predicate. This is a genuine compile-time-proves-
+#     producibility-not-resolvability gap (the design's own §7.3 distinction), not a bug in this
+#     spec: every rule below that requires `attempt_confidence` is a RETROSPECTIVE, MEASUREMENT-
+#     ONLY read of the raw typed run-artifact field — it never goes through compile_context/
+#     RegistryFactStore, exactly as cap_shadow_comparison.yaml's decision-side rules read raw KB
+#     actuation artifacts directly rather than through the live FactStore path. Named here so a
+#     future control-arm author does not assume this spec's `escalation_trigger_rate` is safe to
+#     wire into a real `route_next_job_v1`-style decision without re-deriving it through a
+#     properly authority-gated path first (R5's whole point).
+# (6) Null + stop — explicit. Null is stated above and shown to be untestable-by-construction
+#     today (finding 2), not merely under-powered. Retrospective: no live cells execute, so
+#     budget_usd/max_attempts are nominal; uncertainty_threshold is set wider (0.3) than
+#     cap_session_routing_evidence's 0.15 and cap_shadow_comparison's 0.2, because
+#     `null_testable_theta_*` is expected `false` on this spec's very first run — a wide gate that
+#     still fails honestly, not one quietly tuned to pass.
+name: cap_confidence_cascade
+question: >-
+  Does a confidence-gated model_cascade policy — escalate to a stronger model whenever
+  attempt_confidence falls below a threshold theta — improve cost-per-verified-outcome over the
+  single-model baseline already recorded in the corpus, for theta in {0.3, 0.5, 0.7}? Null
+  hypothesis: no threshold improves cost-per-verified-outcome over baseline. Escalation is
+  counterfactual ONLY — no attempt in the corpus was ever actually escalated, so this spec
+  measures what CAN be measured retrospectively (baseline's real, fully-covered cost-per-
+  verified-outcome; each threshold's real, measured escalation trigger rate) and explicitly marks
+  the null itself as untestable-by-construction today, not a confirmed non-improvement — the
+  escalated subset's true post-escalation cost/outcome is genuinely unknown, never fabricated.
+  "Verified success" here means phase_status == "ok" (a completion signal, 100% covered) — the
+  independently-tested signal (phase_test_verified) is confirmed at 0% coverage in this same
+  corpus and is out of this spec's fixed requires_facts scope.
+version: "0.1"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+workflow:
+  kind: experiment
+  params:
+    mode: retrospective        # replay the existing corpus — no new cells are executed
+    source: experiments/results/workflows/**/*.json (executed phases; attempt_confidence,
+      attempt_cost_usd, attempt_model, phase_status per phase; job_status per run)
+    simulation: >-
+      escalation_trigger + cascade_cost_per_verified_outcome evaluation rules — a NEW retrospective
+      shape for the (unimplemented) model_cascade control arm named in experiment_spec.py,
+      runtime/routing.py, adapters/opencode.py, measurement/signal_registry.py
+factors:
+  # baseline = the single-model corpus as actually run (no escalation). cascade_theta_X = the
+  # counterfactual "escalate below X" policy, X in {0.3, 0.5, 0.7} per the prompt.
+  - {name: cascade_arm, levels: [baseline, cascade_theta_0.3, cascade_theta_0.5, cascade_theta_0.7]}
+design: factorial
+rules:
+  # ── FIRST: the coverage pre-check on attempt_confidence (the n=0 lesson, per the prompt) ──
+  # Measured today: 327/420 = 77.9% -- NOT near-zero (finding 1). Reported unconditionally, every
+  # run, so a future corpus that regresses toward n=0 is caught before any downstream metric is
+  # trusted, exactly as this spec's own authoring caught cap_shadow_comparison.yaml's actuation
+  # side sitting at a real, measured zero.
+  #   attempt_confidence -> FACT_PREDICATES, produced_by attempt_facts/v1 (real predicate).
+  #   Read as a raw typed-artifact value, not through compile_context (finding 5's ADVISORY note).
+  - name: confidence_coverage_precheck
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts:
+      - {fact: attempt_confidence, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires: []
+    produces: [confidence_coverage_ratio, n_confidence_available, n_confidence_total]
+
+  # ── Coverage pre-check on the "verified success" proxy (phase_status) ──
+  # Measured today: 420/420 = 100%. Named "phase_success" (not "verified") to keep the
+  # completion-vs-independently-tested distinction visible in the metric name itself.
+  #   phase_status -> FACT_PREDICATES, produced_by attempt_facts/v1 (real predicate).
+  - name: phase_success_coverage_precheck
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts:
+      - {fact: phase_status, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires: []
+    produces: [status_coverage_ratio, n_status_available, n_status_total]
+
+  # ── job_status join — the confound-control stratifier (finding 4) ──
+  #   job_status -> FACT_PREDICATES, produced_by job_facts/v1 (real predicate, run-level "ok").
+  #   Measured today: 116/116 = 100% coverage (88 ok / 28 failed).
+  - name: job_outcome_join
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts:
+      - {fact: job_status, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires: []
+    produces: [job_ok, job_status_coverage_ratio]
+
+  # ── "Verified success" (== phase_status == "ok") -- null-not-zero: a phase whose phase_status
+  # was never captured is EXCLUDED (null), never counted as a failure. ──
+  #   phase_status -> FACT_PREDICATES (real predicate).
+  - name: verified_success
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts:
+      - {fact: phase_status, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires: []
+    produces: [verified_outcome]
+
+  # ── Escalation trigger — the ONE genuinely measurable per-threshold quantity (finding 2's
+  # sound half): how often would each theta actually fire, restricted to confidence-captured
+  # attempts only (an uncaptured confidence is EXCLUDED — never assumed non-escalating). ──
+  #   attempt_confidence -> FACT_PREDICATES (real predicate; finding 5's raw-read note applies).
+  - name: escalation_trigger
+    plane: measurement
+    evidence_class: "[C]"
+    requires_facts:
+      - {fact: attempt_confidence, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires: []
+    produces:
+      - escalation_trigger_rate_theta_0_3
+      - escalation_trigger_rate_theta_0_5
+      - escalation_trigger_rate_theta_0_7
+      - n_escalation_eligible
+
+  # ── Baseline: cost per verified outcome, FULLY measured (no exclusion needed -- finding 1) ──
+  # CAPTURED-ONLY intersection, per house style: numerator over captured attempt_cost_usd,
+  # denominator over non-null verified_outcome from the SAME cost-captured set. In this corpus
+  # both sit at 100%, so the intersection IS the full 420.
+  #   attempt_cost_usd, attempt_model, phase_status -> FACT_PREDICATES (real predicates).
+  - name: baseline_cost_per_verified_outcome
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts:
+      - {fact: attempt_cost_usd, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: attempt_model, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: phase_status, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires: [verified_outcome]
+    produces: [baseline_cost_per_verified_outcome, baseline_n]
+
+  # ── Cascade arms: cost per verified outcome, TAUTOLOGICAL on the measured subset (finding 2) ──
+  # Per theta: restricted to confidence-captured attempts with attempt_confidence >= theta (would
+  # NOT escalate) -- computed with the SAME formula as baseline, over that subset only, and
+  # labeled "baseline-equivalent" because it mathematically must equal baseline's own number on
+  # the identical subset (no divergence occurred). `*_unmeasured_escalated_n` is the count of
+  # confidence-captured attempts with attempt_confidence < theta (WOULD escalate) -- their true
+  # post-escalation cost/outcome is unknown and excluded, never fabricated. This is why
+  # `arm_comparison`'s regret is 0 by construction, NOT evidence the threshold is safe.
+  #   attempt_cost_usd, attempt_model, phase_status, attempt_confidence -> FACT_PREDICATES (real).
+  - name: cascade_cost_per_verified_outcome
+    plane: measurement
+    evidence_class: "[C]"
+    requires_facts:
+      - {fact: attempt_cost_usd, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: attempt_model, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: phase_status, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: attempt_confidence, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires:
+      - verified_outcome
+      - escalation_trigger_rate_theta_0_3
+      - escalation_trigger_rate_theta_0_5
+      - escalation_trigger_rate_theta_0_7
+    produces:
+      - cascade_theta_0_3_cost_per_verified_outcome
+      - cascade_theta_0_3_n
+      - cascade_theta_0_3_unmeasured_escalated_n
+      - cascade_theta_0_5_cost_per_verified_outcome
+      - cascade_theta_0_5_n
+      - cascade_theta_0_5_unmeasured_escalated_n
+      - cascade_theta_0_7_cost_per_verified_outcome
+      - cascade_theta_0_7_n
+      - cascade_theta_0_7_unmeasured_escalated_n
+
+  # ── Evaluation rule: the threshold table + null-testability flag, stratified by job_status ──
+  # (finding 4). `routing_arm_regret_theta_*` is compare_arms-style weighted loss regret vs
+  # baseline -- ALWAYS 0 today by the tautology in finding 2. `null_testable_theta_*` is the
+  # honest signal: false whenever `*_unmeasured_escalated_n > 0` for that theta (in practice,
+  # every theta today -- 77.9% confidence coverage guarantees escalation candidates exist at
+  # every threshold in {0.3, 0.5, 0.7}).
+  # NOTE (r4 adversarial pass, finding A): the original version of this rule stratified only by
+  # job_status (job_ok) -- the methodologist ROLE's own confound checklist explicitly names
+  # "model x threshold" as a distinct risk this spec had not yet checked: attempt_confidence is a
+  # SELF-REPORT (finding 5 below), and different models may self-report on very different
+  # distributions, so a pooled escalation_trigger_rate(theta) could conflate "this threshold is
+  # aggressive" with "the corpus mix happens to include more of a chronically low-confidence
+  # model." FIXED by adding attempt_model as a requires_facts entry here (the SAME real predicate
+  # `cascade_cost_per_verified_outcome` already requires above -- no new instrumentation, just a
+  # second consumer of already-required data) and one new produced field per theta:
+  # `escalation_trigger_rate_by_model_range_theta_*` = max(per-model trigger rate) - min(per-model
+  # trigger rate) for that theta -- a cheap, single-scalar confound-MAGNITUDE indicator. A full
+  # per-model x per-theta breakdown (7 models x 3 thetas = 21 named metrics) was deliberately NOT
+  # added as separate `produces` entries -- that combinatorial expansion belongs in the writeup's
+  # per-model table (computed post-hoc from the same evaluator's intermediate per-attempt rows,
+  # which already carry attempt_model), not in the compiled metric surface.
+  - name: arm_comparison
+    plane: measurement
+    evidence_class: "[C]"
+    requires_facts:
+      - {fact: attempt_model, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires:
+      - baseline_cost_per_verified_outcome
+      - cascade_theta_0_3_cost_per_verified_outcome
+      - cascade_theta_0_5_cost_per_verified_outcome
+      - cascade_theta_0_7_cost_per_verified_outcome
+      - job_ok
+    produces:
+      - routing_arm_regret_theta_0_3
+      - routing_arm_regret_theta_0_5
+      - routing_arm_regret_theta_0_7
+      - null_testable_theta_0_3
+      - null_testable_theta_0_5
+      - null_testable_theta_0_7
+      - escalation_trigger_rate_by_model_range_theta_0_3
+      - escalation_trigger_rate_by_model_range_theta_0_5
+      - escalation_trigger_rate_by_model_range_theta_0_7
+metrics:
+  - {name: confidence_coverage_ratio, agg: ratio, over: attempt}
+  - {name: status_coverage_ratio, agg: ratio, over: attempt}
+  - {name: job_status_coverage_ratio, agg: ratio, over: job}
+  - {name: escalation_trigger_rate_theta_0_3, agg: ratio, over: attempt}
+  - {name: escalation_trigger_rate_theta_0_5, agg: ratio, over: attempt}
+  - {name: escalation_trigger_rate_theta_0_7, agg: ratio, over: attempt}
+  - {name: baseline_cost_per_verified_outcome, agg: ratio, over: cell}
+  - {name: cascade_theta_0_3_cost_per_verified_outcome, agg: ratio, over: cell}
+  - {name: cascade_theta_0_5_cost_per_verified_outcome, agg: ratio, over: cell}
+  - {name: cascade_theta_0_7_cost_per_verified_outcome, agg: ratio, over: cell}
+  - {name: routing_arm_regret_theta_0_3, agg: mean, over: cell}
+  - {name: routing_arm_regret_theta_0_5, agg: mean, over: cell}
+  - {name: routing_arm_regret_theta_0_7, agg: mean, over: cell}
+  # r4 adversarial fix A (model x threshold confound, see arm_comparison's own comment above):
+  - {name: escalation_trigger_rate_by_model_range_theta_0_3, agg: mean, over: cell}
+  - {name: escalation_trigger_rate_by_model_range_theta_0_5, agg: mean, over: cell}
+  - {name: escalation_trigger_rate_by_model_range_theta_0_7, agg: mean, over: cell}
+comparison:
+  kind: effect_size
+  arm_factor: cascade_arm
+  loss: {cost: 1.0, quality: -5.0}
+writeup:
+  format: lab_book
+  sections: [hypothesis, null_hypothesis, method, confidence_coverage_precheck, threshold_table,
+             verified_success_definition, arms, effect_size, uncertainty, null_interpretation,
+             escalation_untestable_gap, pricing_proxy_forward_gap, limitations]
+# Retrospective: no live cells execute, so budget_usd/max_attempts are nominal; the operative stop
+# gate is uncertainty_threshold, set to 0.3 (wider than cap_session_routing_evidence's 0.15 and
+# cap_shadow_comparison's 0.2) because null_testable_theta_* is expected false on this spec's very
+# first run (finding 2) -- a wide gate that still fails honestly, not one tuned to pass.
+stop: {budget_usd: 5.0, max_attempts: 1, uncertainty_threshold: 0.3}
+# highest_uncertainty (not highest_regret, cf. cap_session_routing_evidence): regret is 0 by
+# tautology today (finding 2), so the informative next-campaign move is whichever theta has the
+# LARGEST unmeasured_escalated_n -- the threshold most in need of a live pilot next.
+adapt: {strategy: coordinate_descent, selection: highest_uncertainty}

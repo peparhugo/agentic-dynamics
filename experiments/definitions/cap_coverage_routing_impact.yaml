@@ -1,0 +1,188 @@
+# cap_coverage_routing_impact — do coverage-corrected routing stats (control.routing's CURRENT
+# recommend_route/compute_routing) actually change any routing recommendation versus the legacy
+# zero-default aggregation (scripts/lab_task_routing.py's own, still-on-disk, quarantined
+# formula), over the SAME corpus?
+#
+# WHAT THIS IS: a retrospective A/B of two AGGREGATION FORMULAS (not two data sources) applied to
+# ONE real corpus, isolating exactly the variable the coverage-correction migration changed.
+#
+# NULL HYPOTHESIS (stated explicitly, per the prompt): zero changes — no task/model pair's
+# routing recommendation (default_model / escalate_model / routing) differs between the two
+# formulas. A null here is information: it would say the migration was a correctness fix with no
+# behavioral consequence YET, not that it was pointless (see finding 2 — it has teeth the moment
+# coverage genuinely drops).
+#
+# ── ADVERSARIAL REVIEW (methodologist pass) — findings & dispositions ─────────────────
+# (1) Corpus identity — VERIFIED by querying BOTH candidates before choosing, not assumed.
+#     ``canonical_corpus.py`` exposes four resolvers (story/review/analysis/finding).
+#     ``resolve_stories()`` (215 current rows) returns multi-SESSION story payloads with an
+#     aggregate ``summary.total_cost`` / ``summary.all_successful`` shape — a plausible-looking
+#     but WRONG match: it would silently substitute a different population (multi-session
+#     narrative outcomes) for what routing.py was built to route. ``resolve_findings()`` (64
+#     current rows) is the correct match — its own docstring says so directly: "the single-task
+#     perturbation cells... labs want the measured fields under their real names" (i.e. NOT
+#     re-mapped into the retired summary's renamed vocabulary — the SAME real fields:
+#     ``model``/``correctness``/``cost_usd``/``perturbation_strength``/...), which is field-for-
+#     field what ``routing.recommend_route``'s own docstring names as its input ("experiment
+#     entries, e.g. from _results_summary.json"). ``resolve_findings()`` IS the live, registry-
+#     governed replacement for that retired file — chosen, not guessed.
+# (2) THE HEADLINE FINDING — coverage is 100% on THIS corpus today, checked live before writing
+#     this spec (the session-routing n=0 lesson, generalized: verify the ACTUAL number, whichever
+#     direction it points). Of the 64 current ``finding`` rows: 64/64 (100%) carry a numeric
+#     ``cost_usd``; 64/64 (100%) carry a numeric ``correctness``. Coverage-corrected and legacy
+#     zero-default arithmetic are therefore MATHEMATICALLY FORCED TO AGREE on this run — there is
+#     no missing value anywhere for the zero-default formula to coerce, so
+#     ``changed_recommendation_count == 0`` is the EXPECTED result, not evidence the coverage
+#     correction "doesn't matter." Read together with cap_shadow_comparison.yaml's 0/2696
+#     actuation coverage and cap_confidence_cascade.yaml's 0/420 test-verification coverage, this
+#     is the THIRD spec in the family whose first real run lands on a boundary case rather than a
+#     mid-distribution result — a pattern worth naming for whoever authors the fifth: check the
+#     actual number before writing the null, every time. This spec's real informative value is
+#     PROSPECTIVE: ``entry_coverage_precheck``'s ratio is the leading indicator to watch — the
+#     day it drops below 100%, ``changed_recommendation_count`` starts actually testing something.
+# (3) Corpus-vs-formula confound — FIXED. ``scripts/lab_task_routing.py`` itself reads the
+#     RETIRED, quarantined ``experiments/results/_results_summary.json``
+#     (``scripts/CONTEXT.md``: ``lab_task_routing.py | quarantined``). Replaying it verbatim
+#     against its OWN retired input would confound two variables at once (different data AND
+#     different formula) and would violate ``conventions.md``'s "never read the retired
+#     _results_summary.json." ``legacy_zero_default_routing`` instead RE-DERIVES
+#     ``lab_task_routing.py``'s aggregation FORMULA — ``e.get("correctness", 0)`` /
+#     ``e.get("cost", 0)``, averaged over ALL ``n`` rather than the captured subset (the exact
+#     defect ``measurement_coverage.py``'s module docstring documents as the historical pattern
+#     this spec's baseline arm re-derives, not invents) — and applies it to the SAME
+#     ``routing_entries`` the coverage-corrected arm reads. This isolates the ONE variable the
+#     prompt asks about (aggregation method), which "compare ... over the same corpus" requires.
+# (4) Eligibility filter parity — VERIFIED, not assumed: with ``compute_routing``'s own
+#     ``min_models=2`` per-task threshold applied to the SAME 64 entries, 2 tasks qualify —
+#     ``task_manager`` (7 distinct models, 49 entries) and ``process_perturbation_resample`` (3
+#     distinct models, 15 entries) — a small but real, non-empty (n>0) comparison set, unlike
+#     cap_shadow_comparison.yaml's genuine n=0.
+# (5) CAP-fact leak — N/A by construction, not merely "clean": this spec makes ZERO
+#     ``requires_facts`` claims anywhere. Verified: ``REDUCERS`` (control/reducers/__init__.py)
+#     has five entries — ``spec_status/v1``, ``attempt_facts/v1`` (consumes ``workflow_run``),
+#     ``job_facts/v1`` (consumes ``workflow_run``), ``workflow_facts/v1``, ``policy_facts/v1`` —
+#     NONE consume story/finding-shaped evidence, so no ``FACT_PREDICATES`` entry could ever be
+#     honestly required here. Every requirement below is the LEGACY ``requires:``/``produces:``
+#     mechanism (validated against ``LEDGER_FIELDS`` ∪ this spec's own measurement-rule
+#     ``produces``), exactly matching ``cap_session_routing_evidence.yaml``'s own precedent (which
+#     likewise declares zero ``requires_facts`` for the same underlying reason — no reducer
+#     bridges its corpus into the fact plane either).
+# (6) Null + stop — explicit. Null: zero changes (stated above). Given finding (2), THIS run is
+#     expected to confirm it trivially; ``uncertainty_threshold: 0.15`` stays tight (matching
+#     cap_session_routing_evidence's own) because — unlike cap_shadow_comparison /
+#     cap_confidence_cascade — there is no coverage gap inflating uncertainty here, only a
+#     (verified) coverage SURPLUS.
+name: cap_coverage_routing_impact
+question: >-
+  Does control.routing's current coverage-corrected recommend_route/compute_routing (excludes
+  uncaptured cost/correctness, never zero-defaults) recommend a DIFFERENT model than the legacy
+  zero-default formula (scripts/lab_task_routing.py's own, still on disk, quarantined — coerces a
+  missing cost/correctness to 0 and averages over all n) — for any task type, for any model — when
+  BOTH are applied to the SAME corpus (canonical_corpus.resolve_findings(), the live replacement
+  for the retired _results_summary.json's "entries")? Null hypothesis: zero changes. Secondary:
+  among any changed recommendations, do they move toward lower-cost models (the expected direction
+  of the zero-default bias, since an unpriced/undermeasured model would look artificially cheap
+  under zero-defaulting)? Checked before writing this question, not assumed: current coverage on
+  cost_usd and correctness is 64/64 = 100% for both fields across the 64 current finding rows, so
+  this run is EXPECTED to confirm the null trivially — the experiment's value is in the pre-check
+  it runs every time, not in a policy verdict this particular corpus can produce today.
+version: "0.1"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+workflow:
+  kind: experiment
+  params:
+    mode: retrospective        # replay the existing corpus — no new cells are executed
+    source: >-
+      canonical_corpus.resolve_findings() — "the single-task perturbation cells" (64 current
+      rows), the live registry-governed replacement for the retired
+      experiments/results/_results_summary.json this spec's baseline arm's formula originally read
+    simulation: >-
+      coverage_corrected_routing (control.routing.compute_routing, called as-is) vs
+      legacy_zero_default_routing (scripts/lab_task_routing.py's aggregation formula, re-derived
+      and applied to the SAME entries) — an evaluation-rule generalization of both real functions
+      into one gated spec
+factors:
+  - {name: stats_method, levels: [coverage_corrected, legacy_zero_default]}
+design: factorial
+rules:
+  # ── Project the real corpus into recommend_route's own entry shape (never the retired file) ──
+  #   model, correctness, cost_usd, _experiment -> canonical_corpus.resolve_findings() (real,
+  #   registry-governed fields, per finding 1). cost=cost_usd, experiment=_experiment,task via
+  #   normalize_task -- the SAME mapping control.routing.compute_routing's own per-task grouping
+  #   already performs internally.
+  - name: finding_corpus_projection
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [routing_entries, n_entries_total, n_eligible_tasks]
+
+  # ── FIRST (before either arm computes): coverage pre-check on the two fields whose coverage
+  # is the WHOLE reason coverage-corrected and zero-default stats can ever diverge. Measured
+  # today: 64/64 = 100% for both (finding 2) -- the leading indicator for when this spec's
+  # comparison becomes informative rather than trivially null. ──
+  - name: entry_coverage_precheck
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [routing_entries]
+    produces: [cost_coverage_ratio, correctness_coverage_ratio, n_cost_captured, n_correctness_captured]
+
+  # ── The coverage-corrected arm: the REAL, current function, called as-is (no re-derivation --
+  # unlike the legacy arm, nothing about this formula needs reconstructing). ──
+  - name: coverage_corrected_routing
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [routing_entries]
+    produces: [coverage_corrected_report]
+
+  # ── The legacy arm: lab_task_routing.py's OWN aggregation formula, re-derived (finding 3) and
+  # applied to the SAME routing_entries -- isolates the aggregation-method variable from the
+  # corpus-source variable. Uses the SAME normalize_task/min_models=2 eligibility filter
+  # compute_routing applies internally, for an apples-to-apples per-task comparison set. ──
+  - name: legacy_zero_default_routing
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [routing_entries]
+    produces: [legacy_report]
+
+  # ── The evaluation rule: primary (changed count/rate, per task/model) + secondary (direction
+  # -- do changes move toward lower-cost models, the zero-default bias's expected direction). ──
+  - name: recommendation_diff
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [coverage_corrected_report, legacy_report]
+    produces:
+      - changed_recommendation_count
+      - changed_recommendation_rate
+      - changed_by_task
+      - changed_by_model
+      - moved_to_lower_cost_count
+      - moved_to_lower_cost_rate
+metrics:
+  - {name: cost_coverage_ratio, agg: ratio, over: attempt}
+  - {name: correctness_coverage_ratio, agg: ratio, over: attempt}
+  - {name: changed_recommendation_count, agg: mean, over: cell}
+  - {name: changed_recommendation_rate, agg: ratio, over: cell}
+  - {name: moved_to_lower_cost_rate, agg: ratio, over: cell}
+comparison:
+  kind: effect_size
+  arm_factor: stats_method
+  loss: {cost: 1.0, quality: -5.0}
+writeup:
+  format: lab_book
+  sections: [hypothesis, null_hypothesis, method, corpus_provenance, entry_coverage_precheck,
+             changed_recommendations_table, direction_analysis, null_interpretation,
+             coverage_saturation_caveat, limitations]
+# Retrospective: no live cells execute, so budget_usd/max_attempts are nominal; the operative stop
+# gate is uncertainty_threshold, kept tight at 0.15 (matching cap_session_routing_evidence) since
+# — unlike the other three specs in this family — this corpus has a verified coverage SURPLUS,
+# not a gap, so there is no data-scarcity source of uncertainty to widen the gate for.
+stop: {budget_usd: 5.0, max_attempts: 1, uncertainty_threshold: 0.15}
+# highest_uncertainty, not largest_effect: the informative next-campaign move is whichever
+# task/model pair sits CLOSEST to losing coverage (smallest n_cost_captured/n_correctness_captured
+# margin) -- that is where a real future divergence would first appear.
+adapt: {strategy: coordinate_descent, selection: highest_uncertainty}

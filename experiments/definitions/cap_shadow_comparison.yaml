@@ -1,0 +1,296 @@
+# cap_shadow_comparison — shadow_rule (route_next_job_v1) vs step_routing, over the real
+# workflow-run corpus (experiments/results/workflows/**/*.json) + shadow decision records
+# (experiments/results/kb/*.json, source_type=actuation, written by control.rules.make_shadow_router).
+#
+# What this is: a RETROSPECTIVE comparison of the plane's fact-based routing proposal
+# (route_next_job_v1, CAP I6) against the deterministic baseline it always runs beside
+# (control.step_routing.route_step) — never applied (I7's apply seam is off by default; this
+# spec does not flip it). The evaluation rule set generalizes
+# scripts/decision_arm_comparison.py's two-signal report (executed-phase compare_arms +
+# decision_calibration's agreement rate) into ONE spec, per the load-bearing rule: measure
+# before policy, one gated artifact instead of two ad-hoc scripts.
+#
+# NULL HYPOTHESIS (stated explicitly): shadow_rule is not inferior to step_routing on
+# cost-per-verified-outcome. A null is information, not failure — it says the plane's simple
+# v1 policy (route to the lexicographically first allowed model) does no worse than the
+# existing deterministic router, which is the bar I7's flip decision needs cleared.
+#
+# GATE VOCABULARY (CAP I5, post-migration): every fact-plane-backed requirement below is
+# `requires_facts` against the REAL FACT_PREDICATES/REDUCERS registries
+# (src/agentic_dynamics/control/facts.py, src/agentic_dynamics/control/reducers/) — attempt_cost_usd,
+# attempt_model, phase_status, phase_test_verified, all produced_by=("attempt_facts/v1",).
+# ControlDecision (the shadow-rule side) has NO fact predicate — a decision is not a
+# CanonicalFact in this design; it is a `source_type="actuation"` KB artifact
+# (control.rules.record_shadow_decision), read back by control.rules.load_shadow_decisions.
+# A `requires_facts` entry naming a decision field would be a stretch (no predicate exists to
+# validate against), so decision-derived rules below carry `requires_facts: []` and read the raw
+# actuation artifacts directly instead — documented per rule, never silently gated around.
+#
+# ── ADVERSARIAL REVIEW (methodologist pass) — findings & dispositions ─────────────────
+# (1) Arm discriminability TODAY is nearly zero — VERIFIED, not assumed. Queried the real
+#     corpus before writing this spec (the session-routing n=0 lesson: never assume a
+#     predicate was recorded): 116 workflow-run JSONs / 420 agent phases exist under
+#     experiments/results/workflows/, but ZERO of the 2696 KB artifacts under
+#     experiments/results/kb/ are source_type="actuation" — control.rules.make_shadow_router
+#     has never actually been wired into a real run yet (matches AGENTS.md's current_state:
+#     "shadow machinery merged but its campaign reports are still being produced"). Every
+#     decision-side metric (agreement_rate, n_decisions, rejected_decision_count,
+#     shadow_rule_cost_per_verified_outcome) is therefore INCONCLUSIVE at n=0 today, not a
+#     confirmed null — the shadow_decision_coverage rule reports this explicitly (n=0/n_total)
+#     rather than letting a zero-decision arm render as "0% regret" (which would read as
+#     perfect agreement — the opposite of the truth). This spec is authored to become
+#     measurable the moment `run_workflow.py` is invoked with the shadow router wired in; it
+#     is not blocked on that wiring to be gate-clean.
+#     UPDATE (r4 adversarial pass, cross-spec sweep): the step_routing side is not fully
+#     measurable either — see the corrected finding (3) below. This spec's ONLY headline
+#     number confirmed at full coverage today is the workflow-run corpus's existence itself
+#     (116 files / 420 phases); every downstream ratio narrows from there.
+# (2) Counterfactual soundness (cost side) — FIXED by restricting to the agreement subset.
+#     The plane's proposed model is NEVER executed (I6 "proposal only" — shadow decisions are
+#     recorded, never applied), so there is no independently measured cost for "what if the
+#     plane's choice had run instead" (the same honest limitation
+#     scripts/decision_arm_comparison.py's docstring states). `shadow_rule_cost_per_verified_outcome`
+#     is therefore a PROXY, valid ONLY on the subset where the decision's proposed model equals
+#     `baseline_model` (shadow_rule agreed with step_routing) — on agreement the two arms
+#     executed the identical model choice, so step_routing's real, measured cost/outcome IS the
+#     shadow arm's realized cost/outcome for that job. On disagreement, shadow_rule's
+#     counterfactual cost is UNMEASURABLE and is excluded from the ratio (never zero-costed);
+#     the disagreement fraction is reported separately (`decision_regret`) so a reader sees the
+#     proxy's shrinking coverage, never a silently-diluted average.
+# (3) Coverage / denominator — CORRECTED in the r4 adversarial pass, not just "FIXED" as
+#     originally written. `phase_coverage_precheck` ORIGINALLY reported n_available/n_total for
+#     only `attempt_cost_usd` (420/420 = 100%) and `phase_status` (420/420 = 100%) — both fully
+#     covered, which read as "the step_routing side is sound." That check missed the ACTUAL
+#     bottleneck: `verified_outcome` (below) requires `phase_test_verified`, not `phase_status` —
+#     and phase_test_verified is captured on 0 of 420 agent phases in this SAME corpus (caught by
+#     cross-referencing cap_confidence_cascade.yaml's independent discovery of the identical gap
+#     during the r4 cross-spec sweep, then verified directly against this spec too, not assumed
+#     transferable). CORRECTED HEADLINE: `step_routing_cost_per_verified_outcome` is therefore
+#     ALSO unmeasured at n=0 today, not only `shadow_rule_cost_per_verified_outcome` — BOTH arms
+#     of this spec's primary metric are currently inconclusive, for two independent reasons (the
+#     shadow router has never run; the independent test verifier has never run inside the
+#     agent_task workflow path either). `phase_coverage_precheck` now checks all three predicates
+#     (attempt_cost_usd, phase_status, phase_test_verified) so this gap is visible in THIS spec's
+#     own pre-check rather than only discoverable by reading a sibling spec. The corpus-wide fix —
+#     wiring test_runner.run_suite into the agent_task workflow path so phase_test_verified starts
+#     accumulating — is a forward gap named ONCE here (see the synthesis doc,
+#     docs/designs/current/cap_routing_evidence_specs.md, for the cross-spec disposition), not
+#     re-solved independently in every spec that depends on it. `cost_per_verified_outcome` on
+#     both arms remains a CAPTURED-ONLY intersection when data does exist: numerator over
+#     captured costs, denominator over non-null verified outcomes from the SAME cost-captured
+#     set — a verified outcome with an uncaptured cost is dropped from both, never zero-costed
+#     (mirrors cap_session_routing_evidence.yaml's discipline).
+# (4) Confounding — accepted limitation + control. Task/story heterogeneity is not a factor
+#     here; `arm_comparison` (generalizing compare_arms) stratifies by `model` (the second
+#     factor) so the routing_arm effect is read within-model, matching
+#     decision_arm_comparison.py's per-model loss breakdown. Pricing drift is out of scope for
+#     a retrospective replay — the writeup pins pricing_version for the replayed corpus.
+# (5) Rejected-decision count — a genuine reader gap, named rather than silently dropped.
+#     `control.rules.load_shadow_decisions` extracts only
+#     {action, baseline_action, model, baseline_model, applied} from each recorded actuation
+#     artifact — it drops `rationale`, which is where the admit/refuse verdict lives
+#     (`make_shadow_router` appends `"| admitted"` or `"| <check>: <reason>"` to
+#     `decision.rationale` before recording — control/rules.py's shadow-router body). This spec
+#     is AUTHORING ONLY (no code changes), so `shadow_agreement`'s evaluator is specified to
+#     read the raw KB artifact's `requested_action.rationale` field directly (the field exists
+#     on-disk today, in every actuation artifact `load_shadow_decisions` would also read) rather
+#     than routing through the narrower convenience function — an evaluator generalization, not
+#     a stretch, and named here so a future reader doesn't rediscover the gap from scratch.
+# (6) CAP-fact leak — CLEAN. Every `requires_facts` entry below resolves against the real
+#     FACT_PREDICATES/REDUCERS registries (attempt_cost_usd, attempt_model, phase_status,
+#     phase_test_verified — all produced_by attempt_facts/v1); no rule requires a predicate
+#     that isn't declared and produced. Verified by running
+#     `control.context_compiler.validate_spec_fact_contracts` against this spec (R1-R11) — zero
+#     refusals. No rule sets `plane: control` / `decision_type`, so R9-R11 (contract binding) do
+#     not apply here — this spec MEASURES the plane's proposals, it does not consume them as
+#     policy (that is I7's job, gated separately behind `workflow.params.control_route`).
+# (7) Null + stop — explicit. Null is stated above. Retrospective: no live cells execute, so
+#     budget_usd/max_attempts are nominal; the operative gate is uncertainty_threshold=0.2 on
+#     the effect_size — wider than cap_session_routing_evidence's 0.15 because finding (1)
+#     means this spec's own first run is expected to land at n≈0 on the shadow side.
+name: cap_shadow_comparison
+question: >-
+  Does the plane's fact-based routing proposal (route_next_job_v1, run in shadow beside every
+  real routing decision) do at least as well as step_routing (the deterministic baseline that
+  always actually runs) on cost per verified outcome? Null hypothesis: shadow_rule is not
+  inferior to step_routing on cost-per-verified-outcome. Arms are retrospective: step_routing is
+  measured directly from the executed-phase corpus (experiments/results/workflows/**/*.json);
+  shadow_rule is scored by (a) agreement rate against the baseline (decision_regret, generalizing
+  decision_calibration) and (b) a cost-per-verified-outcome PROXY valid only on the agreement
+  subset (the plane's proposal was never independently executed — I6 "proposal only"). Coverage
+  is checked and reported before either arm's headline metric, per the session-routing n=0
+  lesson: as of authoring, zero shadow decisions have been recorded yet (the router exists but
+  has not been wired into a real run), so this spec's first execution is expected to report the
+  shadow side as INCONCLUSIVE, not a confirmed null.
+version: "0.1"
+artifact_kind: experiment
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+workflow:
+  kind: experiment
+  params:
+    mode: retrospective        # replay the existing corpus — no new cells are executed
+    source: >-
+      experiments/results/workflows/**/*.json (executed phases, step_routing side) +
+      experiments/results/kb/*.json source_type=actuation (recorded shadow decisions,
+      shadow_rule side, control.rules.record_shadow_decision)
+    simulation: >-
+      shadow_agreement + shadow_rule_cost_per_verified_outcome evaluation rules — generalize
+      scripts/decision_arm_comparison.py's compare_arms + decision_calibration hookup into one
+      spec
+factors:
+  # The arm factor. step_routing is the baseline (always actually executes); shadow_rule is the
+  # plane's counterfactual proposal (recorded, never applied — I6).
+  - {name: routing_arm, levels: [step_routing, shadow_rule]}
+  # The models present in the executed-phase corpus (per AGENTS.md "Models in use").
+  - {name: model, levels: [deepseek/deepseek-v4-flash, deepseek/deepseek-v4-pro, anthropic/claude-haiku-4-5, anthropic/claude-sonnet-5, openai/gpt-5.6-luna, openai/gpt-5.6-sol, openai/gpt-5.6-terra]}
+design: factorial
+rules:
+  # ── Coverage pre-checks (both sides — the n=0 lesson, checked BEFORE any headline metric) ──
+
+  # step_routing side: n_available/n_total for the two fields cost_per_verified_outcome needs.
+  #   attempt_cost_usd  -> FACT_PREDICATES, produced_by attempt_facts/v1 (real predicate)
+  #   phase_status      -> FACT_PREDICATES, produced_by attempt_facts/v1 (real predicate)
+  # r4 adversarial fix D: the ORIGINAL version of this rule checked only attempt_cost_usd and
+  # phase_status — it did NOT check phase_test_verified, which is the predicate `verified_outcome`
+  # (below) and therefore `step_routing_cost_per_verified_outcome` actually bottleneck on. Caught
+  # during the r4 cross-spec coverage sweep (dimension 3: "any metric dividing by an uncaptured
+  # denominator") by cross-referencing cap_confidence_cascade.yaml's independently-discovered
+  # finding that phase_test_verified is captured on 0 of 420 agent phases in this SAME corpus.
+  # FIXED by adding a third checked predicate here, so the gap is now VISIBLE in this spec's own
+  # pre-check rather than silently inherited from a sibling spec's unrelated discovery — see
+  # finding (3) below for the corrected headline: BOTH arms' cost-per-verified-outcome are
+  # currently unmeasured, not only shadow_rule's.
+  #   attempt_cost_usd, phase_status, phase_test_verified -> all real FACT_PREDICATES,
+  #   produced_by attempt_facts/v1.
+  - name: phase_coverage_precheck
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts:
+      - {fact: attempt_cost_usd, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: phase_status, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: phase_test_verified, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    produces:
+      - cost_coverage_ratio
+      - status_coverage_ratio
+      - test_verified_coverage_ratio
+      - n_cost_available
+      - n_cost_total
+      - n_status_available
+      - n_status_total
+      - n_test_verified_available
+      - n_test_verified_total
+
+  # shadow_rule side: n_shadow_decisions/n_route_opportunities. No fact predicate exists for a
+  # ControlDecision (finding 6's negation note) — read directly from the KB actuation artifacts
+  # and the executed-phase corpus (n_route_opportunities = agent phases in the same corpus
+  # window, since make_shadow_router runs beside every route_step call). requires_facts is
+  # empty by construction, not by oversight.
+  - name: shadow_decision_coverage
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts: []
+    requires: []
+    produces: [shadow_decision_coverage_ratio, n_shadow_decisions, n_route_opportunities]
+
+  # ── Verified outcome (shared by both arms' cost-per-verified-outcome) ──
+  #   phase_test_verified -> FACT_PREDICATES, produced_by attempt_facts/v1 (real predicate,
+  #   epistemic_status="verified" -> MEASURED [M] -- the independent test_runner, never a
+  #   self-report)
+  - name: verified_outcome
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts:
+      - {fact: phase_test_verified, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    produces: [verified_outcome]
+
+  # ── step_routing arm: cost per verified outcome, directly measured ──
+  # CAPTURED-ONLY intersection (finding 3): numerator over captured attempt_cost_usd, denominator
+  # over non-null verified_outcome from the SAME cost-captured set.
+  #   attempt_cost_usd -> FACT_PREDICATES (real predicate)
+  #   attempt_model    -> FACT_PREDICATES (real predicate) -- which model step_routing actually ran
+  #   phase_status     -> FACT_PREDICATES (real predicate)
+  #   verified_outcome -> produced by rule `verified_outcome` above
+  - name: step_routing_cost_per_verified_outcome
+    plane: measurement
+    evidence_class: "[M]"
+    requires_facts:
+      - {fact: attempt_cost_usd, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: attempt_model, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: phase_status, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires: [verified_outcome]
+    produces: [step_routing_cost_per_verified_outcome, step_routing_n]
+
+  # ── shadow_rule arm: agreement rate + rejected-decision count ──
+  # Generalizes compile_experiment.decision_calibration (already registered in
+  # MEASUREMENT_RULES) to also surface rejected_decision_count from the raw artifact's
+  # `requested_action.rationale` field (finding 5) -- present on disk, dropped only by the
+  # narrower load_shadow_decisions() convenience reader.
+  #   No fact predicate exists for a ControlDecision (finding 6's negation note) --
+  #   requires_facts is empty by construction; the data source is the raw KB actuation artifacts
+  #   (control.rules.record_shadow_decision's output), read directly.
+  - name: shadow_agreement
+    plane: measurement
+    evidence_class: "[C]"
+    requires_facts: []
+    requires: []
+    produces: [decision_regret, agreement_rate, n_decisions, rejected_decision_count]
+
+  # ── shadow_rule arm: cost per verified outcome, PROXY on the agreement subset only ──
+  # Valid ONLY where the recorded decision's proposed model == baseline_model (finding 2):
+  # on agreement, step_routing's real attempt_cost_usd/verified_outcome for that job IS the
+  # shadow arm's realized value; on disagreement, excluded (never zero-costed) --
+  # `decision_regret` (from `shadow_agreement`) reports the excluded fraction so the shrinking
+  # coverage is visible, never silently diluted into the average.
+  #   attempt_cost_usd -> FACT_PREDICATES (real predicate, read on the agreement subset)
+  #   attempt_model    -> FACT_PREDICATES (real predicate, to test the agreement condition)
+  - name: shadow_rule_cost_per_verified_outcome
+    plane: measurement
+    evidence_class: "[C]"
+    requires_facts:
+      - {fact: attempt_cost_usd, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+      - {fact: attempt_model, scope: self, min_authority: DERIVED, on_missing: classify, on_conflict: classify}
+    requires: [verified_outcome, decision_regret]
+    produces: [shadow_rule_cost_per_verified_outcome, shadow_rule_n]
+
+  # ── Evaluation rule: generalizes scripts/decision_arm_comparison.py's two-signal report ──
+  # into ONE compare_arms(arm_factor=routing_arm, loss={cost:1.0, quality:-5.0}) call, stratified
+  # by `model` (finding 4). Regret is each arm's weighted loss minus the best arm's -- reported
+  # alongside agreement_rate/rejected_decision_count so a reader sees BOTH complementary signals
+  # decision_arm_comparison.py's docstring says are necessary (neither alone answers "is it safe
+  # to flip I7's apply seam").
+  - name: arm_comparison
+    plane: measurement
+    evidence_class: "[C]"
+    requires_facts: []
+    requires: [step_routing_cost_per_verified_outcome, shadow_rule_cost_per_verified_outcome, agreement_rate, rejected_decision_count]
+    produces: [routing_arm_regret, best_arm]
+metrics:
+  - {name: cost_coverage_ratio, agg: ratio, over: attempt}
+  - {name: status_coverage_ratio, agg: ratio, over: attempt}
+  # r4 adversarial fix D (see phase_coverage_precheck's own comment above):
+  - {name: test_verified_coverage_ratio, agg: ratio, over: attempt}
+  - {name: shadow_decision_coverage_ratio, agg: ratio, over: cell}
+  - {name: agreement_rate, agg: ratio, over: cell}
+  - {name: decision_regret, agg: mean, over: cell}
+  - {name: rejected_decision_count, agg: mean, over: cell}
+  - {name: step_routing_cost_per_verified_outcome, agg: ratio, over: cell}
+  - {name: shadow_rule_cost_per_verified_outcome, agg: ratio, over: cell}
+  - {name: routing_arm_regret, agg: mean, over: cell}
+comparison:
+  kind: effect_size
+  arm_factor: routing_arm
+  loss: {cost: 1.0, quality: -5.0}
+writeup:
+  format: lab_book
+  sections: [hypothesis, null_hypothesis, method, coverage_precheck, arms, effect_size,
+             uncertainty, null_interpretation, shadow_execution_gap, proxy_limitation,
+             rejected_decision_gap, limitations]
+# Retrospective: no live cells execute, so budget_usd/max_attempts are nominal (analysis compute
+# only); the operative stop gate is uncertainty_threshold on the effect_size, widened from the
+# session-routing precedent's 0.15 to 0.2 (finding 1: the shadow side is expected at n≈0 today).
+stop: {budget_usd: 5.0, max_attempts: 1, uncertainty_threshold: 0.2}
+adapt: {strategy: coordinate_descent, selection: highest_regret}
