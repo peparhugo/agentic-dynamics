@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-24T14:07:55.384559+00:00",
+  "generated_at": "2026-08-24T15:54:10.578550+00:00",
   "n_specs": 103,
   "specs": [
     {
@@ -62,24 +62,6 @@
       "version": "0.1",
       "status": "runnable",
       "spec_path": "workflows/repository/cap_fact_backfill.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "cap_grit_grid_execute",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/cap_grit_grid_execute.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],
@@ -667,6 +649,24 @@
       "latest_cost_usd": 7.248182,
       "latest_git_sha": "ade880fe0",
       "results_pointer": "experiments/results/workflows/cap_gate_scan/20260823T232410Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "cap_grit_grid_execute",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_grit_grid_execute.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-24T15:54:10.449571+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.133047,
+      "latest_git_sha": "e8c4cfa8e",
+      "results_pointer": "experiments/results/workflows/cap_grit_grid_execute/20260824T155410Z.json",
       "n_runs": 1
     },
     {
