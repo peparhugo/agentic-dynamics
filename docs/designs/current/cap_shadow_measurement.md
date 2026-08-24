@@ -10,100 +10,135 @@ one of:
 - `experiments/results/cap_shadow/decision_arm_comparison_20260823T234503Z.json` (**ARM**)
 - the run ledgers under `experiments/results/workflows/{kb_write_path,code_review,
   labbook_refresh,routing_kb_more_itertools}/*.json` (**LEDGER**)
+- the 11 shadow-decision artifacts themselves, read directly off disk via
+  `control.rules.load_shadow_decisions`'s scan of `experiments/results/kb/*.json`
+  (`extractor_version == "actuation/v1"`), joined to their `causes` (the `context_snapshot`
+  artifact each decision cites) for the workload label and to on-disk file mtime for a wall-clock
+  ordering — (**RAW**)
 
 **Apply stayed OFF for this entire campaign.** No spec passed `--control-route`; no spec's YAML
 sets `workflow.params.control_route`; `tests/test_context_plane_seam.py::test_no_committed_spec_
 opts_into_control_route` (run today) confirms the committed spec corpus still has zero opt-ins.
 
-## 1. Cells run
+## 1. Table of cells — one row per shadow-router invocation (n=11, **RAW**)
 
-Four sub-run attempts against three specs; two completed, three failed before reaching a real
-agent call.
+The shadow router (`control.rules.make_shadow_router`) is called once per agent phase
+(`src/agentic_dynamics/runtime/workflow_runner.py:532`, the only call site). Each call
+independently (a) asks `step_routing.route_step` for the real, executed choice — the
+`step_routing decision` column — and (b) compiles a snapshot and asks the fact-based rule for its
+own proposal — the `shadow decision` column — before recording both together. 11 such calls
+happened across 6 sub-run attempts against 5 distinct specs; the table below is the complete set,
+ordered by wall-clock (file mtime), joined to the matching **LEDGER** phase where one exists:
 
-| spec | model | phases | status | cost (USD) | duration | LEDGER file |
-|---|---|---|---|---|---|---|
-| `kb_write_path` | anthropic/claude-sonnet-5 | 3/3 ok | **ok** | 1.4435 | 283s | `kb_write_path/20260823T234214Z.json` |
-| `code_review` | anthropic/claude-sonnet-5 | 2/2 ok | **ok** | 8.2082 | 913s | `code_review/20260823T233711Z.json` |
-| `labbook_refresh` (attempt 1) | deepseek/deepseek-v4-flash | 0/1 ok | **failed** (`exit_code=1`, 3s) | 0.0 | 3s | `labbook_refresh/20260823T231554Z.json` |
-| `labbook_refresh` (attempt 2) | deepseek/deepseek-v4-flash | 0/1 ok | **failed** (`exit_code=1`, 3s) | 0.0 | 3s | `labbook_refresh/20260823T231642Z.json` |
-| `routing_kb_more_itertools` | deepseek/deepseek-v4-flash | 0/1 ok | **failed** (`exit_code=1`, 3s) | 0.0 | 3s | `routing_kb_more_itertools/20260823T231644Z.json` |
+| # | spec (workload) | shadow decision | step_routing decision | agree/disagree | phase cost (USD) | phase duration | ledger outcome |
+|---|---|---|---|---|---|---|---|
+| 1 | `labbook_refresh` (attempt 1) | `continue` | `route` → deepseek/deepseek-v4-flash | **disagree** | 0.0000 | 2.99s | failed, `exit_code=1` |
+| 2 | `labbook_refresh` (attempt 2) | `continue` | `route` → deepseek/deepseek-v4-flash | **disagree** | 0.0000 | 3.01s | failed, `exit_code=1` |
+| 3 | `registry_canonicalize` | `continue` | `route` → anthropic/claude-sonnet-5 | **disagree** | unmeasured | unmeasured | **no ledger written at all** — see §2 |
+| 4 | `routing_kb_more_itertools` | `continue` | `route` → deepseek/deepseek-v4-flash | **disagree** | 0.0000 | 2.83s | failed, `exit_code=1` |
+| 5 | `code_review` (pre-attempt) | `continue` | `route` → anthropic/claude-sonnet-5 | **disagree** | unmeasured | unmeasured | **no matching ledger** — see §2 |
+| 6 | `kb_write_path` (pre-attempt) | `continue` | `route` → anthropic/claude-sonnet-5 | **disagree** | unmeasured | unmeasured | **no matching ledger** — see §2 |
+| 7 | `code_review` phase 1 (`code_review`) | `continue` | `route` → anthropic/claude-sonnet-5 | **disagree** | 7.0717 | 689.0s | ok |
+| 8 | `code_review` phase 2 (`architecture_review`) | `continue` | `route` → anthropic/claude-sonnet-5 | **disagree** | 1.1366 | 224.2s | ok |
+| 9 | `kb_write_path` phase 1 (`implement`) | `continue` | `route` → anthropic/claude-sonnet-5 | **disagree** | 0.4988 | 51.4s | ok |
+| 10 | `kb_write_path` phase 2 (`test`) | `continue` | `route` → anthropic/claude-sonnet-5 | **disagree** | 0.0646 | 41.6s | ok |
+| 11 | `kb_write_path` phase 3 (`verify`) | `continue` | `route` → anthropic/claude-sonnet-5 | **disagree** | 0.8801 | 190.1s | ok |
 
-**Finding — 3 of 5 attempts never reached CAP.** Despite the campaign's hard rule to run every
-sub-run with `--model anthropic/claude-sonnet-5 --backend claude_cli`, `labbook_refresh` and
-`routing_kb_more_itertools` each ran their one agent phase against `deepseek/deepseek-v4-flash`
-(LEDGER: `"model": "deepseek/deepseek-v4-flash"` on the phase, not the top-level spec model) and
-failed in ~3 seconds with `exit_code=1` — consistent with AGENTS.md's "DeepSeek credits are
-exhausted." These two specs pin a phase-level model in their own YAML that the top-level
-`--model` flag does not override, so the campaign's model choice never reached the phase. This is
-an operational gap in how those two specs are authored, not a bug in the three report scripts —
-recorded here as an accepted limitation, out of scope for this pass. Net effect: **2 real cells**
-(`kb_write_path`, `code_review`) produced usable data, matching the "2-3 small real cells" floor
-but at the low end.
+**11/11 disagree — 0.0% agreement, matching `decision_regret = 1.0` exactly (DEC, §3).**
 
-`n_executed_phases = 8` (**ARM**) = 5 real anthropic phases + 3 failed deepseek phases. The
+Cell-level summary: **2 real cells completed** (`kb_write_path`: 3/3 phases ok, $1.4435 total,
+283s, `kb_write_path/20260823T234214Z.json`; `code_review`: 2/2 phases ok, $8.2082 total, 913s,
+`code_review/20260823T233711Z.json` — **LEDGER**), meeting the "2-3 small real cells" floor at the
+low end. 3 more sub-run attempts (rows 1, 2, 4) failed in ~3 seconds each against
+`deepseek/deepseek-v4-flash`, $0 cost — despite the campaign's hard rule to invoke every sub-run
+with `--model anthropic/claude-sonnet-5 --backend claude_cli`, `labbook_refresh` and
+`routing_kb_more_itertools` each pin a phase-level model in their own spec YAML that the top-level
+`--model` flag does not override, so the real invocation reached `deepseek/deepseek-v4-flash` and
+failed with `exit_code=1` — consistent with AGENTS.md's "DeepSeek credits are exhausted." This is
+an authoring gap in those two specs, not a bug in the three report scripts; recorded as an
+accepted limitation, out of scope for this pass. `n_executed_phases = 8` (**ARM**) = 5 real
+anthropic phases (rows 7-11) + 3 failed deepseek phases (rows 1, 2, 4); the
 `anthropic/claude-sonnet-5` arm (n=5, avg_correctness=1.0, weighted_loss=-3.0697) is the best
-measured arm; the `deepseek/deepseek-v4-flash` arm (n=3, avg_correctness=0.0, weighted_loss=0.0)
-reflects the 3 zero-cost failures above, not a real routing comparison — **ARM**.
+measured arm, `deepseek/deepseek-v4-flash` (n=3, avg_correctness=0.0, weighted_loss=0.0) reflects
+those 3 zero-cost failures, not a real routing comparison (**ARM**).
 
-## 2. Shadow records: real, and validated through C1–C10
+## 2. Reconciling n=11 decisions against n=8 executed phases (the 3 "extra" rows)
 
-Every recorded shadow decision was inspected directly (`control.rules.load_shadow_decisions`
-scan of `experiments/results/kb/*.json`, `extractor_version == "actuation/v1"`). All 11 are real:
-timestamped 2026-08-24 01:15–01:39 local (i.e. within the s1 sub-run window), `causes`-linked to
-one of 5 distinct `context_snapshot` artifacts that are ALSO present in the compacted registry
-(`experiments/data_manifest.json`'s `registry` array — 5 rows, `source_type: context_snapshot`,
-IDs match exactly the 5 `causes` values referenced by the 11 decisions). No orphaned or
-unregistered snapshot.
+Rows 1, 2, 4, 7, 8, 9, 10, 11 (8 rows) map exactly 1:1 onto the 8 phases in `n_executed_phases`
+(**ARM**) — each row's phase-cost/duration was matched to the ledger by wall-clock adjacency
+(e.g. row 7's router call at 23:21:57 UTC starts exactly when `code_review`'s first phase starts;
+689.0s later, at 23:33:26 UTC, row 8's router call fires for the second phase — precisely the
+ledger's own phase boundary). That leaves 3 rows (3, 5, 6) that do **not** correspond to any phase
+in any ledger on disk:
 
-**Every one of the 11 decisions was rejected — at check C2, not applied, and that rejection is
-itself the finding.** Each decision's `rationale` reads: `"snapshot inadmissible: allowed_models
-(workload): halt; max_spend_usd (workload): halt; workflow_phases_remaining (parent): halt | C2:
-snapshot is not admissible: ..."`. The validator (`control.validator.validate_decision`, C1-C10)
-worked exactly as designed: it caught every inadmissible snapshot at the second check and refused
-before the decision could be recorded as anything but `action="continue"`. Zero decisions were
-wrongly admitted; zero reached C3-C10. This is evidence the C1-C10 gate is doing its job, not
-evidence the plane is unsafe.
+- **Row 3 (`registry_canonicalize`, 23:16:40 UTC)** — `workflows/operations/registry_canonicalize.
+  yaml` is a real, existing spec; a sub-run against it was attempted (the router fired once, a
+  snapshot was compiled and registered — `experiments/data_manifest.json`'s registry has the
+  matching `context_snapshot` row) but **no `experiments/results/workflows/registry_canonicalize/`
+  directory exists at all** — the run crashed or was killed hard enough that `run_workflow.py`
+  never reached the code path that writes a ledger, even the `failed`-status kind that
+  `labbook_refresh`/`routing_kb_more_itertools` still managed to write. This sub-run is a 6th real
+  attempt, previously undercounted — it contributes one decision but zero measurable cost/duration
+  and is excluded from `n_executed_phases`.
+- **Rows 5 and 6 (`code_review`/`kb_write_path` "pre-attempts", 23:17:53 and 23:17:54 UTC)** — both
+  fire ~4 and ~20 minutes *before* the eventual successful ledger's `started_at`
+  (`code_review`: 23:21:57 UTC; `kb_write_path`: 23:37:30 UTC — **LEDGER**). Each is a router call
+  from an earlier invocation of the same spec that did not produce a ledger (most likely aborted
+  or superseded by a manual retry), followed later by a second, complete, successful invocation of
+  the same spec that did.
 
-**Coverage caveat on `n=11`:** the 5 distinct snapshots do not map 1:1 to the 11 decisions —
-`route_step`/the shadow router is called exactly once per phase in `workflow_runner.py`
-(confirmed: single call site, `src/agentic_dynamics/runtime/workflow_runner.py:532`), so the 8
-measured phases (**ARM**, §1) should produce 8 decisions, not 11. The extra 3 decisions
-(distribution across snapshots: 4/3/2/1/1) most likely come from sub-run invocations of
-`run_workflow.py` that were retried or interrupted before producing a final ledger JSON — the
-shadow-recording path is best-effort and independent of whether a ledger file is ultimately
-written, so an earlier, superseded invocation's router call still lands in the KB even though its
-phase never appears in `n_executed_phases`. This could not be reconstructed further from what's
-on disk; recorded as an accepted limitation. **The effective independent sample size for the
-flip decision is n=5 (one per distinct compiled snapshot), not n=11** — small either way.
+**Net effect: 6 real sub-run attempts against 5 distinct specs, not the 4 attempts against 3 specs
+this doc's first draft reported** — the shadow-recording path
+(`control.rules.record_shadow_decision`) is best-effort and independent of whether the invocation
+that triggered it ever finishes, so a router call from a crashed/superseded attempt still lands in
+the KB even though nothing else about that attempt is recoverable from the ledgers. **The
+effective independent sample size for the flip decision is n=11 decisions across 6 attempts / 5
+specs — still small, and only 2 of the 5 specs (`kb_write_path`, `code_review`) ever produced a
+complete, cost-and-duration-measured cell.**
 
-## 3. Analysis: shadow vs `step_routing`
+## 3. Analysis: how often shadow == `step_routing`, and why every decision was rejected
 
-- **Agreement rate: 0.0%** (`decision_regret = 1.0`, n=11 — **DEC**). But this is **mechanical**,
-  not a measured routing-quality gap: `route_next_job_v1` always returns `action="continue"` when
-  `ctx.admissible` is `False` (`src/agentic_dynamics/control/rules.py:105-115`), and every one of
-  the 5 snapshots this campaign compiled was inadmissible (§4). `step_routing.route_step` always
-  returns `action="route"` with a real model. With `admissibility_rate = 0.0%`, `decision_regret
-  = 1.0` is the *only* value `decision_calibration` can produce — the campaign never got far
-  enough to compare a routing choice against another routing choice.
-- No rejected decision disagreed with `step_routing` on grounds of a worse proposed model — the
-  plane never got to propose a model at all.
+- **Agreement rate: 0.0%** (`decision_regret = 1.0`, n=11 — **DEC**), exactly matching §1's
+  11-row, 11-disagree table. This is **mechanical, not a measured routing-quality gap**:
+  `route_next_job_v1` always returns `action="continue"` when `ctx.admissible` is `False`
+  (`src/agentic_dynamics/control/rules.py:105-115`), and `decision_calibration` counts any
+  `action != baseline_action` as a disagreement regardless of what model either side would have
+  picked (`src/agentic_dynamics/experiment/compile_experiment.py:355-360`). `step_routing.
+  route_step` always returns `action="route"` with a real model. With `admissibility_rate = 0.0%`
+  (**CTX**, §4), `decision_regret = 1.0` is the *only* value `decision_calibration` can produce —
+  the plane never got far enough to propose a model, so there is nothing to compare on the merits.
+- **Every one of the 11 decisions was rejected — at check C2, and that rejection is itself the
+  finding, inspected directly off each decision's own `rationale` field (RAW):** `"snapshot
+  inadmissible: allowed_models (workload): halt; max_spend_usd (workload): halt;
+  workflow_phases_remaining (parent): halt | C2: snapshot is not admissible: ..."`, identical
+  wording on all 11. The validator (`control.validator.validate_decision`, C1-C10) worked exactly
+  as designed: it caught every inadmissible snapshot at the **second** check and refused before
+  the decision could be recorded as anything but `action="continue"`. **Zero decisions were
+  wrongly admitted; zero reached C3-C10.** This is evidence the C1-C10 gate is doing its job, not
+  evidence the plane is unsafe — but it also means C3-C10 have never been exercised by a real run.
+- No rejected decision disagreed with `step_routing` over a worse *proposed model* — the plane
+  never got to propose one.
 
 ## 4. Coverage: n per cell, missing facts
 
 | signal | n | source |
 |---|---|---|
-| context snapshots compiled | 5 | **CTX** |
+| context snapshots compiled | 5 (distinct) | **CTX** |
 | admissible snapshots | 0 (0.0%) | **CTX** |
-| shadow decisions recorded | 11 (5 independent, §2) | **DEC** |
-| decisions admitted past C2 | 0 | inspected directly, §2 |
-| real executed phases | 8 (5 ok + 3 failed) | **ARM** |
-| real cells (spec runs that completed) | 2 (`kb_write_path`, `code_review`) | §1 |
+| shadow decisions recorded | 11 | **DEC** |
+| decisions admitted past C2 | 0 | inspected directly, §3 |
+| sub-run attempts (specs touched) | 6 attempts / 5 specs | §1-§2 |
+| attempts with a ledger on disk | 5 of 6 (`registry_canonicalize` produced none) | §2 |
+| real executed phases (measured cost+duration) | 8 (5 ok + 3 failed) | **ARM** |
+| real cells fully completed | 2 (`kb_write_path`, `code_review`) | §1 |
 
-Every one of the 5 snapshots is missing the same 5 predicates, 5/5 times each (**CTX**):
+Every one of the 5 distinct snapshots is missing the same 5 predicates, 5/5 times each (**CTX**):
 `allowed_models`, `job_accumulated_cost_usd`, `max_spend_usd`, `phase_test_verified`,
 `workflow_phases_remaining`. `unknown_rate = 100%`, `conflict_rate = 0%`, `stale_rate = 0%` — the
-facts are never resolved (no producer writes them for these cells), not stale or conflicting.
-This is the direct cause of §3's 0% agreement rate.
+facts are never *resolved* (no producer writes them for these cells), not stale or conflicting.
+This is the direct cause of §3's 0% agreement rate. Separately, `registry_canonicalize`'s missing
+ledger (§2) is a coverage gap in the *executed-phase* corpus, not the *snapshot/decision* corpus —
+its snapshot and decision are both present and counted everywhere above.
 
 ## 5. Verdict: apply may **NOT** flip yet — n too small, AND the underlying facts aren't populated
 
@@ -111,12 +146,12 @@ Per `docs/context_abstraction/implementation_notes.md` §12 step 4: flip only on
 `shadow_decision_report.py`'s agreement rate and `decision_arm_comparison.py`'s per-model loss
 together support "the plane is at least non-inferior for this spec." Neither can say that yet:
 
-1. **n is too small.** 5 independent snapshots (11 recorded decisions) across 2 real cells is far
-   below a usable sample for any non-inferiority claim, campaign-wide or per-spec.
+1. **n is too small.** 11 decisions across 6 attempts, only 2 of which became fully-measured real
+   cells, is far below a usable sample for any non-inferiority claim, campaign-wide or per-spec.
 2. **Zero admissible decisions exist.** `admissibility_rate = 0.0%` (**CTX**) means the plane has
    never once proposed a real `route` choice to compare against `step_routing` — the 100%
-   disagreement rate measures fact-population gaps, not routing quality. There is currently no
-   way to distinguish "the plane's policy is bad" from "the plane never got a chance to decide."
+   disagreement rate measures fact-population gaps, not routing quality. There is currently no way
+   to distinguish "the plane's policy is bad" from "the plane never got a chance to decide."
 
 **Flip prerequisites (blocking, in order):**
 
@@ -124,19 +159,20 @@ together support "the plane is at least non-inferior for this spec." Neither can
    `job_accumulated_cost_usd`, `max_spend_usd`, `phase_test_verified`,
    `workflow_phases_remaining` — so snapshots for real workflow cells become admissible at least
    some of the time. Until `admissibility_rate > 0`, no cell can produce a comparable decision.
-2. Fix the two specs (`labbook_refresh`, `routing_kb_more_itertools`) whose phase-level model
-   pin ignores `--model`, or route future shadow-campaign sub-runs around them, so attempts don't
-   burn against exhausted DeepSeek credits before reaching CAP (§1).
+2. Fix the two specs (`labbook_refresh`, `routing_kb_more_itertools`) whose phase-level model pin
+   ignores `--model`, and investigate why `registry_canonicalize`'s attempt produced no ledger at
+   all (§2) — future shadow-campaign sub-runs should not burn attempts on exhausted DeepSeek
+   credits or silent crashes before reaching CAP.
 3. Re-run `--cap-shadow` across enough ADMISSIBLE decisions (not just recorded ones) to read a
    meaningful `decision_regret` — implementation_notes.md §12 step 1's "meaningful number of
-   cycles" is not met by n=5.
-4. Re-read `shadow_decision_report.py` (agreement rate) and `decision_arm_comparison.py`
-   (per-model measured loss) together (§12 steps 2-3). Only once both show non-inferior once
-   admissible data exists does an operator add `workflow.params.control_route: true` to one
-   spec's YAML, in a normal reviewable commit.
+   cycles" is not met by n=11 decisions / 2 real cells.
+4. Re-read `shadow_decision_report.py` (agreement rate) and `decision_arm_comparison.py` (per-model
+   measured loss) together (§12 steps 2-3). Only once both show non-inferior once admissible data
+   exists does an operator add `workflow.params.control_route: true` to one spec's YAML, in a
+   normal reviewable commit.
 5. Apply stays OFF for every other spec regardless — this is a per-spec opt-in, never a default
    (§12).
 
 No report script required a fix this pass — `context_snapshot_report.py`,
 `shadow_decision_report.py`, and `decision_arm_comparison.py` were each re-run fresh and
-byte-for-byte reproduced the committed report JSONs.
+byte-for-byte reproduced the committed report JSONs (verified prior to this doc's first draft).
