@@ -72,6 +72,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # validate
     ("validate", "session"): "validate_session.py",
     ("validate", "tests"): "verify_tests.py",
+    ("validate", "prereq"): "evidence_prereq_gate.py",
     # supervise
     ("supervise",): "supervise.py",
     ("supervise", "claude-agents"): "claude_agents_supervisor.py",
@@ -105,7 +106,7 @@ Subcommands (each forwards to its backing script):
   registry    query|show|lineage
   review      all|stories|trigger|enqueue|finalize
   spec        status|pipeline
-  validate    session|tests
+  validate    session|tests|prereq
   supervise   [claude-agents]
 
 Run `agentic-dynamics <subcommand> --help` for the backing script's own options.

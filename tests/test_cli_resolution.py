@@ -79,6 +79,7 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     # validate
     (("validate", "session"), "validate_session.py", ()),
     (("validate", "tests"), "verify_tests.py", ()),
+    (("validate", "prereq"), "evidence_prereq_gate.py", ()),
     # supervise — the P1-2 regression: the two forms MUST resolve to different scripts.
     (("supervise",), "supervise.py", ()),
     (("supervise", "claude-agents"), "claude_agents_supervisor.py", ()),
