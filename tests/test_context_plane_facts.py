@@ -288,6 +288,16 @@ def test_predicate_registry_has_the_design_seed_rows():
         "checkpoint_model_unchanged",
         "model_change_required",
         "checkpoint_snapshot_identity",
+        "analysis_revision_matches",
+        "ast_parse_coverage",
+        "lsp_analysis_status",
+        "sonar_analysis_status",
+        "changed_symbol_count",
+        "impacted_symbol_count",
+        "new_lsp_error_count",
+        "new_sonar_critical_count",
+        "changed_symbols_with_tests_ratio",
+        "code_change_risk",
     }
 
 
