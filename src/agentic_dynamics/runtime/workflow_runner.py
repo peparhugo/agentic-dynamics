@@ -7,7 +7,10 @@ worktree.
 
 Phase kinds (from ``workflow.params.phases``):
   - ``agent`` (default) — invoke the LLM with the phase prompt. The prompt may use the
-    ``{goal}`` and ``{prior_phases}`` placeholders.
+    ``{goal}`` and ``{prior_phases}`` placeholders. An agent phase may additionally declare
+    ``test_gate: true`` to have the independent test_runner verify the worktree after the agent
+    completes — its outcome lands on ``PhaseResult.test_executed_success`` (the CAP test-runner
+    wiring seam, see docs/designs/current/cap_test_runner_wiring.md §1).
   - ``test`` — run the language's suite independently (via ``test_runner.run_suite``)
     and record ``test_executed_success``. No LLM involved.
 
@@ -269,6 +272,25 @@ def cell_scope(workdir: str | Path) -> str:
     """
     identity = os.environ.get("FINOPS_CELL_ID") or Path(workdir).name
     return f"self-{identity}"
+
+
+def _run_test_gate(pr: PhaseResult, wd: Path, language: str, timeout: int) -> None:
+    """Run the independent suite for an agent phase that declared ``test_gate: true``.
+
+    The test_runner (``run_suite``) is the sole source of truth for the outcome — never the
+    model's self-report (the workflow's ``no_self_reported_tests`` policy). Mirrors the
+    ``kind == "test"`` branch: a failed suite fails the phase, so the commit gate skips it and
+    ``stop_on_error`` honours the failure. When the runner did not execute (no gate, or the
+    agent phase already failed) the caller leaves ``test_executed_success`` at its ``None``
+    default — null-not-zero, never a fabricated value.
+    """
+    suite = run_suite(wd, language, timeout=timeout)
+    pr.tests_passed = suite["passed"]
+    pr.tests_total = suite["total"]
+    pr.test_executed_success = suite_succeeded(suite)
+    if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
+        pr.status = "failed"
+        pr.error = suite.get("tail", "")[-400:]
 
 
 def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
@@ -630,6 +652,17 @@ def run_workflow(
         except Exception as exc:  # one bad phase must not crash the runner
             pr.status = "failed"
             pr.error = repr(exc)
+
+        # CAP test-runner wiring (the named seam, docs/designs/current/cap_test_runner_wiring.md
+        # §1): an agent phase that declares ``test_gate: true`` gets the independent test_runner
+        # over the worktree after the agent completes. Its outcome lands on
+        # ``PhaseResult.test_executed_success`` — the only field ``attempt_facts/v1`` reads to
+        # mint ``phase_test_verified`` (kind-agnostic downstream). Additive and opt-in: phases
+        # without the gate, or an already-failed agent phase, leave the field ``None``
+        # (null-not-zero — no defaulting, no fabrication). A failing gate fails the phase so the
+        # commit below is skipped, exactly like the ``kind == "test"`` branch.
+        if kind != "test" and phase_def.get("test_gate") and pr.status == "ok":
+            _run_test_gate(pr, wd, language, phase_timeout)
 
         pr.duration_s = round(time.time() - t0, 2)
         if commit and pr.status == "ok":
