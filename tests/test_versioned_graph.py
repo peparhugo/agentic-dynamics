@@ -149,11 +149,33 @@ class TestVersionedPopulation:
             snap, revision="rev-1", repository_id=REPO, acl_scope="public", issues=[issue]
         )
         assert counts["affects"] == 1
+        # Issue keys are repository/revision-namespaced (cap_2a p1) and the node carries the
+        # traversal ACL so a scoped expansion can reach it (and its other AFFECTS targets).
+        key = f"{REPO}:rev-1:k1"
         assert _count(
             client,
-            "MATCH (:SonarIssue {key: 'k1'})-[:AFFECTS]->(:SymbolVersion {qualified_name: 'foo'}) "
+            "MATCH (:SonarIssue {key: $key})-[:AFFECTS]->(:SymbolVersion {qualified_name: 'foo'}) "
             "RETURN count(*) AS c",
+            {"key": key},
         ) == 1
+        rec = client._run_value(
+            "MATCH (d:SonarIssue {key: $key}) "
+            "RETURN d.repository_id AS repo, d.acl_scope AS acl, d.commit_sha AS rev",
+            {"key": key},
+        )
+        assert rec["repo"] == REPO and rec["acl"] == "public" and rec["rev"] == "rev-1"
+        # The same issue key in another revision never collides (namespaced key). The count
+        # is scoped to the namespaced prefix so legacy pre-namespacing residue in a shared
+        # Neo4j (old nodes without repository_id) cannot skew it.
+        counts2 = client.populate_versioned_graph(
+            snap, revision="rev-2", repository_id=REPO, acl_scope="public", issues=[issue]
+        )
+        assert counts2["affects"] == 1
+        assert _count(
+            client,
+            "MATCH (n:SonarIssue) WHERE n.key STARTS WITH $prefix RETURN count(*) AS c",
+            {"prefix": f"{REPO}:"},
+        ) == 2
 
     def test_multi_label_seed_join(self, client):
         client.create_knowledge_schema()

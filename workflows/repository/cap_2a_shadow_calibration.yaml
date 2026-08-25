@@ -5,7 +5,7 @@ question: >-
   blast radius over real workflow cells; the 2b randomized pilot launches only when the gate
   clears (proposal hit-rate >= 0.6 with a stated n). Design: cap_evidence_integrity_design.md §6
   (campaign 2a — control value, shadow calibration).
-version: "0.1"
+version: "0.2"
 artifact_kind: workflow
 intent: mutate
 side_effects:
@@ -39,26 +39,39 @@ workflow:
         versioned graph with traversal ACL, code_change_facts/v1 (10 job-scoped predicates incl.
         code_change_risk + TESTED_BY ratio), verify_code_change/v1 contract compiled through the
         R1-R11 gate, and scripts/run_workflow.py --change-analysis (e6 seam) injecting
-        EvidenceChangeAnalyzer at the composition root. KNOWN GAP this campaign fixes: the
-        injected analyzer carries graph_client=None, so impacted_symbol_count (the blast-radius
-        term in the risk formula) is never produced — the composition-root graph wiring is phase
-        p1 below. The e4 graph machinery (populate_versioned_graph, expand_candidates) is proven
-        by live-Neo4j tests. 2a is the FIRST campaign to consume the change facts — the facts
-        existed before but no spec required them (the requires_facts gate on cap_2a_verifier_gate
-        passes today).
+        EvidenceChangeAnalyzer at the composition root. This campaign is not allowed to infer
+        readiness from those facts existing in source: p1 must prove graph wiring, graph-down
+        status preservation, full-revision provenance, next-phase delivery, and citable fact
+        persistence. The e4 graph machinery (populate_versioned_graph, expand_candidates) is
+        proven by live-Neo4j tests. 2a is the FIRST campaign to consume the change facts.
       hard_rules: >-
-        (1) Every phase commits '[workflow] <phase>' with green checks. (2) APPLY STAYS OFF:
-        verify proposals are shadow-only, never applied, never armed (no control_route, no
-        actuation). (3) E4 lesson: p2 measures ONE cell's full cost before p3 commits a
-        per-cell budget — no budget without measurement. (4) Candidate cells are listed with
-        their measured costs BEFORE running (never run a cell the phase did not list). (5) A
-        graph-down cell is FLAGGED, never silently dropped or mislabeled (scored with the
-        delta-only facts, listed as flagged). (6) Every number in the verdict doc cites a
-        produced JSON (ledger, proposal record, or scoring table). (7) The gate is data-driven:
-        2b launches only when hit-rate >= 0.6 with a stated n; otherwise state the n needed.
-        (8) The adversarial phase (p6) is mandatory: findings re-verified against the tree +
-        known-safe list, no bare PASS. (9) No generated-surface edits (agent_config/,
-        .opencode/, .claude/). (10) PASS/FAIL log; resumable.
+        (1) Every implementation phase commits '[workflow] <phase>' with green checks; every
+        measurement phase writes a durable PASS/FAIL log even when it stops early. (2) APPLY
+        STAYS OFF: verify/rework/continue proposals are shadow-only, never applied, never armed;
+        no control_route, no actuation event, and no proposal may trigger rework. (3) The
+        proposal, baseline, outcome, and score are separate records; a model narrative is never
+        the sole evidence for any of them. (4) Before a cell runs, write an immutable candidate
+        manifest containing cell_id, exact spec path and git revision, goal, model/backend,
+        source baseline revision, worktree path, forecast cost, and graph mode. A cell not in that
+        manifest is not run. (5) p2 measures ONE representative cell's full target-model cost;
+        p3 may use that result only as a forecast for unmeasured cells and must report forecast
+        versus actual cost separately. No budget is called measured until its own cell ran. (6)
+        Every cell gets a fresh disposable worktree and unique FINOPS_CELL_ID from the same
+        source revision; no worktree reuse, reset, or cross-cell artifacts. (7) A graph-down cell
+        is FLAGGED, never silently dropped or mislabeled. Delta facts survive, impacted counts
+        are unknown (not zero), and blast-radius error is null with an explicit reason. (8)
+        Every proposal and outcome records the same cell_id, baseline revision, analyzed revision,
+        and contract/schema version; mismatches are invalid, not scored. (9) Every number in the
+        verdict cites a produced JSON and its SHA256. Unknown outcomes stay in the dataset and
+        flagged-cell count; they are absent from a metric denominator only when that metric's
+        required value is genuinely unavailable, with numerator/denominator/unknown counts
+        printed. (10) The raw 2b calibration threshold is hit-rate >= 0.6 with stated n; report a
+        Wilson 95% interval and mark small-n results descriptive-only (never clear 2b on an
+        unqualified tiny sample). (11) No generated-surface edits (agent_config/, .opencode/,
+        .claude/), no secret values in artifacts, and no external actuation. (12) p6 is mandatory:
+        every finding is re-verified against the tree and every non-finding is listed in a
+        known-safe output; no bare PASS. (13) All phases are resumable only when spec version,
+        goal hash, source revision, and candidate-manifest hash match; otherwise restart.
       read_first: >-
         docs/designs/current/cap_evidence_integrity_design.md §6, docs/review/
         cap_evidence_integrity_review.md (Resolutions section — the F3 wiring is the p1 target),
@@ -71,97 +84,193 @@ workflow:
         scripts/run_workflow.py (the --change-analysis block, ~line 213),
         src/agentic_dynamics/knowledge/graph.py:156 (Neo4jClient(uri, user, password) — ENV
         override convention FINOPS_NEO4J_*, "local dev only — override via ENV for prod"),
-        experiments/contexts/verify_code_change.yaml (actions: verify/rework/continue)
+        scripts/run_workflow.py (graph URI precedence, client close, graph_status),
+        src/agentic_dynamics/control/decisions.py (proposal action vocabulary and applied gate),
+        scripts/kb_produce_facts.py (what is and is not canonicalized from a workflow ledger),
+        experiments/contexts/verify_code_change.yaml (actions: verify/rework/continue; exact
+        fact missing/conflict behavior), tests/test_change_analyzer.py,
+        tests/test_workflow_runner.py, tests/test_run_workflow_graph_cli.py
       run_shape: >-
         SINGLE-model: --model deepseek/deepseek-v4-pro --backend opencode (operator preference;
-        sonnet when Claude OAuth is up). One worktree, one branch (feature/cap-2a-shadow-calibration);
-        each phase commits [workflow] <phase>. Sub-run cells execute small existing specs with
-        --change-analysis --change-analysis-graph inside this worktree.
+        sonnet when Claude OAuth is up). The outer workflow uses one branch
+        (feature/cap-2a-shadow-calibration); each measurement cell uses a fresh disposable
+        worktree from the recorded source revision and a unique FINOPS_CELL_ID, then copies only
+        its immutable ledger/proposal/outcome artifacts into the outer worktree. Sub-run cells
+        execute exact existing specs with --change-analysis and, when configured, the graph URI.
+        Never put a live Neo4j password, token, or full connection URI with credentials in a
+        committed artifact.
     phases:
       - name: p1_wire_graph_client
         kind: agent
         timeout: 10800
         prompt: |
           GOAL: {goal}
-          SHAPE: wire the versioned-graph client into the phase-boundary evidence seam at the
-          composition root. Today scripts/run_workflow.py builds EvidenceChangeAnalyzer() with
-          graph_client=None (the F3 review's documented follow-up). Change EXACTLY this: in the
-          --change-analysis block (scripts/run_workflow.py, after the router seams, ~line 213),
-          add a --change-analysis-graph <bolt-uri> flag (and/or FINOPS_NEO4J_URL env). When set,
-          inject EvidenceChangeAnalyzer(Neo4jClient(uri, user, password)) — the constructor at
-          src/agentic_dynamics/knowledge/graph.py:156, credentials from FINOPS_NEO4J_URI/
-          FINOPS_NEO4J_USER/FINOPS_NEO4J_PASSWORD with the module defaults (bolt://localhost:7687,
-          neo4j/password123). When the flag is absent OR the graph is unreachable, fall back to
-          graph_client=None exactly as today: delta-only facts, impacted_symbol_count omitted,
-          code_change_risk renormalized over the remaining terms — NEVER a crash, NEVER a
-          fabricated zero. Do not change EvidenceChangeAnalyzer's public behavior.
-          VERIFY: extend the seam tests — (a) tests/test_workflow_runner.py: the seam is inert
-          without the flag (change_analysis stays None) and analyzes with a graph-shaped double
-          injected; (b) tests/test_change_analyzer.py: the composition-root injection shape
-          (a real Neo4jClient-shaped object passes populate_versioned_graph/expand_candidates
-          through); (c) the graph-down fallback: an analyzer whose graph_client raises degrades
-          to delta-only facts, never a crash. Run python3 -m pytest tests/test_change_analyzer.py
-          tests/test_workflow_runner.py tests/test_code_change_facts.py — all green; keep
-          tests/test_dependency_direction.py green (scripts/ is not a plane; control imports are
-          not touched by this phase).
-          GUARD: without --change-analysis-graph, a run is byte-identical to the merged v1.
-          DELIVER: the wired script + tests, committed.
+          SHAPE: finish the executable p1 seam, not just the argparse flag. In scripts/run_workflow.py
+          (the --change-analysis composition-root block), add --change-analysis-graph <bolt-uri>
+          with deterministic precedence CLI > FINOPS_NEO4J_URI > FINOPS_NEO4J_URL and credentials
+          only from FINOPS_NEO4J_USER / FINOPS_NEO4J_PASSWORD. Construct Neo4jClient(uri, user,
+          password) lazily and close it in a finally block. A missing optional dependency,
+          constructor failure, timeout, or unreachable server is a measured graph_status=unavailable
+          condition, not a CLI failure. A deliberately unconfigured graph is graph_status=
+          not_requested. Do not silently collapse those states.
+
+          The analyzer must populate BOTH the parent and after snapshots before expansion so
+          removed-symbol seeds resolve on a fresh graph. Its impact traversal must exclude
+          SUPERSEDES, keep repository_id + acl_scope on every reachable node, and use full 40-byte
+          commit SHAs for snapshot/version identity. A graph failure preserves delta-derived facts,
+          omits impacted_symbol_count (never zero), and records the failure state. The bounded
+          neighborhood and facts must be delivered to the NEXT phase in a JSON-safe, capped
+          evidence block; no analyzer injection means no prompt or ledger change.
+
+          Add the missing shadow proposal seam before declaring p1 complete: a versioned, validated
+          proposal record for verify_code_change/v1 with proposal_id, cell_id, baseline_revision,
+          analyzed_revision, facts_used, action, depth, scope, expected_effect, applied=false, and
+          recorded_at. It must be artifact-only in shadow mode; no control_route, actuation event,
+          or rework call site. If the proposal cannot be emitted and validated, later cells MUST
+          refuse to run rather than hand-authoring proposals.
+
+          VERIFY: extend hermetic tests for (a) no-flag byte-identical behavior, (b) URI/env
+          precedence, credentials and guaranteed client close, (c) graph construction and graph
+          expansion failure preserving delta facts with graph_status=unavailable, (d) deleted
+          symbols resolving from the parent revision, (e) SUPERSEDES excluded from impact, (f)
+          full-SHA provenance and next-phase evidence delivery, and (g) proposal schema validation
+          with applied=false. Run python3 -m pytest tests/test_change_analyzer.py
+          tests/test_workflow_runner.py tests/test_run_workflow_graph_cli.py
+          tests/test_code_change_facts.py tests/test_versioned_graph.py tests/test_graph.py
+          tests/test_dependency_direction.py — all green. A live Neo4j test is additive, never
+          the only coverage; the hermetic doubles must test the actual contracts.
+          GUARD: without --change-analysis, a run is byte-identical to the merged v1, even when
+          graph env vars are present. Do not put credentials in logs or committed artifacts.
+          DELIVER: the wired runtime, proposal seam, tests, and a short p1 verification JSON,
+          committed.
           LOG: files touched, test result, PASS/FAIL; commit.
       - name: p2_measure_one_cell
         kind: agent
         timeout: 7200
         prompt: |
           GOAL: {goal}
-          SHAPE: measure ONE full cell end-to-end before any budget is committed (E4 lesson —
-          the grit pilot ran 10x over its cost envelope because the per-cell cost was never
-          measured first). Candidate SMALL workflow specs with completed ok runs on the index
-          (experiments/specs/STATUS.md): queue_steer ($0.033), labbook_refresh ($0.0275),
-          finding_economics_closure ($1.28), registry_canonicalize ($0.19),
-          canonical_publication_closure ($1.45). Pick the smallest with agent phases that
-          commit; state the choice + reason. Check Neo4j is reachable at bolt://localhost:7687
-          (the e4 live tests' skipif condition); if down, fix or record it (a graph-down cell is
-          scored delta-only and FLAGGED — never silently dropped).
-          RUN: python3 scripts/run_workflow.py --spec <small spec> --goal <short goal>
-          --model deepseek/deepseek-v4-pro --change-analysis --change-analysis-graph
-          bolt://localhost:7687 --workdir <worktree> (one temp worktree on a temp branch).
-          RECORD: cost, duration, and the facts the seam emitted per committed phase —
-          changed_symbol_count, impacted_symbol_count (NOW non-None — the p1 proof),
-          code_change_risk, ast_parse_coverage; whether the proposal records are complete.
-          DELIVER: the cell's ledger + proposal records; the measured per-cell cost + a proposed
-          per-cell budget for p3 (measured cost x 2 headroom).
+          SHAPE: measure ONE full target-model cell end-to-end before any p3 budget is committed
+          (E4 lesson — the grit pilot ran 10x over its cost envelope because per-cell cost was
+          never measured first). Candidate paths, with historical index costs (NOT target-model
+          measurements), are:
+          workflows/operations/queue_steer.yaml ($0.0330),
+          workflows/operations/labbook_refresh.yaml ($0.0275),
+          workflows/repository/registry_canonicalize.yaml ($0.1872),
+          workflows/repository/finding_economics_closure.yaml ($1.2820),
+          workflows/repository/canonical_publication_closure.yaml ($1.4475).
+          Check each candidate's current phases, side effects, and latest ledger before selecting
+          the smallest one that commits and has an independent test/result signal. Write the
+          candidate manifest FIRST: candidate_id, exact path, path SHA256, target model/backend,
+          goal, source baseline revision, fresh worktree path, FINOPS_CELL_ID, graph mode, and
+          historical cost. Then select exactly one candidate and state the reason.
+
+          RUN from that recorded source revision in a fresh disposable worktree. Use
+          python3 scripts/run_workflow.py --spec <exact path> --goal <short goal>
+          --model deepseek/deepseek-v4-pro --backend opencode --change-analysis
+          [--change-analysis-graph bolt://localhost:7687] --workdir <worktree>.
+          If Neo4j is unavailable, do NOT fabricate a successful graph check: run the cell in
+          delta-only mode, record graph_status=unavailable (or not_requested only when graph was
+          intentionally disabled), and flag it. The cell still contributes to the shadow dataset.
+
+          RECORD one immutable cell manifest and one ledger row per committed phase. Each row must
+          carry cell_id, spec_id/version, model/backend, baseline revision, analyzed full revision,
+          graph_status, graph_updated, facts (including omitted facts explicitly listed), proposal
+          id/schema, cost, duration, test result, and artifact SHA256s. Verify that proposal
+          records are machine-valid and applied=false before accepting the cell. The baseline and
+          proposal must refer to the same worktree, input, and analyzed revision; otherwise mark
+          the cell invalid and stop scoring it.
+
+          DELIVER: candidate manifest, selected cell manifest, phase ledger, validated proposal
+          records, graph reachability result, exact actual cost/duration, and a p3 forecast budget
+          of measured target cost x 2 headroom. Label that budget FORECAST, not measured; p3 must
+          report each later cell's forecast and actual separately. No p3 cell may run until p2's
+          manifest and measured-cost JSON are committed.
           LOG: cost/duration/facts table, PASS/FAIL; commit.
       - name: p3_run_shadow_cells
         kind: agent
         timeout: 14400
         prompt: |
           GOAL: {goal}
-          SHAPE: run the campaign's remaining cells: 2-3 small existing specs (list the
-          candidates + per-cell cost from p2's measurement BEFORE running — hard rule 4).
-          Each cell: baseline executes while the adaptive verifier proposes shadow-only —
-          verify_code_change/v1 actions {verify, rework, continue} with depth/scope, recorded,
-          NEVER applied, never armed (no control_route, no actuation). Cells may reuse one
-          worktree sequentially. Graph-down cells: run and flag, never silently drop.
-          DELIVER: the run ledgers + proposal records (the shadow dataset).
-          LOG: per-cell cost/duration/proposal table; PASS/FAIL; commit.
+          SHAPE: run 2-3 remaining small cells selected from the p2 candidate manifest. Before
+          ANY execution, commit a p3 execution manifest listing every cell, exact spec path and
+          path SHA256, source baseline revision, goal hash, model/backend, fresh worktree,
+          FINOPS_CELL_ID, graph mode, p2-derived FORECAST budget, and stop condition. A p2
+          representative cost is not a measured cost for these cells; record forecast and actual
+          independently. Do not add an unlisted cell after the fact.
+
+          For each cell, create a fresh worktree from the same recorded source revision. Run the
+          static baseline exactly once. Before any outcome is known, emit and persist one
+          verify_code_change/v1 shadow proposal with the exact actions {verify, rework, continue},
+          depth, scope, facts_used, analyzed revision, expected effect, proposal schema version,
+          and applied=false. Validate the proposal against the contract and reject malformed or
+          stale proposals. Then let the baseline complete without consuming the proposal: no
+          adaptive retry, no rework, no route change, no control_route, no actuation, and no
+          hidden second attempt. The proposal must never influence the realized outcome.
+
+          Define the realized outcome independently from the proposal using the baseline's
+          immutable commit, independent test_runner result, and an independent post-hoc evaluator.
+          Use the fixed enum {no_rework, verification_only, targeted_rework, broad_rework,
+          unknown}; record realized_depth and a stable realized_symbol_set of
+          repository_id + revision + file_path + qualified_name + kind. Do not use a model's
+          narrative as both proposal and label. If baseline, worktree, input, analyzed revision,
+          test result, or outcome evidence is mismatched, record outcome=unknown and invalid_for
+          any metric that requires the missing field; never repair it by inference.
+
+          Graph-down cells run and remain in the dataset with graph_status=unavailable and a flag.
+          Delta-only facts are valid evidence for action/depth calibration where the required
+          values exist; predicted impacted count and blast-radius error are null when the graph
+          prediction is unavailable, never zero. Persist one cell manifest, one proposal record,
+          one independent outcome record, and one cost/phase ledger per cell. Hash every input and
+          output. Stop before the next cell if cumulative actual cost would exceed the p2-derived
+          forecast envelope or the declared stop budget; record the stopped cell as not-run rather
+          than silently omitting it.
+
+          DELIVER: immutable p3 manifest, all cell ledgers, validated shadow proposals, independent
+          outcomes, graph-status flags, forecast-vs-actual cost table, and artifact SHA256 index.
+          LOG: per-cell cost/duration/proposal/outcome table; PASS/FAIL; commit.
       - name: p4_score_hit_rate
         kind: agent
         timeout: 10800
         prompt: |
           GOAL: {goal}
-          SHAPE: score the proposals against the outcomes the baseline actually produced.
-          SEMANTICS (defined here): proposal hit-rate = fraction of proposals whose
-          action+depth matched the realized need (proposal said rework/continue and the
-          baseline's actual outcome required that rework/scope; proposal depth vs realized
-          scope of the change). predicted-vs-observed blast radius = per cell,
-          |predicted impacted_symbol_count - realized impacted set size| (realized from the
-          cell's rework/session artifacts — the symbols actually touched downstream).
-          risk vs actual rework: code_change_risk bucket vs whether rework occurred.
-          Per-cell table + aggregate; emit experiments/results/cap_2a_score_<ts>.json.
-          Graph-down cells: scored with the delta-only facts, listed as flagged — NEVER
-          silently dropped, NEVER excluded from the denominator without a note.
-          GUARD: the hit-rate denominator is proposals with recorded outcomes; a cell whose
-          outcome is unknown is flagged, not excluded; no cherry-picking.
-          DELIVER: the scoring JSON + table in the log.
+          SHAPE: score only immutable p2/p3 artifacts and first validate their joins. Emit
+          experiments/results/cap_2a_score_<UTC timestamp>.json with schema_version
+          cap_2a_score/v1, input artifact paths + SHA256s, spec version, source revision,
+          candidate-manifest hash, and a per-cell row. Refuse to score a row whose cell_id,
+          baseline revision, analyzed revision, proposal_id, or contract version does not match;
+          emit it as invalid/flagged instead.
+
+          SEMANTICS (fixed, executable):
+          * proposal hit-rate is a binary per-proposal field. It is 1 only when the proposal's
+            action AND depth match the independently adjudicated realized need. `continue` hits
+            only `no_rework` (and may not claim verification depth); `verify` hits
+            `verification_only` when proposed depth >= realized_depth; `rework` hits
+            `targeted_rework` or `broad_rework` only when its scope contains the realized scope
+            and its depth is >= realized_depth. A proposal with missing/invalid action, depth,
+            scope, or an unknown outcome is not a hit.
+          * hit-rate numerator = sum(hit=1); denominator = proposals with a complete proposal and
+            recorded non-unknown outcome. Publish n_scored, n_hits, n_unknown_outcome,
+            n_invalid_join, and n_not_run separately. Unknown rows remain in the table and the
+            dataset; they are not silently removed.
+          * predicted-vs-observed blast-radius error is
+            abs(predicted_impacted_symbol_count - len(realized_symbol_set)), where both counts
+            use stable symbol identity (repository_id, revision, file_path, qualified_name, kind)
+            and the realized set comes from the independent evaluator, not the proposal. If the
+            graph is unavailable or the predicted count is absent, error=null and the row is
+            graph_flagged; do not encode unknown as zero. Report its own n_available denominator.
+          * risk calibration is a distribution/table of code_change_risk bucket versus realized
+            rework enum. Do not call it causal or predictive with this counterfactual design.
+
+          Compute per-cell rows FIRST, then aggregates. Include graph-unavailable rate,
+          outcome-recorded rate, proposal-validation rate, hit-rate, n, Wilson 95% interval,
+          blast-radius mean/median over available predictions, and all flagged/unknown counts.
+          A graph-down cell can contribute to hit-rate when its proposal/outcome are complete, but
+          it can never contribute a predicted-blast-radius value. Never cherry-pick cells or use
+          a denominator that is not printed.
+
+          DELIVER: the scoring JSON, a human-readable table in the log, and a validation result
+          proving every verdict number can be traced to one JSON field. No recommendation about
+          2b is made in this phase.
           LOG: hit-rate, blast-radius delta, flagged cells; PASS/FAIL; commit.
       - name: p5_verdict
         kind: agent
@@ -169,13 +278,29 @@ workflow:
         prompt: |
           GOAL: {goal}
           DELIVER exactly one file: docs/designs/current/cap_2a_shadow_calibration.md
-          SHAPE: cells table (spec, model, cost, duration, proposal, realized outcome, agree/
-          disagree); analysis: proposal hit-rate vs the >= 0.6 gate, predicted-vs-observed blast
-          radius, flagged cells and why; VERDICT: does 2b's gate clear (hit-rate >= 0.6 with
-          stated n)? If not, the n needed and the blocker. 2b prerequisites per design §6:
-          randomized static-vs-adaptive on live runs, outcome non-inferiority under adaptive
-          control (the counterfactual 2a cannot provide); 2b launches ONLY on this gate.
-          GUARD: every number cites the p4 JSONs; no recommendation without n.
+          SHAPE: include the source revision, spec version, candidate-manifest hash, and SHA256
+          for every p4 JSON used. The cells table must contain cell_id, exact spec/path, model and
+          backend, baseline/analyzed revisions, graph_status, forecast and actual cost, duration,
+          proposal action/depth/scope, proposal validity, realized outcome/depth/symbol-set size,
+          hit/miss/unknown/invalid status, and blast-radius error or null + reason.
+          ANALYSIS: report proposal hit-rate as n_hits/n_scored, the Wilson 95% interval, the
+          printed unknown/invalid/not-run denominators, graph-down rate, outcome-recorded rate,
+          and predicted-vs-observed blast radius only over rows with an available prediction.
+          VERDICT: state exactly whether the raw 2b calibration threshold hit-rate >= 0.6 is met,
+          with n and interval. Mark the result descriptive-only when n is below the campaign's
+          declared minimum or the lower confidence bound is below 0.6; never turn a tiny sample
+          into an authorization. If the gate does not clear, state the additional valid outcomes
+          needed and the blocker; if it clears, state that 2b is eligible for design review, not
+          that 2b has run.
+
+          2b prerequisites per design §6 are mandatory and must be restated: randomized
+          static-vs-adaptive assignment on live runs, pre-registered non-inferiority margin and
+          outcome metric, independent test execution, budget/SLA guard, and outcome
+          non-inferiority under adaptive control. Counterfactual 2a cannot provide these. 2b
+          launches ONLY after the p4 threshold and prerequisites are explicitly reviewed; p5
+          itself never launches a run, flips control_route, or arms actuation.
+          GUARD: every number cites a p4 JSON field; no recommendation without n, denominator,
+          uncertainty, and flagged-cell treatment.
           LOG: PASS/FAIL; commit.
       - name: p6_adversarial
         kind: agent
@@ -189,10 +314,25 @@ workflow:
           cells silently dropped or mislabeled as full-fact, stale facts consumed
           (analysis_revision_matches=false ignored), hit-rate denominator games (unknown-outcome
           cells excluded without a note), p1 wiring that changes no-graph behavior (byte-identical
-          claim falsifiable by diff). Every finding: fix or record as accepted limitation with
-          reasoning. Deliver the TWO required outputs: findings (re-verified, each resolved) +
-          known-safe list (attacks attempted, not falsified, with what was tried and why it did
-          not apply). Re-state the verdict with the attack results. No bare PASS.
+          claim falsifiable by diff), graph construction failure mislabeled not_requested, deleted
+          symbols absent because only the after revision was populated, SUPERSEDES counted as
+          impact, duplicate qualified names collapsed into one symbol, short-SHA or reused-cell
+          identity collision, candidate cost presented as a measurement when it was only historical,
+          proposal/outcome circular labeling, missing independent test evidence, malformed or
+          stale proposal accepted, `applied` true or any actuation call, canonical fact emission
+          silently absent, unclosed Neo4j driver, leaked credentials, and a p4 JSON whose hashes
+          do not match the verdict citations. Every finding: fix it in code/spec/artifacts or
+          record it as an accepted limitation with reasoning and residual risk.
+
+          Deliver TWO exact outputs:
+          1. docs/reviews/cap_2a_shadow_calibration_adversary.md — attack, evidence path/line,
+             result, fix or accepted limitation, and re-test for every finding; include a
+             re-stated verdict.
+          2. docs/reviews/cap_2a_shadow_calibration_known_safe.md — every attempted attack that
+             did not falsify the campaign, what was tried, artifact/tree evidence, and why it is
+             safe. This is not a generic checklist and must not say only PASS.
+          Do not silently rewrite p4 JSONs or the p5 verdict; if a correction is required, point
+          to the corrected artifact and include both old/new hashes.
           LOG: finding table + known-safe list; PASS/FAIL; commit.
 factors:
   - {name: model, levels: [deepseek/deepseek-v4-pro]}
@@ -202,35 +342,60 @@ rules:
     plane: measurement
     evidence_class: "[M]"
     requires: []
-    produces: [graph_client_wired]
+    produces: [graph_client_wired, graph_status_recorded, full_revision_provenance,
+               neighborhood_delivered, proposal_seam_validated, facts_citable]
   - name: cap_2a_cells_run
     plane: measurement
     evidence_class: "[M]"
     requires: []
-    produces: [shadow_cells_run, proposals_recorded]
+    produces: [shadow_cells_run, proposals_recorded, outcomes_recorded,
+               baseline_revision_matches, graph_status_recorded]
   - name: cap_2a_scoring
     plane: measurement
     evidence_class: "[C]"
-    requires: [shadow_cells_run, proposals_recorded]
-    produces: [proposal_hit_rate, predicted_vs_observed_blast_radius]
+    requires: [shadow_cells_run, proposals_recorded, outcomes_recorded,
+               baseline_revision_matches, graph_status_recorded]
+    produces: [proposal_hit_rate, predicted_vs_observed_blast_radius,
+               blast_radius_error, unknown_outcome_count, flagged_cell_count]
   - name: cap_2a_verifier_gate
     plane: control
     evidence_class: "[H]"
     decision_type: verify_code_change
     requires_facts:
-      - {fact: changed_symbol_count, scope: self, value_type: int, on_missing: halt}
-      - {fact: impacted_symbol_count, scope: self, value_type: int, on_missing: continue}
-      - {fact: code_change_risk, scope: self, value_type: float, on_missing: continue}
-      - {fact: ast_parse_coverage, scope: self, value_type: float, on_missing: continue}
+       - {fact: sonar_analysis_status, scope: self, value_type: enum,
+          on_missing: classify, on_conflict: halt}
+       - {fact: lsp_analysis_status, scope: self, value_type: enum,
+          on_missing: classify, on_conflict: halt}
+       - {fact: analysis_revision_matches, scope: self, value_type: bool,
+          on_missing: classify, on_conflict: halt}
+       - {fact: changed_symbol_count, scope: self, value_type: int, on_missing: halt}
+       - {fact: ast_parse_coverage, scope: self, value_type: float,
+          on_missing: halt, on_conflict: halt}
+       - {fact: code_change_risk, scope: self, value_type: float,
+          on_missing: halt, on_conflict: halt}
+       - {fact: new_sonar_critical_count, scope: self, value_type: int,
+          on_missing: classify, on_conflict: halt}
+       - {fact: new_lsp_error_count, scope: self, value_type: int,
+          on_missing: classify, on_conflict: halt}
+       - {fact: impacted_symbol_count, scope: self, value_type: int,
+          on_missing: classify, on_conflict: halt}
+       - {fact: changed_symbols_with_tests_ratio, scope: self, value_type: float,
+          on_missing: classify, on_conflict: halt}
     produces: [gate_decision]
 metrics:
   - {name: shadow_cells_run, agg: mean, over: cell}
-  - {name: proposal_hit_rate, agg: mean, over: cell}
-  - {name: predicted_vs_observed_blast_radius, agg: mean, over: cell}
-  - {name: gate_decision, agg: mean, over: cell}
-comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+  - {name: proposal_hit_rate, agg: ratio, over: outcome}
+  - {name: predicted_vs_observed_blast_radius, agg: distribution, over: cell}
+  - {name: graph_down_rate, agg: ratio, over: cell}
+  - {name: outcome_recorded_rate, agg: ratio, over: cell}
+  - {name: proposal_validation_rate, agg: ratio, over: cell}
+  - {name: gate_decision, agg: distribution, over: cell}
+# No causal arm comparison exists in 2a: model is held constant and the adaptive action is
+# shadow-only. The randomized static-vs-adaptive comparison belongs to campaign 2b.
+comparison: null
 writeup:
   format: lab_book
   sections: [question, p1_wire_graph_client, p2_measure_one_cell, p3_run_shadow_cells, p4_score_hit_rate, p5_verdict, p6_adversarial]
 stop: {budget_usd: 30.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
+seed: 2

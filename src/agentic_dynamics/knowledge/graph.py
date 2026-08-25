@@ -51,6 +51,13 @@ ALLOWED_EXPANSION_RELS = frozenset(
     }
 )
 
+#: The impact-traversal allowlist — the executor-impact edges ONLY (design §5.7, cap_2a p1).
+#: ``SUPERSEDES`` is version history, not blast radius: a changed symbol's older versions are
+#: the same entity's past, so the bounded impact expansion (``control.evidence_analyzer``'s
+#: ``_neighborhood``) must never traverse them as impact edges. Retrieval keeps the full
+#: ``ALLOWED_EXPANSION_RELS`` (version history stays retrievable); impact expansion narrows it.
+IMPACT_EXPANSION_RELS = frozenset(ALLOWED_EXPANSION_RELS - {"SUPERSEDES"})
+
 #: Versioned-graph node labels (design §5.5, two-ID contract). ``ModuleVersion`` /
 #: ``SymbolVersion`` nodes carry ``entity_id`` (stable slot) + ``version_id`` (immutable
 #: version) and ALWAYS carry ``repository_id`` + ``acl_scope`` — a versioned node missing
@@ -206,10 +213,8 @@ class Neo4jClient:
         knowledge base retrievable by the lexical leg.
         """
         for stmt in _KNOWLEDGE_CONSTRAINTS + _KNOWLEDGE_INDEXES + _KNOWLEDGE_FULLTEXT:
-            try:
+            with contextlib.suppress(Exception):
                 self._run(stmt)
-            except Exception:
-                pass
 
     def load_operators(self) -> None:
         operators = [
@@ -881,7 +886,7 @@ class Neo4jClient:
                     counts["imports"] += 1
 
         # CALLS: SymbolVersion -> SymbolVersion (name-based best-effort from sym.calls).
-        for (path, qname, kind), svid in sym_vids.items():
+        for (path, qname, _kind), svid in sym_vids.items():
             for sym in snapshot.files.get(path, []):
                 if sym.qualified_name != qname:
                     continue
@@ -919,18 +924,25 @@ class Neo4jClient:
                     )
                     counts["tested_by"] += 1
 
-        # AFFECTS: optional issues/diagnostics -> smallest containing SymbolVersion.
+        # AFFECTS: optional issues/diagnostics -> smallest containing SymbolVersion. The
+        # SonarIssue/Diagnostic nodes carry the traversal ACL (``repository_id`` +
+        # ``acl_scope``) so a scoped expansion can reach them (and their other AFFECTS
+        # targets), and their keys are repository/revision-namespaced so the same issue key
+        # in different repositories or revisions never collides (cap_2a p1 hardening).
         for issue in issues or []:
             vid = self._version_id_for_location(snapshot, issue.file_path, issue.line, repository_id, revision)
             if vid is None:
                 continue
+            issue_key = f"{repository_id}:{revision}:{issue.key}"
             self._run(
-                "MERGE (d:SonarIssue {key: $key}) "
-                "SET d.rule = $rule, d.severity = $severity, d.file_path = $path, d.line = $line "
+                "MERGE (d:SonarIssue {key: $key, repository_id: $repo, acl_scope: $acl}) "
+                "SET d.commit_sha = $revision, d.rule = $rule, d.severity = $severity, "
+                "d.file_path = $path, d.line = $line "
                 f"WITH d MATCH (s:{SYMBOL_VERSION_LABEL} {{version_id: $vid}}) "
                 "MERGE (d)-[:AFFECTS]->(s)",
                 {
-                    "key": issue.key, "rule": issue.rule, "severity": issue.severity,
+                    "key": issue_key, "repo": repository_id, "acl": acl_scope,
+                    "revision": revision, "rule": issue.rule, "severity": issue.severity,
                     "path": issue.file_path, "line": issue.line, "vid": vid,
                 },
             )
@@ -939,14 +951,17 @@ class Neo4jClient:
             vid = self._version_id_for_location(snapshot, diag.file, diag.line, repository_id, revision)
             if vid is None:
                 continue
+            diag_key = f"{repository_id}:{revision}:{diag.file}:{diag.line}:{diag.code}"
             self._run(
-                "MERGE (d:Diagnostic {key: $key}) "
-                "SET d.rule = $rule, d.severity = $severity, d.file_path = $path, d.line = $line "
+                "MERGE (d:Diagnostic {key: $key, repository_id: $repo, acl_scope: $acl}) "
+                "SET d.commit_sha = $revision, d.rule = $rule, d.severity = $severity, "
+                "d.file_path = $path, d.line = $line "
                 f"WITH d MATCH (s:{SYMBOL_VERSION_LABEL} {{version_id: $vid}}) "
                 "MERGE (d)-[:AFFECTS]->(s)",
                 {
-                    "key": f"{diag.file}:{diag.line}:{diag.code}", "rule": diag.code,
-                    "severity": diag.severity, "path": diag.file, "line": diag.line, "vid": vid,
+                    "key": diag_key, "repo": repository_id, "acl": acl_scope,
+                    "revision": revision, "rule": diag.code, "severity": diag.severity,
+                    "path": diag.file, "line": diag.line, "vid": vid,
                 },
             )
             counts["affects"] += 1
@@ -1085,14 +1100,19 @@ class Neo4jClient:
         timeout_ms: int = 300,
         repository_id: str = "",
         acl_scope: str = "",
+        rels: frozenset[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Return the bounded, allowlisted neighborhood of one or more seed nodes.
 
-        BFS over ``ALLOWED_EXPANSION_RELS`` only, bounded by depth
-        (<= ``max_depth``), neighbors per node per hop (<= ``max_neighbors``),
-        total nodes (<= ``max_nodes``), and wall-clock time (<= ``timeout_ms``).
-        ``seed_ids`` are canonical cross-store ids (knowledge_id / doc_id /
-        step_id / entity_id); a seed that cannot be resolved is skipped cleanly.
+        BFS over the relationship allowlist (``rels`` or the full ``ALLOWED_EXPANSION_RELS``
+        by default), bounded by depth (<= ``max_depth``), neighbors per node per hop
+        (<= ``max_neighbors``), total nodes (<= ``max_nodes``), and wall-clock time
+        (<= ``timeout_ms``). ``seed_ids`` are canonical cross-store ids (knowledge_id /
+        doc_id / step_id / entity_id); a seed that cannot be resolved is skipped cleanly.
+        ``rels`` lets a caller narrow the traversal — the impact expansion passes
+        ``IMPACT_EXPANSION_RELS`` (version history is not a blast-radius edge) while
+        retrieval keeps the full allowlist. Backward compatible: ``None`` (default) is the
+        full ``ALLOWED_EXPANSION_RELS``.
 
         TRAVERSAL ACL (design §5.5, finding 2): when BOTH ``repository_id`` and
         ``acl_scope`` are supplied, the seed resolution AND every Cypher hop
@@ -1109,7 +1129,7 @@ class Neo4jClient:
         ``seed_score * weight * 0.7**depth``. Seeds first (depth 0), then
         breadth-first. Pure read.
         """
-        rels = "|".join(sorted(ALLOWED_EXPANSION_RELS))
+        rels = "|".join(sorted(rels or ALLOWED_EXPANSION_RELS))
         deadline = time.monotonic() + timeout_ms / 1000.0
 
         visited: dict[str, dict[str, Any]] = {}  # keyed by elementId (insertion-ordered)

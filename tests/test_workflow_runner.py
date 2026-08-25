@@ -286,20 +286,90 @@ def test_run_workflow_change_analysis_seam(tmp_path):
 
 
 def test_run_workflow_change_analysis_inert_without_injection(tmp_path):
-    """Without an injected analyzer the seam is inert: change_analysis stays None and the
-    phase result is byte-identical to a plain run (review F3's no-op default)."""
+    """Without an injected analyzer the seam is inert: change_analysis stays None, the phase
+    result is byte-identical to a plain run (review F3's no-op default), and NO evidence block
+    reaches any phase prompt."""
     spec = load_spec(SPEC)
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
 
+    prompts = []
+
     def agent(prompt, *, model, backend, workdir, **kwargs):
+        prompts.append(prompt)
         (Path(workdir) / "app.py").write_text("def f():\n    return 1\n")
         return _fake_agent(files_created=["app.py"])
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
     assert result.phases[0].commit_hash
     assert result.phases[0].change_analysis is None
+    assert all(p.change_analysis is None for p in result.phases)
+    assert all("EVIDENCE" not in p for p in prompts)  # prompts byte-identical without injection
+
+
+def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path):
+    """cap_2a p1 (design §5.7): the ChangeInput revisions are FULL commit SHAs (provenance,
+    the short hash stays display-only), and the NEXT phase's prompt receives a bounded,
+    machine-readable evidence context (graph status, full revision, neighborhood, facts)."""
+    import re
+
+    from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
+
+    class RecordingAnalyzer:
+        def __init__(self):
+            self.changes = []
+
+        def analyze(self, change):
+            self.changes.append(change)
+            return ChangeAnalysis(
+                facts=({"predicate": "changed_symbol_count", "value": "1",
+                        "value_type": "int", "evidence_ids": ()},),
+                neighborhood=("f",),
+                graph_status="available",
+                revision=change.revision,
+            )
+
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    prompts = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        prompts.append(prompt)
+        n = len(prompts)
+        (Path(workdir) / "app.py").write_text(f"def f{n}():\n    return {n}\n")
+        return _fake_agent(files_created=["app.py"])
+
+    analyzer = RecordingAnalyzer()
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                          run_agentic_fn=agent, change_analyzer=analyzer)
+
+    # The FIRST phase's commit is the root commit (no parent to diff) -> not analyzed; the
+    # SECOND committed phase is analyzed with FULL-SHA revisions.
+    assert result.phases[0].change_analysis is None
+    assert len(analyzer.changes) >= 1
+    change = analyzer.changes[0]
+    assert re.fullmatch(r"[0-9a-f]{40}", change.revision) is not None  # full SHA, not short
+    assert change.after.revision == change.revision
+    assert re.fullmatch(r"[0-9a-f]{40}", change.before.revision) is not None  # parent full SHA
+    # The displayed commit_hash stays the SHORT form.
+    assert re.fullmatch(r"[0-9a-f]{7,}", result.phases[1].commit_hash) is not None
+    assert len(result.phases[1].commit_hash) < len(change.revision)
+
+    # The NEXT agent phase's prompt (implement, after ux_design was analyzed) carries the
+    # bounded evidence block with graph status, revision, neighborhood, and facts.
+    evidence_prompts = [p for p in prompts if "EVIDENCE" in p]
+    assert evidence_prompts, "the next-phase prompt must receive the evidence context"
+    line = next(l for l in evidence_prompts[0].splitlines() if l.strip().startswith("- EVIDENCE"))
+    payload = json.loads(line.split("EVIDENCE ", 1)[1])
+    assert payload["graph_status"] == "available"
+    assert payload["revision"] == change.revision
+    assert payload["neighborhood"] == ["f"]
+    assert payload["facts"][0]["predicate"] == "changed_symbol_count"
+    assert payload["phase"] == "ux_design"  # the analyzed phase whose evidence rode forward
 
 
 def test_run_workflow_change_analysis_root_commit_never_fails(tmp_path):

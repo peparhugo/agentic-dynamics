@@ -24,7 +24,6 @@ The analyzer is a pure-ish composition: the only I/O is the duck-typed ``graph_c
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any
 
 from agentic_dynamics.control.facts import EvidenceItem, ReducerInput
@@ -33,6 +32,7 @@ from agentic_dynamics.core.language import (
     symbol_entity_id,
     symbol_version_id,
 )
+from agentic_dynamics.knowledge.graph import IMPACT_EXPANSION_RELS
 from agentic_dynamics.runtime.change_analyzer import (
     ChangeAnalysis,
     ChangeAnalyzer,
@@ -61,25 +61,68 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
     ``graph_client`` is duck-typed: any object exposing ``populate_versioned_graph(snapshot, *,
     revision, repository_id, acl_scope)`` and ``expand_candidates(seed_ids, *, max_depth,
     max_neighbors, max_nodes, timeout_ms, repository_id, acl_scope)`` (the ``Neo4jClient``
-    surface from e4). ``None`` skips the graph step (the loop still emits facts + neighborhood
-    from the delta alone — hermetically testable).
+    surface from e4; ``expand_candidates`` additionally accepts the optional ``rels`` allowlist,
+    and the analyzer passes ``IMPACT_EXPANSION_RELS`` so version history (SUPERSEDES) is never
+    counted as an impact edge). ``None`` skips the graph step (the loop still emits facts +
+    neighborhood from the delta alone — hermetically testable).
+
+    Graph resilience (cap_2a p1): a graph error — a downed server, a timeout, a malformed
+    response — NEVER escapes ``analyze``. The graph leg degrades to delta-only facts with an
+    explicit ``graph_status`` (``available`` / ``unavailable`` / ``not_requested``) on the
+    returned :class:`ChangeAnalysis`; the impacted count is then omitted (None), never a
+    fabricated zero. Only the two graph calls are guarded — a reducer error still propagates.
     """
 
-    def __init__(self, graph_client: Any = None) -> None:
+    def __init__(self, graph_client: Any = None, *, graph_requested: bool | None = None) -> None:
         self.graph_client = graph_client
+        # A requested graph whose client could not be constructed is different from the
+        # deliberate delta-only mode. The composition root uses this bit to keep that loss of
+        # evidence visible in the ledger instead of mislabeling it as "not_requested".
+        self.graph_requested = graph_client is not None if graph_requested is None else graph_requested
 
     def analyze(self, change: ChangeInput) -> ChangeAnalysis:
+        graph_status = "unavailable" if self.graph_requested and self.graph_client is None else "not_requested"
         graph_updated = False
-        if self.graph_client is not None and change.after is not None:
-            counts = self.graph_client.populate_versioned_graph(
-                change.after,
-                revision=change.revision,
-                repository_id=change.repository_id,
-                acl_scope=change.acl_scope,
-            )
-            graph_updated = bool(counts.get("symbol_versions", 0))
+        neighborhood: list[str] = []
+        impacted: int | None = None
 
-        neighborhood, impacted = self._neighborhood(change)
+        # Graph leg — populate first, then the impact expansion. Both are best-effort: a
+        # failure degrades to delta-only facts + an explicit graph_status, never an escaping
+        # exception (the runner records the analysis as a phase-boundary evidence product, and
+        # a graph-down cell must be FLAGGED, not crash the phase).
+        if self.graph_client is not None:
+            graph_failed = False
+            # Populate the parent as well as the after revision. Removed symbols are seeded from
+            # the parent; without its revision in the graph, their impact neighborhood is
+            # silently unresolvable on a fresh graph.
+            for snapshot, revision in (
+                (change.before, getattr(change.before, "revision", "")),
+                (change.after, change.revision),
+            ):
+                if snapshot is None or not revision:
+                    continue
+                try:
+                    counts = self.graph_client.populate_versioned_graph(
+                        snapshot,
+                        revision=revision,
+                        repository_id=change.repository_id,
+                        acl_scope=change.acl_scope,
+                    )
+                except Exception:
+                    graph_failed = True
+                else:
+                    if snapshot is change.after:
+                        graph_updated = bool((counts or {}).get("symbol_versions", 0))
+            graph_status = "unavailable" if graph_failed else "available"
+
+        if graph_status == "available":
+            try:
+                neighborhood, impacted = self._neighborhood(change)
+            except Exception:
+                # The impact leg failed — flag the cell so downstream scoring never mistakes
+                # the delta-only facts for a full-fact analysis.
+                neighborhood, impacted = [], None
+                graph_status = "unavailable"
 
         facts = code_change_facts_v1(self._reducer_input(change, impacted))
         return ChangeAnalysis(
@@ -95,6 +138,11 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
             neighborhood=tuple(neighborhood),
             graph_updated=graph_updated,
             impacted_count=impacted,
+            graph_status=graph_status,
+            revision=change.revision,
+            repository_id=change.repository_id,
+            phase_id=change.phase_id,
+            observed_at=change.observed_at,
         )
 
     def _neighborhood(self, change: ChangeInput) -> tuple[list[str], int | None]:
@@ -102,6 +150,8 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
 
         Returns (symbol qualified names for the executor, impacted count). When no graph client
         or no seeds, the neighborhood is empty and the impacted count is None (unknown, never 0).
+        Traversal is bounded to ``IMPACT_EXPANSION_RELS`` — version history (SUPERSEDES) is not
+        an impact edge, so a changed symbol's older versions never pollute the blast radius.
         """
         if self.graph_client is None or change.delta is None:
             return [], None
@@ -116,6 +166,7 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
             timeout_ms=300,
             repository_id=change.repository_id,
             acl_scope=change.acl_scope,
+            rels=IMPACT_EXPANSION_RELS,
         )
         seed_set = set(seeds)
         neighbors: set[str] = set()
@@ -132,29 +183,47 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
     @staticmethod
     def _reducer_input(change: ChangeInput, impacted: int | None) -> ReducerInput:
         evidence: list[EvidenceItem] = []
+        evidence_prefix = f"{change.repository_id}:{change.phase_id or 'phase'}:{change.revision}"
         if change.delta is not None:
             evidence.append(
-                EvidenceItem(source_type="code_delta", evidence_id=f"delta:{change.revision}", payload=change.delta)
+                EvidenceItem(
+                    source_type="code_delta",
+                    evidence_id=f"delta:{evidence_prefix}",
+                    payload=change.delta,
+                )
             )
         if change.sonar is not None:
             evidence.append(
-                EvidenceItem(source_type="sonar_analysis", evidence_id="sonar:phase", payload=change.sonar)
+                EvidenceItem(
+                    source_type="sonar_analysis",
+                    evidence_id=f"sonar:{evidence_prefix}",
+                    payload=change.sonar,
+                )
             )
         if change.lsp is not None:
             evidence.append(
-                EvidenceItem(source_type="lsp_analysis", evidence_id="lsp:phase", payload=change.lsp)
+                EvidenceItem(
+                    source_type="lsp_analysis",
+                    evidence_id=f"lsp:{evidence_prefix}",
+                    payload=change.lsp,
+                )
             )
         if impacted is not None:
             evidence.append(
-                EvidenceItem(source_type="impacted_symbols", evidence_id="impacted:phase", payload={"count": impacted})
+                EvidenceItem(
+                    source_type="impacted_symbols",
+                    evidence_id=f"impacted:{evidence_prefix}",
+                    payload={"count": impacted},
+                )
             )
+        job_id = change.repository_id or "unscoped"
         return ReducerInput(
-            scope_path=f"org:{change.repository_id}/job:{change.repository_id}",
+            scope_path=f"org:{change.repository_id}/job:{job_id}",
             scope_type="job",
-            scope_id=change.repository_id,
+            scope_id=job_id,
             repository_id=change.repository_id,
             evidence=tuple(evidence),
             facts=(),
-            now="",
+            now=change.observed_at,
             source_revision=change.revision,
         )

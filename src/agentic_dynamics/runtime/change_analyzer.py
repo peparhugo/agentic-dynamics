@@ -17,7 +17,7 @@ ACL-scoped symbol set).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 
@@ -43,6 +43,8 @@ class ChangeInput:
     sonar: dict[str, Any] | None = None
     lsp: dict[str, Any] | None = None
     impacted_count: int | None = None
+    phase_id: str = ""
+    observed_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -52,13 +54,24 @@ class ChangeAnalysis:
     ``facts`` are plain ``{"predicate", "value", "value_type", "evidence_ids"}`` dicts (the
     control reducer's canonical facts, de-typed so runtime need not import ``control.facts``);
     ``neighborhood`` is the bounded executor context (symbol qualified names); ``graph_updated``
-    records whether the versioned graph was populated for this change.
+    records whether the versioned graph was populated for this change. ``graph_status`` is the
+    explicit graph-leg status — ``"not_requested"`` (no client injected), ``"available"``
+    (populate + impact expansion succeeded), or ``"unavailable"`` (a graph error degraded the
+    analysis to delta-only facts, impacted count omitted — never a fabricated zero).
+    ``revision`` is the full commit SHA the analysis was produced for (provenance).
+    ``repository_id``/``phase_id``/``observed_at`` identify the cell boundary that produced the
+    facts; they are optional for structural compatibility with existing analyzer doubles.
     """
 
     facts: tuple[dict[str, Any], ...] = ()
     neighborhood: tuple[str, ...] = ()
     graph_updated: bool = False
     impacted_count: int | None = None
+    graph_status: str = "not_requested"
+    revision: str | None = None
+    repository_id: str = ""
+    phase_id: str = ""
+    observed_at: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """The ledger-shaped form (plain data, JSON-safe) the runner records per phase."""
@@ -67,6 +80,11 @@ class ChangeAnalysis:
             "neighborhood": list(self.neighborhood),
             "graph_updated": self.graph_updated,
             "impacted_count": self.impacted_count,
+            "graph_status": self.graph_status,
+            "revision": self.revision,
+            "repository_id": self.repository_id,
+            "phase_id": self.phase_id,
+            "observed_at": self.observed_at,
         }
 
 

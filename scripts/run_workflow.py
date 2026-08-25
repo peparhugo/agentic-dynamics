@@ -11,11 +11,13 @@ Writes the run ledger to ``experiments/results/workflows/<spec>/<timestamp>.json
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 try:
@@ -80,6 +82,83 @@ def _load_signals(path: str) -> dict[str, ModelSignals]:
     return {m: ModelSignals.from_dict(d) for m, d in raw.items()}
 
 
+#: The versioned-graph env-var family (Neo4jClient at
+#: ``agentic_dynamics/knowledge/graph.py:156`` — "local dev only — override via ENV for prod").
+#: URI resolution precedence: ``--change-analysis-graph`` (CLI) > ``FINOPS_NEO4J_URI`` >
+#: ``FINOPS_NEO4J_URL``. Credentials come ONLY from ``FINOPS_NEO4J_USER`` /
+#: ``FINOPS_NEO4J_PASSWORD`` when set — nothing secret is hard-coded here; without them the
+#: client's own constructor defaults apply.
+NEO4J_URI_ENV = ("FINOPS_NEO4J_URI", "FINOPS_NEO4J_URL")
+NEO4J_USER_ENV = "FINOPS_NEO4J_USER"
+NEO4J_PASSWORD_ENV = "FINOPS_NEO4J_PASSWORD"
+
+
+def resolve_graph_uri(cli_value: str | None) -> str | None:
+    """Resolve the versioned-graph URI: CLI > ``FINOPS_NEO4J_URI`` > ``FINOPS_NEO4J_URL`` > None.
+
+    ``None`` means no graph analysis was explicitly requested anywhere — the caller then
+    leaves the graph client unconstructed (delta-only facts, exactly the pre-graph behavior).
+    """
+    if cli_value:
+        return cli_value
+    for env in NEO4J_URI_ENV:
+        value = os.environ.get(env)
+        if value:
+            return value
+    return None
+
+
+def _build_graph_client(uri: str) -> Any | None:
+    """Construct the ``Neo4jClient`` for a resolved URI, or None when the graph is unavailable.
+
+    A missing optional ``neo4j`` dependency, an unparseable URI, or a server unreachable at
+    construction all degrade to ``None`` — the analyzer then emits delta-only facts and the
+    run carries an explicit ``graph_status``, never a CLI crash. Credentials are threaded ONLY
+    from ``FINOPS_NEO4J_USER`` / ``FINOPS_NEO4J_PASSWORD`` when set; otherwise the client's own
+    constructor defaults apply.
+    """
+    try:
+        from agentic_dynamics.knowledge.graph import Neo4jClient
+    except Exception:  # noqa: BLE001 — optional dependency; graph-unavailable is a state
+        return None
+    kwargs: dict[str, str] = {"uri": uri}
+    user = os.environ.get(NEO4J_USER_ENV)
+    password = os.environ.get(NEO4J_PASSWORD_ENV)
+    if user:
+        kwargs["user"] = user
+    if password:
+        kwargs["password"] = password
+    try:
+        return Neo4jClient(**kwargs)
+    except Exception:  # noqa: BLE001 — unreachable graph degrades, never crashes the CLI
+        return None
+
+
+def _build_change_analyzer(args: argparse.Namespace) -> tuple[Any | None, Any | None]:
+    """Composition-root wiring for the phase-boundary evidence seam (design §5.7, cap_2a p1).
+
+    Returns ``(analyzer, graph_client)``. The analyzer is built ONLY when ``--change-analysis``
+    is passed (the seam opt-in); the graph client is built ONLY when the analyzer is enabled
+    AND a graph URI is explicitly requested (``--change-analysis-graph`` or the
+    ``FINOPS_NEO4J_URI``/``FINOPS_NEO4J_URL`` env vars). Any graph-construction failure
+    degrades to ``graph_client=None`` — delta-only facts, the pre-existing fallback. Without
+    ``--change-analysis`` BOTH are None and the run is byte-identical to the pre-seam behavior
+    (the no-op default is preserved even when the graph env vars are set).
+    """
+    if not args.change_analysis:
+        return None, None
+    from agentic_dynamics.control.evidence_analyzer import EvidenceChangeAnalyzer
+
+    graph_client = None
+    uri = resolve_graph_uri(args.change_analysis_graph)
+    if uri:
+        graph_client = _build_graph_client(uri)
+    return EvidenceChangeAnalyzer(
+        graph_client=graph_client,
+        graph_requested=bool(uri),
+    ), graph_client
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Run an agent_task workflow spec against a goal.")
     ap.add_argument("--spec", required=True, help="path to an ExperimentSpec YAML")
@@ -126,8 +205,18 @@ def main() -> None:
                          "committed phase ALSO hands its typed delta to the phase-boundary "
                          "evidence loop — code_change_facts/v1 facts + ACL-scoped executor "
                          "neighborhood recorded on the phase result. Best-effort — a failed "
-                         "analysis never affects the phase. OFF by default (opt-in; no graph "
-                         "client in v1 — the versioned-graph step is a follow-up).")
+                         "analysis never affects the phase. OFF by default (opt-in). Without "
+                         "this flag the seam is byte-identical inert, even when "
+                         "--change-analysis-graph or the FINOPS_NEO4J_* env vars are set.")
+    ap.add_argument("--change-analysis-graph", default=None, metavar="URI",
+                    help="cap_2a p1 (design §5.7): versioned-graph client URI for the "
+                         "phase-boundary evidence loop (bolt://host:port). Resolved CLI > "
+                         "FINOPS_NEO4J_URI > FINOPS_NEO4J_URL; credentials (when set) from "
+                         "FINOPS_NEO4J_USER / FINOPS_NEO4J_PASSWORD, otherwise the client's "
+                         "own constructor defaults. Only consulted when --change-analysis is "
+                         "also passed; a missing optional dep / unparseable URI / unreachable "
+                         "graph degrades to delta-only facts with an explicit graph_status "
+                         "(unavailable) — never a CLI crash.")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))
@@ -188,31 +277,35 @@ def main() -> None:
     # Phase-boundary evidence (design §5.7 — e6 of cap_evidence_integrity, review F3): the
     # concrete ChangeAnalyzer is injected HERE, at the composition root, exactly where
     # `route_step`/`publisher_factory` are — `runtime.workflow_runner` consumes only the
-    # runtime-owned protocol. Opt-in via --change-analysis (default None: the seam is inert).
-    # No graph client in v1 (the versioned-graph step stays a documented follow-up).
-    change_analyzer = None
-    if args.change_analysis:
-        from agentic_dynamics.control.evidence_analyzer import EvidenceChangeAnalyzer
+    # runtime-owned protocol. Opt-in via --change-analysis (default: the seam is inert).
+    # --change-analysis-graph (or FINOPS_NEO4J_URI/FINOPS_NEO4J_URL) additionally wires the
+    # versioned-graph client (cap_2a p1). The returned graph_client is a live driver handle
+    # and is ALWAYS closed after the run, even when run_workflow raises; a run that never
+    # requested graph analysis has graph_client=None and the finally is a no-op.
+    change_analyzer, graph_client = _build_change_analyzer(args)
 
-        change_analyzer = EvidenceChangeAnalyzer()
-
-    result = run_workflow(
-        spec,
-        goal=args.goal,
-        model=args.model,
-        workdir=args.workdir,
-        backend=args.backend,
-        thinking_effort=args.thinking_effort,
-        thinking_budget_tokens=args.thinking_budget_tokens,
-        output_token_limit=args.output_token_limit,
-        timeout=args.timeout,
-        commit=not args.no_commit,
-        resume=args.resume,
-        signals=signals,
-        router=router,
-        publisher_factory=LivePublisher,
-        change_analyzer=change_analyzer,
-    )
+    try:
+        result = run_workflow(
+            spec,
+            goal=args.goal,
+            model=args.model,
+            workdir=args.workdir,
+            backend=args.backend,
+            thinking_effort=args.thinking_effort,
+            thinking_budget_tokens=args.thinking_budget_tokens,
+            output_token_limit=args.output_token_limit,
+            timeout=args.timeout,
+            commit=not args.no_commit,
+            resume=args.resume,
+            signals=signals,
+            router=router,
+            publisher_factory=LivePublisher,
+            change_analyzer=change_analyzer,
+        )
+    finally:
+        if graph_client is not None:
+            with contextlib.suppress(Exception):
+                graph_client.close()
 
     print(json.dumps(result.to_dict(), indent=2))
 

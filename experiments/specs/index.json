@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-25T18:10:57.165102+00:00",
+  "generated_at": "2026-08-25T19:54:19.628193+00:00",
   "n_specs": 111,
   "specs": [
     {
@@ -23,7 +23,7 @@
     },
     {
       "name": "cap_2a_shadow_calibration",
-      "version": "0.1",
+      "version": "0.2",
       "status": "runnable",
       "spec_path": "workflows/repository/cap_2a_shadow_calibration.yaml",
       "artifact_kind": "workflow",

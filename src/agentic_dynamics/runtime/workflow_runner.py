@@ -49,17 +49,17 @@ from agentic_dynamics.adapters.backends import run_agentic
 from agentic_dynamics.core.language import build_code_snapshot, compute_code_delta, detect_language
 from agentic_dynamics.core.paths import PROJECT_ROOT
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
-from agentic_dynamics.measurement.commit_analysis import _read_commit_files
-from agentic_dynamics.runtime.change_analyzer import (
-    ChangeAnalyzer,
-    ChangeInput,
-    run_change_analysis,
-)
 from agentic_dynamics.knowledge.augment import (
     DEFAULT_INHERITED_TOOLS,
     augment_prompt,
     default_construct_fn,
     default_retrieve_fn,
+)
+from agentic_dynamics.measurement.commit_analysis import _read_commit_files
+from agentic_dynamics.runtime.change_analyzer import (
+    ChangeAnalyzer,
+    ChangeInput,
+    run_change_analysis,
 )
 
 # Routing + telemetry are consumed through the runtime-owned contracts (refactor-repair
@@ -244,6 +244,24 @@ def _git_head(workdir: Path) -> str:
         return ""
 
 
+def _git_full_sha(workdir: Path, rev: str) -> str:
+    """Resolve ``rev`` to its full 40-char SHA, or "" when unresolvable.
+
+    The phase-boundary evidence loop keys snapshot revisions and version ids off the FULL
+    commit SHA (design §5.7 provenance — a short hash is display-only); the displayed
+    ``PhaseResult.commit_hash`` stays short.
+    """
+    try:
+        h = subprocess.run(
+            ["git", "rev-parse", rev], cwd=workdir, capture_output=True, text=True, timeout=30
+        )
+        if h.returncode == 0:
+            return h.stdout.strip()
+    except Exception:
+        pass
+    return ""
+
+
 def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) -> None:
     """Best-effort phase-boundary evidence: analyze ``pr.commit_hash`` and record the result.
 
@@ -253,25 +271,55 @@ def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) ->
     code-change facts + executor neighborhood, stored on ``pr.change_analysis``. Every failure
     path (no parent commit, unreadable revisions, an analyzer error) degrades to
     ``change_analysis=None`` — the seam can never change the phase's outcome (design §5.7).
+
+    ``ChangeInput.revision`` and both snapshot revisions are FULL commit SHAs (provenance);
+    ``pr.commit_hash`` remains the short display hash.
     """
     try:
         profile = detect_language(wd)
-        before_files = _read_commit_files(wd, f"{pr.commit_hash}^", profile)
-        after_files = _read_commit_files(wd, pr.commit_hash, profile)
-        before = build_code_snapshot(before_files, revision=f"{pr.commit_hash}^", profile=profile)
-        after = build_code_snapshot(after_files, revision=pr.commit_hash, profile=profile)
+        full = _git_full_sha(wd, pr.commit_hash) or pr.commit_hash
+        parent = _git_full_sha(wd, f"{full}^")
+        before_rev = parent or f"{full}^"
+        before_files = _read_commit_files(wd, before_rev, profile)
+        after_files = _read_commit_files(wd, full, profile)
+        before = build_code_snapshot(before_files, revision=before_rev, profile=profile)
+        after = build_code_snapshot(after_files, revision=full, profile=profile)
         change = ChangeInput(
             before=before,
             after=after,
             delta=compute_code_delta(before, after),
-            revision=pr.commit_hash,
+            revision=full,
             repository_id=cell_scope(wd),
             acl_scope=cell_scope(wd),
+            phase_id=pr.phase,
+            observed_at=_now(),
         )
         analysis = run_change_analysis(change, analyzer)
         pr.change_analysis = analysis.to_dict()
     except Exception:  # noqa: BLE001 — best-effort seam, never a gate on the phase
         pr.change_analysis = None
+
+
+def _evidence_context(pr: PhaseResult, *, max_neighborhood: int = 16, max_facts: int = 10) -> str:
+    """The bounded, machine-readable evidence block for the NEXT phase's prompt (design §5.7).
+
+    One JSON line rendered from the phase's recorded ``change_analysis``: graph status, the
+    full revision, the bounded ACL-scoped neighborhood, and the delta-derived facts. Appended
+    to ``prior`` ONLY when an analyzer was injected AND the phase produced an analysis —
+    without injection (or after a failed/root-commit analysis) the prompt is byte-identical.
+    """
+    ca = pr.change_analysis or {}
+    payload = {
+        "phase": pr.phase,
+        "revision": ca.get("revision") or pr.commit_hash,
+        "repository_id": ca.get("repository_id", ""),
+        "phase_id": ca.get("phase_id", pr.phase),
+        "observed_at": ca.get("observed_at", ""),
+        "graph_status": ca.get("graph_status", "not_requested"),
+        "neighborhood": list(ca.get("neighborhood") or [])[:max_neighborhood],
+        "facts": list(ca.get("facts") or [])[:max_facts],
+    }
+    return "EVIDENCE " + json.dumps(payload, sort_keys=True)
 
 
 def _completed_phases(workdir: Path, phase_names: list[str], goal: str) -> set[str]:
@@ -721,6 +769,12 @@ def run_workflow(
             # and record its analysis on the phase. Best-effort — never affects the phase.
             if change_analyzer is not None and pr.commit_hash:
                 _run_change_analysis(pr, wd, change_analyzer)
+                # The evidence context rides the existing {prior_phases} channel so the NEXT
+                # phase's prompt receives it (bounded, machine-readable: graph status, full
+                # revision, neighborhood, facts) — only when an analyzer is injected AND this
+                # phase produced an analysis. No analyzer → prior unchanged → prompt identical.
+                if pr.change_analysis is not None:
+                    prior.append(_evidence_context(pr))
             # Self-build ("progressive") producer — opt-in via rag_params.emit_self. After the
             # phase commits, emit its finding into the cell's OWN scope so the cell's retrieval
             # filter can later read its own progress (default OFF: only the "self-built" arm
