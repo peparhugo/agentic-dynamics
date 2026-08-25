@@ -8,6 +8,7 @@ artifact/event round-trip, and the injected revision.
 """
 
 import hashlib
+import json
 import tempfile
 from pathlib import Path
 
@@ -16,7 +17,11 @@ from agentic_dynamics.knowledge.knowledge import Authority, compute_knowledge_id
 from agentic_dynamics.knowledge.knowledge_ingestion import extract_record, record_to_artifact, record_to_event
 from agentic_dynamics.core.language import _PROFILES
 from agentic_dynamics.measurement.lsp_diagnostics import LSPReport
-from agentic_dynamics.measurement.sonar import SonarMetrics
+from agentic_dynamics.measurement.sonar import (
+    SONAR_STATUS_AVAILABLE,
+    SONAR_STATUS_STALE_REFUSED,
+    SonarMetrics,
+)
 
 REPO = "test-repo"
 REVISION = "abc1234"
@@ -39,10 +44,15 @@ def _write_codebase(root: Path) -> Path:
 
 def _analyzed_sonar(**overrides) -> SonarMetrics:
     metrics = SonarMetrics(project_key="pkg", analyzed=True, bugs=3, code_smells=12,
-                           maintainability_rating="C")
+                           maintainability_rating="C", status=SONAR_STATUS_AVAILABLE,
+                           analyzed_sha=REVISION, coverage=42.0, tool_version="7.0.2.5100")
     for k, v in overrides.items():
         setattr(metrics, k, v)
     return metrics
+
+
+def _sonar_text_payload(record) -> dict:
+    return json.loads(record.text)
 
 
 def _available_lsp(**overrides) -> LSPReport:
@@ -71,7 +81,7 @@ def test_extractor_constants():
 
 
 def test_one_record_per_available_signal(monkeypatch):
-    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path: _analyzed_sonar())
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: _analyzed_sonar())
     monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: _available_lsp())
 
     with tempfile.TemporaryDirectory() as d:
@@ -85,7 +95,7 @@ def test_one_record_per_available_signal(monkeypatch):
 
 
 def test_authority_and_evidence_class_per_signal(monkeypatch):
-    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path: _analyzed_sonar())
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: _analyzed_sonar())
     monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: _available_lsp())
 
     with tempfile.TemporaryDirectory() as d:
@@ -106,7 +116,7 @@ def test_authority_and_evidence_class_per_signal(monkeypatch):
 
 
 def test_one_line_finding_text(monkeypatch):
-    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path: _analyzed_sonar())
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: _analyzed_sonar())
     monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: _available_lsp())
 
     with tempfile.TemporaryDirectory() as d:
@@ -116,7 +126,15 @@ def test_one_line_finding_text(monkeypatch):
         )
 
     by = _records_by_signal(records)
-    assert by["sonar"].text == f"{root.name}: 3 bugs, 12 smells, maintainability C"
+    # Sonar text is a TYPED JSON payload (finding 7): summary + analyzer structure fields.
+    sonar = _sonar_text_payload(by["sonar"])
+    assert sonar["kind"] == "sonar-quality/v1"
+    assert sonar["summary"] == f"{root.name}: 3 bugs, 12 smells, maintainability C"
+    assert sonar["sonar_analysis_status"] == SONAR_STATUS_AVAILABLE
+    assert sonar["analyzed_sha"] == REVISION
+    assert sonar["tool_version"] == "7.0.2.5100"
+    assert sonar["coverage"] == 42.0
+    assert "config_hash" in sonar
     assert by["lsp"].text == "pyright: 2 errors, 3 warnings, 5 diagnostics"
     assert "composite entropy" in by["entropy"].text
 
@@ -126,7 +144,8 @@ def test_one_line_finding_text(monkeypatch):
 
 def test_absent_sonar_and_lsp_skipped_not_fabricated(monkeypatch):
     monkeypatch.setattr(
-        qi, "run_sonar_analysis", lambda path: SonarMetrics(analyzed=False, error="sonar-scanner not on PATH")
+        qi, "run_sonar_analysis",
+        lambda path, **kwargs: SonarMetrics(analyzed=False, error="sonar-scanner not on PATH"),
     )
     monkeypatch.setattr(
         qi, "run_diagnostics", lambda path, profile: LSPReport(tool="pyright", language="python", available=False)
@@ -147,9 +166,38 @@ def test_absent_sonar_and_lsp_skipped_not_fabricated(monkeypatch):
     assert not any("entropy" in n for n in notes)  # entropy is always available
 
 
+def test_stale_refused_sonar_emits_status_fact_never_current_stamp(monkeypatch):
+    stale = SonarMetrics(project_key="exp_src", analyzed=True, bugs=9, code_smells=40,
+                         maintainability_rating="D", status=SONAR_STATUS_STALE_REFUSED,
+                         analyzed_sha="deadbeef0000")
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: stale)
+    monkeypatch.setattr(
+        qi, "run_diagnostics", lambda path, profile: LSPReport(tool="pyright", language="python", available=False)
+    )
+
+    notes: list[str] = []
+    with tempfile.TemporaryDirectory() as d:
+        root = _write_codebase(Path(d))
+        records = qi.derive_quality_records(
+            root, profile=_PROFILES["python"], repository_id=REPO, revision=REVISION, notes=notes,
+        )
+
+    by = _records_by_signal(records)
+    assert "sonar" in by
+    payload = _sonar_text_payload(by["sonar"])
+    assert payload["sonar_analysis_status"] == SONAR_STATUS_STALE_REFUSED
+    # The record never claims the current revision was analyzed.
+    assert payload["analyzed_sha"] == "deadbeef0000"
+    assert payload["analyzed_sha"] != REVISION
+    assert any("stale-refused" in n for n in notes)
+    # The record itself is keyed to the current revision (that is when the status was
+    # evaluated) but the payload never stamps it as analyzed.
+    assert by["sonar"].commit_sha == REVISION
+
+
 def test_empty_codebase_skips_everything(monkeypatch):
     monkeypatch.setattr(
-        qi, "run_sonar_analysis", lambda path: SonarMetrics(analyzed=False, error="worktree not found")
+        qi, "run_sonar_analysis", lambda path, **kwargs: SonarMetrics(analyzed=False, error="worktree not found")
     )
     monkeypatch.setattr(
         qi, "run_diagnostics", lambda path, profile: LSPReport(tool="unknown", language="unknown", available=False)
@@ -171,7 +219,7 @@ def test_empty_codebase_skips_everything(monkeypatch):
 
 
 def test_revision_is_injected_head_sha(monkeypatch):
-    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path: _analyzed_sonar())
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: _analyzed_sonar())
     monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: _available_lsp())
 
     with tempfile.TemporaryDirectory() as d:
@@ -186,7 +234,7 @@ def test_revision_is_injected_head_sha(monkeypatch):
 
 
 def test_signals_share_locator_but_distinct_entity(monkeypatch):
-    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path: _analyzed_sonar())
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: _analyzed_sonar())
     monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: _available_lsp())
 
     with tempfile.TemporaryDirectory() as d:
@@ -201,7 +249,7 @@ def test_signals_share_locator_but_distinct_entity(monkeypatch):
 
 
 def test_language_carried_from_profile(monkeypatch):
-    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path: _analyzed_sonar())
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: _analyzed_sonar())
     monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: _available_lsp())
 
     with tempfile.TemporaryDirectory() as d:
@@ -217,7 +265,7 @@ def test_language_carried_from_profile(monkeypatch):
 
 
 def test_artifact_round_trip_preserves_quality_record(monkeypatch):
-    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path: _analyzed_sonar())
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: _analyzed_sonar())
     monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: _available_lsp())
 
     with tempfile.TemporaryDirectory() as d:
@@ -245,7 +293,7 @@ def test_artifact_round_trip_preserves_quality_record(monkeypatch):
 
 
 def test_entropy_round_trip_authority_derived(monkeypatch):
-    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path: SonarMetrics(analyzed=False, error="offline"))
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: SonarMetrics(analyzed=False, error="offline"))
     monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: LSPReport(tool="pyright", language="python", available=False))
 
     with tempfile.TemporaryDirectory() as d:
@@ -267,7 +315,7 @@ def test_entropy_round_trip_authority_derived(monkeypatch):
 def test_deterministic_across_timestamps(monkeypatch):
     from datetime import datetime, timezone
 
-    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path: _analyzed_sonar())
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: _analyzed_sonar())
     monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: _available_lsp())
 
     with tempfile.TemporaryDirectory() as d:

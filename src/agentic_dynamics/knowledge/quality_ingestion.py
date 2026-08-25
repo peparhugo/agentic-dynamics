@@ -23,11 +23,13 @@ Authority ordering is the load-bearing rule (``knowledge.py``):
 
 Graceful degradation (never fail the phase, never fabricate a metric): when the SonarQube
 server is unreachable or ``sonar-scanner`` is absent, ``run_sonar_analysis`` returns
-``analyzed=False`` and that signal is *skipped with a note*; when no LSP binary is installed,
-``run_diagnostics`` returns ``available=False`` and that signal is *skipped with a note* —
-mirroring ``lsp_diagnostics.available_tools()``'s fallback. Entropy is pure in-memory
-computation, so it emits whenever a language is detected. Skipped signals are appended to the
-optional ``notes`` out-parameter (never raised, never fabricated).
+``status=unavailable`` and that signal is *skipped with a note*; a fetch-first analysis whose
+revision cannot be confirmed to match the current one is REFUSED — a record carrying
+``sonar_analysis_status: stale-refused`` is emitted (never a current-commit stamp). When no
+LSP binary is installed, ``run_diagnostics`` returns ``available=False`` and that signal is
+*skipped with a note* — mirroring ``lsp_diagnostics.available_tools()``'s fallback. Entropy is
+pure in-memory computation, so it emits whenever a language is detected. Skipped signals are
+appended to the optional ``notes`` out-parameter (never raised, never fabricated).
 
 Contract (do NOT invent a second one): ``record_to_artifact`` serializes a quality record to its
 durable per-record JSON (``content_hash = sha256(artifact)``) and ``extract_record`` reconstructs
@@ -41,6 +43,7 @@ injectable via ``now`` for tests.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -53,7 +56,12 @@ from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
 from agentic_dynamics.core.language import LanguageProfile, detect_language
 from agentic_dynamics.measurement.lsp_diagnostics import LSPReport, run_diagnostics
 from agentic_dynamics.knowledge.record_factory import build_record as build_record_from_parts
-from agentic_dynamics.measurement.sonar import SonarMetrics, run_sonar_analysis
+from agentic_dynamics.measurement.sonar import (
+    SONAR_STATUS_AVAILABLE,
+    SONAR_STATUS_STALE_REFUSED,
+    SonarMetrics,
+    run_sonar_analysis,
+)
 
 # ── Extractor contract constants ────────────────────────────────
 
@@ -98,12 +106,28 @@ def _codebase_name(codebase_path: Path) -> str:
 
 
 def _sonar_text(sonar: SonarMetrics, codebase_path: Path) -> str:
-    """Render the SonarQube one-liner, e.g. ``"pkg: 3 bugs, 12 smells, maintainability C"``."""
-    rating = sonar.maintainability_rating or "—"
-    return (
-        f"{_codebase_name(codebase_path)}: {sonar.bugs} bugs, "
-        f"{sonar.code_smells} smells, maintainability {rating}"
-    )
+    """Render the SonarQube record text as a TYPED JSON payload.
+
+    Per design finding 7, the structured analyzer fields (``tool_version``, ``config_hash``,
+    ``analyzed_sha``, ``coverage``) ride as a typed JSON payload inside ``text`` — the
+    ``record_factory`` surface is unchanged, no ad hoc schema. ``sonar_analysis_status`` is
+    the measured status enum (``available`` / ``stale-refused``); a ``stale-refused`` payload
+    carries the true ``analyzed_sha`` (or ``""`` when the server did not record it) — never
+    the current commit. ``summary`` keeps the human one-liner.
+    """
+    payload = {
+        "kind": "sonar-quality/v1",
+        "summary": (
+            f"{_codebase_name(codebase_path)}: {sonar.bugs} bugs, "
+            f"{sonar.code_smells} smells, maintainability {sonar.maintainability_rating or '—'}"
+        ),
+        "sonar_analysis_status": sonar.status,
+        "tool_version": sonar.tool_version,
+        "config_hash": sonar.config_hash,
+        "analyzed_sha": sonar.analyzed_sha,
+        "coverage": sonar.coverage,
+    }
+    return json.dumps(payload, sort_keys=True)
 
 
 def _lsp_text(lsp: LSPReport) -> str:
@@ -192,16 +216,19 @@ def derive_quality_records(
     Runs three signals in order — SonarQube (``run_sonar_analysis``), LSP (``run_diagnostics``),
     entropy (``compute_entropy``) — and emits one record per *available* signal:
 
-    * SonarQube → ``MEASURED`` / ``[M]`` (skipped with a note when ``analyzed=False`` — no
-      server, no scanner, or a scan error — never fabricated).
+    * SonarQube → ``MEASURED`` / ``[M]`` (skipped with a note when the server/scanner is
+      unavailable — no fabricated metric; a fetched analysis whose revision cannot be confirmed
+      to match ``revision`` is REFUSED: a record carrying ``sonar_analysis_status:
+      stale-refused`` + the true ``analyzed_sha`` is emitted, never a current-commit stamp).
     * LSP → ``MEASURED`` / ``[M]`` (skipped with a note when ``available=False`` — no binary
       for the language — mirroring ``available_tools()``).
     * Entropy → ``DERIVED`` / ``[C]`` (pure in-memory; emitted whenever a language is detected).
 
-    ``revision`` (the git HEAD sha) and ``codebase_path`` are **injected** for determinism and
-    testability; ``now`` pins timestamps. ``notes`` is an optional out-parameter: every skipped
-    signal appends one human-readable line there (the caller passes ``notes=[]`` to collect
-    them). The function never raises on an absent tool and never fabricates a metric.
+    ``revision`` (the git HEAD sha) is folded into the Sonar project key (revision-scoped) and
+    ``codebase_path`` are **injected** for determinism and testability; ``now`` pins
+    timestamps. ``notes`` is an optional out-parameter: every skipped signal appends one
+    human-readable line there (the caller passes ``notes=[]`` to collect them). The function
+    never raises on an absent tool and never fabricates a metric.
     """
     if notes is None:
         notes = []
@@ -211,9 +238,11 @@ def derive_quality_records(
     language = lang_profile.name if lang_profile else ""
     locator = str(codebase_path)
 
-    # 1. SonarQube — an instrument measurement; skip (don't fabricate) when unavailable.
-    sonar = run_sonar_analysis(str(codebase_path))
-    if sonar.analyzed:
+    # 1. SonarQube — an instrument measurement; REFUSED (never a current-commit stamp) when a
+    #    fetched analysis's revision cannot be confirmed to match the current one (design §5.2),
+    #    and skipped with a note (never fabricated) when the server/scanner is unavailable.
+    sonar = run_sonar_analysis(str(codebase_path), revision=revision)
+    if sonar.status == SONAR_STATUS_AVAILABLE:
         records.append(
             build_quality_record(
                 signal=SIGNAL_SONAR,
@@ -226,6 +255,27 @@ def derive_quality_records(
                 revision=revision,
                 now=now,
             )
+        )
+    elif sonar.status == SONAR_STATUS_STALE_REFUSED:
+        # The status fact IS the information: a stale-fetched analysis, refused. The record
+        # carries sonar_analysis_status: stale-refused + the true analyzed_sha, never a
+        # current-commit stamp. Dependent counts are omitted — never None-as-zero.
+        records.append(
+            build_quality_record(
+                signal=SIGNAL_SONAR,
+                logical_locator=locator,
+                language=language,
+                text=_sonar_text(sonar, codebase_path),
+                authority=Authority.MEASURED,
+                evidence_class="[M]",
+                repository_id=repository_id,
+                revision=revision,
+                now=now,
+            )
+        )
+        notes.append(
+            f"sonar: stale-refused — analysis revision {sonar.analyzed_sha or '(unrecorded)'} "
+            f"does not match current {revision}; refused, never stamped"
         )
     else:
         notes.append(f"sonar: skipped — {sonar.error or 'not analyzed'}")
