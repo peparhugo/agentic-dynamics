@@ -476,6 +476,87 @@ def _scanner_version() -> str:
     return match.group(1) if match else ""
 
 
+@dataclass
+class SonarIssue:
+    """One SonarQube issue (issue-level record surface, design §5.4)."""
+
+    key: str = ""
+    rule: str = ""
+    severity: str = ""
+    message: str = ""
+    file_path: str = ""  # repo-relative path (component minus the project-key prefix)
+    line: int = 0  # 0 for project-level issues
+    effort: str = ""  # remediation effort, e.g. "5min"
+    status: str = ""  # e.g. "OPEN"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "rule": self.rule,
+            "severity": self.severity,
+            "message": self.message,
+            "file_path": self.file_path,
+            "line": self.line,
+            "effort": self.effort,
+            "status": self.status,
+        }
+
+
+def fetch_sonar_issues(
+    project_key: str,
+    sonar_url: str = SONAR_URL_DEFAULT,
+    sonar_user: str = SONAR_USER_DEFAULT,
+    sonar_password: str = SONAR_PASSWORD_DEFAULT,
+    *,
+    ps: int = 500,
+) -> list[SonarIssue]:
+    """Fetch one :class:`SonarIssue` per line/rule from ``/api/issues/search``.
+
+    Paged to ``ps`` (capped at the API's 500). Returns ``[]`` on any API failure — an absent
+    issue surface stays absent, never fabricated.
+    """
+    import urllib.request
+    from base64 import b64encode
+
+    auth_header = b64encode(f"{sonar_user}:{sonar_password}".encode()).decode()
+    issues: list[SonarIssue] = []
+    page = 1
+    page_size = min(max(ps, 1), 500)
+    while True:
+        url = (
+            f"{sonar_url}/api/issues/search?componentKeys={project_key}"
+            f"&ps={page_size}&p={page}"
+        )
+        try:
+            req = urllib.request.Request(url)
+            req.add_header("Authorization", f"Basic {auth_header}")
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read().decode())
+        except Exception:
+            return issues
+        batch = data.get("issues") or []
+        for item in batch:
+            component = item.get("component", "")
+            file_path = component.split(":", 1)[1] if ":" in component else component
+            line = item.get("line") or ((item.get("textRange") or {}).get("startLine") or 0)
+            issues.append(
+                SonarIssue(
+                    key=item.get("key", ""),
+                    rule=item.get("rule", ""),
+                    severity=item.get("severity", ""),
+                    message=item.get("message", ""),
+                    file_path=file_path,
+                    line=line,
+                    effort=item.get("effort", ""),
+                    status=item.get("status", ""),
+                )
+            )
+        total = data.get("paging", {}).get("total", 0)
+        if not batch or page * page_size >= total:
+            return issues
+        page += 1
+
+
 def sonar_quality_score(sonar: SonarMetrics) -> float:
     """Composite sonar quality score 0-1 based on ratings and issue density.
 

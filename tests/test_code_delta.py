@@ -8,12 +8,16 @@ never crash), the two-ID contract, rename-as-new-entity, and the commit_analysis
 
 from pathlib import Path
 
+from agentic_dynamics.core import language as lang_mod
 from agentic_dynamics.core.language import (
+    TESTED_BY_RULE,
     _PROFILES,
     build_code_snapshot,
     compute_code_delta,
     module_entity_id,
+    module_path_from_test_file,
     module_version_id,
+    smallest_containing_symbol,
     symbol_entity_id,
     symbol_version_id,
 )
@@ -197,3 +201,45 @@ def test_read_commit_files_materializes_source(tmp_path):
     files = _read_commit_files(dp, commit, PY)
     assert set(files) == {"app.py"}  # only source extensions, materialized from git
     assert b"def f" in files["app.py"]
+
+
+# ── Issue→symbol linking (design §5.4) ──────────────────────────
+
+
+def test_smallest_containing_symbol():
+    src = (
+        b"class Outer:\n"
+        b"    def method(self):\n"
+        b"        return 1\n"
+        b"def top():\n"
+        b"    return 2\n"
+    )
+    snap = _snapshot({"m.py": src})
+    # Line 2 is inside Outer (1-3) and Outer.method (2-3): method is the SMALLEST.
+    assert smallest_containing_symbol(snap, "m.py", 2).qualified_name == "Outer.method"
+    assert smallest_containing_symbol(snap, "m.py", 4).qualified_name == "top"
+    assert smallest_containing_symbol(snap, "m.py", 99) is None  # no symbol -> None, never invented
+
+
+# ── TESTED_BY rule (design §5.4) ────────────────────────────────
+
+
+def test_module_path_from_test_file():
+    assert module_path_from_test_file("tests/test_math.py") == "tests/math.py"
+    assert module_path_from_test_file("app/calc.test.ts") == "app/calc.ts"
+    assert module_path_from_test_file("math_test.go") == "math.go"
+    assert module_path_from_test_file("math_test.rs") == "math.rs"
+    assert module_path_from_test_file("not_a_test.py") is None
+    assert TESTED_BY_RULE  # provenance recorded
+
+
+def test_tested_symbols_via_rule():
+    files = {
+        "math_utils.py": b"def add(a, b):\n    return a + b\n\ndef unused(x):\n    return x\n",
+        "test_math_utils.py": b"def test_add():\n    assert add(1, 2) == 3\n",
+        "other.py": b"def lonely():\n    pass\n",
+    }
+    snap = _snapshot(files)
+    tested = lang_mod.tested_symbols(snap)
+    assert "add" in tested and "unused" in tested  # whole module is tested
+    assert "lonely" not in tested  # no matching test file -> not claimed tested (deferred)

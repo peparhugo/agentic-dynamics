@@ -12,19 +12,36 @@ import json
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from agentic_dynamics.knowledge import quality_ingestion as qi
 from agentic_dynamics.knowledge.knowledge import Authority, compute_knowledge_id
 from agentic_dynamics.knowledge.knowledge_ingestion import extract_record, record_to_artifact, record_to_event
 from agentic_dynamics.core.language import _PROFILES
-from agentic_dynamics.measurement.lsp_diagnostics import LSPReport
+from agentic_dynamics.measurement.lsp_diagnostics import LSPDiagnostic, LSPReport
 from agentic_dynamics.measurement.sonar import (
     SONAR_STATUS_AVAILABLE,
     SONAR_STATUS_STALE_REFUSED,
+    SonarIssue,
     SonarMetrics,
 )
 
 REPO = "test-repo"
 REVISION = "abc1234"
+
+
+@pytest.fixture(autouse=True)
+def _no_live_sonar_issues(monkeypatch):
+    """Keep the summary-focused tests hermetic: no live Sonar issue fetch."""
+    monkeypatch.setattr(qi, "fetch_sonar_issues", lambda *a, **k: [])
+
+
+def _kind(rec):
+    """The typed-payload kind of a record's text, or None when the text is not JSON."""
+    try:
+        return json.loads(rec.text).get("kind")
+    except (ValueError, TypeError):
+        return None
 
 
 def _write_codebase(root: Path) -> Path:
@@ -135,7 +152,10 @@ def test_one_line_finding_text(monkeypatch):
     assert sonar["tool_version"] == "7.0.2.5100"
     assert sonar["coverage"] == 42.0
     assert "config_hash" in sonar
-    assert by["lsp"].text == "pyright: 2 errors, 3 warnings, 5 diagnostics"
+    lsp = json.loads(by["lsp"].text)
+    assert lsp["kind"] == "lsp-quality/v1"
+    assert lsp["lsp_analysis_status"] == "available"
+    assert lsp["summary"] == "pyright: 2 errors, 3 warnings, 5 diagnostics"
     assert "composite entropy" in by["entropy"].text
 
 
@@ -158,11 +178,15 @@ def test_absent_sonar_and_lsp_skipped_not_fabricated(monkeypatch):
             repository_id=REPO, revision=REVISION, notes=notes,
         )
 
-    # Only entropy survives; sonar and lsp are skipped, never fabricated.
-    assert set(_records_by_signal(records)) == {"entropy"}
-    assert len(records) == 1
+    # Sonar unavailable -> skipped (note), never fabricated. LSP unavailable -> DURABLE
+    # availability probe (lsp_analysis_status: unavailable, zero dependent counts).
+    by = _records_by_signal(records)
+    assert set(by) == {"lsp", "entropy"}
+    lsp = json.loads(by["lsp"].text)
+    assert lsp["lsp_analysis_status"] == "unavailable"
+    assert "total_diagnostics" not in lsp  # zero dependent counts are OMITTED, not zeroed
     assert any("sonar" in n and "skipped" in n for n in notes)
-    assert any("lsp" in n and "skipped" in n for n in notes)
+    assert any("lsp" in n and "unavailable" in n for n in notes)
     assert not any("entropy" in n for n in notes)  # entropy is always available
 
 
@@ -213,6 +237,91 @@ def test_empty_codebase_skips_everything(monkeypatch):
 
     assert records == []
     assert len(notes) == 3  # sonar, lsp, and entropy (no language) all noted as skipped
+
+
+# ── Issue-level records (design §5.4) ───────────────────────────
+
+
+def test_sonar_issues_emit_one_record_per_issue_with_symbol_link(monkeypatch):
+    sonar = SonarMetrics(project_key="exp_src", analyzed=True, status=SONAR_STATUS_AVAILABLE,
+                         analyzed_sha=REVISION)
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: sonar)
+    monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: LSPReport(
+        tool="pyright", language="python", available=False))
+    issues = [
+        SonarIssue(key="k1", rule="python:S113", severity="MINOR", message="trailing comma",
+                   file_path="math_utils.py", line=3, effort="5min", status="OPEN"),
+        SonarIssue(key="k2", rule="python:S300", severity="MAJOR", message="method issue",
+                   file_path="math_utils.py", line=11, effort="20min", status="OPEN"),
+    ]
+    monkeypatch.setattr(qi, "fetch_sonar_issues", lambda *a, **k: issues)
+
+    with tempfile.TemporaryDirectory() as d:
+        root = _write_codebase(Path(d))
+        records = qi.derive_quality_records(
+            root, profile=_PROFILES["python"], repository_id=REPO, revision=REVISION
+        )
+
+    issue_records = [r for r in records if _kind(r) == "sonar-issue/v1"]
+    assert len(issue_records) == 2  # one per issue, never collapsed
+    for rec in issue_records:
+        payload = json.loads(rec.text)
+        assert payload["sonar_analysis_status"] == SONAR_STATUS_AVAILABLE
+        assert payload["analyzed_sha"] == REVISION
+        assert rec.source_type == "report"
+        assert rec.evidence_class == "[M]"
+    by_rule = {json.loads(r.text)["rule"]: r for r in issue_records}
+    # Smallest containing symbol link: line 3 -> add, line 11 -> Calculator.multiply.
+    assert json.loads(by_rule["python:S113"].text)["linked_symbol"] == "add"
+    assert by_rule["python:S113"].symbols == ["add"]
+    assert json.loads(by_rule["python:S300"].text)["linked_symbol"] == "Calculator.multiply"
+    assert by_rule["python:S300"].symbols == ["Calculator.multiply"]
+
+
+def test_lsp_diagnostics_emit_one_record_per_diagnostic_with_symbol_link(monkeypatch):
+    sonar = SonarMetrics(analyzed=False, error="offline")
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: sonar)
+    report = LSPReport(tool="pyright", language="python", available=True, errors=2,
+                       warnings=0, total_diagnostics=2)
+    report.diagnostics = [
+        LSPDiagnostic(severity="error", message="bad return", file="math_utils.py",
+                      line=3, column=5, code="reportReturnType"),
+        LSPDiagnostic(severity="error", message="missing attr", file="math_utils.py",
+                      line=11, column=7, code="reportAttributeAccessIssue"),
+    ]
+    monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: report)
+
+    with tempfile.TemporaryDirectory() as d:
+        root = _write_codebase(Path(d))
+        records = qi.derive_quality_records(
+            root, profile=_PROFILES["python"], repository_id=REPO, revision=REVISION
+        )
+
+    diag_records = [r for r in records if _kind(r) == "lsp-diagnostic/v1"]
+    assert len(diag_records) == 2  # one per diagnostic, never collapsed
+    by_code = {json.loads(r.text)["rule"]: r for r in diag_records}
+    assert json.loads(by_code["reportReturnType"].text)["linked_symbol"] == "add"
+    assert json.loads(by_code["reportAttributeAccessIssue"].text)["linked_symbol"] == "Calculator.multiply"
+    assert json.loads(by_code["reportReturnType"].text)["lsp_analysis_status"] == "available"
+
+
+def test_no_issues_no_fabrication(monkeypatch):
+    """Absent diagnostics/issues stay absent — no empty-file fabrication."""
+    sonar = SonarMetrics(project_key="exp_src", analyzed=True, status=SONAR_STATUS_AVAILABLE)
+    monkeypatch.setattr(qi, "run_sonar_analysis", lambda path, **kwargs: sonar)
+    report = LSPReport(tool="pyright", language="python", available=True, total_diagnostics=0)
+    monkeypatch.setattr(qi, "run_diagnostics", lambda path, profile: report)
+    monkeypatch.setattr(qi, "fetch_sonar_issues", lambda *a, **k: [])
+
+    with tempfile.TemporaryDirectory() as d:
+        root = _write_codebase(Path(d))
+        records = qi.derive_quality_records(
+            root, profile=_PROFILES["python"], repository_id=REPO, revision=REVISION
+        )
+
+    kinds = {_kind(r) for r in records}
+    assert "sonar-issue/v1" not in kinds
+    assert "lsp-diagnostic/v1" not in kinds
 
 
 # ── Identity / provenance ───────────────────────────────────────

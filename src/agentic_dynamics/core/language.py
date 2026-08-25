@@ -730,3 +730,79 @@ def symbol_entity_id(repository_id: str, file_path: str, qualified_name: str, ki
 def symbol_version_id(entity_id: str, revision: str, content_hash: str) -> str:
     """Immutable symbol version: ``f(entity_id, commit, content_hash)``."""
     return hashlib.sha256(f"{entity_id}|{revision}|{content_hash}".encode()).hexdigest()
+
+
+# ── Issue→symbol linking + TESTED_BY rule (design §5.4) ─────────
+
+def smallest_containing_symbol(snapshot: CodeSnapshot, file_path: str, line: int) -> CodeSymbol | None:
+    """The smallest symbol in ``file_path`` whose source span contains ``line``.
+
+    The issue→symbol link (design §5.4): an issue/diagnostic at a line is attributed to the
+    smallest containing symbol — a method over its class over the module. Ties resolve to the
+    symbol defined later (more specific). Returns ``None`` when no symbol contains the line
+    (the issue stays symbol-less, never invented).
+    """
+    best: CodeSymbol | None = None
+    for sym in snapshot.files.get(file_path, []):
+        sp = sym.source_span
+        if not (sp.start_line <= line <= sp.end_line):
+            continue
+        if best is None:
+            best = sym
+            continue
+        size = sp.end_line - sp.start_line
+        best_size = best.source_span.end_line - best.source_span.start_line
+        if size < best_size or (size == best_size and sp.start_line > best.source_span.start_line):
+            best = sym
+    return best
+
+
+#: The TESTED_BY derivation rule, recorded as provenance (design §5.4). Deterministic
+#: test-linking: a test file tests the module whose path is derived by stripping the language's
+#: test marker from the test file's basename (``test_<m>.py`` → ``<m>.py``,
+#: ``<m>.test.ts`` → ``<m>.ts``, ``<m>_test.go`` → ``<m>.go``, ``<m>_test.rs`` → ``<m>.rs``).
+#: A symbol is TESTED_BY a test file iff such a match exists in the snapshot. Where the rule
+#: cannot derive a match, the symbol is NOT claimed tested — ``changed_symbols_with_tests_ratio``
+#: is DEFERRED (fact omitted), never invented.
+TESTED_BY_RULE = (
+    "test-file->module name matching (deterministic): test_<m>.py -> <m>.py, "
+    "<m>.test.ts -> <m>.ts, <m>_test.go -> <m>.go, <m>_test.rs -> <m>.rs; "
+    "a symbol in module M is tested iff a matching test file exists in the snapshot; "
+    "non-derivable matches are omitted (deferred), never invented."
+)
+
+
+def module_path_from_test_file(test_file_path: str) -> str | None:
+    """Apply the TESTED_BY rule: the module file a test file tests, or ``None``.
+
+    Language-aware (matches the profile ``test_file_pattern`` conventions): ``test_<m>.py`` →
+    ``<m>.py``; ``<m>.test.ts`` → ``<m>.ts``; ``<m>_test.go`` → ``<m>.go``; ``<m>_test.rs`` →
+    ``<m>.rs``. No recognized marker for the file's language → ``None`` (the symbol is not
+    claimed tested).
+    """
+    p = Path(test_file_path.replace("\\", "/"))
+    name = p.name
+    if name.startswith("test_") and name.endswith(".py"):
+        return str(p.with_name(name[len("test_"):]))
+    if name.endswith(".ts") or name.endswith(".tsx"):
+        if ".test." in name:
+            return str(p.with_name(name.replace(".test.", ".", 1)))
+        return None
+    if name.endswith(".go") or name.endswith(".rs"):
+        if "_test" in name:
+            return str(p.with_name(name.replace("_test", "", 1)))
+        return None
+    return None
+
+
+def tested_symbols(snapshot: CodeSnapshot) -> set[str]:
+    """Symbol qualified names whose module has a matching test file (TESTED_BY rule)."""
+    module_files = set(snapshot.files)
+    tested: set[str] = set()
+    for test_file in module_files:
+        module_file = module_path_from_test_file(test_file)
+        if module_file is None or module_file not in module_files:
+            continue
+        for sym in snapshot.files[module_file]:
+            tested.add(sym.qualified_name)
+    return tested
