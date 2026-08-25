@@ -1,0 +1,284 @@
+{
+  "schema": "cap_cascade_retrospective/v1",
+  "spec_id": "cap_confidence_cascade@0.1",
+  "source": "experiments/results/workflows/**/*.json (workflow-run ledgers; F1-sanitized costs)",
+  "n_runs": 126,
+  "n_phases": 462,
+  "coverage_precheck": {
+    "confidence_coverage_ratio": 0.7835,
+    "n_confidence_available": 362,
+    "n_confidence_total": 462,
+    "status_coverage_ratio": 1.0,
+    "n_status_available": 462,
+    "n_status_total": 462,
+    "job_status_coverage_ratio": 1.0,
+    "n_jobs_status_captured": 126,
+    "n_jobs_ok": 97,
+    "n_jobs": 126,
+    "verdict": "EVALUABLE_WITH_CAVEAT"
+  },
+  "baseline": {
+    "label": "single-model baseline as actually run (no escalation)",
+    "n": 462,
+    "cost_per_verified_outcome": {
+      "value": 1.8109,
+      "n_captured": 452,
+      "n_total": 462,
+      "coverage": 0.9784,
+      "captured_total_cost_usd": 785.9273,
+      "n_verified": 434
+    },
+    "verified_success_rate": {
+      "value": 0.9394,
+      "n_verified": 434,
+      "n_status_captured": 462,
+      "n_total": 462,
+      "coverage": 1.0
+    }
+  },
+  "arms": {
+    "0_3": {
+      "theta": 0.3,
+      "escalation_trigger_rate": {
+        "value": 0.0166,
+        "n_escalated": 6,
+        "n_captured_confidence": 362
+      },
+      "n_escalation_eligible": 362,
+      "escalated_unmeasured": {
+        "n": 6,
+        "note": "confidence < theta \u2014 a live cascade WOULD have escalated these; their true post-escalation cost/outcome is unknown (never fabricated)"
+      },
+      "non_escalated_subset": {
+        "n": 356,
+        "cost_per_verified_outcome": {
+          "value": 1.8713,
+          "n_captured": 356,
+          "n_total": 356,
+          "coverage": 1.0,
+          "captured_total_cost_usd": 660.5588,
+          "n_verified": 353
+        },
+        "verified_success_rate": {
+          "value": 0.9916,
+          "n_verified": 353,
+          "n_status_captured": 356,
+          "n_total": 356,
+          "coverage": 1.0
+        },
+        "label": "baseline-equivalent (same executions as baseline on this subset)"
+      },
+      "per_model_trigger_range": 0.2857,
+      "by_job_status": {
+        "True": {
+          "escalation_trigger_rate": {
+            "value": 0.0,
+            "n_escalated": 0,
+            "n_captured_confidence": 338
+          },
+          "cost_per_verified_outcome": {
+            "value": 1.3678,
+            "n_captured": 403,
+            "n_total": 403,
+            "coverage": 1.0,
+            "captured_total_cost_usd": 551.214,
+            "n_verified": 403
+          }
+        },
+        "False": {
+          "escalation_trigger_rate": {
+            "value": 0.25,
+            "n_escalated": 6,
+            "n_captured_confidence": 24
+          },
+          "cost_per_verified_outcome": {
+            "value": 7.5714,
+            "n_captured": 49,
+            "n_total": 59,
+            "coverage": 0.8305,
+            "captured_total_cost_usd": 234.7132,
+            "n_verified": 31
+          }
+        }
+      }
+    },
+    "0_5": {
+      "theta": 0.5,
+      "escalation_trigger_rate": {
+        "value": 0.0359,
+        "n_escalated": 13,
+        "n_captured_confidence": 362
+      },
+      "n_escalation_eligible": 362,
+      "escalated_unmeasured": {
+        "n": 13,
+        "note": "confidence < theta \u2014 a live cascade WOULD have escalated these; their true post-escalation cost/outcome is unknown (never fabricated)"
+      },
+      "non_escalated_subset": {
+        "n": 349,
+        "cost_per_verified_outcome": {
+          "value": 1.8932,
+          "n_captured": 349,
+          "n_total": 349,
+          "coverage": 1.0,
+          "captured_total_cost_usd": 655.0436,
+          "n_verified": 346
+        },
+        "verified_success_rate": {
+          "value": 0.9914,
+          "n_verified": 346,
+          "n_status_captured": 349,
+          "n_total": 349,
+          "coverage": 1.0
+        },
+        "label": "baseline-equivalent (same executions as baseline on this subset)"
+      },
+      "per_model_trigger_range": 0.2857,
+      "by_job_status": {
+        "True": {
+          "escalation_trigger_rate": {
+            "value": 0.0207,
+            "n_escalated": 7,
+            "n_captured_confidence": 338
+          },
+          "cost_per_verified_outcome": {
+            "value": 1.3678,
+            "n_captured": 403,
+            "n_total": 403,
+            "coverage": 1.0,
+            "captured_total_cost_usd": 551.214,
+            "n_verified": 403
+          }
+        },
+        "False": {
+          "escalation_trigger_rate": {
+            "value": 0.25,
+            "n_escalated": 6,
+            "n_captured_confidence": 24
+          },
+          "cost_per_verified_outcome": {
+            "value": 7.5714,
+            "n_captured": 49,
+            "n_total": 59,
+            "coverage": 0.8305,
+            "captured_total_cost_usd": 234.7132,
+            "n_verified": 31
+          }
+        }
+      }
+    },
+    "0_7": {
+      "theta": 0.7,
+      "escalation_trigger_rate": {
+        "value": 0.1077,
+        "n_escalated": 39,
+        "n_captured_confidence": 362
+      },
+      "n_escalation_eligible": 362,
+      "escalated_unmeasured": {
+        "n": 39,
+        "note": "confidence < theta \u2014 a live cascade WOULD have escalated these; their true post-escalation cost/outcome is unknown (never fabricated)"
+      },
+      "non_escalated_subset": {
+        "n": 323,
+        "cost_per_verified_outcome": {
+          "value": 1.7755,
+          "n_captured": 323,
+          "n_total": 323,
+          "coverage": 1.0,
+          "captured_total_cost_usd": 569.9258,
+          "n_verified": 321
+        },
+        "verified_success_rate": {
+          "value": 0.9938,
+          "n_verified": 321,
+          "n_status_captured": 323,
+          "n_total": 323,
+          "coverage": 1.0
+        },
+        "label": "baseline-equivalent (same executions as baseline on this subset)"
+      },
+      "per_model_trigger_range": 0.5,
+      "by_job_status": {
+        "True": {
+          "escalation_trigger_rate": {
+            "value": 0.0888,
+            "n_escalated": 30,
+            "n_captured_confidence": 338
+          },
+          "cost_per_verified_outcome": {
+            "value": 1.3678,
+            "n_captured": 403,
+            "n_total": 403,
+            "coverage": 1.0,
+            "captured_total_cost_usd": 551.214,
+            "n_verified": 403
+          }
+        },
+        "False": {
+          "escalation_trigger_rate": {
+            "value": 0.375,
+            "n_escalated": 9,
+            "n_captured_confidence": 24
+          },
+          "cost_per_verified_outcome": {
+            "value": 7.5714,
+            "n_captured": 49,
+            "n_total": 59,
+            "coverage": 0.8305,
+            "captured_total_cost_usd": 234.7132,
+            "n_verified": 31
+          }
+        }
+      }
+    }
+  },
+  "arm_comparison": {
+    "baseline": {
+      "label": "single-model baseline as actually run (no escalation)",
+      "n": 462,
+      "cost_per_verified_outcome": {
+        "value": 1.8109,
+        "n_captured": 452,
+        "n_total": 462,
+        "coverage": 0.9784,
+        "captured_total_cost_usd": 785.9273,
+        "n_verified": 434
+      },
+      "verified_success_rate": {
+        "value": 0.9394,
+        "n_verified": 434,
+        "n_status_captured": 462,
+        "n_total": 462,
+        "coverage": 1.0
+      }
+    },
+    "arms": {
+      "0_3": {
+        "routing_arm_regret": 0.0,
+        "regret_basis": "0.0 by construction \u2014 the cascade arm on the non-escalated subset is byte-identical to baseline on that same subset; NOT evidence a threshold is safe",
+        "null_testable": false,
+        "null_testable_note": "false whenever the escalated (unmeasured) subset is non-empty \u2014 the null is untestable-by-construction from this corpus, not merely under-covered"
+      },
+      "0_5": {
+        "routing_arm_regret": 0.0,
+        "regret_basis": "0.0 by construction \u2014 the cascade arm on the non-escalated subset is byte-identical to baseline on that same subset; NOT evidence a threshold is safe",
+        "null_testable": false,
+        "null_testable_note": "false whenever the escalated (unmeasured) subset is non-empty \u2014 the null is untestable-by-construction from this corpus, not merely under-covered"
+      },
+      "0_7": {
+        "routing_arm_regret": 0.0,
+        "regret_basis": "0.0 by construction \u2014 the cascade arm on the non-escalated subset is byte-identical to baseline on that same subset; NOT evidence a threshold is safe",
+        "null_testable": false,
+        "null_testable_note": "false whenever the escalated (unmeasured) subset is non-empty \u2014 the null is untestable-by-construction from this corpus, not merely under-covered"
+      }
+    }
+  },
+  "null_hypothesis": "no threshold improves cost-per-verified-outcome over baseline \u2014 structurally untestable from this corpus (nothing was ever actually escalated), recorded honestly",
+  "notes": [
+    "verified success == phase_status == 'ok' (completion signal); phase_test_verified is out of this spec's requires_facts scope (confirmed ~0% on agent phases)",
+    "escalation is counterfactual only \u2014 no attempt in the corpus was ever actually escalated by a confidence-gated policy",
+    "confidence is a self-report ([H]/advisory); uncaptured confidence is excluded, never assumed non-escalating",
+    "uncaptured cost is null with zero coverage, never a zero-cost observation (F1 semantics)"
+  ]
+}

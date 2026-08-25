@@ -45,6 +45,8 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("analyze", "trajectories"): "analyze_trajectories.py",
     ("analyze", "stories"): "analyze_stories.py",
     ("analyze", "session-routing"): "retro_session_routing.py",
+    ("analyze", "cascade-retrospective"): "cap_cascade_retrospective.py",
+    ("analyze", "coverage-routing-impact"): "cap_coverage_routing_impact.py",
     # data
     ("data", "build"): "build_data.py",
     ("data", "sync"): "sync_data.py",

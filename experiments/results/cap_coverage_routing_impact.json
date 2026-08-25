@@ -1,0 +1,340 @@
+{
+  "schema": "cap_coverage_routing_impact/v1",
+  "spec_id": "cap_coverage_routing_impact@0.1",
+  "source": "canonical_corpus.resolve_findings() (registry-governed; the live replacement for the retired _results_summary.json)",
+  "corpus": {
+    "n_entries_total": 64,
+    "n_tasks": 2
+  },
+  "entry_coverage_precheck": {
+    "cost_coverage_ratio": 1.0,
+    "correctness_coverage_ratio": 1.0,
+    "n_cost_captured": 64,
+    "n_correctness_captured": 64,
+    "n_total": 64,
+    "operational": {
+      "n_cost_captured": 53,
+      "cost_coverage_ratio": 0.8281,
+      "note": "cost_captured semantics (positive finite cost only; 0.0 = no billable work) \u2014 the coverage recommend_route actually consumes",
+      "by_model": {
+        "anthropic/claude-haiku-4-5": {
+          "n": 7,
+          "n_cost_operational": 1
+        },
+        "anthropic/claude-sonnet-5": {
+          "n": 12,
+          "n_cost_operational": 7
+        }
+      }
+    }
+  },
+  "coverage_corrected": {
+    "_meta": {
+      "tasks_analyzed": 2,
+      "total_valid_entries": 64
+    },
+    "per_task": [
+      {
+        "task": "process_perturbation_resample",
+        "models_tested": 3,
+        "best_correctness_model": "openai/gpt-5.6-sol",
+        "best_efficiency_model": "deepseek/deepseek-v4-pro",
+        "default_model": "deepseek/deepseek-v4-pro",
+        "escalate_model": "openai/gpt-5.6-sol",
+        "routing": "default",
+        "recommendation": "default deepseek/deepseek-v4-pro",
+        "models": {
+          "openai/gpt-5.6-sol": {
+            "n": 5,
+            "n_outcome": 5,
+            "n_cost": 5,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.40127,
+            "efficiency": 2.49
+          },
+          "anthropic/claude-sonnet-5": {
+            "n": 5,
+            "n_outcome": 5,
+            "n_cost": 5,
+            "avg_correctness": 0.92,
+            "avg_cost": 0.476491,
+            "efficiency": 1.93
+          },
+          "deepseek/deepseek-v4-pro": {
+            "n": 5,
+            "n_outcome": 5,
+            "n_cost": 5,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.01351,
+            "efficiency": 74.02
+          }
+        }
+      },
+      {
+        "task": "task_manager",
+        "models_tested": 7,
+        "best_correctness_model": "anthropic/claude-haiku-4-5",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "anthropic/claude-haiku-4-5",
+        "routing": "escalate",
+        "recommendation": "escalate to anthropic/claude-haiku-4-5",
+        "models": {
+          "deepseek/deepseek-v4-pro": {
+            "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
+            "avg_correctness": 0.9974,
+            "avg_cost": 0.01938,
+            "efficiency": 51.47
+          },
+          "anthropic/claude-sonnet-5": {
+            "n": 7,
+            "n_outcome": 7,
+            "n_cost": 2,
+            "avg_correctness": 0.9143,
+            "avg_cost": 0.648012,
+            "efficiency": 1.41
+          },
+          "openai/gpt-5.6-terra": {
+            "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
+            "avg_correctness": 0.9143,
+            "avg_cost": 0.18689,
+            "efficiency": 4.89
+          },
+          "deepseek/deepseek-v4-flash": {
+            "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
+            "avg_correctness": 0.8792,
+            "avg_cost": 0.009603,
+            "efficiency": 91.55
+          },
+          "anthropic/claude-haiku-4-5": {
+            "n": 7,
+            "n_outcome": 7,
+            "n_cost": 1,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.309695,
+            "efficiency": 3.23
+          },
+          "openai/gpt-5.6-sol": {
+            "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.482432,
+            "efficiency": 2.07
+          },
+          "openai/gpt-5.6-luna": {
+            "n": 7,
+            "n_outcome": 7,
+            "n_cost": 7,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.017297,
+            "efficiency": 57.81
+          }
+        }
+      }
+    ],
+    "strategies": {
+      "anthropic/claude-haiku-4-5_only": {
+        "n": 7,
+        "n_cost": 1,
+        "n_outcome": 7,
+        "total_cost": 0.309695,
+        "avg_cost": 0.309695,
+        "avg_correctness": 1.0
+      },
+      "anthropic/claude-sonnet-5_only": {
+        "n": 12,
+        "n_cost": 7,
+        "n_outcome": 12,
+        "total_cost": 3.678477,
+        "avg_cost": 0.525497,
+        "avg_correctness": 0.9167
+      },
+      "deepseek/deepseek-v4-flash_only": {
+        "n": 7,
+        "n_cost": 7,
+        "n_outcome": 7,
+        "total_cost": 0.067223,
+        "avg_cost": 0.009603,
+        "avg_correctness": 0.8792
+      },
+      "deepseek/deepseek-v4-pro_only": {
+        "n": 12,
+        "n_cost": 12,
+        "n_outcome": 12,
+        "total_cost": 0.203213,
+        "avg_cost": 0.016934,
+        "avg_correctness": 0.9985
+      },
+      "openai/gpt-5.6-luna_only": {
+        "n": 7,
+        "n_cost": 7,
+        "n_outcome": 7,
+        "total_cost": 0.121081,
+        "avg_cost": 0.017297,
+        "avg_correctness": 1.0
+      },
+      "openai/gpt-5.6-sol_only": {
+        "n": 12,
+        "n_cost": 12,
+        "n_outcome": 12,
+        "total_cost": 5.383373,
+        "avg_cost": 0.448614,
+        "avg_correctness": 1.0
+      },
+      "openai/gpt-5.6-terra_only": {
+        "n": 7,
+        "n_cost": 7,
+        "n_outcome": 7,
+        "total_cost": 1.308232,
+        "avg_cost": 0.18689,
+        "avg_correctness": 0.9143
+      },
+      "grit_routed": {
+        "n": 12,
+        "n_cost": 6,
+        "n_outcome": 12,
+        "total_cost": 0.377245,
+        "avg_cost": 0.062874,
+        "avg_correctness": 1.0,
+        "routing_distribution": {
+          "deepseek/deepseek-v4-pro": 5,
+          "anthropic/claude-haiku-4-5": 7
+        }
+      }
+    },
+    "routing_distribution": {
+      "default": 1,
+      "escalate": 1
+    }
+  },
+  "legacy_zero_default": {
+    "_meta": {
+      "tasks_analyzed": 2
+    },
+    "per_task": [
+      {
+        "task": "process_perturbation_resample",
+        "models_tested": 3,
+        "best_correctness_model": "openai/gpt-5.6-sol",
+        "best_efficiency_model": "deepseek/deepseek-v4-pro",
+        "default_model": "deepseek/deepseek-v4-pro",
+        "escalate_model": "openai/gpt-5.6-sol",
+        "routing": "default",
+        "recommendation": "default deepseek/deepseek-v4-pro",
+        "models": {
+          "openai/gpt-5.6-sol": {
+            "n": 5,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.40127,
+            "efficiency": 2.49
+          },
+          "anthropic/claude-sonnet-5": {
+            "n": 5,
+            "avg_correctness": 0.92,
+            "avg_cost": 0.476491,
+            "efficiency": 1.93
+          },
+          "deepseek/deepseek-v4-pro": {
+            "n": 5,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.01351,
+            "efficiency": 74.02
+          }
+        }
+      },
+      {
+        "task": "task_manager",
+        "models_tested": 7,
+        "best_correctness_model": "anthropic/claude-haiku-4-5",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "anthropic/claude-haiku-4-5",
+        "routing": "escalate",
+        "recommendation": "escalate to anthropic/claude-haiku-4-5",
+        "models": {
+          "deepseek/deepseek-v4-pro": {
+            "n": 7,
+            "avg_correctness": 0.9974,
+            "avg_cost": 0.01938,
+            "efficiency": 51.47
+          },
+          "anthropic/claude-sonnet-5": {
+            "n": 7,
+            "avg_correctness": 0.9143,
+            "avg_cost": 0.185146,
+            "efficiency": 4.94
+          },
+          "openai/gpt-5.6-terra": {
+            "n": 7,
+            "avg_correctness": 0.9143,
+            "avg_cost": 0.18689,
+            "efficiency": 4.89
+          },
+          "deepseek/deepseek-v4-flash": {
+            "n": 7,
+            "avg_correctness": 0.8792,
+            "avg_cost": 0.009603,
+            "efficiency": 91.55
+          },
+          "anthropic/claude-haiku-4-5": {
+            "n": 7,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.044242,
+            "efficiency": 22.6
+          },
+          "openai/gpt-5.6-sol": {
+            "n": 7,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.482432,
+            "efficiency": 2.07
+          },
+          "openai/gpt-5.6-luna": {
+            "n": 7,
+            "avg_correctness": 1.0,
+            "avg_cost": 0.017297,
+            "efficiency": 57.81
+          }
+        }
+      }
+    ]
+  },
+  "recommendation_diff": {
+    "changed_recommendation_count": 0,
+    "changed_recommendation_rate": 0.0,
+    "changed_by_task": [],
+    "changed_by_model": {},
+    "moved_to_lower_cost_count": 0,
+    "moved_to_lower_cost_rate": null
+  },
+  "per_model_stat_divergence": [
+    {
+      "task": "task_manager",
+      "model": "anthropic/claude-haiku-4-5",
+      "corrected_avg_cost": 0.309695,
+      "legacy_avg_cost": 0.044242,
+      "n_cost_operational": 1,
+      "n": 7
+    },
+    {
+      "task": "task_manager",
+      "model": "anthropic/claude-sonnet-5",
+      "corrected_avg_cost": 0.648012,
+      "legacy_avg_cost": 0.185146,
+      "n_cost_operational": 2,
+      "n": 7
+    }
+  ],
+  "null_hypothesis": "zero changes \u2014 no task/model pair's routing recommendation differs between the two formulas. A null here is information, not failure.",
+  "notes": [
+    "zero changed RECOMMENDATIONS on this corpus (both eligible tasks agree) \u2014 the null holds. Mechanism differs from the spec's finding-2 prediction: raw cost-key coverage is 100%, but OPERATIONAL cost coverage (cost_captured: positive finite only, 0.0 = no billable work) is <100% for some models, so per-model avg_cost DID diverge between the formulas (see per_model_stat_divergence) \u2014 it simply did not flip any decision because the diverging models were not on the decision boundary",
+    "legacy arm re-derives lab_task_routing.py's aggregation formula (zero-default over all n) on the SAME entries \u2014 isolates the aggregation-method variable from the corpus-source variable",
+    "the leading indicator is entry_coverage_precheck.operational.cost_coverage_ratio: the day it drops, changed_recommendation_count starts actually testing something"
+  ]
+}
