@@ -1,0 +1,1 @@
+20260825T124617Z evidence_prereq_gate: MET (exit 0) — cap_e2_cascade_run cap_pattern_minting cap_story_bridge cap_test_runner_wiring merged by ancestry with approved verdicts on HEAD; cap_story_bridge ok=True.
