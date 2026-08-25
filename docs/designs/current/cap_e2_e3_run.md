@@ -122,7 +122,7 @@ attempt lineage (parent_attempt_id / escalation_from / escalation_to) exists.
    Pooling these would conflate "this threshold performed worse" with "this job failed for an
    unrelated reason" — a job whose overall run failed shows ~5.5× the cost-per-verified-outcome
    and far lower verified-success for reasons orthogonal to any routing policy. The escalation
-   trigger is also concentrated in failed jobs (e.g. θ=0.7: 30.0% of confidence-captured phases
+   trigger is also concentrated in failed jobs (e.g. θ=0.7: 37.5% (9/24) of confidence-captured phases
    in ok-false runs would trigger vs 8.9% in ok-true runs) — consistent with low confidence being
    informative about run health, which is exactly what a future live cascade pilot should test.
 
