@@ -1,0 +1,80 @@
+name: cap_2a_calibration_cell
+question: >-
+  p2 calibration cell for the cap_2a_rerun campaign: a small, self-contained symbol-level
+  feature (a `multiply` function) implemented against a seeded Python app, with an independent
+  kind:test phase so test_executed_success comes from runtime.test_runner. Purpose-built so
+  code_change_risk mints (changed symbols + tests_ratio + impacted) and the verify_code_change/v1
+  shadow proposal emits — the cell the first campaign's blockers (no symbol change, no test
+  evidence) make impossible to reuse.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      seeded_app: >-
+        A fresh disposable worktree seeded with a tiny calc package: calc.py (add, subtract)
+        and test_calc.py (test_add, test_subtract). The implement phase adds a symbol-level
+        feature so the typed CodeDelta reports a real changed symbol — never a module-level edit.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Implement a small symbol-level feature in the seeded calc app.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py        (the existing add / subtract functions)
+          - test_calc.py   (the existing test_add / test_subtract)
+
+          DO:
+          - Add a `multiply(a, b)` function to calc.py.
+          - Add a `test_multiply` function to test_calc.py that asserts multiply(2, 3) == 6.
+          - Do not change the existing add / subtract functions or their tests.
+
+          VERIFY: `python -m pytest test_calc.py -q` passes.
+
+          DELIVER the changed calc.py and test_calc.py.
+      - name: test
+        kind: test
+        timeout: 600
+      - name: verify
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Verify the multiply feature landed correctly.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Confirm calc.py defines `multiply(a, b)`.
+          - Confirm test_calc.py defines `test_multiply` and that `python -m pytest test_calc.py -q` passes.
+          - Confirm add / subtract were left unchanged.
+
+          DELIVER a short verification note (what was checked, and the pytest result).
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: feature_implemented, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -1,0 +1,132 @@
+{
+  "schema_version": "cap_2a_p2_ledger/v1",
+  "campaign": "cap_2a_rerun",
+  "phase": "p2_measure_one_cell",
+  "cell_id": "cap2a_p2_bespoke",
+  "spec_id": "cap_2a_calibration_cell@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "ec9f1b8a6216ca14bcb886f743eebb614225218e",
+  "seeded_app_worktree": "/tmp/cap2a_cell_vG65cy",
+  "seeded_app_seed_revision": "4c9d852509a25dab191bff3c2792a7cc92684013",
+  "run_ledger": "experiments/results/workflows/cap_2a_calibration_cell/20260825T235344Z.json",
+  "run_ledger_sha256": "78d1bddb6a5b9720447547efad34566e4d836829c46ea5867a4a2c1691b0e22a",
+  "ok": true,
+  "total_measured_cost_usd": 0.008578,
+  "total_measured_cost_breakdown": {
+    "implement": 0.003559721,
+    "test": 0.0,
+    "verify": 0.005018769
+  },
+  "analyzer_reachability": {
+    "graph": {"reachable": true, "uri": "bolt://localhost:7687", "graph_status": "available", "graph_updated": true},
+    "sonar": {"reachable": true, "status": "available", "scanner": "/tmp/sonar-scanner-6.2.1.4610-linux-x64/bin/sonar-scanner", "server": "http://localhost:9000 (UP)"},
+    "lsp": {"reachable": false, "status": "unavailable", "reason": "pyright/mypy not installed — new_lsp_error_count omitted (never fabricated)"}
+  },
+  "proposal_seam_result": {
+    "proposals_emitted": 1,
+    "refused": false,
+    "proposal_id": "3566dc62cd388656",
+    "action": "verify",
+    "depth": 2,
+    "scope": ["add", "subtract", "test_add", "test_subtract"],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "artifact": "experiments/results/cap_2a_rerun/proposals/3566dc62cd388656.json",
+    "artifact_sha256": "664af6ffd4f848e3286b3fa3409ef5dcaf54eae53dc2310e50446ebc9c8511b1",
+    "note": "Emitted from the implement phase's change_analysis facts (code_change_risk=0.24). risk 0.24 >= 0.2, no measured criticals -> action=verify, depth=2."
+  },
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "f5547d5",
+      "baseline_revision": "4c9d852509a25dab191bff3c2792a7cc92684013",
+      "analyzed_revision": "f5547d56720e8a6c1b03f05973b0767b7febb86f",
+      "cost_usd": 0.003559721,
+      "duration_s": 15.3,
+      "test_result": "test_executed_success = null (no test_gate on this phase; the independent kind:test phase is next)",
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "sonar_analysis_status": "available",
+      "lsp_analysis_status": "unavailable",
+      "facts_emitted": [
+        {"predicate": "sonar_analysis_status", "value": "available"},
+        {"predicate": "lsp_analysis_status", "value": "unavailable"},
+        {"predicate": "analysis_revision_matches", "value": "true"},
+        {"predicate": "ast_parse_coverage", "value": "1.0"},
+        {"predicate": "changed_symbol_count", "value": "2"},
+        {"predicate": "impacted_symbol_count", "value": "4"},
+        {"predicate": "new_sonar_critical_count", "value": "0"},
+        {"predicate": "changed_symbols_with_tests_ratio", "value": "0.5"},
+        {"predicate": "code_change_risk", "value": "0.24"}
+      ],
+      "facts_omitted": [
+        {"predicate": "new_lsp_error_count", "reason": "pyright/mypy not installed (lsp unavailable)"}
+      ],
+      "code_change_risk": "0.24",
+      "proposal": "3566dc62cd388656 (verify, depth 2, applied=false)",
+      "note": "Real symbol change: added multiply() to calc.py + test_multiply to test_calc.py -> changed_symbol_count=2."
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "commit_hash_short": "1fb1776",
+      "cost_usd": 0.0,
+      "duration_s": 0.32,
+      "test_result": "test_executed_success = True (3/3) — independent runtime.test_runner",
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": null,
+      "facts_emitted": [
+        {"predicate": "sonar_analysis_status", "value": "available"},
+        {"predicate": "lsp_analysis_status", "value": "unavailable"},
+        {"predicate": "analysis_revision_matches", "value": "true"},
+        {"predicate": "changed_symbol_count", "value": "0"},
+        {"predicate": "new_sonar_critical_count", "value": "0"},
+        {"predicate": "code_change_risk", "value": "0.0"}
+      ],
+      "proposal": null,
+      "note": "changed_symbol_count=0 (no source change), so the proposal seam is not exercised for this phase; independent test evidence (test_executed_success=True) satisfies hard rule 14."
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "0c65355",
+      "cost_usd": 0.005018769,
+      "duration_s": 9.01,
+      "test_result": "none (documentation/verification phase); test_executed_success = null",
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": null,
+      "sonar_analysis_status": "available",
+      "lsp_analysis_status": "unavailable",
+      "facts_emitted": [
+        {"predicate": "sonar_analysis_status", "value": "available"},
+        {"predicate": "lsp_analysis_status", "value": "unavailable"},
+        {"predicate": "analysis_revision_matches", "value": "true"},
+        {"predicate": "changed_symbol_count", "value": "0"},
+        {"predicate": "new_sonar_critical_count", "value": "0"},
+        {"predicate": "code_change_risk", "value": "0.0"}
+      ],
+      "proposal": null,
+      "note": "No symbol change (wrote a verification note) -> changed_symbol_count=0."
+    }
+  ],
+  "p3_forecast_budget": {
+    "label": "FORECAST",
+    "basis": "p2 measured target-model cost x 2 headroom",
+    "measured_cost_usd": 0.008578,
+    "forecast_per_cell_usd": 0.017156,
+    "note": "FORECAST, not measured. p3 must report each later cell's forecast and actual cost separately. No p3 cell may run until this p2 manifest + measured-cost JSON are committed."
+  },
+  "observations": [
+    "The bespoke cell's seeded app is a fresh git repo with NO .gitignore, so the sonar-scanner's transient .scannerwork/ workspace was committed by the test phase's git add -A (commit 1fb1776). The finops repo's .gitignore already excludes .scannerwork/ (line 61), so this is a seeded-app hygiene issue, not a seam defect; no credentials leaked. p3 cells will seed the app WITH a .gitignore.",
+    "lsp (pyright/mypy) is not installed on this machine, so new_lsp_error_count is measured-unavailable (omitted, never fabricated). code_change_risk still minted from sonar + impacted + tests_ratio terms."
+  ]
+}

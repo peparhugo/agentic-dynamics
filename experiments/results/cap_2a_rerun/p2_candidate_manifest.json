@@ -1,0 +1,73 @@
+{
+  "schema_version": "cap_2a_candidate_manifest/v1",
+  "campaign": "cap_2a_rerun",
+  "phase": "p2_measure_one_cell",
+  "written_at": "2026-08-25T23:50:27Z",
+  "source_baseline_revision": "ec9f1b8a6216ca14bcb886f743eebb614225218e",
+  "target_model": "deepseek/deepseek-v4-pro",
+  "target_backend": "opencode",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis-graph)",
+  "candidates": [
+    {
+      "candidate_id": "c1_finding_economics_closure",
+      "path": "workflows/repository/finding_economics_closure.yaml",
+      "path_sha256": "d6363defc8be7984367c76600f8d1c5f039d0d879fec96300541fbb42b1cf420",
+      "historical_cost_usd": 1.282006,
+      "historical_model": "deepseek/deepseek-v4-pro",
+      "repeatable": true,
+      "phases": ["f1_finding_coverage", "f2_contributor_attestation", "f3_sync_parity", "f4_versions_and_identity", "f5_hunt_and_verify", "f6_release_verify"],
+      "has_kind_test": false,
+      "changes_python_symbols": true,
+      "eligibility": "INELIGIBLE — no kind:test phase (hard rule 14); 6 phases, full-repo scope (slow graph/sonar legs), $1.28."
+    },
+    {
+      "candidate_id": "c2_canonical_publication_closure",
+      "path": "workflows/repository/canonical_publication_closure.yaml",
+      "path_sha256": "12da37f0590ca8f3e3f3d9a2675738f13b5aacb5382a13f61580b84bc745e0fd",
+      "historical_cost_usd": 1.447518,
+      "historical_model": "deepseek/deepseek-v4-pro",
+      "repeatable": false,
+      "phases": ["c1_canonical_tables", "c2_resolution_fail_closed", "c3_contract_semantic", "c4_record_scopes", "c5_test_scope_names", "c6_readme_site_reconcile", "c7_closure_verify"],
+      "has_kind_test": false,
+      "changes_python_symbols": true,
+      "eligibility": "INELIGIBLE — status=completed and repeatable=false (cannot be re-run); no kind:test phase."
+    },
+    {
+      "candidate_id": "c3_queue_steer",
+      "path": "workflows/operations/queue_steer.yaml",
+      "path_sha256": "bb49518cf3c09d34a79d3c8dff908348b25e7e65a189a994e2523f04f6e55d57",
+      "historical_cost_usd": 0.03296,
+      "historical_model": "deepseek/deepseek-v4-flash",
+      "repeatable": true,
+      "phases": ["detect", "interrupt", "reinterleave", "respawn", "endpoint", "verify"],
+      "has_kind_test": false,
+      "changes_python_symbols": true,
+      "eligibility": "INELIGIBLE — no kind:test phase; the interrupt/respawn phases kill and respawn live queue workers and mutate the live Redis story_jobs queue (destructive side effects) — unsafe for a shadow calibration cell."
+    },
+    {
+      "candidate_id": "c4_labbook_refresh",
+      "path": "workflows/operations/labbook_refresh.yaml",
+      "path_sha256": "613b84fe0e723c576632c0ffd3281ced38ee87479f317a179544692211f625df",
+      "historical_cost_usd": 0.027463,
+      "historical_model": "deepseek/deepseek-v4-flash",
+      "repeatable": true,
+      "phases": ["lab_books", "regenerate"],
+      "has_kind_test": false,
+      "changes_python_symbols": false,
+      "eligibility": "INELIGIBLE — no kind:test phase AND its phases only re-run existing lab/build scripts (data.js, markdown, parquet, manifest), so changed_symbol_count=0 — the exact blocker from the first campaign."
+    }
+  ],
+  "bespoke_cell": {
+    "candidate_id": "c5_bespoke_calibration_cell",
+    "path": "workflows/operations/cap_2a_calibration_cell.yaml",
+    "path_sha256": "68d0d3e97b70e72528bcd62e146f9956f29e0c6d63778e01becfaaebaf455adf",
+    "phases": ["implement", "test (kind:test)", "verify"],
+    "has_kind_test": true,
+    "changes_python_symbols": true,
+    "note": "Authored for this campaign (hard rule 14): a 3-phase workflow that implements a symbol-level feature (multiply) against a small seeded calc app, with an independent kind:test phase so test_executed_success comes from runtime.test_runner. The small self-contained app keeps the graph/sonar/tree-sitter legs fast (the first campaign's full-repo blowup never occurs)."
+  },
+  "selection": {
+    "chosen": "c5_bespoke_calibration_cell",
+    "reason": "None of the four listed candidates has a kind:test phase (hard rule 14): canonical_publication_closure is non-repeatable; labbook_refresh changes no Python symbols (reproduces the first campaign's zero-symbol blocker); queue_steer has destructive live-worker/queue side effects; finding_economics_closure is full-repo and $1.28. The bespoke calibration cell is purpose-built to guarantee a real symbol change AND independent test evidence in a small, fast, safe worktree."
+  }
+}
