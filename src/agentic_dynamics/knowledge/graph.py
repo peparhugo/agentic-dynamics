@@ -82,6 +82,17 @@ _KNOWLEDGE_INDEXES = [
     "CREATE INDEX knowledge_entity_id IF NOT EXISTS FOR (k:Knowledge) ON (k.entity_id)",
     "CREATE INDEX step_doc_id IF NOT EXISTS FOR (s:Step) ON (s.doc_id)",
     "CREATE INDEX code_module_name IF NOT EXISTS FOR (c:CodeModule) ON (c.name)",
+    # Versioned-graph entity lookup (design §5.5, cap_2a p2 finding 3): each new
+    # SymbolVersion/ModuleVersion resolves its SUPERSEDES predecessor BY entity_id —
+    # without a label-specific index that is a full label scan per version (O(N²) on
+    # a corpus-sized graph; the p2 cell observed population stalling after ~29,675
+    # symbols). The :Knowledge index does NOT help: the multi-label nodes are matched
+    # as :SymbolVersion, and Cypher only uses the :Knowledge index when the query
+    # constrains that label.
+    "CREATE INDEX symbol_version_entity_id IF NOT EXISTS "
+    "FOR (s:SymbolVersion) ON (s.entity_id)",
+    "CREATE INDEX module_version_entity_id IF NOT EXISTS "
+    "FOR (m:ModuleVersion) ON (m.entity_id)",
 ]
 _KNOWLEDGE_FULLTEXT = [
     "CREATE FULLTEXT INDEX step_text_ft IF NOT EXISTS FOR (s:Step) ON EACH [s.text]",
