@@ -17,7 +17,6 @@ from agentic_dynamics.control.context_compiler import (
     InMemoryFactStore,
     compile_context,
     load_contract,
-    validate_spec_fact_contracts,
 )
 from agentic_dynamics.control.facts import (
     FACT_PREDICATES,
@@ -310,6 +309,194 @@ def test_contract_loads_and_passes_the_fact_contract_gate():
         contracts={contract.decision_type: contract},
     )
     assert errors == [], "\n".join(errors)
+
+
+# ── The verify_code_change/v1 shadow-proposal seam (cap_2a p1) ──
+
+
+def _proposal_facts(**overrides):
+    base = {
+        "sonar_analysis_status": {"predicate": "sonar_analysis_status", "value": "available"},
+        "lsp_analysis_status": {"predicate": "lsp_analysis_status", "value": "available"},
+        "changed_symbol_count": {"predicate": "changed_symbol_count", "value": "2"},
+        "ast_parse_coverage": {"predicate": "ast_parse_coverage", "value": "1.0"},
+        "code_change_risk": {"predicate": "code_change_risk", "value": "0.245"},
+    }
+    base.update(overrides)
+    return list(base.values())
+
+
+def _proposal(scope=("Calc",), **overrides):
+    from agentic_dynamics.control.verify_proposal import build_verify_proposal
+
+    return build_verify_proposal(
+        facts=_proposal_facts(),
+        cell_id="self-cell",
+        baseline_revision="b" * 40,
+        analyzed_revision="a" * 40,
+        scope=scope,
+        recorded_at="2026-08-25T00:00:00+00:00",
+        **overrides,
+    )
+
+
+def test_proposal_schema_validation_with_applied_false():
+    """(g) A valid shadow proposal validates, is ``applied=False``, and any ``applied=True``
+    stamp is REFUSED — the seam's own enforcement of hard-rule 2 ("APPLY STAYS OFF")."""
+    from agentic_dynamics.control.verify_proposal import (
+        PROPOSAL_ACTIONS,
+        validate_verify_proposal,
+    )
+
+    proposal = _proposal()
+    assert proposal.applied is False
+    assert proposal.action == "verify"  # risk 0.245 >= 0.2, no criticals -> verify
+    assert proposal.depth == 2  # 0.245 < 0.3 -> depth 2
+    assert proposal.scope == ("Calc",)
+    assert {"verify", "rework", "continue"} == PROPOSAL_ACTIONS
+
+    result = validate_verify_proposal(proposal)
+    assert result.valid is True, result.errors
+    assert result.errors == ()
+
+    # applied=True must never validate — a shadow proposal is never applied.
+    bad = replace(proposal, applied=True)
+    refused = validate_verify_proposal(bad)
+    assert refused.valid is False
+    assert any("applied" in e for e in refused.errors)
+
+
+def test_proposal_schema_validation_contract_and_version():
+    from agentic_dynamics.control.verify_proposal import (
+        PROPOSAL_SCHEMA_VERSION,
+        validate_verify_proposal,
+    )
+
+    contract = load_contract("verify_code_change", contracts_dir=CONTRACTS_DIR)
+    proposal = _proposal()
+    assert proposal.schema_version == PROPOSAL_SCHEMA_VERSION
+
+    # A legal action validates against the REAL contract's allowed_actions.
+    assert validate_verify_proposal(proposal, contract=contract).valid is True
+
+    # An action outside the vocabulary, a wrong schema version, and an empty revision are all
+    # refused with a named reason — never silently admitted.
+    assert validate_verify_proposal(replace(proposal, action="route"), contract=contract).valid is False
+    assert validate_verify_proposal(replace(proposal, schema_version="bogus/v1")).valid is False
+    assert validate_verify_proposal(replace(proposal, baseline_revision="")).valid is False
+    assert validate_verify_proposal(replace(proposal, depth=-1)).valid is False
+
+
+def test_proposal_build_derives_rework_and_continue():
+    from agentic_dynamics.control.verify_proposal import build_verify_proposal
+
+    # Measured critical issues -> rework (depth 3), over the bounded neighborhood.
+    rework = build_verify_proposal(
+        facts=_proposal_facts(new_sonar_critical_count={"predicate": "new_sonar_critical_count", "value": "1"}),
+        cell_id="c", baseline_revision="b" * 40, analyzed_revision="a" * 40,
+        scope=("f", "g"), recorded_at="t",
+    )
+    assert rework.action == "rework" and rework.depth == 3 and rework.scope == ("f", "g")
+
+    # Low risk, no criticals -> continue (depth 0, empty scope).
+    cont = build_verify_proposal(
+        facts=_proposal_facts(code_change_risk={"predicate": "code_change_risk", "value": "0.05"}),
+        cell_id="c", baseline_revision="b" * 40, analyzed_revision="a" * 40,
+        scope=("f",), recorded_at="t",
+    )
+    assert cont.action == "continue" and cont.depth == 0 and cont.scope == ()
+
+    # Zero changed symbols -> continue, never a rework/verify proposal.
+    zero = build_verify_proposal(
+        facts=_proposal_facts(changed_symbol_count={"predicate": "changed_symbol_count", "value": "0"}),
+        cell_id="c", baseline_revision="b" * 40, analyzed_revision="a" * 40,
+        scope=(), recorded_at="t",
+    )
+    assert zero.action == "continue" and zero.depth == 0
+
+
+def test_proposal_build_refuses_without_halt_facts():
+    from agentic_dynamics.control.verify_proposal import build_verify_proposal
+
+    # A change with no measurable risk (the contract's on_missing: halt fact) is refused —
+    # never guessed into a proposal.
+    no_risk = [f for f in _proposal_facts() if f["predicate"] != "code_change_risk"]
+    with pytest.raises(ValueError, match="code_change_risk"):
+        build_verify_proposal(
+            facts=no_risk, cell_id="c", baseline_revision="b" * 40,
+            analyzed_revision="a" * 40, recorded_at="t",
+        )
+
+    no_delta = [f for f in _proposal_facts() if f["predicate"] != "changed_symbol_count"]
+    with pytest.raises(ValueError, match="changed_symbol_count"):
+        build_verify_proposal(
+            facts=no_delta, cell_id="c", baseline_revision="b" * 40,
+            analyzed_revision="a" * 40, recorded_at="t",
+        )
+
+
+def test_proposal_record_is_artifact_only_and_refuses_invalid(tmp_path):
+    """A valid proposal is durably recorded as a plain JSON artifact (applied=false, versioned);
+    an invalid one is REFUSED (raises) rather than written — the "refuse to run" contract."""
+    import json as _json
+
+    from agentic_dynamics.control.verify_proposal import (
+        PROPOSAL_SCHEMA_VERSION,
+        record_verify_proposal,
+    )
+
+    proposal = _proposal()
+    path = record_verify_proposal(proposal, artifact_dir=tmp_path)
+    assert path.is_file() and path.name == f"{proposal.proposal_id}.json"
+    payload = _json.loads(path.read_text())
+    assert payload["applied"] is False
+    assert payload["schema_version"] == PROPOSAL_SCHEMA_VERSION
+    assert payload["action"] == "verify" and payload["depth"] == 2
+    assert payload["baseline_revision"] == "b" * 40 and payload["analyzed_revision"] == "a" * 40
+
+    with pytest.raises(ValueError, match="refused"):
+        record_verify_proposal(replace(proposal, applied=True), artifact_dir=tmp_path)
+
+
+def test_proposal_emit_refuses_when_unvalidatable(tmp_path):
+    from agentic_dynamics.control.verify_proposal import emit_verify_proposal
+
+    no_risk = [f for f in _proposal_facts() if f["predicate"] != "code_change_risk"]
+    with pytest.raises(ValueError):
+        emit_verify_proposal(
+            facts=no_risk, cell_id="c", baseline_revision="b" * 40,
+            analyzed_revision="a" * 40, recorded_at="t", artifact_dir=tmp_path,
+        )
+
+
+def test_proposal_seam_never_actuates_or_steers():
+    """The proposal seam is artifact-only: no ``publish_event`` call, no actuation-record
+    construction, no ``control_route``/apply-seam import, no rework call site. Checked at the
+    AST level (call targets + imports), not by prose, so the docstring's "never does X" claims
+    do not trigger a false positive."""
+    import ast
+    import inspect
+
+    import agentic_dynamics.control.verify_proposal as vp
+
+    tree = ast.parse(inspect.getsource(vp))
+    forbidden_calls = {
+        "publish_event", "derive_actuation_record", "record_shadow_decision",
+        "make_applying_router",
+    }
+    forbidden_modules = {"actuation_ingestion", "knowledge_stream", "rules"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = (
+                node.func.id if isinstance(node.func, ast.Name)
+                else node.func.attr if isinstance(node.func, ast.Attribute) else None
+            )
+            assert name not in forbidden_calls, f"proposal seam calls {name}"
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                assert alias.name.split(".")[-1] not in forbidden_modules
+        elif isinstance(node, ast.ImportFrom):
+            assert (node.module or "").split(".")[-1] not in forbidden_modules
 
 
 def test_contract_compiles_admissible_through_real_compile_context():
