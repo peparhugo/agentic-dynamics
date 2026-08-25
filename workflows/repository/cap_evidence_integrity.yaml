@@ -1,0 +1,180 @@
+name: cap_evidence_integrity
+question: >-
+  Implement the evidence-integrity stream per docs/designs/current/cap_evidence_integrity_design.md
+  (accepted): (1) Sonar revision identity — revision-scoped project key, analyzed_sha/tool
+  version/config hash persisted in the quality record, stale-fetched analyses REFUSED (never
+  stamped with the current commit; the live exp_src staleness becomes detectable); (2) Pyright
+  pinned for the Python repo with durable availability + one-record-per-diagnostic linked to the
+  smallest containing symbol; (3) typed CodeSnapshot + CodeDelta from tree-sitter replacing the
+  regex diff-stat heuristic (API-compatible with CommitAnalysis); (4) versioned graph
+  population — ModuleVersion/SymbolVersion with repository_id+commit identity, SUPERSEDES edges,
+  DEFINES/IMPORTS populated first, CALLS/TESTED_BY next, ACL on neighborhood expansion; (5)
+  code_change_facts/v1 reducer (minting-order guard: only after CodeDelta exists) +
+  verify_code_change/v1 shadow contract; (6) injected phase-boundary analyzer protocol (the
+  routing/telemetry dependency-inversion pattern). Flash implements; the sonnet-5 adversary
+  (cap_evidence_adversary) reviews the branch afterwards.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery /
+        evidence integrity. canonical_sources: [docs/designs/current/cap_evidence_integrity_design.md
+        (the authority), src/agentic_dynamics/knowledge/quality_ingestion.py (Sonar record),
+        src/agentic_dynamics/measurement/sonar.py (fetch-first), src/agentic_dynamics/measurement/
+        commit_analysis.py (regex heuristic), src/agentic_dynamics/core/language.py (tree-sitter),
+        src/agentic_dynamics/knowledge/graph.py (allowlist), src/agentic_dynamics/measurement/
+        lsp_diagnostics.py (adapter config), src/agentic_dynamics/control/reducers/ (reducer
+        pattern)]. policies: [revision_is_identity, stale_is_refused_never_stamped,
+          null_not_zero, minting_order_guard, shadow_only, acl_on_neighborhood]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: cross_cutting instrumentation.
+        deliberation: [sonar integrity, pyright, code snapshot, versioned graph, change facts,
+        analyzer protocol]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        Verified gaps: quality_ingestion.py:215 calls Sonar without revision/project key while
+        sonar.py:167 is fetch-first (stale analysis can be stamped current); commit_analysis is
+        regex (docstring admits); tree-sitter parse_codebase exists unused for deltas; the graph
+        has 1,082 code nodes with zero relationships and an unpopulated allowlist; LSP adapters
+        all unavailable; 93 Sonar issues collapse to one sentence. The four in-flight branches
+        land first; this stream is next.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green tests. (2) REVISION IS IDENTITY:
+        every new record/node carries repository_id + commit SHA; stale-fetched Sonar analyses
+        are REFUSED (recorded sonar_analysis_status: stale-refused), never stamped with a newer
+        revision. (3) NULL-NOT-ZERO on every analyzer status; an unavailable analyzer is unknown,
+        never zero. (4) MINTING-ORDER GUARD: code_change_facts/v1 predicates are minted ONLY from
+        the typed CodeDelta (phase e4), never before — changed_symbol_count etc. minted from the
+        regex heuristic is a phantom-producer failure. (5) CommitAnalysis API stays compatible
+        (the typed CodeDelta replaces the internals, not the callers). (6) The graph versioning is
+        additive: existing unversioned nodes are not deleted; SUPERSEDES links the versions.
+        (7) ACL: the neighborhood expansion never crosses repository_id (private repo symbols
+        unreachable from public expansions). (8) No new automatable actions; everything shadow.
+        (9) The sonnet-5 adversary reviews this branch separately. (10) PASS/FAIL log.
+      read_first: >-
+        docs/designs/current/cap_evidence_integrity_design.md, src/agentic_dynamics/knowledge/
+        quality_ingestion.py, src/agentic_dynamics/measurement/sonar.py, src/agentic_dynamics/
+        measurement/commit_analysis.py, src/agentic_dynamics/core/language.py, src/agentic_dynamics/
+        knowledge/graph.py, src/agentic_dynamics/measurement/lsp_diagnostics.py,
+        src/agentic_dynamics/control/reducers/_common.py (the reducer shape)
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash --backend opencode. One worktree, one
+        branch (feature/cap-evidence-integrity); each phase commits [workflow] <phase>.
+    phases:
+      - name: e1_sonar_integrity
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: fix Sonar revision identity per design §5.1: (a) quality_ingestion passes a
+          revision-scoped project key (or the analyzed SHA is captured independently);
+          (b) the quality record persists tool_version, config_hash, analyzed_sha, coverage;
+          (c) a fetch-first result whose analysis revision does not match the current revision is
+          REFUSED — the record carries sonar_analysis_status: stale-refused, never the current
+          commit stamp. VERIFY: a unit test proving the stale-refusal path; a live probe showing
+          the current exp_src analysis IS detected as stale (or records its true analyzed_sha).
+          GUARD: no fabricated analysis; the record never claims a revision it did not analyze.
+          LOG: the fix, the test, the live probe; PASS/FAIL; commit.
+      - name: e2_pyright_and_diagnostics
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: pin Pyright for the Python repo per design §5.2: (a) the pyright adapter is
+          enabled with a durable availability probe (pyright --version recorded, not assumed);
+          (b) diagnostics are ingested ONE-RECORD-PER-DIAGNOSTIC (file/line/rule/severity/
+          message), each linked to the smallest containing symbol; the one-sentence compression
+          at quality_ingestion.py:100-123 is replaced for LSP diagnostics by issue-level records.
+          VERIFY: a fixture with N diagnostics produces N records with symbol links; availability
+          probe result durable in the record.
+          GUARD: absent diagnostics stay absent (no empty-file fabrication).
+          LOG: adapter state, record shape, tests; PASS/FAIL; commit.
+      - name: e3_code_snapshot_delta
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the typed CodeSnapshot + CodeDelta per design §5.3 using tree-sitter
+          (core/language.py parse_codebase): a CodeSnapshot per revision (files -> symbols with
+          kinds and positions), a CodeDelta(before, after) computing changed/added/removed
+          symbols, imports, call edges deltas. Replace the regex diff-stat internals of
+          commit_analysis.py while keeping its public API compatible (the docstring's "heuristic"
+          admission is retired). VERIFY: unit tests (a known change produces the expected delta);
+          the CommitAnalysis callers still pass.
+          GUARD: no caller breakage; tree-sitter failures degrade to a recorded parse-coverage
+          fact, never a crash.
+          LOG: API, delta shape, tests; PASS/FAIL; commit.
+      - name: e4_versioned_graph
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: version the graph per design §5.4: ModuleVersion/SymbolVersion nodes keyed by
+          repository_id + commit SHA, SUPERSEDES edges between versions, CONTAINS/DEFINES edges
+          from revision to module to symbol; populate IMPORTS from the CodeSnapshot's import
+          resolution, then DEFINES; CALLS/TESTED_BY populated in the same pass where the snapshot
+          provides them (incremental is fine — the allowlist exists). ACL: the neighborhood
+          expansion filter carries repository_id (never crosses). VERIFY: a fixture revision pair
+          produces versioned nodes + SUPERSEDES + the populated edges; the expansion honors the
+          scope filter (a private-repo node is unreachable from a public expansion).
+          GUARD: additive — existing unversioned nodes untouched.
+          LOG: node/edge counts for the fixture, scope test; PASS/FAIL; commit.
+      - name: e5_change_facts_and_contract
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement code_change_facts/v1 per design §4 — the reducer consuming the typed
+          CodeDelta (minting-order guard: it exists, e3 landed) + analyzer statuses: the ten
+          predicates (analysis_revision_matches, ast_parse_coverage, lsp_analysis_status,
+          sonar_analysis_status, changed_symbol_count, impacted_symbol_count, new_lsp_error_count,
+          new_sonar_critical_count, changed_symbols_with_tests_ratio, code_change_risk);
+          unavailable analyzers -> None (never zero). Author the verify_code_change/v1 contract
+          (experiments/contexts/) with the shadow-only posture (no new automatable actions).
+          VERIFY: hermetic tests (fixture delta + analyzer statuses -> facts, null-not-zero on
+          unavailable); the contract compiles and passes the gate.
+          GUARD: predicates from FACT_PREDICATES (additive entries for the new ones);
+          code_change_risk is [C] composite of the measured inputs.
+          LOG: reducer, contract, tests; PASS/FAIL; commit.
+      - name: e6_analyzer_protocol
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the injected phase-boundary analyzer protocol per design §5.6, following the
+          existing dependency-inversion pattern (runtime owns the protocol; control implementations
+          injected at the composition root). The protocol exposes: before-change (target symbols),
+          after-commit (rerun AST + pyright), boundary (sonar). No behavior change when the
+          implementation is absent (default no-op). VERIFY: the protocol is testable with a fake;
+          the composition root wiring is optional and OFF by default.
+          GUARD: runtime never imports control; default no-op keeps existing behavior identical.
+          LOG: protocol, wiring, tests; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: evidence_integrity_built
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [sonar_revision_safe, pyright_durable, code_delta_typed, graph_versioned, change_facts_minted, analyzer_protocol_injected]
+metrics:
+  - {name: sonar_revision_safe, agg: mean, over: cell}
+  - {name: pyright_durable, agg: mean, over: cell}
+  - {name: code_delta_typed, agg: mean, over: cell}
+  - {name: graph_versioned, agg: mean, over: cell}
+  - {name: change_facts_minted, agg: mean, over: cell}
+  - {name: analyzer_protocol_injected, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup: {format: lab_book, sections: [question, e1_sonar_integrity, e2_pyright_and_diagnostics, e3_code_snapshot_delta, e4_versioned_graph, e5_change_facts_and_contract, e6_analyzer_protocol]}
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

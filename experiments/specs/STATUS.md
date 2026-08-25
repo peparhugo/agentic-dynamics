@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-24T23:01:23.747010+00:00`  ·  103 spec(s)
-**Work remaining:** 25 open · 78 completed/retired
+Generated at: `2026-08-25T00:06:02.725070+00:00`  ·  108 spec(s)
+**Work remaining:** 27 open · 81 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -14,6 +14,7 @@ Generated at: `2026-08-24T23:01:23.747010+00:00`  ·  103 spec(s)
 | `cap_grit_strength_grid` | experiment | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_story_bridge` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | runnable | 0.1 | — | 2026-08-23 19:16 | ok | anthropic/claude-sonnet-5 | $49.5218 | 4 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
@@ -30,6 +31,7 @@ Generated at: `2026-08-24T23:01:23.747010+00:00`  ·  103 spec(s)
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `agentic_dynamics_rebrand` | workflow | no | failed | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
+| `cap_sonnet_adversary` | workflow | no | failed | 0.1 | — | 2026-08-25 00:06 | fail | anthropic/claude-sonnet-5 | $0.0000 | 1 |
 | `claude_background_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
@@ -40,6 +42,7 @@ Generated at: `2026-08-24T23:01:23.747010+00:00`  ·  103 spec(s)
 | `canonical_state_round2` | workflow | no | completed | 0.1 | — | 2026-08-18 17:55 | ok | anthropic/claude-fable-5 | $4.8433 | 2 |
 | `cap_addendum_design` | workflow | no | completed | 0.1 | — | 2026-08-22 18:15 | ok | deepseek/deepseek-v4-pro | $0.4667 | 1 |
 | `cap_addendum_implement` | workflow | no | completed | 0.1 | — | 2026-08-24 14:07 | ok | anthropic/claude-sonnet-5 | $27.9867 | 2 |
+| `cap_e2_cascade_run` | workflow | no | completed | 0.1 | — | 2026-08-24 23:55 | ok | deepseek/deepseek-v4-flash | $0.1075 | 1 |
 | `cap_fact_auto_emit` | workflow | no | completed | 0.1 | — | 2026-08-24 00:06 | ok | anthropic/claude-sonnet-5 | $6.2564 | 1 |
 | `cap_fact_backfill` | workflow | no | completed | 0.1 | — | 2026-08-24 23:01 | ok | deepseek/deepseek-v4-flash | $0.3553 | 1 |
 | `cap_gate_migration` | workflow | no | completed | 0.1 | — | 2026-08-24 00:30 | ok | anthropic/claude-sonnet-5 | $13.7720 | 1 |
@@ -47,10 +50,12 @@ Generated at: `2026-08-24T23:01:23.747010+00:00`  ·  103 spec(s)
 | `cap_grit_grid_execute` | workflow | no | completed | 0.1 | — | 2026-08-24 15:54 | ok | deepseek/deepseek-v4-flash | $0.1330 | 1 |
 | `cap_i0_i3_remediation` | workflow | no | completed | 0.1 | — | 2026-08-23 15:45 | ok | anthropic/claude-sonnet-5 | $32.7888 | 2 |
 | `cap_implement_repair` | workflow | no | completed | 0.1 | — | 2026-08-22 18:16 | ok | deepseek/deepseek-v4-pro | $0.2652 | 1 |
+| `cap_pattern_minting` | workflow | no | completed | 0.1 | — | 2026-08-24 23:57 | ok | deepseek/deepseek-v4-flash | $0.1690 | 1 |
 | `cap_routing_evidence_specs` | workflow | no | completed | 0.1 | — | 2026-08-24 00:35 | ok | anthropic/claude-sonnet-5 | $13.6310 | 1 |
 | `cap_session_routing_spec` | workflow | no | completed | 0.1 | — | 2026-08-22 17:59 | ok | deepseek/deepseek-v4-pro | $0.1430 | 1 |
 | `cap_shadow_campaign` | workflow | no | completed | 0.1 | — | 2026-08-24 00:07 | ok | anthropic/claude-sonnet-5 | $6.7989 | 1 |
 | `cap_shadow_fact_disposition` | workflow | no | completed | 0.1 | — | 2026-08-24 00:44 | ok | deepseek/deepseek-v4-flash | $0.2045 | 1 |
+| `cap_test_runner_wiring` | workflow | no | completed | 0.1 | — | 2026-08-25 00:03 | ok | deepseek/deepseek-v4-flash | $0.0737 | 1 |
 | `claude_tools_to_skills` | workflow | no | completed | 0.1 | — | 2026-08-14 22:29 | ok | anthropic/claude-fable-5 | $8.3582 | 1 |
 | `code_review` | workflow | no | completed | 0.1 | — | 2026-08-24 01:18 | ok | openai/gpt-5.6-luna | $0.1648 | 3 |
 | `consolidation_release` | workflow | no | completed | 0.1 | — | 2026-08-20 13:10 | ok | deepseek/deepseek-v4-pro | $0.1756 | 1 |

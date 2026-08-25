@@ -1,0 +1,83 @@
+name: cap_evidence_adversary
+question: >-
+  Sonnet-5 adversarial review of the cap_evidence_integrity branch per the adversarial
+  convention: findings re-verified against the tree, plus the attempted-attacks/known-safe list.
+  Attack the six phases' claims: sonar revision identity (stale-refusal provable, analyzed_sha
+  real, no current-commit stamp on stale), pyright durability (availability probed not assumed,
+  one-record-per-diagnostic with real symbol links), typed CodeDelta (tree-sitter, API-compatible,
+  no regex residue), versioned graph (repository_id+commit identity, SUPERSEDES, scope filter —
+  private unreachable from public), change facts (minting-order guard respected, null-not-zero,
+  contract gate-clean), analyzer protocol (dependency inversion, default no-op).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery /
+        adversarial review. canonical_sources: [feature/cap-evidence-integrity (the branch),
+        workflows/repository/cap_evidence_integrity.yaml (the spec), docs/designs/current/
+        cap_evidence_integrity_design.md, agent_config/conventions.md (the adversarial
+        convention)]. policies: [findings_are_verified, known_safe_list_required, no_bare_pass]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: adversarial review.
+        deliberation: [review the evidence-integrity branch]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        cap_evidence_integrity (flash) implements the six phases on its branch; this workflow
+        reviews it after it lands. The branch must exist with its [workflow] commits before the
+        review phase runs.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with findings + known-safe list. (2) Per the
+        convention: findings re-verified against the tree (re-derived, never imagined); the
+        attempted-attacks/known-safe list is mandatory; no bare PASS. (3) If the branch is
+        missing or lacks its expected [workflow] commits, FAIL the phase cleanly with the reason.
+        (4) Sonnet-5 only. (5) No code changes except a review record if the convention requires.
+      read_first: >-
+        agent_config/conventions.md, workflows/repository/cap_evidence_integrity.yaml,
+        docs/designs/current/cap_evidence_integrity_design.md
+      run_shape: >-
+        SINGLE-model: --model anthropic/claude-sonnet-5 --backend claude_cli (CLAUDE_BIN). One
+        worktree, one branch (feature/cap-evidence-adversary); each phase commits [workflow] <phase>.
+    phases:
+      - name: a1_review_evidence_integrity
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          TARGET: feature/cap-evidence-integrity. FIRST verify the branch exists and its six
+          phases committed (git log). Then review per the conventions, attacking each phase's
+          claims: (1) sonar — stale-refusal provable from a test, analyzed_sha/tool_version/
+          config_hash persisted, no path stamps a stale analysis with a newer revision;
+          (2) pyright — availability probed (not assumed), one-record-per-diagnostic with symbol
+          links; (3) CodeDelta — tree-sitter based, CommitAnalysis API compatible, no regex
+          residue in the delta path; (4) graph — repository_id+commit identity on every new node,
+          SUPERSEDES wired, scope filter proven (private unreachable from public expansion);
+          (5) change facts — minting-order guard respected (nothing minted before the typed
+          delta), null-not-zero on unavailable analyzers, contract gate-clean; (6) protocol —
+          dependency inversion holds (runtime never imports control), default no-op.
+          DELIVER: findings (each re-verified with evidence) + the known-safe list + verdict
+          (PASS/FAIL with mandatory fixes).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules:
+  - name: evidence_adversary_run
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [evidence_branch_reviewed]
+metrics:
+  - {name: evidence_branch_reviewed, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup: {format: lab_book, sections: [question, a1_review_evidence_integrity]}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

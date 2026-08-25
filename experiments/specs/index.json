@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-24T23:01:23.747010+00:00",
-  "n_specs": 103,
+  "generated_at": "2026-08-25T00:06:02.725070+00:00",
+  "n_specs": 108,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -100,6 +100,24 @@
       "spec_path": "experiments/definitions/cap_shadow_comparison.yaml",
       "artifact_kind": "experiment",
       "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "cap_story_bridge",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_story_bridge.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
@@ -400,6 +418,24 @@
       "n_runs": 2
     },
     {
+      "name": "cap_sonnet_adversary",
+      "version": "0.1",
+      "status": "failed",
+      "spec_path": "workflows/repository/cap_sonnet_adversary.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-25T00:06:02.680139+00:00",
+      "latest_ok": false,
+      "latest_model": "anthropic/claude-sonnet-5",
+      "latest_cost_usd": 0.0,
+      "latest_git_sha": "6cdefa102",
+      "results_pointer": "experiments/results/workflows/cap_sonnet_adversary/20260825T000602Z.json",
+      "n_runs": 1
+    },
+    {
       "name": "claude_background_sessions",
       "version": "0.1",
       "status": "failed",
@@ -580,6 +616,24 @@
       "n_runs": 2
     },
     {
+      "name": "cap_e2_cascade_run",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_e2_cascade_run.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-24T23:55:09.460771+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.107522,
+      "latest_git_sha": "f6274020b",
+      "results_pointer": "experiments/results/workflows/cap_e2_cascade_run/20260824T235509Z.json",
+      "n_runs": 1
+    },
+    {
       "name": "cap_fact_auto_emit",
       "version": "0.1",
       "status": "completed",
@@ -706,6 +760,24 @@
       "n_runs": 1
     },
     {
+      "name": "cap_pattern_minting",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_pattern_minting.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-24T23:57:45.329867+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.168998,
+      "latest_git_sha": "0e79c155a",
+      "results_pointer": "experiments/results/workflows/cap_pattern_minting/20260824T235745Z.json",
+      "n_runs": 1
+    },
+    {
       "name": "cap_routing_evidence_specs",
       "version": "0.1",
       "status": "completed",
@@ -775,6 +847,24 @@
       "latest_cost_usd": 0.204488,
       "latest_git_sha": "ba48a7f58",
       "results_pointer": "experiments/results/workflows/cap_shadow_fact_disposition/20260824T004425Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "cap_test_runner_wiring",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_test_runner_wiring.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-25T00:03:11.180748+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.073715,
+      "latest_git_sha": "3d4149664",
+      "results_pointer": "experiments/results/workflows/cap_test_runner_wiring/20260825T000311Z.json",
       "n_runs": 1
     },
     {
