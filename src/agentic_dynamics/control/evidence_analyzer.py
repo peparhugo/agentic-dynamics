@@ -24,6 +24,7 @@ The analyzer is a pure-ish composition: the only I/O is the duck-typed ``graph_c
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typing import Any
 
 from agentic_dynamics.control.facts import EvidenceItem, ReducerInput
@@ -71,7 +72,20 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
     explicit ``graph_status`` (``available`` / ``unavailable`` / ``not_requested``) on the
     returned :class:`ChangeAnalysis`; the impacted count is then omitted (None), never a
     fabricated zero. Only the two graph calls are guarded — a reducer error still propagates.
+
+    HARD DEADLINE (cap_2a p1, found live during the campaign's p2 cell): the graph leg runs
+    under ``GRAPH_LEG_TIMEOUT_SECONDS`` — a stalled driver (unreachable server, hung
+    connection-acquisition retry, a Bolt peer that never answers) BLOCKS the phase forever
+    otherwise, which would violate the phase-boundary seam's never-block guarantee. On
+    timeout the leg degrades exactly like any other graph failure: delta-only facts +
+    ``graph_status=unavailable``. The abandoned worker thread keeps waiting in the background;
+    the driver is closed by the composition root's ``finally`` regardless.
     """
+
+    #: Client-side deadline for the whole graph leg (populate parent + after, then the impact
+    #: expansion). A healthy local Neo4j answers each call in well under a second; 30s is a
+    #: generous envelope that still guarantees a hung server can never stall a phase.
+    GRAPH_LEG_TIMEOUT_SECONDS = 30.0
 
     def __init__(self, graph_client: Any = None, *, graph_requested: bool | None = None) -> None:
         self.graph_client = graph_client
@@ -86,43 +100,39 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
         neighborhood: list[str] = []
         impacted: int | None = None
 
-        # Graph leg — populate first, then the impact expansion. Both are best-effort: a
-        # failure degrades to delta-only facts + an explicit graph_status, never an escaping
-        # exception (the runner records the analysis as a phase-boundary evidence product, and
-        # a graph-down cell must be FLAGGED, not crash the phase).
+        # Graph leg — populate first, then the impact expansion. Best-effort under a hard
+        # client-side deadline: a failure (raised OR timed-out — a stalled driver never
+        # returns) degrades to delta-only facts + an explicit graph_status, never an escaping
+        # exception and never a hung phase (the runner records the analysis as a phase-boundary
+        # evidence product; a graph-down cell must be FLAGGED, not crash the phase).
         if self.graph_client is not None:
             graph_failed = False
-            # Populate the parent as well as the after revision. Removed symbols are seeded from
-            # the parent; without its revision in the graph, their impact neighborhood is
-            # silently unresolvable on a fresh graph.
-            for snapshot, revision in (
-                (change.before, getattr(change.before, "revision", "")),
-                (change.after, change.revision),
-            ):
-                if snapshot is None or not revision:
-                    continue
-                try:
-                    counts = self.graph_client.populate_versioned_graph(
-                        snapshot,
-                        revision=revision,
-                        repository_id=change.repository_id,
-                        acl_scope=change.acl_scope,
-                    )
-                except Exception:
-                    graph_failed = True
-                else:
-                    if snapshot is change.after:
-                        graph_updated = bool((counts or {}).get("symbol_versions", 0))
+            pool = ThreadPoolExecutor(max_workers=1)
+            try:
+                graph_updated = pool.submit(self._populate_graph, change).result(
+                    timeout=self.GRAPH_LEG_TIMEOUT_SECONDS
+                )
+            except FuturesTimeout:
+                graph_failed = True
+            except Exception:
+                graph_failed = True
+            finally:
+                pool.shutdown(wait=False)
             graph_status = "unavailable" if graph_failed else "available"
 
         if graph_status == "available":
+            pool = ThreadPoolExecutor(max_workers=1)
             try:
-                neighborhood, impacted = self._neighborhood(change)
-            except Exception:
+                neighborhood, impacted = pool.submit(self._neighborhood, change).result(
+                    timeout=self.GRAPH_LEG_TIMEOUT_SECONDS
+                )
+            except (FuturesTimeout, Exception):
                 # The impact leg failed — flag the cell so downstream scoring never mistakes
                 # the delta-only facts for a full-fact analysis.
                 neighborhood, impacted = [], None
                 graph_status = "unavailable"
+            finally:
+                pool.shutdown(wait=False)
 
         facts = code_change_facts_v1(self._reducer_input(change, impacted))
         return ChangeAnalysis(
@@ -144,6 +154,35 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
             phase_id=change.phase_id,
             observed_at=change.observed_at,
         )
+
+    def _populate_graph(self, change: ChangeInput) -> bool:
+        """Populate the parent and after revisions; True when the after revision got versions.
+
+        Runs under the analyzer's client-side deadline (see ``analyze``). Each snapshot is
+        populated independently — one failure does not stop the other.
+        """
+        graph_updated = False
+        # Populate the parent as well as the after revision. Removed symbols are seeded from
+        # the parent; without its revision in the graph, their impact neighborhood is
+        # silently unresolvable on a fresh graph.
+        for snapshot, revision in (
+            (change.before, getattr(change.before, "revision", "")),
+            (change.after, change.revision),
+        ):
+            if snapshot is None or not revision:
+                continue
+            try:
+                counts = self.graph_client.populate_versioned_graph(
+                    snapshot,
+                    revision=revision,
+                    repository_id=change.repository_id,
+                    acl_scope=change.acl_scope,
+                )
+            except Exception:  # noqa: BLE001 — a failing graph is a state, not a crash
+                continue
+            if snapshot is change.after:
+                graph_updated = bool((counts or {}).get("symbol_versions", 0))
+        return graph_updated
 
     def _neighborhood(self, change: ChangeInput) -> tuple[list[str], int | None]:
         """The ACL-scoped 1-2 hop reachable set from the changed symbols.
