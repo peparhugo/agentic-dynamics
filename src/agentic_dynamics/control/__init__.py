@@ -34,6 +34,7 @@ Control consumes facts, not arbitrary retrieved text (rec 8): it must not import
 
 from . import (
     actuation_ingestion,
+    evidence_analyzer,
     live,
     observation_ingestion,
     pipeline_status,
@@ -44,4 +45,4 @@ from . import (
     supervisor,
 )
 
-__all__ = ['actuation_ingestion', 'live', 'observation_ingestion', 'pipeline_status', 'queue_reinterleave', 'routing', 'signal_store', 'step_routing', 'supervisor']
+__all__ = ['actuation_ingestion', 'evidence_analyzer', 'live', 'observation_ingestion', 'pipeline_status', 'queue_reinterleave', 'routing', 'signal_store', 'step_routing', 'supervisor']

@@ -479,6 +479,9 @@ LEGITIMATE_CALLERS = frozenset(
         "src/agentic_dynamics/control/rules.py",
         "src/agentic_dynamics/control/validator.py",
         "src/agentic_dynamics/control/profiles.py",
+        # Evidence-integrity e6 (design §5.7): the concrete phase-boundary analyzer is the
+        # composition-root producer — it builds the reducer input and de-types the emitted facts.
+        "src/agentic_dynamics/control/evidence_analyzer.py",
     }
 )
 
