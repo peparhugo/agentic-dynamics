@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-25T22:40:43.333458+00:00",
-  "n_specs": 111,
+  "generated_at": "2026-08-25T22:55:21.814486+00:00",
+  "n_specs": 112,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -20,6 +20,26 @@
       "latest_git_sha": "01517934f",
       "results_pointer": "experiments/results/workflows/auto_posthoc_wiring/20260817T161730Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "cap_2a_rerun",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_2a_rerun.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [
+        "cap_2a_shadow_calibration"
+      ],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
     },
     {
       "name": "cap_confidence_cascade",
