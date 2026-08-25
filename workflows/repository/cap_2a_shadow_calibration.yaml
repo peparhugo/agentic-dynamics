@@ -1,0 +1,193 @@
+name: cap_2a_shadow_calibration
+question: >-
+  Does the adaptive verifier's proposal (verify_code_change/v1: depth/scope/rework) predict
+  the outcome the baseline actually produced? Measure proposal hit-rate and predicted-vs-observed
+  blast radius over real workflow cells; the 2b randomized pilot launches only when the gate
+  clears (proposal hit-rate >= 0.6 with a stated n). Design: cap_evidence_integrity_design.md §6
+  (campaign 2a — control value, shadow calibration).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / CAP evidence integrity.
+        canonical_sources: [docs/designs/current/cap_evidence_integrity_design.md §6 (campaign
+        2a/2b), docs/review/cap_evidence_integrity_review.md (F1-F3 resolutions),
+        src/agentic_dynamics/control/reducers/code_change_facts.py (the 10 predicates + risk
+        formula), src/agentic_dynamics/runtime/change_analyzer.py +
+        src/agentic_dynamics/control/evidence_analyzer.py (the seam),
+        src/agentic_dynamics/knowledge/graph.py (Neo4jClient, e4 traversal ACL),
+        experiments/contexts/verify_code_change.yaml (the contract)].
+        policies: [measure_before_actuate, apply_stays_off, shadow_is_never_applied,
+        measure_one_cell_cost_before_budget]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research (measurement campaign).
+        deliberation: [wire graph client, run cells under shadow, score proposals vs realized
+        outcomes, hit-rate gate, verdict].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        Evidence-integrity vertical MERGED (e1-e6 + F1-F3 fixes): typed CodeSnapshot/CodeDelta,
+        versioned graph with traversal ACL, code_change_facts/v1 (10 job-scoped predicates incl.
+        code_change_risk + TESTED_BY ratio), verify_code_change/v1 contract compiled through the
+        R1-R11 gate, and scripts/run_workflow.py --change-analysis (e6 seam) injecting
+        EvidenceChangeAnalyzer at the composition root. KNOWN GAP this campaign fixes: the
+        injected analyzer carries graph_client=None, so impacted_symbol_count (the blast-radius
+        term in the risk formula) is never produced — the composition-root graph wiring is phase
+        p1 below. The e4 graph machinery (populate_versioned_graph, expand_candidates) is proven
+        by live-Neo4j tests. 2a is the FIRST campaign to consume the change facts — the facts
+        existed before but no spec required them.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) p1 MUST ship the
+        composition-root graph wiring with a regression test proving the injection (and the
+        analyzer's fallback when the graph is down — graph_client=None semantics preserved,
+        delta-only facts, never a crash). (3) APPLY STAYS OFF: verify proposals are shadow-only,
+        never applied, never armed (no control_route, no actuation). (4) E4 lesson: p2 measures
+        ONE cell's full cost before p3 commits a per-cell budget — no budget without measurement.
+        (5) Every number in the verdict doc cites a produced JSON (ledger, proposal record, or
+        scoring table). (6) The gate is data-driven: 2b launches only when hit-rate >= 0.6 with
+        a stated n; otherwise state the n needed. (7) The adversarial phase (p6) is mandatory:
+        findings re-verified against the tree + known-safe list, no bare PASS. (8) No
+        generated-surface edits (agent_config/, .opencode/, .claude/). (9) PASS/FAIL log;
+        resumable.
+      read_first: >-
+        docs/designs/current/cap_evidence_integrity_design.md §6, docs/review/
+        cap_evidence_integrity_review.md (Resolutions), src/agentic_dynamics/control/reducers/
+        code_change_facts.py (predicates + RISK_WEIGHTS), src/agentic_dynamics/runtime/
+        change_analyzer.py + src/agentic_dynamics/control/evidence_analyzer.py (ChangeInput/
+        ChangeAnalysis), scripts/run_workflow.py (--change-analysis), src/agentic_dynamics/
+        knowledge/graph.py (Neo4jClient constructor), experiments/contexts/verify_code_change.yaml
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-pro --backend opencode (operator preference;
+        sonnet when Claude OAuth is up). One worktree, one branch (feature/cap-2a-shadow-calibration);
+        each phase commits [workflow] <phase>. Sub-run cells execute small existing specs with
+        --change-analysis (+ the p1-wired graph flag) inside this worktree.
+    phases:
+      - name: p1_wire_graph_client
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: wire the versioned-graph client into the phase-boundary evidence seam at the
+          composition root. scripts/run_workflow.py --change-analysis currently builds
+          EvidenceChangeAnalyzer() with graph_client=None (documented v1 follow-up of review F3).
+          Add the graph wiring: a --change-analysis-graph flag (or FINOPS_NEO4J_URL env) that
+          constructs the e4 Neo4jClient (src/agentic_dynamics/knowledge/graph.py) and injects it
+          into EvidenceChangeAnalyzer. Regression test: the composition root injects a real
+          graph-shaped client; the analyzer falls back to delta-only facts when the graph is down
+          (graph_client=None semantics preserved — never a crash). Do NOT change the analyzer's
+          public behavior when no graph is supplied.
+          DELIVER: the wired script + test, committed; a short wiring note in the phase log.
+          LOG: files touched, test result, PASS/FAIL; commit.
+      - name: p2_measure_one_cell
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: measure ONE full cell end-to-end before any budget is committed (E4 lesson).
+          Pick the smallest runnable existing spec from the index; run it with the full seam
+          (--change-analysis + the graph flag from p1) and log: cost, duration, facts produced
+          (changed_symbol_count, impacted_symbol_count, code_change_risk, ast_parse_coverage),
+          and whether the proposal records are complete. State the measured per-cell cost and a
+          proposed per-cell budget for p3.
+          DELIVER: the cell's ledger + proposal records + the measured-cost line in the log.
+          LOG: cost/duration/facts table, PASS/FAIL; commit.
+      - name: p3_run_shadow_cells
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the remaining cells of the campaign: 2-3 small existing specs (list the
+          candidates + per-cell cost from p2's measurement before running). Each cell: baseline
+          executes while the adaptive verifier proposes shadow-only (verify_code_change/v1
+          depth/scope/rework) — proposals recorded, NEVER applied, never armed. Cells may reuse
+          one worktree sequentially.
+          DELIVER: the run ledgers + proposal records (the shadow dataset).
+          LOG: per-cell cost/duration/proposal table; PASS/FAIL; commit.
+      - name: p4_score_hit_rate
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: score the proposals against the outcomes the baseline actually produced:
+          predicted vs observed blast radius (predicted impacted_symbol_count vs the realized
+          rework/scope), proposal hit-rate (proposal matched the realized need), risk vs actual
+          rework. Tabulate per cell; compute the gate metrics (hit-rate, predicted-vs-observed
+          delta, n). Any cell where the graph was down (impacted count absent) is scored with
+          the delta-only facts and flagged — never silently dropped.
+          DELIVER: the scoring table JSON (experiments/results/cap_2a_*).
+          LOG: hit-rate, blast-radius delta, flagged cells; PASS/FAIL; commit.
+      - name: p5_verdict
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/cap_2a_shadow_calibration.md
+          SHAPE: cells table (spec, model, cost, duration, proposal, realized outcome, agree/
+          disagree); analysis: proposal hit-rate vs the >= 0.6 gate, predicted-vs-observed blast
+          radius, any flagged cells and why; VERDICT: does 2b's gate clear (hit-rate >= 0.6 with
+          stated n)? If not, the n needed and the blocker. Also state 2b's launch prerequisites
+          (per §6: randomized static-vs-adaptive, non-inferiority under adaptive control).
+          GUARD: every number cites the p4 JSONs; no recommendation without n.
+          LOG: PASS/FAIL; commit.
+      - name: p6_adversarial
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — try to falsify the campaign. Attack: wrong baseline
+          (verifier and baseline on different inputs), cherry-picked cells, proposals recorded
+          but never validated against realized outcomes, graph-down cells silently dropped or
+          mislabeled, stale facts (analysis_revision_matches=false ignored), hit-rate computed
+          over a non-denominator. Every finding: fix or record as accepted limitation with
+          reasoning. Re-state the verdict with the attack results. Deliver the two required
+          outputs: findings (re-verified) + known-safe list (attacks attempted, not falsified).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: cap_2a_graph_wiring
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [graph_client_wired]
+  - name: cap_2a_cells_run
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [shadow_cells_run, proposals_recorded]
+  - name: cap_2a_scoring
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [shadow_cells_run, proposals_recorded]
+    produces: [proposal_hit_rate, predicted_vs_observed_blast_radius]
+  - name: cap_2a_verifier_gate
+    plane: control
+    evidence_class: "[H]"
+    decision_type: verify_code_change
+    requires_facts:
+      - {fact: changed_symbol_count, scope: self, value_type: int, on_missing: halt}
+      - {fact: impacted_symbol_count, scope: self, value_type: int, on_missing: continue}
+      - {fact: code_change_risk, scope: self, value_type: float, on_missing: continue}
+      - {fact: ast_parse_coverage, scope: self, value_type: float, on_missing: continue}
+    produces: [gate_decision]
+metrics:
+  - {name: shadow_cells_run, agg: mean, over: cell}
+  - {name: proposal_hit_rate, agg: mean, over: cell}
+  - {name: predicted_vs_observed_blast_radius, agg: mean, over: cell}
+  - {name: gate_decision, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+writeup:
+  format: lab_book
+  sections: [question, p1_wire_graph_client, p2_measure_one_cell, p3_run_shadow_cells, p4_score_hit_rate, p5_verdict, p6_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

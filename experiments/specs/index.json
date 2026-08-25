@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-25T15:30:18.947349+00:00",
-  "n_specs": 110,
+  "generated_at": "2026-08-25T18:10:57.165102+00:00",
+  "n_specs": 111,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -20,6 +20,24 @@
       "latest_git_sha": "01517934f",
       "results_pointer": "experiments/results/workflows/auto_posthoc_wiring/20260817T161730Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "cap_2a_shadow_calibration",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_2a_shadow_calibration.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
     },
     {
       "name": "cap_confidence_cascade",
