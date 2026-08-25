@@ -89,14 +89,18 @@ workflow:
         branch (feature/cap-evidence-integrity); each phase commits [workflow] <phase>.
     phases:
       - name: p0_prereq_gate
-        kind: test
+        kind: agent
         timeout: 10800
-        prompt: |-
-          Deterministic preflight (kind: test — the runner fails this phase when the suite
-          fails; a "FAIL" word cannot be ignored). Runs tests/test_evidence_prereq_gate.py:
-          (1) the four in-flight branches' final [workflow] commits reachable from HEAD;
-          (2) cap_sonnet_adversary has a completed (ok) run ledger; (3) cap_story_bridge has a
-          completed (ok) run ledger. If the suite fails, the phase fails and the workflow stops.
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the DETERMINISTIC preflight: python3 scripts/evidence_prereq_gate.py.
+          The script exits 0 when all prerequisites hold (four branches merged by ancestry,
+          their review verdicts approved on HEAD, story_bridge ok) and 1 otherwise.
+          IF IT EXITS NON-ZERO: FAIL THIS PHASE (end with an exit-code-1 command / a failing
+          check) so the runner records the phase as failed and the workflow stops — never
+          proceed to e1 on a failed gate. IF IT EXITS ZERO: commit the gate report
+          (a one-line record of the run) and proceed.
+          GUARD: the gate is the script's exit code — no prose substitutes for it.
       - name: e1_sonar_integrity
         kind: agent
         timeout: 14400
@@ -164,8 +168,9 @@ workflow:
           VERIFY: a fixture revision pair produces versioned nodes + SUPERSEDES + populated edges;
           a traversal seeded from a public-scope record cannot reach a private-repo node (the hop
           constraint, not post-filter); the multi-label join works (Knowledge seed -> SymbolVersion).
-          GUARD: additive — existing unversioned nodes untouched; no behavior change when ACL
-          params are absent for legacy callers (defaults preserve current behavior).
+          GUARD: additive — existing unversioned nodes untouched; legacy callers that omit the
+          ACL args interact ONLY with unversioned legacy nodes (versioned nodes fail closed on
+          missing scope, always — defaults are legacy-only, explicitly).
           LOG: node/edge counts, ACL test, seed-join test; PASS/FAIL; commit.
       - name: e5_change_facts_and_contract
         kind: agent
@@ -178,13 +183,21 @@ workflow:
           sonar_analysis_status, changed_symbol_count, impacted_symbol_count, new_lsp_error_count,
           new_sonar_critical_count, changed_symbols_with_tests_ratio, code_change_risk). SEMANTICS
           per hard rule 6: status facts carry the measured enum (available/unavailable/
-          stale-refused); dependent counts are OMITTED when the analyzer did not run. Denominators
-          + zero-change behavior for the ratios defined in the reducer docstring. code_change_risk
+          stale-refused); dependent count FACTS ARE OMITTED when the analyzer did not run (the
+          wording is "dependent count facts omitted", matching null-not-zero — never "zero
+          dependent counts"). DEFINED DENOMINATOR + ZERO-CHANGE BEHAVIOR (not delegated to the
+          reducer docstring): ast_parse_coverage = parsed_changed_files / changed_files; when
+          changed_files == 0 the fact is omitted (no denominator); changed_symbols_with_tests_ratio
+          = tested_changed_symbols / changed_symbols; when changed_symbols == 0 OR the TESTED_BY
+          rule cannot link any changed symbol (deferred case), the ratio fact is OMITTED (never 0);
+          impacted_symbol_count = the 1-2 hop reachable set from changed symbols (hops 1 then 2,
+          unique symbols, bounded by the same ACL-scoped expansion). code_change_risk
           v1 formula (DEFINED, not invented): risk = 0.35*min(1, new_sonar_critical/10) +
           0.25*min(1, new_lsp_error/10) + 0.20*(1 - tests_ratio) + 0.20*min(1, impacted/10);
-          terms whose analyzer did not run are OMITTED and the remaining weights renormalized to
-          sum 1; risk is None when NO terms are measurable; the weights are [P] operator policy
-          with this provenance recorded in the reducer docstring. Author the
+          terms whose analyzer did not run OR whose ratio is deferred are OMITTED and the
+          remaining weights renormalized to sum 1; risk is None when NO terms are measurable;
+          the weights are [P] operator policy with this provenance recorded in the reducer
+          docstring. Author the
           verify_code_change/v1 contract (experiments/contexts/) — shadow-only, no new automatable
           actions.
           VERIFY: hermetic tests (fixture delta + analyzer statuses -> facts; unavailable analyzers

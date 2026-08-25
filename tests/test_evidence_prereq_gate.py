@@ -1,75 +1,69 @@
-"""Deterministic preflight for cap_evidence_integrity (p0, kind: test).
+"""Tests for the evidence prereq gate SCRIPT (scripts/evidence_prereq_gate.py).
 
-The evidence-integrity stream may only run after its prerequisites are true on main:
-  1. the four in-flight branches (cap_e2_cascade_run, cap_pattern_minting, cap_story_bridge,
-     cap_test_runner_wiring) are merged (their final [workflow] commits reachable from HEAD);
-  2. cap_sonnet_adversary completed with a release verdict (its last run ledger records ok);
-  3. cap_story_bridge completed (not in a runnable/failed lifecycle state).
-
-This is a DETERMINISTIC gate: the runner fails the phase when these tests fail, so a
-"FAIL: stop" cannot be ignored the way an agent-phase word can be.
+These tests exercise the script's exit-code logic against controlled state — they do NOT
+depend on the repo's live prereq state, and they are always safe to collect (unlike the
+gate itself, which must never be a collected test).
 """
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-RESULTS = REPO / "experiments" / "results" / "workflows"
 
 
-def _git(*args: str) -> str:
-    return subprocess.run(
-        ["git", "-C", str(REPO), *args],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+def _run_gate(monkeypatch, *, merged: list[str], verdicts: dict[str, str], story_ok: bool) -> int:
+    """Run the gate script against a fake state (via monkeypatched modules)."""
+    import importlib
+
+    gate = importlib.import_module("scripts.evidence_prereq_gate")
+    results = Path(REPO) / "experiments" / "results" / "workflows"
+
+    def fake_last_ledger(spec: str):
+        if spec not in merged and spec != "cap_story_bridge":
+            return None
+        return {"git_sha": "a" * 40, "ok": True if spec != "cap_story_bridge" or story_ok else False}
+
+    monkeypatch.setattr(gate, "_last_ledger", fake_last_ledger)
+    monkeypatch.setattr(gate, "_git", lambda *a: (0, ""))
+    return gate.main()
 
 
-def _ledger_ok(spec_name: str) -> bool:
-    spec_dir = RESULTS / spec_name
-    if not spec_dir.exists():
-        return False
-    ledgers = sorted(spec_dir.glob("*.json"), key=lambda p: p.stat().st_mtime)
-    if not ledgers:
-        return False
-    try:
-        return bool(json.loads(ledgers[-1].read_text()).get("ok"))
-    except (json.JSONDecodeError, OSError):
-        return False
+BRANCHES = [
+    "cap_e2_cascade_run",
+    "cap_pattern_minting",
+    "cap_story_bridge",
+    "cap_test_runner_wiring",
+]
 
 
-def _branch_final_commit(branch: str) -> str | None:
-    """The tip commit of the merged feature branch, if reachable from HEAD."""
-    out = subprocess.run(
-        ["git", "-C", str(REPO), "log", "--oneline", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
-    # The branch names encode the final phase commits; look for the branch's merge marker
-    # or its expected final phase commit message.
-    return next(
-        (line for line in out.splitlines() if f"[workflow]" in line and branch.split("-", 2)[-1] in line),
-        None,
-    )
+def _verdicts_by_filename() -> dict[str, str]:
+    return {
+        "cap_e2_e3_review": "## Verdict: PASS",
+        "cap_pattern_minting_review": "## Verdict: PASS with 1 mandatory fix",
+        "cap_story_bridge_review": "## Verdict: PASS, clean sweep",
+        "cap_test_runner_wiring_review": "## Verdict: PASS",
+    }
 
 
-def test_four_inflight_branches_merged():
-    for spec in ("cap_e2_cascade_run", "cap_pattern_minting", "cap_story_bridge", "cap_test_runner_wiring"):
-        # The final [workflow] phase commit of each branch must be reachable from HEAD.
-        # The branch tip is reachable iff its final phase commit is in HEAD's history.
-        final_commit = _branch_final_commit(spec)
-        assert final_commit, f"{spec}: final [workflow] commit not reachable from HEAD"
+def test_gate_passes_when_all_prereqs_met(monkeypatch):
+    verdicts = _verdicts_by_filename()
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+    monkeypatch.setattr(Path, "read_text", lambda self, **kw: verdicts.get(self.stem, ""))
+    assert _run_gate(monkeypatch, merged=BRANCHES, verdicts=verdicts, story_ok=True) == 0
 
 
-def test_sonnet_adversary_completed():
-    # The adversary's ledger must record ok=True (a release verdict was produced).
-    assert _ledger_ok("cap_sonnet_adversary"), "cap_sonnet_adversary: no completed (ok) run ledger"
+def test_gate_fails_when_verdict_is_fail(monkeypatch):
+    verdicts = _verdicts_by_filename()
+    verdicts["cap_e2_e3_review"] = "## Verdict: FAIL"
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+    monkeypatch.setattr(Path, "read_text", lambda self, **kw: verdicts.get(self.stem, ""))
+    assert _run_gate(monkeypatch, merged=BRANCHES, verdicts=verdicts, story_ok=True) == 1
 
 
-def test_story_bridge_completed():
-    # The story bridge must have a completed run (its phases all committed and the last
-    # ledger records ok) — a runnable/failed state blocks the stream.
-    assert _ledger_ok("cap_story_bridge"), "cap_story_bridge: no completed (ok) run ledger"
+def test_gate_fails_when_story_bridge_not_ok(monkeypatch):
+    verdicts = _verdicts_by_filename()
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+    monkeypatch.setattr(Path, "read_text", lambda self, **kw: verdicts.get(self.stem, ""))
+    assert _run_gate(monkeypatch, merged=BRANCHES, verdicts=verdicts, story_ok=False) == 1

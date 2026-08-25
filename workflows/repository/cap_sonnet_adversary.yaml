@@ -55,7 +55,7 @@ workflow:
         timeout: 14400
         prompt: |
           GOAL: {goal}
-          TARGET: feature/cap-e2-cascade-run. FIRST verify the branch exists and has committed
+          TARGET: feature/cap-e2_cascade_run. FIRST verify the branch exists and has committed
           its phases (git log). Review per the conventions: attack the cascade simulation
           (coverage pre-check actually reported? counterfactual-only? thresholds honest?),
           the E3 change-rate table (recomputed from the registry, not trusted), and the writeup
@@ -67,7 +67,7 @@ workflow:
         timeout: 14400
         prompt: |
           GOAL: {goal}
-          TARGET: feature/cap-pattern-minting. Verify the branch state first. Attack: reducer-
+          TARGET: feature/cap-pattern_minting. Verify the branch state first. Attack: reducer-
           mint-only (any hand-written pattern fact? D7 violated anywhere? support fabricated or
           estimated?), idempotency re-derived, entity identity correct, skipped labs recorded
           honestly, source_experiment refs real. DELIVER: findings + known-safe list + verdict.
@@ -77,7 +77,7 @@ workflow:
         timeout: 14400
         prompt: |
           GOAL: {goal}
-          TARGET: feature/cap-story-bridge. Verify the branch state first. Attack: zero diffs to
+          TARGET: feature/cap-story_bridge. Verify the branch state first. Attack: zero diffs to
           existing reducers (git diff reducers minus the new story_facts.py — must be empty);
           token-split instrumentation additive (absent splits stay absent); story_facts/v1
           follows attempt_facts/v1's identity + null-not-zero; hermetic + idempotent tests exist
@@ -89,7 +89,7 @@ workflow:
         timeout: 14400
         prompt: |
           GOAL: {goal}
-          TARGET: feature/cap-test-runner-wiring. Verify the branch state first. Attack:
+          TARGET: feature/cap-test_runner_wiring. Verify the branch state first. Attack:
           test_runner is the ONLY source (any self-reported test? any defaulting of None to
           False?), the seam mapping matches the actual code, additive-only wiring, hermetic
           tests present/absent, the re-derivation proof (one real phase now carries a bool

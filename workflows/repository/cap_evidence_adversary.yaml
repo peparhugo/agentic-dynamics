@@ -62,9 +62,12 @@ workflow:
           TARGET: feature/cap-evidence-integrity. FIRST verify the branch exists and its seven
           phases (p0 + e1-e6) committed (git log). Then review per the conventions, attacking
           each phase's claims:
-          (1) p0 — DETERMINISTIC: the phase is kind: test running tests/test_evidence_prereq_gate.py;
-          prove a failing gate FAILS the phase (the runner's suite-failure path), i.e. an
-          unreachable-branch state cannot proceed to e1.
+          (1) p0 — DETERMINISTIC: p0 runs the gate script scripts/evidence_prereq_gate.py
+          (exit-code based — NOT a collected pytest test, so CI is unaffected). Verify via its
+          LEDGER result (a successful test/agent phase commits no files, so no [workflow] p0
+          commit exists — do not require one): the phase record shows ok, AND the gate script's
+          checks hold at the branch tip (run it yourself: exit 0). Attack: an unmet prereq
+          state must make the phase fail (exit 1), i.e. the gate cannot be satisfied by prose.
           (2) e1 — stale-refusal provable from a test; the record's structured fields ride as a
           typed JSON payload in text (record_factory surface unchanged — check no unknown
           extra_fields crept in); no path stamps a stale analysis with a newer revision.
