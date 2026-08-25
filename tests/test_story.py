@@ -20,6 +20,7 @@ from agentic_dynamics.runtime.story import (
     notification_service_story,
     run_story,
     save_story_result,
+    session_token_split,
     static_site_gen_story,
     task_manager_story,
 )
@@ -175,6 +176,94 @@ class TestStoryResult:
             ],
         )
         assert result2.all_successful
+
+
+class TestSessionTokenSplit:
+    def test_reported_split_is_recorded(self):
+        from agentic_dynamics.adapters.opencode import AgenticResult
+
+        agentic = AgenticResult(
+            prompt_tokens=300,
+            completion_tokens=200,
+            usage_reported=True,
+        )
+        assert session_token_split(agentic) == {"in": 300, "out": 200}
+
+    def test_measured_zero_split_is_recorded(self):
+        from agentic_dynamics.adapters.opencode import AgenticResult
+
+        # A backend that reported usage with a zero count is a real measurement (null-not-zero),
+        # not an absent split.
+        agentic = AgenticResult(prompt_tokens=0, completion_tokens=0, usage_reported=True)
+        assert session_token_split(agentic) == {"in": 0, "out": 0}
+
+    def test_absent_split_when_backend_did_not_report(self):
+        from agentic_dynamics.adapters.opencode import AgenticResult
+
+        # No model call / no usage event -> coverage-not-available, never a fabricated 0.
+        assert session_token_split(AgenticResult(total_tokens=500)) is None
+        assert session_token_split(None) is None
+
+    def test_serialization_omits_absent_split(self):
+        result = StoryResult(
+            story_name="test",
+            sessions=[SessionResult(1, "greenfield", "A", total_tokens=500)],
+        )
+        s0 = result.to_dict()["sessions"][0]
+        assert "tokens" not in s0
+        assert s0["total_tokens"] == 500  # flat total stays the valid fallback
+
+    def test_serialization_roundtrip_with_split(self):
+        result = StoryResult(
+            story_name="test",
+            sessions=[
+                SessionResult(
+                    1,
+                    "greenfield",
+                    "A",
+                    total_tokens=500,
+                    tokens={"in": 300, "out": 200},
+                )
+            ],
+        )
+        d = result.to_dict()
+        assert d["sessions"][0]["tokens"] == {"in": 300, "out": 200}
+        assert d["sessions"][0]["total_tokens"] == 500  # additive, never replaced
+
+    def test_save_and_load_with_split(self):
+        result = StoryResult(
+            story_name="test",
+            story_id="abc123",
+            sessions=[
+                SessionResult(
+                    1,
+                    "greenfield",
+                    "Build.",
+                    cost_usd=3.0,
+                    total_tokens=500,
+                    tokens={"in": 300, "out": 200},
+                )
+            ],
+        )
+        with tempfile.TemporaryDirectory() as d:
+            dp = Path(d)
+            save_story_result(result, dp / "result.json")
+            loaded = load_story_result(dp / "result.json")
+            assert loaded.sessions[0].tokens == {"in": 300, "out": 200}
+            assert loaded.sessions[0].total_tokens == 500
+
+    def test_save_and_load_absent_split_stays_absent(self):
+        result = StoryResult(
+            story_name="test",
+            story_id="abc123",
+            sessions=[SessionResult(1, "greenfield", "Build.", total_tokens=500)],
+        )
+        with tempfile.TemporaryDirectory() as d:
+            dp = Path(d)
+            save_story_result(result, dp / "result.json")
+            loaded = load_story_result(dp / "result.json")
+            assert loaded.sessions[0].tokens is None
+            assert loaded.sessions[0].total_tokens == 500
 
 
 class TestGitHelpers:

@@ -67,6 +67,7 @@ from agentic_dynamics.control.reducers import (  # noqa: E402
     job_facts_v1,
     policy_facts_v1,
     spec_status_v1,
+    story_facts_v1,
     workflow_facts_v1,
 )
 from agentic_dynamics.control.reducers._common import run_artifact_id, run_recency_key  # noqa: E402
@@ -583,6 +584,9 @@ def derive_facts(
             EvidenceItem(source_type="spec", evidence_id=f"spec:{c.get('name') or '?'}", payload=c)
             for c in load_spec_configs()
         )
+    elif reducer_version == "story_facts/v1":
+        # The first-class story bridge: the RAW StoryResult artifact (not the projection).
+        evidence = _story_cell_evidence(load_story_cells())
     elif reducer_version in RUN_REDUCERS:
         evidence = _run_evidence(load_run_jsons())
     else:  # spec_status/v1
@@ -732,6 +736,14 @@ def _project_story_session(cell: dict, session: dict) -> dict:
     confidence = session.get("confidence")
     if confidence is not None:
         phase["confidence"] = confidence
+    tokens = session.get("tokens")
+    if isinstance(tokens, dict):
+        # The backend-reported in/out split (additive to the flat total_tokens). Pass through
+        # exactly the measured keys; ``attempt_facts/v1``'s null-safe gate then emits
+        # attempt_tokens_in/out only where the backend reported a (possibly zero) value.
+        split = {"in": tokens.get("in"), "out": tokens.get("out")}
+        if split["in"] is not None or split["out"] is not None:
+            phase["tokens"] = split
     return {
         "spec_name": spec_name,
         "spec_id": f"{spec_name}@story",
@@ -872,6 +884,17 @@ def _story_session_evidence(cells: list[dict]) -> tuple[EvidenceItem, ...]:
     )
 
 
+def _story_cell_evidence(cells: list[dict]) -> tuple[EvidenceItem, ...]:
+    """One ``story`` evidence item per distinct story CELL — the RAW StoryResult artifact.
+
+    The evidence family ``story_facts/v1`` consumes (the first-class bridge, replacing the
+    projection above for that reducer's path): one item per cell, payload = the cell dict as it
+    sits on disk, content-addressed ``evidence_id`` (``story:<run_artifact_id(cell)>``). The
+    reducer reads the sessions itself; no producer-side projection.
+    """
+    return _dedup_evidence(cells, "story")
+
+
 def _story_result_evidence(cells: list[dict]) -> tuple[EvidenceItem, ...]:
     """One ``story_result`` evidence item per distinct story CELL (job-level run)."""
     return _dedup_evidence([_project_story_result(c) for c in cells], "story_result")
@@ -925,6 +948,28 @@ def derive_story_facts(repository_id: str, revision: str, now: str) -> list:
     """Derive the story corpus's fact records: per-session attempts + per-cell jobs."""
     return fi.derive_fact_records(_story_facts(repository_id, revision, now),
                                   registry_path=REGISTRY_INDEX_PATH)
+
+
+def derive_story_facts_v1(repository_id: str, revision: str, now: str) -> list:
+    """Derive the story corpus's FIRST-CLASS attempt facts via ``story_facts/v1``.
+
+    The p3 ``derive_story_facts`` projection above (attempt over ``story_session`` + job over
+    ``story_result``) is UNCHANGED; this is the new reducer's path — raw ``StoryResult`` cells →
+    ``story_facts/v1`` → per-session attempt facts. Job-level story facts stay with ``job_facts/v1``
+    (see the reducer's module docstring for the single-level rationale). Supersedes the projection's
+    per-session facts on emission (same logical slot, new reducer_version).
+    """
+    return fi.derive_fact_records(
+        story_facts_v1(
+            _family_input(
+                repository_id,
+                revision,
+                now,
+                _story_cell_evidence(load_story_cells()),
+            )
+        ),
+        registry_path=REGISTRY_INDEX_PATH,
+    )
 
 
 def derive_summary_facts(repository_id: str, revision: str, now: str) -> list:

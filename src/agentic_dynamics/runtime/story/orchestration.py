@@ -27,6 +27,7 @@ from agentic_dynamics.runtime.story.models import (
     SessionSpec,
     StoryConfig,
     StoryResult,
+    session_token_split,
 )
 from agentic_dynamics.runtime.story.persistence import (
     _detect_or_use,
@@ -414,5 +415,6 @@ def _run_session(
         confidence=agentic.confidence if agentic else None,
         answer_tokens=agentic.answer_tokens if agentic else 0,
         explanation_tokens=agentic.explanation_tokens if agentic else 0,
+        tokens=session_token_split(agentic),
     )
 

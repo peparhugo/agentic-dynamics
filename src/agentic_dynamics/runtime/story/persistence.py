@@ -256,6 +256,9 @@ def load_story_result(path: Path) -> StoryResult:
                 confidence=s.get("confidence"),
                 answer_tokens=s.get("answer_tokens", 0),
                 explanation_tokens=s.get("explanation_tokens", 0),
+                tokens=(
+                    s["tokens"] if isinstance(s.get("tokens"), dict) else None
+                ),
             )
         )
     return result
