@@ -236,6 +236,99 @@ def test_run_workflow_commits_per_phase(tmp_path):
     assert "[workflow] scope" in log.stdout
 
 
+def test_run_workflow_change_analysis_seam(tmp_path):
+    """Review F3: an injected ChangeAnalyzer runs over each committed phase, best-effort,
+    and the analysis lands on the phase result — the seam is inert without injection."""
+    from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
+
+    class RecordingAnalyzer:
+        def __init__(self):
+            self.changes = []
+
+        def analyze(self, change):
+            self.changes.append(change)
+            return ChangeAnalysis(
+                facts=({"predicate": "changed_symbol_count", "value": "1",
+                        "value_type": "int", "evidence_ids": ()},),
+                neighborhood=("f",),
+            )
+
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    calls = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        n = len(calls)
+        calls.append(n)
+        (Path(workdir) / "app.py").write_text(f"def f{n}():\n    return {n}\n")
+        return _fake_agent(files_created=["app.py"])
+
+    analyzer = RecordingAnalyzer()
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                          run_agentic_fn=agent, change_analyzer=analyzer)
+
+    # The FIRST phase's commit is the worktree's root commit — no parent to diff, so the
+    # seam degrades to None. The SECOND committed phase has a parent: it gets analyzed.
+    assert result.phases[0].commit_hash
+    assert result.phases[0].change_analysis is None  # root commit: no parent to diff
+    assert result.phases[1].commit_hash
+    assert analyzer.changes  # the analyzer saw the second phase's change
+    change = analyzer.changes[0]
+    assert change.delta is not None
+    assert {s.qualified_name for s in change.delta.added_symbols} == {"f1"}
+    assert {s.qualified_name for s in change.delta.removed_symbols} == {"f0"}
+    assert result.phases[1].change_analysis["neighborhood"] == ["f"]
+    assert result.phases[1].change_analysis["facts"][0]["predicate"] == "changed_symbol_count"
+    assert result.phases[1].change_analysis["graph_updated"] is False
+
+
+def test_run_workflow_change_analysis_inert_without_injection(tmp_path):
+    """Without an injected analyzer the seam is inert: change_analysis stays None and the
+    phase result is byte-identical to a plain run (review F3's no-op default)."""
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "app.py").write_text("def f():\n    return 1\n")
+        return _fake_agent(files_created=["app.py"])
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    assert result.phases[0].commit_hash
+    assert result.phases[0].change_analysis is None
+
+
+def test_run_workflow_change_analysis_root_commit_never_fails(tmp_path):
+    """A phase whose commit has NO parent (root commit in the worktree) cannot be diffed —
+    the seam degrades to None instead of failing the phase."""
+    from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
+
+    class Analyzer:
+        def analyze(self, change):
+            return ChangeAnalysis()
+
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    # Commit the FIRST phase's change directly (no parent), then let the runner commit a
+    # second phase whose analysis targets commit^ — the runner's own first commit is root.
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "app.py").write_text("def f():\n    return 1\n")
+        return _fake_agent(files_created=["app.py"])
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                          run_agentic_fn=agent, change_analyzer=Analyzer())
+    assert result.ok
+    # Root-commit phases degrade gracefully (change_analysis may be None), never a failure.
+    assert all(p.status == "ok" for p in result.phases)
+
+
 def test_run_workflow_excludes_instrument_from_commit(tmp_path):
     """The runner's own ``.instrument/`` transcripts never enter history (item 5.1)."""
     spec = load_spec(SPEC)

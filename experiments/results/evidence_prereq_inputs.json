@@ -1,0 +1,21 @@
+{
+  "_comment": "Pinned provenance for the cap_evidence_integrity p0 prereq gate (review F2 fix). The gate's primary inputs are the machine-local run ledgers under experiments/results/workflows/ (gitignored, never provenance); when those are absent (fresh checkout), the gate falls back to these pinned run records — the git_sha of each prerequisite campaign's run at its completion, plus its ok flag. Regenerate by hand only when a prerequisite campaign re-runs: copy the four values from the newest ledger of each spec.",
+  "runs": {
+    "cap_e2_cascade_run": {
+      "git_sha": "f6274020b",
+      "ok": true
+    },
+    "cap_pattern_minting": {
+      "git_sha": "0e79c155a",
+      "ok": true
+    },
+    "cap_story_bridge": {
+      "git_sha": "d68752aee",
+      "ok": true
+    },
+    "cap_test_runner_wiring": {
+      "git_sha": "3d4149664",
+      "ok": true
+    }
+  }
+}

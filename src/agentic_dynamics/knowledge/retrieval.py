@@ -75,14 +75,18 @@ ADVISORY_FRESH_30D = 0.90   # [H]
 ADVISORY_FRESH_90D = 0.75   # [H] older advisory evidence is excluded entirely.
 
 #: Graph-expansion relationship weights ([H]). CONTRADICTS always carries a conflict label.
+#: CONTAINS + AFFECTS (design §5.5) let the executor traverse the versioned graph
+#: (module/symbol containment, issue→symbol).
 RELATIONSHIP_WEIGHTS: dict[str, float] = {
     "TESTED_BY": 1.0,
     "DEFINES": 1.0,
     "SUPERSEDES": 1.0,
+    "CONTAINS": 0.9,
     "IMPORTS": 0.8,
     "CALLS": 0.8,
     "PRODUCED_BY": 0.8,
     "PRECEDES": 0.7,
+    "AFFECTS": 0.7,
     "CONTRADICTS": 0.6,
 }
 
@@ -1005,7 +1009,13 @@ def retrieve(
             # Seed canonical id → real fused score, for scoring expanded hops below.
             seed_scores = {c.id: c.fused_score for c in fused[:seed_count]}
             expanded = graph_client.expand_candidates(
-                seeds, max_depth=2, max_neighbors=8, max_nodes=40, timeout_ms=300
+                seeds,
+                max_depth=2,
+                max_neighbors=8,
+                max_nodes=40,
+                timeout_ms=300,
+                repository_id=repository_id,
+                acl_scope=acl_scope,
             )
             fused_ids = {c.id for c in fused}
             for node in expanded:

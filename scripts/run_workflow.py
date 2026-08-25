@@ -120,6 +120,14 @@ def main() -> None:
                          f"{FACT_AUTO_EMIT_ENV}=0 environment variable (a per-process override, "
                          "e.g. for a worker that must never write to the KB); this CLI flag "
                          "always wins when both are set.")
+    ap.add_argument("--change-analysis", action="store_true",
+                    help="evidence-integrity e6 seam (design §5.7, review F3): inject the "
+                         "concrete EvidenceChangeAnalyzer at the composition root so every "
+                         "committed phase ALSO hands its typed delta to the phase-boundary "
+                         "evidence loop — code_change_facts/v1 facts + ACL-scoped executor "
+                         "neighborhood recorded on the phase result. Best-effort — a failed "
+                         "analysis never affects the phase. OFF by default (opt-in; no graph "
+                         "client in v1 — the versioned-graph step is a follow-up).")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))
@@ -177,6 +185,17 @@ def main() -> None:
             repository_id=cell_scope(args.workdir),
         )
 
+    # Phase-boundary evidence (design §5.7 — e6 of cap_evidence_integrity, review F3): the
+    # concrete ChangeAnalyzer is injected HERE, at the composition root, exactly where
+    # `route_step`/`publisher_factory` are — `runtime.workflow_runner` consumes only the
+    # runtime-owned protocol. Opt-in via --change-analysis (default None: the seam is inert).
+    # No graph client in v1 (the versioned-graph step stays a documented follow-up).
+    change_analyzer = None
+    if args.change_analysis:
+        from agentic_dynamics.control.evidence_analyzer import EvidenceChangeAnalyzer
+
+        change_analyzer = EvidenceChangeAnalyzer()
+
     result = run_workflow(
         spec,
         goal=args.goal,
@@ -192,6 +211,7 @@ def main() -> None:
         signals=signals,
         router=router,
         publisher_factory=LivePublisher,
+        change_analyzer=change_analyzer,
     )
 
     print(json.dumps(result.to_dict(), indent=2))

@@ -1,0 +1,107 @@
+# experiments/contexts/verify_code_change.yaml
+#
+# The decision-type contract for evidence-integrity e5 (design §5.6): "how confident are we in
+# this code change, and how deep should verification go" — the SHADOW-ONLY consumer of the
+# code_change_facts/v1 reducer. It is a PROPOSAL contract, mirroring session_routing.yaml's
+# posture: `AUTOMATABLE_ACTIONS` (`control/decisions.py`) is UNTOUCHED — the actions below
+# cannot be applied by any control path yet; the contract only defines the *semantics* of the
+# proposal the control rule would emit.
+#
+# ── Hard-rule 6 semantics (design §5.6) — read before editing ──
+#
+# Status facts (lsp_analysis_status / sonar_analysis_status) carry the measured enum
+# (available/unavailable/stale-refused). Dependent COUNT facts (new_lsp_error_count,
+# new_sonar_critical_count, impacted_symbol_count, changed_symbols_with_tests_ratio) are OMITTED
+# when the analyzer did not run or the TESTED_BY rule cannot link — never a fabricated zero. So a
+# required fact below with `on_missing: classify` legitimately covers "the analyzer did not run";
+# it is never interpreted as "zero problems".
+decision_type: verify_code_change
+contract_version: "verify_code_change/v1"
+
+# The scope at which this decision is made (the change is job-scoped).
+decision_scope: job
+
+# SHADOW-ONLY proposal actions — none of these is automatable (AUTOMATABLE_ACTIONS unchanged).
+# `verify` proposes a verification depth; `rework` proposes targeted rework; `continue` accepts
+# the default (no proposal). All proposals are scored against the outcome the baseline produced.
+allowed_actions: [verify, rework, continue]
+
+# Maximum age of the snapshot at APPLY time (TOCTOU guard, check C7).
+max_snapshot_age_seconds: 300
+
+# Invariants: none — there is no fact that is a safety precondition for EVERY one of the three
+# shadow actions (same rationale as session_routing.yaml's empty invariants).
+invariants: []
+
+# Objectives: what the shadow proposal optimizes — verification depth vs cost.
+objectives:
+  - signal: correctness
+    direction: maximize
+    weight: 2.0
+  - signal: cost
+    direction: minimize
+    weight: 1.0
+
+# Required facts: the code-change state this decision is ALLOWED and REQUIRED to see. Dependent
+# count facts are soft (on_missing: classify) — their ABSENCE means "the analyzer did not run"
+# (null-not-zero), never "zero".
+requires_facts:
+  - fact: sonar_analysis_status
+    scope: self
+    min_authority: DERIVED
+    on_missing: classify   # sonar unavailable -> propose from the remaining measurable terms
+    on_conflict: halt
+
+  - fact: lsp_analysis_status
+    scope: self
+    min_authority: DERIVED
+    on_missing: classify
+    on_conflict: halt
+
+  - fact: changed_symbol_count
+    scope: self
+    min_authority: DERIVED
+    on_missing: halt        # a change with NO typed delta is unverifiable — never guess
+    on_conflict: halt
+
+  - fact: ast_parse_coverage
+    scope: self
+    min_authority: DERIVED
+    on_missing: halt        # unparsed changed code cannot be verified by AST — halt
+    on_conflict: halt
+
+  - fact: code_change_risk
+    scope: self
+    min_authority: DERIVED
+    on_missing: halt        # no measurable term -> risk is unknown, not zero
+    on_conflict: halt
+
+  - fact: new_sonar_critical_count
+    scope: self
+    min_authority: DERIVED
+    on_missing: classify    # analyzer did not run -> dependent count OMITTED (not zero)
+    on_conflict: halt
+
+  - fact: new_lsp_error_count
+    scope: self
+    min_authority: DERIVED
+    on_missing: classify
+    on_conflict: halt
+
+  - fact: impacted_symbol_count
+    scope: self
+    min_authority: DERIVED
+    on_missing: classify    # graph unavailable -> blast radius unknown, never zero
+    on_conflict: halt
+
+  - fact: changed_symbols_with_tests_ratio
+    scope: self
+    min_authority: DERIVED
+    on_missing: classify    # TESTED_BY rule deferred -> ratio omitted, never 0.0
+    on_conflict: halt
+
+# Explicitly excluded: named so a reader can see the exclusion is deliberate.
+excludes:
+  - advisory_facts       # available in ControlContext.advisory, never citable (check C5)
+  - live_telemetry       # DB 1 is never a fact source (design §10.4)
+  - sibling_job_facts    # lateral reads are forbidden by the hierarchy (design §10.2)

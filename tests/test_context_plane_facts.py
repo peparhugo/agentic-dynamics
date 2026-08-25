@@ -288,6 +288,16 @@ def test_predicate_registry_has_the_design_seed_rows():
         "checkpoint_model_unchanged",
         "model_change_required",
         "checkpoint_snapshot_identity",
+        "analysis_revision_matches",
+        "ast_parse_coverage",
+        "lsp_analysis_status",
+        "sonar_analysis_status",
+        "changed_symbol_count",
+        "impacted_symbol_count",
+        "new_lsp_error_count",
+        "new_sonar_critical_count",
+        "changed_symbols_with_tests_ratio",
+        "code_change_risk",
     }
 
 
@@ -469,6 +479,9 @@ LEGITIMATE_CALLERS = frozenset(
         "src/agentic_dynamics/control/rules.py",
         "src/agentic_dynamics/control/validator.py",
         "src/agentic_dynamics/control/profiles.py",
+        # Evidence-integrity e6 (design §5.7): the concrete phase-boundary analyzer is the
+        # composition-root producer — it builds the reducer input and de-types the emitted facts.
+        "src/agentic_dynamics/control/evidence_analyzer.py",
     }
 )
 

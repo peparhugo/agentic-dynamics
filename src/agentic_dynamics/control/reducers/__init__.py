@@ -27,6 +27,10 @@ from agentic_dynamics.control.facts import Reducer, ReducerSpec
 from agentic_dynamics.control.profiles import PROFILES_V1, profiles_v1
 from agentic_dynamics.control.reducers.attempt_facts import ATTEMPT_FACTS_V1, attempt_facts_v1
 from agentic_dynamics.control.reducers.checkpoint import CHECKPOINT_V1, checkpoint_v1
+from agentic_dynamics.control.reducers.code_change_facts import (
+    CODE_CHANGE_FACTS_V1,
+    code_change_facts_v1,
+)
 from agentic_dynamics.control.reducers.job_facts import JOB_FACTS_V1, job_facts_v1
 from agentic_dynamics.control.reducers.pattern import PATTERN_V1, pattern_v1
 from agentic_dynamics.control.reducers.policy_facts import POLICY_FACTS_V1, policy_facts_v1
@@ -45,6 +49,7 @@ REDUCERS: dict[str, ReducerSpec] = {
     PROFILES_V1.version: PROFILES_V1,
     PATTERN_V1.version: PATTERN_V1,
     CHECKPOINT_V1.version: CHECKPOINT_V1,
+    CODE_CHANGE_FACTS_V1.version: CODE_CHANGE_FACTS_V1,
 }
 
 #: version → pure reducer callable — what ``scripts/kb_produce_facts.py`` invokes.
@@ -58,6 +63,7 @@ _IMPLS: dict[str, Reducer] = {
     PROFILES_V1.version: profiles_v1,
     PATTERN_V1.version: pattern_v1,
     CHECKPOINT_V1.version: checkpoint_v1,
+    CODE_CHANGE_FACTS_V1.version: code_change_facts_v1,
 }
 
 
@@ -87,4 +93,6 @@ __all__ = [
     "pattern_v1",
     "CHECKPOINT_V1",
     "checkpoint_v1",
+    "CODE_CHANGE_FACTS_V1",
+    "code_change_facts_v1",
 ]

@@ -344,6 +344,7 @@ class TestExpandCandidates(_Neo4jTestBase):
         assert ALLOWED_EXPANSION_RELS == {
             "DEFINES", "IMPORTS", "CALLS", "TESTED_BY",
             "PRODUCED_BY", "PRECEDES", "SUPERSEDES", "CONTRADICTS",
+            "CONTAINS", "AFFECTS",  # design §5.5 — the versioned-graph traversal relations
         }
 
     def test_expand_returns_rel_type_depth_path_and_origin(self):

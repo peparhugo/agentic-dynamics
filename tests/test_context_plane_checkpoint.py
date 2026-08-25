@@ -369,7 +369,7 @@ def test_shipped_session_routing_contract_never_fails_r11():
 
 def test_all_committed_contracts_pass_r11_via_load_all_contracts():
     contracts = load_all_contracts(contracts_dir=CONTRACTS_DIR)
-    assert set(contracts) == {"route_next_job", "session_routing"}
+    assert set(contracts) == {"route_next_job", "session_routing", "verify_code_change"}
 
     class _Spec:
         rules = ()
