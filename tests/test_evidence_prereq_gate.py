@@ -67,3 +67,31 @@ def test_gate_fails_when_story_bridge_not_ok(monkeypatch):
     monkeypatch.setattr(Path, "exists", lambda self: True)
     monkeypatch.setattr(Path, "read_text", lambda self, **kw: verdicts.get(self.stem, ""))
     assert _run_gate(monkeypatch, merged=BRANCHES, verdicts=verdicts, story_ok=False) == 1
+
+
+def test_gate_passes_via_pinned_inputs_when_ledgers_absent(monkeypatch):
+    """Review F2: on a fresh checkout the machine-local run ledgers are absent (gitignored);
+    the gate must still re-run, falling back to the committed pinned inputs."""
+    import importlib
+
+    gate = importlib.import_module("scripts.evidence_prereq_gate")
+    verdicts = _verdicts_by_filename()
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+    monkeypatch.setattr(Path, "read_text", lambda self, **kw: verdicts.get(self.stem, ""))
+    monkeypatch.setattr(gate, "_last_ledger", lambda spec: None)
+    monkeypatch.setattr(
+        gate, "_pinned_record", lambda spec: {"git_sha": "a" * 40, "ok": True}
+    )
+    monkeypatch.setattr(gate, "_git", lambda *a: (0, ""))
+    assert gate.main() == 0
+
+
+def test_gate_fails_when_pinned_inputs_also_absent(monkeypatch):
+    """Neither the ledgers nor the pinned inputs exist -> the gate fails closed."""
+    import importlib
+
+    gate = importlib.import_module("scripts.evidence_prereq_gate")
+    monkeypatch.setattr(Path, "exists", lambda self: False)
+    monkeypatch.setattr(gate, "_last_ledger", lambda spec: None)
+    monkeypatch.setattr(gate, "_pinned_record", lambda spec: None)
+    assert gate.main() == 1

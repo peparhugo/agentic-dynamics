@@ -644,6 +644,23 @@ def build_code_snapshot(
     )
 
 
+def _file_content_unchanged(before: CodeSnapshot, after: CodeSnapshot, path: str) -> bool:
+    """True when ``path``'s symbol surface + imports are identical across the two snapshots.
+
+    Files that failed to parse on either side have no symbol surface (they live in
+    ``unparsed_files``, not ``files``), so they compare by content hash instead — hashes are
+    recorded for every source file regardless of parseability. This keeps a file that BECOMES
+    unparseable (or parseable) in the change universe instead of vanishing from the
+    ``changed_files`` list, which would make ``ast_parse_coverage`` structurally 1.0.
+    """
+    if path in before.files and path in after.files:
+        return (
+            before.files[path] == after.files[path]
+            and before.imports.get(path) == after.imports.get(path)
+        )
+    return before.file_hashes.get(path) == after.file_hashes.get(path)
+
+
 def compute_code_delta(before: CodeSnapshot, after: CodeSnapshot) -> CodeDelta:
     """Compute the typed :class:`CodeDelta` between two snapshots.
 
@@ -664,13 +681,12 @@ def compute_code_delta(before: CodeSnapshot, after: CodeSnapshot) -> CodeDelta:
         if b_syms[k].content_hash != a_syms[k].content_hash
     ]
 
-    b_files = set(before.files)
-    a_files = set(after.files)
+    b_files = set(before.files) | set(before.unparsed_files)
+    a_files = set(after.files) | set(after.unparsed_files)
     changed_files = sorted(
         f
         for f in (a_files & b_files)
-        if before.files.get(f) != after.files.get(f)
-        or before.imports.get(f) != after.imports.get(f)
+        if not _file_content_unchanged(before, after, f)
     )
 
     added_imports = {

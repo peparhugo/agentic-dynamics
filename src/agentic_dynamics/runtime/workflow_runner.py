@@ -46,9 +46,15 @@ from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.adapters.backends import run_agentic
-from agentic_dynamics.core.language import detect_language
+from agentic_dynamics.core.language import build_code_snapshot, compute_code_delta, detect_language
 from agentic_dynamics.core.paths import PROJECT_ROOT
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
+from agentic_dynamics.measurement.commit_analysis import _read_commit_files
+from agentic_dynamics.runtime.change_analyzer import (
+    ChangeAnalyzer,
+    ChangeInput,
+    run_change_analysis,
+)
 from agentic_dynamics.knowledge.augment import (
     DEFAULT_INHERITED_TOOLS,
     augment_prompt,
@@ -116,6 +122,8 @@ class PhaseResult:
     test_executed_success: bool | None = None
     tests_passed: int = 0
     tests_total: int = 0
+    # phase-boundary evidence (populated only when a change_analyzer is injected; design §5.7)
+    change_analysis: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -150,6 +158,7 @@ class PhaseResult:
             "test_executed_success": self.test_executed_success,
             "tests_passed": self.tests_passed,
             "tests_total": self.tests_total,
+            "change_analysis": self.change_analysis,
         }
 
 
@@ -233,6 +242,36 @@ def _git_head(workdir: Path) -> str:
         return h.stdout.strip()
     except Exception:
         return ""
+
+
+def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) -> None:
+    """Best-effort phase-boundary evidence: analyze ``pr.commit_hash`` and record the result.
+
+    The typed before/after CodeSnapshots + CodeDelta are materialized from git (the phase
+    commit vs its parent); the analyzer (injected at the composition root — the concrete
+    ``control.evidence_analyzer.EvidenceChangeAnalyzer`` or any structural match) returns the
+    code-change facts + executor neighborhood, stored on ``pr.change_analysis``. Every failure
+    path (no parent commit, unreadable revisions, an analyzer error) degrades to
+    ``change_analysis=None`` — the seam can never change the phase's outcome (design §5.7).
+    """
+    try:
+        profile = detect_language(wd)
+        before_files = _read_commit_files(wd, f"{pr.commit_hash}^", profile)
+        after_files = _read_commit_files(wd, pr.commit_hash, profile)
+        before = build_code_snapshot(before_files, revision=f"{pr.commit_hash}^", profile=profile)
+        after = build_code_snapshot(after_files, revision=pr.commit_hash, profile=profile)
+        change = ChangeInput(
+            before=before,
+            after=after,
+            delta=compute_code_delta(before, after),
+            revision=pr.commit_hash,
+            repository_id=cell_scope(wd),
+            acl_scope=cell_scope(wd),
+        )
+        analysis = run_change_analysis(change, analyzer)
+        pr.change_analysis = analysis.to_dict()
+    except Exception:  # noqa: BLE001 — best-effort seam, never a gate on the phase
+        pr.change_analysis = None
 
 
 def _completed_phases(workdir: Path, phase_names: list[str], goal: str) -> set[str]:
@@ -377,6 +416,7 @@ def run_workflow(
     retrieve_fn: Callable[..., Any] | None = None,
     construct_fn: Callable[..., Any] | None = None,
     rag_params: dict[str, Any] | None = None,
+    change_analyzer: ChangeAnalyzer | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
@@ -416,6 +456,15 @@ def run_workflow(
     switch, so the existing fork chain (``fork: true``) keeps forking for free when it stays
     on the prior model. Without a ``model_pool`` the workflow is single-model (``model``) —
     backward compatible, and it needs no router.
+
+    Phase-boundary evidence (``change_analyzer``, design §5.7 — e6 of cap_evidence_integrity):
+    when a ``ChangeAnalyzer`` is injected at the composition root, each phase that commits
+    ALSO hands its commit to the analyzer — the typed before/after CodeSnapshots + CodeDelta
+    are materialized from git, and the analyzer returns the code-change facts + ACL-scoped
+    executor neighborhood, recorded on ``PhaseResult.change_analysis``. Best-effort by
+    construction: a materialization failure, an unanalyzable commit (e.g. a root commit with
+    no parent), or an analyzer error degrades to ``change_analysis=None`` — it can never
+    change the phase's outcome. ``None`` (default) leaves the seam inert.
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -667,6 +716,11 @@ def run_workflow(
         pr.duration_s = round(time.time() - t0, 2)
         if commit and pr.status == "ok":
             pr.commit_hash = _git_commit(wd, name, goal)
+            # Phase-boundary evidence (design §5.7 — e6): when a ChangeAnalyzer is injected,
+            # hand the committed change to it (typed snapshots + delta materialized from git)
+            # and record its analysis on the phase. Best-effort — never affects the phase.
+            if change_analyzer is not None and pr.commit_hash:
+                _run_change_analysis(pr, wd, change_analyzer)
             # Self-build ("progressive") producer — opt-in via rag_params.emit_self. After the
             # phase commits, emit its finding into the cell's OWN scope so the cell's retrieval
             # filter can later read its own progress (default OFF: only the "self-built" arm

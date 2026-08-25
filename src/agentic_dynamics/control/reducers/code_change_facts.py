@@ -20,6 +20,9 @@ SEMANTICS (hard rule 6 + design §5.6, DEFINED here — not delegated to the doc
 * ``analysis_revision_matches`` — bool; OMITTED when the sonar analysis did not run.
 * ``ast_parse_coverage`` — ``parsed_changed_files / changed_files`` where changed_files =
   ``delta.changed_files + delta.added_files``; OMITTED when changed_files == 0 (no denominator).
+  The delta's file lists include unparseable files (``compute_code_delta`` tracks them by
+  content hash), so a changed-but-unparseable file degrades coverage below 1.0 instead of
+  vanishing from the denominator.
 * ``lsp_analysis_status`` / ``sonar_analysis_status`` — the measured enum
   (``available``/``unavailable``/``stale-refused``), emitted whenever the status is known.
 * ``changed_symbol_count`` — from the typed CodeDelta only (minting-order guard).

@@ -235,6 +235,37 @@ def test_zero_change_omits_parse_coverage_denominator():
     assert by["changed_symbol_count"].value == "0"  # a real measured zero, not a fabricated one
 
 
+def test_changed_but_unparseable_file_degrades_parse_coverage():
+    before = build_code_snapshot({"m.py": b"def f():\n    pass\n"}, revision="rev-1", profile=PY)
+    after = build_code_snapshot({"m.py": b"def f(:\n"}, revision="rev-2", profile=PY)
+    delta = compute_code_delta(before, after)
+    items = (EvidenceItem(source_type="code_delta", evidence_id="delta-1", payload=delta),)
+    facts = code_change_facts_v1(_inp(*items))
+    by = _facts_by_predicate(facts)
+    # The delta tracks the unparseable file as changed (content hash differs), so the fact is
+    # EMITTED with a degraded value — never omitted, never a structural 1.0 (review F1).
+    assert float(by["ast_parse_coverage"].value) == 0.0
+    assert by["changed_symbol_count"].value == "1"  # f is removed from the parseable surface
+
+
+def test_parse_coverage_mixed_parsed_and_unparseable():
+    before = build_code_snapshot(
+        {"a.py": b"def f():\n    pass\n", "b.py": b"def g():\n    pass\n"},
+        revision="rev-1", profile=PY,
+    )
+    after = build_code_snapshot(
+        {"a.py": b"def f():\n    pass\n", "b.py": b"def g(:\n"},
+        revision="rev-2", profile=PY,
+    )
+    delta = compute_code_delta(before, after)
+    items = (EvidenceItem(source_type="code_delta", evidence_id="delta-1", payload=delta),)
+    facts = code_change_facts_v1(_inp(*items))
+    by = _facts_by_predicate(facts)
+    # a.py unchanged; b.py changed + unparseable -> 0 parsed / 1 changed file.
+    assert delta.changed_files == ["b.py"]
+    assert float(by["ast_parse_coverage"].value) == 0.0
+
+
 # ── The verify_code_change/v1 contract ──────────────────────────
 
 

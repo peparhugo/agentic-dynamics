@@ -118,6 +118,37 @@ def test_rename_is_new_entity_not_change():
     assert delta.changed_symbols == []
 
 
+def test_changed_file_becoming_unparseable_stays_in_changed_files():
+    before = _snapshot({"m.py": b"def f():\n    pass\n"}, revision="r1")
+    after = _snapshot({"m.py": b"def f(:\n"}, revision="r2")  # syntax error -> unparseable
+    delta = compute_code_delta(before, after)
+    # The file still EXISTS in the after state (it is in after.unparsed_files), so it is a
+    # changed file — never a removed file. Without this, ast_parse_coverage would be
+    # structurally 1.0 (see the F1 review finding).
+    assert delta.changed_files == ["m.py"]
+    assert delta.removed_files == []
+    assert delta.added_files == []
+
+
+def test_added_unparseable_file_tracked_in_added_files():
+    before = _snapshot({"a.py": b"def f():\n    pass\n"}, revision="r1")
+    after = _snapshot(
+        {"a.py": b"def f():\n    pass\n", "bad.py": b"def broken(:\n"}, revision="r2"
+    )
+    delta = compute_code_delta(before, after)
+    assert delta.added_files == ["bad.py"]
+    assert delta.removed_files == []
+
+
+def test_unparseable_file_unchanged_not_in_changed_files():
+    before = _snapshot({"bad.py": b"def broken(:\n"}, revision="r1")
+    after = _snapshot({"bad.py": b"def broken(:\n"}, revision="r2")
+    delta = compute_code_delta(before, after)
+    # Same content, still unparseable: no change (content-hash comparison, no symbol surface).
+    assert delta.changed_files == []
+    assert delta.changed_symbol_count == 0
+
+
 # ── Two-ID contract ─────────────────────────────────────────────
 
 

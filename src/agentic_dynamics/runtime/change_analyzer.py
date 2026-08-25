@@ -60,6 +60,15 @@ class ChangeAnalysis:
     graph_updated: bool = False
     impacted_count: int | None = None
 
+    def to_dict(self) -> dict[str, Any]:
+        """The ledger-shaped form (plain data, JSON-safe) the runner records per phase."""
+        return {
+            "facts": list(self.facts),
+            "neighborhood": list(self.neighborhood),
+            "graph_updated": self.graph_updated,
+            "impacted_count": self.impacted_count,
+        }
+
 
 class ChangeAnalyzer(Protocol):
     """The phase-boundary evidence protocol (design §5.7).
