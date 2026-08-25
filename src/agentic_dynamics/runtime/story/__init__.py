@@ -39,6 +39,7 @@ from agentic_dynamics.runtime.story.models import (  # noqa: F401
     SessionSpec,
     StoryConfig,
     StoryResult,
+    session_token_split,
 )
 from agentic_dynamics.runtime.story.orchestration import (  # noqa: F401
     _count_tests,
@@ -74,6 +75,7 @@ __all__ = [
     "SessionSpec",
     "StoryConfig",
     "StoryResult",
+    "session_token_split",
     "_count_tests",
     "_prepare_worktree",
     "run_story",

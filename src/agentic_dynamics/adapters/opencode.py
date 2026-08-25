@@ -73,6 +73,13 @@ class AgenticResult:
     reasoning_tokens: int = 0
     total_tokens: int = 0
 
+    # Whether the backend reported per-step token usage in the transcript. Set by the JSONL
+    # parser when it sees a step_finish/usage event carrying a tokens dict — the signal that
+    # ``prompt_tokens``/``completion_tokens`` are measured (possibly 0) rather than absent.
+    # ``False`` means the session never reached a model call (or the backend reported no
+    # usage): the in/out split is coverage-not-available, distinct from a measured zero.
+    usage_reported: bool = False
+
     # Token split — the completion/output stream is partitioned into the "answer"
     # (tokens spent writing the deliverable via tool calls) and "explanation"
     # (tokens spent on prose narration). This is the decomposition the
@@ -559,6 +566,9 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
             was_tool_step = step_has_tool
             step_has_tool = False
             if isinstance(tokens, dict):
+                # The backend reported usage for this step — the split is measured (even a
+                # legitimately zero token count is a real measurement), not absent.
+                result.usage_reported = True
                 # Token counts are per-step deltas, sum across steps
                 result.prompt_tokens += tokens.get("input", 0) or 0
                 result.completion_tokens += tokens.get("output", 0) or 0

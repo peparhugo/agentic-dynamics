@@ -113,6 +113,10 @@ class SessionResult:
     confidence: float | None = None  # [H] execution-confidence signal (opencode.AgenticResult.confidence)
     answer_tokens: int = 0  # output tokens → deliverable (tool-call steps)
     explanation_tokens: int = 0  # output tokens → prose narration
+    # Backend-reported token in/out split (additive to the flat ``total_tokens``), e.g.
+    # ``{"in": 300, "out": 200}``. ``None`` = the backend reported no usage — the split is
+    # coverage-not-available and the flat ``total_tokens`` remains the valid fallback.
+    tokens: dict[str, int] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -138,6 +142,8 @@ class SessionResult:
             "answer_tokens": self.answer_tokens,
             "explanation_tokens": self.explanation_tokens,
         }
+        if self.tokens is not None:
+            d["tokens"] = self.tokens
         if self.agentic:
             d["agentic"] = {
                 "tests_passed": self.agentic.tests_passed,
@@ -160,6 +166,19 @@ class SessionResult:
                 "confidence": self.agentic.confidence,
             }
         return d
+
+
+def session_token_split(agentic: AgenticResult | None) -> dict[str, int] | None:
+    """The backend-reported in/out token split for a session's agentic work.
+
+    Returns ``None`` (coverage-not-available) when no backend reported usage — the flat
+    ``total_tokens`` remains the valid fallback. Never fabricates a split: a backend that
+    reported a measured zero is recorded as ``{"in": 0, "out": 0}``; a session that never
+    reached a model call stays ``None``.
+    """
+    if agentic is None or not agentic.usage_reported:
+        return None
+    return {"in": agentic.prompt_tokens, "out": agentic.completion_tokens}
 
 
 @dataclass

@@ -732,6 +732,14 @@ def _project_story_session(cell: dict, session: dict) -> dict:
     confidence = session.get("confidence")
     if confidence is not None:
         phase["confidence"] = confidence
+    tokens = session.get("tokens")
+    if isinstance(tokens, dict):
+        # The backend-reported in/out split (additive to the flat total_tokens). Pass through
+        # exactly the measured keys; ``attempt_facts/v1``'s null-safe gate then emits
+        # attempt_tokens_in/out only where the backend reported a (possibly zero) value.
+        split = {"in": tokens.get("in"), "out": tokens.get("out")}
+        if split["in"] is not None or split["out"] is not None:
+            phase["tokens"] = split
     return {
         "spec_name": spec_name,
         "spec_id": f"{spec_name}@story",

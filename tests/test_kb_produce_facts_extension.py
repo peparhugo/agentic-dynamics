@@ -211,6 +211,40 @@ def test_story_absent_fields_stay_absent(kpf, tmp_path):
     assert not any(_pred(r) == "attempt_tokens_in" for r in records)
 
 
+# ── 1b. Story token split: the census's PARTIAL rows become PRODUCED on re-derivation ──
+
+
+def test_story_token_split_becomes_produced(kpf, tmp_path):
+    # The backfill census named attempt_tokens_in/out PARTIAL for stories (flat total_tokens, no
+    # split). With the s1 instrumentation a session that records a backend-reported split makes
+    # those rows PRODUCED on re-derivation; a session without the split stays absent.
+    _write_story_cell(tmp_path, "split", sessions=[
+        {"session_number": 1, "exit_code": 0, "commit_hash": "aaa111",
+         "cost_usd": 0.5, "tokens": {"in": 300, "out": 200}},
+        {"session_number": 2, "exit_code": 0, "commit_hash": "bbb222",
+         "cost_usd": 1.0, "total_tokens": 700},  # flat-only: split stays absent
+        {"session_number": 3, "exit_code": 0, "commit_hash": "ccc333",
+         "cost_usd": 1.5, "tokens": {"in": 0, "out": 0}},  # measured zero is a real split
+    ])
+    records = kpf.derive_story_facts(REPO, REVISION, NOW)
+
+    tok_in = [r for r in records if _pred(r) == "attempt_tokens_in"]
+    tok_out = [r for r in records if _pred(r) == "attempt_tokens_out"]
+    # Only the two sessions whose backend reported a split emit in/out facts.
+    assert len(tok_in) == 2
+    assert len(tok_out) == 2
+    values_in = {json.loads(r.text)["value"] for r in tok_in}
+    assert values_in == {"300", "0"}  # measured 0 is emitted (null-not-zero)
+    values_out = {json.loads(r.text)["value"] for r in tok_out}
+    assert values_out == {"200", "0"}
+
+    # Stable ids: re-derivation over the same artifact -> byte-identical knowledge_ids.
+    round_1b = kpf.derive_story_facts(REPO, REVISION, NOW)
+    assert {r.knowledge_id for r in round_1b} == {r.knowledge_id for r in records}
+    _persist(kpf.REGISTRY_INDEX_PATH, *records)
+    assert kpf.derive_story_facts(REPO, REVISION, NOW) == []
+
+
 def test_story_per_run_identity_is_distinct(kpf, tmp_path):
     # Two cells: same story+model, DIFFERENT condition -> distinct JOB cells (no cross-supersede).
     _write_story_cell(tmp_path, "c_clean", condition="clean", sessions=[
