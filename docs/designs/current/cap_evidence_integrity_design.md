@@ -154,18 +154,32 @@ disable, RAG and Graph arms both use topology and the contrast is void):
 | RAG | lexical/dense augmentation, **graph expansion disabled** |
 | Graph | revision-correct symbol neighborhood (traversal-enforced ACL) |
 
-**Campaign 2 — control value (split, finding 1):** shadow routing always executes the baseline,
-so it cannot measure outcome value directly. Split:
+**Campaign 2 — control value (split + randomized pilot — sol review finding 6):** shadow
+routing always executes the baseline, so it cannot prove the outcome under adaptive control.
 - **2a — shadow calibration:** the adaptive verifier proposes (depth/scope/rework) while the
   baseline executes; measure proposal quality vs the outcome the baseline actually produced
-  (predicted vs observed blast radius).
-- **2b — live static-vs-adaptive:** separately authorized AFTER 2a shows non-inferiority; only
-  then does the adaptive verifier actually select verification.
+  (predicted vs observed blast radius, proposal hit-rate). Gate: 2b launches only when the
+  calibration metrics clear stated thresholds (e.g. proposal hit-rate >= 0.6).
+- **2b — randomized live pilot:** adaptive vs static on live runs, RANDOMIZED, which
+  establishes outcome non-inferiority under adaptive control (the counterfactual 2a cannot
+  provide). Only after 2b shows non-inferiority is the adaptive verifier authorized to select
+  verification on a continuing basis.
 
-| 2a (shadow calibration) | 2b (live, gated on 2a) |
+| 2a (shadow calibration, gated) | 2b (randomized pilot, gated on 2a) |
 |---|---|
-| Static (baseline executes; adaptive proposes) | Static |
-| Shadow adaptive (proposals scored vs realized outcome) | Applied adaptive (only after 2a non-inferior) |
+| Static executes; adaptive proposes; proposals scored vs realized outcome | Randomized static-vs-adaptive; outcome non-inferiority measured |
+
+**Pyright pin (finding 4):** pyproject.toml gains the `[lsp]` extra (`pyright>=1.1.390`); the
+implementation must either prove pyright runs on its fixture or explicitly record the
+unavailable-safe scope (durable availability probe, `lsp_analysis_status: unavailable`, zero
+dependent counts) — a silent pass without either is a defect.
+
+**`code_change_risk` v1 formula (finding 5 — defined, not invented):**
+`risk = 0.35·min(1, new_sonar_critical/10) + 0.25·min(1, new_lsp_error/10) +
+0.20·(1 − tests_ratio) + 0.20·min(1, impacted/10)`; terms whose analyzer did not run are
+OMITTED and the remaining weights renormalized to sum 1; risk is `None` when NO terms are
+measurable; the weights are `[P]` operator policy with this provenance recorded in the reducer
+docstring.
 
 **Measured:** independent test success, new LSP errors, new Sonar criticals, rework, cost,
 latency, context tokens, predicted-vs-observed blast radius.

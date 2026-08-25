@@ -59,10 +59,12 @@ workflow:
         complete/merged, p0 FAILS cleanly and the workflow stops. (3) TWO-ID IDENTITY: every
         versioned node carries entity_id = f(repository_id, path, qualified_name, kind) and
         version_id = f(entity_id, commit, content_hash); SUPERSEDES is deterministic; renames are
-        explicitly unsupported (a rename is a new entity, recorded as such). (4) TRAVERSAL ACL:
-        expand_candidates accepts repository_id AND acl_scope, constrains the seed and every
-        Cypher hop, and fails closed for versioned nodes missing either; post-filtering is a
-        second layer, never the enforcement. (5) STALE IS REFUSED: a fetch-first Sonar analysis
+        explicitly unsupported (a rename is a new entity, recorded as such). (4) TRAVERSAL ACL
+        (fail-closed, no legacy carve-out for the versioned path): expand_candidates accepts
+        repository_id AND acl_scope, constrains the seed and every Cypher hop, and fails closed
+        for VERSIONED nodes missing either; EVERY caller is updated to pass both explicitly
+        (retrieval.py:1007-1009 included); the omit-allowed behavior is retired for the versioned
+        path and documented as legacy-only for unversioned nodes. (5) STALE IS REFUSED: a fetch-first Sonar analysis
         whose revision mismatches the current one is never stamped with the current commit
         (sonar_analysis_status: stale-refused). (6) STATUS ENUM, NOT NONE: analyzer status facts
         carry a measured enum (available/unavailable/stale-refused); dependent counts are OMITTED
@@ -87,17 +89,14 @@ workflow:
         branch (feature/cap-evidence-integrity); each phase commits [workflow] <phase>.
     phases:
       - name: p0_prereq_gate
-        kind: agent
+        kind: test
         timeout: 10800
-        prompt: |
-          GOAL: {goal}
-          SHAPE: verify the prerequisite state: the four in-flight branches
-          (cap_e2_cascade_run, cap_pattern_minting, cap_story_bridge, cap_test_runner_wiring)
-          and their sonnet-adversary reviews are complete and merged to main (git log main);
-          the lifecycle index is current (python3 scripts/spec_status.py; the committed index
-          must include the new specs). DELIVER the gate table (item, evidence, PASS/FAIL).
-          GUARD: any FAIL => commit the gate doc and STOP the workflow cleanly.
-          LOG: gate table; PASS/FAIL; commit.
+        prompt: |-
+          Deterministic preflight (kind: test — the runner fails this phase when the suite
+          fails; a "FAIL" word cannot be ignored). Runs tests/test_evidence_prereq_gate.py:
+          (1) the four in-flight branches' final [workflow] commits reachable from HEAD;
+          (2) cap_sonnet_adversary has a completed (ok) run ledger; (3) cap_story_bridge has a
+          completed (ok) run ledger. If the suite fails, the phase fails and the workflow stops.
       - name: e1_sonar_integrity
         kind: agent
         timeout: 14400
@@ -138,7 +137,11 @@ workflow:
           one-record-per-diagnostic (file/line/rule/severity/message), each linked to the SMALLEST
           CONTAINING SYMBOL (symbols + spans now exist from e2); (b) SONAR issues one-record-per-
           issue (file/line/rule/severity/message/remediation_effort) — the 93-issue compression at
-          quality_ingestion.py:100-123 is retired for the issue surface. Define + record the
+          quality_ingestion.py:100-123 is retired for the issue surface. PYRIGHT IS PINNED
+          (pyproject.toml [lsp] extra): the phase must EITHER prove pyright runs on its fixture
+          (install the extra if needed) OR explicitly record the unavailable-safe scope (availability
+          probe durable; records emitted with lsp_analysis_status: unavailable and zero
+          dependent counts) — passing without either is a defect. Define + record the
           TESTED_BY derivation rule (test-file->module name matching); where not derivable for a
           fixture, changed_symbols_with_tests_ratio is DEFERRED (omitted), never invented.
           VERIFY: a fixture with N diagnostics + M Sonar issues produces N+M records with symbol
@@ -177,7 +180,11 @@ workflow:
           per hard rule 6: status facts carry the measured enum (available/unavailable/
           stale-refused); dependent counts are OMITTED when the analyzer did not run. Denominators
           + zero-change behavior for the ratios defined in the reducer docstring. code_change_risk
-          is [C] with its deterministic formula + policy provenance recorded. Author the
+          v1 formula (DEFINED, not invented): risk = 0.35*min(1, new_sonar_critical/10) +
+          0.25*min(1, new_lsp_error/10) + 0.20*(1 - tests_ratio) + 0.20*min(1, impacted/10);
+          terms whose analyzer did not run are OMITTED and the remaining weights renormalized to
+          sum 1; risk is None when NO terms are measurable; the weights are [P] operator policy
+          with this provenance recorded in the reducer docstring. Author the
           verify_code_change/v1 contract (experiments/contexts/) — shadow-only, no new automatable
           actions.
           VERIFY: hermetic tests (fixture delta + analyzer statuses -> facts; unavailable analyzers

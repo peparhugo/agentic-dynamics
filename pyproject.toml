@@ -29,6 +29,10 @@ chromadb = ["chromadb>=0.4.0"]
 ollama = ["ollama>=0.3.0"]
 neo4j = ["neo4j>=5.20"]
 admin = ["flask>=3.0"]
+# Evidence-integrity stream (cap_evidence_integrity): the Python repo's pinned LSP analyzer.
+# The e3 phase must prove pyright runs on its fixture or explicitly record the unavailable-safe
+# scope — the pin is the prerequisite either way.
+lsp = ["pyright>=1.1.390"]
 
 # One entry point over the maintained scripts/ surface (rec 5): `agentic-dynamics` dispatches to
 # the backing scripts via `agentic_dynamics.cli`. Each subcommand is a thin adapter (rec 8).

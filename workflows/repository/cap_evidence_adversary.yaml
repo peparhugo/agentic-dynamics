@@ -2,12 +2,18 @@ name: cap_evidence_adversary
 question: >-
   Sonnet-5 adversarial review of the cap_evidence_integrity branch per the adversarial
   convention: findings re-verified against the tree, plus the attempted-attacks/known-safe list.
-  Attack the six phases' claims: sonar revision identity (stale-refusal provable, analyzed_sha
-  real, no current-commit stamp on stale), pyright durability (availability probed not assumed,
-  one-record-per-diagnostic with real symbol links), typed CodeDelta (tree-sitter, API-compatible,
-  no regex residue), versioned graph (repository_id+commit identity, SUPERSEDES, scope filter —
-  private unreachable from public), change facts (minting-order guard respected, null-not-zero,
-  contract gate-clean), analyzer protocol (dependency inversion, default no-op).
+  Attack the REVISED seven-phase contract: p0 (deterministic gate actually blocks — a failing
+  test-kind phase stops the run, not a word), e1 Sonar revision identity (stale-refusal provable,
+  analyzed_sha/tool_version/config_hash persisted as typed JSON payload, no current-commit stamp
+  on stale), e2 typed CodeDelta (tree-sitter, qualified names + spans, two-ID contract, renames
+  unsupported, CommitAnalysis API compatible), e3 issue-level records for BOTH analyzers (Sonar
+  one-per-issue — not just Pyright; pyright pinned [lsp] extra and proven-or-unavailable-recorded;
+  symbol links real; TESTED_BY rule or deferral), e4 versioned graph (two-ID identity, SUPERSEDES,
+  Knowledge:SymbolVersion seed join, CONTAINS/AFFECTS added to allowlist + weights, ACL enforced
+  INSIDE the traversal with fail-closed on missing scope and every caller updated), e5 change
+  facts (minting-order guard, status enum + omitted counts, defined denominators, the EXACT v1
+  risk formula with renormalization + [P] provenance), e6 runtime-loop smoke (end-to-end fixture
+  proving change -> delta -> graph -> facts -> neighborhood).
 version: "0.1"
 artifact_kind: workflow
 intent: mutate
@@ -24,16 +30,17 @@ workflow:
       domain_context: >-
         PROVISIONAL DomainProfile (pre-CAP-I8 static filing). domain: software_delivery /
         adversarial review. canonical_sources: [feature/cap-evidence-integrity (the branch),
-        workflows/repository/cap_evidence_integrity.yaml (the spec), docs/designs/current/
-        cap_evidence_integrity_design.md, agent_config/conventions.md (the adversarial
-        convention)]. policies: [findings_are_verified, known_safe_list_required, no_bare_pass]
+        workflows/repository/cap_evidence_integrity.yaml (the revised spec),
+        docs/designs/current/cap_evidence_integrity_design.md (revised),
+        agent_config/conventions.md]. policies: [findings_are_verified, known_safe_list_required,
+          no_bare_pass]
       challenge_context: >-
         PROVISIONAL ChallengeProfile. challenge: adversarial review.
         deliberation: [review the evidence-integrity branch]. session_policy: {default: fork_per_phase}
       current_state: >-
-        cap_evidence_integrity (flash) implements the six phases on its branch; this workflow
-        reviews it after it lands. The branch must exist with its [workflow] commits before the
-        review phase runs.
+        cap_evidence_integrity (flash) implements the seven phases (p0 + e1-e6) on its branch;
+        this workflow reviews it after it lands. The branch must exist with its [workflow]
+        commits before the review phase runs.
       hard_rules: >-
         (1) Every phase commits '[workflow] <phase>' with findings + known-safe list. (2) Per the
         convention: findings re-verified against the tree (re-derived, never imagined); the
@@ -42,7 +49,7 @@ workflow:
         (4) Sonnet-5 only. (5) No code changes except a review record if the convention requires.
       read_first: >-
         agent_config/conventions.md, workflows/repository/cap_evidence_integrity.yaml,
-        docs/designs/current/cap_evidence_integrity_design.md
+        docs/designs/current/cap_evidence_integrity_design.md, tests/test_evidence_prereq_gate.py
       run_shape: >-
         SINGLE-model: --model anthropic/claude-sonnet-5 --backend claude_cli (CLAUDE_BIN). One
         worktree, one branch (feature/cap-evidence-adversary); each phase commits [workflow] <phase>.
@@ -52,17 +59,38 @@ workflow:
         timeout: 14400
         prompt: |
           GOAL: {goal}
-          TARGET: feature/cap-evidence-integrity. FIRST verify the branch exists and its six
-          phases committed (git log). Then review per the conventions, attacking each phase's
-          claims: (1) sonar — stale-refusal provable from a test, analyzed_sha/tool_version/
-          config_hash persisted, no path stamps a stale analysis with a newer revision;
-          (2) pyright — availability probed (not assumed), one-record-per-diagnostic with symbol
-          links; (3) CodeDelta — tree-sitter based, CommitAnalysis API compatible, no regex
-          residue in the delta path; (4) graph — repository_id+commit identity on every new node,
-          SUPERSEDES wired, scope filter proven (private unreachable from public expansion);
-          (5) change facts — minting-order guard respected (nothing minted before the typed
-          delta), null-not-zero on unavailable analyzers, contract gate-clean; (6) protocol —
-          dependency inversion holds (runtime never imports control), default no-op.
+          TARGET: feature/cap-evidence-integrity. FIRST verify the branch exists and its seven
+          phases (p0 + e1-e6) committed (git log). Then review per the conventions, attacking
+          each phase's claims:
+          (1) p0 — DETERMINISTIC: the phase is kind: test running tests/test_evidence_prereq_gate.py;
+          prove a failing gate FAILS the phase (the runner's suite-failure path), i.e. an
+          unreachable-branch state cannot proceed to e1.
+          (2) e1 — stale-refusal provable from a test; the record's structured fields ride as a
+          typed JSON payload in text (record_factory surface unchanged — check no unknown
+          extra_fields crept in); no path stamps a stale analysis with a newer revision.
+          (3) e2 — tree-sitter delta with qualified names + spans; the two-ID contract
+          (entity_id/version_id) helpers exist and are deterministic; renames recorded as new
+          entities; CommitAnalysis API compatible (callers untouched).
+          (4) e3 — SONAR issue-level records exist (not only Pyright); pyright is pinned in
+          pyproject [lsp] extra AND the phase either proves pyright ran on its fixture or
+          explicitly records the unavailable-safe scope (no silent pass); diagnostics/issues
+          link to smallest containing symbol; the TESTED_BY rule is defined and recorded or the
+          ratio is deferred.
+          (5) e4 — versioned nodes carry both IDs; SUPERSEDES wired; the multi-labeled
+          Knowledge:SymbolVersion seed join works (full-text seed expands into symbol versions);
+          CONTAINS + AFFECTS are in ALLOWED_EXPANSION_RELS and RELATIONSHIP_WEIGHTS;
+          ACL is enforced INSIDE the traversal: expand_candidates takes repository_id +
+          acl_scope, the seed and every hop are constrained, versioned nodes fail closed on
+          missing scope, and EVERY caller (retrieval.py:1007-1009 included) passes both —
+          attack a traversal seeded from a public record reaching a private node.
+          (6) e5 — minting-order guard respected (nothing minted before the typed delta);
+          status enum + omitted counts (never None-as-zero); denominators + zero-change defined;
+          the code_change_risk v1 formula matches the spec EXACTLY (0.35/0.25/0.20/0.20 weights,
+          min(1, x/10) normalization, omitted-term renormalization, None when nothing measurable,
+          [P] provenance recorded) — no invented weights.
+          (7) e6 — the end-to-end smoke actually ran and produced evidence: change ->
+          CodeSnapshot/CodeDelta -> graph update -> code_change_facts emit -> neighborhood
+          supplied; runtime never imports control; default no-op preserved.
           DELIVER: findings (each re-verified with evidence) + the known-safe list + verdict
           (PASS/FAIL with mandatory fixes).
           LOG: finding table + known-safe list; PASS/FAIL; commit.
@@ -79,5 +107,5 @@ metrics:
   - {name: evidence_branch_reviewed, agg: mean, over: cell}
 comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
 writeup: {format: lab_book, sections: [question, a1_review_evidence_integrity]}
-stop: {budget_usd: 8.0, max_attempts: 1}
+stop: {budget_usd: 10.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
