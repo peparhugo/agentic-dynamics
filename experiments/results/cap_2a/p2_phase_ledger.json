@@ -1,0 +1,138 @@
+{
+  "schema_version": "cap_2a_p2_ledger/v1",
+  "campaign": "cap_2a_shadow_calibration",
+  "phase": "p2_measure_one_cell",
+  "cell_id": "cap2a_p2_registry_canonicalize",
+  "spec_id": "registry_canonicalize@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "e61c709ebd3f9cf4c731ea0b731ac09e787a6343",
+  "worktree": "/tmp/wt_cap2a_p2_registry",
+  "run_ledger": "experiments/results/workflows/registry_canonicalize/20260825T220339Z.json",
+  "run_ledger_sha256": "999f553abc60288d74845a548b94c7aae3d80f657728c40f6fa8dd72e0352ccf",
+  "ok": true,
+  "total_measured_cost_usd": 0.202402,
+  "total_measured_cost_breakdown": {
+    "implement": 0.001164,
+    "test": 0.062071,
+    "verify": 0.139167
+  },
+  "graph_reachability": {
+    "neo4j_reachable": true,
+    "uri": "bolt://localhost:7687",
+    "attempted": true,
+    "populate_completed": false,
+    "observations": [
+      "Implement-phase change-analysis attempted populate_versioned_graph for the parent revision (e61c709eb): reached 29,675 SymbolVersion nodes before stalling; the after revision (bccb17514) was never reached.",
+      "Root cause: the SUPERSEDES edge step in populate_versioned_graph is O(N^2) at full-repo scale. Its Cypher is MATCH (old:SymbolVersion) WHERE old.entity_id = $ent AND old.version_id <> $vid — a per-symbol label scan. The only entity_id index is on :Knowledge(entity_id); no :SymbolVersion(entity_id) index exists, so each of ~30k symbols scans every SymbolVersion node.",
+      "Consequence: the first run_workflow.py invocation died during graph population (empty log = SIGKILL, no Python traceback) after ~25 min of a single revision. The graph leg is impractical at this scale; the cell was re-run delta-only (--change-analysis WITHOUT --change-analysis-graph) with --resume to complete the measurement."
+    ]
+  },
+  "proposal_seam_result": {
+    "proposals_emitted": 0,
+    "refused": true,
+    "refusal_reason": "Every committed phase yields code_change_risk OMITTED (no measurable term), and build_verify_proposal requires code_change_risk as a contract on_missing:halt fact. Emitting would raise ValueError (the refuse-to-run contract) — no proposal was hand-authored."
+  },
+  "phases": [
+    {
+      "phase": "implement",
+      "status": "ok",
+      "commit_hash_short": "bccb17514",
+      "baseline_revision": "e61c709ebd3f9cf4c731ea0b731ac09e787a6343",
+      "analyzed_revision": "bccb1751458fe5c5e00f4e1935704aa80477c678",
+      "cost_usd": 0.001164,
+      "duration_s": 300,
+      "duration_note": "agent ~5 min (launch->commit); change-analysis graph population then ran ~25 min and the process died (see graph_reachability)",
+      "test_result": "agent self-reported pytest 97 passed (test_kb_produce_registry + test_story_ingestion + test_knowledge_ingestion); test_executed_success = null (no test_gate / kind:test phase)",
+      "graph_status": "unavailable",
+      "graph_updated": false,
+      "facts_emitted": [
+        {"predicate": "changed_symbol_count", "value": "0", "value_type": "int"},
+        {"predicate": "ast_parse_coverage", "value": "1.0", "value_type": "float"}
+      ],
+      "facts_omitted": [
+        {"predicate": "code_change_risk", "reason": "no measurable term (no sonar/lsp, changed_symbols=0, no impacted count)"},
+        {"predicate": "impacted_symbol_count", "reason": "graph population impractical"},
+        {"predicate": "new_sonar_critical_count", "reason": "sonar analyzer not wired into run_workflow change-analysis"},
+        {"predicate": "new_lsp_error_count", "reason": "lsp analyzer not wired into run_workflow change-analysis"},
+        {"predicate": "changed_symbols_with_tests_ratio", "reason": "changed_symbol_count=0 (module-level bootstrap fix is invisible to the typed symbol delta)"},
+        {"predicate": "analysis_revision_matches", "reason": "sonar analysis did not run"},
+        {"predicate": "sonar_analysis_status", "reason": "not measured"},
+        {"predicate": "lsp_analysis_status", "reason": "not measured"}
+      ],
+      "proposal": null,
+      "proposal_note": "NOT emitted — code_change_risk omitted; seam refuses (ValueError) rather than guessing",
+      "note": "Real functional change (fixed scripts/archive/kb_produce_registry.py bootstrap + REPO_ROOT) but it is module-level code, so the typed CodeDelta reports 0 changed symbols."
+    },
+    {
+      "phase": "test",
+      "status": "ok",
+      "commit_hash_short": "fb1ca291e",
+      "baseline_revision": "bccb1751458fe5c5e00f4e1935704aa80477c678",
+      "analyzed_revision": "fb1ca291ed0462d9a52a40678d39a802b5230ee2",
+      "cost_usd": 0.062071,
+      "duration_s": 463.47,
+      "test_result": "agent ran the full pytest gate; test_executed_success = null (no independent test_runner)",
+      "graph_status": "not_requested",
+      "graph_updated": false,
+      "facts_emitted": [
+        {"predicate": "changed_symbol_count", "value": "0", "value_type": "int"}
+      ],
+      "facts_omitted": [
+        {"predicate": "code_change_risk", "reason": "no measurable term"},
+        {"predicate": "ast_parse_coverage", "reason": "no changed Python source files (data.js / lab outputs / README / manifest)"},
+        {"predicate": "impacted_symbol_count", "reason": "graph not requested"},
+        {"predicate": "new_sonar_critical_count", "reason": "sonar not wired"},
+        {"predicate": "new_lsp_error_count", "reason": "lsp not wired"},
+        {"predicate": "changed_symbols_with_tests_ratio", "reason": "changed_symbol_count=0"},
+        {"predicate": "analysis_revision_matches", "reason": "sonar did not run"},
+        {"predicate": "sonar_analysis_status", "reason": "not measured"},
+        {"predicate": "lsp_analysis_status", "reason": "not measured"}
+      ],
+      "proposal": null,
+      "proposal_note": "NOT emitted — code_change_risk omitted",
+      "note": "Regenerated the canonical data.js + lab outputs + manifest (2,233 insertions) reflecting the canonicalized corpus."
+    },
+    {
+      "phase": "verify",
+      "status": "ok",
+      "commit_hash_short": "c2ed5270e",
+      "baseline_revision": "fb1ca291ed0462d9a52a40678d39a802b5230ee2",
+      "analyzed_revision": "c2ed5270e0c04fe0609e6f8369501e6441ceee28",
+      "cost_usd": 0.139167,
+      "duration_s": 356.18,
+      "test_result": "none (documentation phase); test_executed_success = null",
+      "graph_status": "not_requested",
+      "graph_updated": false,
+      "facts_emitted": [
+        {"predicate": "changed_symbol_count", "value": "0", "value_type": "int"}
+      ],
+      "facts_omitted": [
+        {"predicate": "code_change_risk", "reason": "no measurable term"},
+        {"predicate": "ast_parse_coverage", "reason": "no changed Python source files (markdown doc only)"},
+        {"predicate": "impacted_symbol_count", "reason": "graph not requested"},
+        {"predicate": "new_sonar_critical_count", "reason": "sonar not wired"},
+        {"predicate": "new_lsp_error_count", "reason": "lsp not wired"},
+        {"predicate": "changed_symbols_with_tests_ratio", "reason": "changed_symbol_count=0"},
+        {"predicate": "analysis_revision_matches", "reason": "sonar did not run"},
+        {"predicate": "sonar_analysis_status", "reason": "not measured"},
+        {"predicate": "lsp_analysis_status", "reason": "not measured"}
+      ],
+      "proposal": null,
+      "proposal_note": "NOT emitted — code_change_risk omitted",
+      "note": "Wrote docs/review/impl_registry_canonicalize.md tracing each canonicalization rule to code."
+    }
+  ],
+  "p3_forecast_budget": {
+    "label": "FORECAST",
+    "basis": "p2 measured target-model cost x 2 headroom",
+    "measured_cost_usd": 0.202402,
+    "forecast_per_cell_usd": 0.404804,
+    "note": "FORECAST, not measured. p3 must report each later cell's forecast and actual cost separately. No p3 cell may run until this p2 manifest + measured-cost JSON are committed."
+  },
+  "blocking_findings": [
+    "The verify_code_change proposal cannot be emitted for ANY phase of this cell because code_change_risk is never produced: run_workflow.py's _run_change_analysis injects no sonar/lsp into ChangeInput, the graph leg (for impacted) is impractical (O(N^2) SUPERSEDES), and all three commits changed non-symbol files so changed_symbol_count=0.",
+    "The typed CodeDelta is symbol-only: module-level code changes (the implement phase's real bootstrap/REPO_ROOT fix) are invisible, reporting changed_symbol_count=0.",
+    "The graph population SUPERSEDES step is O(N^2) (no :SymbolVersion(entity_id) index); at full-repo scale (~30k symbols) a single revision did not complete in ~25 min."
+  ]
+}
