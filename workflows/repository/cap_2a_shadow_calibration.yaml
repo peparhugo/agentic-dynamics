@@ -44,32 +44,39 @@ workflow:
         term in the risk formula) is never produced — the composition-root graph wiring is phase
         p1 below. The e4 graph machinery (populate_versioned_graph, expand_candidates) is proven
         by live-Neo4j tests. 2a is the FIRST campaign to consume the change facts — the facts
-        existed before but no spec required them.
+        existed before but no spec required them (the requires_facts gate on cap_2a_verifier_gate
+        passes today).
       hard_rules: >-
-        (1) Every phase commits '[workflow] <phase>' with green checks. (2) p1 MUST ship the
-        composition-root graph wiring with a regression test proving the injection (and the
-        analyzer's fallback when the graph is down — graph_client=None semantics preserved,
-        delta-only facts, never a crash). (3) APPLY STAYS OFF: verify proposals are shadow-only,
-        never applied, never armed (no control_route, no actuation). (4) E4 lesson: p2 measures
-        ONE cell's full cost before p3 commits a per-cell budget — no budget without measurement.
-        (5) Every number in the verdict doc cites a produced JSON (ledger, proposal record, or
-        scoring table). (6) The gate is data-driven: 2b launches only when hit-rate >= 0.6 with
-        a stated n; otherwise state the n needed. (7) The adversarial phase (p6) is mandatory:
-        findings re-verified against the tree + known-safe list, no bare PASS. (8) No
-        generated-surface edits (agent_config/, .opencode/, .claude/). (9) PASS/FAIL log;
-        resumable.
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) APPLY STAYS OFF:
+        verify proposals are shadow-only, never applied, never armed (no control_route, no
+        actuation). (3) E4 lesson: p2 measures ONE cell's full cost before p3 commits a
+        per-cell budget — no budget without measurement. (4) Candidate cells are listed with
+        their measured costs BEFORE running (never run a cell the phase did not list). (5) A
+        graph-down cell is FLAGGED, never silently dropped or mislabeled (scored with the
+        delta-only facts, listed as flagged). (6) Every number in the verdict doc cites a
+        produced JSON (ledger, proposal record, or scoring table). (7) The gate is data-driven:
+        2b launches only when hit-rate >= 0.6 with a stated n; otherwise state the n needed.
+        (8) The adversarial phase (p6) is mandatory: findings re-verified against the tree +
+        known-safe list, no bare PASS. (9) No generated-surface edits (agent_config/,
+        .opencode/, .claude/). (10) PASS/FAIL log; resumable.
       read_first: >-
         docs/designs/current/cap_evidence_integrity_design.md §6, docs/review/
-        cap_evidence_integrity_review.md (Resolutions), src/agentic_dynamics/control/reducers/
-        code_change_facts.py (predicates + RISK_WEIGHTS), src/agentic_dynamics/runtime/
-        change_analyzer.py + src/agentic_dynamics/control/evidence_analyzer.py (ChangeInput/
-        ChangeAnalysis), scripts/run_workflow.py (--change-analysis), src/agentic_dynamics/
-        knowledge/graph.py (Neo4jClient constructor), experiments/contexts/verify_code_change.yaml
+        cap_evidence_integrity_review.md (Resolutions section — the F3 wiring is the p1 target),
+        src/agentic_dynamics/control/reducers/code_change_facts.py (predicates + RISK_WEIGHTS),
+        src/agentic_dynamics/runtime/change_analyzer.py (ChangeInput/ChangeAnalysis/ChangeAnalyzer),
+        src/agentic_dynamics/control/evidence_analyzer.py (EvidenceChangeAnalyzer — the
+        graph_client duck-type: populate_versioned_graph(snapshot, *, revision, repository_id,
+        acl_scope) + expand_candidates(seed_ids, *, max_depth, max_neighbors, max_nodes,
+        timeout_ms, repository_id, acl_scope)),
+        scripts/run_workflow.py (the --change-analysis block, ~line 213),
+        src/agentic_dynamics/knowledge/graph.py:156 (Neo4jClient(uri, user, password) — ENV
+        override convention FINOPS_NEO4J_*, "local dev only — override via ENV for prod"),
+        experiments/contexts/verify_code_change.yaml (actions: verify/rework/continue)
       run_shape: >-
         SINGLE-model: --model deepseek/deepseek-v4-pro --backend opencode (operator preference;
         sonnet when Claude OAuth is up). One worktree, one branch (feature/cap-2a-shadow-calibration);
         each phase commits [workflow] <phase>. Sub-run cells execute small existing specs with
-        --change-analysis (+ the p1-wired graph flag) inside this worktree.
+        --change-analysis --change-analysis-graph inside this worktree.
     phases:
       - name: p1_wire_graph_client
         kind: agent
@@ -77,39 +84,63 @@ workflow:
         prompt: |
           GOAL: {goal}
           SHAPE: wire the versioned-graph client into the phase-boundary evidence seam at the
-          composition root. scripts/run_workflow.py --change-analysis currently builds
-          EvidenceChangeAnalyzer() with graph_client=None (documented v1 follow-up of review F3).
-          Add the graph wiring: a --change-analysis-graph flag (or FINOPS_NEO4J_URL env) that
-          constructs the e4 Neo4jClient (src/agentic_dynamics/knowledge/graph.py) and injects it
-          into EvidenceChangeAnalyzer. Regression test: the composition root injects a real
-          graph-shaped client; the analyzer falls back to delta-only facts when the graph is down
-          (graph_client=None semantics preserved — never a crash). Do NOT change the analyzer's
-          public behavior when no graph is supplied.
-          DELIVER: the wired script + test, committed; a short wiring note in the phase log.
+          composition root. Today scripts/run_workflow.py builds EvidenceChangeAnalyzer() with
+          graph_client=None (the F3 review's documented follow-up). Change EXACTLY this: in the
+          --change-analysis block (scripts/run_workflow.py, after the router seams, ~line 213),
+          add a --change-analysis-graph <bolt-uri> flag (and/or FINOPS_NEO4J_URL env). When set,
+          inject EvidenceChangeAnalyzer(Neo4jClient(uri, user, password)) — the constructor at
+          src/agentic_dynamics/knowledge/graph.py:156, credentials from FINOPS_NEO4J_URI/
+          FINOPS_NEO4J_USER/FINOPS_NEO4J_PASSWORD with the module defaults (bolt://localhost:7687,
+          neo4j/password123). When the flag is absent OR the graph is unreachable, fall back to
+          graph_client=None exactly as today: delta-only facts, impacted_symbol_count omitted,
+          code_change_risk renormalized over the remaining terms — NEVER a crash, NEVER a
+          fabricated zero. Do not change EvidenceChangeAnalyzer's public behavior.
+          VERIFY: extend the seam tests — (a) tests/test_workflow_runner.py: the seam is inert
+          without the flag (change_analysis stays None) and analyzes with a graph-shaped double
+          injected; (b) tests/test_change_analyzer.py: the composition-root injection shape
+          (a real Neo4jClient-shaped object passes populate_versioned_graph/expand_candidates
+          through); (c) the graph-down fallback: an analyzer whose graph_client raises degrades
+          to delta-only facts, never a crash. Run python3 -m pytest tests/test_change_analyzer.py
+          tests/test_workflow_runner.py tests/test_code_change_facts.py — all green; keep
+          tests/test_dependency_direction.py green (scripts/ is not a plane; control imports are
+          not touched by this phase).
+          GUARD: without --change-analysis-graph, a run is byte-identical to the merged v1.
+          DELIVER: the wired script + tests, committed.
           LOG: files touched, test result, PASS/FAIL; commit.
       - name: p2_measure_one_cell
         kind: agent
         timeout: 7200
         prompt: |
           GOAL: {goal}
-          SHAPE: measure ONE full cell end-to-end before any budget is committed (E4 lesson).
-          Pick the smallest runnable existing spec from the index; run it with the full seam
-          (--change-analysis + the graph flag from p1) and log: cost, duration, facts produced
-          (changed_symbol_count, impacted_symbol_count, code_change_risk, ast_parse_coverage),
-          and whether the proposal records are complete. State the measured per-cell cost and a
-          proposed per-cell budget for p3.
-          DELIVER: the cell's ledger + proposal records + the measured-cost line in the log.
+          SHAPE: measure ONE full cell end-to-end before any budget is committed (E4 lesson —
+          the grit pilot ran 10x over its cost envelope because the per-cell cost was never
+          measured first). Candidate SMALL workflow specs with completed ok runs on the index
+          (experiments/specs/STATUS.md): queue_steer ($0.033), labbook_refresh ($0.0275),
+          finding_economics_closure ($1.28), registry_canonicalize ($0.19),
+          canonical_publication_closure ($1.45). Pick the smallest with agent phases that
+          commit; state the choice + reason. Check Neo4j is reachable at bolt://localhost:7687
+          (the e4 live tests' skipif condition); if down, fix or record it (a graph-down cell is
+          scored delta-only and FLAGGED — never silently dropped).
+          RUN: python3 scripts/run_workflow.py --spec <small spec> --goal <short goal>
+          --model deepseek/deepseek-v4-pro --change-analysis --change-analysis-graph
+          bolt://localhost:7687 --workdir <worktree> (one temp worktree on a temp branch).
+          RECORD: cost, duration, and the facts the seam emitted per committed phase —
+          changed_symbol_count, impacted_symbol_count (NOW non-None — the p1 proof),
+          code_change_risk, ast_parse_coverage; whether the proposal records are complete.
+          DELIVER: the cell's ledger + proposal records; the measured per-cell cost + a proposed
+          per-cell budget for p3 (measured cost x 2 headroom).
           LOG: cost/duration/facts table, PASS/FAIL; commit.
       - name: p3_run_shadow_cells
         kind: agent
         timeout: 14400
         prompt: |
           GOAL: {goal}
-          SHAPE: run the remaining cells of the campaign: 2-3 small existing specs (list the
-          candidates + per-cell cost from p2's measurement before running). Each cell: baseline
-          executes while the adaptive verifier proposes shadow-only (verify_code_change/v1
-          depth/scope/rework) — proposals recorded, NEVER applied, never armed. Cells may reuse
-          one worktree sequentially.
+          SHAPE: run the campaign's remaining cells: 2-3 small existing specs (list the
+          candidates + per-cell cost from p2's measurement BEFORE running — hard rule 4).
+          Each cell: baseline executes while the adaptive verifier proposes shadow-only —
+          verify_code_change/v1 actions {verify, rework, continue} with depth/scope, recorded,
+          NEVER applied, never armed (no control_route, no actuation). Cells may reuse one
+          worktree sequentially. Graph-down cells: run and flag, never silently drop.
           DELIVER: the run ledgers + proposal records (the shadow dataset).
           LOG: per-cell cost/duration/proposal table; PASS/FAIL; commit.
       - name: p4_score_hit_rate
@@ -117,13 +148,20 @@ workflow:
         timeout: 10800
         prompt: |
           GOAL: {goal}
-          SHAPE: score the proposals against the outcomes the baseline actually produced:
-          predicted vs observed blast radius (predicted impacted_symbol_count vs the realized
-          rework/scope), proposal hit-rate (proposal matched the realized need), risk vs actual
-          rework. Tabulate per cell; compute the gate metrics (hit-rate, predicted-vs-observed
-          delta, n). Any cell where the graph was down (impacted count absent) is scored with
-          the delta-only facts and flagged — never silently dropped.
-          DELIVER: the scoring table JSON (experiments/results/cap_2a_*).
+          SHAPE: score the proposals against the outcomes the baseline actually produced.
+          SEMANTICS (defined here): proposal hit-rate = fraction of proposals whose
+          action+depth matched the realized need (proposal said rework/continue and the
+          baseline's actual outcome required that rework/scope; proposal depth vs realized
+          scope of the change). predicted-vs-observed blast radius = per cell,
+          |predicted impacted_symbol_count - realized impacted set size| (realized from the
+          cell's rework/session artifacts — the symbols actually touched downstream).
+          risk vs actual rework: code_change_risk bucket vs whether rework occurred.
+          Per-cell table + aggregate; emit experiments/results/cap_2a_score_<ts>.json.
+          Graph-down cells: scored with the delta-only facts, listed as flagged — NEVER
+          silently dropped, NEVER excluded from the denominator without a note.
+          GUARD: the hit-rate denominator is proposals with recorded outcomes; a cell whose
+          outcome is unknown is flagged, not excluded; no cherry-picking.
+          DELIVER: the scoring JSON + table in the log.
           LOG: hit-rate, blast-radius delta, flagged cells; PASS/FAIL; commit.
       - name: p5_verdict
         kind: agent
@@ -133,9 +171,10 @@ workflow:
           DELIVER exactly one file: docs/designs/current/cap_2a_shadow_calibration.md
           SHAPE: cells table (spec, model, cost, duration, proposal, realized outcome, agree/
           disagree); analysis: proposal hit-rate vs the >= 0.6 gate, predicted-vs-observed blast
-          radius, any flagged cells and why; VERDICT: does 2b's gate clear (hit-rate >= 0.6 with
-          stated n)? If not, the n needed and the blocker. Also state 2b's launch prerequisites
-          (per §6: randomized static-vs-adaptive, non-inferiority under adaptive control).
+          radius, flagged cells and why; VERDICT: does 2b's gate clear (hit-rate >= 0.6 with
+          stated n)? If not, the n needed and the blocker. 2b prerequisites per design §6:
+          randomized static-vs-adaptive on live runs, outcome non-inferiority under adaptive
+          control (the counterfactual 2a cannot provide); 2b launches ONLY on this gate.
           GUARD: every number cites the p4 JSONs; no recommendation without n.
           LOG: PASS/FAIL; commit.
       - name: p6_adversarial
@@ -143,13 +182,17 @@ workflow:
         timeout: 10800
         prompt: |
           GOAL: {goal}
-          ROLE: adversarial verifier — try to falsify the campaign. Attack: wrong baseline
-          (verifier and baseline on different inputs), cherry-picked cells, proposals recorded
-          but never validated against realized outcomes, graph-down cells silently dropped or
-          mislabeled, stale facts (analysis_revision_matches=false ignored), hit-rate computed
-          over a non-denominator. Every finding: fix or record as accepted limitation with
-          reasoning. Re-state the verdict with the attack results. Deliver the two required
-          outputs: findings (re-verified) + known-safe list (attacks attempted, not falsified).
+          ROLE: adversarial verifier — try to falsify the campaign. Attack (each re-verified
+          against the tree, never imagined): wrong baseline (verifier and baseline on different
+          inputs/worktrees), cherry-picked cells (a listed candidate that was skipped without
+          reason), proposals recorded but never validated against realized outcomes, graph-down
+          cells silently dropped or mislabeled as full-fact, stale facts consumed
+          (analysis_revision_matches=false ignored), hit-rate denominator games (unknown-outcome
+          cells excluded without a note), p1 wiring that changes no-graph behavior (byte-identical
+          claim falsifiable by diff). Every finding: fix or record as accepted limitation with
+          reasoning. Deliver the TWO required outputs: findings (re-verified, each resolved) +
+          known-safe list (attacks attempted, not falsified, with what was tried and why it did
+          not apply). Re-state the verdict with the attack results. No bare PASS.
           LOG: finding table + known-safe list; PASS/FAIL; commit.
 factors:
   - {name: model, levels: [deepseek/deepseek-v4-pro]}
