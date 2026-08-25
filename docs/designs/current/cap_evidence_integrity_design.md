@@ -48,13 +48,31 @@ SonarIssue    -[:AFFECTS]-> SymbolVersion
 new version   -[:SUPERSEDES]-> old version
 ```
 
-**Identity rule:** every node identity includes `repository_id` + commit SHA. Global
-`module_path` uniqueness is insufficient across revisions and worktrees (the identity-collision
-lesson, applied to the graph preemptively).
+**Identity rule (two-ID contract — sol review finding 9):** every versioned node carries a
+stable logical slot and an immutable version, mirroring the knowledge plane:
+`entity_id = f(repository_id, path, qualified_name, kind)` and
+`version_id = f(entity_id, commit, content_hash)`; `new -[:SUPERSEDES]-> old` is deterministic
+from these. Rename handling: **explicitly unsupported** (a rename is a new entity, recorded as
+such — no implicit matching).
 
-**ACL rule (refinement added):** the bounded neighborhood the executor receives carries the
-same scope discipline as the fact plane — the private repo's symbols must never appear in a
-public-repo executor's expansion. `repository_id` on every node makes this enforceable.
+**ACL rule (traversal-enforced — finding 2):** `repository_id` is tenancy identity, NOT the ACL
+field; `acl_scope` is. The isolation is enforced INSIDE the traversal: `expand_candidates`
+accepts both `repository_id` and `acl_scope`, constrains the seed and every Cypher hop, and
+FAILS CLOSED for any versioned node missing either property. Filtering after traversal
+(`retrieval.py:1018-1019`) remains a second layer, never the enforcement.
+
+**Seed join (finding 3):** the executor's retrieval seeds are `Knowledge` records; the versioned
+nodes must be reachable from them. Chosen: **multi-labeled `Knowledge:SymbolVersion` nodes** on
+the code records the versioned graph populates, so existing full-text seeds expand directly
+into symbol versions. `CONTAINS` and `AFFECTS` are ADDED to `ALLOWED_EXPANSION_RELS`
+(`graph.py:27-37`) and `RELATIONSHIP_WEIGHTS` (`retrieval.py:78-87`) with weights, so every
+relation the executor must traverse is traversable.
+
+**Durable record representation (finding 7):** the structured analyzer fields
+(`tool_version`, `config_hash`, `analyzed_sha`, `rule`, `severity`, `line`, `coverage`) are
+carried as a **typed JSON payload inside `text`** (the existing `record_factory` surface stays
+unchanged — no schema migration; `extra_fields` is used only for the established keys). Chosen
+now by design; the implementation does not choose ad hoc.
 
 **Two consumers, kept separate:**
 
@@ -93,41 +111,61 @@ Job-scoped facts, consumed by a `verify_code_change/v1` contract (shadow):
 
 **Unavailable analysis remains unknown, never zero** (m2 discipline).
 
-## 5. Implementation order (the workflow's phases)
+## 5. Implementation order (the workflow's phases — revised per sol review findings 4/5/6/10/11)
 
-1. **Sonar revision identity** — revision-scoped project key; persist tool version, config
-   hash, analyzed SHA, coverage in the quality record; a stale-fetched analysis is REFUSED
-   (recorded as `sonar_analysis_status: stale-refused`), never stamped. Verify: the live
-   `exp_src` staleness is now detected.
-2. **Pyright pinned** — the Python repo's LSP tool; availability probe durable; diagnostics
-   ingested one-record-per-diagnostic, linked to the smallest containing symbol.
-3. **Typed CodeSnapshot + CodeDelta** — tree-sitter-based; replaces the regex heuristic path
-   (API-compatible with CommitAnalysis); versioned semantic deltas.
-4. **Versioned graph population** — ModuleVersion/SymbolVersion with repository_id+commit,
-   SUPERSEDES edges; populate DEFINES, IMPORTS first; CALLS, TESTED_BY next; ACL on the
-   neighborhood expansion.
-5. **`code_change_facts/v1` + `verify_code_change/v1`** — the reducer (minting-order guard:
-   only after CodeDelta exists) + the shadow contract.
-6. **Injected phase-boundary analyzer protocol** — dependency inversion like the existing
-   routing/telemetry seam.
+1. **Prerequisite gate** — the four in-flight branches + their adversary reviews must be
+   complete before this stream fires; the lifecycle index is refreshed (spec_status).
+2. **Sonar revision identity** — revision-scoped project key; persist tool version, config
+   hash, analyzed SHA, coverage (typed JSON payload in `text`); a stale-fetched analysis is
+   REFUSED (`sonar_analysis_status: stale-refused`), never stamped. Verify: the live `exp_src`
+   staleness is now detected.
+3. **Typed CodeSnapshot + CodeDelta** (moved BEFORE diagnostic linking — finding 4) —
+   tree-sitter-based; `_CodeSymbol` gains `qualified_name` + `source_span`; replaces the regex
+   heuristic path (API-compatible with CommitAnalysis); the two-ID contract lands here.
+4. **Issue-level records (Sonar AND Pyright — finding 5)** — one record per Sonar issue AND per
+   LSP diagnostic, each linked to the smallest containing symbol (symbols now exist from step 3);
+   the 93-issue compression is retired. TESTED_BY derivation rule: deterministic test-linking
+   (test-file→module name matching, recorded as the rule's provenance); if not derivable for a
+   given fixture, `changed_symbols_with_tests_ratio` is DEFERRED (fact omitted), never invented.
+5. **Versioned graph population** — ModuleVersion/SymbolVersion with the two-ID contract,
+   SUPERSEDES edges; multi-labeled `Knowledge:SymbolVersion` seeds; CONTAINS/DEFINES/IMPORTS
+   populated first, CALLS/TESTED_BY/AFFECTS next; ACL enforced in the traversal (finding 2).
+6. **`code_change_facts/v1` + `verify_code_change/v1`** — minted only from the typed CodeDelta
+   (minting-order guard); semantics per finding 8: status facts carry a measured enum
+   (`available`/`unavailable`/`stale-refused`), dependent counts are OMITTED when the analyzer
+   did not run (never `None`-as-zero, never fabricated); denominators + zero-change behavior
+   defined; `code_change_risk` is `[C]` with its deterministic formula and policy provenance
+   recorded (no arbitrary weights).
+7. **Runtime loop smoke (finding 6)** — the injected phase-boundary analyzer protocol + a
+   concrete composition-root data flow (change → CodeSnapshot/CodeDelta → graph update →
+   `code_change_facts` emit → executor neighborhood supplied) proven by ONE fixture or smoke
+   workflow. Opt-in, OFF by default, but the end-to-end evidence loop is demonstrated, not
+   merely declared.
 
-## 6. Campaigns (designed here, authored as ExperimentSpecs after the workflow lands)
+## 6. Campaigns (revised per sol review finding 1 — unconfounded)
 
-**Campaign 1 — context value (unconfounded):**
+**Campaign 1 — context value (unconfounded):** the RAG arm explicitly DISABLES graph expansion
+(the existing fusion already expands via Neo4j at `retrieval.py:1001-1049` — without the
+disable, RAG and Graph arms both use topology and the contrast is void):
 
 | Arm | Context |
 |---|---|
 | Baseline | current workflow (no augmentation) |
-| RAG | existing lexical/dense augmentation |
-| Graph | revision-correct symbol neighborhood |
+| RAG | lexical/dense augmentation, **graph expansion disabled** |
+| Graph | revision-correct symbol neighborhood (traversal-enforced ACL) |
 
-**Campaign 2 — control value:**
+**Campaign 2 — control value (split, finding 1):** shadow routing always executes the baseline,
+so it cannot measure outcome value directly. Split:
+- **2a — shadow calibration:** the adaptive verifier proposes (depth/scope/rework) while the
+  baseline executes; measure proposal quality vs the outcome the baseline actually produced
+  (predicted vs observed blast radius).
+- **2b — live static-vs-adaptive:** separately authorized AFTER 2a shows non-inferiority; only
+  then does the adaptive verifier actually select verification.
 
-| Arm | Verification |
+| 2a (shadow calibration) | 2b (live, gated on 2a) |
 |---|---|
-| Static | existing fixed verification |
-| Shadow adaptive | verification proposed from code-change facts |
-| Applied adaptive | only after shadow is non-inferior |
+| Static (baseline executes; adaptive proposes) | Static |
+| Shadow adaptive (proposals scored vs realized outcome) | Applied adaptive (only after 2a non-inferior) |
 
 **Measured:** independent test success, new LSP errors, new Sonar criticals, rework, cost,
 latency, context tokens, predicted-vs-observed blast radius.
