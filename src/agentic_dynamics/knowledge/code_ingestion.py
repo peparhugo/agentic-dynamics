@@ -107,12 +107,20 @@ def _resolve_profile(
 
 @dataclass(frozen=True)
 class _CodeSymbol:
-    """One extracted function or class, with just enough to render a signature summary."""
+    """One extracted function or class, with just enough to render a signature summary.
+
+    ``qualified_name`` (design §5.3) is the module-relative qualified name — methods become
+    ``ClassName.method_name`` (renames are new entities, never implicitly matched);
+    ``source_span`` is the 1-based ``(start_line, start_col, end_line, end_col)`` of the
+    tree-sitter node.
+    """
 
     name: str
     kind: str  # "function" | "class"
     signature: str  # name + parenthesized parameters (classes have none).
     docstring_head: str  # first non-empty docstring line, else "".
+    qualified_name: str = ""
+    source_span: tuple[int, int, int, int] | None = None  # (sl, sc, el, ec), 1-based
 
 
 def _node_name(node, source_bytes: bytes) -> str:
@@ -169,21 +177,34 @@ def _docstring_head(node, source_bytes: bytes) -> str:
     return ""
 
 
-def _symbol_from_node(node, kind: str, source_bytes: bytes) -> _CodeSymbol | None:
+def _symbol_from_node(
+    node, kind: str, source_bytes: bytes, enclosing: list[str] | None = None
+) -> _CodeSymbol | None:
     """Build a :class:`_CodeSymbol` from a function/class tree-sitter node, or ``None``.
 
     The signature is ``name + parameters`` (no full body, no return-type inference — the
-    requirement asks for "name + params + docstring head").
+    requirement asks for "name + params + docstring head"). ``enclosing`` is the chain of
+    enclosing class names used for the module-relative ``qualified_name`` (methods become
+    ``ClassName.method_name``); ``source_span`` mirrors the typed snapshot's span.
     """
     name = _node_name(node, source_bytes)
     if not name:
         return None
     signature = f"{name}{_params_text(node, source_bytes)}"
+    qualified_name = ".".join([*(enclosing or []), name])
+    source_span = (
+        node.start_point[0] + 1,
+        node.start_point[1] + 1,
+        node.end_point[0] + 1,
+        node.end_point[1] + 1,
+    )
     return _CodeSymbol(
         name=name,
         kind=kind,
         signature=signature,
         docstring_head=_docstring_head(node, source_bytes),
+        qualified_name=qualified_name,
+        source_span=source_span,
     )
 
 
@@ -192,23 +213,30 @@ def _collect_symbols(parser, source_bytes: bytes, profile: LanguageProfile) -> l
 
     A full recursive walk, so a method nested inside a class is collected as its own
     ``function`` record (matching ``parse_codebase``'s ``function_count`` semantics) while the
-    class itself is collected as a ``class`` record.
+    class itself is collected as a ``class`` record. ``qualified_name`` tracks the enclosing
+    class chain (design §5.3).
     """
     func_types = set(profile.function_node_types)
     class_types = set(profile.class_node_types)
     symbols: list[_CodeSymbol] = []
+    enclosing: list[str] = []
 
     def walk(node) -> None:
         if node.type in func_types:
-            sym = _symbol_from_node(node, "function", source_bytes)
+            sym = _symbol_from_node(node, "function", source_bytes, enclosing)
             if sym is not None:
                 symbols.append(sym)
         elif node.type in class_types:
-            sym = _symbol_from_node(node, "class", source_bytes)
+            name = _node_name(node, source_bytes)
+            if name:
+                enclosing.append(name)
+            sym = _symbol_from_node(node, "class", source_bytes, enclosing)
             if sym is not None:
                 symbols.append(sym)
         for child in node.children:
             walk(child)
+        if node.type in class_types:
+            enclosing.pop()
 
     walk(parser.parse(source_bytes).root_node)
     return symbols

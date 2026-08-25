@@ -78,7 +78,17 @@ def test_no_cross_experiment_baseline_fallback():
 
 def test_go_rust_patterns_in_ast_diff():
     # P0-10: commit_analysis.py diff stats must cover Go (func) and Rust (fn).
+    # The former regex diff-stat heuristics were REPLACED by the typed tree-sitter
+    # CodeSnapshot/CodeDelta (design §5.3 — cap_evidence_integrity e2). The coverage
+    # guarantee now comes from the tree-sitter profile node types (func/fn), asserted here.
     src = _read("src/agentic_dynamics/measurement/commit_analysis.py")
-    assert r"\n\+func " in src
-    assert r"\n\+fn " in src
-    assert r"\n\+use " in src
+    assert "build_code_snapshot" in src
+    assert "compute_code_delta" in src
+    core_lang = _read("src/agentic_dynamics/core/language.py")
+    # Go's function_declaration and Rust's function_item are covered by the profile.
+    assert '"go": ["function_declaration"]' in core_lang
+    assert '"rust": ["function_item"]' in core_lang
+    # The old regex heuristic is gone (it was not a tree-sitter AST).
+    assert r"\n\+func " not in src
+    assert r"\n\+fn " not in src
+    assert r"\n\+use " not in src

@@ -21,7 +21,13 @@ from typing import Any
 
 import yaml
 
-from agentic_dynamics.core.language import LanguageProfile, detect_language
+from agentic_dynamics.core.language import (
+    LanguageProfile,
+    _should_skip,
+    build_code_snapshot,
+    compute_code_delta,
+    detect_language,
+)
 
 # ── Data Structures ────────────────────────────────────────────
 
@@ -65,6 +71,11 @@ class CommitAnalysis:
     lines_added: int = 0
     lines_removed: int = 0
 
+    # Typed delta provenance (design §5.3): fraction of changed source files parsed by
+    # tree-sitter, and the raw CodeDelta summary. None/absent when no source files changed.
+    parse_coverage: float | None = None
+    code_delta: dict[str, Any] | None = None
+
     # SonarQube delta (populated if SonarQube available)
     sonar_available: bool = False
     sonar_bugs_delta: int = 0
@@ -98,6 +109,7 @@ class CommitAnalysis:
                 "imports_removed": self.imports_removed,
                 "lines_added": self.lines_added,
                 "lines_removed": self.lines_removed,
+                "parse_coverage": self.parse_coverage,
             },
             "sonar": {
                 "available": self.sonar_available,
@@ -217,10 +229,12 @@ def compute_ast_diff(
 ) -> CommitAnalysis:
     """Compute diff-level structural changes between two commits.
 
-    Uses `git diff` (instant) instead of temporary worktrees. The structural
-    counts (functions/classes/imports) are a regex diff-stat *heuristic*, not a
-    tree-sitter AST — kept under this name for API compatibility. Language-aware
-    patterns cover Python, TypeScript, Go, and Rust.
+    Uses `git diff` (instant) for file/line counts and **tree-sitter** for the structural
+    counts (functions/classes/imports): both revisions are materialized from git (``git
+    ls-tree`` + ``git show``, no temp worktrees) into typed :class:`CodeSnapshot`\\ s and
+    diffed by :func:`compute_code_delta` (design §5.3 — replaces the former regex diff-stat
+    heuristic). The public API is unchanged; ``parse_coverage`` records the fraction of changed
+    source files tree-sitter parsed (a parse failure is a recorded fact, never a crash).
 
     Args:
         worktree: Path to the git worktree.
@@ -271,75 +285,26 @@ def compute_ast_diff(
         elif line.startswith("D"):
             files_deleted += 1
 
-    # Functions/classes/imports: count + and - lines in the diff.
-    # This is a diff-stat *heuristic* (regex on git diff hunks), not a
-    # tree-sitter AST — the function name is retained for API compatibility.
-    # Patterns per language so Go/Rust are not miscounted as zero.
-    if profile.name == "python":
-        func_pattern = r"\n\+def "
-        async_func = r"\n\+async def "
-        class_pattern = r"\n\+class "
-        import_patterns = (r"\n\+import ", r"\n\+from ")
-        func_rem_pattern = r"\n\-def "
-        async_rem = r"\n\-async def "
-        class_rem_pattern = r"\n\-class "
-        import_rem_patterns = (r"\n\-import ", r"\n\-from ")
-    elif profile.name == "typescript":
-        func_pattern = r"\n\+function "
-        async_func = r"\n\+async function "
-        class_pattern = r"\n\+class "
-        import_patterns = (r"\n\+import ",)
-        func_rem_pattern = r"\n\-function "
-        async_rem = r"\n\-async function "
-        class_rem_pattern = r"\n\-class "
-        import_rem_patterns = (r"\n\-import ",)
-    elif profile.name == "go":
-        func_pattern = r"\n\+func "
-        async_func = r"(?!)"  # Go has no async functions
-        class_pattern = r"\n\+type "
-        import_patterns = (r"\n\+import ",)
-        func_rem_pattern = r"\n\-func "
-        async_rem = r"(?!)"
-        class_rem_pattern = r"\n\-type "
-        import_rem_patterns = (r"\n\-import ",)
-    elif profile.name == "rust":
-        func_pattern = r"\n\+fn "
-        async_func = r"\n\+async fn "
-        class_pattern = r"\n\+(struct|enum|impl|trait) "
-        import_patterns = (r"\n\+use ",)
-        func_rem_pattern = r"\n\-fn "
-        async_rem = r"\n\-async fn "
-        class_rem_pattern = r"\n\-(struct|enum|impl|trait) "
-        import_rem_patterns = (r"\n\-use ",)
-    else:
-        # Unknown language — best-effort TypeScript-style heuristics.
-        func_pattern = r"\n\+function "
-        async_func = r"\n\+async function "
-        class_pattern = r"\n\+class "
-        import_patterns = (r"\n\+import ",)
-        func_rem_pattern = r"\n\-function "
-        async_rem = r"\n\-async function "
-        class_rem_pattern = r"\n\-class "
-        import_rem_patterns = (r"\n\-import ",)
+    # Functions/classes/imports: TYPED CodeDelta over tree-sitter snapshots of both
+    # revisions (design §5.3) — replaces the regex diff-stat heuristic. Both revisions are
+    # materialized from git (no temp worktrees); unparseable files are a recorded
+    # parse-coverage fact, never a crash.
+    before_files = _read_commit_files(worktree, parent_commit, profile)
+    after_files = _read_commit_files(worktree, child_commit, profile)
+    before = build_code_snapshot(before_files, revision=parent_commit, profile=profile)
+    after = build_code_snapshot(after_files, revision=child_commit, profile=profile)
+    delta = compute_code_delta(before, after)
 
-    import re
-    diff_text = _run_git(
-        worktree, "diff",
-        f"{parent_commit}..{child_commit}",
-        "--", ":(exclude)node_modules", ":(exclude)dist", ":(exclude).instrument", ":(exclude)__pycache__", ":(exclude).pytest_cache",
-    )
+    funcs_added = sum(1 for s in delta.added_symbols if s.kind == "function")
+    funcs_removed = sum(1 for s in delta.removed_symbols if s.kind == "function")
+    classes_added = sum(1 for s in delta.added_symbols if s.kind == "class")
+    classes_removed = sum(1 for s in delta.removed_symbols if s.kind == "class")
+    imports_added = sum(len(v) for v in delta.added_imports.values())
+    imports_removed = sum(len(v) for v in delta.removed_imports.values())
 
-    funcs_added = len(re.findall(func_pattern, diff_text)) + len(re.findall(async_func, diff_text))
-    funcs_removed = len(re.findall(func_rem_pattern, diff_text)) + len(re.findall(async_rem, diff_text))
-    classes_added = len(re.findall(class_pattern, diff_text))
-    classes_removed = len(re.findall(class_rem_pattern, diff_text))
-
-    imports_added = 0
-    imports_removed = 0
-    for pat in import_patterns:
-        imports_added += len(re.findall(pat, diff_text))
-    for pat in import_rem_patterns:
-        imports_removed += len(re.findall(pat, diff_text))
+    # Parse-coverage fact: fraction of source files tree-sitter parsed across both revisions.
+    coverages = [c for c in (before.parse_coverage(), after.parse_coverage()) if c is not None]
+    parse_coverage = round(sum(coverages) / len(coverages), 4) if coverages else None
 
     return CommitAnalysis(
         commit_hash=child_commit,
@@ -355,6 +320,8 @@ def compute_ast_diff(
         imports_removed=imports_removed,
         lines_added=lines_added,
         lines_removed=lines_removed,
+        parse_coverage=parse_coverage,
+        code_delta=delta.to_dict(),
     )
 
 
@@ -839,3 +806,42 @@ def _run_git(worktree: Path, *args: str) -> str:
             f"git {' '.join(args)} failed (exit {proc.returncode}): {proc.stderr.strip()}"
         )
     return proc.stdout
+
+
+def _run_git_bytes(worktree: Path, *args: str) -> bytes:
+    """Run git in the worktree. Returns raw stdout bytes. Raises on failure."""
+    proc = subprocess.run(
+        ["git"] + list(args),
+        capture_output=True,
+        cwd=str(worktree),
+        timeout=60,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"git {' '.join(args)} failed (exit {proc.returncode}): {proc.stderr.decode(errors='replace').strip()}"
+        )
+    return proc.stdout
+
+
+def _read_commit_files(worktree: Path, commit: str, profile: LanguageProfile | None) -> dict[str, bytes]:
+    """Materialize a commit's source files as ``{relative_path: bytes}``.
+
+    Uses ``git ls-tree`` + ``git show`` (no temp worktrees) so tree-sitter snapshots can be
+    built for arbitrary revisions. Non-source paths and skipped directories are excluded; a
+    blob that fails to materialize is silently skipped (recorded as unparsed upstream) —
+    never a crash.
+    """
+    files: dict[str, bytes] = {}
+    extensions = set(profile.extensions) if profile else None
+    names = _run_git(worktree, "ls-tree", "-r", "--name-only", commit).splitlines()
+    for name in names:
+        p = Path(name)
+        if _should_skip(p):
+            continue
+        if extensions is not None and p.suffix not in extensions:
+            continue
+        try:
+            files[name] = _run_git_bytes(worktree, "show", f"{commit}:{name}")
+        except RuntimeError:
+            continue
+    return files
