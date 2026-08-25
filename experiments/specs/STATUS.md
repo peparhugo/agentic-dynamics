@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-25T00:53:29.777067+00:00`  ·  110 spec(s)
-**Work remaining:** 28 open · 82 completed/retired
+Generated at: `2026-08-25T02:55:50.816485+00:00`  ·  110 spec(s)
+**Work remaining:** 27 open · 83 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -32,7 +32,6 @@ Generated at: `2026-08-25T00:53:29.777067+00:00`  ·  110 spec(s)
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `agentic_dynamics_rebrand` | workflow | no | failed | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
-| `cap_sonnet_adversary` | workflow | no | failed | 0.1 | — | 2026-08-25 00:06 | fail | anthropic/claude-sonnet-5 | $0.0000 | 1 |
 | `claude_background_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
@@ -56,6 +55,7 @@ Generated at: `2026-08-25T00:53:29.777067+00:00`  ·  110 spec(s)
 | `cap_session_routing_spec` | workflow | no | completed | 0.1 | — | 2026-08-22 17:59 | ok | deepseek/deepseek-v4-pro | $0.1430 | 1 |
 | `cap_shadow_campaign` | workflow | no | completed | 0.1 | — | 2026-08-24 00:07 | ok | anthropic/claude-sonnet-5 | $6.7989 | 1 |
 | `cap_shadow_fact_disposition` | workflow | no | completed | 0.1 | — | 2026-08-24 00:44 | ok | deepseek/deepseek-v4-flash | $0.2045 | 1 |
+| `cap_sonnet_adversary` | workflow | no | completed | 0.1 | — | 2026-08-25 02:20 | ok | anthropic/claude-sonnet-5 | $18.1312 | 2 |
 | `cap_story_bridge` | workflow | no | completed | 0.1 | — | 2026-08-25 00:53 | ok | deepseek/deepseek-v4-flash | $0.0917 | 1 |
 | `cap_test_runner_wiring` | workflow | no | completed | 0.1 | — | 2026-08-25 00:03 | ok | deepseek/deepseek-v4-flash | $0.0737 | 1 |
 | `claude_tools_to_skills` | workflow | no | completed | 0.1 | — | 2026-08-14 22:29 | ok | anthropic/claude-fable-5 | $8.3582 | 1 |

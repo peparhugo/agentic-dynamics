@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-25T00:53:29.777067+00:00",
+  "generated_at": "2026-08-25T02:55:50.816485+00:00",
   "n_specs": 110,
   "specs": [
     {
@@ -436,24 +436,6 @@
       "n_runs": 2
     },
     {
-      "name": "cap_sonnet_adversary",
-      "version": "0.1",
-      "status": "failed",
-      "spec_path": "workflows/repository/cap_sonnet_adversary.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-25T00:06:02.680139+00:00",
-      "latest_ok": false,
-      "latest_model": "anthropic/claude-sonnet-5",
-      "latest_cost_usd": 0.0,
-      "latest_git_sha": "6cdefa102",
-      "results_pointer": "experiments/results/workflows/cap_sonnet_adversary/20260825T000602Z.json",
-      "n_runs": 1
-    },
-    {
       "name": "claude_background_sessions",
       "version": "0.1",
       "status": "failed",
@@ -866,6 +848,24 @@
       "latest_git_sha": "ba48a7f58",
       "results_pointer": "experiments/results/workflows/cap_shadow_fact_disposition/20260824T004425Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "cap_sonnet_adversary",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_sonnet_adversary.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-25T02:20:08.585833+00:00",
+      "latest_ok": true,
+      "latest_model": "anthropic/claude-sonnet-5",
+      "latest_cost_usd": 18.131214,
+      "latest_git_sha": "cb7ca48a7",
+      "results_pointer": "experiments/results/workflows/cap_sonnet_adversary/20260825T022008Z.json",
+      "n_runs": 2
     },
     {
       "name": "cap_story_bridge",
