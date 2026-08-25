@@ -231,6 +231,36 @@ def test_impact_expansion_allowlist_excludes_supersedes():
     assert "CALLS" in IMPACT_EXPANSION_RELS and "AFFECTS" in IMPACT_EXPANSION_RELS
 
 
+def test_stalled_graph_degrades_within_deadline_never_hangs():
+    """cap_2a p1 (found live during p2): a STALLED graph — a Bolt peer that never answers, a
+    hung connection-acquisition retry — must degrade within the client-side deadline, never
+    hang the phase. The analyzer's hard deadline turns a non-returning driver into an
+    unavailable status with delta-only facts, exactly like a raised error."""
+    import time
+
+    class StalledGraphClient:
+        def populate_versioned_graph(self, snapshot, *, revision, repository_id, acl_scope):
+            time.sleep(60)  # simulate a driver stuck in a retry loop
+
+        def expand_candidates(self, *args, **kwargs):
+            time.sleep(60)
+
+    change, _ = _change()
+    analyzer = EvidenceChangeAnalyzer(graph_client=StalledGraphClient())
+    analyzer.GRAPH_LEG_TIMEOUT_SECONDS = 1.0  # shrink the deadline for the test
+    t0 = time.monotonic()
+    out = analyzer.analyze(change)
+    elapsed = time.monotonic() - t0
+
+    assert elapsed < 10.0  # returned despite the stalled client
+    assert out.graph_status == "unavailable"
+    assert out.impacted_count is None
+    assert out.neighborhood == ()
+    by = {f["predicate"] for f in out.facts}
+    assert "changed_symbol_count" in by  # delta facts survived the stalled graph leg
+    assert "impacted_symbol_count" not in by
+
+
 try:
     socket.create_connection(("localhost", 7687), timeout=2).close()
     _NEO4J_OK = True
