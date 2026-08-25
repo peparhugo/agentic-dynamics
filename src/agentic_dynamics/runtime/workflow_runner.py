@@ -34,12 +34,15 @@ never again mean "global".
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
 import subprocess
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,6 +59,13 @@ from agentic_dynamics.knowledge.augment import (
     default_retrieve_fn,
 )
 from agentic_dynamics.measurement.commit_analysis import _read_commit_files
+from agentic_dynamics.measurement.lsp_diagnostics import run_diagnostics
+from agentic_dynamics.measurement.sonar import (
+    SONAR_STATUS_AVAILABLE,
+    SONAR_STATUS_STALE_REFUSED,
+    SONAR_STATUS_UNAVAILABLE,
+    run_sonar_analysis,
+)
 from agentic_dynamics.runtime.change_analyzer import (
     ChangeAnalyzer,
     ChangeInput,
@@ -262,6 +272,115 @@ def _git_full_sha(workdir: Path, rev: str) -> str:
     return ""
 
 
+#: Client-side deadline for the sonar/lsp analyzer legs (design §5.7, cap_2a rerun p1). The
+#: graph leg already carries its own hard deadline (``EvidenceChangeAnalyzer.GRAPH_LEG_TIMEOUT_SECONDS``);
+#: the sonar and lsp legs get the SAME discipline here — a non-returning analyzer (a hung
+#: sonar-scanner, a stalled pyright, a server that never answers) must degrade to its measured
+#: unavailable status within this envelope, never hang the phase (the first campaign's hang
+#: lesson). ``run_sonar_analysis``'s own subprocess timeout is 300s, so 360s lets a real scan
+#: complete while still bounding a pathological hang; ``run_diagnostics`` is bounded to ~120s
+#: internally, well under this envelope. Tests shrink this constant to prove the deadline.
+ANALYZER_LEG_TIMEOUT_SECONDS = 360.0
+
+
+def _call_with_deadline(fn: Callable[[], Any], *, timeout: float) -> tuple[bool, Any]:
+    """Run ``fn`` in a single worker thread under a hard client-side deadline.
+
+    Returns ``(returned, result)``. ``returned`` is False on a timeout (the worker is abandoned
+    and keeps running in the background — the same discipline the graph leg uses) or on any
+    raised exception; ``result`` is the call's return value on success. A non-returning analyzer
+    can never hang the phase: the deadline degrades it to its measured unavailable status in the
+    caller.
+    """
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        return True, pool.submit(fn).result(timeout=timeout)
+    except FuturesTimeout:
+        return False, None
+    except Exception:  # noqa: BLE001 — an analyzer error is a state, never a crash
+        return False, None
+    finally:
+        pool.shutdown(wait=False)
+
+
+def _sonar_evidence(wd: Path, revision: str) -> dict[str, Any]:
+    """Run the revision-scoped sonar analyzer for the phase commit and shape its evidence payload.
+
+    ``run_sonar_analysis(wd, revision=revision)`` builds a revision-scoped project key, so a
+    fetch-first analysis can only ever cover this revision; a stale-fetched analysis whose
+    revision cannot be confirmed to match is REFUSED (``status="stale-refused"``) — a measured
+    status, never a fabrication. The payload matches the reducer's ``sonar_analysis`` evidence
+    shape (``{"status", "revision_matches"|None, "new_critical_count"|None, "analyzed_sha"}``):
+
+    * ``status`` — the measured enum verbatim (``available``/``unavailable``/``stale-refused``).
+    * ``revision_matches`` — True iff the analysis is confirmed to cover ``revision``
+      (``available``), False iff it was refused (``stale-refused``), and None when nothing ran
+      (``unavailable``) — so the reducer OMITS ``analysis_revision_matches`` only when nothing ran.
+    * ``new_critical_count`` — the critical-issue count (bugs + vulnerabilities) at this tree
+      state when available; None otherwise (never a fabricated zero). "Critical" = the
+      reliability (bugs) + security (vulnerabilities) defects — the release-blocking classes —
+      NOT the maintainability code smells.
+    * ``analyzed_sha`` — the revision the analysis actually covers (provenance; ``""`` when
+      unrecorded).
+
+    Runs under the hard deadline; a non-returning or raising analyzer degrades to a measured
+    ``{"status": "unavailable"}`` payload (count omitted) — never None, so the unavailable
+    status itself stays visible in the ledger.
+    """
+    returned, metrics = _call_with_deadline(
+        lambda: run_sonar_analysis(str(wd), revision=revision),
+        timeout=ANALYZER_LEG_TIMEOUT_SECONDS,
+    )
+    if not returned or metrics is None:
+        return {"status": SONAR_STATUS_UNAVAILABLE, "revision_matches": None,
+                "new_critical_count": None, "analyzed_sha": ""}
+    status = getattr(metrics, "status", SONAR_STATUS_UNAVAILABLE)
+    revision_matches: bool | None = None
+    new_critical_count: int | None = None
+    if status == SONAR_STATUS_AVAILABLE:
+        revision_matches = True
+        new_critical_count = int(getattr(metrics, "bugs", 0)) + int(
+            getattr(metrics, "vulnerabilities", 0)
+        )
+    elif status == SONAR_STATUS_STALE_REFUSED:
+        revision_matches = False
+    return {
+        "status": status,
+        "revision_matches": revision_matches,
+        "new_critical_count": new_critical_count,
+        "analyzed_sha": getattr(metrics, "analyzed_sha", ""),
+    }
+
+
+def _lsp_evidence(wd: Path, profile: Any) -> dict[str, Any]:
+    """Run the LSP diagnostics tool for the phase commit and shape its evidence payload.
+
+    ``run_diagnostics(wd, profile)`` runs at the worktree's current tree state — which IS the
+    analyzed commit when this runs (the phase has just committed). The payload matches the
+    reducer's ``lsp_analysis`` evidence shape (``{"status", "new_error_count"|None, "tool"}``):
+
+    * ``status`` — ``available`` when the tool ran, else ``unavailable``.
+    * ``new_error_count`` — the tool's measured error count when available; None otherwise
+      (never a fabricated zero).
+    * ``tool`` — the tool that produced (or would have produced) the diagnostics.
+
+    Runs under the same hard deadline; a non-returning or raising tool degrades to a measured
+    ``{"status": "unavailable"}`` payload (count omitted).
+    """
+    returned, report = _call_with_deadline(
+        lambda: run_diagnostics(wd, profile),
+        timeout=ANALYZER_LEG_TIMEOUT_SECONDS,
+    )
+    if not returned or report is None:
+        return {"status": "unavailable", "new_error_count": None, "tool": ""}
+    available = bool(getattr(report, "available", False))
+    return {
+        "status": "available" if available else "unavailable",
+        "new_error_count": int(getattr(report, "errors", 0)) if available else None,
+        "tool": getattr(report, "tool", ""),
+    }
+
+
 def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) -> None:
     """Best-effort phase-boundary evidence: analyze ``pr.commit_hash`` and record the result.
 
@@ -284,6 +403,13 @@ def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) ->
         after_files = _read_commit_files(wd, full, profile)
         before = build_code_snapshot(before_files, revision=before_rev, profile=profile)
         after = build_code_snapshot(after_files, revision=full, profile=profile)
+        # The sonar + lsp legs (design §5.7, cap_2a rerun p1): both run at the worktree's
+        # current tree state (which IS the analyzed commit here — the phase just committed),
+        # under the same hard deadline as the graph leg. A non-returning analyzer degrades to
+        # its measured unavailable status (the terms are omitted downstream), never a hung
+        # phase. These payloads are what makes code_change_risk mintable.
+        sonar = _sonar_evidence(wd, full)
+        lsp = _lsp_evidence(wd, profile)
         change = ChangeInput(
             before=before,
             after=after,
@@ -291,6 +417,8 @@ def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) ->
             revision=full,
             repository_id=cell_scope(wd),
             acl_scope=cell_scope(wd),
+            sonar=sonar,
+            lsp=lsp,
             phase_id=pr.phase,
             observed_at=_now(),
         )
@@ -298,6 +426,13 @@ def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) ->
         pr.change_analysis = analysis.to_dict()
     except Exception:  # noqa: BLE001 — best-effort seam, never a gate on the phase
         pr.change_analysis = None
+    finally:
+        # The sonar leg writes ``sonar-project.properties`` into the worktree and removes it on
+        # its normal path; a deadline-abandoned scan could leave it behind. Sweep it here (this
+        # whole function is opt-in — it only runs when an analyzer is injected) so it can never
+        # enter the NEXT phase's commit, and its local-dev login line never reaches history.
+        with contextlib.suppress(OSError):
+            (wd / "sonar-project.properties").unlink(missing_ok=True)
 
 
 def _evidence_context(pr: PhaseResult, *, max_neighborhood: int = 16, max_facts: int = 10) -> str:

@@ -2,8 +2,11 @@
 
 import json
 import subprocess
+import time
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from agentic_dynamics.experiment import spec_status
 from agentic_dynamics.experiment.experiment_spec import load_spec, validate_spec
@@ -36,6 +39,23 @@ def _fake_agent(**overrides):
     )
     base.update(overrides)
     return SimpleNamespace(**base)
+
+
+def _stub_analyzers(monkeypatch):
+    """Fast + hermetic sonar/lsp stubs for tests that inject a fake analyzer.
+
+    The phase-boundary seam gathers sonar/lsp evidence for ANY injected analyzer; tests that
+    assert the seam's OTHER aspects (delta materialization, full-SHA provenance, next-phase
+    evidence) must not hit the real SonarQube/pyright — so stub both legs to their measured
+    unavailable status (fast, deterministic, no network).
+    """
+    from agentic_dynamics.measurement.lsp_diagnostics import LSPReport
+    from agentic_dynamics.measurement.sonar import SonarMetrics
+
+    monkeypatch.setattr(workflow_runner, "run_sonar_analysis",
+                        lambda *a, **k: SonarMetrics(status="unavailable"))
+    monkeypatch.setattr(workflow_runner, "run_diagnostics",
+                        lambda *a, **k: LSPReport(tool="pyright", language="python", available=False))
 
 
 def test_spec_loads_and_validates():
@@ -236,10 +256,12 @@ def test_run_workflow_commits_per_phase(tmp_path):
     assert "[workflow] scope" in log.stdout
 
 
-def test_run_workflow_change_analysis_seam(tmp_path):
+def test_run_workflow_change_analysis_seam(tmp_path, monkeypatch):
     """Review F3: an injected ChangeAnalyzer runs over each committed phase, best-effort,
     and the analysis lands on the phase result — the seam is inert without injection."""
     from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
+
+    _stub_analyzers(monkeypatch)
 
     class RecordingAnalyzer:
         def __init__(self):
@@ -308,13 +330,15 @@ def test_run_workflow_change_analysis_inert_without_injection(tmp_path):
     assert all("EVIDENCE" not in p for p in prompts)  # prompts byte-identical without injection
 
 
-def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path):
+def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path, monkeypatch):
     """cap_2a p1 (design §5.7): the ChangeInput revisions are FULL commit SHAs (provenance,
     the short hash stays display-only), and the NEXT phase's prompt receives a bounded,
     machine-readable evidence context (graph status, full revision, neighborhood, facts)."""
     import re
 
     from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
+
+    _stub_analyzers(monkeypatch)
 
     class RecordingAnalyzer:
         def __init__(self):
@@ -372,10 +396,12 @@ def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path)
     assert payload["phase"] == "ux_design"  # the analyzed phase whose evidence rode forward
 
 
-def test_run_workflow_change_analysis_root_commit_never_fails(tmp_path):
+def test_run_workflow_change_analysis_root_commit_never_fails(tmp_path, monkeypatch):
     """A phase whose commit has NO parent (root commit in the worktree) cannot be diffed —
     the seam degrades to None instead of failing the phase."""
     from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
+
+    _stub_analyzers(monkeypatch)
 
     class Analyzer:
         def analyze(self, change):
@@ -397,6 +423,161 @@ def test_run_workflow_change_analysis_root_commit_never_fails(tmp_path):
     assert result.ok
     # Root-commit phases degrade gracefully (change_analysis may be None), never a failure.
     assert all(p.status == "ok" for p in result.phases)
+
+
+# ── Phase-boundary evidence: sonar + lsp wiring (cap_2a rerun p1) ──
+#
+# These tests drive the REAL EvidenceChangeAnalyzer (delta-only, graph_client=None) over a real
+# git worktree whose agent phases make a real symbol change, with the sonar/lsp analyzers
+# monkeypatched to return fabricated SonarMetrics/LSPReport payloads — proving the WIRING in
+# _run_change_analysis translates analyzer results into the reducer's sonar_analysis /
+# lsp_analysis evidence shapes, so code_change_risk can be minted (the first campaign's blocker).
+
+
+def _facts_of(phase) -> dict[str, dict]:
+    return {f["predicate"]: f for f in (phase.change_analysis or {}).get("facts", [])}
+
+
+def _run_symbol_change(tmp_path, monkeypatch, *, analyzer, sonar_fn=None, lsp_fn=None):
+    """Run a workflow whose agent phases write a real symbol change, with an injected analyzer.
+
+    The first agent phase's commit is the worktree's root commit (no parent → not analyzed); the
+    second committed phase has a parent and is analyzed. Returns the workflow result.
+    """
+    if sonar_fn is not None:
+        monkeypatch.setattr(workflow_runner, "run_sonar_analysis", sonar_fn)
+    if lsp_fn is not None:
+        monkeypatch.setattr(workflow_runner, "run_diagnostics", lsp_fn)
+
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    calls = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        n = len(calls)
+        calls.append(prompt)
+        (Path(workdir) / "app.py").write_text(f"def f{n}():\n    return {n}\n")
+        return _fake_agent(files_created=["app.py"])
+
+    return run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                        run_agentic_fn=agent, change_analyzer=analyzer)
+
+
+def test_change_analysis_wires_sonar_lsp_into_risk(tmp_path, monkeypatch):
+    """(a) A phase commit with a real symbol change + available sonar/lsp mints
+    new_sonar_critical_count / new_lsp_error_count and code_change_risk is non-None."""
+    from agentic_dynamics.control.evidence_analyzer import EvidenceChangeAnalyzer
+    from agentic_dynamics.measurement.lsp_diagnostics import LSPReport
+    from agentic_dynamics.measurement.sonar import SonarMetrics
+
+    def sonar(*a, **k):
+        return SonarMetrics(status="available", bugs=2, vulnerabilities=1,
+                            analyzed_sha=k.get("revision", ""))
+
+    def lsp(*a, **k):
+        return LSPReport(tool="pyright", language="python", available=True, errors=3)
+
+    result = _run_symbol_change(
+        tmp_path, monkeypatch, analyzer=EvidenceChangeAnalyzer(graph_client=None),
+        sonar_fn=sonar, lsp_fn=lsp,
+    )
+
+    assert result.phases[0].change_analysis is None  # root commit — no parent to diff
+    analyzed = result.phases[1]
+    facts = _facts_of(analyzed)
+    assert facts["sonar_analysis_status"]["value"] == "available"
+    assert facts["lsp_analysis_status"]["value"] == "available"
+    assert facts["analysis_revision_matches"]["value"] == "true"
+    # 2 bugs + 1 vulnerability = 3 criticals.
+    assert facts["new_sonar_critical_count"]["value"] == "3"
+    assert facts["new_lsp_error_count"]["value"] == "3"
+    assert "code_change_risk" in facts
+    # risk = (0.35*0.3 + 0.25*0.3) / 0.60 = 0.3 (no tests/impacted term).
+    assert float(facts["code_change_risk"]["value"]) == pytest.approx(0.3)
+
+
+def test_change_analysis_unavailable_analyzers_omit_counts(tmp_path, monkeypatch):
+    """(b) stale-refused sonar + unavailable lsp emit their measured STATUS enums but omit the
+    counts, and with no other measurable term code_change_risk stays None (null-not-zero)."""
+    from agentic_dynamics.control.evidence_analyzer import EvidenceChangeAnalyzer
+    from agentic_dynamics.measurement.lsp_diagnostics import LSPReport
+    from agentic_dynamics.measurement.sonar import SonarMetrics
+
+    def sonar(*a, **k):
+        return SonarMetrics(status="stale-refused", analyzed_sha="deadbeef")
+
+    def lsp(*a, **k):
+        return LSPReport(tool="pyright", language="python", available=False)
+
+    result = _run_symbol_change(
+        tmp_path, monkeypatch, analyzer=EvidenceChangeAnalyzer(graph_client=None),
+        sonar_fn=sonar, lsp_fn=lsp,
+    )
+
+    facts = _facts_of(result.phases[1])
+    assert facts["sonar_analysis_status"]["value"] == "stale-refused"
+    assert facts["lsp_analysis_status"]["value"] == "unavailable"
+    assert facts["analysis_revision_matches"]["value"] == "false"  # refused → false, not omitted
+    assert "new_sonar_critical_count" not in facts  # refused → omitted, never zero
+    assert "new_lsp_error_count" not in facts        # unavailable → omitted, never zero
+    assert "code_change_risk" not in facts           # NO term measurable → risk omitted (None)
+
+
+def test_change_analysis_risk_renormalizes_over_surviving_term(tmp_path, monkeypatch):
+    """(b) An unavailable analyzer is OMITTED from the risk formula; the surviving sonar term
+    renormalizes to weight 1.0 and code_change_risk stays non-None."""
+    from agentic_dynamics.control.evidence_analyzer import EvidenceChangeAnalyzer
+    from agentic_dynamics.measurement.lsp_diagnostics import LSPReport
+    from agentic_dynamics.measurement.sonar import SonarMetrics
+
+    def sonar(*a, **k):
+        return SonarMetrics(status="available", bugs=2, vulnerabilities=0,
+                            analyzed_sha=k.get("revision", ""))
+
+    def lsp(*a, **k):
+        return LSPReport(tool="pyright", language="python", available=False)
+
+    result = _run_symbol_change(
+        tmp_path, monkeypatch, analyzer=EvidenceChangeAnalyzer(graph_client=None),
+        sonar_fn=sonar, lsp_fn=lsp,
+    )
+
+    facts = _facts_of(result.phases[1])
+    assert "new_lsp_error_count" not in facts
+    assert "code_change_risk" in facts
+    # risk = (0.35 * min(1, 2/10)) / 0.35 = 0.2.
+    assert float(facts["code_change_risk"]["value"]) == pytest.approx(0.2)
+
+
+def test_change_analysis_hanging_analyzer_degrades_within_deadline(tmp_path, monkeypatch):
+    """(c) A NON-RETURNING analyzer degrades to its measured unavailable status within the hard
+    deadline — the phase completes, never hangs, and the count term is omitted (never zero)."""
+    from agentic_dynamics.control.evidence_analyzer import EvidenceChangeAnalyzer
+
+    monkeypatch.setattr(workflow_runner, "ANALYZER_LEG_TIMEOUT_SECONDS", 1.0)
+
+    def hang(*a, **k):
+        time.sleep(10)  # a stalled analyzer that never returns within the deadline
+
+    monkeypatch.setattr(workflow_runner, "run_sonar_analysis", hang)
+    monkeypatch.setattr(workflow_runner, "run_diagnostics", hang)
+
+    t0 = time.monotonic()
+    result = _run_symbol_change(
+        tmp_path, monkeypatch, analyzer=EvidenceChangeAnalyzer(graph_client=None),
+    )
+    elapsed = time.monotonic() - t0
+
+    assert elapsed < 5.0  # returned via the 1s deadline, not the 10s sleep
+    assert result.phases[1].status == "ok"  # the seam never fails the phase
+    facts = _facts_of(result.phases[1])
+    assert facts["sonar_analysis_status"]["value"] == "unavailable"
+    assert facts["lsp_analysis_status"]["value"] == "unavailable"
+    assert "new_sonar_critical_count" not in facts
+    assert "new_lsp_error_count" not in facts
 
 
 def test_run_workflow_excludes_instrument_from_commit(tmp_path):
