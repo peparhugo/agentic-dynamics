@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # HANDOFF — session boundary 2026-08-25
 
 > This session built the machine's control plane end-to-end (CAP I0–I10), populated its fact
