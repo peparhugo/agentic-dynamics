@@ -1,0 +1,84 @@
+{
+  "schema_version": "cap_2a_candidate_manifest/v1",
+  "campaign": "cap_2a_shadow_calibration",
+  "phase": "p2_measure_one_cell",
+  "spec_path": "workflows/repository/cap_2a_shadow_calibration.yaml",
+  "spec_version": "0.2",
+  "source_baseline_revision": "e61c709ebd3f9cf4c731ea0b731ac09e787a6343",
+  "target_model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "graph_mode": "bolt://localhost:7687",
+  "written_at": "2026-08-25T21:11:52Z",
+  "candidates": [
+    {
+      "candidate_id": "labbook_refresh",
+      "spec_path": "workflows/operations/labbook_refresh.yaml",
+      "spec_path_sha256": "613b84fe0e723c576632c0ffd3281ced38ee87479f317a179544692211f625df",
+      "historical_cost_usd": 0.0275,
+      "historical_model": "deepseek/deepseek-v4-flash",
+      "historical_git_sha": "df84d28a1",
+      "phases": ["lab_books", "regenerate"],
+      "side_effects": {"repository": true, "external_services": true},
+      "repeatable": true,
+      "independent_test_signal": false,
+      "excluded_reason": "No independent test/result signal: neither phase runs a test suite or an independent evaluator — lab_books re-runs nine lab scripts, regenerate just confirms files are written. Smallest, but fails the selection criterion."
+    },
+    {
+      "candidate_id": "queue_steer",
+      "spec_path": "workflows/operations/queue_steer.yaml",
+      "spec_path_sha256": "bb49518cf3c09d34a79d3c8dff908348b25e7e65a189a994e2523f04f6e55d57",
+      "historical_cost_usd": 0.0330,
+      "historical_model": "deepseek/deepseek-v4-flash",
+      "historical_git_sha": "6ddbdc29e",
+      "phases": ["detect", "interrupt", "reinterleave", "respawn", "endpoint", "verify"],
+      "side_effects": {"repository": true, "external_services": true},
+      "repeatable": true,
+      "independent_test_signal": false,
+      "excluded_reason": "No dedicated test phase runs the tests it writes (reinterleave/endpoint add tests but nothing runs them as an independent gate), and its live side effects (SIGKILL worker.py PIDs, respawn workers on the live 6380 queue, verify-phase polling) confound the outcome with live-system state — a poor measurement cell."
+    },
+    {
+      "candidate_id": "registry_canonicalize",
+      "spec_path": "workflows/operations/registry_canonicalize.yaml",
+      "spec_path_sha256": "b194a4ca64a2e83a6bd42d28b5f0e592a70a88daeddd95cbd53400eb974e074e",
+      "historical_cost_usd": 0.1872,
+      "historical_model": "deepseek/deepseek-v4-pro",
+      "historical_git_sha": "701219316",
+      "phases": ["implement", "test", "verify"],
+      "side_effects": {"repository": true, "external_services": true},
+      "repeatable": true,
+      "independent_test_signal": true,
+      "notes": "Dedicated 'test' phase runs `pytest tests/ -m \"not external\" -q` plus `kb_produce_registry.py --dry-run` — a deterministic, independent test_executed_success signal. Self-contained (dry-run only, no live queue mutation). NOTE: the p2 prompt listed this as workflows/repository/registry_canonicalize.yaml; the actual committed path is workflows/operations/registry_canonicalize.yaml (SHA256 recorded here is for the operations path).",
+      "excluded_reason": null
+    },
+    {
+      "candidate_id": "finding_economics_closure",
+      "spec_path": "workflows/repository/finding_economics_closure.yaml",
+      "spec_path_sha256": "d6363defc8be7984367c76600f8d1c5f039d0d879fec96300541fbb42b1cf420",
+      "historical_cost_usd": 1.2820,
+      "historical_model": "deepseek/deepseek-v4-pro",
+      "historical_git_sha": "92374fb57",
+      "phases": ["f1_finding_coverage", "f2_contributor_attestation", "f3_sync_parity", "f4_versions_and_identity", "f5_hunt_and_verify", "f6_release_verify"],
+      "side_effects": {"repository": true},
+      "repeatable": true,
+      "independent_test_signal": true,
+      "excluded_reason": "Not the smallest: 6 phases, ~7x the cost of registry_canonicalize."
+    },
+    {
+      "candidate_id": "canonical_publication_closure",
+      "spec_path": "workflows/repository/canonical_publication_closure.yaml",
+      "spec_path_sha256": "12da37f0590ca8f3e3f3d9a2675738f13b5aacb5382a13f61580b84bc745e0fd",
+      "historical_cost_usd": 1.4475,
+      "historical_model": "deepseek/deepseek-v4-pro",
+      "historical_git_sha": "86ef9a34c",
+      "phases": ["c1_canonical_tables", "c2_resolution_fail_closed", "c3_contract_semantic", "c4_record_scopes", "c5_test_scope_names", "c6_readme_site_reconcile", "c7_closure_verify"],
+      "side_effects": {"repository": true, "external_services": false},
+      "repeatable": false,
+      "independent_test_signal": true,
+      "excluded_reason": "Largest (7 phases, ~$1.45) and non-repeatable (repeatable: false, status completed)."
+    }
+  ],
+  "selection": {
+    "candidate_id": "registry_canonicalize",
+    "reason": "The smallest candidate that both commits and has an independent test/result signal. labbook_refresh (cheapest) has no test signal; queue_steer (next cheapest) has no dedicated test phase and destructive live side effects. registry_canonicalize is self-contained, runs a real pytest gate as an independent signal, and is ~7x cheaper than the two closure specs."
+  }
+}

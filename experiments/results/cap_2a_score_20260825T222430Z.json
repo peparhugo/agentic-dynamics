@@ -1,0 +1,157 @@
+{
+  "schema_version": "cap_2a_score/v1",
+  "campaign": "cap_2a_shadow_calibration",
+  "phase": "p4_score_hit_rate",
+  "generated_at": "2026-08-25T22:24:30Z",
+  "spec": {
+    "path": "workflows/repository/cap_2a_shadow_calibration.yaml",
+    "version": "0.2",
+    "source_revision": "e61c709ebd3f9cf4c731ea0b731ac09e787a6343",
+    "spec_sha256": "b683067b38f5a0f95977da86e3b13409e94c4605ce0a9d0d022c4b14ffb54a2f",
+    "candidate_manifest_sha256": "6b8bbab62c868a236c72cf9b6d71201dfde91484cf7ffbca8e89a20a5336c315"
+  },
+  "input_artifacts": [
+    {
+      "path": "experiments/results/cap_2a/p2_candidate_manifest.json",
+      "sha256": "6b8bbab62c868a236c72cf9b6d71201dfde91484cf7ffbca8e89a20a5336c315"
+    },
+    {
+      "path": "experiments/results/cap_2a/p2_cell_manifest.json",
+      "sha256": "71456ce45d5e1c914f243338a338889b22d3aea8b4e64f8ec07cad48ffbed574"
+    },
+    {
+      "path": "experiments/results/cap_2a/p2_phase_ledger.json",
+      "sha256": "8c95e10acf9f60e929e70fe8c739b864a42c7f31633288faaa34cd33a290ad61"
+    },
+    {
+      "path": "experiments/results/cap_2a/p3_execution_manifest.json",
+      "sha256": "8d08017faa72edd7c4f8c2b11b2d8c38989556eac954bea427d558b35b4f6e35"
+    }
+  ],
+  "join_validation": {
+    "errors": [],
+    "valid": true
+  },
+  "cells": [
+    {
+      "cell_id": "cap2a_p2_registry_canonicalize",
+      "spec_path": "workflows/operations/registry_canonicalize.yaml",
+      "status": "proposal_missing",
+      "baseline_revision": "e61c709ebd3f9cf4c731ea0b731ac09e787a6343",
+      "analyzed_revisions": [
+        "bccb1751458fe5c5e00f4e1935704aa80477c678",
+        "fb1ca291ed0462d9a52a40678d39a802b5230ee2",
+        "c2ed5270e0c04fe0609e6f8369501e6441ceee28"
+      ],
+      "graph_status": "unavailable",
+      "graph_flagged": true,
+      "proposal_id": null,
+      "proposal_schema_version": null,
+      "proposal_action": null,
+      "proposal_depth": null,
+      "proposal_scope": null,
+      "proposal_valid": null,
+      "predicted_impacted_symbol_count": null,
+      "realized_symbol_set": null,
+      "realized_outcome": null,
+      "realized_depth": null,
+      "hit": null,
+      "blast_radius_error": null,
+      "flags": [
+        "proposal_missing",
+        "graph_unavailable"
+      ],
+      "reason": "cell ran (ok=True, 3 commits) but the verify_code_change seam refused to emit a proposal (code_change_risk never produced \u2014 sonar/lsp not wired, graph leg impractical); no proposal to score against an outcome."
+    },
+    {
+      "cell_id": "cap2a_p3_labbook_refresh",
+      "spec_path": "workflows/operations/labbook_refresh.yaml",
+      "status": "not-run",
+      "baseline_revision": "e61c709ebd3f9cf4c731ea0b731ac09e787a6343",
+      "analyzed_revisions": [],
+      "graph_status": "not_requested",
+      "graph_flagged": false,
+      "proposal_id": null,
+      "proposal_schema_version": null,
+      "proposal_action": null,
+      "proposal_depth": null,
+      "proposal_scope": null,
+      "proposal_valid": null,
+      "predicted_impacted_symbol_count": null,
+      "realized_symbol_set": null,
+      "realized_outcome": null,
+      "realized_depth": null,
+      "hit": null,
+      "blast_radius_error": null,
+      "flags": [
+        "not-run"
+      ],
+      "reason": "refused to run (proposal seam cannot emit a valid proposal; see p3_execution_manifest blocking_condition)"
+    },
+    {
+      "cell_id": "cap2a_p3_queue_steer",
+      "spec_path": "workflows/operations/queue_steer.yaml",
+      "status": "not-run",
+      "baseline_revision": "e61c709ebd3f9cf4c731ea0b731ac09e787a6343",
+      "analyzed_revisions": [],
+      "graph_status": "not_requested",
+      "graph_flagged": false,
+      "proposal_id": null,
+      "proposal_schema_version": null,
+      "proposal_action": null,
+      "proposal_depth": null,
+      "proposal_scope": null,
+      "proposal_valid": null,
+      "predicted_impacted_symbol_count": null,
+      "realized_symbol_set": null,
+      "realized_outcome": null,
+      "realized_depth": null,
+      "hit": null,
+      "blast_radius_error": null,
+      "flags": [
+        "not-run"
+      ],
+      "reason": "refused to run (proposal seam cannot emit a valid proposal; see p3_execution_manifest blocking_condition)"
+    }
+  ],
+  "aggregates": {
+    "n_cells": 3,
+    "n_scored": 0,
+    "n_hits": 0,
+    "n_unknown_outcome": 0,
+    "n_invalid_join": 0,
+    "n_not_run": 2,
+    "n_proposal_missing": 1,
+    "hit_rate": null,
+    "hit_rate_n": 0,
+    "wilson_95": null,
+    "blast_radius": {
+      "n_available": 0,
+      "mean": null,
+      "median": null
+    },
+    "graph_unavailable_rate": 1.0,
+    "graph_down_n": 1,
+    "graph_down_denominator": 1,
+    "outcome_recorded_rate": 0.0,
+    "proposal_validation_rate": 0.0,
+    "risk_calibration": []
+  },
+  "traceability": {
+    "n_cells": "len(cells) \u2014 1 p2 cell + 2 p3 cells",
+    "n_not_run": "cells where status=='not-run' (p3_execution_manifest.cells[].status)",
+    "n_proposal_missing": "cells where status=='proposal_missing' (p2 cell: no proposal_id)",
+    "n_scored": "cells with proposal_id != null AND realized_outcome not in (None,'unknown')",
+    "n_hits": "scored cells where hit==True",
+    "n_unknown_outcome": "cells with proposal_id != null AND realized_outcome=='unknown'",
+    "n_invalid_join": "join_errors count across p2 cell_manifest vs phase_ledger",
+    "hit_rate": "n_hits / n_scored (null: n_scored==0)",
+    "wilson_95": "Wilson 95% interval on hit_rate (null: n_scored==0)",
+    "blast_radius": "rows with predicted_impacted_symbol_count != null (all null: graph unavailable)",
+    "graph_unavailable_rate": "n_graph_down / n_ran",
+    "outcome_recorded_rate": "n_outcome_recorded / n_ran",
+    "proposal_validation_rate": "n_proposal_valid / n_ran",
+    "risk_calibration": "code_change_risk bucket vs realized rework enum (empty: no code_change_risk produced)"
+  },
+  "note": "No 2b recommendation is made in this phase (p4). Hit-rate is undefined (n=0): no cell produced a complete verify_code_change proposal, because the seam refuses to emit (code_change_risk never produced \u2014 sonar/lsp not wired into run_workflow change-analysis; graph leg impractical). This is a dataset integrity fact, not a small-n authorization."
+}

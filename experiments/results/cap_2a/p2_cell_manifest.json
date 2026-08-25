@@ -1,0 +1,28 @@
+{
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "campaign": "cap_2a_shadow_calibration",
+  "phase": "p2_measure_one_cell",
+  "candidate_manifest_ref": "experiments/results/cap_2a/p2_candidate_manifest.json",
+  "candidate_manifest_sha256": "6b8bbab62c868a236c72cf9b6d71201dfde91484cf7ffbca8e89a20a5336c315",
+  "selection": {
+    "candidate_id": "registry_canonicalize",
+    "reason": "The smallest candidate that commits AND has a genuine test/result signal (a dedicated 'test' phase running the pytest suite). labbook_refresh has no test signal; queue_steer has no dedicated test phase and destructive live side effects; the two closure specs are ~7-8x larger."
+  },
+  "cell_id": "cap2a_p2_registry_canonicalize",
+  "finoos_cell_id": "cap2a_p2_registry_canonicalize",
+  "spec_path": "workflows/operations/registry_canonicalize.yaml",
+  "spec_path_sha256": "b194a4ca64a2e83a6bd42d28b5f0e592a70a88daeddd95cbd53400eb974e074e",
+  "spec_version": "0.1",
+  "spec_id": "registry_canonicalize@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "goal": "Canonicalize the corpus per docs/data_integrity_findings.md",
+  "source_baseline_revision": "e61c709ebd3f9cf4c731ea0b731ac09e787a6343",
+  "worktree": "/tmp/wt_cap2a_p2_registry",
+  "worktree_branch": "feature/cap2a-p2-registry-canonicalize",
+  "graph_mode": "bolt://localhost:7687",
+  "graph_resolution": "requested -> attempted -> impractical (see graph_reachability in p2_phase_ledger.json); cell completed delta-only",
+  "historical_cost_usd": 0.1872,
+  "historical_cost_label": "historical-index, NOT measured for the target model+change-analysis seam",
+  "written_at": "2026-08-25T22:05:00Z"
+}

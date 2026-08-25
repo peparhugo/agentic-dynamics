@@ -1,0 +1,59 @@
+{
+  "schema_version": "cap_2a_p1_verification/v1",
+  "phase": "p1_wire_graph_client",
+  "spec": "workflows/repository/cap_2a_shadow_calibration.yaml",
+  "spec_version": "0.2",
+  "source_revision": "1a2c1a30976d93ef0a0bb7fea5ccb3e204dd6557",
+  "status": "PASS",
+  "capabilities": {
+    "graph_client_wired": true,
+    "graph_status_recorded": true,
+    "full_revision_provenance": true,
+    "neighborhood_delivered": true,
+    "proposal_seam_validated": true,
+    "facts_citable": true
+  },
+  "graph_status_states": {
+    "not_requested": "no graph URI requested (--change-analysis-graph / FINOPS_NEO4J_URI / FINOPS_NEO4J_URL all unset)",
+    "available": "parent + after snapshots populated AND impact expansion succeeded",
+    "unavailable": "construction/dependency/timeout/unreachable/reachable-but-degraded — delta facts preserved, impacted_symbol_count omitted (never 0)"
+  },
+  "seam": {
+    "flag": "--change-analysis-graph <bolt-uri>",
+    "precedence": "CLI > FINOPS_NEO4J_URI > FINOPS_NEO4J_URL",
+    "credentials": "FINOPS_NEO4J_USER / FINOPS_NEO4J_PASSWORD only; constructor defaults otherwise",
+    "lifecycle": "lazy construction; close() in a finally block even when run_workflow raises",
+    "proposal_schema": "verify_code_change_proposal/v1 (contract verify_code_change/v1)",
+    "proposal_applied": false
+  },
+  "test_suite": {
+    "command": "python3 -m pytest tests/test_change_analyzer.py tests/test_workflow_runner.py tests/test_run_workflow_graph_cli.py tests/test_code_change_facts.py tests/test_versioned_graph.py tests/test_graph.py tests/test_dependency_direction.py",
+    "passed": 135,
+    "failed": 0,
+    "live_neo4j": "passed"
+  },
+  "guards": {
+    "no_flag_byte_identical": true,
+    "supersedes_excluded_from_impact": true,
+    "graph_failure_never_zero_impacted": true,
+    "credentials_not_in_artifacts": true
+  },
+  "files_touched": [
+    "scripts/run_workflow.py",
+    "src/agentic_dynamics/runtime/change_analyzer.py",
+    "src/agentic_dynamics/runtime/workflow_runner.py",
+    "src/agentic_dynamics/control/evidence_analyzer.py",
+    "src/agentic_dynamics/knowledge/graph.py",
+    "src/agentic_dynamics/control/verify_proposal.py",
+    "src/agentic_dynamics/control/__init__.py",
+    "tests/test_change_analyzer.py",
+    "tests/test_workflow_runner.py",
+    "tests/test_run_workflow_graph_cli.py",
+    "tests/test_code_change_facts.py",
+    "tests/test_versioned_graph.py",
+    "tests/test_graph.py",
+    "tests/test_dependency_direction.py",
+    "tests/test_cap_2a_spec.py",
+    "workflows/repository/cap_2a_shadow_calibration.yaml"
+  ]
+}
