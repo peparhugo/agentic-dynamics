@@ -7,12 +7,23 @@ perturbation operators, strategies, and basin topologies.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import re
 import sys
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from agentic_dynamics.core.language import (
+    module_entity_id,
+    module_path_from_test_file,
+    module_version_id,
+    smallest_containing_symbol,
+    symbol_entity_id,
+    symbol_version_id,
+    tested_symbols,
+)
 
 if TYPE_CHECKING:
     from agentic_dynamics.measurement.codebase_graph import CodebaseGraph
@@ -23,7 +34,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 # Allowlisted relationship types for bounded graph expansion. Retrieval may only
 # traverse these types; any other relationship (ad-hoc links, ``MENTIONS``, etc.)
 # is invisible to expansion, so retrieved evidence cannot sneak in through an
-# unvetted edge.
+# unvetted edge. ``CONTAINS`` + ``AFFECTS`` (design §5.5) are the versioned-graph
+# relations the executor must traverse (module/symbol containment, issue→symbol).
 ALLOWED_EXPANSION_RELS = frozenset(
     {
         "DEFINES",
@@ -34,8 +46,19 @@ ALLOWED_EXPANSION_RELS = frozenset(
         "PRECEDES",
         "SUPERSEDES",
         "CONTRADICTS",
+        "CONTAINS",
+        "AFFECTS",
     }
 )
+
+#: Versioned-graph node labels (design §5.5, two-ID contract). ``ModuleVersion`` /
+#: ``SymbolVersion`` nodes carry ``entity_id`` (stable slot) + ``version_id`` (immutable
+#: version) and ALWAYS carry ``repository_id`` + ``acl_scope`` — a versioned node missing
+#: either fails closed under traversal (see ``expand_candidates``).
+MODULE_VERSION_LABEL = "ModuleVersion"
+SYMBOL_VERSION_LABEL = "SymbolVersion"
+REVISION_LABEL = "Revision"
+_VERSIONED_LABELS = (MODULE_VERSION_LABEL, SYMBOL_VERSION_LABEL)
 
 # Knowledge-base schema statements. ``Knowledge.knowledge_id`` is unique (the
 # immutable version); ``Knowledge.entity_id`` is indexed but NOT unique (many
@@ -84,6 +107,34 @@ def _canonical_id(properties: dict[str, Any], fallback: str) -> str:
         if properties.get(key):
             return str(properties[key])
     return fallback
+
+
+def _acl_params(repository_id: str, acl_scope: str) -> dict[str, str]:
+    """The ACL parameters for a scoped traversal (only present when BOTH supplied)."""
+    if repository_id and acl_scope:
+        return {"repository_id": repository_id, "acl_scope": acl_scope}
+    return {}
+
+
+def _acl_clause(alias: str, repository_id: str, acl_scope: str) -> str:
+    """The traversal ACL predicate for ``alias`` (design §5.5, finding 2).
+
+    TRAVERSAL-ENFORCED, never a post-filter: the predicate is interpolated into the Cypher
+    WHERE of the seed resolution and every hop.
+
+    * BOTH ``repository_id`` + ``acl_scope`` supplied — the scoped path: only nodes carrying
+      that exact tenancy identity pass. Versioned nodes must carry both properties; a versioned
+      node missing either fails closed.
+    * Either omitted — the LEGACY-ONLY default: versioned nodes (``ModuleVersion`` /
+      ``SymbolVersion``) are never traversed (fail closed on missing scope, always); only
+      unversioned legacy nodes are reachable.
+    """
+    if repository_id and acl_scope:
+        return (
+            f"{alias}.repository_id = $repository_id AND {alias}.acl_scope = $acl_scope"
+        )
+    versioned = " OR ".join(f"{alias}:{label}" for label in _VERSIONED_LABELS)
+    return f"NOT ({versioned})"
 
 
 class _BufferedResult:
@@ -699,6 +750,244 @@ class Neo4jClient:
 
         return counts
 
+    def populate_versioned_graph(
+        self,
+        snapshot: Any,
+        *,
+        revision: str,
+        repository_id: str,
+        acl_scope: str,
+        issues: list[Any] | None = None,
+        diagnostics: list[Any] | None = None,
+    ) -> dict[str, int]:
+        """Version the graph from a typed CodeSnapshot (design §5.5, e4).
+
+        Creates, for one revision of one repository:
+
+        * a ``Revision`` node (``version_id = f(repository_id, revision)``);
+        * one ``ModuleVersion`` per module and one ``SymbolVersion`` per symbol, each with the
+          two-ID contract (``entity_id`` stable slot + ``version_id`` immutable version), the
+          traversal ACL properties (``repository_id`` + ``acl_scope``) ALWAYS present, and
+          ``SUPERSEDES`` edges to every older version of the same entity (deterministic from the
+          ids); renames are new entities (no implicit matching);
+        * ``CONTAINS`` / ``DEFINES`` / ``IMPORTS`` first, ``CALLS`` / ``TESTED_BY`` / ``AFFECTS``
+          next;
+        * the **multi-label seed join**: each ``SymbolVersion`` is also ``:Knowledge`` with the
+          knowledge-surface properties (``knowledge_id`` = ``version_id``, ``text``,
+          ``authority``, ``source_type``), so existing full-text seeds expand directly into
+          symbol versions.
+
+        Additive by construction: only versioned nodes/edges are written; existing unversioned
+        nodes are untouched. ``issues`` / ``diagnostics`` (optional) create ``SonarIssue`` /
+        ``Diagnostic`` nodes and ``AFFECTS`` edges to the smallest containing ``SymbolVersion``.
+        """
+        counts = {
+            "revisions": 0, "module_versions": 0, "symbol_versions": 0,
+            "contains": 0, "defines": 0, "imports": 0, "calls": 0,
+            "tested_by": 0, "affects": 0, "supersedes": 0,
+        }
+        rev_version_id = hashlib.sha256(
+            f"revision|{repository_id}|{revision}".encode()
+        ).hexdigest()
+        self._run(
+            "MERGE (r:Revision {version_id: $vid}) "
+            "SET r.repository_id = $repo, r.acl_scope = $acl, r.commit_sha = $revision",
+            {"vid": rev_version_id, "repo": repository_id, "acl": acl_scope, "revision": revision},
+        )
+        counts["revisions"] = 1
+
+        sym_vids: dict[tuple[str, str, str], str] = {}  # (file, qname, kind) -> version_id
+        qname_to_vid: dict[str, str] = {}
+        module_vids: dict[str, str] = {}  # module_name -> version_id
+
+        for path in sorted(snapshot.files):
+            module_name = snapshot.files[path][0].module_name if snapshot.files[path] else ""
+            module_ent = module_entity_id(repository_id, module_name)
+            module_hash = snapshot.file_hashes.get(path, "")
+            module_vid = module_version_id(module_ent, revision, module_hash)
+            module_vids[module_name] = module_vid
+            self._run(
+                f"MERGE (m:{MODULE_VERSION_LABEL} {{version_id: $vid}}) "
+                "SET m.entity_id = $ent, m.module_name = $module_name, m.module_path = $path, "
+                "m.repository_id = $repo, m.acl_scope = $acl, m.commit_sha = $revision, "
+                "m.content_hash = $hash, m.language = $language",
+                {
+                    "vid": module_vid, "ent": module_ent, "module_name": module_name,
+                    "path": path, "repo": repository_id, "acl": acl_scope,
+                    "revision": revision, "hash": module_hash,
+                    "language": snapshot.language,
+                },
+            )
+            counts["module_versions"] += 1
+            self._run(
+                f"MATCH (r:{REVISION_LABEL} {{version_id: $rid}}) "
+                f"MATCH (m:{MODULE_VERSION_LABEL} {{version_id: $vid}}) "
+                f"MERGE (r)-[:CONTAINS]->(m)",
+                {"rid": rev_version_id, "vid": module_vid},
+            )
+            counts["contains"] += 1
+
+            for sym in snapshot.files[path]:
+                sym_ent = symbol_entity_id(
+                    repository_id, path, sym.qualified_name, sym.kind
+                )
+                sym_vid = symbol_version_id(sym_ent, revision, sym.content_hash)
+                sym_vids[(path, sym.qualified_name, sym.kind)] = sym_vid
+                qname_to_vid[sym.qualified_name] = sym_vid
+                self._run(
+                    f"MERGE (s:{SYMBOL_VERSION_LABEL} {{version_id: $vid}}) "
+                    f"SET s:{'Knowledge'} "
+                    "SET s.entity_id = $ent, s.qualified_name = $qname, s.kind = $kind, "
+                    "s.file_path = $path, s.module_name = $module_name, "
+                    "s.repository_id = $repo, s.acl_scope = $acl, s.commit_sha = $revision, "
+                    "s.content_hash = $hash, s.source_span = $span, s.text = $text, "
+                    "s.knowledge_id = $vid, s.authority = 'SOURCE', s.source_type = 'code', "
+                    "s.logical_locator = $path, s.language = $language",
+                    {
+                        "vid": sym_vid, "ent": sym_ent, "qname": sym.qualified_name,
+                        "kind": sym.kind, "path": path, "module_name": module_name,
+                        "repo": repository_id, "acl": acl_scope, "revision": revision,
+                        "hash": sym.content_hash,
+                        "span": f"{sym.source_span.start_line}:{sym.source_span.end_line}",
+                        "text": f"{sym.qualified_name} ({sym.kind}) in {path}",
+                        "language": snapshot.language,
+                    },
+                )
+                counts["symbol_versions"] += 1
+                self._run(
+                    f"MATCH (m:{MODULE_VERSION_LABEL} {{version_id: $mvid}}) "
+                    f"MATCH (s:{SYMBOL_VERSION_LABEL} {{version_id: $svid}}) "
+                    f"MERGE (m)-[:CONTAINS]->(s) "
+                    f"MERGE (m)-[:DEFINES]->(s)",
+                    {"mvid": module_vid, "svid": sym_vid},
+                )
+                counts["contains"] += 1
+                counts["defines"] += 1
+
+        # IMPORTS: ModuleVersion -> ModuleVersion (from the snapshot's per-file imports).
+        for path in sorted(snapshot.imports):
+            from_module = snapshot.files[path][0].module_name if snapshot.files.get(path) else ""
+            if not from_module or from_module not in module_vids:
+                continue
+            for target in snapshot.imports.get(path, []):
+                target_module = target.replace("/", ".").replace(".py", "")
+                if target_module in module_vids:
+                    self._run(
+                        f"MATCH (a:{MODULE_VERSION_LABEL} {{version_id: $avid}}) "
+                        f"MATCH (b:{MODULE_VERSION_LABEL} {{version_id: $bvid}}) "
+                        f"MERGE (a)-[:IMPORTS]->(b)",
+                        {"avid": module_vids[from_module], "bvid": module_vids[target_module]},
+                    )
+                    counts["imports"] += 1
+
+        # CALLS: SymbolVersion -> SymbolVersion (name-based best-effort from sym.calls).
+        for (path, qname, kind), svid in sym_vids.items():
+            for sym in snapshot.files.get(path, []):
+                if sym.qualified_name != qname:
+                    continue
+                for callee in sym.calls:
+                    if callee in qname_to_vid:
+                        self._run(
+                            f"MATCH (a:{SYMBOL_VERSION_LABEL} {{version_id: $avid}}) "
+                            f"MATCH (b:{SYMBOL_VERSION_LABEL} {{version_id: $bvid}}) "
+                            f"MERGE (a)-[:CALLS]->(b)",
+                            {"avid": svid, "bvid": qname_to_vid[callee]},
+                        )
+                        counts["calls"] += 1
+
+        # TESTED_BY: tested symbols -> the symbols of their matching test module (the rule).
+        tested = tested_symbols(snapshot)
+        for test_file in sorted(snapshot.files):
+            module_file = module_path_from_test_file(test_file)
+            if module_file is None or module_file not in snapshot.files:
+                continue
+            for tested_sym in snapshot.files[module_file]:
+                if tested_sym.qualified_name not in tested:
+                    continue
+                tested_vid = sym_vids.get((module_file, tested_sym.qualified_name, tested_sym.kind))
+                if tested_vid is None:
+                    continue
+                for test_sym in snapshot.files[test_file]:
+                    test_vid = sym_vids.get((test_file, test_sym.qualified_name, test_sym.kind))
+                    if test_vid is None:
+                        continue
+                    self._run(
+                        f"MATCH (a:{SYMBOL_VERSION_LABEL} {{version_id: $avid}}) "
+                        f"MATCH (b:{SYMBOL_VERSION_LABEL} {{version_id: $bvid}}) "
+                        f"MERGE (a)-[:TESTED_BY]->(b)",
+                        {"avid": tested_vid, "bvid": test_vid},
+                    )
+                    counts["tested_by"] += 1
+
+        # AFFECTS: optional issues/diagnostics -> smallest containing SymbolVersion.
+        for issue in issues or []:
+            vid = self._version_id_for_location(snapshot, issue.file_path, issue.line, repository_id, revision)
+            if vid is None:
+                continue
+            self._run(
+                "MERGE (d:SonarIssue {key: $key}) "
+                "SET d.rule = $rule, d.severity = $severity, d.file_path = $path, d.line = $line "
+                f"WITH d MATCH (s:{SYMBOL_VERSION_LABEL} {{version_id: $vid}}) "
+                "MERGE (d)-[:AFFECTS]->(s)",
+                {
+                    "key": issue.key, "rule": issue.rule, "severity": issue.severity,
+                    "path": issue.file_path, "line": issue.line, "vid": vid,
+                },
+            )
+            counts["affects"] += 1
+        for diag in diagnostics or []:
+            vid = self._version_id_for_location(snapshot, diag.file, diag.line, repository_id, revision)
+            if vid is None:
+                continue
+            self._run(
+                "MERGE (d:Diagnostic {key: $key}) "
+                "SET d.rule = $rule, d.severity = $severity, d.file_path = $path, d.line = $line "
+                f"WITH d MATCH (s:{SYMBOL_VERSION_LABEL} {{version_id: $vid}}) "
+                "MERGE (d)-[:AFFECTS]->(s)",
+                {
+                    "key": f"{diag.file}:{diag.line}:{diag.code}", "rule": diag.code,
+                    "severity": diag.severity, "path": diag.file, "line": diag.line, "vid": vid,
+                },
+            )
+            counts["affects"] += 1
+
+        # SUPERSEDES: every new version -> every older version of the same entity (deterministic).
+        # ``new`` is anchored by version_id (the version just written) so a re-population never
+        # cross-links two older versions.
+        module_pairs = {
+            (module_entity_id(repository_id, name), vid) for name, vid in module_vids.items()
+        }
+        symbol_pairs = {
+            (symbol_entity_id(repository_id, path, qname, kind), vid)
+            for (path, qname, kind), vid in sym_vids.items()
+        }
+        for label, pairs in (
+            (MODULE_VERSION_LABEL, module_pairs),
+            (SYMBOL_VERSION_LABEL, symbol_pairs),
+        ):
+            for ent, vid in sorted(pairs):
+                self._run(
+                    f"MATCH (new:{label} {{version_id: $vid}}) "
+                    f"MATCH (old:{label}) "
+                    "WHERE old.entity_id = $ent AND old.version_id <> $vid "
+                    f"MERGE (new)-[:SUPERSEDES]->(old)",
+                    {"ent": ent, "vid": vid},
+                )
+                counts["supersedes"] += 1
+
+        return counts
+
+    @staticmethod
+    def _version_id_for_location(
+        snapshot: Any, file_path: str, line: int, repository_id: str, revision: str
+    ) -> str | None:
+        """The version_id of the smallest containing symbol at ``(file_path, line)``, or None."""
+        sym = smallest_containing_symbol(snapshot, file_path, line)
+        if sym is None:
+            return None
+        ent = symbol_entity_id(repository_id, file_path, sym.qualified_name, sym.kind)
+        return symbol_version_id(ent, revision, sym.content_hash)
+
     @staticmethod
     def _node_dict(record: Any, *, with_score: bool = False) -> dict[str, Any]:
         """Normalize a search record into ``{"id", "labels", "properties"}``."""
@@ -711,7 +1000,13 @@ class Neo4jClient:
             out["score"] = record["score"]
         return out
 
-    def _resolve_node(self, node_ref: str) -> dict[str, Any] | None:
+    def _resolve_node(
+        self,
+        node_ref: str,
+        *,
+        repository_id: str = "",
+        acl_scope: str = "",
+    ) -> dict[str, Any] | None:
         """Resolve a node by canonical id (or ``elementId``) — not elementId alone.
 
         The retrieval leg seeds expansion with canonical cross-store ids
@@ -720,12 +1015,19 @@ class Neo4jClient:
         for callers that still pass an elementId. Returns ``None`` when
         unresolvable so the caller can skip the seed cleanly (never a zero-score
         hit).
+
+        The traversal ACL (``repository_id`` + ``acl_scope``) is enforced HERE — a
+        seed outside the scope is unresolvable, never a later post-filter.
         """
+        acl = _acl_clause("n", repository_id, acl_scope)
+        params: dict[str, Any] = {"id": node_ref}
+        params.update(_acl_params(repository_id, acl_scope))
         rec = self._run_value(
-            "MATCH (n) WHERE n.knowledge_id = $id OR n.doc_id = $id "
-            "OR n.step_id = $id OR n.entity_id = $id OR elementId(n) = $id "
+            "MATCH (n) WHERE (n.knowledge_id = $id OR n.doc_id = $id "
+            "OR n.step_id = $id OR n.entity_id = $id OR elementId(n) = $id) "
+            f"AND {acl} "
             "RETURN elementId(n) AS node_id, labels(n) AS labels, properties(n) AS properties",
-            {"id": node_ref},
+            params,
         )
         if rec is None:
             return None
@@ -735,19 +1037,33 @@ class Neo4jClient:
             "properties": dict(rec["properties"]),
         }
 
-    def _neighbors(self, node_id: str, rels: str, limit: int) -> list[dict[str, Any]]:
+    def _neighbors(
+        self,
+        node_id: str,
+        rels: str,
+        limit: int,
+        *,
+        repository_id: str = "",
+        acl_scope: str = "",
+    ) -> list[dict[str, Any]]:
         """Return up to ``limit`` neighbors of ``node_id`` (elementId) over ``rels``.
 
         ``rels`` is a ``|``-joined allowlist built from ``ALLOWED_EXPANSION_RELS``
         (fixed, safe identifiers), so it is safe to interpolate into the pattern.
         Each neighbor carries the traversed relationship type (``type(r)``) so the
         caller can score the hop with the correct relationship weight.
+
+        The traversal ACL is enforced on EVERY HOP: ``m`` must satisfy
+        ``_acl_clause`` inside the Cypher (never a post-filter).
         """
+        acl = _acl_clause("m", repository_id, acl_scope)
+        params: dict[str, Any] = {"id": node_id, "limit": limit}
+        params.update(_acl_params(repository_id, acl_scope))
         records = self._run(
-            f"MATCH (n)-[r:{rels}]-(m) WHERE elementId(n) = $id "
+            f"MATCH (n)-[r:{rels}]-(m) WHERE elementId(n) = $id AND {acl} "
             "RETURN DISTINCT elementId(m) AS node_id, labels(m) AS labels, "
             "properties(m) AS properties, type(r) AS rel_type LIMIT $limit",
-            {"id": node_id, "limit": limit},
+            params,
         )
         return [
             {
@@ -767,6 +1083,8 @@ class Neo4jClient:
         max_neighbors: int = 8,
         max_nodes: int = 40,
         timeout_ms: int = 300,
+        repository_id: str = "",
+        acl_scope: str = "",
     ) -> list[dict[str, Any]]:
         """Return the bounded, allowlisted neighborhood of one or more seed nodes.
 
@@ -775,6 +1093,14 @@ class Neo4jClient:
         total nodes (<= ``max_nodes``), and wall-clock time (<= ``timeout_ms``).
         ``seed_ids`` are canonical cross-store ids (knowledge_id / doc_id /
         step_id / entity_id); a seed that cannot be resolved is skipped cleanly.
+
+        TRAVERSAL ACL (design §5.5, finding 2): when BOTH ``repository_id`` and
+        ``acl_scope`` are supplied, the seed resolution AND every Cypher hop
+        constrain nodes to those exact tenancy values (fail-closed for versioned
+        nodes missing either). When either is omitted, the legacy-only default
+        applies: versioned nodes (``ModuleVersion``/``SymbolVersion``) are NEVER
+        traversed — only unversioned legacy nodes are reachable. This is enforced
+        inside the queries, never as a post-filter.
 
         Each returned node carries its canonical id (property-derived, elementId
         fallback), the traversed relationship type, the BFS depth, the path of
@@ -792,7 +1118,9 @@ class Neo4jClient:
         for seed in seed_ids:
             if len(visited) >= max_nodes:
                 break
-            node = self._resolve_node(seed)
+            node = self._resolve_node(
+                seed, repository_id=repository_id, acl_scope=acl_scope
+            )
             if node is None:
                 continue  # unresolvable seed → skipped cleanly, never a zero-score hit
             elem = node["id"]
@@ -819,7 +1147,9 @@ class Neo4jClient:
                 if time.monotonic() > deadline or len(visited) >= max_nodes:
                     break
                 parent = visited[elem]
-                for neighbor in self._neighbors(elem, rels, max_neighbors):
+                for neighbor in self._neighbors(
+                    elem, rels, max_neighbors, repository_id=repository_id, acl_scope=acl_scope
+                ):
                     n_elem = neighbor["id"]
                     if n_elem in visited:
                         continue
