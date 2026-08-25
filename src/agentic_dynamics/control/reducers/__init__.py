@@ -31,6 +31,7 @@ from agentic_dynamics.control.reducers.job_facts import JOB_FACTS_V1, job_facts_
 from agentic_dynamics.control.reducers.pattern import PATTERN_V1, pattern_v1
 from agentic_dynamics.control.reducers.policy_facts import POLICY_FACTS_V1, policy_facts_v1
 from agentic_dynamics.control.reducers.spec_status import SPEC_STATUS_V1, spec_status_v1
+from agentic_dynamics.control.reducers.story_facts import STORY_FACTS_V1, story_facts_v1
 from agentic_dynamics.control.reducers.workflow_facts import WORKFLOW_FACTS_V1, workflow_facts_v1
 
 #: version → ReducerSpec — the declarative registry ``facts.verify_chain`` consumes.
@@ -40,6 +41,7 @@ REDUCERS: dict[str, ReducerSpec] = {
     JOB_FACTS_V1.version: JOB_FACTS_V1,
     WORKFLOW_FACTS_V1.version: WORKFLOW_FACTS_V1,
     POLICY_FACTS_V1.version: POLICY_FACTS_V1,
+    STORY_FACTS_V1.version: STORY_FACTS_V1,
     PROFILES_V1.version: PROFILES_V1,
     PATTERN_V1.version: PATTERN_V1,
     CHECKPOINT_V1.version: CHECKPOINT_V1,
@@ -52,6 +54,7 @@ _IMPLS: dict[str, Reducer] = {
     JOB_FACTS_V1.version: job_facts_v1,
     WORKFLOW_FACTS_V1.version: workflow_facts_v1,
     POLICY_FACTS_V1.version: policy_facts_v1,
+    STORY_FACTS_V1.version: story_facts_v1,
     PROFILES_V1.version: profiles_v1,
     PATTERN_V1.version: pattern_v1,
     CHECKPOINT_V1.version: checkpoint_v1,
@@ -76,6 +79,8 @@ __all__ = [
     "workflow_facts_v1",
     "POLICY_FACTS_V1",
     "policy_facts_v1",
+    "STORY_FACTS_V1",
+    "story_facts_v1",
     "PROFILES_V1",
     "profiles_v1",
     "PATTERN_V1",
