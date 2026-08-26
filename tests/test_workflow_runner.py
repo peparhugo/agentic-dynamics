@@ -2,6 +2,8 @@
 
 import json
 import subprocess
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1007,3 +1009,179 @@ def test_lsp_evidence_novelty_introduced_error_counts_one(monkeypatch, tmp_path)
     assert payload["status"] == "available"
     assert payload["new_error_count"] == 1
     assert payload["tool"] == "mypy"
+
+
+# ── Phase watchdog (cap_runner_hardening p1) ─────────────────────
+
+
+def _watchdog_transcript(workdir):
+    return Path(workdir) / ".instrument" / "session.jsonl"
+
+
+def _watchdog_stalled_agent(killed, release):
+    """A fake agent that writes one step, registers a SIGTERM-recording kill, then goes quiet.
+
+    The watchdog must SIGTERM it (recording the kill) and fail the phase with STALLED while
+    the agent itself keeps waiting until the kill releases it.
+    """
+
+    def agent(prompt, *, model, backend, workdir, watchdog=None, **kwargs):
+        transcript = _watchdog_transcript(workdir)
+        transcript.parent.mkdir(parents=True, exist_ok=True)
+        watchdog["kill"] = lambda: (killed.append("SIGTERM"), release.set())
+        with transcript.open("a") as fh:
+            fh.write(json.dumps({"type": "step_start"}) + "\n")
+        release.wait(timeout=5)  # no further steps — the transcript goes stale past the threshold
+        return _fake_agent()
+
+    return agent
+
+
+def test_watchdog_sigterms_a_stalled_agent_and_fails_the_phase(tmp_path):
+    """(a) A fake agent that stops writing steps for > threshold is SIGTERM'd and the phase
+    fails with STALLED + evidence (last-step timestamp, stale age, transcript tail), and the
+    evidence rides the phase's ledger record."""
+    spec = load_spec(SPEC)
+    killed: list[str] = []
+    release = threading.Event()
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        phase_watchdog_min=0.03,  # 1.8s — the test's whole runtime budget
+        run_agentic_fn=_watchdog_stalled_agent(killed, release),
+    )
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.stall_evidence is not None
+    assert p.stall_evidence["reason"] == "STALLED"
+    assert p.stall_evidence["stale_age_s"] >= p.stall_evidence["threshold_min"] * 60
+    assert p.stall_evidence["last_step_at"]
+    assert "step_start" in p.stall_evidence["transcript_tail"]
+    assert "STALLED" in p.error
+    assert killed == ["SIGTERM"]  # the watchdog actually killed the agent
+    assert result.ok is False
+
+    # The ledger carries the evidence, not just the error string.
+    ledger = result.to_dict()["phases"][0]
+    assert ledger["stall_evidence"]["reason"] == "STALLED"
+    assert ledger["status"] == "failed"
+
+
+def test_watchdog_never_kills_a_compliant_agent(tmp_path):
+    """(b) A fake agent that keeps stepping — even slowly — is never killed; the phase stays ok."""
+    spec = load_spec(SPEC)
+    killed: list[str] = []
+    release = threading.Event()
+
+    def agent(prompt, *, model, backend, workdir, watchdog=None, **kwargs):
+        transcript = _watchdog_transcript(workdir)
+        transcript.parent.mkdir(parents=True, exist_ok=True)
+        watchdog["kill"] = lambda: (killed.append("SIGTERM"), release.set())
+        for i in range(5):
+            with transcript.open("a") as fh:
+                fh.write(json.dumps({"type": "step_start", "n": i}) + "\n")
+            release.wait(timeout=0.3)  # continuous slow steps: max gap 0.3s < 1.8s threshold
+        return _fake_agent()
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        phase_watchdog_min=0.03, run_agentic_fn=agent,
+    )
+    assert result.phases[0].status == "ok"
+    assert result.phases[0].stall_evidence is None
+    assert killed == []
+
+
+def test_watchdog_threshold_env_override(tmp_path, monkeypatch):
+    """(c) FINOPS_PHASE_WATCHDOG_MIN overrides the default threshold; the stall fires under it."""
+    monkeypatch.setenv("FINOPS_PHASE_WATCHDOG_MIN", "0.03")
+    spec = load_spec(SPEC)
+    killed: list[str] = []
+    release = threading.Event()
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False,  # no explicit arg → env wins
+        run_agentic_fn=_watchdog_stalled_agent(killed, release),
+    )
+    assert result.phases[0].status == "failed"
+    assert result.phases[0].stall_evidence["reason"] == "STALLED"
+    assert result.phases[0].stall_evidence["threshold_min"] == 0.03
+
+
+def test_watchdog_explicit_arg_overrides_env(tmp_path, monkeypatch):
+    """The CLI/arg threshold outranks the env: a huge explicit value means no stall even with a
+    hostile small env value, and the kill never fires."""
+    monkeypatch.setenv("FINOPS_PHASE_WATCHDOG_MIN", "0.03")  # would stall under the env alone
+    spec = load_spec(SPEC)
+    killed: list[str] = []
+    release = threading.Event()
+
+    def agent(prompt, *, model, backend, workdir, watchdog=None, **kwargs):
+        transcript = _watchdog_transcript(workdir)
+        transcript.parent.mkdir(parents=True, exist_ok=True)
+        watchdog["kill"] = lambda: (killed.append("SIGTERM"), release.set())
+        with transcript.open("a") as fh:
+            fh.write("step\n")
+        release.wait(timeout=0.8)  # short — the explicit 60-min threshold never fires here
+        return _fake_agent()
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        phase_watchdog_min=60.0, run_agentic_fn=agent,
+    )
+    assert result.phases[0].status == "ok"
+    assert result.phases[0].stall_evidence is None
+    assert killed == []
+
+
+def test_watchdog_default_threshold_does_not_fire_for_a_quick_agent(tmp_path, monkeypatch):
+    """The default (20 min) watchdog is inert for a normal quick agent — no stall, no overhead
+    observable in the outcome."""
+    monkeypatch.delenv("FINOPS_PHASE_WATCHDOG_MIN", raising=False)
+    spec = load_spec(SPEC)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
+    assert result.ok
+    assert all(p.stall_evidence is None for p in result.phases)
+
+
+def test_watchdog_zero_disables_it(tmp_path, monkeypatch):
+    """A threshold <= 0 turns the watchdog off — the phase is byte-identical to pre-hardening
+    (no seam, no kill path, no stall possible)."""
+    monkeypatch.setenv("FINOPS_PHASE_WATCHDOG_MIN", "0.03")
+    spec = load_spec(SPEC)
+    seen = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        seen.append(kwargs)
+        time.sleep(1.0)  # would definitely stall under the env threshold — but it is disabled
+        return _fake_agent()
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        phase_watchdog_min=0, run_agentic_fn=agent,
+    )
+    assert result.phases[0].status == "ok"
+    assert all("watchdog" not in kw for kw in seen)  # no seam threaded to the agent
+
+
+def test_watchdog_only_wraps_agent_phases(tmp_path):
+    """The watchdog wraps the agent process only — test phases run in-process (run_suite) and
+    are never given a watchdog seam or a kill path."""
+    spec = load_spec(SPEC)
+    watchdogs = []
+
+    def agent(prompt, *, model, backend, workdir, watchdog=None, **kwargs):
+        watchdogs.append(watchdog)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=agent)
+    # scope/ux_design/implement are agent phases → seam present; verify (kind=test) never calls agent.
+    assert len(watchdogs) == 3
+    assert all(w is not None for w in watchdogs)
+    assert result.phases[-1].kind == "test"
+    assert result.phases[-1].stall_evidence is None
+

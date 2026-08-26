@@ -14,6 +14,14 @@ Phase kinds (from ``workflow.params.phases``):
   - ``test`` — run the language's suite independently (via ``test_runner.run_suite``)
     and record ``test_executed_success``. No LLM involved.
 
+Phase watchdog (cap_runner_hardening p1): each agent phase is wrapped in a stall monitor that
+polls the phase's session transcript (``<workdir>/.instrument/session.jsonl``, appended live
+by the adapters while the seam is present). A transcript whose last step is stale past the
+threshold — resolved explicit ``phase_watchdog_min`` arg > ``FINOPS_PHASE_WATCHDOG_MIN`` env >
+default 20 min — is SIGTERM'd and the phase fails with reason ``STALLED`` + the evidence
+(last-step timestamp, stale age, transcript tail). Only step gaps count (the transcript's
+last-step age, never wall time); test phases are never wrapped.
+
 The agent works directly in ``workdir``; prior-phase artifacts are committed there, so
 later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
@@ -139,6 +147,9 @@ class PhaseResult:
     tests_total: int = 0
     # phase-boundary evidence (populated only when a change_analyzer is injected; design §5.7)
     change_analysis: dict[str, Any] | None = None
+    #: cap_runner_hardening p1: when the phase watchdog SIGTERM'd a stalled agent, the
+    #: structured evidence (last-step timestamp, stale age, transcript tail). None otherwise.
+    stall_evidence: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -174,6 +185,7 @@ class PhaseResult:
             "tests_passed": self.tests_passed,
             "tests_total": self.tests_total,
             "change_analysis": self.change_analysis,
+            "stall_evidence": self.stall_evidence,
         }
 
 
@@ -285,6 +297,24 @@ def _git_full_sha(workdir: Path, rev: str) -> str:
 #: bounded to ~120s internally, well under this envelope. Tests shrink this constant to prove
 #: the deadline.
 ANALYZER_LEG_TIMEOUT_SECONDS = 360.0
+
+# ── Phase watchdog (cap_runner_hardening p1) ──────────────────────────────────────────────
+#
+# The measured execution disease: agents that go silent for 45-65 minutes while staying alive
+# (no session steps, idle CPU) — the stabilization p3 stall, the two terra stalls in both site
+# revamps. The runner previously waited on the opencode process indefinitely. The watchdog is
+# the technical, deterministic fix: it monitors the phase's session transcript (the worktree's
+# ``.instrument/session.jsonl``, appended live by the adapters while the seam is present) and
+# fails the phase once the transcript's LAST STEP is stale past the threshold — not wall time,
+# so a phase that keeps producing steps never fires no matter how long it runs. A stalled agent
+# is SIGTERM'd (exit ``-15``, the measured signature) and the phase fails with reason
+# ``STALLED`` + evidence (last-step timestamp, stale age, transcript tail).
+#
+# Threshold resolution: explicit ``phase_watchdog_min`` argument > ``FINOPS_PHASE_WATCHDOG_MIN``
+# env > ``PHASE_WATCHDOG_DEFAULT_MIN`` (20 — below the observed 45-65-min stalls, above any
+# legit step gap, the longest observed ~10 min). A value <= 0 disables the watchdog for the run.
+PHASE_WATCHDOG_ENV = "FINOPS_PHASE_WATCHDOG_MIN"
+PHASE_WATCHDOG_DEFAULT_MIN = 20.0
 
 
 def _call_with_deadline(fn: Callable[[], Any], *, timeout: float) -> tuple[bool, Any]:
@@ -630,6 +660,148 @@ def _completed_phases_from_index(
         return set()  # never block a resume on an index/ledger problem
 
 
+class PhaseWatchdog:
+    """Stall monitor for one agent phase (cap_runner_hardening p1).
+
+    The agent's steps land in ``<workdir>/.instrument/session.jsonl`` — the adapters append
+    each event line to that file LIVE while the seam is present, so the file's mtime IS the
+    last-step time. The monitor polls that age — NOT wall time — so a phase that keeps
+    producing steps never fires no matter how long it runs, while an agent whose last step
+    is stale past the threshold is SIGTERM'd (via the ``kill`` handle the adapter registered
+    in the seam) and the phase fails with reason ``STALLED`` plus the evidence (last-step
+    timestamp, stale age, transcript tail).
+
+    Threshold: ``FINOPS_PHASE_WATCHDOG_MIN`` env / CLI ``--phase-watchdog-min``, default 20
+    minutes (the measured stalls were 45-65 min; no legit step gap observed beyond ~10 min).
+    A threshold <= 0 disables the watchdog — agent phases then run unwrapped, byte-identical
+    to the pre-hardening runner. Non-agent phases never construct one (test phases run
+    in-process via ``test_runner``).
+
+    The monitor itself is a cheap mtime poll (one ``os.stat`` per interval, sub-second) — it
+    adds no meaningful overhead to a compliant phase.
+    """
+
+    def __init__(
+        self, workdir: str | Path, threshold_min: float, *, poll_interval_s: float | None = None
+    ) -> None:
+        self.workdir = Path(workdir)
+        self.threshold_min = float(threshold_min)
+        self.threshold_s = self.threshold_min * 60.0
+        if self.threshold_s <= 0:
+            raise ValueError("phase watchdog threshold must be > 0")
+        #: the transcript the phase's agent writes its steps to (run_workflow passes the same
+        #: path as ``transcript_path`` so the adapter writes exactly the file being watched)
+        self.transcript = self.workdir / ".instrument" / "session.jsonl"
+        #: adaptive poll interval: short enough to catch small test thresholds promptly, long
+        #: enough to be negligible in production (<= 10s for the default 20-min threshold)
+        self.poll_interval_s = poll_interval_s or max(0.25, min(self.threshold_s / 8.0, 10.0))
+        #: the shared kill seam — ``stream_subprocess`` populates ``["kill"]`` the moment the
+        #: agent process spawns, so this monitor can SIGTERM a process it never spawned
+        self.seam: dict[str, Any] = {"kill": None, "killed": False}
+        self._start = time.time()
+
+    def _last_step_age(self) -> float:
+        """Seconds since the transcript's last write (or phase start when no file exists yet)."""
+        try:
+            mtime = self.transcript.stat().st_mtime
+        except OSError:
+            mtime = self._start
+        return time.time() - mtime
+
+    def _last_step_at_iso(self) -> str:
+        try:
+            mtime = self.transcript.stat().st_mtime
+        except OSError:
+            mtime = self._start
+        return datetime.fromtimestamp(mtime, timezone.utc).isoformat()
+
+    def _transcript_tail(self, max_lines: int = 5, max_chars: int = 400) -> str:
+        try:
+            lines = self.transcript.read_text().splitlines()
+        except OSError:
+            return ""
+        tail = "\n".join(lines[-max_lines:])
+        if len(tail) > max_chars:
+            tail = tail[-max_chars:]
+        return tail or "(no transcript yet)"
+
+    def check_stall(self) -> dict[str, Any] | None:
+        """Return the STALLED evidence when the transcript has been silent past the threshold."""
+        age = self._last_step_age()
+        if age < self.threshold_s:
+            return None
+        return {
+            "reason": "STALLED",
+            "last_step_at": self._last_step_at_iso(),
+            "stale_age_s": round(age, 1),
+            "stale_min": round(age / 60.0, 1),
+            "threshold_min": self.threshold_min,
+            "transcript_tail": self._transcript_tail(),
+        }
+
+    def kill_agent(self) -> None:
+        """SIGTERM the stalled agent via the seam the adapter registered (best-effort)."""
+        self.seam["killed"] = True
+        kill = self.seam.get("kill")
+        if kill is not None:
+            with contextlib.suppress(Exception):  # the agent may have already exited
+                kill()
+
+
+def _resolve_watchdog_min(cli_value: float | None) -> float:
+    """Resolve the phase-watchdog threshold: explicit arg > env > default (cap p1 hard rule 5)."""
+    if cli_value is not None:
+        return float(cli_value)
+    raw = os.environ.get(PHASE_WATCHDOG_ENV, "").strip()
+    if raw:
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+    return PHASE_WATCHDOG_DEFAULT_MIN
+
+
+def _run_agent_phase(
+    run_agent: Callable[..., Any],
+    prompt: str,
+    agent_kwargs: dict[str, Any],
+    watchdog: PhaseWatchdog | None,
+) -> tuple[Any | None, dict[str, Any] | None]:
+    """Run one agent invocation, optionally under the stall watchdog.
+
+    Without a watchdog this is exactly the pre-hardening blocking call. With one, the agent
+    runs in a worker thread while this monitor polls the session transcript's last-step age;
+    a stall past the threshold SIGTERMs the agent and returns ``(None, evidence)`` so the
+    caller fails the phase with ``STALLED`` + the evidence. ``(result, None)`` on a normal
+    completion. The worker is abandoned (not joined) on a stall — the kill is what brings the
+    process down, and the phase must fail deterministically, not wait for the agent's own exit.
+    """
+    if watchdog is None:
+        return run_agent(prompt, **agent_kwargs), None
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(run_agent, prompt, **agent_kwargs)
+    try:
+        while True:
+            try:
+                return future.result(timeout=watchdog.poll_interval_s), None
+            except FuturesTimeout:
+                evidence = watchdog.check_stall()
+                if evidence is not None:
+                    watchdog.kill_agent()
+                    return None, evidence
+    finally:
+        pool.shutdown(wait=False)
+
+
+def _format_stall_evidence(ev: dict[str, Any]) -> str:
+    """Render the structured stall evidence into the phase's error (the ledger carries both)."""
+    return (
+        f"STALLED — no session step for {ev['stale_min']} min "
+        f"(threshold {ev['threshold_min']} min); last step at {ev['last_step_at']}; "
+        f"transcript tail:\n{ev['transcript_tail']}"
+    )
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -658,6 +830,7 @@ def run_workflow(
     construct_fn: Callable[..., Any] | None = None,
     rag_params: dict[str, Any] | None = None,
     change_analyzer: ChangeAnalyzer | None = None,
+    phase_watchdog_min: float | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
@@ -706,6 +879,16 @@ def run_workflow(
     construction: a materialization failure, an unanalyzable commit (e.g. a root commit with
     no parent), or an analyzer error degrades to ``change_analysis=None`` — it can never
     change the phase's outcome. ``None`` (default) leaves the seam inert.
+
+    Phase watchdog (``phase_watchdog_min``, cap_runner_hardening p1): every agent phase
+    is wrapped in a stall monitor that watches the session transcript's last-step age
+    (``.instrument/session.jsonl``, appended live by the adapters while the seam is
+    present). A transcript silent for ``phase_watchdog_min`` minutes — resolved explicit
+    arg > ``FINOPS_PHASE_WATCHDOG_MIN`` env > default 20 — is SIGTERM'd and the phase
+    fails with reason ``STALLED`` + evidence (last-step timestamp, stale age, transcript
+    tail), recorded on ``PhaseResult.stall_evidence`` and the ledger. A value <= 0
+    disables it. Only step gaps count (the transcript's last-step age, never wall time),
+    and non-agent phases are never wrapped (test phases run in-process).
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -830,6 +1013,8 @@ def run_workflow(
                 # fine-grained session events stream into the Control Room.
                 prev_cell = os.environ.get("FINOPS_CELL_ID")
                 os.environ["FINOPS_CELL_ID"] = cell_id
+                ar = None
+                stall: dict[str, Any] | None = None
                 try:
                     # Select this step's model: pin wins, allowed_models restricts, else the
                     # full pool — scored over measured signals, pricing a model switch's cache
@@ -907,38 +1092,59 @@ def run_workflow(
                     ):
                         agent_kwargs["session_id"] = prev_session_id
                         agent_kwargs["fork"] = True
-                    ar = run_agent(prompt, **agent_kwargs)
+                    pr.model = model_i
+
+                    # Phase watchdog (cap_runner_hardening p1) — wrap the agent invocation in a
+                    # stall monitor. The monitor polls the session transcript's last-step age
+                    # (``.instrument/session.jsonl``, appended live by the adapters while the seam
+                    # is present) and fails the phase deterministically — SIGTERM + STALLED +
+                    # evidence — when no new step appears for the threshold (explicit arg >
+                    # ``FINOPS_PHASE_WATCHDOG_MIN`` env > default 20 min; a value <= 0 disables
+                    # it). Only agent phases are wrapped; test phases run in-process, never
+                    # through this path.
+                    watchdog_min = _resolve_watchdog_min(phase_watchdog_min)
+                    watchdog = PhaseWatchdog(wd, watchdog_min) if watchdog_min > 0 else None
+                    if watchdog is not None:
+                        agent_kwargs["watchdog"] = watchdog.seam
+                        agent_kwargs["transcript_path"] = str(watchdog.transcript)
+                    ar, stall = _run_agent_phase(run_agent, prompt, agent_kwargs, watchdog)
+                    if stall is not None:
+                        # The stalled agent was SIGTERM'd; the phase fails with the evidence
+                        # (last-step timestamp, stale age, transcript tail) on the ledger.
+                        pr.status = "failed"
+                        pr.error = _format_stall_evidence(stall)
+                        pr.stall_evidence = stall
                 finally:
                     if prev_cell is None:
                         os.environ.pop("FINOPS_CELL_ID", None)
                     else:
                         os.environ["FINOPS_CELL_ID"] = prev_cell
-                pr.model = model_i
-                pr.tokens = {
-                    "in": getattr(ar, "prompt_tokens", 0),
-                    "out": getattr(ar, "completion_tokens", 0),
-                    "reasoning": getattr(ar, "reasoning_tokens", 0),
-                    "answer": getattr(ar, "answer_tokens", 0),
-                    "explanation": getattr(ar, "explanation_tokens", 0),
-                    "total": getattr(ar, "total_tokens", 0),
-                }
-                pr.cost_usd = getattr(ar, "estimated_cost_usd", 0.0)
-                pr.confidence = getattr(ar, "confidence", None)
-                pr.cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
-                pr.cache_write_tokens = getattr(ar, "cache_write_tokens", 0)
-                pr.cache_hit_rate = round(getattr(ar, "cache_hit_rate", 0.0), 4)
-                sid = getattr(ar, "session_id", "")
-                if sid:
-                    pr.session_id = sid
-                    prev_session_id = sid
-                prev_model = model_i
-                prev_cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
-                pr.files_created = list(getattr(ar, "files_created", []) or [])
-                pr.files_modified = list(getattr(ar, "files_modified", []) or [])
-                pr.final_response = getattr(ar, "final_response", "")
-                if not getattr(ar, "ok", True):
-                    pr.status = "failed"
-                    pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"
+                if stall is None and ar is not None:
+                    pr.tokens = {
+                        "in": getattr(ar, "prompt_tokens", 0),
+                        "out": getattr(ar, "completion_tokens", 0),
+                        "reasoning": getattr(ar, "reasoning_tokens", 0),
+                        "answer": getattr(ar, "answer_tokens", 0),
+                        "explanation": getattr(ar, "explanation_tokens", 0),
+                        "total": getattr(ar, "total_tokens", 0),
+                    }
+                    pr.cost_usd = getattr(ar, "estimated_cost_usd", 0.0)
+                    pr.confidence = getattr(ar, "confidence", None)
+                    pr.cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
+                    pr.cache_write_tokens = getattr(ar, "cache_write_tokens", 0)
+                    pr.cache_hit_rate = round(getattr(ar, "cache_hit_rate", 0.0), 4)
+                    sid = getattr(ar, "session_id", "")
+                    if sid:
+                        pr.session_id = sid
+                        prev_session_id = sid
+                    prev_model = model_i
+                    prev_cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
+                    pr.files_created = list(getattr(ar, "files_created", []) or [])
+                    pr.files_modified = list(getattr(ar, "files_modified", []) or [])
+                    pr.final_response = getattr(ar, "final_response", "")
+                    if not getattr(ar, "ok", True):
+                        pr.status = "failed"
+                        pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"
         except Exception as exc:  # one bad phase must not crash the runner
             pr.status = "failed"
             pr.error = repr(exc)

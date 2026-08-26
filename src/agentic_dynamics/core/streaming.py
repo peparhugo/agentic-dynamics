@@ -34,6 +34,7 @@ def stream_subprocess(
     workdir: str,
     timeout: int = 300,
     on_line: Callable[[str], None] | None = None,
+    watchdog: dict | None = None,
 ) -> StreamResult:
     """Run ``cmd`` in ``workdir``, streaming stdout line-by-line.
 
@@ -44,6 +45,11 @@ def stream_subprocess(
         on_line: Optional callback invoked per stdout line (trailing newline
             stripped). Exceptions raised by the callback are swallowed so a
             telemetry failure never kills the experiment run.
+        watchdog: Optional kill seam (cap_runner_hardening p1). When given, it is
+            populated with a ``watchdog["kill"]`` callable the moment the process
+            spawns, so an external monitor (the workflow runner's phase watchdog)
+            can SIGTERM a stalled agent from another thread — the runner never sees
+            the ``Popen`` handle otherwise.
 
     Returns:
         StreamResult with the exit code (-1 on timeout, -2 on spawn failure),
@@ -75,6 +81,9 @@ def stream_subprocess(
         )
     except OSError as e:
         return StreamResult(exit_code=-2, stdout="", stderr="", error=str(e))
+
+    if watchdog is not None:
+        watchdog["kill"] = lambda: _terminate_process_group_sigterm(proc)
 
     out_thread = threading.Thread(
         target=_read, args=(proc.stdout, out_chunks, out_lock, True), daemon=True
@@ -118,4 +127,23 @@ def _terminate_process_group(proc: subprocess.Popen) -> None:
         proc.wait(timeout=5)
     except subprocess.TimeoutExpired:
         proc.kill()
+        proc.wait()
+
+
+def _terminate_process_group_sigterm(proc: subprocess.Popen) -> None:
+    """SIGTERM the process group, escalating to SIGKILL after a short grace.
+
+    The phase watchdog's action (cap_runner_hardening p1): a stalled agent is
+    deterministically SIGTERM'd — its exit code records ``-15``, the exact measured
+    stall signature — rather than left to hang for another hour. A process that
+    ignores SIGTERM is escalated to SIGKILL so the session group dies and the
+    reader threads' pipes close.
+    """
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         proc.wait()

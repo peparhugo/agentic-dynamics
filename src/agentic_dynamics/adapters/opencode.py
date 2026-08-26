@@ -234,6 +234,7 @@ def run_opencode_agentic(
     transcript_path: str | None = None,
     session_id: str | None = None,
     fork: bool = False,
+    watchdog: dict | None = None,
 ) -> AgenticResult:
     """Spawn an opencode agentic session in an isolated worktree.
 
@@ -264,6 +265,11 @@ def run_opencode_agentic(
             forking the given session (``--session <id> --fork``), so the shared
             context prefix is served as provider cache reads.
         fork: Fork from ``session_id`` to reuse its context prefix (cache reads).
+        watchdog: Optional kill seam (cap_runner_hardening p1). When given, the
+            transcript is ALSO appended live, one event line per step, so an external
+            monitor can read the session's last-step age from the file's mtime; and
+            ``watchdog["kill"]`` is registered (via ``stream_subprocess``) so the
+            monitor can SIGTERM the process group when the phase stalls.
 
     Returns:
         AgenticResult with complete execution trace.
@@ -320,7 +326,25 @@ def run_opencode_agentic(
 
     publisher = make_publisher() if on_event is None else None
 
+    # Live transcript seam (cap_runner_hardening p1): while the phase watchdog is active,
+    # append each streamed event line to the transcript file as it arrives, so the file's
+    # mtime IS the session's last-step time for the runner's stall monitor. Cheap — one
+    # buffered write per step — and only enabled when the seam is present (the default path
+    # stays byte-identical: the transcript is written once at the end).
+    live_fh = None
+    if watchdog is not None:
+        live_path = (
+            Path(transcript_path)
+            if transcript_path
+            else Path(workdir) / ".instrument" / "session.jsonl"
+        )
+        live_path.parent.mkdir(parents=True, exist_ok=True)
+        live_fh = live_path.open("a")
+
     def _on_line(line: str) -> None:
+        if live_fh is not None and line.strip():
+            live_fh.write(line + "\n")
+            live_fh.flush()
         try:
             obj = json.loads(line)
         except json.JSONDecodeError:
@@ -332,8 +356,14 @@ def run_opencode_agentic(
         elif publisher is not None:
             publisher.publish_event(obj)
 
-    on_line = _on_line if (on_event is not None or publisher is not None) else None
-    stream = stream_subprocess(cmd, workdir=workdir, timeout=timeout, on_line=on_line)
+    on_line = _on_line if (on_event is not None or publisher is not None or watchdog is not None) else None
+    try:
+        stream = stream_subprocess(
+            cmd, workdir=workdir, timeout=timeout, on_line=on_line, watchdog=watchdog
+        )
+    finally:
+        if live_fh is not None:
+            live_fh.close()
     if stream.timed_out:
         result.error = f"Timeout after {timeout}s"
         result.exit_code = -1

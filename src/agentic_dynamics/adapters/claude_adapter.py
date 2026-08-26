@@ -267,6 +267,7 @@ def run_claude_agentic(
     transcript_path: str | None = None,
     session_id: str | None = None,
     fork: bool = False,
+    watchdog: dict | None = None,
 ) -> AgenticResult:
     """Run an agentic session through the Claude CLI, emitting opencode JSONL.
 
@@ -328,6 +329,20 @@ def run_claude_agentic(
     publisher = make_publisher() if on_event is None else None
     captured_session_id = ""
 
+    # Live transcript seam (cap_runner_hardening p1): mirror opencode's watchdog path —
+    # append each translated event line to the transcript file as it arrives so the runner's
+    # stall monitor can read the last-step age from the file's mtime. Only when the seam is
+    # present; the default path stays byte-identical (transcript written once at the end).
+    live_fh = None
+    if watchdog is not None:
+        live_path = (
+            Path(transcript_path)
+            if transcript_path
+            else Path(workdir) / ".instrument" / "session.jsonl"
+        )
+        live_path.parent.mkdir(parents=True, exist_ok=True)
+        live_fh = live_path.open("a")
+
     def on_line(line: str) -> None:
         nonlocal captured_session_id
         try:
@@ -338,13 +353,23 @@ def run_claude_agentic(
         if sid:
             captured_session_id = sid
         for out in adapter.feed(event):
-            translated_lines.append(json.dumps(out))
+            serialized = json.dumps(out)
+            translated_lines.append(serialized)
+            if live_fh is not None:
+                live_fh.write(serialized + "\n")
+                live_fh.flush()
             if on_event is not None:
                 on_event(out)
             elif publisher is not None:
                 publisher.publish_event(out)
 
-    stream = stream_subprocess(cmd, workdir=workdir, timeout=timeout, on_line=on_line)
+    try:
+        stream = stream_subprocess(
+            cmd, workdir=workdir, timeout=timeout, on_line=on_line, watchdog=watchdog
+        )
+    finally:
+        if live_fh is not None:
+            live_fh.close()
 
     if stream.timed_out:
         result.error = f"Timeout after {timeout}s"

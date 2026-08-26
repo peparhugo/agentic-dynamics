@@ -170,6 +170,11 @@ def main() -> None:
     ap.add_argument("--thinking-budget-tokens", type=int, default=0)
     ap.add_argument("--output-token-limit", type=int, default=0)
     ap.add_argument("--timeout", type=int, default=1800, help="per-phase timeout (s)")
+    ap.add_argument("--phase-watchdog-min", type=float, default=None, metavar="MIN",
+                    help="phase watchdog threshold in minutes (cap_runner_hardening p1): an "
+                         "agent phase whose session transcript shows no new step for this long "
+                         "is SIGTERM'd and fails with STALLED + evidence. Default "
+                         "FINOPS_PHASE_WATCHDOG_MIN env, else 20; 0 disables the watchdog.")
     ap.add_argument("--no-commit", action="store_true", help="do not commit after phases")
     ap.add_argument("--resume", action="store_true",
                     help="skip phases that already have a [workflow] <phase> commit; when the "
@@ -297,6 +302,7 @@ def main() -> None:
             timeout=args.timeout,
             commit=not args.no_commit,
             resume=args.resume,
+            phase_watchdog_min=args.phase_watchdog_min,
             signals=signals,
             router=router,
             publisher_factory=LivePublisher,
