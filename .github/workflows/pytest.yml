@@ -55,7 +55,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest pytest-timeout pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
+          # The deterministic suite imports the knowledge clients at collection time
+          # (test_graph -> neo4j, embeddings -> chromadb, ollama_analyzer -> ollama,
+          # sync_data --check -> duckdb+pyarrow) — the [admin] extra is not enough;
+          # the stabilization split's first green run exposed this (lint had hidden
+          # it: the old combined job never reached tests).
           pip install -e ".[admin]"
+          pip install neo4j chromadb ollama duckdb pyarrow
 
       - name: Run deterministic test suite (external-service tests excluded)
         run: |
@@ -98,7 +104,13 @@ jobs:
       - name: Install package (console entry point)
         run: |
           python -m pip install --upgrade pip
+          # The deterministic suite imports the knowledge clients at collection time
+          # (test_graph -> neo4j, embeddings -> chromadb, ollama_analyzer -> ollama,
+          # sync_data --check -> duckdb+pyarrow) — the [admin] extra is not enough;
+          # the stabilization split's first green run exposed this (lint had hidden
+          # it: the old combined job never reached tests).
           pip install -e ".[admin]"
+          pip install neo4j chromadb ollama duckdb pyarrow
 
       - name: Gate — CLI resolves and prints help (agentic-dynamics --help)
         run: agentic-dynamics --help
