@@ -1,0 +1,295 @@
+name: cap_site_revamp
+question: >-
+  Rebuild the public site (apps/website/) so it ESTABLISHES THE FIELD — Agentic Dynamics as
+  a named, credible field of inquiry — and cements the operator as its expert. NOT a SaaS
+  pitch: relatable, credible, visually exceptional (SVG diagrams, d3-class charts, flows,
+  interactive cards), editorialized with provenance on every claim, and updatable as new
+  findings arrive (data.js remains the single data door). Executed by gpt-terra across
+  research -> visual system -> editorial -> implementation -> truth/UX review -> dual
+  deploy. Every number on the site must trace to data.js / the registry / a committed
+  verdict — never invented, never stale.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: javascript
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: public-facing research website / field
+        establishment. canonical_sources: [apps/website/CONTEXT.md (deploy + page
+        inventory), apps/website/data.js (THE data door — window.DYNAMICS_DATA, provenance-
+        tagged [M]/[C]/[H]/[X]/[P]), apps/website/*.html + app.js + base.css (current
+        pages — the audit target), experiments/results/cap_2b/cap_2b_score_20260826T160018Z.json
+        (the randomized pilot: NON-INFERIOR, adaptive cpvo $0.010485 vs static $0.013344,
+        success 100% vs 66.7%), experiments/results/cap_escalation_measurement/
+        cap_escalation_measurement_score_20260826T125726Z.json (measured E_x: 11.47 sol /
+        12.51 sonnet), docs/designs/current/cap_2a_rerun3.md (the control verdict),
+        experiments/results/cap_2a_rerun2/cap_2a_rerun2_score_20260826T015846Z.json (the
+        calibration arc 0/3 -> 2/3), experiments/specs/STATUS.md + the registry (the
+        campaign corpus), AGENTS.md Editor rules (provenance tags, grounded claims)].
+        policies: [no_saas_framing, provenance_on_every_claim, data_js_is_the_only_door,
+        honest_nulls_shown, updatable_by_construction]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: field-establishment site rebuild.
+        deliberation: [research + editorial audit, visual system, editorial rewrite,
+        implementation, truth/UX review, dual deploy].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        The site is 8 static HTML pages (index/framework/evidence/story/methodology/
+        accelerator/databricks/glossary) + app.js + base.css + GENERATED data.js, served from
+        TWO Firebase projects (ai-finops-rulebook = canonical — never change or retire the
+        URL; agentic-dynamics = mirror — both must stay in sync, deployed from
+        apps/website/). The corpus is large and provenance-tagged: 772+ sessions, stories,
+        the 10 decision rules (framework page — currently PROPOSALS), the EFFICIENT
+        archetype is EMPTY, and the NEW evidence from the campaign arc is NOT yet on the
+        site: the randomized 2b pilot (adaptive verification NON-INFERIOR, 21% cheaper
+        cpvo), the measured escalation multiplier (11.47/12.51, not the sourced 28), and the
+        calibration arc (0/3 -> 2/3 -> decided). The site's current framing is
+        calculator/playbook-heavy (SaaS-adjacent); the operator wants FIELD
+        ESTABLISHMENT: relatable (the $20-key origin), credible (measured-vs-modeled
+        separation, uncertainty shown, honest nulls), expert (the disciplines, the
+        framework, the rules as arms — with the decided arm now backed by a randomized
+        pilot), and VISUALLY EXCEPTIONAL.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks; every phase's
+        deliverable is committed before the next begins. (2) NO SAAS FRAMING: the site must
+        never read as a product pitch, a dashboard-for-sale, or a vendor page. It reads as a
+        FIELD: a named discipline with a question, a method, an instrument, evidence, open
+        questions, and honest limits. (3) PROVENANCE ON EVERY CLAIM: every number carries
+        its [M]/[C]/[H]/[X]/[P] tag; every claim's source is traceable (data.js field,
+        registry record, or a committed verdict doc with SHA256); NOTHING is invented, and
+        nothing is presented as measured that is modeled ([X] external, [P] policy/prior —
+        the site's existing tags stay the standard). (4) DATA.JS IS THE ONLY DATA DOOR:
+        pages never hardcode a number that lives in data.js; the site must remain
+        regenerable via scripts/build_data.py so NEW findings flow in without page edits.
+        (5) HONEST NULLS SHOWN: the site gains credibility by displaying what is NOT
+        measured (the empty EFFICIENT archetype, the session-routing escalate arm that
+        could not be triggered, model-dependent claims) — a finding that is absent or
+        untested is labeled absent, never implied. (6) THE CANONICAL URL NEVER CHANGES:
+        ai-finops-rulebook.web.app stays canonical; agentic-dynamics.web.app stays the
+        mirror; BOTH deploy from apps/website/ with firebase.json in place; never let them
+        drift. (7) The revamp must not break the data build: scripts/build_data.py +
+        scripts/generate_manifest.py + scripts/sync_data.py must all still run green and
+        produce a complete data.js. (8) ACCESSIBILITY + MOBILE: the visual system must be
+        keyboard- and screen-reader-usable, responsive, and pass an a11y pass in p4.
+        (9) Performance: the pages must not ship megabytes of JS; chart/diagram libraries
+        are loaded with judgment (d3 or a lighter hand-rolled SVG when the chart is
+        simpler — the p0 research decides per-visualization, never a blanket dependency).
+        (10) No generated-surface edits (agent_config/, .opencode/, .claude/). (11) p4's
+        truth/UX review is adversarial and mandatory: findings re-verified against the
+        tree; the anti-SaaS test is explicit (a reader must not be able to misread the site
+        as a product); no bare PASS. (12) Resumable only when spec version, goal hash,
+        source revision, and candidate-manifest hash match. (13) The updatability contract:
+        the site documents WHERE new findings land (a 'New evidence' pattern — e.g. the
+        evidence page's corpus table, the framework page's arm status) so the operator can
+        publish a finding by regenerating data.js + editing one editorial slot, not by
+        rewriting pages.
+      read_first: >-
+        apps/website/CONTEXT.md, apps/website/data.js (the fields + tag vocabulary),
+        apps/website/index.html + framework.html + evidence.html + story.html +
+        methodology.html (the audit targets — read ALL of them), apps/website/app.js +
+        base.css, experiments/results/cap_2b/cap_2b_score_20260826T160018Z.json,
+        experiments/results/cap_escalation_measurement/cap_escalation_measurement_score_
+        20260826T125726Z.json, docs/designs/current/cap_2a_rerun3.md,
+        scripts/build_data.py (the data door), AGENTS.md Editor rules
+      run_shape: >-
+        EXECUTED BY gpt-terra (openai/gpt-5.6-terra) — the operator's explicit choice —
+        on every phase. One branch (feature/site-revamp); each phase commits
+        [workflow] <phase>. The worktree holds the full repo; the site work happens in
+        apps/website/. The p5 deploy runs firebase from the worktree's apps/website/.
+        No credentials in committed artifacts.
+    phases:
+      - name: p0_research_and_editorial_audit
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the research + editorial audit phase — NO implementation yet. Deliver a
+          committed research doc that pins every decision the later phases must follow
+          (the operator's demand: detailed, researched, editorialized).
+          R1 — READ THE EVIDENCE: all 8 pages, data.js (every field + its tag), the
+          verdict docs (2b NON-INFERIOR numbers, measured E_x 11.47/12.51, the calibration
+          arc, the honest nulls — escalate untriggered, EFFICIENT archetype empty), the
+          registry counts, the story numbers ($20 key, 347/772 sessions, 3 models, the cost
+          gap). Inventory EVERY number the site currently claims and tag each
+          [M]/[C]/[H]/[X]/[P] with its source field — this table becomes the editorial
+          ledger the rewrite phases MUST respect.
+          R2 — FIELD POSITIONING RESEARCH: articulate the anti-SaaS positioning in one
+          page: what 'establishing a field' means concretely (named question, method,
+          instrument, evidence, open problems, limits), how credible fields signal
+          credibility (measured-vs-modeled separation, uncertainty shown, honest nulls,
+          provenance, reproducibility), and what the site must NOT do (pricing, tiers,
+          'get started', feature lists, testimonial vibes). Write the positioning statement
+          VERBATIM into the doc — the editorial phase follows it.
+          R3 — VISUAL SYSTEM RESEARCH: per-visualization library decisions (d3 vs
+          hand-rolled SVG vs CSS-only) with a rationale each — the site's data is small
+          and curated, so heavy charting frameworks are likely wrong; recommend a
+          lightweight architecture (e.g. inline SVG + a tiny d3 subset or none) with the
+          trade-offs stated. Define the visual language: typography (serif/sans pairing
+          for a research-field feel), color (restrained, editorial — the current
+          calculator aesthetic goes), motion (minimal, purposeful), and the DIAGRAM
+          INVENTORY with a sketch-level spec for each: the instrument cycle
+          (instrument -> derive -> write policy -> grid -> campaign), the N x M problem,
+          the planes (core/experiment/measurement/runtime/adapters/knowledge/control/
+          reporting), ONE ENGINE / TWO OPERATING MODES, the bounded-autonomy envelope, the
+          cost curves (immediate vs cumulative with the N^2 term — modeled, [C]), the
+          escalation chain (cell -> rejected outcome -> E_x 11.47x downstream cost), the
+          calibration arc (0/3 -> 2/3 -> randomized NON-INFERIOR), and the 10 rules as
+          interactive cards (status: proposal vs measured vs decided).
+          R4 — IA + EDITORIAL MAP: the page architecture (what stays, what merges, what
+          moves — e.g. databricks.html may fold into evidence; accelerator may fold into
+          framework), the narrative spine (Story -> Question -> Method -> Evidence ->
+          Framework -> Open questions), and the UPDATABILITY pattern: exactly where new
+          findings land (data.js + one editorial slot per page — name them).
+          DELIVER one committed file: docs/designs/current/cap_site_revamp_research.md
+          (R1's editorial ledger table, R2's positioning statement verbatim, R3's visual
+          system + diagram inventory + library decisions, R4's IA map + updatability
+          pattern) — NO placeholders; the later phases implement THIS doc.
+          LOG: PASS/FAIL; commit.
+      - name: p1_visual_system
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the visual system per the research doc (R3): the design tokens
+          (typography, color, spacing, radius, motion), base.css v2, and the DIAGRAM
+          ASSETS as inline SVG components (apps/website/assets/ or equivalent): the
+          instrument cycle, the N x M problem, the planes map, ONE ENGINE / TWO OPERATING
+          MODES, the bounded-autonomy envelope, the cost curves, the escalation chain, the
+          calibration arc, and the 10-rules interactive card component (flip or expand,
+          status badge: proposal / measured / decided). Every diagram is hand-crafted SVG
+          with the research doc's recommended architecture — a diagram must communicate ONE
+          idea, annotated with the [M]/[C]/[H]/[X]/[P] tags where numbers appear.
+          DELIVER: the tokens + base.css v2 + the SVG components + a component gallery page
+          (apps/website/_design.html or committed preview) so p2/p3 can see the system.
+          GUARD: accessible (aria-labels on every SVG, keyboard-operable cards), responsive,
+          restrained motion, no external font/dependency lock-in without the research doc's
+          blessing.
+          LOG: files created, the design decisions followed from R3; PASS/FAIL; commit.
+      - name: p2_editorial_rewrite
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: rewrite ALL pages' copy per the research doc (R2 positioning VERBATIM +
+          R4 IA map), weaving in the NEW evidence: the randomized 2b verdict (the first
+          arm to be DECIDED — on the framework page's arm status, backed by the pilot's
+          numbers), the measured E_x (11.47/12.51 — the escalation chain diagram's
+          number), the calibration arc, AND the honest nulls (the EFFICIENT archetype is
+          EMPTY — shown as an open question; the session-routing escalate arm untriggered —
+          shown as a measured limit). Every claim traces to the R1 editorial ledger (tag +
+          source field); the editorial ledger is the law — no number outside it without
+          going back to p0-style verification. The Story page carries the human spine (the
+          $20 key, the Rome train) — relatable, first-person, credible; the Evidence page
+          is the field's data (corpus table, per-model verification/cost, cache economics,
+          the campaign arc with the honest nulls); the Framework page is the intellectual
+          core (the cycle, the planes, ONE ENGINE/TWO MODES, bounded autonomy, the 10
+          rules with their status — proposals vs measured vs decided); the Methodology page
+          is the instrument (how the machine measures, the discipline of provenance);
+          glossary + the fold-ins from the R4 IA map.
+          DELIVER: the rewritten pages (HTML with the copy final), committed.
+          GUARD: the anti-SaaS test — read the rewritten home page cold: it must read as a
+          field's statement of itself, never a product; the 'decided arm' claim cites the
+          2b score JSON; the honest-null claims are labeled [M] absence, not implied.
+          LOG: per-page rewrite summary + the editorial ledger deltas; PASS/FAIL; commit.
+      - name: p3_implementation
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: assemble the revamped site from p1's visual system + p2's copy: every
+          page rebuilt (HTML + app.js v2 wiring the interactive cards, the diagrams, the
+          data-driven slots), data.js stays THE data door (a new finding updates data.js +
+          one editorial slot — demonstrate this by wiring at least the 2b verdict and the
+          measured E_x through data.js-backed slots rather than hardcoded page text where
+          feasible). Verify the build chain end-to-end in the worktree: python3
+          scripts/sync_data.py && python3 scripts/build_data.py && python3
+          scripts/generate_manifest.py all green, data.js regenerated and complete; the
+          pages render (open them / smoke-test the JS with node or a headless check).
+          DELIVER: the full revamped site in apps/website/, committed.
+          GUARD: no number hardcoded in pages that exists in data.js; the canonical URL
+          and mirror config untouched (firebase.json, .firebaserc); accessibility +
+          responsive verified (keyboard nav, 320px viewport, no overflow); performance
+          sane (no megabyte scripts; d3 only where p0 approved it).
+          LOG: the build chain output, page inventory, known deviations from the research
+          doc; PASS/FAIL; commit.
+      - name: p4_truth_and_quality_review
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial truth + UX reviewer. Attack in order:
+          (1) TRUTH — every number on every page traces to the editorial ledger (R1) and
+          its data.js/verdict source; a stale, invented, or mis-tagged number is a FAILED
+          finding; the new claims (2b verdict, E_x, calibration arc) cite their score JSONs
+          with SHA256s; the honest nulls are presented as absences, not implications.
+          (2) THE ANTI-SAAS TEST — read the home page as a buyer would: it must not be
+          misreadable as a product (no pricing, tiers, CTAs, 'get started', features-as-
+          selling-points); any such residue is a FAILED finding.
+          (3) THE FIELD TEST — does the site establish the field: named question, method,
+          instrument, evidence, open problems, limits — all present and coherent?
+          (4) UX/UI — information hierarchy, the diagrams communicate one idea each,
+          interactive cards work, mobile + keyboard + screen-reader pass, load performance.
+          (5) UPDATABILITY — the documented new-findings pattern actually works (walk one
+          finding through data.js -> slot -> page).
+          Every finding: fix on the branch or record as accepted limitation with reasoning.
+          DELIVER: docs/reviews/cap_site_revamp_review.md (findings, evidence paths,
+          fixes, the anti-SaaS verdict verbatim) + a known-safe list (what was tried and
+          why it passed).
+          LOG: finding table; PASS/FAIL; commit.
+      - name: p5_deploy
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: final build + dual deploy. Run the data chain fresh (sync -> build ->
+          manifest), then from apps/website/: firebase deploy --only hosting (canonical:
+          ai-finops-rulebook) AND firebase deploy --only hosting --project agentic-dynamics
+          (mirror) — BOTH, never one. Verify both URLs respond (curl both with status 200)
+          and the mirror serves byte-identical assets to the canonical (diff the deployed
+          HTML). Update robots.txt/sitemap.xml/og-image if the IA changed. If the
+          agentic-dynamics project ID is unavailable, STOP and ask — never pick a
+          fallback.
+          DELIVER: the deploy output (both targets), the URL verification, and the
+          post-deploy smoke (home page renders, one diagram page renders).
+          LOG: deploy + verification output; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-terra]}
+design: factorial
+rules:
+  - name: cap_site_research
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [research_pinned, editorial_ledger]
+  - name: cap_site_build
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [research_pinned, editorial_ledger]
+    produces: [site_revamped, data_door_preserved]
+  - name: cap_site_review
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [site_revamped]
+    produces: [truth_review_passed, anti_saas_verdict]
+  - name: cap_site_deploy
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [site_revamped, truth_review_passed]
+    produces: [dual_deploy_verified]
+metrics:
+  - {name: truth_review_passed, agg: mean, over: cell}
+  - {name: anti_saas_verdict, agg: mean, over: cell}
+  - {name: dual_deploy_verified, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p0_research_and_editorial_audit, p1_visual_system, p2_editorial_rewrite, p3_implementation, p4_truth_and_quality_review, p5_deploy]
+stop: {budget_usd: 25.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
