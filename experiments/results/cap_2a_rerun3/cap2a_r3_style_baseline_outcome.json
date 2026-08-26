@@ -1,0 +1,22 @@
+{
+  "schema_version": "cap_2a_outcome/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "cell_id": "cap2a_r3_style_baseline",
+  "arm": "baseline",
+  "baseline_revision": "fec7a127bafd6dc62db57fac4d0cc0ad7ece91ad",
+  "analyzed_revision": "e1d01471772b2e685c6fff44f82671dbb797897a",
+  "proposal_id": "7cb946e0176d54dd",
+  "graph_status": "available",
+  "sonar_status": "available",
+  "lsp_status": "available",
+  "test_executed_success": true,
+  "tests_passed": 3,
+  "tests_total": 3,
+  "outcome": "no_rework",
+  "realized_depth": 0,
+  "defect_present_on_final_commit": false,
+  "new_sonar_critical_count": 0,
+  "realized_symbol_set": [],
+  "adjudication_note": "Independent post-hoc evaluator: rate_for() uses direct float `==` comparisons (minting python:S1244 MAJOR, bug-type) but has NO functional defect \u2014 the documented values resolve deterministically and the independent kind:test phase recorded test_executed_success=true (3/3). The severity filter (BLOCKER,CRITICAL only) correctly EXCLUDES the S1244 MAJOR finding, so new_sonar_critical_count=0 and the realized class is no_rework. This is the severity-conflation fix as data."
+}

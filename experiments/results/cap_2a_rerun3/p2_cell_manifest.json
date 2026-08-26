@@ -1,0 +1,96 @@
+{
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p2_measure_gate_cell",
+  "written_at": "2026-08-26T04:39:00Z",
+  "candidate_id": "c1_clean_gate",
+  "arm": "gate",
+  "cell_id": "cap2a_r3_clean_gate",
+  "spec_path": "workflows/operations/cap_2a_cell_clean.yaml",
+  "spec_path_sha256": "65730a228e238513747fdd658679d4b89389140f92f2a26021170cab338cbba0",
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+  "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "seeded_app_worktree": "/tmp/cap2a_cell_clean_rerun3_gate",
+  "seeded_app_seed_revision": "399e5860f2ca25f0a68c886c2fd2490b90b21302",
+  "finops_cell_id": "cap2a_r3_clean_gate",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "change_analysis": true,
+  "baseline_revision": "399e5860f2ca25f0a68c886c2fd2490b90b21302",
+  "analyzed_revision": "629f689ee4b89c4ced20317598cfbd077aca65a5",
+  "analyzer_status": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available (mypy 2.3.1)"
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.18",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_omitted": [],
+  "proposal": {
+    "proposal_id": "c28eb202d27da59a",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/c28eb202d27da59a.json",
+    "artifact_sha256": "18541a0f1b5de23879b617824b513403b90b133230bb93eb385a9f70dc2350ed"
+  },
+  "gate_application": {
+    "applied_or_null": "null",
+    "action": "continue",
+    "depth": 0,
+    "proof": "Provable null. The proposal action is `continue` (depth 0, empty scope) — applying it exactly as proposed means do nothing (no rework pass, no verify pass beyond the cell's own test phase). The commit trail shows exactly 2 commits (399e586 seed calc app -> 629f689 [workflow] implement), with NO rework/verify-pass commit; the verify phase produced no diff (change_analysis=None, empty commit_hash). The proposal record itself carries applied=false (the shadow-seam invariant); the GATE application is the provable absence of any extra pass.",
+    "commit_trail": ["399e5860f2ca25f0a68c886c2fd2490b90b21302 (seed calc app)", "629f689ee4b89c4ced20317598cfbd077aca65a5 ([workflow] implement)"],
+    "extra_passes": 0
+  },
+  "expected_effect_checks": [
+    {
+      "predicate": "code_change_risk",
+      "direction": "unchanged",
+      "expected": "unchanged",
+      "observed": null,
+      "held": false,
+      "reason": "Unmeasurable: the null application (continue) commits nothing after the implement phase, so no next-phase change_analysis exists to re-measure code_change_risk. The helper reports held=false with observed=null (an unmeasurable claim is a failed claim, never a silent pass) — recorded honestly, not authored."
+    }
+  ],
+  "expected_effect_check_rate": {
+    "claims_made": 1,
+    "claims_checked": 1,
+    "check_rate": 1.0,
+    "held": 0,
+    "held_rate": 0.0,
+    "note": "Every proposal claim was checked (check_rate=1.0); the single `unchanged` claim is unmeasurable under the null application (no next-phase re-analysis), so held_rate=0.0 is an honest measurement of an unmeasurable claim, not a failed prediction."
+  },
+  "cost": {
+    "implement_usd": 0.003790648,
+    "test_usd": 0.0,
+    "verify_usd": 0.004659314,
+    "total_usd": 0.00845
+  },
+  "duration": {
+    "implement_s": 18.77,
+    "test_s": 0.33,
+    "verify_s": 8.14,
+    "wall_s": 84.3
+  },
+  "test_result": "test_executed_success = true (3/3) — independent runtime.test_runner",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T043811Z.json",
+  "run_ledger_sha256": "86feb52d78f3df6c6b1e9d5f1692cc06ad9c717a0627247dd41e6108509b8d08",
+  "expected_realized_class": "no_rework",
+  "note": "E4 gate-arm measurement of the SAME clean stimulus (paired with p1's baseline arm via same spec path + goal hash + source revision). The proposal emitted + validated (continue/depth 0/empty scope, applied=false) and the gate application is a PROVABLE NULL. Graph/sonar/lsp all available; no facts omitted."
+}

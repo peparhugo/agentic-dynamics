@@ -1,0 +1,34 @@
+{
+  "schema_version": "cap_2a_outcome/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "cell_id": "cap2a_r3_critical_gate",
+  "arm": "gate",
+  "baseline_revision": "f451cfc4d0fd45512d187549eda3541ae465fb46",
+  "analyzed_revision": "df14d9d1e6dc9894782d38c0d788f856651e3b04",
+  "final_revision": "33211ed769f948753e1d3a141fb890cdaaf35294",
+  "proposal_id": "03962721aea0655c",
+  "graph_status": "available",
+  "sonar_status": "available",
+  "lsp_status": "available",
+  "test_executed_success": true,
+  "tests_passed": 3,
+  "tests_total": 3,
+  "outcome": "targeted_rework",
+  "defect_present_at_implement": true,
+  "defect_present_on_final_commit": false,
+  "new_sonar_critical_count_implement": 1,
+  "rework_applied": true,
+  "rework_passes": 1,
+  "realized_depth": 1,
+  "realized_symbol_set": [
+    {
+      "file_path": "calc.py",
+      "kind": "function",
+      "qualified_name": "classify",
+      "repository_id": "self-cap2a_r3_critical_gate",
+      "revision": "33211ed769f948753e1d3a141fb890cdaaf35294"
+    }
+  ],
+  "adjudication_note": "Independent post-hoc evaluator over the immutable commits. At the implement commit (df14d9d), classify(10.0) was misclassified (the deliberate [10,20) boundary defect: `value > 10` instead of `>= 10`), and the independent kind:test phase recorded test_executed_success=False (2/3). The GATE then APPLIED the rework proposal (one bounded rework pass): a new commit (33211ed) changed exactly ONE line (`if value > 10:` -> `if value >= 10:`) \u2014 classify(10.0) now resolves correctly, and the independent test_runner on the final commit records 3/3 (test_executed_success=true). Defect ABSENT on the final commit. NOTE: the rework fixed the DEFECT (boundary), not the S3776 cognitive-complexity finding that triggered the proposal (new_sonar_critical_count=1 at implement); the complexity finding persists on the final commit \u2014 recorded for the p4 expected-effect check."
+}

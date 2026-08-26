@@ -1,0 +1,94 @@
+{
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "candidate_id": "c2_critical_gate",
+  "arm": "gate",
+  "cell_id": "cap2a_r3_critical_gate",
+  "spec_path": "workflows/operations/cap_2a_cell_critical.yaml",
+  "spec_path_sha256": "6ecb2bd93e8718c8c42382f648e859672c649de761e46ba74c2d7a460721e4d7",
+  "spec_id": "cap_2a_cell_critical@0.1",
+  "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+  "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "seeded_app_worktree": "/tmp/cap2a_cell_critical_rerun3_gate",
+  "seeded_app_seed_revision": "f451cfc4d0fd45512d187549eda3541ae465fb46",
+  "finops_cell_id": "cap2a_r3_critical_gate",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "baseline_revision": "f451cfc4d0fd45512d187549eda3541ae465fb46",
+  "analyzed_revision": "df14d9d1e6dc9894782d38c0d788f856651e3b04",
+  "final_revision": "33211ed769f948753e1d3a141fb890cdaaf35294",
+  "analyzer_status": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available (mypy 2.3.1)"
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.215",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "1",
+    "sonar_analysis_status": "available"
+  },
+  "facts_omitted": [],
+  "proposal": {
+    "proposal_id": "03962721aea0655c",
+    "action": "rework",
+    "depth": 3,
+    "scope": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/03962721aea0655c.json",
+    "artifact_sha256": "c076e3dc16e29c5aa5d7f1302ab83a727222ee8a5601c2f4b16d68aca445364a"
+  },
+  "gate_application": {
+    "applied_or_null": "applied",
+    "action": "rework",
+    "depth": 3,
+    "rework_passes": 1,
+    "rework_commit": "33211ed769f948753e1d3a141fb890cdaaf35294",
+    "rework_diff": "calc.py: one line `if value > 10:` -> `if value >= 10:` (1 insertion, 1 deletion)",
+    "proof": "The rework proposal was APPLIED as ONE bounded rework pass over the proposal scope (changed symbols + dependents). The commit trail shows a new commit 33211ed ([workflow] rework) on top of the implement commit df14d9d; the diff is exactly the one-line boundary fix. Nothing else changed (no extra passes, no control_route, no actuation).",
+    "commit_trail": [
+      "f451cfc4d0fd45512d187549eda3541ae465fb46 (seed calc app)",
+      "df14d9d1e6dc9894782d38c0d788f856651e3b04 ([workflow] implement)",
+      "33211ed769f948753e1d3a141fb890cdaaf35294 ([workflow] rework)"
+    ]
+  },
+  "outcome": {
+    "artifact": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_gate_outcome.json",
+    "artifact_sha256": "6dfe331d1ed0a4ad877ecc81945e6ce56e4118e44726433e02cea0da53871dfd",
+    "outcome": "targeted_rework",
+    "test_executed_success": true,
+    "defect_present_on_final_commit": false
+  },
+  "cost": {
+    "run_workflow_usd": 0.010647,
+    "rework_pass_usd": 0.004021,
+    "total_usd": 0.014668
+  },
+  "duration": {
+    "implement_s": 99.83,
+    "rework_s": 16.6,
+    "wall_s": 154.0
+  },
+  "test_result": "final commit test_executed_success = true (3/3) \u2014 independent runtime.test_runner after the applied rework",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T044907Z.json",
+  "run_ledger_sha256": "c050cd55293d119d5d72e061cc5d38ea70043af6504fb426b4f5676df7822d87",
+  "expected_realized_class": "targeted_rework"
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "cap_2a_p4_validation/v1",
+  "phase": "p4_score_value",
+  "campaign": "cap_2a_rerun3",
+  "score_artifact": "experiments/results/cap_2a_rerun3/cap_2a_rerun3_score_20260826T050000Z.json",
+  "score_sha256": "08b6fb3297a5a41a3b81b4abc69b68cf86dde108918a244b4cf4fe6689a66a09",
+  "join_validation_errors": [],
+  "verdict_number_trace": {
+    "paired_delta_clean_usd": {
+      "value": 5.9e-05,
+      "field": "paired_value_delta[0].delta_value_usd"
+    },
+    "paired_delta_critical_usd": {
+      "value": 0.106869,
+      "field": "paired_value_delta[1].delta_value_usd"
+    },
+    "paired_delta_style_usd": {
+      "value": 7.8e-05,
+      "field": "paired_value_delta[2].delta_value_usd"
+    },
+    "downstream_defect_cost_usd": {
+      "value": 0.112588,
+      "field": "asymmetric_loss.downstream_defect_cost_usd"
+    },
+    "sum_baseline_loss_usd": {
+      "value": 0.112588,
+      "field": "asymmetric_loss.sum_baseline_loss_usd"
+    },
+    "sum_gate_loss_usd": {
+      "value": -0.112588,
+      "field": "asymmetric_loss.sum_gate_loss_usd"
+    },
+    "cost_per_outcome_baseline": {
+      "value": 0.012948,
+      "field": "cost_per_outcome.baseline_arm.cost_per_outcome_usd"
+    },
+    "cost_per_outcome_gate": {
+      "value": 0.010492,
+      "field": "cost_per_outcome.gate_arm.cost_per_outcome_usd"
+    },
+    "expected_effect_check_rate": {
+      "value": 1.0,
+      "field": "expected_effects.aggregates.check_rate"
+    },
+    "expected_effect_held_rate": {
+      "value": 0.25,
+      "field": "expected_effects.aggregates.held_rate"
+    }
+  }
+}

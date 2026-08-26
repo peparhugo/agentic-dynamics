@@ -1,0 +1,30 @@
+{
+  "schema_version": "cap_2a_outcome/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "cell_id": "cap2a_r3_critical_baseline",
+  "arm": "baseline",
+  "baseline_revision": "66272af150acc5a10df4efc2953ed601fdfb088b",
+  "analyzed_revision": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+  "proposal_id": "7f6ac70cbe5c7cf4",
+  "graph_status": "available",
+  "sonar_status": "available",
+  "lsp_status": "available",
+  "test_executed_success": false,
+  "tests_passed": 2,
+  "tests_total": 3,
+  "outcome": "targeted_rework",
+  "realized_depth": 1,
+  "defect_present_on_final_commit": true,
+  "new_sonar_critical_count": 1,
+  "realized_symbol_set": [
+    {
+      "file_path": "calc.py",
+      "kind": "function",
+      "qualified_name": "classify",
+      "repository_id": "self-cap2a_r3_critical_baseline",
+      "revision": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc"
+    }
+  ],
+  "adjudication_note": "Independent post-hoc evaluator: classify(10.0) returns 'upper-a' but the documented [10,20) contract requires 'mid-a' \u2014 the implement phase used `elif 10 < value < 20` (strict >) where the contract requires `>= 10`, so the boundary value 10.0 is misclassified (the ONE deliberate defect). The independent kind:test phase recorded test_executed_success=False (2/3 \u2014 test_classify's boundary assertion failed). Defect present in the committed code -> targeted_rework; a single targeted edit (`10 < value` -> `10 <= value`) fixes it -> realized_depth=1, realized_symbol_set={classify}. new_sonar_critical_count=1 (python:S3776 CRITICAL cognitive complexity)."
+}

@@ -1,0 +1,149 @@
+{
+  "schema_version": "cap_2a_rework_analysis/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p4_score_value",
+  "cell_id": "cap2a_r3_critical_gate",
+  "purpose": "The next-phase change_analysis of the critical-gate APPLIED rework (rework commit vs implement commit), measured via EvidenceChangeAnalyzer (sonar + lsp + graph legs). This is the evidence for the rework proposal's expected-effect check (new_sonar_critical_count decrease, new_lsp_error_count decrease).",
+  "baseline_revision": "df14d9d1e6dc9894782d38c0d788f856651e3b04",
+  "analyzed_revision": "33211ed769f948753e1d3a141fb890cdaaf35294",
+  "sonar_evidence": {
+    "status": "available",
+    "revision_matches": true,
+    "new_critical_count": 0,
+    "analyzed_sha": "33211ed769f948753e1d3a141fb890cdaaf35294"
+  },
+  "lsp_evidence": {
+    "status": "available",
+    "new_error_count": 0,
+    "tool": "mypy"
+  },
+  "change_analysis": {
+    "facts": [
+      {
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      },
+      {
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      },
+      {
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      },
+      {
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      },
+      {
+        "predicate": "changed_symbol_count",
+        "value": "1",
+        "value_type": "int",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      },
+      {
+        "predicate": "impacted_symbol_count",
+        "value": "5",
+        "value_type": "int",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      },
+      {
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      },
+      {
+        "predicate": "new_sonar_critical_count",
+        "value": "0",
+        "value_type": "int",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      },
+      {
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "1.0",
+        "value_type": "float",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      },
+      {
+        "predicate": "code_change_risk",
+        "value": "0.1",
+        "value_type": "float",
+        "evidence_ids": [
+          "delta:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "sonar:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "lsp:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294",
+          "impacted:self-cap2a_r3_critical_gate:rework:33211ed769f948753e1d3a141fb890cdaaf35294"
+        ]
+      }
+    ],
+    "neighborhood": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ],
+    "graph_updated": true,
+    "impacted_count": 5,
+    "graph_status": "available",
+    "revision": "33211ed769f948753e1d3a141fb890cdaaf35294",
+    "repository_id": "self-cap2a_r3_critical_gate",
+    "phase_id": "rework",
+    "observed_at": "2026-08-26T05:00:00Z"
+  }
+}

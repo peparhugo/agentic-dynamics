@@ -1,0 +1,22 @@
+{
+  "schema_version": "cap_2a_outcome/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "cell_id": "cap2a_r3_style_gate",
+  "arm": "gate",
+  "baseline_revision": "b0a8961df37970c7645956e104e5f3e13e3adcf1",
+  "analyzed_revision": "f1888c8e048b21af1c0201277c926e7c49929fc1",
+  "proposal_id": "b4c91ccfbdabeef2",
+  "graph_status": "available",
+  "sonar_status": "available",
+  "lsp_status": "available",
+  "test_executed_success": true,
+  "tests_passed": 3,
+  "tests_total": 3,
+  "outcome": "no_rework",
+  "realized_depth": 0,
+  "defect_present_on_final_commit": false,
+  "new_sonar_critical_count": 0,
+  "realized_symbol_set": [],
+  "adjudication_note": "Independent post-hoc evaluator: rate_for() has no functional defect (float == comparisons mint python:S1244 MAJOR only, severity-excluded), test_executed_success=true (3/3). The gate proposal is `continue` (new_sonar_critical_count=0, risk 0.18 < 0.2), applied as a PROVABLE NULL: commit trail is seed -> implement with no rework/verify-pass commit."
+}

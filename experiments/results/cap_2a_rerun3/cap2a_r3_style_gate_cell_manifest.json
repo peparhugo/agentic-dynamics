@@ -1,0 +1,84 @@
+{
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "candidate_id": "c3_style_gate",
+  "arm": "gate",
+  "cell_id": "cap2a_r3_style_gate",
+  "spec_path": "workflows/operations/cap_2a_cell_style.yaml",
+  "spec_path_sha256": "eaf7e806ce8f3b7f49f3f804904df513887e58387a73e1dc2ffe1337fd994ab4",
+  "spec_id": "cap_2a_cell_style@0.1",
+  "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+  "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "seeded_app_worktree": "/tmp/cap2a_cell_style_rerun3_gate",
+  "seeded_app_seed_revision": "b0a8961df37970c7645956e104e5f3e13e3adcf1",
+  "finops_cell_id": "cap2a_r3_style_gate",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "baseline_revision": "b0a8961df37970c7645956e104e5f3e13e3adcf1",
+  "analyzed_revision": "f1888c8e048b21af1c0201277c926e7c49929fc1",
+  "analyzer_status": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available (mypy 2.3.1)"
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.18",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_omitted": [],
+  "proposal": {
+    "proposal_id": "b4c91ccfbdabeef2",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/b4c91ccfbdabeef2.json",
+    "artifact_sha256": "3d92bfde2920b33fb36c0aeeccb74eb5c3c36b4be99650e249c0eadcfc8dfe6b"
+  },
+  "gate_application": {
+    "applied_or_null": "null",
+    "action": "continue",
+    "depth": 0,
+    "proof": "continue is a no-op; applied exactly as proposed (no rework, no verify pass beyond the cell's own test phase). Commit trail: b0a8961 (seed) -> f1888c8 (implement), NO extra commits; verify phase produced no diff.",
+    "commit_trail": [
+      "b0a8961df37970c7645956e104e5f3e13e3adcf1 (seed calc app)",
+      "f1888c8e048b21af1c0201277c926e7c49929fc1 ([workflow] implement)"
+    ],
+    "extra_passes": 0
+  },
+  "outcome": {
+    "artifact": "experiments/results/cap_2a_rerun3/cap2a_r3_style_gate_outcome.json",
+    "artifact_sha256": "2f1bdad5f1815dbfaf520742b54060dd2e97e726ee3371e18dfa96b3933d3246",
+    "outcome": "no_rework",
+    "test_executed_success": true,
+    "defect_present_on_final_commit": false
+  },
+  "cost": {
+    "implement_usd": 0.003685668,
+    "test_usd": 0.0,
+    "verify_usd": 0.004673234,
+    "total_usd": 0.008359
+  },
+  "duration": {
+    "implement_s": 16.4,
+    "test_s": 0.33,
+    "verify_s": 9.59
+  },
+  "test_result": "test_executed_success = true (3/3) \u2014 independent runtime.test_runner",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T045533Z.json",
+  "run_ledger_sha256": "b14454b89aa3f5e9fd65ffbcfed19f9967006b564bb5b4ec886e89758880a578",
+  "expected_realized_class": "no_rework"
+}
