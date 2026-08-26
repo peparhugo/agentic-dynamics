@@ -1,0 +1,34 @@
+{
+  "schema_version": "cap_2a_p4_validation/v1",
+  "campaign": "cap_2a_rerun2",
+  "phase": "p4_score_hit_rate",
+  "score_json": "experiments/results/cap_2a_rerun2/cap_2a_rerun2_score_20260826T015846Z.json",
+  "join_validation": {
+    "n_valid_joins": 3,
+    "n_invalid_joins": 0,
+    "errors": [],
+    "note": "Every cell's proposal + outcome + cell manifest agree on cell_id, baseline_revision, analyzed_revision, proposal_id, and contract_version (verify_code_change/v1, applied=false). No row was refused."
+  },
+  "verdict_number_to_field": {
+    "hit_rate = 0.6667": "aggregates.n_hits (2) / aggregates.n_scored (3). Per-cell hit: cells[cap2a_p2_clean].hit=true (continue hits no_rework), cells[cap2a_p3_critical].hit=false (rework scope [add,subtract,test_add,test_subtract] does not contain realized {classify}), cells[cap2a_p3_style].hit=true (continue hits no_rework).",
+    "n = 3": "aggregates.n_scored — all three cells have a complete proposal + a recorded non-unknown outcome.",
+    "wilson_95_ci = [0.2077, 0.9385]": "Wilson 95% on hit_rate 2/3 (z=1.96, standard score interval; the same formula the rerun used, which gave [0.0, 0.5615] at 0/3).",
+    "risk_mint_rate = 1.0": "3/3 cells minted code_change_risk (clean 0.18, critical 0.215, style 0.18) — carries the rerun's broken-blocker fix (rerun risk_mint_rate also 1.0).",
+    "blast_radius mean = 3.6667 / median = 4": "abs(predicted_impacted_symbol_count - len(realized_symbol_set)) per cell: clean |4-0|=4, critical |4-1|=3, style |4-0|=4. n_available=3 (all graph available).",
+    "graph_unavailable_rate = 0.0": "0/3 cells graph_status != available.",
+    "outcome_recorded_rate = 1.0": "3/3 cells have a recorded realized_outcome (no unknown).",
+    "proposal_validation_rate = 1.0": "3/3 proposals validated (valid_join=true, applied=false).",
+    "n_unknown_outcome = 0 / n_invalid_join = 0 / n_not_run = 0": "aggregates fields; all three cells ran, joined, and scored."
+  },
+  "calibration_trace": {
+    "risk_buckets[0.15,0.3).no_rework = 2 / targeted_rework = 1": "clean (0.18, no_rework) + style (0.18, no_rework) + critical (0.215, targeted_rework) all fall in [0.15,0.3); buckets [0,0.15) and [0.3,inf) are empty.",
+    "finding_outcome['0'].no_rework = 2 / ['>=1'].targeted_rework = 1": "new_sonar_critical_count=0 for clean+style (both no_rework); =1 for critical (targeted_rework).",
+    "severity_strictness": "Live server probe (127.0.0.1:9000): critical -> python:S3776 CRITICAL calc.py:9 (counted); style -> 5x python:S1244 MAJOR (calc.py:18/20/22, test_calc.py:13/14) -> BLOCKER,CRITICAL filter returns 0 (excluded). This is the conflation fix as DATA, not prose."
+  },
+  "rerun_comparison": {
+    "rerun": "0/3 hits (all three cells realized no_rework but proposed verify/rework — systematic action over-prediction; the p3b rework was driven by python:S1244 MAJOR).",
+    "rerun2": "2/3 hits. Action over-prediction is GONE: continue->no_rework correct 2/2, rework->targeted_rework action correct 1/1. The single miss is a SCOPE miss, not an action miss: the rework scope (executor neighborhood) excludes the changed symbol {classify}.",
+    "overprediction_shrank": true
+  },
+  "note": "No 2b recommendation here (p4). Hit-rate 0.667 >= 0.6 gate threshold, descriptively under n=3."
+}
