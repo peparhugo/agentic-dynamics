@@ -1,6 +1,9 @@
+---
+status: accepted
+---
 # cap_site_revamp — follow-up question: how do we gate visual craft?
 
-**Status: open** · Raised: 2026-08-26, after `cap_site_revamp` (gpt-terra) deployed.
+Raised: 2026-08-26, after `cap_site_revamp` (gpt-terra) deployed.
 
 ## What happened (the finding)
 
