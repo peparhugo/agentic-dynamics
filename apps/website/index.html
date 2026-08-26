@@ -1,206 +1,107 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Agentic Dynamics — No Universal Best Practices</title>
-<meta name="description" content="There are no universal AI best practices — only agent-environment systems. Agentic Dynamics measures that collision across 1,067 sessions and 7 models.">
-<meta property="og:title" content="Agentic Dynamics — No Universal Best Practices">
-<meta property="og:description" content="No universal best practices. Only agent-environment systems. Agentic Dynamics measures the collision, from 1,067 sessions and 7 models.">
-<meta property="og:url" content="https://ai-finops-rulebook.web.app/">
-<meta property="og:type" content="website">
-<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
-<meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Agentic Dynamics is the empirical study of how agents behave as tasks, environments, workflows, and time change.">
+<title>Agentic Dynamics</title>
 <link rel="stylesheet" href="base.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<style>
-.home-hero h1{max-width:780px;font-size:clamp(1.9rem,4.2vw,3.2rem)}
-.hero-actions{display:flex;gap:0.8rem;flex-wrap:wrap;margin-top:1.5rem}
-.source-note{display:inline-flex;align-items:center;gap:0.5rem;margin-top:1.1rem;padding:0.55rem 0.8rem;border:1px solid var(--b);border-radius:999px;color:var(--t3);font-size:0.76rem;background:rgba(16,23,34,0.68)}
-.source-note strong{color:var(--t2)}
-.lever-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
-.lever-card{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:18px;padding:1.2rem;text-align:left}
-.lever-card .lever-name{font-family:'JetBrains Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--am);margin-bottom:0.7rem}
-.lever-card .lever-measure{font-weight:800;color:var(--t);font-size:1rem;margin-bottom:0.45rem;letter-spacing:-0.02em}
-.lever-card p{font-size:0.84rem;margin:0;color:var(--t2)}
-.mechanism-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
-.mechanism{display:flex;flex-direction:column;min-height:100%;background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:18px;padding:1.2rem;text-align:left}
-.mechanism .num{font-family:'JetBrains Mono',monospace;font-size:0.78rem;font-weight:800;color:var(--ac);margin-bottom:0.75rem}
-.mechanism h3{margin:0 0 0.5rem;font-size:1rem}.mechanism p{margin:0;font-size:0.83rem;color:var(--t2);line-height:1.6}
-.cost-contrast{display:grid;grid-template-columns:minmax(0,0.75fr) minmax(320px,1fr);gap:1.4rem;align-items:stretch;margin-top:1.5rem}
-.cost-panel{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:22px;padding:1.4rem;text-align:left;box-shadow:var(--panel-shadow)}
-.cost-panel h3{font-family:'JetBrains Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--t3);margin:0 0 1rem}
-.model-row{display:grid;grid-template-columns:1fr auto auto;gap:1rem;align-items:center;padding:0.85rem 0;border-bottom:1px solid var(--b);font-size:0.86rem;color:var(--t2)}
-.model-row:last-child{border-bottom:none}.model-row strong{color:var(--t)}.model-row .price{font-family:'JetBrains Mono',monospace;color:var(--ac);font-weight:800}.model-row .high{color:var(--am)}
-.route-panel{border:1px solid var(--ba);border-left:4px solid var(--ac);border-radius:0 18px 18px 0;padding:1.25rem;background:rgba(34,211,238,0.045);text-align:left}
-.route-panel p{margin:0;color:var(--t2);font-size:0.94rem}.route-panel strong{color:var(--t)}
-.pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.6rem;margin:1.5rem 0}
-.pipe-step{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0.9rem;text-align:center;font-size:0.72rem;color:var(--t2)}
-.pipe-step .ps-label{font-weight:700;color:var(--ac);font-size:0.7rem;margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:0.5px}
-.finding{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:14px;padding:1.3rem;margin:0.8rem 0;text-align:left}
-.finding .fn{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--ac);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem}
-.finding h3{font-size:0.95rem;margin:0 0 0.3rem;color:var(--t)}
-.finding p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
-.op-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.8rem;margin:1rem 0}
-.op-card{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1rem;text-align:left}
-.op-card h4{font-size:0.78rem;color:var(--t);margin:0 0 0.4rem}
-.op-card ul{list-style:none;padding:0;margin:0}
-.op-card li{font-size:0.7rem;color:var(--t2);padding:0.15rem 0}
-body.light .source-note,body.light .lever-card,body.light .mechanism,body.light .cost-panel,body.light .finding,body.light .op-card,body.light .pipe-step{background:linear-gradient(180deg,#ffffff,#f8fafc)}
-body.light .route-panel{background:rgba(34,211,238,0.08)}
-.field-map{margin:0}
-.field-map img{display:block;width:100%;max-width:760px;height:auto;margin:0 auto;border-radius:18px;border:1px solid var(--b)}
-.field-map figcaption{font-size:0.8rem;color:var(--t3);text-align:center;margin-top:0.75rem}
-@media(max-width:900px){.lever-grid,.mechanism-grid,.cost-contrast,.op-grid{grid-template-columns:1fr}.mechanism-grid{gap:0.8rem}}
-@media(max-width:768px){.hero-actions{flex-direction:column}.hero-actions .cta-btn{justify-content:center}.source-note{border-radius:14px;align-items:flex-start}.model-row{grid-template-columns:1fr;gap:0.25rem}}
-</style>
-<script src="data.js"></script>
+<script src="data.js">
+</script>
+<script src="assets/design-components.js">
+</script>
+<script src="assets/publication.js">
+</script>
 </head>
-<body class="home">
-
-<nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
-
-<section class="dossier-hero home-hero"><div class="hero-grid">
-  <div>
-    <div class="section-kicker" style="font-size:0.82rem;margin-bottom:0.5rem;color:var(--ac);letter-spacing:0.12em">Why — Agentic Dynamics</div>
-    <h1>Systems are constantly evolving. Scaling agents means measuring that evolution.</h1>
-    <p class="lead">Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This repository is its founding instrument and corpus.</p>
-    <blockquote class="pullquote">&ldquo;The system shapes the agent — and the agent reshapes the system. Read that again.&rdquo;</blockquote>
-    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">Examine the Method</a><a href="evidence.html" class="cta-btn ghost">Inspect the Evidence →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
-  </div>
-  <aside class="proof-ledger" aria-label="Key numbers">
-    <h3>Evidence behind the discovery</h3>
-    <div class="proof-card"><span class="label">Story sessions</span><div class="value"><span data-stat="story_sessions">1,067</span></div></div>
-    <div class="proof-card"><span class="label">Models</span><div class="value"><span data-stat="variants">7</span></div></div>
-    <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">215</span></div></div>
-    <div class="proof-card success"><span class="label">Total measured cost</span><div class="value">$<span data-stat="story_total_cost">309.17</span></div></div>
-  </aside>
-</div></section>
-
-<!-- The field -->
-<section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">What — the field</div>
-  <h2>A measurement question became Agentic Dynamics.</h2>
-  <figure class="field-map">
-    <img src="agentic-dynamics-field-map.png" alt="Field map of Agentic Dynamics: five disciplines — AI and agentic systems, FinOps and cloud economics, software engineering and architecture, systems and reliability engineering, and experimental science — surround a core that measures how context, complexity, and uncertainty shape agent decisions and propagate into reliability, cost, and value.">
-    <figcaption>Five disciplines feed one core: how context, complexity, and uncertainty shape agent decisions — and propagate into reliability, cost, and value.</figcaption>
-  </figure>
-  <p class="lead">Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This instrument currently examines cost, verification, maintainability, recovery, and five-session progression in coding-agent workflows. Routing and long-horizon value remain questions for controlled experiments, not conclusions inferred from a price sheet.</p>
-  <div class="hero-actions"><a href="framework.html" class="cta-btn">Examine Policy Experiments →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
-</div></section>
-
-<!-- Section 2: HOW -->
-<section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">How — the question scaled</div>
-  <h2>One question became an N x M measurement problem.</h2>
-  <p class="lead">The original question compared one model's cost and quality under degraded input. Answering it properly required N linked sessions, because each output becomes the next session's codebase, and M measurement angles, because passing tests cannot stand in for verification, maintainability, cache economics, routing risk, or long-horizon cost. The corpus is the product of that multiplication, not a larger benchmark.</p>
-  <div class="op-grid">
-    <div class="op-card">
-      <h4>N — linked sessions</h4>
-      <ul>
-        <li>Session 1: greenfield build from spec</li>
-        <li>Session 2: feature addition</li>
-        <li>Session 3: integration (auth, async, persistence)</li>
-        <li>Session 4: refactor (repository pattern, layering)</li>
-        <li>Session 5: cross-cutting (rate limiting, pagination)</li>
-      </ul>
-    </div>
-    <div class="op-card">
-      <h4>Controlled variation</h4>
-      <ul>
-        <li><strong>Clean</strong> — unmodified specifications</li>
-        <li><strong>Early degrade</strong> — the first spec is corrupted, cascading through later sessions</li>
-      </ul>
-    </div>
-    <div class="op-card">
-      <h4>M — measurement angles</h4>
-      <ul>
-        <li>AST diffs, conventions, and maintainability per commit</li>
-        <li>Maintainability cost and long-horizon scalability</li>
-        <li>One-way/two-way-door routing and verification depth</li>
-        <li>Cache economics, recovery, tests, and independent review</li>
-      </ul>
-    </div>
-  </div>
-  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">215 stories across 3 codebases (CRUD API, static site generator, notification service) and 2 tiers, run against 7 models. Every measurement is provenance-tagged; a signal that was not captured is published as null with its coverage, never a fabricated zero. Collection creates one N x M burden; analysis creates a second across models, conditions, tasks, tiers, commits, and story positions. More sessions without analysis are volume, not information.</p>
-</div></section>
-
-<!-- Section 3: The instrument -->
-<section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">How — from events to policy</div>
-  <h2>Instrument, derive, write policy, grid, campaign.</h2>
-  <div class="pipeline">
-    <div class="pipe-step"><div class="ps-label">Instrument — capture events</div>Session 1–5 traces, tokens, cache reads, cost, tests, and code changes</div>
-    <div class="pipe-step"><div class="ps-label">Derive — turn events into information</div>Static analysis, reviews, verification depth, recovery, and cost per accepted outcome</div>
-    <div class="pipe-step"><div class="ps-label">Write policy — consume measured information</div>Control rules use only fields the instrument actually produces</div>
-    <div class="pipe-step"><div class="ps-label">Grid — test policy as an arm</div>Compare policy choices across controlled factor combinations</div>
-    <div class="pipe-step"><div class="ps-label">Campaign — change one variable and repeat</div>Use the remaining uncertainty to select the next measurement</div>
-  </div>
-  <div class="hero-actions"><a href="methodology.html" class="cta-btn">Examine the Method →</a><a href="https://github.com/peparhugo/agentic-dynamics" class="cta-btn ghost">Inspect the Source →</a></div>
-</div></section>
-
-<!-- Section 4: WHAT -->
-<section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">What — the evidence</div>
-  <h2>The unmeasured gap became visible.</h2>
-  <p class="lead">The supporting corpus contains 1,067 instrumented story sessions. Four findings made the gap concrete.</p>
-  <div class="finding">
-    <div class="fn">Finding 1</div>
-    <h3>Price and verification depth do not move together in this corpus.</h3>
-    <p>OpenAI spans a 41× price range — Luna at $0.09 and Sol at $3.75 — and both write ~10 tests per story. Claude spans 2.9× — Haiku at $1.59 and Sonnet 5 at $4.58 — and both write ~120. All pass their tests. In these observed tasks, the 10× verification gap appears <em>between</em> vendors rather than between price tiers; the result describes this corpus, not a universal purchasing rule.</p>
-  </div>
-  <div class="finding">
-    <div class="fn">Finding 2</div>
-    <h3>Later sessions cost more across the five-session arc.</h3>
-    <p>The measured story cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34), while tokens grow from 18.7K to 34.9K. Every session inherits a larger codebase, so per-session cost understates the observed maintenance arc by ~2×. Generalizing that mechanism beyond the measured arc remains modeled.</p>
-  </div>
-  <div class="finding">
-    <div class="fn">Finding 3</div>
-    <h3>Cache behavior separates token volume from session cost.</h3>
-    <p>The cheapest model (Flash) and the most expensive (Sol) both send ~47K tokens per session — Flash at $0.07, Sol at $3.75. Luna hits a 98% cache-hit rate and sends just 6.3K. Token volume, cache policy, and test thoroughness appear as three separate knobs in this corpus; their separation does not establish that any one predicts the other two.</p>
-  </div>
-  <div class="finding">
-    <div class="fn">Finding 4</div>
-    <h3>Degradation can leak across sessions, and recovery can be measured.</h3>
-    <p>Corrupting the session-1 spec (<code>early_degrade</code>) lowers the success rate to 86% (versus 97% clean) and raises the cascade rate (1.5% &rarr; 2.5%). Degradation raises risk at the margin; it does not dominate the outcome. Cells labelled <code>bad_seed</code>/<code>early_degrade</code> that carried no instrumented test verdict received no actual perturbation and are counted as <code>clean</code> (<code>docs/data_integrity_findings.md</code> treatment rule 1), so the arms above are the corrected ones.</p>
-  </div>
-  <div class="hero-actions"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
-</div></section>
-
-<!-- Section 5: The concept -->
-<section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">What — the durable-value gap</div>
-  <h2>Correctness is not verification.</h2>
-  <p class="lead">A model can pass every test it writes and still leave a system unverified. The gap is measured by test thoroughness:</p>
-  <p style="font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:0.85rem;line-height:2;text-align:center;padding:1rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b)">
-    Tests per story: Luna 7 &middot; Terra 9 &middot; Sol 13 &middot; Flash 34 &middot; Pro 34 &middot; Haiku 117 &middot; Sonnet 122
-  </p>
-  <p>All seven models pass their own tests at roughly equal rates, but the tests differ by an order of magnitude. Luna ships ~7 tests that confirm the happy path. Sonnet 5 ships ~122 that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." One has a much broader observed verification surface.</p>
-  <p>This is the durable-value gap. Correctness asks whether code passes the tests you have. Verification asks whether you have the tests that would catch the failures that matter. In this corpus, that safety net varies by vendor family, while price alone does not explain the difference.</p>
-  <div class="hero-actions"><a href="evidence.html#story-models" class="cta-btn">Inspect the Verification Gap →</a></div>
-</div></section>
-
-<!-- Bottom links -->
-<section class="dossier-section"><div class="dossier-inner">
-  <div style="display:flex;gap:2rem;flex-wrap:wrap;justify-content:center;font-size:0.85rem">
-    <a href="evidence.html" style="color:var(--ac)">Evidence</a>
-    <a href="methodology.html" style="color:var(--ac)">Instrument</a>
-    <a href="framework.html" style="color:var(--ac)">Framework</a>
-    <a href="story.html" style="color:var(--ac)">Story</a>
-    <a href="https://github.com/peparhugo/agentic-dynamics" style="color:var(--ac)">GitHub</a>
-    <a href="databricks.html" style="color:var(--t3)">Related Work</a>
-  </div>
-</div></section>
-
-<footer>
-  <strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-  <span data-stat="story_sessions">1,067</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">215</span> stories · $<span data-stat="story_total_cost">309.17</span> measured<br>
-  <a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> ·
-  <a href="story.html">Story</a> · <a href="methodology.html">Instrument</a> ·
-  <a href="evidence.html">Evidence</a> · <a href="databricks.html">Related Work</a>
+<body class="ad-page">
+<nav class="ad-public-nav" aria-label="Primary">
+<div class="ad-public-nav__inner">
+<a href="index.html">AGENTIC DYNAMICS</a>
+<a href="story.html">Story</a>
+<a href="question.html">Question</a>
+<a href="methodology.html">Method</a>
+<a href="evidence.html">Evidence</a>
+<a href="framework.html">Framework</a>
+<a href="accelerator.html">Open questions</a>
+</div>
+</nav>
+<main class="ad-shell">
+<header class="ad-hero">
+<div class="ad-hero__grid">
+<div class="ad-reading">
+<p class="ad-kicker">A field statement</p>
+<h1>Measure the changing system around the agent.</h1>
+<p class="ad-lead">Agentic Dynamics is the empirical study of how agents behave as tasks, environments, workflows, and time change. It begins with a practical question: what does an agentic outcome cost once verification, recovery, inherited context, and downstream consequences are included? The field's method is to instrument real agent work, derive named information from the resulting record, test policy choices as controlled arms, and repeat only where uncertainty remains. This site publishes the instrument, the corpus boundary, the verdicts, the nulls, and the open problems. It does not sell certainty, a routing product, or a universal best practice.</p>
+<p class="ad-source">[P] R2 positioning statement, reproduced verbatim from `cap_site_revamp_research.md:16`.</p>
+</div>
+<aside class="ad-stat-rail" aria-label="Current corpus receipt">
+<div class="ad-stat">
+<span class="ad-stat__label">Captured story sessions</span>
+<strong class="ad-stat__value" data-ad-stat="sessions">not loaded</strong>
+<span class="ad-stat__source">[M] `summary.sessions_total`</span>
+</div>
+<div class="ad-stat">
+<span class="ad-stat__label">Stories / reruns included</span>
+<strong class="ad-stat__value" data-ad-stat="stories">not loaded</strong>
+<span class="ad-stat__source">[C] `summary.stories_total`</span>
+</div>
+<div class="ad-stat">
+<span class="ad-stat__label">Measured total cost</span>
+<strong class="ad-stat__value" data-ad-stat="cost">not loaded</strong>
+<span class="ad-stat__source">[M] `summary.total_cost`</span>
+</div>
+</aside>
+</div>
+</header>
+<section class="ad-section ad-columns">
+<div class="ad-reading">
+<p class="ad-kicker">The method</p>
+<h2>Instrument. Derive. Write policy. Grid. Campaign.</h2>
+<p>Events become information only after they are captured and evaluated. Information becomes a policy input only when the instrument produced it. A policy becomes evidence only when it is tested as an arm in a controlled grid. A campaign changes one factor in response to the uncertainty that remains.</p>
+<figure class="ad-figure" data-ad-diagram="cycle">
+<figcaption>Figure 1. The field method [P], adapted from the architecture and experiment compiler. It names an ordering, not a performance claim.</figcaption>
+</figure>
+</div>
+<aside class="ad-aside">
+<p>
+<span class="ad-evidence" data-evidence="P">[P] FIELD POSITION</span>
+</p>
+<p>The field's method is to instrument real agent work, derive named information from the resulting record, test policy choices as controlled arms, and repeat only where uncertainty remains. This site publishes the instrument, the corpus boundary, the verdicts, the nulls, and the open problems. It does not sell certainty, a routing product, or a universal best practice.</p>
+<p class="ad-source">Verbatim continuation of the R2 positioning statement, `cap_site_revamp_research.md:16`.</p>
+</aside>
+</section>
+<section class="ad-section">
+<p class="ad-kicker">What is established</p>
+<h2>A research program, not a product.</h2>
+<div class="ad-columns">
+<div class="ad-reading">
+<p>The site publishes the instrument, the corpus boundary, verdicts, nulls, and open problems. It does not sell certainty, a routing product, or a universal best practice.</p>
+<p>The current linked-story corpus records how agents inherit code through five-session work, while the earlier perturbation corpus remains a dated precursor. They are related instruments, not one merged denominator.</p>
+<ul class="ad-link-list">
+<li>
+<a href="story.html">Read the personal anomaly that became the question.</a>
+</li>
+<li>
+<a href="methodology.html">Inspect the instrument and provenance discipline.</a>
+</li>
+<li>
+<a href="evidence.html">Inspect the corpus, verdicts, and measured limits.</a>
+</li>
+<li>
+<a href="framework.html">See how information becomes testable policy.</a>
+</li>
+</ul>
+</div>
+<aside class="ad-callout ad-callout--null">
+<h3>Nulls are results.</h3>
+<p>Untriggered escalation, unavailable LSP diagnostics, and threshold-bound historical classifications are published as limitations. They are not transformed into zeroes or promises.</p>
+<p class="ad-source">[M] absence states and [H] historical classification; see Evidence and Open Questions.</p>
+</aside>
+</div>
+</section>
+</main>
+<footer class="ad-shell ad-footer">
+<p class="ad-note">Current corpus receipt: `apps/website/data.js` generated 2026-08-26. Editorial policy and field statement: `docs/designs/current/cap_site_revamp_research.md`.</p>
 </footer>
-
-<script src="app.js"></script>
 </body>
 </html>

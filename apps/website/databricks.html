@@ -1,209 +1,53 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Related Work — Agentic Dynamics</title>
-<meta name="description" content="On August 7, 2026, Databricks published their AI cost playbook. Agentic Dynamics examines related operational questions through 227 historical controlled experiments and maps each source to its evidence.">
-<meta property="og:title" content="Related Work — Agentic Dynamics">
-<meta property="og:description" content="Agentic Dynamics related work: Databricks coding-agent benchmark and FinOps Foundation">
-<meta property="og:url" content="https://ai-finops-rulebook.web.app/databricks.html">
-<meta property="og:type" content="website">
-<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
-<meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Scoped related work for Agentic Dynamics.">
+<title>Related Work | Agentic Dynamics</title>
 <link rel="stylesheet" href="base.css">
-<style>
-article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
-.db-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,0.72fr);gap:2rem;align-items:stretch;margin-bottom:3rem}
-.db-hero-copy{padding:1rem 0}.db-hero-copy h1{max-width:760px}
-.subtitle{font-size:1.05rem;color:var(--t2);margin:1rem 0 1.25rem;line-height:1.7;max-width:760px}.lead{font-size:1.05rem;color:var(--t2);margin:1rem 0 1.25rem;line-height:1.7;max-width:760px}
-.db-ledger{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(7,10,15,0.96));border:1px solid var(--ba);border-radius:24px;padding:1.2rem;box-shadow:var(--panel-shadow)}
-.db-ledger h3{font-family:'JetBrains Mono',monospace;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.09em;color:var(--t3);margin:0 0 1rem}
-.db-row{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;border-top:1px solid var(--b);padding:0.85rem 0}.db-row:first-of-type{border-top:none;padding-top:0}
-.db-row span{font-size:0.8rem;color:var(--t2)}.db-row strong{font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:1rem;text-align:right}.db-row.market strong{color:var(--am)}
-.ext-link{display:inline-flex;align-items:center;gap:0.4rem;padding:0.55rem 1rem;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.22);border-radius:999px;font-size:0.75rem;font-weight:700;color:var(--am);text-decoration:none;margin-top:0.25rem;transition:border-color .2s,background .2s}
-.ext-link:hover{border-color:rgba(245,158,11,0.42);background:rgba(245,158,11,0.12);text-decoration:none}
-.section-hd{border-left:3px solid var(--ac);padding-left:1rem;margin:2.8rem 0 1rem}
-.section-hd.amber{border-left-color:var(--am)}
-.claim-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
-.claim-box{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:18px;padding:1.25rem;text-align:left;box-shadow:0 1px 0 rgba(255,255,255,0.03) inset}
-.claim-box h4{font-size:0.75rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 0.5rem}
-.claim-box .tag{display:inline-block;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem}
-.claim-box .tag.their{background:rgba(245,158,11,0.08);color:var(--am);border:1px solid rgba(245,158,11,0.18)}
-.claim-box .tag.ours{background:rgba(34,211,238,0.08);color:var(--ac);border:1px solid rgba(34,211,238,0.18)}
-.claim-box p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
-.mono{font-family:'JetBrains Mono',monospace}
-.gap-box{background:rgba(245,158,11,0.055);border:1px solid rgba(245,158,11,0.16);border-left:3px solid var(--am);border-radius:0 16px 16px 0;padding:1rem 1.2rem;margin:0.8rem 0;font-size:0.82rem;color:var(--t2);line-height:1.65}
-.gap-box strong{color:var(--am)}
-.miss-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.8rem;margin:1rem 0}
-.miss-card{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:16px;padding:1rem;text-align:left}
-.miss-card h4{font-size:0.85rem;color:var(--t);margin:0 0 0.3rem}
-.miss-card p{font-size:0.76rem;color:var(--t2);line-height:1.5;margin:0}
-.bottom{background:linear-gradient(135deg,rgba(34,211,238,0.07),rgba(245,158,11,0.06));border:1px solid var(--ba);border-left:3px solid var(--ac);border-radius:0 18px 18px 0;padding:1.3rem 1.5rem;margin:2rem 0;font-size:0.88rem;color:var(--t2);line-height:1.7}
-.bottom strong{color:var(--t)}
-@media(max-width:768px){article{padding:5rem 1rem 2rem}.db-hero,.claim-grid{grid-template-columns:1fr}.db-hero{gap:1rem}}
-</style>
-<script src="data.js"></script>
 </head>
-<body>
-
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
-
-<article>
-
-<section class="db-hero">
-<div class="db-hero-copy">
-<div class="eyebrow">Databricks playbook · Agentic Dynamics instrument</div>
-<h1>Two Methods, Convergent Questions</h1>
-<p class="lead">In July 2026, Databricks published their playbook for reducing AI coding costs at scale — based on surveys of Stripe, Coinbase, Uber, and Ramp. The sources reached related operational conclusions through different evidence: Databricks contributes enterprise survey evidence, while this instrument contributes 227 historical controlled stress tests across 8 models and 3 architectures.</p>
-<a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" class="ext-link" target="_blank">Read the original Databricks post →</a>
+<body class="ad-page">
+<nav class="ad-public-nav" aria-label="Primary">
+<div class="ad-public-nav__inner">
+<a href="index.html">AGENTIC DYNAMICS</a>
+<a href="story.html">Story</a>
+<a href="question.html">Question</a>
+<a href="methodology.html">Method</a>
+<a href="evidence.html">Evidence</a>
+<a href="framework.html">Framework</a>
+<a href="accelerator.html">Open questions</a>
 </div>
-<aside class="db-ledger">
-<h3>Two methodologies</h3>
-<div class="db-row market"><span>Databricks source</span><strong>Enterprise surveys</strong></div>
-<div class="db-row"><span>Instrument source</span><strong>227 historical experiments</strong></div>
-<div class="db-row"><span>Stress method</span><strong>10 operators</strong></div>
-<div class="db-row"><span>Added dimension</span><strong>Grit</strong></div>
+</nav>
+<main class="ad-shell">
+<header class="ad-hero ad-reading">
+<p class="ad-kicker">Related work / external context</p>
+<h1>Related questions, different evidence.</h1>
+<p class="ad-lead">This appendix folds the former Databricks comparison into the evidence record. External enterprise reporting and a controlled coding-agent instrument answer related questions at different scopes.</p>
+</header>
+<section class="ad-section ad-columns">
+<div class="ad-reading">
+<h2>What this instrument adds</h2>
+<p>Agentic Dynamics contributes reproducible cells, perturbation conditions, ledger-level provenance, independent test execution where available, and explicit policy-arm boundaries. It does not turn that scope into an enterprise-scale survey result.</p>
+<p>External sources can motivate a question or situate a method. They never become evidence that the current corpus measured an external organization's workflows.</p>
+</div>
+<aside class="ad-callout">
+<h3>Databricks coding-cost article</h3>
+<p>Read it as an external operational source about AI coding costs at scale. Its claims retain its own methods, samples, and qualifiers.</p>
+<p>
+<a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale">Open source article</a>
+</p>
+<p class="ad-source">[X] external source; no numerical claim is imported here.</p>
 </aside>
 </section>
-
-<!-- Section 1: Efficiency Frontier and Grit -->
-<div class="section-hd"><h2>The Efficiency Frontier and Grit</h2></div>
-
-<p>Databricks defines the <strong style="color:var(--ac)">Efficiency Frontier</strong> as "the set of models that have the best price point for a given level of intelligence." We define <strong style="color:var(--ac)">Grit</strong> as Ground-Truth Integrity — how well a model maintains correctness when given degraded, contradictory, or incomplete instructions.</p>
-
-<p>Complementary concepts examined through different methods. The Efficiency Frontier concerns price for a level of intelligence; Grit concerns integrity under degraded input.</p>
-
-<div class="claim-grid">
-<div class="claim-box">
-  <div class="tag their">Databricks</div>
-  <h4>Their evidence</h4>
-  <p>Surveys of Stripe, Coinbase, Uber, and Ramp. Directional estimates. "Public benchmarks do a poor job of indicating real-world performance on coding tasks."</p>
-</div>
-<div class="claim-box">
-  <div class="tag ours">This instrument</div>
-  <h4>Our evidence</h4>
-  <p><strong>227 historical controlled experiments</strong> across 8 models and 3 architectures. 10 calibrated perturbation operators. Every measurement provenance-tagged [M] measured, [C] computed, [H] heuristic, [X] external.</p>
-</div>
-</div>
-
-<!-- Lever 1 -->
-<div class="section-hd"><h2>Lever 1: Shift to Efficient Models</h2></div>
-<div class="claim-grid">
-<div class="claim-box">
-  <div class="tag their">Databricks</div>
-  <h4>Their finding</h4>
-  <p>"Rapidly adopting newer, more efficient models delivers the largest cost wins." ~50% savings. "The efficiency frontier is advancing far faster than the intelligence frontier."</p>
-</div>
-<div class="claim-box">
-  <div class="tag ours">This instrument</div>
-  <h4>Our measurement</h4>
-  <p><strong class="mono" style="color:var(--success)">$<span data-stat="deepseek_cost_per">0.02</span>/session (DeepSeek)</strong> vs <strong class="mono" style="color:var(--am)">$<span data-stat="claude_cost_per">1.08</span>/session (Claude).</strong> <strong style="color:var(--ac)">69× measured cost gap.</strong> Same generated token volumes (~11K tokens/session). The gap is pricing architecture, not capability. Head-to-head correctness across overlapping task types when regrouped shows different model-rankings across perturbation classes — no single provider dominates.</p>
-</div>
-</div>
-<div class="gap-box"><strong>Where they complement each other:</strong> Their survey focused on price/intelligence tradeoffs from enterprise deployment data. Our controlled experiments measure integrity under stress — revealing that a model can be cheap and smart on a benchmark yet collapse under inverted constraints. Grit captures something the Efficiency Frontier wasn't designed to measure.</div>
-
-<!-- Lever 2 -->
-<div class="section-hd"><h2>Lever 2: Dynamic Request and Task Routing</h2></div>
-<div class="claim-grid">
-<div class="claim-box">
-  <div class="tag their">Databricks</div>
-  <h4>Their finding</h4>
-  <p>"Internal results suggest that our AI Gateway Smart Router is able to consistently reduce average task cost by more than 30%." Request-level, task-level, and escalation routing.</p>
-</div>
-<div class="claim-box">
-  <div class="tag ours">This instrument</div>
-  <h4>Our measurement</h4>
-  <p><strong>Grit-routed strategy: 95% correctness at $0.12/session.</strong> Per-task routing decision table from 17 task types. 14/17 → DeepSeek default. 3/17 → Claude escalation. DeepSeek-only beats Claude-only on BOTH cost AND correctness.</p>
-</div>
-</div>
-<div class="gap-box"><strong>Where they complement each other:</strong> Their routing strategy is based on task complexity taxonomy from real-world deployment data. Our Grit-gated routing adds stress-resilience to the equation — measuring flail rate under perturbation to ensure cheaper models don't collapse when instructions degrade.</div>
-
-<!-- Lever 3 -->
-<div class="section-hd"><h2>Lever 3: Visibility, Tripwires, and Progressive Budgets</h2></div>
-<div class="claim-grid">
-<div class="claim-box">
-  <div class="tag their">Databricks</div>
-  <h4>Their finding</h4>
-  <p>"Instead of a hard user spending cap, most companies are adopting a more nuanced and progressive approach." Visibility, spend gates, downshifting, suspension. ~10% savings.</p>
-</div>
-<div class="claim-box">
-  <div class="tag ours">This instrument</div>
-  <h4>Our measurement</h4>
-  <p><strong>WOC = <span data-stat-fmt="woc">0.90</span></strong> — measured first-pass success rate across 227 historical experiments. Rule 7: Budget Ceiling (T<sub>max</sub> = Budget / C<sub>job</sub>). Rule 8: Cascade Rule (escalate only on Grit failure). Their "downshifting" = our cascade. Their "spend gates" = our WOC alerts.</p>
-</div>
-</div>
-<div class="gap-box"><strong>Where they complement each other:</strong> Their approach handles reactive budgeting — detecting and responding to overspend in real-time from live deployment data. This instrument adds forecasting: the Snowball Rule (N²) and EPM Horizon model multi-year cost trajectories, projecting costs before they compound.</div>
-
-<!-- Lever 4 -->
-<div class="section-hd"><h2>Lever 4: Reducing Token Overhead</h2></div>
-<div class="claim-grid">
-<div class="claim-box">
-  <div class="tag their">Databricks</div>
-  <h4>Their finding</h4>
-  <p>"Simple tuning of our harness and caching settings led to an almost 50% reduction in the number of generated tokens." Compaction, less chatty harnesses, cache tuning. ~10% + 50% token reduction.</p>
-</div>
-<div class="claim-box">
-  <div class="tag ours">This instrument</div>
-  <h4>Our measurement</h4>
-  <p><strong>Explanation Tax:</strong> Claude flails on 11% of sessions (zero code, narration only) vs DeepSeek 8%. When models succeed, DeepSeek carries negligible narration overhead (0.0% penalty), Claude carries 8.5%. <strong>Cache Tax:</strong> $3.75/Mtok writes vs $0.14/Mtok reads — <strong>26.8&times; pricing asymmetry.</strong> Claude writes 20.0K cache tokens/session at premium rates. DeepSeek reads 223K at negligible cost. Exact same insight. Calibrated measurements.</p>
-</div>
-</div>
-<div class="gap-box"><strong>Where they complement each other:</strong> Their surveys and experiments identified that token overhead exists. Our stress tests measured <em>why</em> it happens — the model's architectural default to conversational mode under perturbation — making it actionable at the model selection level as well as the tool tuning level. If you're tuning your tools to reduce verbosity, you're working against the model's training distribution. Routing to a model with lower narrative overhead may be more cost-effective.</div>
-
-<!-- Where Each Adds Unique Insight -->
-<div class="section-hd amber"><h2>Where Each Adds Unique Insight</h2></div>
-
-<p style="font-size:0.88rem;color:var(--t2);line-height:1.65;margin-bottom:1rem"><strong style="color:var(--am)">Databricks</strong> brings industry scale — real-world deployment data from companies processing millions of AI workflows daily, validated against enterprise budgets. Their surveys capture operational patterns at a breadth that controlled experiments alone cannot match: adoption lifecycles, organizational friction, and the full cost of change management.</p>
-
-<p style="font-size:0.88rem;color:var(--t2);line-height:1.65;margin-bottom:1rem"><strong style="color:var(--ac)">The Agentic Dynamics instrument</strong> contributes methodology that enterprise surveys can't provide: controlled reproducibility, perturbation stress testing that reveals model fragility invisible on clean benchmarks, provenance-tagged measurements at the session level, and an open-source instrument deployable against any workload.</p>
-
-<div class="miss-grid">
-<div class="miss-card">
-  <h4>Perturbation stress testing</h4>
-  <p>Measures Grit through 10 calibrated degradation operators — revealing that a model performing well on benchmarks may fail entirely under degraded instructions.</p>
-</div>
-<div class="miss-card">
-  <h4>Model behavior under degraded input</h4>
-  <p>Manifold vs semantic perturbation classification. Some models handle logical corruption (94% correctness). Others collapse under linguistic distortion (escape=0.76).</p>
-</div>
-<div class="miss-card">
-  <h4>Compounding and forecasting</h4>
-  <p>Snowball Rule (N²): codebase growth compounds quadratically. EPM Horizon: energy prices inflate compute costs. Survival Horizon: how many sessions before bankruptcy?</p>
-</div>
-<div class="miss-card">
-  <h4>Attractor basin topology</h4>
-  <p>The shape of a model's failure space. Wide-shallow basins explore efficiently. Narrow-deep basins recover expensively. Collapsed basins flail. Measured, not theorized.</p>
-</div>
-<div class="miss-card">
-  <h4>Autonomous workforce model</h4>
-  <p>Batch economics (50% discount, 72-hour horizon). Escalation cascades. SLA buffers. Workforce capacity modeling — projecting autonomous agent workloads beyond individual developer use.</p>
-</div>
-<div class="miss-card">
-  <h4>Reproducible evidence</h4>
-  <p>Provenance-tagged measurements [M]/[C]/[H]/[X], open-source under Apache 2.0, inspectable down to individual session transcripts. Every measurement is independently verifiable.</p>
-</div>
-</div>
-
-<!-- Bottom Line -->
-<div class="bottom">
-  <strong>Where they converge:</strong> Databricks and this instrument examine four related operational areas with different scopes. Their surveys captured operational patterns at enterprise scale — from companies processing millions of AI coding workflows daily. Our 227 historical controlled experiments provide calibrated measurements under controlled stress. Together they offer complementary evidence: enterprise survey findings and provenance-tagged, reproducible instrument results that anyone can test against their own workloads.<br><br>
-  <a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" style="color:var(--ac)" target="_blank">Read the original Databricks playbook →</a><br>
-  <a href="evidence.html" style="color:var(--ac)">See the full experimental evidence →</a>
-</div>
-
-<div style="text-align:center;margin:2rem 0"><a href="evidence.html" class="cta-btn">View the Full Evidence →</a></div>
-
-</article>
-
-<footer>
-<strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-<span data-stat="sessions">1,067</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">215</span> stories · $<span data-stat="cost">309.17</span> measured<br>
-<a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> ·
-<a href="/">Home</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
-</footer>
-
-<script src="app.js"></script>
+<section class="ad-section ad-reading">
+<p class="ad-kicker">Citation discipline</p>
+<h2>Compare methods before comparing conclusions.</h2>
+<p>The Evidence page leads with current corpus receipts and campaign verdicts. This appendix exists to make the boundary clear: comparable vocabulary is not a shared denominator, and an external playbook is not a verification of this instrument's policy arms.</p>
+<p>
+<a href="evidence.html">Return to current evidence.</a>
+</p>
+</section>
+</main>
 </body>
 </html>

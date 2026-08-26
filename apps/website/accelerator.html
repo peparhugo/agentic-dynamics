@@ -1,442 +1,69 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Operational hypotheses derived from Agentic Dynamics — turn measurement into enterprise acceleration at every level of AI maturity.">
-<meta property="og:title" content="Applications — Agentic Dynamics">
-<meta property="og:description" content="Agentic Dynamics applications and future work — operational hypotheses">
-<meta property="og:url" content="https://ai-finops-rulebook.web.app/accelerator.html">
-<meta property="og:type" content="website">
-<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
-<meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
-<title>Applications — Agentic Dynamics</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Open questions and limits in Agentic Dynamics.">
+<title>Open Questions | Agentic Dynamics</title>
 <link rel="stylesheet" href="base.css">
-<style>
-body{display:flex;flex-direction:column}
-main{flex:1;max-width:1040px;width:100%;margin:0 auto;padding:5rem 1.5rem 3rem}
-.sec{padding:1.5rem}
-ul,ol{padding-left:1.25rem;color:var(--t2);font-size:0.9rem;line-height:1.6;margin-bottom:1rem}
-li{margin-bottom:0.35rem}
-.sub{color:var(--t2);font-size:0.95rem;margin-bottom:1rem}
-
-.pulse{margin-bottom:1rem}
-
-/* Numbered problem cards */
-.problem-list{display:flex;flex-direction:column;gap:0}
-.problem-item{display:grid;grid-template-columns:50px 1fr;gap:0.8rem;padding:1rem 0.8rem;border-bottom:1px solid var(--b)}
-.problem-num{font-family:"JetBrains Mono",monospace;font-size:1.2rem;font-weight:700;color:var(--ac);text-align:center;padding-top:0.15rem}
-.problem-body h4{font-size:0.9rem;color:var(--t);margin-bottom:0.2rem}
-.problem-body p{font-size:0.82rem;color:var(--t2);line-height:1.5;margin:0}
-
-/* Timeline */
-.timeline{display:flex;flex-direction:column;gap:0;margin:1.5rem 0}
-.timeline-step{display:grid;grid-template-columns:120px 1fr;gap:1rem;padding:1rem 0.8rem;border-left:2px solid var(--ba);position:relative;transition:border-color .2s}
-.timeline-step:hover{border-left-color:var(--ac)}
-.timeline-step::before{content:'';width:10px;height:10px;border-radius:50%;background:var(--bg4);border:2px solid var(--ba);position:absolute;left:-6px;top:1.4rem;transition:border-color .2s,background .2s}
-.timeline-step:hover::before{border-color:var(--ac);background:var(--ac)}
-.timeline-label{font-family:"JetBrains Mono",monospace;font-size:0.75rem;font-weight:600;color:var(--ac);padding-top:0.15rem}
-.timeline-body h4{font-size:0.92rem;color:var(--t);margin-bottom:0.2rem}
-.timeline-body p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
-
-/* Ladder */
-.ladder{display:flex;flex-direction:column;gap:0;margin:1.5rem 0;position:relative}
-.ladder-rung{display:grid;grid-template-columns:50px 1fr;gap:1rem;padding:1.1rem 0.8rem;border-left:2px solid var(--ba);position:relative;transition:border-color .2s}
-.ladder-rung:hover{border-left-color:var(--ac)}
-.ladder-rung::before{content:'';width:10px;height:10px;border-radius:50%;background:var(--bg4);border:2px solid var(--ba);position:absolute;left:-6px;top:1.5rem;transition:border-color .2s,background .2s}
-.ladder-rung:hover::before{border-color:var(--ac);background:var(--ac)}
-.ladder-level{font-family:"JetBrains Mono",monospace;font-size:1.3rem;font-weight:700;color:var(--ac);text-align:center;padding-top:0.05rem}
-.ladder-body h4{font-size:0.9rem;color:var(--t);margin-bottom:0.2rem}
-.ladder-body p{font-size:0.8rem;color:var(--t2);line-height:1.55;margin:0}
-.ladder-body .tags{display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem}
-.ladder-body .tags span{font-size:0.65rem;padding:0.1em 0.55em;border-radius:3px;background:var(--bg4);color:var(--t3);border:1px solid var(--b)}
-
-/* ROI band */
-.roi-band{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.8rem;margin:1.5rem 0}
-.roi-metric{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;text-align:center;transition:transform .2s,border-color .2s}
-.roi-metric:hover{transform:translateY(-2px);border-color:var(--ac)}
-.roi-metric .big{font-size:1.6rem;font-weight:800;color:var(--ac);font-family:"JetBrains Mono",monospace}
-.roi-metric .big.green{color:var(--success)}
-.roi-metric .lbl{font-size:0.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px;margin-top:0.3rem;font-weight:600}
-.roi-metric .desc{font-size:0.72rem;color:var(--t2);margin-top:0.15rem;line-height:1.35}
-
-.quote-box{background:var(--bg3);border:1px solid var(--ba);border-radius:12px;padding:1.5rem;margin:1.5rem 0;text-align:center}
-.quote-box p{font-size:0.95rem;color:var(--t);font-style:italic;line-height:1.6;margin:0}
-.quote-box .attrib{font-size:0.72rem;color:var(--t3);margin-top:0.6rem;font-style:normal}
-
-.comparison-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.5rem 0}
-.comp-col{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem}
-.comp-col h4{font-size:0.88rem;color:var(--t3);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
-.comp-col ul{list-style:none;padding:0;margin:0}
-.comp-col li{padding:0.35rem 0;font-size:0.82rem;color:var(--t2);border-bottom:1px solid var(--b);margin:0}
-.comp-col li:last-child{border-bottom:none}
-.comp-col.accent{background:rgba(34,211,238,0.05);border-color:rgba(34,211,238,0.2)}
-.comp-col.accent h4{color:var(--ac)}
-
-.formula{font-family:"JetBrains Mono",monospace;color:var(--am);font-size:0.9rem;display:block;padding:0.5rem 0}
-.rule-num{font-family:"JetBrains Mono",monospace;color:var(--ac);font-size:0.8rem;font-weight:600}
-.dashboard-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem}
-.dim{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1.5rem}
-.dim h3{font-size:1rem;color:var(--ac);margin:0 0 0.75rem}
-.metric-label{font-size:0.72rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.15rem}
-.metric-value{font-family:"JetBrains Mono",monospace;font-size:1.1rem;color:var(--t);margin-bottom:0.75rem}
-.kpi{display:flex;flex-direction:column}
-
-.constraints{display:grid;grid-template-columns:1fr;gap:0.3rem;margin:1rem 0}
-.cr{display:grid;grid-template-columns:1fr 1.5fr 1.5fr;gap:0.5rem;align-items:center;padding:0.55rem 0.8rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b);font-size:0.78rem}
-.cr.head{background:var(--bg4);font-weight:600;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t2)}
-.cr .nm{font-weight:500;color:var(--t)}.cr .fl{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--t3);line-height:1.45}.cr .ck{text-align:center}
-@media(max-width:768px){
-  .timeline-step{grid-template-columns:80px 1fr}
-  .timeline-label{font-size:0.7rem}
-  .ladder-rung{grid-template-columns:40px 1fr;padding:1rem 0.6rem}
-  .ladder-level{font-size:1rem}
-  .problem-item{grid-template-columns:36px 1fr}
-  .comparison-grid{grid-template-columns:1fr}
-  .dashboard-grid{grid-template-columns:1fr}
-}
-</style>
-<script src="data.js"></script>
 </head>
-<body>
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
-<main>
-
-<div class="callout" style="max-width:700px;margin:0 auto 2rem;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-left:3px solid var(--am);border-radius:0 10px 10px 0"><p style="font-size:0.85rem;color:var(--am);margin:0;font-weight:600">Operational hypotheses derived from research; not independently validated.</p></div>
-
-<section class="sec alt" style="text-align:center">
-  <div class="pulse"><span class="dot"></span> Applications / Future Work</div>
-  <h1>Extending the measurement instrument to operational scenarios.</h1>
-  <p class="sub" style="max-width:640px;margin-left:auto;margin-right:auto;margin-top:0.5rem">These are working hypotheses for how the measured cost and correctness patterns might apply at enterprise scale. They have not been independently validated and should be treated as directional.</p>
-  <div class="stats" style="margin-top:1.5rem">
-    <div class="stat"><div class="v">249</div><div class="l">Historical Experiment Sessions</div><div class="s">Across 8 models, 3 architectures</div></div>
-    <div class="stat"><div class="v">10</div><div class="l">Decision Rules</div><div class="s">Rules 1–5 measured · Rules 6–10 modeled</div></div>
-    <div class="stat"><div class="v"><span data-stat="costgap">69×</span></div><div class="l">Measured Cost Gap</div><div class="s">Identical output. Different cost.</div></div>
-    <div class="stat"><div class="v">$<span data-stat="cost">309.17</span></div><div class="l">Total Research Cost</div><div class="s">Every session recorded and inspectable</div></div>
-  </div>
+<body class="ad-page">
+<nav class="ad-public-nav" aria-label="Primary">
+<div class="ad-public-nav__inner">
+<a href="index.html">AGENTIC DYNAMICS</a>
+<a href="story.html">Story</a>
+<a href="question.html">Question</a>
+<a href="methodology.html">Method</a>
+<a href="evidence.html">Evidence</a>
+<a href="framework.html">Framework</a>
+<a href="accelerator.html" aria-current="page">Open questions</a>
+</div>
+</nav>
+<main class="ad-shell">
+<header class="ad-hero ad-reading">
+<p class="ad-kicker">Open questions / no sales claims</p>
+<h1>What the instrument has not earned the right to say.</h1>
+<p class="ad-lead">A field becomes credible by naming the measurements it still lacks. These are not roadmap promises or implementation offers; they are testable gaps in the record.</p>
+</header>
+<section class="ad-section">
+<div class="ad-rule-grid">
+<article class="ad-callout ad-callout--null">
+<h3>Escalation premium</h3>
+<p>The prospective escalate arm was executable but untriggered: all six live cells completed on the first attempt. The 3.1x retrospective premium is neither confirmed nor refuted by that grid.</p>
+<p class="ad-source">[C] retrospective 3.1x ratio; [M] untriggered live state. `cap_session_routing_prospective.md:92-108,128-139`.</p>
+</article>
+<article class="ad-callout ad-callout--null">
+<h3>Typed checkpoints</h3>
+<p>The typed checkpoint arms were not run because `context_snapshot_id` has no production capture. Cache-reuse proxies are recorded as proxies, never described as the typed treatment.</p>
+<p class="ad-source">[M] instrumentation absence / [P] next measurement gate.</p>
+</article>
+<article class="ad-callout ad-callout--null">
+<h3>Language-server diagnostics</h3>
+<p>Current analysis rows report zero available LSP measurements. That is not a clean bill of health and must never become a "0 errors" claim.</p>
+<p class="ad-source">[M] `data.js.analysis.*.lsp_*` coverage = 0.</p>
+</article>
+<article class="ad-callout">
+<h3>The historical EFFICIENT bin</h3>
+<p>The prior thresholded archetype display is empty for EFFICIENT. It remains an open classification question because the result is [H], threshold-specific, and not a universal current-corpus null.</p>
+<p class="ad-source">[H] historical display classification; see Evidence.</p>
+</article>
+</div>
 </section>
-
-<section class="sec">
-  <h2 id="what-is">What is the Accelerator?</h2>
-  <p class="sub">The Accelerator is an implementation guide and measurement tooling — open-source Python tooling that instruments your AI sessions to measure cost-per-outcome across models. It is not a SaaS product. It runs locally against your sessions.</p>
+<section class="ad-section ad-columns">
+<div class="ad-reading">
+<p class="ad-kicker">Next valid experiments</p>
+<h2>Measure the missing signal, then write the arm.</h2>
+<p>The next experiments require an actual first-attempt failure to measure escalation, a checkpoint producer to run typed checkpoint arms, and coverage-producing diagnostics before reporting static quality. Broader domains also need their own controlled work; the current corpus is coding-agent work, not a universal agent population.</p>
+</div>
+<aside class="ad-callout ad-callout--policy">
+<h3>Campaign discipline</h3>
+<p>Change one factor, pre-register the comparison, preserve independent evaluation, and publish the denominator and uncertainty.</p>
+<p class="ad-source">[P] campaign method; [C] decision reporting standard.</p>
+</aside>
 </section>
-
-<section class="sec">
-  <h2 id="problem">The Problem</h2>
-  <p class="sub" style="font-size:0.88rem">You've deployed AI. You don't have acceleration. Here's why.</p>
-  <div class="problem-list">
-    <div class="problem-item">
-      <div class="problem-num">01</div>
-      <div class="problem-body">
-        <h4>You bought AI tools. Individual output went up. Team velocity stayed flat.</h4>
-        <p>Every developer has Copilot. Every quarterly report shows more AI usage. Deployment frequency hasn't moved. 80% of AI initiatives never deliver measurable business value. Individual execution solves the wrong bottleneck.</p>
-      </div>
-    </div>
-    <div class="problem-item">
-      <div class="problem-num">02</div>
-      <div class="problem-body">
-        <h4>You set token budgets. Costs went down. AI effectiveness went with it.</h4>
-        <p>Finance introduced sensible controls. Reasoning models got restricted. Context windows got shortened. Conversation history got truncated. You asked your best architect to design a system after reading only a fraction of the documentation — and got what you paid for.</p>
-      </div>
-    </div>
-    <div class="problem-item">
-      <div class="problem-num">03</div>
-      <div class="problem-body">
-        <h4>You adopted reasoning models. Quality improved. Costs became completely unpredictable.</h4>
-        <p>One architecture redesign costs $0.015. The same task on another model costs $1.01. Your budget spreadsheet has no column for "model variance" — and without calibrated pass-rate data, every model routing decision is a bet.</p>
-      </div>
-    </div>
-    <div class="problem-item">
-      <div class="problem-num">04</div>
-      <div class="problem-body">
-        <h4>Your board wants 3-year AI projections. Nobody can model what they can't measure.</h4>
-        <p>Codebase growth compounds quadratically. The &beta;·v·N&sup2; term dominates long-run cost — model the curve before architectural commitments.</p>
-      </div>
-    </div>
-  </div>
-  <div class="highlight-box" style="margin-top:1rem">
-    <p><strong>The problem isn't your team.</strong> It's the invisible gap between AI investment and business outcome. That's what the Accelerator measures. That's what it closes.</p>
-  </div>
-</section>
-
-<section class="sec alt">
-  <h2 id="delivers">What the Accelerator delivers</h2>
-  <p class="sub">Not a cost tracker. A business acceleration engine — powered by Agentic Dynamics measurement and precision FinOps, backed by 249 historical experiment sessions.</p>
-  <div class="trust-grid" style="margin-top:1.5rem">
-    <div class="trust-card"><h4>Precision FinOps Measurement</h4><p>Not cost-per-prompt. Cost-per-outcome. Baseline WOC ratio, escalation rate, model utilization profile — captured by a calibrated instrument that knows the difference between cheap and efficient. Every token, every route, every recovery event tracked and inspectable.</p></div>
-    <div class="trust-card"><h4>Systemic Efficiency</h4><p>Not cheaper models. Smarter measurement. Track cost-per-outcome by task type, model, and team. Every session's cost is inspectable. Every routing decision is backed by calibrated pass-rate data.</p></div>
-    <div class="trust-card"><h4>The AI Maturity Ladder</h4><p>Engage at any level. Individual worker tool selection. Team budgeting and cost controls. Governance and compliance. 3-year projections and CapEx-to-OpEx modeling. Full augmented workforce transformation (hypothetical — not tested at enterprise scale). Start where you are. Scale to where you need to be.</p></div>
-  </div>
-</section>
-
-<section class="sec alt">
-  <h2 id="enterprise">What This Means for Your Enterprise</h2>
-  <p class="sub" style="font-size:0.88rem;margin-bottom:1.5rem">Every enterprise AI concern maps to a measured dimension of the instrument. Here's the translation layer.</p>
-  <div class="tbl"><table>
-    <thead><tr><th>If you're worried about...</th><th>Our measurement is...</th><th>What you can do</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Paying for models to re-learn your architecture every session</strong></td><td>Cache Strategy + Snowball Rule</td><td>Switch to cache-read at $0.14/Mtok. Measure N² curve. If cache hit rate under 50%, don't write.</td></tr>
-      <tr><td><strong>Models that break when instructions are incomplete or contradictory</strong></td><td>Grit — Flail Rate + Recovery Cost</td><td>Don't deploy models with >15% flail rate. High-Grit models (DeepSeek 8%) self-correct. Low-Grit models (nano 14%) cannot be trusted unsupervised.</td></tr>
-      <tr><td><strong>Budget overruns from models that narrate every decision</strong></td><td>Explanation Tax ε</td><td>Route routine work to models with low flail (DeepSeek 8.4%). Reserve high-flail models (Claude 11.4%) for auditable work only. Measured from 227 historical experiments.</td></tr>
-      <tr><td><strong>Autonomous systems silently failing at scale</strong></td><td>First-Pass Rule — WOC Ratio</td><td>Track WOC by model, task type, and time of day. Escalate if below 0.85. Design cascades so low-Grit models never enter unsupervised pipelines.</td></tr>
-      <tr><td><strong>3-year cost projections that keep surprising finance</strong></td><td>EPM Horizon + Snowball Rule</td><td>Model the N² curve before committing. Hedge energy price exposure. A 2× EPM spike during a 5-year horizon doubles cumulative costs.</td></tr>
-      <tr><td><strong>Every AI session billed at premium rates by default</strong></td><td>Cache Strategy + Model Selection</td><td>Route routine work to $0.016/session models. Only 11.5% of sessions need escalation. Cache-read at $0.14/Mtok instead of cache-write at $3.75/Mtok.</td></tr>
-    </tbody>
-  </table></div>
-  <div class="highlight-box" style="margin-top:1rem">
-    <strong>The bottom line</strong> — the organizations that win won't have the largest AI budgets. They'll have the most disciplined measurement — routing work to the cheapest capable model for every task, tracking cost-per-outcome, and never paying for more reasoning than the job requires.
-  </div>
-</section>
-
-<section class="sec">
-  <h2 id="how-it-works">How it works</h2>
-  <p class="sub" style="font-size:0.88rem">From invisible spend to precision acceleration. Engineered methodology, not a black box.</p>
-  <div class="timeline">
-    <div class="timeline-step">
-      <div class="timeline-label">Weeks 1–2</div>
-      <div class="timeline-body">
-        <h4>Baseline &amp; Diagnose</h4>
-        <p>Capture your current cost-to-serve per task type. Establish WOC ratio, escalation rate, model utilization profile. Identify the 20% of workflows driving 80% of AI spend. Every organization has a different bottleneck — we find yours with measurement, not assumptions.</p>
-      </div>
-    </div>
-    <div class="timeline-step">
-      <div class="timeline-label">Weeks 3–4</div>
-      <div class="timeline-body">
-        <h4>Tune &amp; Enforce</h4>
-        <p>Apply the 10 decision rules. Implement cascade routing, cache layering, and budget enforcement. Route 78.6% of tasks to the cheapest tier. Escalate only what needs reasoning. Track cost-per-outcome in real time, not at the end of the quarter.</p>
-      </div>
-    </div>
-    <div class="timeline-step">
-      <div class="timeline-label">Week 5+</div>
-      <div class="timeline-body">
-        <h4>Monitor &amp; Compound</h4>
-        <p>Dashboard cost-per-outcome, throughput, and budget runway in real time. Every session feeds back into your calibrated cost model — routing gets smarter, projections get tighter, and the instrument adapts to your actual workloads.</p>
-      </div>
-    </div>
-  </div>
-  <div class="roi-band">
-    <div class="roi-metric"><div class="big green">Directional</div><div class="lbl">Cost Modeling</div><div class="desc">Per-task cost differentials measured across 249 historical experiment sessions. Enterprise extrapolations are modeled, not validated.</div></div>
-    <div class="roi-metric"><div class="big">69×</div><div class="lbl">Measured Cost Gap</div><div class="desc">Identical task. Cheapest model vs. most expensive. Evidence on every page.</div></div>
-    <div class="roi-metric"><div class="big">4–6</div><div class="lbl">Weeks to Baseline</div><div class="desc">From first session capture to calibrated cost model for your specific workloads</div></div>
-    <div class="roi-metric"><div class="big">0.90</div><div class="lbl">First-Pass Success Rate (WOC)</div><div class="desc">WOC = 1/(1+r) with r=0.115. 90% of sessions succeed first-pass.</div></div>
-  </div>
-  <p style="color:var(--t2);font-size:0.8rem;text-align:center;margin-top:0.25rem">Even when models use identical token volumes (~11K/session), per-token pricing diverges 25–75×.</p>
-</section>
-
-<section class="sec alt">
-  <h2 id="maturity-ladder">The AI Maturity Ladder</h2>
-  <p class="sub">The Accelerator engages at every level. Start where you are. Scale to where you need to be.</p>
-  <div class="ladder">
-    <div class="ladder-rung">
-      <div class="ladder-level">1</div>
-      <div class="ladder-body">
-        <h4>Individual Worker</h4>
-        <p>Model selection, personal productivity, and tool consolidation. Equip every employee with the right AI at the right cost. Eliminate shadow AI spend and seat-license waste. The tooling profiles task types and recommends the cheapest model that gets the job done — measured (Rules 1–5), not guessed.</p>
-        <div class="tags"><span>Model selection</span><span>Personal ROI</span><span>Tool consolidation</span><span>Skills acceleration</span></div>
-      </div>
-    </div>
-    <div class="ladder-rung">
-      <div class="ladder-level">2</div>
-      <div class="ladder-body">
-        <h4>Budgeting &amp; Cost Controls</h4>
-        <p>Token budgets, cascade routing, cost-per-outcome tracking across teams. Stop measuring cost per prompt — measure cost per completed task. Provider-specific caching, batch scheduling, and budget enforcement that cuts spend without cutting context. Chargeback models that connect cost to value.</p>
-        <div class="tags"><span>Token budgets</span><span>Cascade routing</span><span>Cost-per-outcome</span><span>Chargeback</span></div>
-      </div>
-    </div>
-    <div class="ladder-rung">
-      <div class="ladder-level">3</div>
-      <div class="ladder-body">
-        <h4>Governance</h4>
-        <p>Policy enforcement, compliance guardrails, multi-team standards. Select models by Grit (integrity under degraded input). Prevent expensive reasoning models on trivial tasks. Audit trails that demonstrate compliance. Approval workflows for high-cost or high-risk operations. Track WOC ratio across teams and flag outliers before they become budget overruns.</p>
-        <div class="tags"><span>Policy enforcement</span><span>Compliance</span><span>Audit trails</span><span>Standards</span></div>
-      </div>
-    </div>
-    <div class="ladder-rung">
-      <div class="ladder-level">4</div>
-      <div class="ladder-body">
-        <h4>3-Year Projections &amp; Planning</h4>
-        <p>Cost modeling with N² codebase growth compounding, energy price inflation hedging, CapEx-to-OpEx transition. The tooling models the N&sup2; curve so your board sees it coming. Workforce readiness planning for augmented-to-autonomous transition.</p>
-        <div class="tags"><span>N² growth modeling</span><span>CapEx→OpEx</span><span>Workforce planning</span><span>Scenario simulation</span></div>
-      </div>
-    </div>
-    <div class="ladder-rung">
-      <div class="ladder-level">5</div>
-      <div class="ladder-body">
-        <h4>Augmented &amp; Autonomous Workforce</h4>
-        <p>Full AI-native transformation. Agentic CI/CD pipelines that auto-escalate through model tiers. Autonomous governance and evolution (AGE) — systems that self-monitor, self-correct, and self-optimize. The escalation cascade: 78.6% of tasks resolve at the cheapest tier. Only &lt;5% ever reach a human. Continuous optimization that fine-tunes enterprise AI spend over time.</p>
-        <div class="tags"><span>Agentic CI/CD</span><span>Autonomous governance</span><span>Escalation cascade</span><span>Continuous optimization</span></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-<section class="sec alt">
-  <h2 id="projections">Enterprise Projections</h2>
-  <p class="sub" style="font-size:0.88rem;margin-bottom:1rem">What Grit-routed model selection means in practice. Projections derived from our 227 historical worktrees (perturbation corpus) (Rules 1–5 measured) and WFM principles (Rules 6–10 modeled), applied to realistic enterprise team sizes.</p>
-
-  <div class="highlight-box" style="margin-top:1rem">
-    <strong>Project your costs:</strong> Use the <a href="framework.html#calculator" style="color:var(--ac)">interactive calculator on the Operational Framework page</a> to project costs for your team size and workload.
-  </div>
-</section>
-
-<section class="sec">
-  <h2 id="autonomous-workloads">Autonomous Workloads</h2>
-  <p class="sub">When AI works without human supervision — the rules, economics, and operational model</p>
-
-  <h3 id="grit-controls">How Grit Controls Autonomous Workloads</h3>
-  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">The Grit framework directly governs unsupervised AI operations. In autonomous mode, you can't review every output. You need models that self-correct when given bad context — because bad context is inevitable in real systems (stale documentation, conflicting requirements, incomplete specifications).</p>
-  <ul style="margin-top:0.5rem">
-  <li><strong>Flail Rate</strong> determines which models should NEVER be in autonomous cascades. GPT-5-nano (14% flail) and GPT-5-mini (8% flail) cannot be trusted unsupervised.</li>
-  <li><strong>Recovery Cost</strong> compounds across thousands of autonomous sessions. Claude writes 22,500 tokens to cache per session at $3.75/Mtok. At 5,000 jobs/day, that's $1,688/day in cache overhead alone. Switch to cache-read for autonomous batch processing.</li>
-  <li><strong>First-Pass Success (Rule 5) IS Grit</strong> in production. Track WOC by model, task type, and time of day.</li>
-  </ul>
-
-  <h3 id="autonomous-patterns">Real-World Autonomous Patterns</h3>
-  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Autonomous AI maps directly to established workforce management disciplines. The equations are the same. The resource under management is what's different.</p>
-  <div class="constraints">
-    <div class="cr head"><div class="nm">Agentic Dynamics Concept</div><div class="fl">WFM Discipline</div><div class="fl">How It Maps</div></div>
-    <div class="cr"><div class="nm">Budget Ceiling</div><div class="fl">Erlang-C staffing models</div><div class="fl">Throughput derived from budget, not headcount. T<sub>max</sub> = Budget / C<sub>job</sub> is the AI equivalent of Erlang's offered load → agents → service level. <em>(derived from measured retry rate r=0.115, modeled on Erlang-C staffing)</em></div></div>
-    <div class="cr"><div class="nm">Cascade Rule</div><div class="fl">Tiered support (L1/L2/L3)</div><div class="fl">Flash → Sonnet → Opus → Human is the same structure as L1 agent → L2 specialist → L3 engineer → supervisor. Grit gates determine which tier auto-resolves vs escalates. <em>(modeled escalation architecture; cascade experiments not yet executed)</em></div></div>
-    <div class="cr"><div class="nm">SLA Buffer</div><div class="fl">AHT × service level targets</div><div class="fl">Queue depth × average job time + retry buffer = completion window. Same formula as call center SLAs. <em>(modeled from WFM queue theory; batch experiments not yet executed)</em></div></div>
-    <div class="cr"><div class="nm">First-Pass Rule (WOC)</div><div class="fl">First-call resolution (FCR)</div><div class="fl">WOC = 1/(1+r) is the AI equivalent of FCR. Above 0.85 healthy. Below 0.70 critical. Track by task type, model, time of day — exactly how call centers track FCR.</div></div>
-    <div class="cr"><div class="nm">Batch Discount</div><div class="fl">Back-office batch processing</div><div class="fl">Deferred work is cheaper. Real-time has a premium. The 50% batch discount mirrors the economics of night-shift back-office processing vs daytime real-time queues. <em>(modeled; 50% discount from provider pricing tables)</em></div></div>
-  </div>
-
-  <h3 id="batch-vs-ondemand">Batch vs On-Demand Decision Table</h3>
-  <div class="tbl"><table>
-  <tr><th>Task Type</th><th>Urgency</th><th>Complexity</th><th>Mode</th><th>Rationale</th></tr>
-  <tr><td>Code review</td><td>&lt; 1 hour</td><td>Low–Medium</td><td><span style="color:var(--cy)">On-demand</span></td><td>Blocks developer workflow</td></tr>
-  <tr><td>Test generation</td><td>&lt; 4 hours</td><td>Medium</td><td><span style="color:var(--am)">Batch</span></td><td>Non-blocking, can queue</td></tr>
-  <tr><td>PR description</td><td>&lt; 5 min</td><td>Low</td><td><span style="color:var(--cy)">On-demand</span></td><td>Trivial, no queuing benefit</td></tr>
-  <tr><td>Refactoring sweep</td><td>&lt; 72 hours</td><td>High</td><td><span style="color:var(--am)">Batch</span></td><td>Large scope, schedule overnight</td></tr>
-  <tr><td>Documentation gen</td><td>&lt; 24 hours</td><td>Low</td><td><span style="color:var(--am)">Batch</span></td><td>Non-urgent, perfect for idle windows</td></tr>
-  <tr><td>Incident triage</td><td>&lt; 2 min</td><td>High</td><td><span style="color:var(--cy)">On-demand</span></td><td>Time-critical, needs fastest model</td></tr>
-  <tr><td>Dependency updates</td><td>&lt; 72 hours</td><td>Low</td><td><span style="color:var(--am)">Batch</span></td><td>Can run weekly, huge cost savings</td></tr>
-  <tr><td>Security audit</td><td>&lt; 72 hours</td><td>Medium</td><td><span style="color:var(--am)">Batch</span></td><td>Queue depth manageable, retry-safe</td></tr>
-  </table></div>
-
-  <h3 id="woc-ratio">WOC Ratio — Rule 5 (First-Pass)</h3>
-  <p style="color:var(--t2);font-size:0.9rem">WOC = 1/(1+r) where r is retry rate. Higher WOC = better (more first-pass success). Measured: WOC = <span data-stat-fmt="woc">0.90</span> from r=0.115.</p>
-  <div class="row" style="margin-top:1rem">
-  <div class="card">
-  <h4>Healthy</h4>
-  <p style="font-size:1.5rem;color:var(--cy);font-family:'JetBrains Mono',monospace">WOC &gt; 0.85</p>
-  <p>Good first-pass rate. Scaling is safe.</p>
-  </div>
-  <div class="card">
-  <h4>Investigate</h4>
-  <p style="font-size:1.5rem;color:var(--am);font-family:'JetBrains Mono',monospace">WOC 0.70–0.85</p>
-  <p>Retry rate rising. Tune thresholds.</p>
-  </div>
-  <div class="card">
-  <h4>Critical</h4>
-  <p style="font-size:1.5rem;color:var(--danger);font-family:'JetBrains Mono',monospace">WOC &lt; 0.70</p>
-  <p>Too many retries. Pause autonomy until root cause found.</p>
-  </div>
-  </div>
-  <div class="highlight-box" style="margin-top:1rem">
-  <p><strong>Calculated:</strong> <span class="met">WOC = <span data-stat-fmt="woc">0.90</span></span> from retry rate r=0.115 across 249 historical experiment sessions.</p>
-  </div>
-
-  <h3 id="escalation-cascade">Escalation Cascade</h3>
-  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Visual flow from cheapest to most expensive resolution path.</p>
-  <div style="display:flex;flex-direction:column;gap:0.75rem;max-width:600px;margin:0 auto">
-  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--cy);color:var(--bg)">T1</span><strong style="color:var(--t)">Flash / DeepSeek v4 Pro</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;1.0 base cost</span></div>
-  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--am);color:var(--bg)">T2</span><strong style="color:var(--t)">Sonnet / GPT-4o</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;8–12 cost</span></div>
-  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--danger);color:var(--bg)">T3</span><strong style="color:var(--t)">Opus / GPT-5.6</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;28.2 cost (price ratio)</span></div>
-  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg4);border:1px dashed var(--ba);border-radius:8px"><span class="tag">Human</span><strong style="color:var(--t)">Human Review</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">$25–150/hr context-switch cost</span></div>
-  </div>
-  <div class="highlight-box" style="margin-top:1.25rem"><p><strong>Key insight:</strong> <span class="tip" title="[C] Computed: 1 - retry_rate = 1 - 0.115 = 88.5%">88.5%</span> of tasks resolve at T1. Only 11.5% escalate. Of those that escalate, most resolve at T2. The human sees < 5% of all tasks.</p></div>
-
-  <h3 id="workstream-capacity">Workstream Capacity</h3>
-  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">How many jobs can you process per day at a given budget?</p>
-  <span class="formula">Throughput = Budget / (cost<sub>per_job</sub> &times; (1 + retry_rate))</span>
-  <div class="tbl" style="margin-top:1rem">
-  <table>
-  <tr><th>Scenario</th><th>Budget/Day</th><th>Cost/Job</th><th>Retry Rate</th><th>Jobs/Day</th></tr>
-  <tr><td>Light coding tasks</td><td><code>$5.00</code></td><td><code>$0.015</code></td><td>11.5%</td><td><span class="met">299</span></td></tr>
-  <tr><td>Code review + fix</td><td><code>$10.00</code></td><td><code>$0.08</code></td><td>11.5%</td><td><span class="met">112</span></td></tr>
-  <tr><td>Architecture generation</td><td><code>$20.00</code></td><td><code>$0.42</code></td><td>11.5%</td><td><span class="met">43</span></td></tr>
-  <tr><td>Full-stack PRD → deploy</td><td><code>$50.00</code></td><td><code>$1.01</code></td><td>11.5%</td><td><span class="met">44</span></td></tr>
-  </table></div>
-</section>
-
-
-
-<section class="sec">
-  <h2 id="measurement-tooling">The Measurement Tools</h2>
-  <p class="sub">This Agentic Dynamics instrument isn't theory. It's calibrated through 249 historical sessions, 10 perturbation operators, and 7 recovery signals to measure what AI costs and why. Run it against your own sessions and fine-tune the machine to your workloads.</p>
-  <div class="trust-grid" style="margin-top:1.5rem">
-    <div class="trust-card"><h4>10 perturbation operators</h4><p>4 manifold (alien vocab, framing shifts, causality reversal, forced abandonment) and 6 semantic (false premises, inverted constraints, removed constraints, phantom success, competing goals, contradiction injection).</p></div>
-    <div class="trust-card"><h4>7 recovery signals</h4><p>Surface markers, behavioral convergence, qualifiers, tech term convergence, step length convergence, structural pattern convergence, trajectory distance. Every trajectory step classified: EXPLORATION, RECOVERY, STABLE, or UNKNOWN.</p></div>
-    <div class="trust-card"><h4>Session capture &amp; fine-tuning</h4><p>Run the tools against your organization's own AI tool sessions. Calibrate cost models to your specific workloads, models, and task types. Every session captured becomes training data for a continuously improving cost intelligence engine.</p></div>
-  </div>
-  <div class="stats" style="margin-top:1.5rem">
-    <div class="stat"><div class="v">249</div><div class="l">Historical Experiment Sessions</div><div class="s">Every session recorded and inspectable</div></div>
-    <div class="stat"><div class="v">3</div><div class="l">Architectures</div><div class="s">GPT dense · DeepSeek MoE · Claude dense</div></div>
-    <div class="stat"><div class="v">8</div><div class="l">Model Variants</div><div class="s">Cross-architecture AST-level comparison</div></div>
-    <div class="stat"><div class="v">34</div><div class="l">Configs</div><div class="s">Open source · Apache 2.0 license</div></div>
-  </div>
-</section>
-
-<section class="sec alt">
-  <h2 id="over-diy">Why the Accelerator over DIY</h2>
-  <div class="comparison-grid">
-    <div class="comp-col">
-      <h4>Without the Accelerator</h4>
-      <ul>
-        <li>Cost measured per prompt, not per outcome</li>
-        <li>Model routing decisions made on price, not pass-rate data</li>
-        <li>Token budgets cut without understanding reasoning impact</li>
-        <li>3-year projections built in spreadsheets, not simulations</li>
-        <li>Governance is reactive — budget overruns found after the quarter closes</li>
-        <li>Vendor benchmarks used as cost estimates for your specific workloads</li>
-      </ul>
-    </div>
-    <div class="comp-col accent">
-      <h4>With the Accelerator</h4>
-      <ul>
-        <li>Cost-per-outcome tracked by task type, model, and team</li>
-        <li>Calibrated pass-rate data drives every routing decision</li>
-        <li>Budget enforcement that preserves reasoning depth</li>
-        <li>N² growth modeling with scenario simulation built in</li>
-        <li>Calibrated pass-rate data drives every routing decision</li>
-        <li>Real-time dashboards flag WOC outliers before they become overruns</li>
-        <li>Your own sessions calibrate your own cost models</li>
-      </ul>
-    </div>
-  </div>
-  <div class="highlight-box" style="margin-top:1rem">
-    <p><strong>Open source. No vendor lock-in.</strong> 34 configs, 249 historical sessions. The instrument runs locally — no API keys required to verify. If you find a gap, extend it. The data is yours. The instrument is Apache 2.0 licensed. Run it against any model, any provider, any task.</p>
-  </div>
-</section>
-
-<section class="sec">
-  <h2 id="cost-compounds">Cost compounds. Are you measuring it?</h2>
-  <p class="sub">Traditional engineering optimizes for CPU, memory, storage, and network. AI introduces a new resource that deserves the same discipline: reasoning. The instrument measures what that reasoning costs — by model, by task, by session — so you route work where it delivers results. No more guessing which model is right for the job.</p>
-  <div class="link-grid" style="margin-top:1.5rem">
-    <a href="/">Agentic Dynamics Overview</a>
-    <a href="framework.html">10 Decision Rules</a>
-    <a href="methodology.html">Methodology</a>
-    <a href="evidence.html">The Evidence</a>
-    <a href="story.html">Origin Story</a>
-  </div>
-</section>
-
-<div style="text-align:center;margin-top:1rem"><a href="framework.html" class="cta-btn">Explore Operational Principles &rarr;</a></div>
-
 </main>
-<footer>
-  <strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-  <span data-stat="sessions">1,067</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">215</span> stories · $<span data-stat="cost">309.17</span> measured<br>
-  <a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> ·
-  <a href="/">Home</a> · <a href="story.html">Story</a> ·
-  <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
+<footer class="ad-shell ad-footer">
+<p class="ad-note">This page holds open experiments and measurement gaps. It makes no service or adoption promise.</p>
 </footer>
-
-<script src="app.js"></script>
 </body>
 </html>

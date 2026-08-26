@@ -1,290 +1,72 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>The Instrument — Agentic Dynamics</title>
-<meta name="description" content="How the Agentic Dynamics measurement instrument works. 249 historical sessions, 8 models, 10 perturbation operators, 7 recovery signals.">
-<meta property="og:title" content="The Instrument — Agentic Dynamics">
-<meta property="og:description" content="How the Agentic Dynamics measurement instrument works — 10 perturbation operators, pipeline, methodology">
-<meta property="og:url" content="https://ai-finops-rulebook.web.app/methodology.html">
-<meta property="og:type" content="website">
-<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
-<meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="The Agentic Dynamics instrument captures events, derives information, and keeps evidence classes separate.">
+<title>The Instrument | Agentic Dynamics</title>
 <link rel="stylesheet" href="base.css">
-<style>
-.sec.wide{max-width:1100px}
-.pulse{font-size:0.68rem;margin-bottom:1rem}
-.pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin:2rem 0}
-.pipe-step{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;text-align:center;position:relative}
-.pipe-step .ps-num{font-size:2rem;font-weight:800;color:var(--ac);opacity:0.3;margin-bottom:0.3rem}
-.pipe-step .ps-title{font-weight:700;color:var(--t);font-size:0.82rem;margin-bottom:0.3rem}
-.pipe-step .ps-desc{font-size:0.68rem;color:var(--t2);line-height:1.5}
-.pipe-step::after{content:'';position:absolute;right:-0.6rem;top:50%;width:0.8rem;height:0.8rem;border-top:2px solid var(--ac);border-right:2px solid var(--ac);transform:translateY(-50%) rotate(45deg);opacity:0.3}
-.pipe-step:last-child::after{display:none}
-@media(max-width:768px){.pipe-step::after{display:none}}
-.card .ctag{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;background:rgba(34,211,238,0.08);color:var(--ac);border:1px solid rgba(34,211,238,0.15)}
-.card .ctag.amber{background:rgba(251,191,36,0.08);color:var(--am);border:1px solid rgba(251,191,36,0.15)}
-.card .ctitle{font-size:0.85rem;font-weight:700;color:var(--t);margin-bottom:0.3rem}
-.card .cdesc{font-size:0.75rem;color:var(--t2);line-height:1.55}
-.wtm{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:1.5rem 0;font-size:0.8rem;color:var(--t2);line-height:1.7}
-.wtm strong{color:var(--t)}
-.eq{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;font-family:'JetBrains Mono',monospace;font-size:0.7rem;line-height:1.9;color:var(--t2);text-align:left;margin:1.5rem 0}
-</style>
-<script src="data.js"></script>
+<script src="assets/design-components.js">
+</script>
+<script src="assets/publication.js">
+</script>
 </head>
-<body>
-
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
-
-<!-- Hero -->
-<section class="sec" style="padding-top:6rem">
-<div class="pulse"><span class="dot"></span> How — Research Methodology</div>
-<h1>The N x M Measurement Instrument</h1>
-<p class="lead" style="font-size:1.05rem;color:var(--t)">How the measurement instrument was built. A calibrated measurement apparatus that measures how specification degradation changes agent decisions, behavior, and the economics of the results — cost, correctness, and what those outcomes are worth.</p>
-<p style="max-width:800px;margin:0.5rem auto 0;font-size:0.8rem;color:var(--t2)">This page describes the 249 historical perturbation sessions; the <a href="evidence.html" style="color:var(--ac)">Evidence page</a> leads with the newer 1,067-session linked-story corpus.</p>
-<div class="stats">
-<div class="stat"><div class="v">10</div><div class="l">Perturbation Operators</div></div>
-<div class="stat"><div class="v">7</div><div class="l">Recovery Signals</div></div>
-<div class="stat"><div class="v">4</div><div class="l">Strategy Archetypes</div></div>
-<div class="stat"><div class="v">34</div><div class="l">Experiment Configs</div></div>
-<div class="stat"><div class="v">249</div><div class="l">Historical Sessions</div></div>
-<div class="stat"><div class="v">8</div><div class="l">Models Tested</div></div>
+<body class="ad-page">
+<nav class="ad-public-nav" aria-label="Primary">
+<div class="ad-public-nav__inner">
+<a href="index.html">AGENTIC DYNAMICS</a>
+<a href="story.html">Story</a>
+<a href="question.html">Question</a>
+<a href="methodology.html" aria-current="page">Method</a>
+<a href="evidence.html">Evidence</a>
+<a href="framework.html">Framework</a>
+<a href="accelerator.html">Open questions</a>
+</div>
+</nav>
+<main class="ad-shell">
+<header class="ad-hero ad-reading">
+<p class="ad-kicker">The instrument</p>
+<h1>Capture the event before interpreting the outcome.</h1>
+<p class="ad-lead">The instrument runs controlled agent work in isolated worktrees, records attempts and outcomes, executes independent tests, and derives named information without confusing a model with a measurement.</p>
+</header>
+<section class="ad-section ad-columns">
+<div class="ad-reading">
+<h2>Five stages, one record.</h2>
+<p>
+<strong>Declare:</strong> specify workflow, factors, budget, and instrumentation. <strong>Execute:</strong> record attempts, tools, timing, tokens, and cost. <strong>Verify:</strong> run the independent test suite where available. <strong>Derive:</strong> calculate measures and coverage from the record. <strong>Compare:</strong> only compare policy arms when the design provides them.</p>
+<p>For linked stories, five sessions commit into one another: greenfield, feature, integration, refactor, cross-cutting. That creates the inherited state the next session must confront.</p>
+</div>
+<aside class="ad-aside">
+<p>
+<span class="ad-evidence" data-evidence="M">[M] MEASURED</span> capture from ledgers, tests, costs, and filesystem events.</p>
+<p>
+<span class="ad-evidence" data-evidence="C">[C] COMPUTED</span> direct transformation of measured inputs.</p>
+<p>
+<span class="ad-evidence" data-evidence="H">[H] HEURISTIC</span> a thresholded or algorithmic classification.</p>
+<p>
+<span class="ad-evidence" data-evidence="X">[X] EXTERNAL</span> a linked source outside this corpus.</p>
+<p>
+<span class="ad-evidence" data-evidence="P">[P] POLICY</span> a design, proposal, or authorization boundary.</p>
+</aside>
+</section>
+<section class="ad-section ad-reading">
+<p class="ad-kicker">Provenance is a method</p>
+<h2>Coverage is part of the result.</h2>
+<p>A missing test verdict, unavailable language server, untriggered escalation, or absent canonical lab output is reported as such. The instrument does not replace missing coverage with a zero, a proxy, or an older corpus value.</p>
+<div class="ad-callout ad-callout--null">
+<h3>Known historical limitation</h3>
+<p>116 of 227 sessions in the historical precursor used heuristic correctness because no pytest suite executed. This constrains that precursor; it is not a property of the current linked-story corpus.</p>
+<p class="ad-source">[H] historical correctness; `experiments/data_manifest.json` known limitations.</p>
 </div>
 </section>
-
-<details style="max-width:800px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
-<summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the methodology actually means</summary>
-<div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
-<p>We built a measurement instrument that applies <strong style="color:var(--t)">10 types of "stress tests"</strong> (perturbation operators) to AI models across <strong style="color:var(--t)">249 historical sessions</strong>. It measures how models respond — do they explore new solutions, or recover to familiar patterns? — and classifies that behavior into <strong style="color:var(--t)">4 strategy archetypes</strong> (Conservative, Exploratory, Wasteful, Efficient). Cost drivers (C₀, P, ε, r) are measured from the 227 historical worktrees. Modeling parameters (β, EPM) are externally calibrated. Analysis outputs (escape scores, strategy) are heuristically computed — every metric is tagged with provenance [M]/[C]/[H]/[X] in the game reports.</p>
-<p>Below is the full methodology — the operators, detection signals, pipeline, and reproducible experiment configs.</p>
-</div>
-</details>
-
-<div class="highlight-box" style="border-left-color:var(--cy);margin-bottom:2rem">
-<strong>&#9881; Just want to run the instrument?</strong><br>
-<code style="display:block;margin:0.5rem 0;font-size:0.75rem;word-break:break-all">git clone https://github.com/peparhugo/agentic-dynamics && cd agentic-dynamics && pip install -e . && python scripts/run.py experiments/configs/task_manager.yaml</code>
-For the full methodology — perturbation operators, recovery signals, strategy archetypes — read on.
-</div>
-
-<!-- Pipeline -->
-<section class="sec alt wide">
-<h2>How the Instrument Captures Events</h2>
-<p class="lead">Every experiment follows the same calibrated path. A YAML configuration defines the task, the model, the perturbation operators, and the analysis modules. The instrument dispatches through a <strong style="color:var(--ac)">provider-agnostic backend</strong> — the opencode binary or the Claude CLI, whichever serves the model — applies perturbations, streams the observable execution trace live, and runs multi-dimensional analysis.</p>
-<div class="pipeline">
-<div class="pipe-step"><div class="ps-num">1</div><div class="ps-title">Config</div><div class="ps-desc">YAML defines task domain, model, perturbation operators, strengths, and RNG seed for reproducibility.</div></div>
-<div class="pipe-step"><div class="ps-num">2</div><div class="ps-title">Dispatch</div><div class="ps-desc">Backend-agnostic run: <code style="color:var(--ac)">anthropic/*</code> routes to the Claude CLI (subscription-safe), everything else to opencode. An isolated worktree receives the (perturbed) prompt and produces code + reasoning.</div></div>
-<div class="pipe-step"><div class="ps-num">3</div><div class="ps-title">Trajectory</div><div class="ps-desc">Full reasoning trace captured and streamed live (Redis pub/sub with per-cell replay). Tool calls, outputs, token counts, timing. Reasoning steps embedded via bge-m3 (1024-dim) into ChromaDB for step-level comparison across sessions.</div></div>
-<div class="pipe-step"><div class="ps-num">4</div><div class="ps-title">Analysis</div><div class="ps-desc">Solution quality, basin escape, recovery classification, strategy taxonomy, efficiency metrics. All scored.</div></div>
-<div class="pipe-step"><div class="ps-num">5</div><div class="ps-desc">Measured session costs and test results feed the cost equation. Provenance-tagged metrics power the 10 decision rules.</div></div>
-</div>
-</section>
-
-<!-- The CLI Tools -->
-<section class="sec wide">
-<h2>The CLI Tools</h2>
-<p class="lead">The instrument runs in two regimes over the same backend, orchestrated by a YAML pipeline and observed through a live control plane.</p>
-<div class="cards">
-<div class="card"><div class="ctag">Single-session</div><div class="ctitle">Perturbation experiments</div><div class="cdesc"><code style="color:var(--ac)">scripts/run.py &lt;task&gt;.yaml</code>. One task, one (perturbed) prompt, one isolated worktree. Produces a Game Report and feeds <code>_results_summary.json</code> — the original 227 historical worktrees.</div></div>
-<div class="card"><div class="ctag amber">Multi-session</div><div class="ctitle">Story pipeline</div><div class="cdesc"><code style="color:var(--ac)">scripts/enqueue.py</code> fills a Redis queue (story &times; tier &times; quality &times; condition); <code style="color:var(--ac)">scripts/worker.py</code> drains it, running each cell as a five-session story with git commits between sessions &mdash; greenfield &rarr; feature &rarr; integration &rarr; refactor &rarr; cross-cutting.</div></div>
-<div class="card"><div class="ctag">Orchestration</div><div class="ctitle">YAML pipeline</div><div class="cdesc"><code style="color:var(--ac)">scripts/pipeline.py --plan &lt;ci|deploy|full_matrix|feature|ship_features&gt;</code>. Phase DAGs (lint &rarr; test &rarr; build; matrix &rarr; analyze &rarr; review &rarr; deploy) with Redis state and parallel workers.</div></div>
-<div class="card"><div class="ctag">Control plane</div><div class="ctitle">Live telemetry</div><div class="cdesc"><code style="color:var(--ac)">admin/server.py</code> serves a dashboard: a live experiment matrix, per-cell event streams (SSE), and a routing board &mdash; reading the same Redis state the workers write.</div></div>
-</div>
-<div class="wtm"><strong>Provider-agnostic by design:</strong> every regime goes through the same backend seam (<code style="color:var(--ac)">backends.py</code>). <code style="color:var(--ac)">anthropic/*</code> models run through the Claude CLI &mdash; subscription-safe, no per-token API spend &mdash; while other providers run through opencode. Both emit the same event schema, so downstream analysis is identical regardless of provider.</div>
-</section>
-
-<!-- Measurement Provenance -->
-<section class="sec alt wide">
-<h2>Measurement Provenance</h2>
-<p class="lead">Every metric in the game reports carries a provenance tag. This taxonomy makes clear what was measured, what was computed, and what is estimated.</p>
-<div class="pipeline">
-<div class="pipe-step"><div class="ps-num">[M]</div><div class="ps-title">Measured</div><div class="ps-desc">API tokens &amp; costs, pytest results, LOC, cache tokens, exit codes, session duration &mdash; directly from the openCode DB or filesystem.</div></div>
-<div class="pipe-step"><div class="ps-num">[C]</div><div class="ps-title">Computed</div><div class="ps-desc">Thinking ratio, output density, quality/$, quality/J &mdash; derived directly from measured values with no estimation.</div></div>
-<div class="pipe-step"><div class="ps-num">[H]</div><div class="ps-title">Heuristic</div><div class="ps-desc">Escape scores, novelty, code quality, strategy classification &mdash; algorithmic analysis with author-chosen thresholds.</div></div>
-<div class="pipe-step"><div class="ps-num">[X]</div><div class="ps-title">External</div><div class="ps-desc">Energy estimates from TokenPowerBench (Niu et al., AAAI 2026). EPM projections from IEA World Energy Outlook 2024.</div></div>
-</div>
-</section>
-
-<!-- Operators -->
-<section class="sec wide">
-<h2>Perturbation Operators</h2>
-<p class="lead">10 calibrated operators across three perturbation classes. <strong style="color:var(--ac)">Specification corruption</strong> degrades information quality while preserving intended ground truth. <strong style="color:var(--am)">Objective mutation</strong> changes the requested target. <strong style="color:var(--cy)">Process perturbation</strong> forces a different search process.</p>
-<div class="cards">
-<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Inject Alien Vocabulary</div><div class="cdesc">Replace domain terminology with vocabulary from unrelated fields (biology, music, astronomy, warfare). Uses a built-in synonym replacement map for recognized software terms (api→gateway, database→archive, etc.); alien-domain vocabulary is applied only as fallback when no tech terms are detected in the prompt. Tests whether the model maps alien terms back to correct concepts or gets lost in translation.</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject False Premise</div><div class="cdesc">Insert a plausible but incorrect assumption into the context. Pool size: ~6 fixed stimuli (2 mild, 2 medium, 2 strong). Strength selects severity tier from a discrete pool rather than acting as a continuous dial. Tests whether the model identifies and rejects false premises or rationalizes them into the solution.</div></div>
-<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Shift Framing</div><div class="cdesc">Reframe the task from "build this" to "find the flaws in this approach." Pool size: 3 fixed stimuli. Strength selects severity tier from a discrete pool rather than acting as a continuous dial. Tests epistemic flexibility — can the model invert its stance under perturbation?</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Invert Constraint</div><div class="cdesc">Flip a requirement to its opposite (e.g., "must be fast" → "must be slow"). Operates via regex rewrite of constraint-form sentences (must→must NOT, secure→insecure, etc.); may be a silent no-op if no constraint-form sentences match the regex patterns. Tests whether the model identifies the absurdity or complies blindly.</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Insert Contradiction</div><div class="cdesc">Place two mutually exclusive requirements in the prompt. Domain targeting is approximate (keyword match on task description's first words with stopword filtering; falls back to a general pool when no keyword match). Contradiction pairs drawn from 4 domain-specific pools (api, database, security, general). Tests conflict resolution — which does the model prioritize?</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Remove Critical Constraint</div><div class="cdesc">Silently drop a defining requirement (e.g., JWT auth from a REST API) via string replacement. At high strength (≥0.8), removes the most critical-severity constraints by keyword scoring (auth, token, rate, limit, etc.). May be a silent no-op if no constraint candidates are found. Tests whether the model flags underspecification or confabulates missing pieces.</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject Phantom Success</div><div class="cdesc">Assert that an intermediate step already passed when it hasn't. Pool size: ~6 fixed stimuli (2 subtle, 2 blatant, 2 obvious). Strength selects severity tier from a discrete pool rather than acting as a continuous dial. Tests truth-seeking vs coherence — does the model question false results?</div></div>
-<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Reverse Causality</div><div class="cdesc">Present the solution before the problem statement. Section reordering at high strength (≥0.8: full inversion — constraints → expected output → task description); at ≥0.4: constraints moved before task description; at lower strengths: simple second-half-first swap or instruction prepend. Tests non-linear reasoning and structural flexibility under temporal inversion.</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject Competing Goal</div><div class="cdesc">Add a conflicting requirement. Pool size: ~5 fixed stimuli (2 mild, 2 sharp, 1 direct). Strength selects severity tier from a discrete pool rather than acting as a continuous dial. Tests trade-off recognition — does the model commit to one path or hedge between both?</div></div>
-<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Force Abandonment</div><div class="cdesc">Force generation and immediate discard of solutions via prepended instruction (1–4 rounds, scaled by strength as rounds = 1 + ⌊strength × 3⌋). Directly measures attractor basin depth — how strongly the model returns to its default solution structure.</div></div>
-</div>
-<div class="wtm"><strong>Strength calibration note:</strong> For semantic (append-only) operators — inject_false_premise, inject_phantom_success, inject_competing_goal, and shift_framing — strength selects a severity tier from a discrete pool of ~3–6 fixed stimuli rather than acting as a continuous dial. Manifold operators (reverse_causality, force_abandonment) use strength as a continuous parameter to scale the magnitude of structural transformation.</div>
-</section>
-
-<!-- Recovery -->
-<section class="sec alt wide">
-<h2>Recovery Classification</h2>
-<p class="lead">When perturbed, models either <strong style="color:var(--ac)">escape</strong> the basin (produce genuinely different solutions) or <strong style="color:var(--am)">recover</strong> (return to the baseline). Seven detection signals classify each reasoning segment as EXPLORATION or RECOVERY.</p>
-<div class="cards">
-<div class="card"><div class="ctitle">1. Recovery Markers</div><div class="cdesc">Text patterns like "let me explain," "in other words," "to clarify," "here's why" signal the model is justifying a return to familiar territory. 18 marker patterns scanned.</div></div>
-<div class="card"><div class="ctitle">2. Tool Convergence</div><div class="cdesc">Does the tool-call sequence converge toward the baseline set? Scored by Jaccard similarity between perturbed and baseline tool invocations.</div></div>
-<div class="card"><div class="ctitle">3. Qualifier Markers</div><div class="cdesc">Hedging language ("typically," "generally," "in most cases") indicates uncertainty recovery. Frequency measured against baseline.</div></div>
-<div class="card"><div class="ctitle">4. Tech Convergence</div><div class="cdesc">37 technology terms (flask, postgresql, redis, docker, jwt, celery, kafka, etc.) tracked. Do perturbed solutions converge on the same tech stack?</div></div>
-<div class="card"><div class="ctitle">5. Length Convergence</div><div class="cdesc">Token output length ratio between perturbed and baseline. Models that recover tend to match baseline output length as they return to familiar solution patterns.</div></div>
-<div class="card"><div class="ctitle">6. Pattern Convergence</div><div class="cdesc">Structural overlap in the reasoning trace. Do the same reasoning sub-steps appear? Measured by n-gram overlap between trajectories.</div></div>
-<div class="card"><div class="ctitle">7. Reasoning Trajectory Distance</div><div class="cdesc"><strong>[M] New in v0.5.</strong> Each reasoning step is embedded into 1024-dimensional space using bge-m3 (via Ollama + ChromaDB). Pairwise cosine distances between steps at matching positions measure <em>process-level</em> divergence — how differently the model <em>thinks</em> under perturbation, not just what it produces. 2,215 step embeddings across 222 sessions. Identical reasoning = 0.0, similar approach = ~0.19, genuinely different thinking = 0.25+.</div></div>
-</div>
-<div class="wtm"><strong>Observed pattern:</strong> Manifold perturbations (alien vocabulary, framing shifts) produce escape=0.76 for DeepSeek vs 0.62 for Claude. Semantic perturbations (constraint removal, false premises) produce escape=0.18 vs 0.21. This pattern supports the perturbation taxonomy: linguistic surface shifts appear to force models to explore novel solution topologies; logical contradictions appear to test error detection capability. Across both classes, DeepSeek's recovery costs 68-77× less than Claude's.</div>
-</section>
-
-<!-- Basin -->
-<section class="sec wide">
-<h2>Basin Escape &amp; Attractor Strength</h2>
-<p class="lead">The <strong style="color:var(--ac)">attractor basin</strong> is a model's default solution topology — the structural pattern it falls into when unconstrained. Measuring how far perturbation pushes the model out of its basin reveals how rigidly it adheres to trained patterns.</p>
-<div class="cards">
-<div class="card"><div class="ctitle">Architecture Divergence</div><div class="cdesc">Structural comparison of generated code — module count, class hierarchy, dependency graph. Measured on a 0–1 scale where 1.0 = completely novel architecture.</div></div>
-<div class="card"><div class="ctitle">Structural Novelty</div><div class="cdesc">Presence of solution elements not found in the baseline. Does perturbation produce genuinely new approaches, or just reorder existing patterns?</div></div>
-<div class="card"><div class="ctitle">Escape Score</div><div class="cdesc">Composite metric (0–1) combining architecture divergence and structural novelty. A score of 1.0 means the model fully abandoned its default solution topology under perturbation.</div></div>
-</div>
-<div class="wtm"><strong>What we found:</strong> Manifold-class perturbations (alien vocab, framing shifts) produce consistently higher escape scores on DeepSeek than semantic-class perturbations. This suggests GRPO-compressed models are more susceptible to linguistic-surface perturbation than to logical contradiction — an insight that directly informed our model selection rules.</div>
-</section>
-
-<!-- Strategy -->
-<section class="sec alt wide">
-<h2>Strategy Taxonomy</h2>
-<p class="lead">Every model exhibits a measurable <strong style="color:var(--ac)">strategic archetype</strong> under perturbation. These aren't labels — they're computed from the ratio of exploration tokens to recovery tokens, weighted by escape score and solution quality.</p>
-<div class="cards">
-<div class="card"><div class="ctag">Conservative</div><div class="ctitle">CONSERVATIVE</div><div class="cdesc">Low exploration, high recovery. The model retreats to familiar patterns when perturbed. Claude Sonnet 5 and GPT-5.6 consistently exhibit this archetype — high pass rates but higher flail rates under perturbation.</div></div>
-<div class="card"><div class="ctag">Exploratory</div><div class="ctitle">EXPLORATORY</div><div class="cdesc">High escape, low recovery. The model genuinely explores novel solution space under perturbation. DeepSeek's GRPO architecture produces this behavior — lower baseline pass rate but dramatically lower cost.</div></div>
-<div class="card"><div class="ctag amber">Wasteful</div><div class="ctitle">WASTEFUL</div><div class="cdesc">High exploration but low quality. The model wanders without producing useful output. Small models with high reasoning overhead (GPT-5-nano, GPT-5-mini) tend toward this archetype under high-strength perturbation.</div></div>
-<div class="card"><div class="ctag amber">Efficient</div><div class="ctitle">EFFICIENT</div><div class="cdesc">High exploration, high quality, low recovery cost. The ideal. DeepSeek in forced-silent mode approaches this archetype — producing structurally sound solutions without paying the narration cost.</div></div>
-</div>
-</section>
-
-<!-- Efficiency -->
-<section class="sec wide">
-<h2>Efficiency Measurement</h2>
-<p class="lead">Every session is measured along three resource axes — tokens, dollars, and joules. These measurements are the empirical foundation for every parameter in the unified cost equation.</p>
-<div class="cards">
-<div class="card"><div class="ctitle">Token Efficiency</div><div class="cdesc">Input tokens, output tokens, and reasoning tokens tracked per session. The code-to-reasoning token ratio is the primary cost-driver signal. Provider architecture internals (parameter counts, GPU TDP) are not independently verifiable for closed models.</div></div>
-<div class="card"><div class="ctitle">Cost Measurement</div><div class="cdesc">USD cost computed from provider pricing at time of inference. Builds-per-dollar, cost-per-pass, and Explanation Tax all derived directly from session cost data. Not estimated — measured.</div></div>
-<div class="card"><div class="ctitle">Energy Efficiency</div><div class="cdesc">Joule estimates computed from GPU TDP, active parameters, and token counts. DeepSeek H800 TDP: 350W. Claude H100 TDP: 700W. Architectural efficiency compounds with token efficiency — The 69× cost gap is driven by per-token output pricing: Claude charges ~$15/Mtok for output tokens; DeepSeek charges ~$1.10/Mtok. Generated token volumes are near-identical (~11K output+reasoning tokens per session for both). The pricing architecture is the dominant lever, not token efficiency..</div></div>
-</div>
-<div class="eq">
-<span style="color:var(--ac)">C&#8320;</span> = baseline session cost &middot; <span style="color:var(--ac)">P</span> = pass rate &middot; <span style="color:var(--ac)">&epsilon;</span> = Explanation Tax &middot; <span style="color:var(--ac)">&beta;</span> = context inflation<br>
-<span style="color:var(--ac)">v</span> = velocity &middot; <span style="color:var(--ac)">N</span> = sessions &middot; <span style="color:var(--ac)">A</span> = architecture multiplier &middot; <span style="color:var(--ac)">EPM(t)</span> = energy price multiplier<br><br>
-<span style="color:var(--ac)">Cumulative cost:</span> C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]<br>
-<span style="color:var(--ac)">Cost per outcome:</span> CostPerOutcome(K,v) = C(K/P, v) / K<br>
-<span style="color:var(--ac)">Model gap:</span> Gap = (A &times; Verbosity &times; (1+&epsilon;)) &times; EPM(N)
-</div>
-<p style="font-size:0.8rem;color:var(--t3);text-align:center">C&#8320; = model choice, &epsilon; = cost of verbalized reasoning, &beta;&middot;N&sup2; = compounding codebase growth, EPM = energy market exposure, v = scaling speed. Cost drivers (C&#8320;, P, &epsilon;, r) measured from the experiment corpus; &beta; and EPM externally calibrated — see provenance tags [M]/[C]/[H]/[X] throughout.</p>
-</section>
-
-<!-- Constraint Detection -->
-<section class="sec alt wide">
-<h2>Constraint Detection &amp; Verification</h2>
-<p class="lead">The claim that "both models implement all seven constraints" isn't subjective. It's verified through a <strong style="color:var(--ac)">dual-signal system</strong> that scans both the reasoning text and the generated code for constraint mentions and implementations.</p>
-<div class="cards">
-<div class="card"><div class="ctitle">Reasoning Scan</div><div class="cdesc">Scans the model's reasoning output for explicit mentions of constraint keywords (JWT, rate limit, pagination, audit, etc.) and their expansion mappings. Detects whether the model <em>considered</em> each constraint.</div></div>
-<div class="card"><div class="ctitle">Code Scan</div><div class="cdesc">Analyzes generated source files (Python, TypeScript, Go, Rust — 25+ file extensions) for actual implementations. Detects auth decorators, rate limiter imports, pagination logic, error handler registrations, audit logging calls, API versioning structures, and domain-specific patterns across languages.</div></div>
-<div class="card"><div class="ctitle">AST Analysis</div><div class="cdesc">Parses generated Python into abstract syntax trees. Compares perturbed vs baseline AST node count and structure. Finding: perturbed output is 112.6% of baseline nodes — structurally identical code with minimal variance.</div></div>
-</div>
-<div class="wtm"><strong>What this suggests:</strong> The measured cost gap does not appear to be a capability gap. Both provider families produce structurally equivalent code for the same constraints. The delta appears to be in pricing architecture and per-token provider economics. Observed differences in reasoning-token overhead between model families may be caused by training architecture, provider-side caching, or some combination — this experiment does not identify the causal mechanism.</div>
-</section>
-
-<!-- Reproduce This -->
-<section class="sec">
-<h2>Reproduce This</h2>
-<p class="lead">The instrument is open source. Every experiment is a YAML config. Every run is seeded for reproducibility. Here's how to run your own.</p>
-
-<div class="cards">
-<div class="card"><div class="ctitle">1. Clone &amp; Install</div><div class="cdesc"><code style="color:var(--ac)">git clone https://github.com/peparhugo/agentic-dynamics<br>cd agentic-dynamics<br>pip install -e .</code></div></div>
-<div class="card"><div class="ctitle">2. Run a Config</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run.py experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro</code><br><br>Choose from 34 configs in <code>experiments/configs/</code>. Each defines the task, model, perturbation operators, and strengths.</div></div>
-<div class="card"><div class="ctitle">3. Run a Story</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run_story.py task_manager_api --model anthropic/claude-sonnet-5 --backend claude_cli</code><br><br>Five-session stories with git commits between sessions. <code>--backend claude_cli</code> runs Claude on your subscription; <code>--model anthropic/*</code> auto-routes the same way. Scale with <code>scripts/enqueue.py</code> + <code>scripts/worker.py</code>.</div></div>
-<div class="card"><div class="ctitle">4. Watch It Live</div><div class="cdesc"><code style="color:var(--ac)">python admin/server.py</code><br><br>Live control plane: experiment matrix, per-cell event streams, routing board. Or <code>scripts/monitor.py</code> for a terminal dashboard.</div></div>
-<div class="card"><div class="ctitle">5. Read &amp; Extend</div><div class="cdesc">Results output to <code>experiments/results/</code> as JSON and Markdown. Add perturbation operators in <code>src/instrument/perturb.py</code>, configs in <code>experiments/configs/</code>. The instrument is modular &ndash; new operators, models, and providers plug in without modifying the core runner.</div></div>
-</div>
-</section>
-<section class="sec wide">
-<h2>Experiment Matrix</h2>
-<p class="lead">34 configuration files covering 5 task domains plus 3 additional languages (TypeScript, Go, Rust) planned for expansion. Each config specifies the model, perturbation operators, strengths, and RNG seed. Every run is reproducible.</p>
-<div class="tbl"><table><thead><tr><th>Config</th><th>Domain</th><th>Models Run</th><th>Operator Types</th></tr></thead><tbody>
-<tr><td class="mono">task_manager.yaml</td><td>REST API (Flask)</td><td>All 8 models</td><td>Baseline, perturbation, batch cross-domain</td></tr>
-<tr><td class="mono">data_table.yaml</td><td>Frontend data grid</td><td>DeepSeek, GPT-5.6, Claude</td><td>Baseline, batch cross-domain</td></tr>
-<tr><td class="mono">collaborative_editor.yaml</td><td>Real-time editor</td><td>DeepSeek, GPT-5.6, Claude</td><td>Baseline, batch cross-domain</td></tr>
-<tr><td class="mono">constraint_detection.yaml</td><td>Multi-constraint API</td><td>DeepSeek, GPT-5, GPT-5-mini</td><td>Baseline, inject_phantom, remove_critical</td></tr>
-<tr><td class="mono">silent_mode_sweep.yaml</td><td>Silent vs forced</td><td>All 8 models</td><td>Natural vs forced-silent mode sweep</td></tr>
-<tr><td class="mono">url_shortener.yaml</td><td>REST API</td><td>DeepSeek, Claude</td><td>Iterative build, perturbation</td></tr>
-<tr><td class="mono">search_kv_store.yaml</td><td>Key-value store</td><td>DeepSeek</td><td>Baseline optimization</td></tr>
-<tr><td class="mono">twitter_timeline.yaml</td><td>Social feed</td><td>DeepSeek</td><td>Baseline</td></tr>
-<tr><td class="mono">web_crawler.yaml</td><td>Distributed crawler</td><td>DeepSeek</td><td>Baseline</td></tr>
-<tr><td class="mono">mint_financial.yaml</td><td>Financial tracking</td><td>DeepSeek</td><td>Baseline</td></tr>
-<tr><td class="mono">social_graph.yaml</td><td>Graph database</td><td>DeepSeek</td><td>Baseline</td></tr>
-<tr><td class="mono">form_wizard.yaml</td><td>Multi-step forms</td><td>DeepSeek</td><td>Baseline</td></tr>
-<tr><td class="mono">notification_system.yaml</td><td>Event-driven</td><td>DeepSeek</td><td>Baseline</td></tr>
-<tr><td class="mono">autocomplete_search.yaml</td><td>Search UI</td><td>DeepSeek</td><td>Baseline</td></tr>
-<tr><td class="mono">fastapi_maintenance.yaml</td><td>Code maintenance</td><td>DeepSeek</td><td>Refactoring under constraints</td></tr>
-<tr><td class="mono">flask_maintenance.yaml</td><td>Code maintenance</td><td>DeepSeek, GPT-5-mini</td><td>Refactoring under constraints</td></tr>
-<tr><td class="mono">architecture_redesign.yaml</td><td>System design</td><td>DeepSeek</td><td>Structural perturbation</td></tr>
-<tr><td class="mono">factorial_compound.yaml</td><td>Compound analysis</td><td>DeepSeek, Claude</td><td>Multi-factor perturbation</td></tr>
-<tr><td class="mono">iterative_build.yaml</td><td>Multi-phase build</td><td>DeepSeek</td><td>Sequential development</td></tr>
-<tr><td class="mono">recovery_cost.yaml</td><td>Cost measurement</td><td>DeepSeek</td><td>Recovery cost profiling</td></tr>
-<tr><td class="mono">comparative.yaml</td><td>Cross-model</td><td>DeepSeek, GPT-5-mini</td><td>Head-to-head comparison</td></tr>
-<tr><td class="mono">baseline.yaml</td><td>Generic</td><td>DeepSeek</td><td>Unperturbed baseline</td></tr>
-</tbody></table></div>
-</section>
-
-<!-- The Framework -->
-<section class="sec alt" style="text-align:center">
-<h2>From Measured Events to Information</h2>
-<p class="lead" style="margin:0 auto">The perturbation operators test specification resilience. The recovery signals classify behavior. The strategy taxonomy maps behavior to cost. The efficiency metrics quantify the cost. Together, they produce a measurement instrument for coding-agent economics under degraded input.</p>
-<div class="stats" style="max-width:800px;margin:2rem auto">
-<div class="stat"><div class="v">69×</div><div class="l">Measured Cost Gap</div></div>
-<div class="stat"><div class="v">6–50%</div><div class="l">Flail Rate Range</div></div>
-<div class="stat"><div class="v">1.80&times;</div><div class="l">2050 EPM Horizon</div></div>
-<div class="stat"><div class="v">$<span data-stat="cost">309.17</span></div><div class="l">Total Experiment Cost</div></div>
-</div>
-<div style="margin-top:2rem"><a href="/" class="cta-btn" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s;border:none;cursor:pointer">Explore Agentic Dynamics &rarr;</a></div>
-</section>
-
-<section class="sec alt wide">
-<h2>Where This Work Fits in the Literature</h2>
-<p class="lead">The concepts in Agentic Dynamics connect to established academic and industry research. Each coined term maps to a known body of work.</p>
-<div class="tbl"><table><thead><tr><th>Our Concept</th><th>Industry / Academic Term</th><th>Reference</th></tr></thead><tbody>
-<tr><td><strong style="color:var(--ac)">Silent Inference</strong></td><td>Cost-Aware Architecture</td><td>Multi-agent systems literature</td></tr>
-<tr><td><strong style="color:var(--am)">Explanation Tax</strong></td><td>Reasoning Token Overhead / CoT Costs</td><td><a href="https://arxiv.org/abs/2501.12948" target="_blank" style="color:var(--ac)">DeepSeek-R1 Technical Report, 2025</a></td></tr>
-<tr><td><strong style="color:var(--cy)">Cost-Per-Pass</strong></td><td>Cost-of-Pass</td><td><a href="https://arxiv.org/abs/2508.02694" target="_blank" style="color:var(--ac)">Zhou et al., arXiv:2508.02694, 2025</a></td></tr>
-<tr><td><strong style="color:var(--am)">Snowball Rule (N&sup2;)</strong></td><td>Inference Production Frontier</td><td><a href="https://arxiv.org/abs/2510.26136" target="_blank" style="color:var(--ac)">Zhuang et al., arXiv:2510.26136, 2025</a></td></tr>
-<tr><td><strong style="color:var(--ac)">EPM</strong></td><td>4Ms Framework</td><td><a href="https://cloud.google.com/blog/topics/systems/4ms-of-ai-efficiency" target="_blank" style="color:var(--ac)">Google Cloud, 2025</a></td></tr>
-<tr><td>Prompt &amp; Plan Caching</td><td>Cache Saver Framework</td><td><a href="https://aclanthology.org/2025.findings-emnlp.1" target="_blank" style="color:var(--ac)">Potamitis et al., EMNLP 2025</a></td></tr>
-<tr><td>Grit (Ground-Truth Integrity)</td><td>Complementary to the Efficiency Frontier for Coding Models</td><td><a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" target="_blank" style="color:var(--ac)">Wendell et al., Databricks Blog, Aug 2026</a></td></tr>
-<tr><td>Behavioral Attraction Basins</td><td>Manifold of Failure</td><td><a href="https://arxiv.org/abs/2602.22291" target="_blank" style="color:var(--ac)">Munshi et al., arXiv:2602.22291, 2026</a></td></tr>
-<tr><td>Semantic &amp; Cascade Routing</td><td>SATER / Speculative Cascades</td><td><a href="https://arxiv.org/abs/2510.05164" target="_blank" style="color:var(--ac)">Shen et al., arXiv:2510.05164, 2025</a></td></tr>
-</tbody></table></div>
-<p style="font-size:0.78rem;color:var(--t3);text-align:center;margin-top:1rem"><strong>Energy:</strong> IEA 2025 &middot; Goldman Sachs 2026 (220% AI demand) &middot; EIA 2026 &middot; Carnegie Mellon 2025 &middot; Rystad Energy 2025<br><strong>Research:</strong> Liu et al. (2026) &middot; TokenPowerBench (AAAI 2026) &middot; Zhu &amp; Zhu (2026) &middot; CARL (ACL 2026) &middot; TRACED (2026)</p>
-</section>
-
-<section class="sec alt wide">
-<h2>Limitations</h2>
-<p class="lead" style="font-size:0.82rem;color:var(--t2);line-height:1.7;max-width:900px;margin:0 auto">
-The 227 historical experiments are statistically meaningful but not exhaustive — confidence intervals widen for per-model-per-task breakdowns. Validated on Python/Flask REST APIs and TypeScript/Node.js (21 cross-model runs). Not yet validated on Go, Rust, Java, or non-code tasks. Provider pricing and model behavior change — this is a Q3 2026 snapshot. The instrument is open source; independent replication welcome. EPM projections use IEA baseline (1.6%/yr); real energy markets may diverge.<br><br>
-Known methodological constraints: <strong>insert_contradiction</strong> domain matching relies on keyword overlap with task descriptions and is sensitive to stopword filtering — mismatches default to the general contradiction pool. <strong>inject_alien_vocab</strong> provenance fields track which tech terms were replaced but do not record domain-level attribution for fallback injections. <strong>invert_constraint</strong> and <strong>remove_critical_constraint</strong> may produce passive runs (no-op) when the prompt contains no constraint-form sentences matching their regex patterns — these are recorded as such in the Perturbation metadata but may go unnoticed in aggregate summaries.
+<section class="ad-section ad-reading">
+<p class="ad-kicker">Reproducibility</p>
+<h2>Every conclusion should have an artifact path.</h2>
+<p>Generated public data comes from `apps/website/data.js`. Campaign verdicts point to immutable score JSONs and phase ledgers. The source repository contains the experiment specifications, test runner, and compiler gate.</p>
+<p>
+<a href="evidence.html">Inspect the current corpus and campaign records.</a>
 </p>
 </section>
-
-<div style="text-align:center;margin-top:1rem"><a href="evidence.html" class="cta-btn">View the Evidence →</a></div>
-
-<footer>
-<strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-<span data-stat="sessions">1,067</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">215</span> stories · $<span data-stat="cost">309.17</span> measured<br>
-<a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> ·
-  <a href="/">Home</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
-</footer>
-
-<script src="app.js"></script>
+</main>
 </body>
 </html>

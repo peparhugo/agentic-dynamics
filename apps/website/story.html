@@ -1,229 +1,69 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>The Story — Agentic Dynamics</title>
-<meta name="description" content="How a $20 API key exposed a value-measurement gap and broadened an AI FinOps question into Agentic Dynamics, behind 249 historical sessions, 8 models, and 224 historical game reports.">
-<meta property="og:title" content="The Story — Agentic Dynamics">
-<meta property="og:description" content="The Agentic Dynamics discovery story: how a $20 API key exposed a gap between success and durable value">
-<meta property="og:url" content="https://ai-finops-rulebook.web.app/story.html">
-<meta property="og:type" content="website">
-<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
-<meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="How a $20 API key became a question about durable agentic outcomes.">
+<title>The Story | Agentic Dynamics</title>
 <link rel="stylesheet" href="base.css">
-<style>
-article{max-width:720px;margin:0 auto;padding:5rem 2rem 4rem}
-.subtitle{font-size:0.95rem;color:var(--t2);margin-bottom:2.5rem;line-height:1.6}
-p strong{color:var(--t)}
-.highlight{background:var(--bg3);border:1px solid var(--b);border-radius:14px;padding:1.8rem;margin:2rem 0}
-.highlight h3{color:var(--ac);margin-top:0}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.8rem;margin:1.5rem 0}
-.stat-card{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1.1rem;text-align:center;transition:transform .2s}
-.stat-card:hover{transform:translateY(-2px);border-color:rgba(34,211,238,0.25)}
-.stat-card .v{font-size:1.5rem;font-weight:800;color:var(--ac)}
-.stat-card .v.amber{color:var(--am)}
-.stat-card .v.cyan{color:var(--cy)}
-.stat-card .l{font-size:0.6rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px;margin-top:0.2rem;font-weight:600}
-blockquote{border-left:3px solid var(--ac);padding:1rem 1.5rem;margin:2rem 0;font-size:1.05rem;color:var(--t);font-style:italic;line-height:1.7;background:rgba(34,211,238,0.03);border-radius:0 10px 10px 0}
-blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:normal;margin-top:0.8rem}
-.callout{display:flex;align-items:flex-start;gap:1rem;background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem 1.5rem;margin:1.5rem 0}
-.callout .icon{font-size:1.6rem;flex-shrink:0}
-.callout p{font-size:0.85rem;margin:0;color:var(--t2)}
-.callout p strong{color:var(--ac)}
-.comparison{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.5rem 0}
-.comp-box{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;text-align:left}
-.comp-box h3{font-size:0.85rem;margin:0 0 0.5rem}
-.comp-box ul{list-style:none;padding:0}.comp-box li{font-size:0.78rem;color:var(--t2);padding:0.2rem 0}
-.comp-box li::before{content:'\2192 ';color:var(--t3)}
-.comp-box.green h3{color:var(--ac)}.comp-box.amber h3{color:var(--am)}
-@media(max-width:768px){article{padding:3rem 1.5rem 2rem}.comparison{grid-template-columns:1fr}}
-</style>
-<script src="data.js"></script>
 </head>
-<body>
-
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link" style="color:var(--ac)">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
-
-<article>
-
-<h1>A $20 API key exposed a value-measurement gap.</h1>
-<p class="subtitle">I was trying to spend less while I was away. The unexplained difference between cost, output, and durable value turned a personal budget experiment into a measurement question.</p>
-
-<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 1 &middot; Why — The Anomaly</div>
-
-<h2>The cost anomaly.</h2>
-
-<p>At the start of 2026, I was spending close to $700 per month on AI subscriptions. ChatGPT Pro. Claude Max. All the tiers. I used them for everything &ndash; coding, writing, thinking through architecture decisions, running experiments. It was just the cost of doing business. I didn't think about it.</p>
-
-<p>Then I went on a break to Italy. I downgraded every subscription to the lowest tier. On the train from Rome to Naples, I decided to try something.</p>
-
-<p>But I had a few things I wanted to tinker with while I was away. So I did something I'd never done before: I loaded $20 USD onto the DeepSeek v4 API and pointed my tooling at it. Twenty dollars. That's less than I'd spend on a single lunch in Rome.</p>
-
-<p>That was weeks ago. I burned through <span data-stat="deepseek_cost">$2.04</span> in DeepSeek experiment costs — plus personal sessions, under $13 total for weeks of experimentation.</p>
-
-<div class="stats-grid">
-<div class="stat-card"><div class="v">3</div><div class="l">Models Tested</div></div>
-<div class="stat-card"><div class="v">347</div><div class="l">Instrumented Sessions</div></div>
-<div class="stat-card"><div class="v amber">$<span data-stat="cost">309.17</span></div><div class="l">Total Research Cost</div></div>
-<div class="stat-card"><div class="v cyan"><span data-stat="costgap">17&times;</span></div><div class="l">Measured Cost Gap</div></div>
+<body class="ad-page">
+<nav class="ad-public-nav" aria-label="Primary">
+<div class="ad-public-nav__inner">
+<a href="index.html">AGENTIC DYNAMICS</a>
+<a href="story.html" aria-current="page">Story</a>
+<a href="question.html">Question</a>
+<a href="methodology.html">Method</a>
+<a href="evidence.html">Evidence</a>
+<a href="framework.html">Framework</a>
+<a href="accelerator.html">Open questions</a>
 </div>
-
-<h2>The cost gap demanded an explanation.</h2>
-
-<p>In the time it took me to burn through $12.73, I:</p>
-
-<div class="highlight">
-<ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
-<li>&rarr; Completely overhauled and refactored a Dreamlab exploratory codebase — the one that eventually became this research instrument</li>
-<li>&rarr; Built a greenfield project for downloading videos, generating subtitles, cutting them into shorts, and publishing to YouTube</li>
-<li>&rarr; Ran every experiment in the Agentic Dynamics corpus — 224 historical game reports across 8 models</li>
-<li>&rarr; Wrote this entire website — the instrument, the principles, the calculator, the methodology page</li>
-<li>&rarr; Debugged production issues, explored architecture decisions, refactored storage layers, and built collaboration features</li>
-</ul>
-</div>
-
-<div class="stats-grid">
-<div class="stat-card"><div class="v">347</div><div class="l">Total Sessions</div></div>
-<div class="stat-card"><div class="v amber">$<span data-stat="cost">309.17</span></div><div class="l">All-Model Experiment Cost</div></div>
-<div class="stat-card"><div class="v">$12.73</div><div class="l">DeepSeek Spend</div></div>
-<div class="stat-card"><div class="v amber"><span data-stat="claude_cost">$4.64</span></div><div class="l">Claude Sonnet 5 Spend</div></div>
-</div>
-
-<blockquote>
-"This doesn't make any sense. How is this possible? The same tasks. The same outcomes. A fraction of the cost. I had to understand why."
-<cite>&ndash; Me, staring at the DeepSeek billing dashboard, on a train from Rome to Naples</cite>
-</blockquote>
-
-<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 2 &middot; How — The Question Scaled</div>
-
-<h2>One comparison became an N x M experiment.</h2>
-
-<p>The price difference was only the first observation. To understand whether cheaper output also created durable value, I needed to compare behavior under controlled degradation and follow what happened after each session.</p>
-
-<p>The experiments revealed something I didn't expect. When we deliberately broke the instructions — inverted constraints, removed critical requirements, injected alien vocabulary — the models produced materially different recovery and output behavior. I initially thought the cost difference was simply token volume. It wasn't. That led me to start perturbing specifications and measuring how the agents behaved.</p>
-
-<p>I'm calling this <strong style="color:var(--ac)">Grit</strong>: Ground-Truth Integrity. How well does a model maintain correctness when the input is degraded?</p>
-
-<p>The measurement produced two dimensions:</p>
-<div class="highlight" style="padding:1.3rem">
-<ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
-<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: 11%. DeepSeek: 8%. GPT-5-nano: 14%. (Single-session perturbation experiment, 227 historical runs.)</li>
-<li><strong style="color:var(--cy)">Recovery cost:</strong> When the model DOES succeed, how much extra does it cost to work through the confusion? DeepSeek: negligible narration overhead. Claude: 8.5% narration penalty on successful sessions, plus 11% flail rate. (Single-session perturbation experiment.)</li>
-</ul>
-</div>
-
-<p>We observe materially different recovery and output behavior across provider families. Differences may be explained by model architecture, post-training, provider-side optimizations, tooling interaction, or some combination. This experiment does not identify the causal mechanism.</p>
-
-<p>One hypothesis is that DeepSeek's GRPO reinforcement learning approach may contribute to its lower reasoning-token overhead, while SFT-trained models may produce more billed reasoning tokens under perturbation. But this remains a hypothesis — the experiment measures outcomes and cost, not training architecture internals.</p>
-
-<p>We observe an interesting pattern: some models produce fewer reasoning tokens while maintaining performance. Whether this is caused by GRPO training architecture, provider-side caching, or some combination is not yet determined.</p>
-
-<p>Later analysis revealed the deeper layer: equal token counts do not equate to identical cost. Claude Sonnet 5's output tokens cost ~5.1&times; more per unit off-peak (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$10.00 vs $1.98 per 1M output tokens, off-peak</span>); DeepSeek's rate doubles to $3.96/M at peak (01:00&ndash;04:00 &amp; 06:00&ndash;10:00 UTC), narrowing the gap to ~2.5&times;. And cache behavior splits the models: DeepSeek reuses only 78% of its context, re-reading the codebase every session at 35K tokens, while Luna and Sonnet trust their cache at 97-98% hit rates and send 6K new tokens. Two models produce the same codebase at wildly different token economics.</p>
-
-<h2>Scaling the question changed the problem.</h2>
-
-<p>A clean-versus-degraded prompt comparison could answer one bounded question, but agentic software work is cumulative. N linked sessions were needed because each session changes the codebase inherited by the next. M measurement angles were needed because tests alone cannot represent maintainability, maintainability cost, long-horizon scalability, one-way and two-way-door routing risk, verification depth, cache economics, recovery, or cost per accepted outcome.</p>
-
-<p>Collection was only half of the multiplication. The same sessions then had to be analyzed across models, conditions, tasks, tiers, commits, and positions in the story: a second N x M burden. More sessions without analysis produce volume, not information; more metrics without consistent event capture produce incomparable claims.</p>
-
-<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 3 &middot; How — The Instrument</div>
-
-<h2>The question required instrumentation, not another benchmark.</h2>
-
-<p><strong>Instrument — capture events.</strong> This is instrumentation that runs async CLI sessions at scale: a queue that workers drain, isolation so sessions cannot delete the lab, resumability after timeouts, and per-session capture of cost, tests, cache behavior, code changes, and perturbation context. The instrument does not judge code. It runs thousands of sessions and records what happened.</p>
-
-<p><strong>Because the outcome of one session is the starting point of the next.</strong> Five sessions chain into a story — greenfield &rarr; feature &rarr; integration &rarr; refactor &rarr; cross-cutting — each committing onto the last. The output becomes the next codebase. The measured arc shows later sessions costing more; the N&sup2; relationship is a modeled extension beyond those endpoints.</p>
-
-<p><strong>Derive — turn events into information.</strong> Session traces, tests, static analysis, and independent reviews become measures of verification depth, maintainability, recovery, and cost per accepted outcome. This is the analysis layer that turns the N x M corpus into comparable evidence.</p>
-
-<p><strong>Write policy, then grid.</strong> A separate module — the one I'm focused on now — can use measured information to propose routing experiments. DeepSeek through opencode. Sonnet through the Claude CLI. Luna through opencode. The same chained sessions and passing tests produced different observed verification depth: Sonnet writes 73 tests for $2.32 while Luna writes 7 for $0.09. Which toolchain should receive one kind of session is a policy question to test as an arm, not a conclusion to infer from price alone.</p>
-
-<div class="callout">
-<div class="icon">&#9888;</div>
-<p><strong>Campaign — change one variable and repeat.</strong> Running sessions at scale is itself a measurement problem. The queue got wiped twice because the sessions I was running deleted the lab. SonarQube processes one analysis at a time, so I stood up four. Sessions time out mid-story and must resume without losing attribution. None of this is the finding; all of it is required to make repeated comparisons possible.</p>
-</div>
-
-<p><strong>The payoff is information, not session volume.</strong> Over 2,000 sessions — 1,067 story-building runs across 215 cells and seven models, plus 911 independent reviews — made cost and verification differences visible on the same linked work. That evidence can support a proposed policy; only a controlled grid can establish whether the policy improves value.</p>
-
-<blockquote>
-"The outcome of one session is the starting point of the next. Measure it before deciding how to route it."
-</blockquote>
-
-<h2>The question crossed four disciplines.</h2>
-
-<p>The measurement problem did not fit inside a single discipline. Economics, physics, energy markets, and software systems each exposed a different part of the same cumulative process.</p>
-
-<p><strong>Economics.</strong> Cost curves distinguish marginal from total cost. The N&sup2; term in the modeled cumulative equation reads as a production function: codebase growth can become a second-order cost driver rather than a sequence of independent prompt charges.</p>
-
-<p><strong>Physics.</strong> A GPU drawing 700W while running converts energy into computation. That makes Watt-per-useful-token and the Energy Price Multiplier physical inputs to long-horizon hypotheses, not substitutes for directly measured session cost.</p>
-
-<p><strong>Energy markets.</strong> External projections estimate 220% growth in AI power demand and data-center consumption of 6.7&ndash;12% of US generation. These are external structural inputs to a model, not outcomes measured by this experiment.</p>
-
-<p><strong>Software engineering and system architecture.</strong> Production experience supplied the operational constraints: switching C&#8320; can be a two-way door, while architecture choices that determine &beta; may persist across the codebase. Those distinctions become hypotheses that the instrument can test.</p>
-
-<p><strong>Career context.</strong> Work with CFO and CTO decisions clarified the difference between evidence that describes a benchmark and evidence strong enough to change a policy. The ten rules are possible control rules; where they have not been run as arms, they remain proposals.</p>
-
-<div class="callout">
-<div class="icon">&#9888;</div>
-<p><strong>The disciplines constrain one another.</strong> Physics bounds the energy input, economics describes compounding cost, software architecture explains inherited state, and operational leadership asks which decision the evidence can actually support. Together they turn separate observations into a testable research program.</p>
-</div>
-
-<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 4 &middot; What — The Field</div>
-
-<h2>The result was not a cheaper-model verdict.</h2>
-
-<p>The work began as an AI FinOps question: I started out trying to show that DeepSeek was more efficient by running the same tasks, measuring the costs, and publishing the numbers. The linked sessions showed why that answer was incomplete. Agentic Dynamics is the resulting field of inquiry, not a product: it is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This instrument currently studies immediate cost, verification, maintainability, recovery, and five-session progression in coding-agent workflows; routing and long-horizon economics remain open research questions.</p>
-
-<p><strong>Immediate cost.</strong> The DeepSeek and Claude gap was not only price per session; it changed how long a fixed budget could sustain work. A useful policy must maximize accepted outcomes before the budget runs out, rather than choose the cheapest model for every prompt.</p>
-
-<p><strong>Durable verification.</strong> What I didn't expect when I first published the instrument was that the deeper distinction was not simply token count. Luna writes 7 tests per story for $0.09. Sonnet 5 writes 73 for $2.32. Both codebases pass their tests. Only one has the broader observed safety net. That is the durable-value gap the instrument was built to measure.</p>
-
-<p><strong>Maintainability and recovery.</strong> A passing result does not reveal what the next agent inherits, how expensive the code is to maintain, or whether degraded input leaks into later work. Linked sessions make those questions observable without collapsing them into a single score.</p>
-
-<p><strong>One-way and two-way-door routing.</strong> Switching C&#8320; can be reversible. Committing to an architecture that determines &beta; and v may not be. Routing is therefore a possible policy arm: classify the task, apply a measured verification gate, and test whether the proposed route improves durable value.</p>
-
-<p><strong>Long-horizon economics.</strong> Under linear context-growth assumptions, cumulative context cost contains an N&sup2; term (modeled extension, not independently tested). The &beta;·v·N&sup2; term is a hypothesis for long-run cost — model the curve before architectural commitments.</p>
-
-<p><strong>Cost per accepted outcome.</strong> CostPerOutcome is not cost per prompt or cost per session. It asks for the durable value of an accepted outcome divided by what it cost to produce and sustain it.</p>
-
-<p><strong>Energy economics.</strong> EPM(t), the Energy Price Multiplier, brings external energy-market assumptions into long-horizon modeling. The 4Ms framework from Google Cloud formalizes this dimension, and the IEA projects 1.8&times; growth by 2050. Those external projections inform scenarios; this corpus did not measure them.</p>
-
-<div class="callout">
-<div class="icon">&#9888;</div>
-<p><strong>The comparison opened a broader question.</strong> I thought I was comparing two models. The evidence instead pointed to a field that connects individual sessions with cumulative outcome-delivery costs over multi-decade horizons, while keeping measured observations separate from modeled extensions.</p>
-</div>
-
-<h2>The field starts where benchmarks stop.</h2>
-
-<p>Benchmarks can compare models on bounded tasks. They do not by themselves explain, under a team's assumptions, what cumulative costs would be in 2035 or whether the resulting software remains verifiable and maintainable.</p>
-
-<p>A one-task score can still be useful, including a 2% difference on HumanEval. The missing question is whether switching models saves or costs money over three years once team size, velocity, inherited codebase growth, verification depth, and energy exposure enter the analysis.</p>
-
-<p><strong>The discovery defines a research program: measure the events, derive the information, test the policy, and repeat.</strong></p>
-
-<blockquote>
-"The instrument didn't come from theory. It came from seeing $12.73 and $700 produce an unexplained difference — and needing to understand why."
-</blockquote>
-
-<p>The immediate record answers <strong>"what did we spend last month?"</strong> The modeled question asks <strong style="color:var(--ac)">"what will we spend over the next 3 years?"</strong> Under modeled assumptions, the N&sup2; term describes how inherited codebase growth can affect cumulative cost; it remains one hypothesis to test, not a measured forecast.</p>
-
-<div style="text-align:center;margin:2rem 0">
-<a href="/" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s">Follow the Discovery &rarr;</a>
-</div>
-
+</nav>
+<main class="ad-shell">
+<article class="ad-reading ad-hero">
+<p class="ad-kicker">Origin / first-person record</p>
+<h1>A $20 API key made a missing measurement impossible to ignore.</h1>
+<p class="ad-lead">I was trying to spend less while I was away. The difference between cost, output, and durable value turned a personal budget experiment into a research question.</p>
+<p>At the start of 2026, I was spending close to $700 per month on AI subscriptions. On a train from Rome to Naples, I loaded $20 USD onto the DeepSeek v4 API and pointed my tooling at it.</p>
+<p>
+<span class="ad-evidence" data-evidence="H">[H] PERSONAL ORIGIN</span> The $20 key, the train, and the subscription spend are first-person narrative, not telemetry. They belong here because they explain why the question mattered.</p>
 </article>
-
-<div style="text-align:center;margin:2rem 0"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
-
-<footer>
-<strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
-<span data-stat="sessions">1,067</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">215</span> stories · $<span data-stat="cost">309.17</span> measured<br>
-<a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> ·
-  <a href="/">Home</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
+<section class="ad-section ad-columns">
+<div class="ad-reading">
+<p class="ad-kicker">The anomaly</p>
+<h2>Cheap output was not the conclusion.</h2>
+<p>The early comparison looked like a cost question: how could similar work appear at radically different prices? That framing was inadequate. A passing task does not say what the next agent inherits, how much verification was chosen, whether a defect is caught independently, or what recovery costs after a rejection.</p>
+<p>The observation became a more demanding question: how do changing tasks, environments, workflows, and time alter accepted outcomes? That is the field claim, not "one model is cheaper."</p>
+</div>
+<aside class="ad-callout">
+<h3>A historical snapshot is not a current receipt.</h3>
+<p>The Story once carried 347 instrumented sessions as a local historical snapshot. It is retained as context only, never merged with the current 1,067-session corpus.</p>
+<p class="ad-source">[H] `story.html` historical prose; current corpus source is `data.js.summary.sessions_total` [M].</p>
+</aside>
+</section>
+<section class="ad-section ad-reading">
+<p class="ad-kicker">The question scaled</p>
+<h2>One comparison became an N x M instrument.</h2>
+<p>Linked sessions were necessary because each outcome becomes the code and context of the next session. Multiple measurement angles were necessary because self-authored tests cannot stand in for verification, recovery, maintainability, cost, or downstream loss.</p>
+<figure class="ad-figure" data-ad-diagram="nxm">
+<figcaption>Figure 2. The N x M problem is a method map [P]. It does not convert the number of sessions into a claim of information by itself.</figcaption>
+</figure>
+</section>
+<section class="ad-section ad-reading">
+<p class="ad-kicker">The result</p>
+<h2>The field starts where the benchmark ends.</h2>
+<p>The work now asks what must be observed before a policy can be justified. It has a method, an instrument, a corpus boundary, decisions with authorization limits, and open questions. The personal story is the beginning of that program, not proof of its conclusions.</p>
+<p>
+<a href="question.html">Read the named question and its boundaries.</a>
+</p>
+</section>
+</main>
+<footer class="ad-shell ad-footer">
+<p class="ad-note">Origin claims: [H] first-person record, `story.html:51-64` in the prior site. Current evidence and verdicts are separately sourced on the Evidence page.</p>
 </footer>
-
-<script src="app.js"></script>
+<script src="assets/design-components.js">
+</script>
+<script src="assets/publication.js">
+</script>
 </body>
 </html>
