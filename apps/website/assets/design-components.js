@@ -132,27 +132,42 @@
       <text class="small" x="380" y="308" text-anchor="middle">A displayed curve must say whether it is observed, computed, or unavailable.</text>`);
   }
 
-  function escalationChain() {
-    return svg("Measured escalation cost chain", "A baseline cell and two measured escalation fixes yield separate E_x ratios, each with n equal to one model.", `
+  function escalationChain(escalation) {
+    // Campaign measurements arrive through data.js. Diagram structure is static;
+    // values are never duplicated here as presentation fallbacks.
+    const models = escalation && escalation.models ? escalation.models : [];
+    const baseline = escalation ? escalation.baseline_cost_usd : null;
+    const first = models[0] || {};
+    const second = models[1] || {};
+    const shortName = (model) => (model || "not loaded").split("/").pop().replace("gpt-5.6-", "").replace("claude-", "");
+    const usd = (value) => value == null ? "not loaded" : `$${Number(value).toFixed(6)}`;
+    const ratio = (value) => value == null ? "not loaded" : Number(value).toFixed(4);
+    return svg("Measured escalation cost chain", "A baseline cell and two measured escalation fixes yield separate E_x ratios with per-model cell counts shown.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
-      <text class="micro" x="36" y="42">MEASURED ESCALATION / N = 1 PER MODEL</text>
-      <g transform="translate(42 126)"><rect class="node-measured" width="136" height="88" rx="8"/><text class="label" x="68" y="34" text-anchor="middle">Baseline cell</text><text class="small" x="68" y="53" text-anchor="middle">$0.008949 [M]</text><text class="tag-m" x="68" y="72" text-anchor="middle">critical defect</text></g>
+      <text class="micro" x="36" y="42">MEASURED ESCALATION / PER-MODEL N VISIBLE</text>
+      <g transform="translate(42 126)"><rect class="node-measured" width="136" height="88" rx="8"/><text class="label" x="68" y="34" text-anchor="middle">Baseline cell</text><text class="small" x="68" y="53" text-anchor="middle">${usd(baseline)} [M]</text><text class="tag-m" x="68" y="72" text-anchor="middle">critical defect</text></g>
       <path class="flow" d="M178 170H260"/>
       <g transform="translate(260 126)"><rect class="node" width="126" height="88" rx="8"/><text class="label" x="63" y="34" text-anchor="middle">Rejected</text><text class="small" x="63" y="53" text-anchor="middle">downstream risk</text><text class="small" x="63" y="70" text-anchor="middle">not a price list</text></g>
       <path class="flow-measured" d="M386 150H458M386 194H458"/>
-      <g transform="translate(458 94)"><rect class="node-measured" width="210" height="78" rx="8"/><text class="label" x="16" y="30">Sol fix: $0.102619 [M]</text><text class="small" x="16" y="49">E_x = 11.4671 [C]</text><text class="micro" x="16" y="66">n = 1 / model</text></g>
-      <g transform="translate(458 206)"><rect class="node-measured" width="210" height="78" rx="8"/><text class="label" x="16" y="30">Sonnet fix: $0.111982 [M]</text><text class="small" x="16" y="49">E_x = 12.5134 [C]</text><text class="micro" x="16" y="66">n = 1 / model</text></g>
+      <g transform="translate(458 94)"><rect class="node-measured" width="210" height="78" rx="8"/><text class="label" x="16" y="30">${shortName(first.escalation_model)} fix: ${usd(first.escalation_fix_cost_usd)} [M]</text><text class="small" x="16" y="49">E_x = ${ratio(first.E_x)} [C]</text><text class="micro" x="16" y="66">n = ${first.n_model_cells == null ? "not loaded" : first.n_model_cells} / model</text></g>
+      <g transform="translate(458 206)"><rect class="node-measured" width="210" height="78" rx="8"/><text class="label" x="16" y="30">${shortName(second.escalation_model)} fix: ${usd(second.escalation_fix_cost_usd)} [M]</text><text class="small" x="16" y="49">E_x = ${ratio(second.E_x)} [C]</text><text class="micro" x="16" y="66">n = ${second.n_model_cells == null ? "not loaded" : second.n_model_cells} / model</text></g>
       <text class="small" x="42" y="314">Ratios are descriptive measurements, not a provider recommendation.</text>`);
   }
 
-  function calibrationArc() {
+  function calibrationArc(campaign) {
+    const staticArm = campaign && campaign.static ? campaign.static : {};
+    const adaptiveArm = campaign && campaign.adaptive ? campaign.adaptive : {};
+    const decision = campaign && campaign.decision_rule ? campaign.decision_rule : {};
+    const ci = decision.cpvo_ratio_ci_95 || [];
+    const ratio = decision.cpvo_ratio == null ? "not loaded" : Number(decision.cpvo_ratio).toFixed(4);
+    const interval = ci.length === 2 ? `[${Number(ci[0]).toFixed(4)}, ${Number(ci[1]).toFixed(4)}]` : "not loaded";
     return svg("Calibration arc from descriptive rerun to randomized decision", "Three panels show a 0 of 3 predecessor, a 2 of 3 rerun with a wide interval, and a randomized non-inferiority decision limited to design review.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
       <text class="micro" x="36" y="42">CALIBRATION ARC / UNCERTAINTY STAYS VISIBLE</text>
       <path class="flow" d="M236 170H270M466 170H500"/>
       <g transform="translate(42 96)"><rect class="node-null" width="194" height="150" rx="8"/><text class="micro" x="16" y="23">PREDECESSOR</text><text class="label" x="16" y="54">0 / 3</text><text class="small" x="16" y="77">proposal hits</text><text class="small" x="16" y="104">not a clearance</text><text class="micro" x="16" y="128">[C] descriptive rate</text></g>
       <g transform="translate(270 96)"><rect class="node-computed" width="196" height="150" rx="8"/><text class="micro" x="16" y="23">RERUN 2</text><text class="label" x="16" y="54">2 / 3</text><text class="small" x="16" y="77">Wilson [.2077, .9385]</text><text class="small" x="16" y="104">wide interval; n = 3</text><text class="tag-c" x="16" y="128">[C] descriptive only</text></g>
-      <g transform="translate(500 96)"><rect class="node-policy" width="194" height="150" rx="8"/><text class="micro" x="16" y="23">RANDOMIZED 2B</text><text class="label" x="16" y="54">NON-INFERIOR</text><text class="small" x="16" y="77">CPVO ratio .7857 [C]</text><text class="small" x="16" y="98">CI [.6842, .9105]</text><text class="tag-p" x="16" y="128">[P] design review only</text></g>
+      <g transform="translate(500 96)"><rect class="node-policy" width="194" height="150" rx="8"/><text class="micro" x="16" y="23">RANDOMIZED 2B / n=${staticArm.n == null ? "?" : staticArm.n}+${adaptiveArm.n == null ? "?" : adaptiveArm.n}</text><text class="label" x="16" y="54">${decision.decision || "NOT LOADED"}</text><text class="small" x="16" y="77">CPVO ratio ${ratio} [C]</text><text class="small" x="16" y="98">CI ${interval}</text><text class="tag-p" x="16" y="128">[P] design review only</text></g>
       <text class="small" x="368" y="302" text-anchor="middle">The final panel does not arm a policy or activate control.</text>`);
   }
 

@@ -10,7 +10,7 @@
 </script>
 <script src="assets/design-components.js">
 </script>
-<script src="assets/publication.js">
+<script src="app.js">
 </script>
 </head>
 <body class="ad-page">
@@ -86,12 +86,12 @@
 <figcaption>Figure 3. Calibration and randomized 2b decision. Rates, interval, arm definition, and authorization boundary remain visible.</figcaption>
 </figure>
 <p class="ad-note">
-<span class="ad-evidence" data-evidence="C">[C] DECISION</span> `cap_2b` randomized pilot: static n=9, CPVO $0.013344, 6/9 verified; adaptive n=9, CPVO $0.010485, 9/9 verified; CPVO ratio .7857, 95% CI [.6842, .9105]; success gap -.3333. The pre-registered rule decided NON-INFERIOR.</p>
+<span class="ad-evidence" data-evidence="C">[C] DECISION</span> <span data-ad-cap2b-summary>Campaign data unavailable.</span></p>
 </div>
 <aside class="ad-callout ad-callout--policy">
 <h3>Authorization boundary</h3>
 <p>The decision authorizes design review of continuing adaptive selection only. It does not launch a regime, flip `control_route`, arm actuation, or promote a general routing claim.</p>
-<p class="ad-source">[P] `docs/designs/current/cap_2b.md:89-96`; score JSON `cap_2b_score_20260826T160018Z.json`.</p>
+<p class="ad-source">[P] `docs/designs/current/cap_2b.md:89-96`; [M]/[C] score JSON `<span data-ad-cap2b-source>not loaded</span>`.</p>
 </aside>
 </div>
 </section>
@@ -99,17 +99,17 @@
 <p class="ad-kicker">Escalation measurement</p>
 <h2>Downstream cost is now measured in two descriptive cells.</h2>
 <figure class="ad-figure" data-ad-diagram="escalation">
-<figcaption>Figure 4. Baseline and fix costs produce two measured E_x ratios. Each escalation model has n=1, so the result is descriptive and has no confidence interval.</figcaption>
+<figcaption>Figure 4. Baseline and fix costs produce two measured E_x ratios. Each escalation model has <span data-ad-escalation-n>an artifact-defined n</span>, so the result is descriptive and has no confidence interval.</figcaption>
 </figure>
-<p class="ad-note">[M] baseline $0.008949; Sol fix $0.102619; Sonnet fix $0.111982. [C] E_x=11.4671 and 12.5134 respectively. Source: `experiments/results/cap_escalation_measurement/cap_escalation_measurement_score_20260826T125726Z.json`.</p>
+<p class="ad-note"><span data-ad-escalation-summary>Campaign data unavailable.</span> Source: `<span data-ad-escalation-source>not loaded</span>`.</p>
 </section>
 <section class="ad-section">
 <p class="ad-kicker">Honest limits</p>
 <div class="ad-figure-grid">
 <div class="ad-callout ad-callout--null">
 <h3>Escalate was untriggered.</h3>
-<p>All six live escalate cells passed on their assigned model's first attempt. The measured live CPVO is the no-escalation-needed case, not an estimate of escalation premium.</p>
-<p class="ad-source">[M] `cap_session_routing_prospective.md:92-108,128-139`.</p>
+<p data-ad-untriggered-summary>Campaign data unavailable.</p>
+<p class="ad-source">[M] source `<span data-ad-routing-source>not loaded</span>`; `cap_session_routing_prospective.md:92-108,128-139`.</p>
 </div>
 <div class="ad-callout ad-callout--null">
 <h3>The historical EFFICIENT bin is empty.</h3>

@@ -1,8 +1,8 @@
-/* Generated 2026-08-26 17:27:45 UTC by build_data.py */
+/* Generated 2026-08-26 19:31:29 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-26T17:27:42.843987+00:00",
+    "generated_at": "2026-08-26T19:31:26.176655+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -61,12 +61,12 @@ window.DYNAMICS_DATA = {
     "waivers": []
   },
   "publication_contract": {
-    "registry_identity": "b21ba6ac3459d8ea1e19d51cd17058cd0f1717bd30922a0249f46f51e4ce6bcb",
+    "registry_identity": "2a622f891f138a6292f6bf1b9d0653fc9d57bd76dd97b180504d027bd3201b6b",
     "resolved_input_identity": "077f95acc9fdb7e40a132aa89c5c27c4d48eba4ba3582dc2028234723ecf7534",
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "d9c2c28ca6aec573db01c8062707bf237f0f6a4044a9df82435b0a56b92b9bac"
+    "generator_source_tree_identity": "022ed659af231424e400cc1f5f78f7d5670207dda0976e7bb7d87e67368c72c1"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 35,
     "experiment_specs": 11,
-    "workflow_specs": 111,
+    "workflow_specs": 113,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
@@ -3675,6 +3675,88 @@ window.DYNAMICS_DATA = {
       "escalate": 1
     }
   },
+  "campaigns": {
+    "cap_2b": {
+      "status": "DECIDED",
+      "authorization": "design_review_only",
+      "source_artifact": "experiments/results/cap_2b/cap_2b_score_20260826T160018Z.json",
+      "source_document": "docs/designs/current/cap_2b.md",
+      "static": {
+        "n": 9,
+        "total_cost_usd": 0.080062,
+        "accepted_outcomes": 6,
+        "cpvo_usd": 0.013344,
+        "verified_success_rate": 0.666667
+      },
+      "adaptive": {
+        "n": 9,
+        "total_cost_usd": 0.094364,
+        "accepted_outcomes": 9,
+        "cpvo_usd": 0.010485,
+        "verified_success_rate": 1.0
+      },
+      "decision_rule": {
+        "cpvo_ratio": 0.785746,
+        "cpvo_ratio_ci_95": [
+          0.6842,
+          0.9105
+        ],
+        "success_gap_static_minus_adaptive": -0.333333,
+        "margin_cpvo_ratio_le": 1.1,
+        "margin_success_gap_le": 0.05,
+        "decision": "NON_INFERIOR"
+      },
+      "denominators": {
+        "n_total": 18,
+        "n_static": 9,
+        "n_adaptive": 9,
+        "n_defect_bearing": 6,
+        "n_invalid_join": 0
+      },
+      "_provenance": {
+        "per_arm": "M/C",
+        "decision_rule": "C",
+        "authorization": "P"
+      }
+    },
+    "escalation": {
+      "status": "MEASURED",
+      "source_artifact": "experiments/results/cap_escalation_measurement/cap_escalation_measurement_score_20260826T125726Z.json",
+      "baseline_cost_usd": 0.008949,
+      "models": [
+        {
+          "escalation_model": "openai/gpt-5.6-sol",
+          "escalation_fix_cost_usd": 0.102619,
+          "E_x": 11.4671,
+          "E_x_formula": "0.102619 / 0.008949",
+          "n_model_cells": 1
+        },
+        {
+          "escalation_model": "anthropic/claude-sonnet-5",
+          "escalation_fix_cost_usd": 0.111982,
+          "E_x": 12.5134,
+          "E_x_formula": "0.111982 / 0.008949",
+          "n_model_cells": 1
+        }
+      ],
+      "_provenance": {
+        "baseline_cost_usd": "M",
+        "models": "M/C"
+      }
+    },
+    "session_routing": {
+      "source_artifact": "experiments/results/cap_session_routing_prospective/cap_session_routing_prospective_score_20260826T160605Z.json",
+      "escalate_live": {
+        "cpvo_usd": 0.005946,
+        "n": 6,
+        "success_rate": 1.0,
+        "untriggered": "all 6 live escalate cells completed first-attempt; the arm never fired, so the live escalate cpvo reflects the no-escalation-needed case, NOT the escalation premium"
+      },
+      "_provenance": {
+        "escalate_live": "M"
+      }
+    }
+  },
   "correctness_escape_quadrants": [],
   "sonar": {
     "models": {},
@@ -3991,7 +4073,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-26T17:27:43.015325+00:00"
+    "generated_at": "2026-08-26T19:31:26.350133+00:00"
   },
   "reviews": {
     "models": [

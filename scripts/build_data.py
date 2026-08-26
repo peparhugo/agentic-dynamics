@@ -99,6 +99,107 @@ def load_inventory():
     return json.loads(INVENTORY_PATH.read_text())
 
 
+def _load_latest_campaign_score(directory: str, pattern: str) -> tuple[dict[str, Any], str]:
+    """Load the newest immutable campaign score and retain its public artifact path.
+
+    Campaign results are not part of the story registry. Publishing them through this
+    narrow adapter makes their separate evidence boundary explicit and fails closed if
+    a required score artifact is absent rather than leaving the website with a stale
+    hand-transcribed verdict.
+    """
+    candidates = sorted((RESULTS_DIR / directory).glob(pattern))
+    if not candidates:
+        raise RuntimeError(f"Missing required campaign score: {directory}/{pattern}")
+    path = candidates[-1]
+    return json.loads(path.read_text()), str(path.relative_to(ROOT))
+
+
+def _load_campaign_publications() -> dict[str, Any]:
+    """Produce the limited, provenance-tagged campaign fields the public site renders.
+
+    The selection deliberately excludes raw ledgers and unmeasurable secondary claims.
+    It exposes only the registered 2b decision, the measured escalation costs/ratios,
+    and the prospective arm's untriggered state. Each output carries the artifact path
+    and per-field provenance so a new score updates the site through ``data.js``.
+    """
+    cap_2b, cap_2b_path = _load_latest_campaign_score("cap_2b", "cap_2b_score_*.json")
+    escalation, escalation_path = _load_latest_campaign_score(
+        "cap_escalation_measurement", "cap_escalation_measurement_score_*.json"
+    )
+    routing, routing_path = _load_latest_campaign_score(
+        "cap_session_routing_prospective", "cap_session_routing_prospective_score_*.json"
+    )
+
+    static = cap_2b["per_arm"]["static"]
+    adaptive = cap_2b["per_arm"]["adaptive"]
+    decision = cap_2b["decision_rule"]
+    live_escalate = routing["retrospective_comparison"]["escalate"]["live"]
+
+    return {
+        "cap_2b": {
+            "status": "DECIDED",
+            "authorization": "design_review_only",
+            "source_artifact": cap_2b_path,
+            "source_document": "docs/designs/current/cap_2b.md",
+            "static": {
+                key: static[key]
+                for key in ("n", "total_cost_usd", "accepted_outcomes", "cpvo_usd", "verified_success_rate")
+            },
+            "adaptive": {
+                key: adaptive[key]
+                for key in ("n", "total_cost_usd", "accepted_outcomes", "cpvo_usd", "verified_success_rate")
+            },
+            "decision_rule": {
+                key: decision[key]
+                for key in (
+                    "cpvo_ratio",
+                    "cpvo_ratio_ci_95",
+                    "success_gap_static_minus_adaptive",
+                    "margin_cpvo_ratio_le",
+                    "margin_success_gap_le",
+                    "decision",
+                )
+            },
+            "denominators": cap_2b["denominators"],
+            "_provenance": {
+                "per_arm": "M/C",
+                "decision_rule": "C",
+                "authorization": "P",
+            },
+        },
+        "escalation": {
+            "status": "MEASURED",
+            "source_artifact": escalation_path,
+            "baseline_cost_usd": escalation["original_cell_cost_usd"],
+            "models": [
+                {
+                    **{
+                        key: model[key]
+                        for key in ("escalation_model", "escalation_fix_cost_usd", "E_x", "E_x_formula")
+                    },
+                    "n_model_cells": sum(
+                        candidate["escalation_model"] == model["escalation_model"]
+                        for candidate in escalation["per_model"]
+                    ),
+                }
+                for model in escalation["per_model"]
+            ],
+            "_provenance": {
+                "baseline_cost_usd": "M",
+                "models": "M/C",
+            },
+        },
+        "session_routing": {
+            "source_artifact": routing_path,
+            "escalate_live": {
+                key: live_escalate[key]
+                for key in ("cpvo_usd", "n", "success_rate", "untriggered")
+            },
+            "_provenance": {"escalate_live": "M"},
+        },
+    }
+
+
 @dataclass
 class CanonicalCorpus:
     """The canonical measurement corpus a repointed build_data consumes.
@@ -2082,6 +2183,7 @@ def build():
     spec_counts = _spec_counts()
     lab_counts = _lab_status_counts()
     provider_count = len({m.get("provider") for m in models})
+    campaign_publications = _load_campaign_publications()
 
     data = {
         "_meta": {
@@ -2213,6 +2315,10 @@ def build():
         "energy_ranking": energy_ranking,
         "strategy_distribution": corpus.strategy_distribution,
         "routing": compute_routing(entries),
+        # Campaign score artifacts have their own immutable evidence boundary. They
+        # feed the public verdict/escalation slots without being folded into the
+        # current story-corpus aggregates above.
+        "campaigns": campaign_publications,
         "correctness_escape_quadrants": _load_correctness_escape_quadrants(),
         "sonar": _compute_sonar(entries),
         "design_parameters": {

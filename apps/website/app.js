@@ -1,211 +1,100 @@
-/* === Agentic Dynamics — Shared JavaScript === */
-/* v0.5 */
+/*
+ * Agentic Dynamics public-site wiring v2.
+ *
+ * ``data.js`` is the single publication door. This module formats already
+ * provenance-tagged values, renders inline SVG components, and binds accessible
+ * rule cards; it never introduces a numeric fallback or invents a finding.
+ */
+(function () {
+  "use strict";
 
-/* --- Theme Toggle --- */
-(function() {
-  const saved = localStorage.getItem('ai-finops-theme');
-  if (saved === 'light') document.body.classList.add('light');
+  function formatUsd(value, digits) {
+    return `$${Number(value).toFixed(digits === undefined ? 2 : digits)}`;
+  }
 
-  const toggle = document.createElement('button');
-  toggle.className = 'theme-toggle';
-  toggle.setAttribute('aria-label', 'Toggle light/dark mode');
-  toggle.textContent = document.body.classList.contains('light') ? '☀' : '☾';
-  toggle.addEventListener('click', function() {
-    document.body.classList.toggle('light');
-    const isLight = document.body.classList.contains('light');
-    toggle.textContent = isLight ? '☀' : '☾';
-    localStorage.setItem('ai-finops-theme', isLight ? 'light' : 'dark');
-  });
-  document.body.appendChild(toggle);
-})();
+  function setText(selector, value) {
+    document.querySelectorAll(selector).forEach((element) => {
+      element.textContent = value;
+    });
+  }
 
-/* --- Data-driven injection (reads window.DYNAMICS_DATA from data.js) --- */
-(function() {
-  document.addEventListener('DOMContentLoaded', function() {
-    var D = window.DYNAMICS_DATA;
-    if (!D) return;
+  function renderStats(data) {
+    if (!data || !data.summary) return;
+    const summary = data.summary;
+    setText('[data-ad-stat="sessions"]', Number(summary.sessions_total).toLocaleString());
+    setText('[data-ad-stat="stories"]', Number(summary.stories_total).toLocaleString());
+    setText('[data-ad-stat="models"]', String(summary.variants));
+    setText('[data-ad-stat="cost"]', formatUsd(summary.total_cost));
+    setText('[data-ad-stat="providers"]', String(data.public_statistics.providers));
+    setText('[data-ad-stat="findings"]', String(summary.canonical_findings));
+  }
 
-    function fmtUSD(v) { return (typeof v === 'number' ? v.toFixed(2) : v); }
+  function renderModelTable(data) {
+    const target = document.querySelector('[data-ad-model-table]');
+    if (!target || !data || !Array.isArray(data.models)) return;
+    const rows = data.models.map((model) => {
+      const cache = model.avg_cache_hit == null ? "not captured" : `${(model.avg_cache_hit * 100).toFixed(1)}%`;
+      const tests = model.avg_tests == null ? "not captured" : Number(model.avg_tests).toFixed(1);
+      const records = model.cost_captured_records == null ? "not captured" : `${model.cost_captured_records}/${model.total_records}`;
+      return `<tr><td><strong>${model.label}</strong></td><td class="num">${formatUsd(model.avg_cost)}</td><td class="num">${tests}</td><td class="num">${cache}</td><td class="num">${records}</td></tr>`;
+    }).join("");
+    target.innerHTML = `<table class="ad-table"><caption>Current story-model aggregates [C] over captured story records [M]</caption><thead><tr><th>Model</th><th>Average cost/story</th><th>Average tests</th><th>Average cache hit</th><th>Cost records</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
 
-    // Declared model resolution — explicit model ids only, never substring matching.
-    //
-    // D.models is the story corpus ordered by avg_cost, so a naive `indexOf` lookup
-    // returns the *cheapest* variant whose id merely *contains* the key:
-    //   'deepseek' -> deepseek/deepseek-v4-flash  (not Pro)
-    //   'claude'   -> anthropic/claude-haiku-4-5  (not Sonnet 5)
-    //   'gpt-5.6'  -> openai/gpt-5.6-luna         (first avg_cost hit)
-    // Those are the wrong models for the cost/narration stats. Each stat key is
-    // therefore mapped to one explicit provider/model id, resolved by exact id
-    // equality below — never by order-sensitive substring matching:
-    //   'deepseek' -> the flagship DeepSeek v4 Pro   (not Flash)
-    //   'claude'   -> the flagship Claude Sonnet 5   (not Haiku)
-    //   'gpt-5.6'  -> the declared GPT-5.6 family default (the flagship Sol tier,
-    //                 chosen by symmetry with the other two provider defaults)
-    //   'nano'     -> the historical GPT-5-nano; absent from the story corpus, so
-    //                 its narration stat correctly resolves to the em-dash fallback.
-    var MODEL_RESOLUTION = {
-      'deepseek': 'deepseek/deepseek-v4-pro',
-      'claude': 'anthropic/claude-sonnet-5',
-      'gpt-5.6': 'openai/gpt-5.6-sol',
-      'nano': 'openai/gpt-5-nano',
+  function renderCampaignSlots(data) {
+    const campaigns = data && data.campaigns;
+    if (!campaigns) return;
+    const cap2b = campaigns.cap_2b;
+    const escalation = campaigns.escalation;
+    const routing = campaigns.session_routing;
+    const ci = cap2b.decision_rule.cpvo_ratio_ci_95;
+    const decision = `Static n=${cap2b.static.n}, CPVO ${formatUsd(cap2b.static.cpvo_usd, 6)}, ${cap2b.static.accepted_outcomes}/${cap2b.static.n} verified; adaptive n=${cap2b.adaptive.n}, CPVO ${formatUsd(cap2b.adaptive.cpvo_usd, 6)}, ${cap2b.adaptive.accepted_outcomes}/${cap2b.adaptive.n} verified; CPVO ratio ${Number(cap2b.decision_rule.cpvo_ratio).toFixed(4)}, 95% CI [${Number(ci[0]).toFixed(4)}, ${Number(ci[1]).toFixed(4)}]; success gap ${Number(cap2b.decision_rule.success_gap_static_minus_adaptive).toFixed(4)}. The pre-registered rule decided ${cap2b.decision_rule.decision}.`;
+    setText('[data-ad-cap2b-summary]', decision);
+    setText('[data-ad-cap2b-source]', cap2b.source_artifact);
+
+    const models = escalation.models;
+    const escalationSummary = `[M] baseline ${formatUsd(escalation.baseline_cost_usd, 6)}; ${models.map((model) => `${model.escalation_model.split("/").pop()}: ${formatUsd(model.escalation_fix_cost_usd, 6)} [M], E_x=${Number(model.E_x).toFixed(4)} [C]`).join("; ")}.`;
+    setText('[data-ad-escalation-summary]', escalationSummary);
+    const escalationDefinition = `The measured campaign reports ${models.map((model) => `${model.escalation_model.split("/").pop()} at E_x=${Number(model.E_x).toFixed(4)} (n=${model.n_model_cells} model cell)`).join(" and ")}.`;
+    setText('[data-ad-escalation-definition]', escalationDefinition);
+    setText('[data-ad-escalation-n]', models.map((model) => `n=${model.n_model_cells} per model`).join(", "));
+    setText('[data-ad-escalation-source]', escalation.source_artifact);
+
+    const untriggered = routing.escalate_live;
+    const untriggeredSummary = `All ${untriggered.n} live escalate cells completed on the first attempt. ${untriggered.untriggered}`;
+    setText('[data-ad-untriggered-summary]', untriggeredSummary);
+    setText('[data-ad-routing-source]', routing.source_artifact);
+  }
+
+  function renderDiagrams(data) {
+    if (!window.AgenticDesign) return;
+    const campaigns = data && data.campaigns ? data.campaigns : {};
+    const diagrams = {
+      cycle: AgenticDesign.instrumentCycle,
+      nxm: AgenticDesign.nxmProblem,
+      planes: AgenticDesign.planesMap,
+      engine: AgenticDesign.engineModes,
+      autonomy: AgenticDesign.autonomyEnvelope,
+      curves: AgenticDesign.costCurves,
+      escalation: () => AgenticDesign.escalationChain(campaigns.escalation),
+      calibration: () => AgenticDesign.calibrationArc(campaigns.cap_2b),
     };
-
-    function findModel(D, key) {
-      var id = MODEL_RESOLUTION[key] || key;
-      var ms = D.models || [];
-      for (var mi = 0; mi < ms.length; mi++) {
-        if (ms[mi].id === id) return ms[mi];
-      }
-      return {};
+    document.querySelectorAll('[data-ad-diagram]').forEach((figure) => {
+      const makeDiagram = diagrams[figure.dataset.adDiagram];
+      if (makeDiagram) figure.insertAdjacentHTML("afterbegin", makeDiagram());
+    });
+    const rules = document.querySelector("[data-ad-rules]");
+    if (rules) {
+      rules.innerHTML = AgenticDesign.rulesComponent();
+      AgenticDesign.activateRuleCards(rules);
     }
+  }
 
-    var pctOrDash = function(v) { return v == null ? '\u2014' : v + '%'; };
-    var penaltyOrDash = function(v) { return v == null ? '\u2014' : (v * 100).toFixed(1) + '%'; };
-
-    var statMap = {
-      'sessions': function() { return D.summary.sessions_total; },
-      'worktrees': function() { return D.summary.worktrees_total; },
-      'reports': function() { return D.summary.game_reports; },
-      'cost': function() { return fmtUSD(D.summary.total_cost); },
-      'architectures': function() { return D.summary.architectures; },
-      'variants': function() { return D.summary.variants; },
-      'story_sessions': function() { return D.summary.story_sessions || D.summary.sessions_total; },
-      'stories_total': function() { return D.summary.stories_total || 0; },
-      'story_total_cost': function() { return fmtUSD(D.summary.story_total_cost || D.summary.total_cost); },
-      // Canonical-registry scoped counts (review P1) — the registry claim vs what
-      // actually resolved vs what was used. No single "canonical stories" number.
-      'registry_current_records': function() { return D.summary.registry_current_records; },
-      'resolved_measurement_payloads': function() { return D.summary.resolved_measurement_payloads; },
-      'eligible_records': function() { return D.summary.eligible_records; },
-      'records_used': function() { return D.summary.records_used; },
-      'unresolved_waivered': function() { return D.summary.unresolved_waivered; },
-      'canonical_findings': function() { return D.summary.canonical_findings; },
-      // m4: the tombstone population split by reason — a retraction is NOT contamination.
-      'contaminated_tombstones': function() { return D.summary.contaminated_tombstones; },
-      'no_measurement_tombstones': function() { return D.summary.no_measurement_tombstones; },
-      'tombstones_total': function() { return D.summary.tombstones_total; },
-      'costgap': function() { return D.derived.cost_gap; },
-      'passrate': function() { return D.derived.overall_pass_rate; },
-      'deepseek_cost': function() { return fmtUSD(D.derived.total_cost_deepseek); },
-      'claude_cost': function() { return fmtUSD(D.derived.total_cost_claude); },
-      'total_tests': function() { return D.derived.total_tests_passed + '/' + D.derived.total_tests_run; },
-      'woc': function() { return D.calculator.woc_ratio.toFixed(2); },
-      'woc_percent': function() { return Math.round(D.calculator.woc_ratio * 100) + '%'; },
-      'deepseek_cost_per': function() { return fmtUSD(findModel(D, 'deepseek').avg_cost); },
-      'claude_cost_per': function() { return fmtUSD(findModel(D, 'claude').avg_cost); },
-      'gpt56_cost_per': function() { return fmtUSD(findModel(D, 'gpt-5.6').avg_cost); },
-      'deepseek_narration': function() { return pctOrDash(findModel(D, 'deepseek').narration_rate); },
-      'claude_narration': function() { return pctOrDash(findModel(D, 'claude').narration_rate); },
-      'nano_narration': function() { return pctOrDash(findModel(D, 'nano').narration_rate); },
-      'deepseek_penalty': function() { return penaltyOrDash(findModel(D, 'deepseek').avg_narration_penalty); },
-      'claude_penalty': function() { return penaltyOrDash(findModel(D, 'claude').avg_narration_penalty); },
-    };
-
-    var els = document.querySelectorAll('[data-stat]');
-    for (var i = 0; i < els.length; i++) {
-      var el = els[i];
-      var key = el.getAttribute('data-stat');
-      var fn = statMap[key];
-      if (fn) {
-        var val = fn();
-        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-          el.value = val;
-        } else {
-          el.textContent = val;
-        }
-      }
-    }
-
-    var fmtEls = document.querySelectorAll('[data-stat-fmt]');
-    for (var j = 0; j < fmtEls.length; j++) {
-      var fel = fmtEls[j];
-      var fkey = fel.getAttribute('data-stat-fmt');
-      var ffn = statMap[fkey];
-      if (ffn) fel.textContent = ffn();
-    }
-
-    // data-anal: populate analysis-metric cells from D.analysis.models
-    var analysisModels = (D.analysis && D.analysis.models) || [];
-    var analRows = document.querySelectorAll('tr[data-anal-model]');
-    for (var r = 0; r < analRows.length; r++) {
-      var row = analRows[r];
-      var modelId = row.getAttribute('data-anal-model');
-      var model = null;
-      for (var mi = 0; mi < analysisModels.length; mi++) {
-        if (analysisModels[mi].model === modelId) { model = analysisModels[mi]; break; }
-      }
-      if (!model) continue;
-      var cells = row.querySelectorAll('[data-anal]');
-      for (var c = 0; c < cells.length; c++) {
-        var cell = cells[c];
-        var field = cell.getAttribute('data-anal');
-        var v = model[field];
-        if (v !== undefined && v !== null) {
-          // Optional measurements publish {value, n_available, n_total, coverage};
-          // render the value, and an em-dash when no cell actually measured it.
-          if (v && typeof v === 'object' && 'value' in v) { v = v.value; }
-          cell.textContent = (v === null || v === undefined)
-            ? '\u2014'
-            : ((typeof v === 'number') ? v.toLocaleString() : v);
-        }
-      }
-    }
+  document.addEventListener("DOMContentLoaded", () => {
+    const data = window.DYNAMICS_DATA;
+    renderStats(data);
+    renderModelTable(data);
+    renderCampaignSlots(data);
+    renderDiagrams(data);
   });
-})();
-
-/* --- Floating Table of Contents (bottom-right button → slide panel) --- */
-(function() {
-  // Auto-enable on pages with sufficient headings
-  var headings = document.querySelectorAll('h2, h3');
-  if (headings.length < 3) return;
-
-  // Collect headings
-  var headings = document.querySelectorAll('h2, h3');
-  var items = [];
-  headings.forEach(function(h) {
-    var text = h.textContent.trim();
-    if (!text || text.length < 3) return;
-    if (!h.id) {
-      h.id = text.toLowerCase().replace(/[^a-z0-9\s-]+/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
-    }
-    items.push({ tag: h.tagName, id: h.id, text: text });
-  });
-  if (items.length < 3) return;
-
-  // Build panel HTML
-  var panelLinks = '';
-  items.forEach(function(item) {
-    var cls = item.tagName === 'H3' ? ' class="toc-h3"' : '';
-    var display = item.text.length > 32 ? item.text.substring(0, item.text.lastIndexOf(' ', 32)) + '\u2026' : item.text;
-    panelLinks += '<a href="#' + item.id + '"' + cls + ' data-target="' + item.id + '">' + display + '</a>';
-  });
-
-  // Inject DOM
-  var overlay = document.createElement('div'); overlay.className = 'toc-overlay'; document.body.appendChild(overlay);
-  var panel = document.createElement('nav'); panel.className = 'toc-panel'; panel.innerHTML = '<div class="toc-panel-header">On this page</div>' + panelLinks; document.body.appendChild(panel);
-  var btn = document.createElement('button'); btn.className = 'toc-float'; btn.setAttribute('aria-label','Contents'); btn.innerHTML = '\u2630'; document.body.appendChild(btn);
-
-  // Show button after scrolling
-  var showBtn = function() { btn.classList.toggle('visible', window.scrollY > 300); };
-  window.addEventListener('scroll', showBtn, { passive: true });
-  showBtn(); // initial check
-
-  // Toggle panel
-  var close = function() { overlay.classList.remove('open'); panel.classList.remove('open'); };
-  var open = function() { overlay.classList.add('open'); panel.classList.add('open'); };
-  btn.onclick = function() { overlay.classList.contains('open') ? close() : open(); };
-  overlay.onclick = close;
-
-  // Close panel on link click + scroll to target
-  panel.querySelectorAll('a').forEach(function(a) {
-    a.onclick = function(e) {
-      e.preventDefault();
-      var target = document.getElementById(a.dataset.target);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      close();
-    };
-  });
-
-  // Close on Escape
-  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
-})();
+}());
