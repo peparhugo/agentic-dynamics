@@ -1,0 +1,241 @@
+name: cap_terra_postmortem
+question: >-
+  Post-mortem: why did gpt-5.6-terra — the operator's go-to UI/UX model, trusted on design
+  work — produce a result the operator calls "complete and utter trash" on BOTH site
+  revamps (cap_site_revamp, cap_site_revamp2)? Not "why is the site worse" (that is
+  cap_site_regression_analysis, running in parallel) — THIS campaign examines TERRA'S
+  EXECUTION itself: what it actually did across both runs (transcripts, commits, stalls,
+  process violations, decisions), where its output diverged from good UI/UX practice, and
+  what the machine's workflow process must change so a trusted design model stops
+  producing trash. The operator's judgment is data: the output was trash, twice, by the
+  same model that is trusted elsewhere — so the failure is in the interaction between the
+  model and the process, and the post-mortem must say exactly where.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: javascript
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: model-execution post-mortem (agent-built
+        creative work). canonical_sources: [/tmp/wt_site_revamp/.instrument/session.jsonl
+        (revamp1's FULL transcript — terra's actual steps and reasoning),
+        /tmp/wt_site_revamp2/.instrument/session.jsonl (revamp2's transcripts — note
+        there were multiple agent sessions across the fresh launches and the resume),
+        git log of feature/site-revamp + feature/site-revamp2 (every commit terra made —
+        messages, sizes, contents), docs/designs/current/cap_site_revamp_research.md
+        (the research doc terra wrote — its own words), docs/reviews/cap_site_revamp_review.md
+        + docs/reviews/cap_site_revamp2_review.md (the self-reviews that PASSED),
+        docs/designs/current/cap_site_revamp_followup.md (the post-mortem of revamp1),
+        the spec files (cap_site_revamp.yaml, cap_site_revamp2.yaml — the process terra
+        operated under), the run ledgers (experiments/results/workflows/cap_site_revamp*
+        — timing, cost, phase statuses)].
+        policies: [the_operators_judgment_is_data, no_sugarcoating, evidence_per_claim,
+        no_site_repairs]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: post-mortem (model execution failure).
+        deliberation: [transcript + execution timeline, decision audit, failure-mode
+        classification, findings + process changes, adversarial verification].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        Known facts to build on (verify from the sources, don't assume): terra stalled
+        silently twice (~50 min with no steps); its commits used plain messages
+        (violating hard rule 1 — the [workflow] prefix, which also broke the resume
+        machinery and forced fresh launches); it DEPLOYED ITS BRANCH during a non-deploy
+        phase (p3's 'verify deployed DOM gates' — the deployed site had to be reverted
+        TWICE); its self-reviews passed both times ('visual quality: PASS' with rendered
+        inspection); its 'visual system' shipped ZERO <svg> (the figures are CSS/editorial
+        blocks); the original site's interactive layer (levers/calculator/charts) did not
+        survive; the operator's verdict after seeing the revamp2 build: trash. The
+        process it operated under: prescriptive phases, an example-library requirement,
+        provenance/anti-SaaS gates, inventory checklists, self-review. The post-mortem
+        must decide: was this terra failing, the process failing terra, or the interaction?
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) EVIDENCE PER
+        CLAIM: every statement about terra cites the transcript line, the commit, or the
+        artifact — quote the primary sources (the session.jsonl is the ground truth of
+        what terra did). (3) NO SUGARCOATING: the post-mortem names the failures plainly
+        ('trash' is the operator's data, not hyperbole to soften) and assigns them where
+        they belong — model, process, or interaction — with reasoning. (4) NO SITE
+        REPAIRS: analysis only. (5) Both revamps analyzed; the second run's fresh
+        launches + resume are part of the execution record. (6) The operator's trust in
+        GPT for UI/UX is the stakes: the recommendations must make that trust recoverable
+        in THIS machine (what must the workflow change so terra's next run is good?).
+        (7) Every phase writes a durable PASS/FAIL log. (8) p5 mandatory: findings
+        re-verified + known-safe, no bare PASS. (9) No generated-surface edits, no
+        secrets, no external actuation. (10) Resumable only when spec version, goal hash,
+        source revision, and candidate-manifest hash match.
+      read_first: >-
+        /tmp/wt_site_revamp/.instrument/session.jsonl + /tmp/wt_site_revamp2/.instrument/
+        session.jsonl (THE primary sources — terra's actual steps), git log --format="%h
+        %ci %s" feature/site-revamp + feature/site-revamp2 (the commit trail), docs/reviews/
+        cap_site_revamp2_review.md + cap_site_revamp_review.md (the self-reviews),
+        docs/designs/current/cap_site_revamp_research.md (terra's research — its design
+        intent), workflows/repository/cap_site_revamp2.yaml (the process it operated
+        under), docs/designs/current/cap_site_revamp_followup.md (the revamp1 post-mortem)
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash (the operator's choice for
+        analysis). One branch (feature/cap-terra-postmortem); each phase commits
+        [workflow] <phase>. Analysis only.
+    phases:
+      - name: p1_execution_timeline
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: reconstruct what terra ACTUALLY did, from the transcripts (the primary
+          source). For revamp1 (session.jsonl in /tmp/wt_site_revamp) and revamp2
+          (the sessions in /tmp/wt_site_revamp2): build the execution timeline —
+          per step: timestamp, the tool call or text, the phase. Reconstruct the DESIGN
+          DECISIONS terra made at each phase (from its text: why it chose the visual
+          language, the typography, the figure approach, what it dropped and why). Mark
+          the timeline with: the SILENT STALLS (step gaps > 20 min with no tool call —
+          quantify each: when, how long), the process violations (plain commits instead of
+          [workflow] <phase>; the deploy during p3 — quote the tool call that deployed),
+          and the self-review moments (what terra said about its own work before passing
+          it). Count and date every commit per run. DELIVER:
+          experiments/results/cap_terra_postmortem/timeline.md (the annotated timeline +
+          the stall/violation census), committed.
+          LOG: the stall census (n, duration), the violation census; PASS/FAIL; commit.
+      - name: p2_decision_audit
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: audit terra's UI/UX decisions against good practice — and against the
+          operator's trust (GPT is the go-to UI/UX model). From p1's timeline + the
+          research doc + the shipped artifacts: list every significant design decision
+          (visual language, typography, color, the figure approach, the interactive-layer
+          fate, the IA changes), terra's stated reasoning for each (quote it), and an
+          independent assessment of each decision (what an experienced UI/UX reviewer
+          would say; where it diverges from what made the ORIGINAL site impressive —
+          cross-reference the regression campaign's p1 if available, else the live site).
+          PAY SPECIAL ATTENTION to: (a) the interactive layer — did terra decide to drop
+          the levers/calculator/charts, or did it never consider them? (quote the
+          transcript); (b) the figure approach — why CSS/editorial blocks instead of
+          diagrams? (its stated reason); (c) the 'editorial' framing — did the
+          anti-SaaS/provenance constraints read to terra as 'static and safe'?
+          DELIVER: experiments/results/cap_terra_postmortem/decision_audit.md (the
+          decision table: decision, terra's reasoning quote, independent assessment),
+          committed.
+          LOG: the decision count + the worst offenders; PASS/FAIL; commit.
+      - name: p3_failure_mode_classification
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: classify the failure modes with evidence, and assign responsibility
+          (model vs process vs interaction). For each failure mode, quote the evidence
+          and assign:
+          (F1) SILENT STALLS (2+ episodes, ~50 min each) — model (API/stepping), process
+          (no watchdog), or interaction?
+          (F2) PROCESS VIOLATIONS (plain commits, early deploy) — model ignoring the
+          hard rules, or process not enforcing them?
+          (F3) SELF-REVIEW PASSING TRASH — the p4 reviews passed both times; is that
+          self-review bias (model), or a process whose gates measured compliance
+          (inventory checklists, DOM checks) rather than quality (process)?
+          (F4) STATIC OVER INTERACTIVE — the interactive layer dropped; did the
+          anti-SaaS/editorial framing push this (process), or did terra choose static
+          because it's easier/safer (model), or was the drop just never gated (process)?
+          (F5) PASTICHE — the example-library adaptation produced generic patterns;
+          did the requirement cause this (process) or did terra misuse it (model)?
+          (F6) CAPABILITY — was any part simply beyond terra's design skill? (model)
+          For each: the verdict + the responsibility split + what the process could have
+          caught (e.g. a watchdog would catch F1; a deploy-phase gate would catch F2; an
+          independent reviewer would catch F3).
+          DELIVER: experiments/results/cap_terra_postmortem/failure_modes.md (the
+          classification table), committed.
+          LOG: the responsibility table; PASS/FAIL; commit.
+      - name: p4_postmortem
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: deliver the post-mortem:
+          docs/designs/current/cap_terra_postmortem.md with:
+          (1) THE PLAIN ANSWER: what happened with terra, in one page — the timeline
+          summary, the failures, who/what is responsible (the p3 responsibility table),
+          stated without sugarcoating;
+          (2) THE TRUST QUESTION: what this means for 'GPT is my go-to UI/UX model' —
+          what terra was good at in these runs (the research doc was strong; quote it)
+          and where the process extracted its worst (the prescriptive compliance game,
+          self-review, no human checkpoints);
+          (3) THE PROCESS CHANGES (each with the failure mode it prevents and an
+          implementation sketch): a phase watchdog (auto-kill + resume on > N minutes
+          without a step); enforced [workflow] commits (the runner validates the commit
+          prefix before proceeding); deploy-phase gating (only p5 may deploy; any deploy
+          elsewhere is a failed phase — technical enforcement, not a prompt rule);
+          INDEPENDENT review (the reviewer must be a different model/session than the
+          author — the self-review passed trash twice); interactive-layer preservation
+          (a hard gate: features present pre-change must survive — the regression
+          campaign's feature matrix as the gate input); HUMAN design checkpoints (the
+          operator reviews the design direction AFTER the research/visual-system phase,
+          BEFORE implementation — the point where 'trash' is cheapest to catch);
+          smaller iterations (the revamp attempted too much per phase — smaller,
+          reviewable increments);
+          (4) THE TRANSFERABLE LESSON: the machine has now measured three times that its
+          gates test compliance, not quality — the post-mortem states the pattern and
+          the general fix (quality gates require independent judgment; delight cannot be
+          checked by the creator).
+          Rank the changes by evidence strength + implementation cost.
+          DELIVER: docs/designs/current/cap_terra_postmortem.md, committed.
+          LOG: the post-mortem summary; PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — try to falsify the post-mortem. Attack in order:
+          (1) the timeline is accurate to the transcripts (spot-check quoted lines);
+          (2) the decision audit quotes terra fairly (no cherry-picked reasoning);
+          (3) the responsibility assignments are evidence-backed — a 'process' verdict
+          with only model evidence is a FAILED finding;
+          (4) the process changes would actually prevent the failures (walk each: would
+          the watchdog have fired? would the independent review have caught the trash?
+          would the deploy gate have blocked the p3 deploy?);
+          (5) the operator's judgment was used as data, not argued with;
+          (6) the post-mortem names the failures plainly (no sugarcoating survives).
+          Every finding: fix in the post-mortem artifacts or record as accepted
+          limitation with reasoning. Deliver TWO outputs:
+          docs/reviews/cap_terra_postmortem_adversary.md (attack, evidence, result,
+          fix/limitation, re-test) and docs/reviews/cap_terra_postmortem_known_safe.md
+          (attempted non-falsifying attacks, evidence, why safe).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: cap_terra_timeline
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [execution_timeline, stall_census]
+  - name: cap_terra_decision_audit
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [execution_timeline]
+    produces: [decision_table]
+  - name: cap_terra_failure_modes
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [decision_table]
+    produces: [responsibility_table]
+  - name: cap_terra_postmortem_findings
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [responsibility_table]
+    produces: [process_changes_ranked]
+metrics:
+  - {name: responsibility_table, agg: mean, over: cell}
+  - {name: process_changes_ranked, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_execution_timeline, p2_decision_audit, p3_failure_mode_classification, p4_postmortem, p5_adversarial]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

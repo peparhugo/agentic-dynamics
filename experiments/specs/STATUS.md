@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-26T22:35:43.045657+00:00`  ·  126 spec(s)
-**Work remaining:** 31 open · 95 completed/retired
+Generated at: `2026-08-26T22:46:18.944039+00:00`  ·  127 spec(s)
+**Work remaining:** 32 open · 95 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -20,6 +20,7 @@ Generated at: `2026-08-26T22:35:43.045657+00:00`  ·  126 spec(s)
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_site_regression_analysis` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_terra_postmortem` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | runnable | 0.1 | — | 2026-08-23 19:16 | ok | anthropic/claude-sonnet-5 | $49.5218 | 4 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
