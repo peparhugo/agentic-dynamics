@@ -273,12 +273,12 @@ class EfficiencyMetrics:
 
     # Solution density
     lines_of_code: int = 0
-    solution_density: float = 0.0      # LOC / total_tokens
-    correctness_per_dollar: float = 0.0  # correctness / cost
-    quality_per_joule: float = 0.0       # composite quality / energy
+    solution_density: float | None = None  # LOC / total_tokens (None = denominator uncaptured)
+    correctness_per_dollar: float | None = None  # correctness / cost (None = denominator uncaptured)
+    quality_per_joule: float | None = None  # composite quality / energy (None = denominator uncaptured)
 
     # Composite
-    efficiency_score: float = 0.0
+    efficiency_score: float | None = None  # composite / cost (None = denominator uncaptured)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -300,10 +300,18 @@ class EfficiencyMetrics:
             "energy_output_j": round(self.energy_output_j, 2),
             "energy_reasoning_j": round(self.energy_reasoning_j, 2),
             "total_energy_j": round(self.total_energy_j, 2),
-            "solution_density": round(self.solution_density, 6),
-            "correctness_per_dollar": round(self.correctness_per_dollar, 2),
-            "quality_per_joule": round(self.quality_per_joule, 6),
-            "efficiency_score": round(self.efficiency_score, 4),
+            "solution_density": (
+                round(self.solution_density, 6) if self.solution_density is not None else None
+            ),
+            "correctness_per_dollar": (
+                round(self.correctness_per_dollar, 2) if self.correctness_per_dollar is not None else None
+            ),
+            "quality_per_joule": (
+                round(self.quality_per_joule, 6) if self.quality_per_joule is not None else None
+            ),
+            "efficiency_score": (
+                round(self.efficiency_score, 4) if self.efficiency_score is not None else None
+            ),
         }
 
 
@@ -363,13 +371,18 @@ def compute_efficiency(
     m.energy_reasoning_j = reasoning_tokens * ENERGY_PER_REASONING_TOKEN
     m.total_energy_j = m.energy_input_j + m.energy_output_j + m.energy_reasoning_j
 
-    # Solution density
+    # Solution density — the ratios are None when their denominator is uncaptured (a run with
+    # zero tokens / zero cost / zero energy), never a fabricated 0.0 or a ``max(denom, tiny)``
+    # superspike (the same null-not-zero semantics strategy.py's exploration_premium uses).
     if solution:
         m.lines_of_code = solution.lines_of_code
-        m.solution_density = solution.lines_of_code / max(m.total_tokens, 1)
-        m.correctness_per_dollar = solution.correctness_score / max(m.total_cost_usd, 0.000001)
-        m.quality_per_joule = solution.composite_score / max(m.total_energy_j, 0.01)
-        m.efficiency_score = solution.composite_score / max(m.total_cost_usd, 0.000001)
+        if m.total_tokens > 0:
+            m.solution_density = solution.lines_of_code / m.total_tokens
+        if m.total_cost_usd > 0:
+            m.correctness_per_dollar = solution.correctness_score / m.total_cost_usd
+            m.efficiency_score = solution.composite_score / m.total_cost_usd
+        if m.total_energy_j > 0:
+            m.quality_per_joule = solution.composite_score / m.total_energy_j
 
     return m
 

@@ -61,7 +61,7 @@ def collect_transitions() -> list[dict]:
         if not isinstance(run, dict):
             continue
         phases = [p for p in (run.get("phases") or []) if isinstance(p, dict)]
-        for prev, cur in zip(phases, phases[1:]):
+        for prev, cur in zip(phases, phases[1:], strict=False):
             sid_prev, sid_cur = prev.get("session_id"), cur.get("session_id")
             if not sid_cur:
                 continue
@@ -161,7 +161,7 @@ def main() -> None:
     payload = {
         "study": "cap_session_routing_retrospective/v1",
         "source": "experiments/results/workflows/**/*.json (run-level phase transitions)",
-        "arms": ARMS,
+        "arm_names": list(ARMS),
         "null_hypothesis": "no arm outperforms `continue` on cost per verified outcome",
         "notes": [
             "verified success = the phase committed with status ok (the per-phase gate)",

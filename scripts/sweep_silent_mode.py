@@ -204,7 +204,8 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             results.append(pert_row)
             print(f"${r_pert.estimated_cost_usd:.4f} {r_pert.total_tokens:,}tok "
                   f"correct={sol_pert.correctness_score:.0%} "
-                  f"recovery={rc.recovery_cost_usd:.4f} ratio={rc.recovery_cost_ratio:.2f}x "
+                  f"recovery={rc.recovery_cost_usd:.4f} "
+                  f"ratio={(f'{rc.recovery_cost_ratio:.2f}x' if rc.recovery_cost_ratio is not None else 'n/a')} "
                   f"tests={r_pert.tests_passed}/{r_pert.tests_total}")
             time.sleep(2)
 

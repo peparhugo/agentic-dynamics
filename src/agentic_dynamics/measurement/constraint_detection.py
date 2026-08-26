@@ -50,7 +50,7 @@ class DetectionReport:
     strength: float = 0.0
     constraints_total: int = 0
     constraints_detected: int = 0
-    detection_rate: float = 0.0
+    detection_rate: float | None = None  # None when there are no constraints to detect
     detections: list[ConstraintDetection] = field(default_factory=list)
 
     # Recovery correlation
@@ -65,7 +65,9 @@ class DetectionReport:
             "strength": self.strength,
             "constraints_total": self.constraints_total,
             "constraints_detected": self.constraints_detected,
-            "detection_rate": round(self.detection_rate, 4),
+            "detection_rate": (
+                round(self.detection_rate, 4) if self.detection_rate is not None else None
+            ),
             "detections": [d.to_dict() for d in self.detections],
             "recovery_cost_usd": round(self.recovery_cost_usd, 6),
             "recovery_tokens": self.recovery_tokens,
@@ -155,7 +157,10 @@ def detect_constraints(
         if detected:
             report.constraints_detected += 1
 
-    report.detection_rate = report.constraints_detected / max(report.constraints_total, 1)
+    # None when there are no constraints to detect (a fabricated 0.0 would read "detected none
+    # of none"); a rate over a real constraint set is measured, not defaulted.
+    if report.constraints_total > 0:
+        report.detection_rate = report.constraints_detected / report.constraints_total
     return report
 
 

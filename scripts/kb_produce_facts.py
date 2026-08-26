@@ -49,6 +49,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 # scripts/ → repo root → src, so the local package wins over any installed one (matches the
 # bootstrap in worker.py / kb_worker.py / kb_produce.py).
