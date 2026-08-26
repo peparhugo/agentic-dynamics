@@ -1,0 +1,280 @@
+name: cap_2b
+question: >-
+  The randomized live pilot: does ADAPTIVE verification (the gate APPLIED) remain
+  non-inferior to STATIC (proposals ignored) on cost-per-accepted-outcome and verified
+  success, under randomized assignment — the counterfactual no shadow campaign could
+  provide? Pre-registered margin + outcome metric committed BEFORE any cell (p0), blocked
+  randomization by stimulus with a committed seed, independent test execution, budget/SLA
+  guard, and the non-inferiority decision rule applied in the verdict. The effect prior is
+  MEASURED: one applied rework converts a rejected outcome at a $0.005719 premium vs
+  ~$0.0461 avoided escalation at the measured E_x=11.47 (sol). Design:
+  docs/designs/current/cap_2b_design.md (accepted).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+supersedes: cap_2a_rerun3
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / CAP evidence integrity.
+        canonical_sources: [docs/designs/current/cap_2b_design.md (ACCEPTED — the
+        pre-registration contents, read FIRST), docs/designs/current/cap_2a_rerun3.md (the
+        feasibility probe verdict), docs/designs/current/cap_escalation_measurement.md (the
+        measured E_x: 11.47 sol / 12.51 sonnet), workflows/operations/cap_2a_cell_clean.yaml
+        + cap_2a_cell_critical.yaml + cap_2a_cell_style.yaml (the stimulus set — the 1/3
+        defect base rate by construction), src/agentic_dynamics/control/verify_proposal.py
+        (the treatment — code-unchanged), the merged measurement fixes (scope cc66efd30,
+        expected-effects 4fa22047c, severity 0e24d6985)].
+        policies: [measure_before_actuate, preregister_before_data, apply_only_in_adaptive_arm,
+        independent_test_execution, budget_sla_guard]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research (the randomized pilot).
+        deliberation: [preregister, measure one cell, run the randomized grid, score the
+        decision rule, verdict, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        rerun3 (the feasibility probe) measured the paired delta: applied gate improves
+        value/$ descriptively (critical +\$0.106869, driven by one applied rework converting a
+        rejected outcome) — but with n=3 pairs, no randomization, and one arm at a time. The
+        measured E_x campaign pinned the multiplier: 11.47 (sol) / 12.51 (sonnet) — the loss
+        table's magnitude. 2b's pre-registration must be COMMITTED before any cell runs; the
+        margin (adaptive cpvo <= 1.10 x static AND verified-success gap <= 5pts) and the power
+        analysis (80% power at alpha=0.05 one-sided on the measured effect; defect-bearing
+        cells counted, not all cells) are the p0 deliverables. The treatment stays
+        code-unchanged; the adaptive arm applies the proposal exactly as proposed (rework =
+        ONE bounded pass over the proposal scope — hittable since cc66efd30 — verify = one
+        pass, continue = null).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks; every measurement
+        phase writes a durable PASS/FAIL log. (2) PREREGISTRATION BEFORE DATA: p0's
+        docs/designs/current/cap_2b_preregistration.md (margin, outcome metric, power
+        analysis, randomization seed + block scheme, analysis plan, authorization boundary)
+        is committed BEFORE any cell runs — provable by commit order; a cell that ran before
+        it is invalid. (3) RANDOMIZATION IS THE ASSIGNMENT: the arm labels come from the
+        committed seed + block scheme, computed by the campaign — never the model's choice,
+        never post-hoc selection; a deviation from the pre-registered plan is a FAILED
+        finding, not a limitation. (4) APPLIED INVARIANT: static arm = proposals recorded,
+        NEVER applied; adaptive arm = applied exactly as proposed (rework/verify/continue),
+        nothing else, no extra retries, no control_route, no actuation events. (5) Candidate
+        manifest FIRST (cell_id, arm, stimulus, repetition, exact spec + SHA256, goal hash,
+        worktree, FINOPS_CELL_ID, forecast cost). (6) p1 measures ONE cell before p2 (E4);
+        p2 uses measured costs as forecast only. (7) Outcomes INDEPENDENT: test_runner
+        verdicts + the post-hoc evaluator over the immutable commits (verification surface,
+        severity-filtered static quality, rework passes, defect presence — the rerun3 value
+        components), never the proposing agent's narrative. (8) Graph-down/analyzer-down:
+        FLAGGED, never silently dropped. (9) Every verdict number cites a produced JSON +
+        SHA256; unknown outcomes stay in the dataset with printed denominators. (10) The
+        budget/SLA guard: the adaptive arm's rework capped at ONE pass per cell; per-cell
+        timeout; the campaign stop budget — a guard breach stops the cell and is recorded.
+        (11) The decision rule is applied with n + CI; non-inferiority authorizes DESIGN
+        REVIEW of continuing adaptive selection, nothing else. (12) No generated-surface
+        edits, no secrets, no external actuation. (13) p6 mandatory: findings re-verified +
+        known-safe output, no bare PASS. (14) Resumable only when spec version, goal hash,
+        source revision, and candidate-manifest hash match. (15) THE TREATMENT IS
+        CODE-UNCHANGED: verify_proposal / _risk_depth / VERIFY_RISK_THRESHOLD / the risk
+        weights are not modified by this campaign.
+      read_first: >-
+        docs/designs/current/cap_2b_design.md (FIRST — the pre-registration contents + arms
+        + acceptance criteria), docs/designs/current/cap_2a_rerun3.md (the probe verdict +
+        the n statement), docs/designs/current/cap_escalation_measurement.md (the measured
+        E_x), workflows/operations/cap_2a_cell_clean.yaml + cap_2a_cell_critical.yaml +
+        cap_2a_cell_style.yaml (the stimulus set), src/agentic_dynamics/control/
+        verify_proposal.py (the treatment), scripts/kb_produce_campaign_evidence.py (the
+        registry ingestion)
+      run_shape: >-
+        SINGLE wrapper model: deepseek/deepseek-v4-flash (cheap orchestrator). Cells:
+        deepseek/deepseek-v4-pro (the stimulus set's model — unchanged from rerun3). One
+        branch (feature/cap-2b); each phase commits [workflow] <phase>; each cell in a fresh
+        disposable worktree with a unique FINOPS_CELL_ID. No credentials in committed
+        artifacts.
+    phases:
+      - name: p0_preregister
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: the pre-registration phase — NO cells run until this is committed.
+          DELIVER exactly one committed file: docs/designs/current/cap_2b_preregistration.md
+          with NO placeholders, per the design doc §2, containing:
+          (1) PRIMARY OUTCOME METRIC: cost-per-accepted-outcome (cpvo = total cost / accepted
+          outcomes; accepted = test_runner verified AND post-hoc evaluator defect
+          determination) + SECONDARY verified-success rate;
+          (2) NON-INFERIORITY MARGIN: adaptive cpvo <= 1.10 x static cpvo AND adaptive
+          verified-success rate >= static rate - 5 percentage points — with the justification
+          from the measured effect prior (one applied rework ~= $0.005719 premium vs ~$0.0461
+          avoided escalation at E_x=11.47);
+          (3) POWER ANALYSIS: n of DEFECT-BEARING cells for 80% power at alpha=0.05
+          one-sided using the measured effect; the stimulus family's base rate is 1/3 by
+          construction — state the total cell count accordingly (e.g. >= 6 defect-bearing =>
+          >= 18 cells) and the repetitions per block;
+          (4) RANDOMIZATION SCHEME: block-randomized by stimulus (clean/critical/style),
+          50/50 static/adaptive within each block, THE COMMITTED SEED (a concrete hex string
+          in the doc), the repetition labels, and the exact assignment table for every cell
+          (cell_id -> arm) — pre-computed in the doc, not at run time;
+          (5) ANALYSIS PLAN: per-arm cpvo + verified success with n + CI; the decision rule
+          (non-inferior iff cpvo_adaptive <= 1.10 x cpvo_static AND success gap <= 5pts);
+          sensitivity: the asymmetric-loss table at E_x=11.47 and 28;
+          (6) AUTHORIZATION BOUNDARY: non-inferiority here authorizes DESIGN REVIEW of
+          continuing adaptive selection — nothing else; 2b never launches the continuing
+          regime itself.
+          GUARD: every number is derived from the cited artifacts (the measured effect, the
+          measured E_x) with the derivation shown; the seed is concrete; the assignment table
+          is complete.
+          LOG: PASS/FAIL; commit.
+      - name: p1_measure_one
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: E4 measurement — ONE cell per the pre-registered assignment table (the
+          first static-arm cell in the table), stimulus from the table, fresh worktree,
+          unique FINOPS_CELL_ID, candidate manifest FIRST. RUN with the seam
+          (--change-analysis, [--change-analysis-graph]). The proposal MUST emit (static arm:
+          applied=false; a refusal here is a seam regression — record and FAIL). RECORD the
+          cell's cost/duration/facts/proposal per the rerun3 cell shape; compute the FORECAST
+          per-cell budget (measured x 2, labeled FORECAST) for p2.
+          DELIVER: the cell manifest + phase ledger + the forecast.
+          LOG: PASS/FAIL; commit.
+      - name: p2_run_randomized_cells
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the remaining cells EXACTLY per the pre-registered assignment table
+          (p0's doc — arm labels from the committed seed + block scheme, never from any other
+          source). Execution manifest FIRST (every cell_id from the table with its arm,
+          stimulus, repetition, worktree, FINOPS_CELL_ID, forecast cost — no unlisted cells,
+          no arm deviations). Per cell: fresh worktree, unique FINOPS_CELL_ID, proposal
+          emitted + validated BEFORE the outcome; static arm = proposal recorded, NEVER
+          applied; adaptive arm = APPLIED exactly as proposed (rework = ONE bounded pass over
+          the proposal scope, verify = one pass, continue = provable null) with the
+          application provable in the commit trail. Outcomes INDEPENDENT (test_runner +
+          post-hoc evaluator per hard rule 7). Graph-down/analyzer-down: flag, never drop.
+          Budget/SLA guard: stop before a cell whose forecast would exceed the envelope or the
+          stop budget; record stopped cells as not-run. The critical cells are the pilot's
+          defect-bearing cells — the n is counted in them.
+          DELIVER: immutable p2 manifest, per-cell ledgers/proposals/outcome records/
+          application proofs, flags, forecast-vs-actual table, artifact SHA256 index.
+          LOG: per-cell arm/stimulus/cost/outcome table; PASS/FAIL; commit.
+      - name: p3_score
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: score ONLY immutable p1/p2 artifacts; validate joins first (cell_id, arm
+          from the PRE-REGISTERED table, stimulus, repetition — a cell scored under a
+          different arm than its assignment is invalid). Emit experiments/results/cap_2b/
+          cap_2b_score_<ts>.json: per-cell rows (arm, stimulus, cost, accepted, cpvo,
+          verified-success, proposal action/depth, applied-or-null proof id, expected-effect
+          checks) + per-arm aggregates (cpvo, verified-success rate, n, CI) + the
+          DEFECT-BEARING breakdown (the pilot's n) + the asymmetric-loss table at E_x=11.47
+          and 28 + the decision-rule computation (cpvo ratio, success gap) with the
+          pre-registered margin referenced by section.
+          GUARD: the arm labels in the score JSON match the pre-registered table exactly;
+          a mismatch is invalid, not corrected.
+          DELIVER: the score JSON + a validation result tracing every verdict number to a
+          field.
+          LOG: per-arm table + decision-rule inputs; PASS/FAIL; commit.
+      - name: p4_verdict
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/cap_2b.md
+          SHAPE: source revision, spec version, candidate-manifest hash, SHA256s for the p3
+          JSON; the per-arm table; the defect-bearing n; the decision-rule computation with
+          the pre-registered margin cited by section.
+          VERDICT: (1) non-inferior or not — the decision rule applied with n + CI; (2) the
+          authorization statement — non-inferiority authorizes DESIGN REVIEW of continuing
+          adaptive selection, nothing else; (3) sensitivity — the loss table at E_x 11.47 vs
+          28; (4) the expected-effect checks rate; (5) flagged cells and the budget/SLA guard
+          outcome. If the rule does NOT decide (n below the power analysis, CI crossing),
+          state exactly what additional cells the pre-registered plan requires. DESCRIPTIVE
+          framing throughout; no claim beyond the pre-registered decision rule.
+          GUARD: every number cites the p3 JSON; no post-hoc redefinition of the margin.
+          LOG: PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier. Attack in order: (1) PRE-REGISTRATION ADHERENCE — the
+          committed pre-registration (commit hash, margin, seed, assignment table) matches
+          what was analyzed; ANY deviation (a redefined margin, a reseeded assignment, a
+          dropped cell) is a FAILED finding, not a limitation; (2) RANDOMIZATION INTEGRITY —
+          the assignment table is derivable from the committed seed + block scheme, and every
+          cell's recorded arm equals its assignment; a cell scored under a different arm is
+          invalid; (3) APPLICATION PROVABILITY — adaptive-arm rework/verify provable in the
+          commit trail, static-arm proposals provably never applied; (4) INDEPENDENT OUTCOMES
+          — test_runner + post-hoc evaluator, not the proposing agent; (5) the measured-fix
+          provenance (scope cc66efd30, expected-effects, severity) is consumed as-is, the
+          treatment untouched (diff check); (6) the usual suite (baselines, denominators,
+          credentials, hashes, guard breaches, fabrication). Every finding: fix or record as
+          accepted limitation with reasoning + residual risk. Deliver TWO outputs:
+          docs/reviews/cap_2b_adversary.md (attack, evidence, result, fix/limitation,
+          re-test, re-stated verdict) and docs/reviews/cap_2b_known_safe.md (attempted
+          non-falsifying attacks, evidence, why safe).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: arm, levels: [static, adaptive]}
+design: factorial
+rules:
+  - name: cap_2b_preregistered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [margin_registered, seed_committed, assignment_table]
+  - name: cap_2b_cells_run
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [assignment_table]
+    produces: [randomized_cells_run, proposals_applied]
+  - name: cap_2b_scoring
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [randomized_cells_run, proposals_applied]
+    produces: [cpvo_per_arm, verified_success_rate, decision_rule]
+  - name: cap_2b_verifier_gate
+    plane: control
+    evidence_class: "[H]"
+    decision_type: verify_code_change
+    requires_facts:
+      - {fact: sonar_analysis_status, scope: self, value_type: enum,
+         on_missing: classify, on_conflict: halt}
+      - {fact: lsp_analysis_status, scope: self, value_type: enum,
+         on_missing: classify, on_conflict: halt}
+      - {fact: analysis_revision_matches, scope: self, value_type: bool,
+         on_missing: classify, on_conflict: halt}
+      - {fact: changed_symbol_count, scope: self, value_type: int, on_missing: halt}
+      - {fact: ast_parse_coverage, scope: self, value_type: float,
+         on_missing: halt, on_conflict: halt}
+      - {fact: code_change_risk, scope: self, value_type: float,
+         on_missing: halt, on_conflict: halt}
+      - {fact: new_sonar_critical_count, scope: self, value_type: int,
+         on_missing: classify, on_conflict: halt}
+      - {fact: new_lsp_error_count, scope: self, value_type: int,
+         on_missing: classify, on_conflict: halt}
+      - {fact: impacted_symbol_count, scope: self, value_type: int,
+         on_missing: classify, on_conflict: halt}
+      - {fact: changed_symbols_with_tests_ratio, scope: self, value_type: float,
+         on_missing: classify, on_conflict: halt}
+    produces: [non_inferiority_verdict]
+metrics:
+  - {name: cpvo_per_arm, agg: mean, over: cell}
+  - {name: verified_success_rate, agg: mean, over: cell}
+  - {name: decision_rule, agg: mean, over: cell}
+  - {name: non_inferiority_verdict, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: arm, loss: {cost: 1.0, quality: -5.0, value: -10.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_preregister, p1_measure_one, p2_run_randomized_cells, p3_score, p4_verdict, p5_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

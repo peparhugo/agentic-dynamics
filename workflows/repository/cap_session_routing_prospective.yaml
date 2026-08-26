@@ -1,0 +1,215 @@
+name: cap_session_routing_prospective
+question: >-
+  Does the assigned session policy change verified-success-per-dollar (cpvo), net of cache
+  and context-pressure effects — measured LIVE under randomization? The retrospective replay
+  measured fork_cached (n=246, cpvo $1.2658) and escalate (n=7, cpvo $3.9238 — the ~3.1x
+  escalation premium) on EXISTING ledger rows where arms were never randomized and typed
+  checkpoints were never recorded (I10 forward-only). This campaign runs the arms LIVE: 24
+  randomized cells (session_policy x model x repetition) where the assigned policy governs
+  phase-boundary session behavior, outcomes measured per arm on the immutable commits.
+  Design: docs/designs/current/cap_session_routing_prospective_design.md (accepted).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / CAP session routing.
+        canonical_sources: [docs/designs/current/cap_session_routing_prospective_design.md
+        (ACCEPTED — the arms + proxies, read FIRST), docs/designs/current/
+        context_abstraction_addendum_design.md §4.4 (the frozen factor set),
+        experiments/definitions/cap_session_routing_evidence.yaml (the arm definitions),
+        experiments/results/session_routing_retrospective.json (the retro arms: fork_cached
+        n=246 cpvo $1.2658, escalate n=7 cpvo $3.9238, 3.1x premium),
+        src/agentic_dynamics/control/rules.py:186 (session_routing_v1 — proposal-only,
+        the policy vocabulary), experiments/contexts/session_routing.yaml (the contract:
+        continue/fork/compress_and_fork/escalate)].
+        policies: [measure_before_actuate, proxies_recorded_not_silent, arms_never_estimated]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research (the 4-arm session-policy study,
+        live). deliberation: [author cell spec + measure one cell, run the 24-cell grid,
+        score per-arm cpvo/verified/cache, verdict vs the retrospective, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        The retrospective replay exists (arms measured on old ledger rows); the typed
+        checkpoint arms are NOT executable (checkpoint_snapshot_identity declared-never-
+        emitted; snapshots have zero production capture — I10 forward-gated). The evidence
+        spec's own arm definitions are the runnable proxies: fork_cached = new session with
+        cache reuse; escalate = failed session re-run on the other model. session_routing_v1
+        is proposal-only with zero production callers (rules.py:186) — this campaign does NOT
+        wire it as a control (the arms are assigned by the campaign, not proposed by the
+        model). The cell is a small multi-phase agent_task workflow (the calibration-cell
+        pattern); the runner's fork flag is controlled by the arm, not the spec.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks; every measurement
+        phase writes a durable PASS/FAIL log. (2) THE ARM IS ASSIGNED, NEVER PROPOSED: the
+        session policy per cell comes from the campaign's manifest (the factor level) — the
+        model never chooses its arm; a cell whose session behavior deviates from its assigned
+        arm is invalid, never scored as the assigned arm. (3) Proxy honesty: every cell
+        manifest records the proxy mapping (fork_cached = new session + cache_read_tokens >
+        0; escalate = failed phase re-run on the OTHER model); the typed checkpoint arms are
+        listed as not-run (I10), never estimated. (4) The escalate arm is provable: the
+        ledger shows the failed phase, the new session, and the other model; a narrated-but-
+        unexecuted escalation is a FAILED finding. (5) Candidate manifest FIRST (cell_id,
+        session_policy arm, model, repetition, exact cell spec + SHA256, goal hash, worktree,
+        FINOPS_CELL_ID, forecast cost); a cell not in the manifest is not run. (6) p1 measures
+        ONE cell per arm shape before p2 (E4); p2 uses measured costs as forecast only. (7)
+        Outcomes from the ledger + test_runner on the immutable commits (verified success,
+        cost, cache utilization, rework, latency) — never the cell agent's narrative. (8)
+        Graph-down/analyzer-down conditions are FLAGGED, never silently dropped. (9) Every
+        verdict number cites a produced JSON + SHA256. (10) DESCRIPTIVE-ONLY (n=3 per
+        policy-model cell): no arm is authorized; the retrospective comparison is reported
+        with the numbers. (11) No generated-surface edits, no secrets, no external actuation.
+        (12) p6 mandatory: findings re-verified + known-safe output, no bare PASS. (13)
+        Resumable only when spec version, goal hash, source revision, and candidate-manifest
+        hash match.
+      read_first: >-
+        docs/designs/current/cap_session_routing_prospective_design.md (FIRST — arms +
+        proxies + outcome rule), docs/designs/current/context_abstraction_addendum_design.md
+        §4.4 (factor set + the outcome rule), experiments/definitions/
+        cap_session_routing_evidence.yaml (arm definitions), experiments/results/
+        session_routing_retrospective.json (the retro arms + numbers),
+        src/agentic_dynamics/control/rules.py:186 (session_routing_v1), experiments/contexts/
+        session_routing.yaml (the contract), workflows/operations/cap_2a_cell_clean.yaml
+        (the cell pattern to adapt)
+      run_shape: >-
+        SINGLE wrapper model: deepseek/deepseek-v4-flash (cheap orchestrator — the operator
+        preference for orchestration). The cells run the factor's models: deepseek-v4-pro and
+        deepseek-v4-flash (the escalate arm's target is the OTHER model). One branch
+        (feature/cap-session-routing-prospective); each phase commits [workflow] <phase>;
+        each cell in a fresh disposable worktree with a unique FINOPS_CELL_ID.
+    phases:
+      - name: p1_author_cell_and_measure
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: author the session-policy cell spec (workflows/operations/
+          cap_session_policy_cell.yaml — adapt the calibration-cell pattern: a small
+          multi-phase agent_task workflow, implement + test + verify against a seeded app,
+          fork controlled BY THE ARM not the spec) per the design doc's §2 arm table; then
+          measure ONE cell (E4): the continue arm, pro model, r1, in a fresh worktree with
+          the full seam. Candidate manifest FIRST. RECORD the cell's cost/duration/verified
+          success/cache utilization, and the FORECAST per-arm budget (measured x 2, labeled
+          FORECAST). The cell spec must make the arm executable: the campaign passes the arm
+          via the cell's goal/env (e.g. FINOPS_CELL_ID carries the arm), and the cell's
+          phases follow the assigned session behavior.
+          DELIVER: the cell spec + the measured cell's manifest/ledger + the forecast table.
+          LOG: PASS/FAIL; commit.
+      - name: p2_run_grid
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the grid: 24 cells (session_policy [continue, fork_blind, fork_cached,
+          escalate] x model [deepseek-v4-pro, deepseek-v4-flash] x repetition [r1, r2, r3])
+          minus the p1-measured cell. Execution manifest FIRST (cell_id, arm, model,
+          repetition, exact cell spec + SHA256, goal hash, worktree, FINOPS_CELL_ID, forecast
+          cost — no unlisted cells). Per cell: fresh worktree, unique FINOPS_CELL_ID, the
+          arm's session behavior enforced (continue = one session; fork_* = new session per
+          phase with the cache semantics; escalate = a failed phase is re-run in a new
+          session on the OTHER model). The escalate arm's model switch is provable in the
+          ledger (failed phase -> new session -> other model). Cells may reuse one worktree
+          root; never reuse a worktree. Graph-down/analyzer-down: flag, never drop. Stop
+          before the next cell if cumulative actual cost exceeds the forecast envelope or the
+          stop budget; record stopped cells as not-run.
+          DELIVER: immutable p2 manifest, per-cell ledgers + manifests, the escalate proofs,
+          flags, forecast-vs-actual table, artifact SHA256 index.
+          LOG: per-cell arm/model/cost/verified table; PASS/FAIL; commit.
+      - name: p3_score
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: score ONLY immutable p1/p2 artifacts; validate joins first (cell_id, arm,
+          model, repetition — a cell whose session behavior deviates from its assigned arm is
+          invalid, never scored as the arm). Emit experiments/results/cap_session_routing_
+          prospective/cap_session_routing_prospective_score_<ts>.json with per-cell rows and
+          per-arm aggregates: cost, cpvo (cost / verified success), verified-success rate,
+          cache utilization (cache_hit + tokens_in across phases), rework (failed phases),
+          repeated failures, latency, context-token growth (tokens_in phase 3 vs phase 1).
+          Compute the model x policy interaction (the addendum F5 requirement): cpvo per
+          arm-model cell. Retrospective comparison: the retro numbers (fork_cached cpvo
+          $1.2658 n=246, escalate cpvo $3.9238 n=7, the 3.1x premium) vs the live numbers,
+          with n stated on both sides.
+          DELIVER: the score JSON + a validation result tracing every verdict number to a
+          field.
+          LOG: per-arm table + retro-vs-live; PASS/FAIL; commit.
+      - name: p4_verdict
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/cap_session_routing_prospective.md
+          SHAPE: source revision, spec version, candidate-manifest hash, SHA256s for the p3
+          JSON; the per-arm table (cpvo, verified success, cache, rework, latency, n); the
+          model interaction; the retro-vs-live comparison; flagged cells; the proxy mapping
+          table (what each arm executed vs the typed-checkpoint semantics).
+          VERDICT: per-arm ranking with the numbers; is the retrospective escalation premium
+          (3.1x) confirmed, moved, or falsified by live randomized numbers? DESCRIPTIVE-ONLY
+          (n=3 per policy-model cell): no arm is authorized, no policy promoted; the I10
+          typed-checkpoint arms remain not-run and the instrumentation gap is restated.
+          GUARD: every number cites the p3 JSON; the retro comparison states n on both sides.
+          LOG: PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier. Attack in order: (1) arm integrity — the cell's session
+          behavior provably matches its assigned arm (session lineage in the ledgers: reused
+          session_id = continue; new session + cache = fork_cached; model switch after a
+          failed phase = escalate); a mismatched cell scored under its assigned arm is a
+          FAILED finding; (2) escalate provability — the failed phase -> new session -> other
+          model chain is in the ledger, not narration; (3) cache semantics — fork_cached's
+          cache reuse is real (cache_read_tokens > 0), not asserted; (4) the retrospective
+          comparison is apples-to-apples (same metrics, n stated); (5) randomization honesty
+          — the cells were listed in the manifest before running (no cherry-picking after the
+          fact); (6) the usual suite (credentials, hashes, not-run cells, fabricated numbers,
+          actuation). Every finding: fix or record as accepted limitation with reasoning +
+          residual risk. Deliver TWO outputs: docs/reviews/
+          cap_session_routing_prospective_adversary.md (attack, evidence, result, fix/
+          limitation, re-test, re-stated verdict) and docs/reviews/
+          cap_session_routing_prospective_known_safe.md (attempted non-falsifying attacks,
+          evidence, why safe; not a generic checklist).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: session_policy, levels: [continue, fork_blind, fork_cached, escalate]}
+  - {name: model, levels: [deepseek/deepseek-v4-pro, deepseek/deepseek-v4-flash]}
+  - {name: repetition, levels: [r1, r2, r3]}
+design: factorial
+rules:
+  - name: cap_session_policy_cells_run
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [policy_cells_run, arms_assigned]
+  - name: cap_session_policy_outcome
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [policy_cells_run, arms_assigned]
+    produces: [session_verified_success, session_context_growth, cpvo_per_arm]
+  - name: cap_session_policy_scoring
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [session_verified_success, cpvo_per_arm]
+    produces: [arm_ranking, escalation_premium_live]
+metrics:
+  - {name: cpvo_per_arm, agg: mean, over: cell}
+  - {name: session_verified_success, agg: mean, over: cell}
+  - {name: session_context_growth, agg: mean, over: cell}
+  - {name: escalation_premium_live, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: session_policy, loss: {cost: 1.0, quality: -5.0, latency: -2.0}}
+writeup:
+  format: lab_book
+  sections: [question, p1_author_cell_and_measure, p2_run_grid, p3_score, p4_verdict, p5_adversarial]
+stop: {budget_usd: 40.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
