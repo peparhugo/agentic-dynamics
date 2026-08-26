@@ -413,7 +413,7 @@ def test_producer_story_facts_v1_supersedes_the_projection_slot(kpf, tmp_path):
     # Same session -> the projection (attempt_facts/v1) and story_facts/v1 agree on the logical
     # slot (same scope_id/predicate/subject), so emission under the new reducer_version replaces
     # the adaptation fact rather than coexisting with it (the bridge's supersede-on-emission).
-    cell = _write_cell(tmp_path, "slot", sessions=[
+    _write_cell(tmp_path, "slot", sessions=[
         {"session_number": 1, "exit_code": 0, "commit_hash": "aaa111", "cost_usd": 0.5},
     ])
 

@@ -19,9 +19,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from agentic_dynamics.measurement.efficiency import compute_cost_estimate
 from agentic_dynamics.control.live import make_publisher
 from agentic_dynamics.core.streaming import stream_subprocess
+from agentic_dynamics.measurement.efficiency import compute_cost_estimate
 
 # Resolve opencode binary: env override or default ~/.opencode/bin/opencode
 _OPENCODE_BIN = os.environ.get("OPENCODE_BIN", "")

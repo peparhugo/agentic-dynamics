@@ -13,6 +13,4 @@ Reserved (empty until post-consolidation CAP implementation, per ``ARCHITECTURE.
 
 from . import constants, language, paths, session_types, streaming
 
-
-
-__all__ = ['language', 'paths', 'session_types', 'streaming']
+__all__ = ['constants', 'language', 'paths', 'session_types', 'streaming']

@@ -22,8 +22,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from agentic_dynamics.control.live import make_publisher
-from agentic_dynamics.adapters.opencode import (
+# Import-order-sensitive (DO NOT let isort reorder; pinned with # isort: skip): ``control.live``
+# MUST be imported BEFORE ``agentic_dynamics.adapters.opencode`` here. ``opencode`` imports
+# ``control.live`` (the pinned execution→control telemetry seam), and ``control`` transitively
+# imports ``runtime`` which eagerly imports ``adapters.opencode``. Importing ``control`` first
+# fully loads it (and, through that chain, fully loads ``opencode``) before this module touches
+# ``opencode`` — if ``opencode`` were imported first it would be PARTIALLY initialized when the
+# ``control → runtime → opencode`` chain re-enters it (ImportError). Same contract as the old
+# pre-sort ordering; only this line's position matters.
+from agentic_dynamics.control.live import make_publisher  # isort: skip
+from agentic_dynamics.adapters.opencode import (  # noqa: E402  # isort: skip
     AgenticResult,
     _build_standardized_prompt,
     _diff_workdir,
@@ -32,6 +40,7 @@ from agentic_dynamics.adapters.opencode import (
     _parse_session_output,
 )
 from agentic_dynamics.core.streaming import stream_subprocess
+
 
 def _resolve_claude_bin(
     *,

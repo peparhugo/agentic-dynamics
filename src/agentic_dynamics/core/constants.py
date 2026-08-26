@@ -1,6 +1,10 @@
 """Shared constants for the FinOps framework pipeline scripts."""
 
-from agentic_dynamics.core.session_types import EXPERIMENT_SESSION_PATTERNS as EXPERIMENT_SESSION_PATTERNS
+import os as _os
+
+from agentic_dynamics.core.session_types import (
+    EXPERIMENT_SESSION_PATTERNS as EXPERIMENT_SESSION_PATTERNS,
+)
 from agentic_dynamics.core.session_types import normalize_task as normalize_task
 
 MODEL_LABELS = {
@@ -48,8 +52,6 @@ def bootstrap_ci(values, n_resamples=1000, ci=95, seed=42):
     hi_idx = int((100 + ci) / 2 / 100 * n_resamples) - 1
     return [round(means[lo_idx], 4), round(means[hi_idx], 4)]
 
-
-import os as _os
 
 WORKTREE_ROOT = _os.environ.get("FINOPS_WORKTREE_ROOT", "/tmp")
 WORKTREE_GLOB = _os.path.join(WORKTREE_ROOT, "exp_*")

@@ -11,7 +11,6 @@ Usage:
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 try:
@@ -20,8 +19,8 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
-from agentic_dynamics.measurement.commit_analysis import score_conventions
 from agentic_dynamics.core.language import detect_language
+from agentic_dynamics.measurement.commit_analysis import score_conventions
 
 STORIES_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "stories"
 ANALYSIS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "analysis"

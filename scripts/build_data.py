@@ -41,9 +41,8 @@ REPORTS_DIR = RESULTS_DIR / "reports"
 DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 OUTPUT_PATH = ROOT / "apps" / "website" / "data.js"
 
-from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
-
 from agentic_dynamics.control.routing import compute_routing  # noqa: E402
+from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
 from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS  # noqa: E402
 from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
     DATA_INTEGRITY_POLICY_VERSION,

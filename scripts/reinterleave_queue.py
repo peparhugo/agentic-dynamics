@@ -12,7 +12,6 @@ Usage:
 
 import json
 import sys
-from pathlib import Path
 
 try:
     import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]

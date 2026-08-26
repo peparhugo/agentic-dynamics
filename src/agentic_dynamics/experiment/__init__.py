@@ -10,6 +10,4 @@ campaign primitives (``adapt.py``, ``JobRecord``/``AttemptRecord``).
 
 from . import compile_experiment, experiment_spec, spec_status
 
-
-
 __all__ = ['compile_experiment', 'experiment_spec', 'spec_status']

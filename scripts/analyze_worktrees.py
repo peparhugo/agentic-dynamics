@@ -21,7 +21,6 @@ import os
 import re
 import shutil
 import sqlite3
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,19 +37,22 @@ from agentic_dynamics.core.constants import (
     bootstrap_ci,
     probe_session_schema,
 )
-
-from agentic_dynamics.reporting.game_report import GameReport
-from agentic_dynamics.measurement.semantic_validation import analyze_ast
-from agentic_dynamics.measurement.perturb import build_operators
-from agentic_dynamics.measurement.strategy import classify_strategy
-from agentic_dynamics.measurement.efficiency import compute_efficiency
-from agentic_dynamics.measurement.sonar import compute_sonar_diff
-from agentic_dynamics.measurement.solution import evaluate_solution
 from agentic_dynamics.measurement.basin import measure_basin_escape
-from agentic_dynamics.measurement.perturb import perturbation_class_for
-from agentic_dynamics.measurement.sonar import run_sonar_analysis
-from agentic_dynamics.measurement.sonar import sonar_quality_score
-from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS, COMPOSITE_WEIGHTS_SONAR
+from agentic_dynamics.measurement.efficiency import compute_efficiency
+from agentic_dynamics.measurement.perturb import build_operators, perturbation_class_for
+from agentic_dynamics.measurement.semantic_validation import analyze_ast
+from agentic_dynamics.measurement.solution import (
+    COMPOSITE_WEIGHTS,
+    COMPOSITE_WEIGHTS_SONAR,
+    evaluate_solution,
+)
+from agentic_dynamics.measurement.sonar import (
+    compute_sonar_diff,
+    run_sonar_analysis,
+    sonar_quality_score,
+)
+from agentic_dynamics.measurement.strategy import classify_strategy
+from agentic_dynamics.reporting.game_report import GameReport
 
 OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"

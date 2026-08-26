@@ -136,7 +136,7 @@ def provider_summary(cells: list[dict[str, Any]]) -> dict[str, Any]:
     """
     providers = [provider_of(c) for c in cells]
     longest = current = 1 if providers else 0
-    for previous, next_ in zip(providers, providers[1:]):
+    for previous, next_ in zip(providers, providers[1:], strict=False):
         current = current + 1 if previous == next_ else 1
         longest = max(longest, current)
     return {

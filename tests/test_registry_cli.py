@@ -212,8 +212,8 @@ def test_cmd_query_combines_filters():
         _row(knowledge_id="kid_b", source_type="story", lifecycle_state="tombstoned"),
         _row(knowledge_id="kid_c", source_type="review", lifecycle_state="current"),
     ]
-    import io
     import contextlib
+    import io
 
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):

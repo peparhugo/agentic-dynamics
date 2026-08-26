@@ -27,7 +27,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
-from agentic_dynamics.runtime.test_runner import resolve_node, run_suite, suite_succeeded  # noqa: E402
+from agentic_dynamics.runtime.test_runner import (  # noqa: E402
+    resolve_node,
+    run_suite,
+    suite_succeeded,
+)
 
 STORIES_DIR = ROOT / "experiments" / "results" / "stories"
 OUT_PATH = ROOT / "experiments" / "results" / "verified_tests.json"

@@ -384,12 +384,11 @@ def exact_identifier_hit(candidate: Candidate, exact_terms: list[str]) -> bool:
         t = term.lower()
         if not t:
             continue
-        if t == lowered_locator or t == lowered_id or t == lowered_text:
+        if t in (lowered_locator, lowered_id, lowered_text):
             return True
-        if "/" in t or "." in t or "_" in t:
-            # allow exact path/symbol containment (never a bare word substring)
-            if t in lowered_locator or t in lowered_text:
-                return True
+        # allow exact path/symbol containment (never a bare word substring)
+        if ("/" in t or "." in t or "_" in t) and (t in lowered_locator or t in lowered_text):
+            return True
     return False
 
 

@@ -237,23 +237,23 @@ def diff_recommendations(
     changed_total = 0
     for task in tasks:
         c = corrected_by_task.get(task)
-        l = legacy_by_task.get(task)
-        if c is None or l is None:
+        legacy = legacy_by_task.get(task)
+        if c is None or legacy is None:
             changed_tasks.append({"task": task, "note": "present in only one arm"})
             changed_total += 1
             continue
         c_route = (c["default_model"], c["routing"])
-        l_route = (l["default_model"], l["routing"])
+        l_route = (legacy["default_model"], legacy["routing"])
         if c_route == l_route:
             continue
         changed_total += 1
-        for m in (c["default_model"], l["default_model"]):
+        for m in (c["default_model"], legacy["default_model"]):
             if m:
                 changed_models[m] = changed_models.get(m, 0) + 1
         moved = None
-        if c["default_model"] and l["default_model"]:
+        if c["default_model"] and legacy["default_model"]:
             c_cost = c["models"][c["default_model"]]["avg_cost"]
-            l_cost = l["models"][l["default_model"]]["avg_cost"]
+            l_cost = legacy["models"][legacy["default_model"]]["avg_cost"]
             if c_cost is not None and l_cost is not None:
                 moved = "to_lower_cost" if c_cost < l_cost else "to_higher_cost"
                 if c_cost < l_cost:
@@ -263,8 +263,8 @@ def diff_recommendations(
                 "task": task,
                 "corrected_default": c["default_model"],
                 "corrected_routing": c["routing"],
-                "legacy_default": l["default_model"],
-                "legacy_routing": l["routing"],
+                "legacy_default": legacy["default_model"],
+                "legacy_routing": legacy["routing"],
                 "direction": moved,
             }
         )
@@ -295,11 +295,11 @@ def compute() -> dict[str, Any]:
     diverged_stats: list[dict[str, Any]] = []
     for task in sorted(set(corrected_by_task) | set(legacy_by_task)):
         c = corrected_by_task.get(task)
-        l = legacy_by_task.get(task)
-        if c is None or l is None:
+        legacy = legacy_by_task.get(task)
+        if c is None or legacy is None:
             continue
-        for mid in sorted(set(c["models"]) | set(l["models"])):
-            cms, lms = c["models"].get(mid), l["models"].get(mid)
+        for mid in sorted(set(c["models"]) | set(legacy["models"])):
+            cms, lms = c["models"].get(mid), legacy["models"].get(mid)
             if cms is None or lms is None:
                 continue
             c_avg = cms.get("avg_cost")

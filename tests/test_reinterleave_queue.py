@@ -40,7 +40,7 @@ def test_consecutive_providers_always_differ() -> None:
     out = reinterleave_cells(jobs)
 
     providers = [c["model"].split("/", 1)[0] for c in out]
-    for i, (a, b) in enumerate(zip(providers, providers[1:])):
+    for i, (a, b) in enumerate(zip(providers, providers[1:], strict=False)):
         assert a != b, f"adjacent same-provider run: {a} at positions {i}-{i + 1}"
 
 

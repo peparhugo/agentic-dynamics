@@ -67,7 +67,7 @@ def _assessment_id(cell_id: str, at: str) -> str:
     same-entity supersession chain), so the timestamp is folded in deliberately: two
     verdicts against the same cell at different times must never collide on identity.
     """
-    return hashlib.sha256(f"{cell_id}|{at}".encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(f"{cell_id}|{at}".encode()).hexdigest()[:16]
 
 
 # ── Record construction: observation (every verdict) ────────────

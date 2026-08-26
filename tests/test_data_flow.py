@@ -63,4 +63,4 @@ def test_knowledge_never_actuates():
                 )
             if isinstance(node, ast.Attribute) and node.attr == "derive_actuation_record":
                 # A bare attribute reference is a call site (e.g. actuation_ingestion.derive_actuation_record(...)).
-                assert False, f"{path}: references derive_actuation_record"
+                raise AssertionError(f"{path}: references derive_actuation_record")

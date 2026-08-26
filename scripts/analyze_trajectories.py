@@ -26,7 +26,6 @@ Produces:
 
 import argparse
 import json
-import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -335,7 +334,6 @@ def analyze_all(limit=0, model_filter=None):
 def enrich_with_embeddings(results, model_map):
     """Query ChromaDB for step embeddings and add reasoning_distance per session."""
     try:
-        import sys
         try:
             import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
         except ImportError:  # imported as scripts.<name> — repo root is on sys.path

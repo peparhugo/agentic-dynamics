@@ -81,7 +81,7 @@ def _actuation_id(target_session_id: str, causes: str, occurred_at: str) -> str:
     observation, at different times are independent facts, never the same logical entity.
     """
     return hashlib.sha256(
-        f"{target_session_id}|{causes}|{occurred_at}".encode("utf-8")
+        f"{target_session_id}|{causes}|{occurred_at}".encode()
     ).hexdigest()[:16]
 
 

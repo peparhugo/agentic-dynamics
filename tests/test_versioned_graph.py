@@ -16,9 +16,6 @@ import pytest
 from agentic_dynamics.core.language import (
     _PROFILES,
     build_code_snapshot,
-    compute_code_delta,
-    module_entity_id,
-    module_version_id,
     symbol_entity_id,
     symbol_version_id,
 )

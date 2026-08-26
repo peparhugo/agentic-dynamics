@@ -9,7 +9,6 @@ Output: experiments/results/legacy_labs/lab_basin_topology_neo4j.json
 """
 
 import json
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent

@@ -336,10 +336,7 @@ def _module_slot(file_path: str) -> str:
     slot the two-ID contract hashes (design §5.3).
     """
     p = Path(file_path.replace("\\", "/"))
-    if p.name == "__init__.py":
-        stem = str(p.parent)
-    else:
-        stem = str(p.with_suffix(""))
+    stem = str(p.parent) if p.name == "__init__.py" else str(p.with_suffix(""))
     return stem.replace("/", ".") or p.name
 
 

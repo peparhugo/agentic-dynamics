@@ -13,9 +13,17 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from agentic_dynamics.adapters.opencode import AgenticResult, run_opencode_agentic
+# Deliberately lazy (import-cycle break): importing ``adapters.opencode`` here at module level
+# closes the cycle adapters.opencode → control → reporting → adapters.opencode (control eagerly
+# imports reporting via routing.py/pattern.py; ``adapters.opencode`` eagerly imports
+# ``control.live`` — the pinned telemetry seam). ``AgenticResult`` is annotation-only (this
+# module has ``from __future__ import annotations``), and ``run_opencode_agentic`` is imported
+# at each call site. The publication boundary (game_report / canonical_corpus / lab_contract)
+# must load without dragging the execution adapters in.
+if TYPE_CHECKING:
+    from agentic_dynamics.adapters.opencode import AgenticResult
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
@@ -174,6 +182,8 @@ class OpencodeAnalyzer:
         prompt = _build_session_prompt(name)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         session_name = f"meta_analyze_{name}_{ts}"
+        from agentic_dynamics.adapters.opencode import run_opencode_agentic
+
         return run_opencode_agentic(
             prompt,
             model=self.model,
@@ -189,6 +199,8 @@ class OpencodeAnalyzer:
         prompt = _build_comparison_prompt(bn, pn)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         session_name = f"meta_compare_{bn}_vs_{pn}_{ts}"
+        from agentic_dynamics.adapters.opencode import run_opencode_agentic
+
         return run_opencode_agentic(
             prompt,
             model=self.model,
@@ -204,6 +216,8 @@ class OpencodeAnalyzer:
         prompt = _build_batch_prompt(entries, question)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         session_name = f"meta_batch_{ts}"
+        from agentic_dynamics.adapters.opencode import run_opencode_agentic
+
         return run_opencode_agentic(
             prompt,
             model=self.model,
@@ -225,6 +239,8 @@ class OpencodeAnalyzer:
         prompt = _build_batch_prompt(filtered[:limit], q)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         session_name = f"meta_filter_{key}_{value}_{ts}"
+        from agentic_dynamics.adapters.opencode import run_opencode_agentic
+
         return run_opencode_agentic(
             prompt,
             model=self.model,

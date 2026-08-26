@@ -25,8 +25,8 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
-from agentic_dynamics.measurement.efficiency import compute_cost_estimate
 from agentic_dynamics.adapters.opencode import AgenticResult, _parse_session_output
+from agentic_dynamics.measurement.efficiency import compute_cost_estimate
 from agentic_dynamics.runtime.story import _count_tests
 
 RESULTS_DIR = ROOT / "experiments" / "results" / "stories"

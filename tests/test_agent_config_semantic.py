@@ -33,8 +33,8 @@ and absolute paths (``/tmp/…``) are excluded by construction from the path/scr
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from agentic_dynamics import cli
 
@@ -131,10 +131,7 @@ def _is_path_candidate(token: str) -> bool:
 def _path_exists(token: str) -> bool:
     """Resolve a path candidate against the repo root and the package root."""
     token = _LINE_REF.sub("", token)
-    for base in (ROOT, ROOT / "src" / "agentic_dynamics"):
-        if (base / token).exists():
-            return True
-    return False
+    return any((base / token).exists() for base in (ROOT, ROOT / "src" / "agentic_dynamics"))
 
 
 def _module_exists(module: str) -> bool:

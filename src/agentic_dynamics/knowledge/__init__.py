@@ -10,8 +10,23 @@ Knowledge does NOT actuate (rec 8): no module here calls
 POLICY-authority facts (enforced by the Stage 1 data-flow tests).
 """
 
-from . import augment, code_ingestion, embeddings, graph, knowledge, knowledge_ingestion, knowledge_stream, ledger_ingestion, policy_ingestion, prompt_constructor, quality_ingestion, record_factory, retrieval, review_ingestion, spec_ingestion, story_ingestion
-
-
+from . import (
+    augment,
+    code_ingestion,
+    embeddings,
+    graph,
+    knowledge,
+    knowledge_ingestion,
+    knowledge_stream,
+    ledger_ingestion,
+    policy_ingestion,
+    prompt_constructor,
+    quality_ingestion,
+    record_factory,
+    retrieval,
+    review_ingestion,
+    spec_ingestion,
+    story_ingestion,
+)
 
 __all__ = ['augment', 'code_ingestion', 'embeddings', 'graph', 'knowledge', 'knowledge_ingestion', 'knowledge_stream', 'ledger_ingestion', 'policy_ingestion', 'prompt_constructor', 'quality_ingestion', 'record_factory', 'retrieval', 'review_ingestion', 'spec_ingestion', 'story_ingestion']

@@ -28,7 +28,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-
 #: Default executor tool surface offered to the prompt constructor's ``allowed_tools``
 #: subset check. Overridable via ``rag_params.inherited_tools``; the constructor may only
 #: *reduce* this set, never add to it.
@@ -77,7 +76,9 @@ def _evidence_from_attempt(attempt: Any) -> list[Any]:
     of either (real candidates or test doubles).
     """
     selected = getattr(attempt, "selected_evidence", []) or []
-    from agentic_dynamics.knowledge.prompt_constructor import EvidenceUnit  # lazy — avoids import-time coupling
+    from agentic_dynamics.knowledge.prompt_constructor import (
+        EvidenceUnit,  # lazy — avoids import-time coupling
+    )
 
     units: list[Any] = []
     for c in selected:
@@ -123,8 +124,8 @@ def augment_prompt(
     ``construct_fn`` maps a ``ConstructionRequest`` to an ``AugmentedPrompt``.
     """
     from agentic_dynamics.knowledge.prompt_constructor import (
-        ConstructionRequest,
         DEFAULT_CONSTRUCTOR_MODEL,
+        ConstructionRequest,
         hash_work_item,
     )
 
@@ -243,7 +244,10 @@ def default_construct_fn(rag_params: dict[str, Any], run_agent: Callable[..., An
     The constructor runs on ``DEFAULT_CONSTRUCTOR_MODEL`` (cheapest), so the wiring has
     a real end-to-end path when ``rag_augment`` is enabled without explicit injection.
     """
-    from agentic_dynamics.knowledge.prompt_constructor import DEFAULT_CONSTRUCTOR_MODEL, ModelPromptConstructor
+    from agentic_dynamics.knowledge.prompt_constructor import (
+        DEFAULT_CONSTRUCTOR_MODEL,
+        ModelPromptConstructor,
+    )
 
     constructor_model = str(rag_params.get("constructor_model", DEFAULT_CONSTRUCTOR_MODEL))
 

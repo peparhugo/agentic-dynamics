@@ -15,9 +15,10 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
-from agentic_dynamics.core.constants import MODEL_LABELS
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
+from agentic_dynamics.core.constants import MODEL_LABELS
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"

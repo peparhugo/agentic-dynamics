@@ -5,7 +5,6 @@ operator×strength combination from the opencode session database.
 """
 
 import sqlite3
-import sys
 from collections import defaultdict
 from pathlib import Path
 

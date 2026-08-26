@@ -29,11 +29,17 @@ from __future__ import annotations
 import hashlib
 import inspect
 import os
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Iterable
+from typing import Any
 
-from agentic_dynamics.knowledge.knowledge import Authority, KnowledgeEvent, KnowledgeRecord, message_family
+from agentic_dynamics.knowledge.knowledge import (
+    Authority,
+    KnowledgeEvent,
+    KnowledgeRecord,
+    message_family,
+)
 
 # ── Connection / key contract ───────────────────────────────────
 

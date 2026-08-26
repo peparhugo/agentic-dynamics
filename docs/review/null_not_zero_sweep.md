@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # Null-not-zero ratio sweep — the `= 0.0`-when-denominator-missing guard
 
 Part of `cap_stabilization_release` p1 (`workflows/repository/cap_stabilization_release.yaml`,

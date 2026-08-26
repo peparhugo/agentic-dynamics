@@ -106,7 +106,7 @@ def test_kb_registry_v1_handler_appends_one_line_per_call(tmp_path, monkeypatch)
 
     lines = kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()
     assert len(lines) == 2
-    assert [json.loads(l)["knowledge_id"] for l in lines] == ["kid_1", "kid_2"]
+    assert [json.loads(line)["knowledge_id"] for line in lines] == ["kid_1", "kid_2"]
 
 
 def test_kb_registry_v1_handler_creates_parent_directory(tmp_path, monkeypatch):
@@ -146,7 +146,7 @@ def test_kb_registry_v1_handler_delete_is_tombstoned(tmp_path, monkeypatch):
 
     handler(_record(knowledge_id="kid_contaminated"), operation="delete", reason="contaminated cell")
 
-    lines = [json.loads(l) for l in kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()]
+    lines = [json.loads(line) for line in kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()]
     assert len(lines) == 1  # a self-tombstone — no predecessor side-effect
     assert lines[0]["knowledge_id"] == "kid_contaminated"
     assert lines[0]["lifecycle_state"] == "tombstoned"
@@ -166,7 +166,7 @@ def test_kb_registry_v1_handler_supersede_marks_predecessor_superseded_with_effe
 
     handler(successor, operation="supersede")
 
-    lines = [json.loads(l) for l in kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()]
+    lines = [json.loads(line) for line in kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()]
     assert len(lines) == 2
 
     successor_line, predecessor_line = lines
@@ -197,7 +197,7 @@ def test_kb_registry_v1_handler_supersede_without_predecessor_writes_one_line(tm
 class _FakeNeo4jClient:
     """Records the Cypher query + bound params it was called with — never a live driver."""
 
-    instances: list["_FakeNeo4jClient"] = []
+    instances: list[_FakeNeo4jClient] = []
 
     def __init__(self, *args, **kwargs):
         self.calls: list[tuple[str, dict]] = []

@@ -9,6 +9,4 @@ Pinned executionâ†’control observation edge: ``opencode`` / ``claude_adapter`` â
 
 from . import backends, claude_adapter, opencode
 
-
-
 __all__ = ['backends', 'claude_adapter', 'opencode']
