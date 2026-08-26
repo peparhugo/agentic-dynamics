@@ -1,0 +1,198 @@
+name: cap_escalation_measurement
+question: >-
+  What does a rejected outcome actually cost downstream, in dollars? The rerun3 control
+  experiment's asymmetric-loss table scales linearly with the escalation multiplier E_x
+  (p6 limitation F3): sourced at 28 (pricing ratio) the gate's loss-axis swing is $0.225176;
+  at the measured 3.1 it is $0.024930 — direction robust (break-even ~1.42), magnitude 10x
+  apart. This campaign MEASURES E_x: the rerun3 critical-baseline cell's escaped defect
+  (immutable commit efe33b6fb8ad — the applied gate's rework fixed it; the baseline ignored
+  the proposal and the defect propagated) is handed to a fresh escalation session whose job is
+  to fix the inherited broken codebase. The measured fix cost / the original cell cost IS the
+  measured E_x, and the loss table is recomputed at the measured value.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / CAP evidence integrity.
+        canonical_sources: [docs/designs/current/cap_2a_rerun3.md (the control verdict +
+        the E_x sensitivity supplement), experiments/results/cap_2a_rerun3/
+        cap_2a_rerun3_score_20260826T050000Z.json (the critical-baseline cell's
+        analyzed_revision efe33b6fb8ad — the ESCAPED DEFECT commit, accepted=false,
+        false_continue_cost at E_x=28 = $0.112588 over the base defect cost $0.004021),
+        experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_outcome.json (the
+        independent outcome record), workflows/operations/cap_2a_cell_critical.yaml (the
+        stimulus — the defect is the inverted boundary comparison in calc.py's classify)].
+        policies: [measure_before_actuate, measured_not_sourced, no_extra_hints]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research (measurement — the escalation
+        multiplier). deliberation: [locate the escaped defect, measure the escalation fix,
+        compute E_x, adversarial attribution].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        rerun3 COMPLETED: the applied gate's rework fixed the critical defect at a lower
+        cost-per-accepted-outcome; the baseline arm IGNORED the (correct) rework proposal and
+        the defect escaped — outcome accepted=false, immutable commit efe33b6fb8ad (the
+        baseline arm's analyzed revision). The asymmetric-loss table valued the escaped
+        defect's downstream cost at $0.112588 via E_x=28 over a $0.004021 base. THIS campaign
+        measures what fixing that escaped defect actually costs when a LATER session inherits
+        the broken codebase — the escalation E_x in dollars, per tier. The critical-baseline
+        cell's original cost (the denominator) is in its phase ledger
+        (experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_phase_ledger.json).
+        Operator note: Claude OAuth may be down — check auth status before tier_up; a missing
+        tier is a flagged not-run, never a fabricated number.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks; every measurement phase
+        writes a durable PASS/FAIL log even when it stops early. (2) THE ESCALATION SESSION
+        GETS NO EXTRA HINTS: its goal is exactly what a downstream session inherits — the
+        committed codebase + its failing tests; NO mention of the campaign, the verifier, the
+        defect's location, or the intended fix. The goal text is pinned in the manifest. (3)
+        Attribution discipline: the escalation session's fix MUST make the inherited tests pass
+        AND remove the defect (post-hoc verification by the campaign, not by the session); a
+        fix that hides the failing test is invalid. (4) Candidate manifest FIRST (cell_id,
+        escalation tier, exact source commit, model/backend, goal hash, worktree,
+        FINOPS_CELL_ID, forecast cost); a cell not in the manifest is not run. (5) E_x =
+        escalation_fix_cost_usd / original_cell_cost_usd, computed from MEASURED dollars, with
+        the denominator's provenance cited (the critical-baseline phase ledger). (6) The loss
+        table is recomputed at the measured E_x and reported ALONGSIDE the 3.1 and 28 columns —
+        never replacing the sourced columns. (7) Graph-down/analyzer-down conditions are
+        FLAGGED; unrun tiers (e.g. OAuth down) are not-run, never estimated. (8) Every verdict
+        number cites a produced JSON + SHA256. (9) p4 mandatory: findings re-verified + known-
+        safe output, no bare PASS. (10) No generated-surface edits, no secrets in artifacts,
+        no external actuation. (11) Resumable only when spec version, goal hash, source
+        revision, and candidate-manifest hash match.
+      read_first: >-
+        docs/designs/current/cap_2a_rerun3.md (verdict + E_x supplement),
+        experiments/results/cap_2a_rerun3/cap_2a_rerun3_score_20260826T050000Z.json
+        (asymmetric_loss block: base downstream defect cost $0.004021, the E_x=28 figures),
+        experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_outcome.json +
+        cap2a_r3_critical_baseline_phase_ledger.json (the outcome + the original cell cost),
+        workflows/operations/cap_2a_cell_critical.yaml (the stimulus + defect description),
+        scripts/kb_produce_campaign_evidence.py (the registry report ingestion — reuse)
+      run_shape: >-
+        The campaign wrapper runs on deepseek/deepseek-v4-pro (operator preference). The
+        escalation cells are ONE factor: escalation_tier — same_tier
+        (deepseek/deepseek-v4-pro — what the same economy pays to fix it) and tier_up
+        (claude-sonnet-5 or gpt-5.6 when auth is up — what the escalation path pays).
+        Each escalation cell runs in a fresh disposable worktree checked out at the escaped-
+        defect commit (efe33b6fb8ad), with the pinned goal and unique FINOPS_CELL_ID; only
+        immutable artifacts are copied out. No credentials in committed artifacts.
+    phases:
+      - name: p1_locate_the_escaped_defect
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: identify + verify the escaped defect. From the rerun3 score JSON, the
+          critical-baseline cell: analyzed_revision efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc
+          (accepted=false — the defect escaped). Verify the defect is PRESENT on that commit:
+          the immutable commit's tests FAIL (run the test suite on a fresh worktree checked out
+          at that commit — record the failing test + the failure output) and the defect is the
+          inverted boundary comparison in calc.py's classify (per the stimulus spec — post-hoc
+          verification, the same evaluator shape the rerun3 outcome record used). RECORD the
+          original cell cost (the E_x denominator) from
+          experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_phase_ledger.json with
+          its SHA256. CHECK auth status for the escalation models (same_tier =
+          deepseek/deepseek-v4-pro — operator preference; tier_up = claude-sonnet-5 or
+          gpt-5.6): a downed OAuth means the tier_up cell is a flagged not-run later, never an
+          estimate. DELIVER: a p1_locate_verification.json (commit, failing test output,
+          defect-present determination, original cell cost + SHA256, auth status per
+          escalation model) under experiments/results/cap_escalation_measurement/.
+          LOG: PASS/FAIL; commit.
+      - name: p2_measure_escalation_fix
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the escalation cells — ONE per available escalation tier, per the p1
+          manifest. Candidate manifest FIRST (cell_id, escalation tier, exact source commit
+          efe33b6fb8ad, model/backend, THE PINNED GOAL, fresh worktree, FINOPS_CELL_ID,
+          forecast cost from the p1 original-cell-cost x 10 headroom). The PINNED GOAL
+          (hard rule 2 — no extra hints): fix the inherited codebase so its tests pass.
+          That is ALL the session knows. Run it as a minimal workflow (implement phase + test
+          phase) in a fresh worktree checked out at the escaped-defect commit, with the
+          pinned goal, the tier's model, and the seam flags (--change-analysis) so the fix
+          itself is measured. Record: cost, duration, tests passing on the final commit,
+          defect absent on the final commit (post-hoc verification — the campaign checks, not
+          the session), any unrun tier (OAuth down) flagged not-run.
+          DELIVER: per cell one immutable manifest + one phase ledger + one outcome record
+          (defect-fixed? tests-passing? cost/duration, artifact SHA256s).
+          LOG: per-tier cost/duration/fix table; PASS/FAIL; commit.
+      - name: p3_compute_ex
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: compute the measured E_x per escalation tier: E_x_tier =
+          escalation_fix_cost_usd / original_cell_cost_usd, both from the MEASURED ledgers
+          (the denominator cited with its SHA256). Emit
+          experiments/results/cap_escalation_measurement/cap_escalation_measurement_score_<ts>.json
+          with: per-tier E_x + the cost breakdown (original cell cost, escalation fix cost),
+          the loss table recomputed at the MEASURED E_x alongside the 3.1 and 28 columns
+          (never replacing them), the base downstream defect cost ($0.004021 from the rerun3
+          score JSON — re-derive, don't trust the copy), and denominators/flags per tier.
+          GUARD: the same-tier E_x is the floor (what the same economy pays); the tier-up E_x
+          is the escalation path; a not-run tier is listed, never estimated.
+          DELIVER: the score JSON + a validation note tracing each number to a ledger field.
+          LOG: E_x table; PASS/FAIL; commit.
+      - name: p4_adversarial
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier. Attack in order: (1) attribution — is the escalation
+          session fixing THE escaped defect (the inverted boundary comparison), or a different
+          breakage? The final commit must both pass the inherited tests AND remove the
+          specific defect (diff the fix against the gate arm's rework commit from rerun3 if
+          it helps); (2) hints — did the escalation session receive anything beyond the pinned
+          goal (the worktree, the goal text, the env)? (3) denominator integrity — the
+          original cell cost is the critical-baseline cell's true measured cost (not the
+          forecast); (4) E_x math — recompute from the ledgers; (5) the loss-table columns
+          (measured vs 3.1 vs 28) are comparable (same base defect cost); (6) the usual suite:
+          credentials, hashes, not-run tiers mislabeled, fabricated numbers. Every finding:
+          fix or record as accepted limitation with reasoning + residual risk. Deliver TWO
+          outputs: docs/reviews/cap_escalation_measurement_adversary.md (attack, evidence,
+          result, fix/limitation, re-test, re-stated E_x) and
+          docs/reviews/cap_escalation_measurement_known_safe.md (attempted non-falsifying
+          attacks, what was tried, evidence, why safe). Also deliver
+          docs/designs/current/cap_escalation_measurement.md — the verdict: the measured E_x
+          per tier, the loss table at the measured value vs 3.1 vs 28, and the resulting
+          statement for the rerun3 asymmetric-loss conclusion (direction robust? magnitude?).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: escalation_tier, levels: [same_tier, tier_up]}
+design: factorial
+rules:
+  - name: cap_escalation_defect_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [escaped_defect_verified, original_cell_cost]
+  - name: cap_escalation_fix_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [escaped_defect_verified]
+    produces: [escalation_fix_cost_usd, defect_fixed]
+  - name: cap_escalation_ex_computed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [escalation_fix_cost_usd, original_cell_cost]
+    produces: [measured_escalation_multiplier, loss_table_at_measured_ex]
+metrics:
+  - {name: measured_escalation_multiplier, agg: mean, over: cell}
+  - {name: escalation_fix_cost_usd, agg: mean, over: cell}
+  - {name: loss_table_at_measured_ex, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_locate_the_escaped_defect, p2_measure_escalation_fix, p3_compute_ex, p4_adversarial]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
