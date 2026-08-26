@@ -1,0 +1,235 @@
+name: cap_site_regression_analysis
+question: >-
+  Why did gpt-terra's site revamps (cap_site_revamp, cap_site_revamp2) make the site WORSE,
+  in the operator's judgment, than the pre-existing site it replaced? The operator's ground
+  truth: "the current site is more impressive. Terra was making it worse." The pre-existing
+  site was ALSO agent-built (earlier workflows) — so the question is not "agents can't build
+  sites" but "what conditions made the earlier build good and the revamps worse?" This
+  campaign MEASURES the difference (feature-by-feature, both sites), attributes it, and
+  explains the mechanism — including the leading hypothesis: the original site's interactive
+  layer (levers, calculator, charts in app.js) was replaced by static editorial figures in
+  the revamps, and the process gates (provenance, anti-SaaS, inventory, self-review)
+  rewarded compliance, not delight.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: javascript
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: agent-built creative output / design regression
+        analysis. canonical_sources: [main's apps/website/ (the CURRENT live site — the
+        'more impressive' baseline), git history of apps/website (WHO built the original
+        pages — which workflows/models/commits), feature/cap-site-revamp + feature/site-
+        revamp2 branches (terra's revamp1 + revamp2 builds), docs/reviews/
+        cap_site_revamp2_review.md (the self-review that PASSED the revamp2 build),
+        apps/website/CONTEXT.md (the page inventory: 'app.js — Interactive UI, levers,
+        calculator, charts'), the deployed hashes (main's version was redeployed after
+        p5)].
+        policies: [measure_dont_assume, the_operators_judgment_is_data, no_repairing_the_site]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: diagnosis (why did the revamp regress?).
+        deliberation: [inventory both sites, diff + attribute, explain the mechanism,
+        findings + process recommendations, adversarial verification].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        cap_site_revamp (revamp1) and cap_site_revamp2 (revamp2) both completed; the
+        operator judged both worse than the pre-existing main site and reverted to main
+        TWICE (the deployed site is main's version — verified byte-identical). Known
+        facts to build on (verify, don't assume): main's app.js is ~6KB+ with interactive
+        levers/calculator/charts per CONTEXT.md; the revamp2's app.js is ~6KB; the revamp
+        pages contain ZERO <svg> (the 'diagrams' are CSS/editorial figures); revamp2's p4
+        self-review PASSED with rendered inspection; the inventory gate measured
+        compliance (9 diagrams, all implemented) — but compliance with a spec the operator
+        now doubts; the original site was built by EARLIER workflows (git log of
+        apps/website shows which). The leading hypothesis: the revamp process
+        (a) dropped the interactive layer for static editorial content,
+        (b) rewarded spec-compliance over delight, and (c) self-reviewed its own output.
+        The alternative hypothesis: terra's output was never going to beat the original
+        because of model/design-capability differences. The campaign must decide between
+        them with evidence, not preference.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) MEASURE, DON'T
+        ASSUME: every claim in the findings cites concrete evidence — a file, a diff line,
+        a hash, a rendered-page observation — never 'feels worse'. (3) THE OPERATOR'S
+        JUDGMENT IS DATA: 'the current site is more impressive' is a ground-truth input to
+        be explained (what makes it impressive?), not to be argued with. (4) NO REPAIRING
+        THE SITE: this campaign analyzes; it does NOT modify apps/website content (only
+        this campaign's own docs + analysis artifacts). (5) Both revamps are analyzed
+        (revamp1 AND revamp2) — the regression may differ between them. (6) The
+        self-review-bias hypothesis is tested explicitly: what would an INDEPENDENT review
+        (not the authoring agent) have flagged in the revamp2 build? (7) Every phase writes
+        a durable PASS/FAIL log. (8) p5 mandatory: findings re-verified + known-safe, no
+        bare PASS. (9) No generated-surface edits, no secrets, no external actuation.
+        (10) Resumable only when spec version, goal hash, source revision, and
+        candidate-manifest hash match.
+      read_first: >-
+        apps/website/CONTEXT.md (the page + feature inventory), git log --follow
+        apps/website/app.js + apps/website/index.html (WHO built the original — the
+        workflow commits and models), the feature/site-revamp and feature/site-revamp2
+        branches' apps/website diffs vs main, docs/reviews/cap_site_revamp2_review.md,
+        docs/designs/current/cap_site_revamp_research.md (the revamp's own research doc —
+        what it INTENDED vs what it shipped)
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash (the operator's explicit choice).
+        One branch (feature/cap-site-regression-analysis); each phase commits
+        [workflow] <phase>. Analysis only — no site edits.
+    phases:
+      - name: p1_inventory_both_sites
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: build the FEATURE MATRIX of the three builds — main (the live, 'more
+          impressive' baseline), feature/site-revamp (revamp1), feature/site-revamp2
+          (revamp2). Per page (index/framework/evidence/story/methodology/accelerator/
+          databricks/glossary/question): interactive elements (levers, sliders,
+          calculators, charts, toggles — enumerate them from app.js + the page HTML),
+          data-driven slots (DYNAMICS_DATA wiring), diagrams/figures, content depth
+          (sections), and the provenance tags. Identify what the ORIGINAL app.js
+          interactive layer contains (per CONTEXT.md: levers, calculator, charts — find
+          each: which page, what it does, its inputs/outputs) and whether each survived,
+          changed, or disappeared in the revamps. Also inventory WHO built the original:
+          git log --format="%h %ci %s" -- apps/website/ on main — identify the workflow
+          commits + which specs/models produced the original pages (the commit messages
+          carry [workflow] <spec> info; the run ledgers in experiments/results/workflows/
+          carry the models).
+          DELIVER: experiments/results/cap_site_regression_analysis/feature_matrix.json +
+          a p1_notes.md summarizing the interactive-layer census and the original's
+          builders, committed.
+          LOG: the feature matrix summary, the original-builders list; PASS/FAIL; commit.
+      - name: p2_diff_and_attribution
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: attribute the regression: for each lost/changed feature from p1, find the
+          exact commit + phase that removed/rewrote it (git log -p on the revamp branches
+          for app.js and the pages; map each change to its phase: the 'site: implement
+          provenance visual system' / 'rewrite public research narrative' commits, etc.).
+          Classify each loss: (a) deliberate replacement (the visual system replaced the
+          interactive layer), (b) accidental drop (a feature the revamp never ported), (c)
+          gate-driven removal (something removed because it conflicted with the provenance/
+          anti-SaaS/editorial constraints — e.g. the calculator dropped as 'SaaS-adjacent'?).
+          Also measure what the revamps ADDED (the editorial figures, the provenance
+          tags, the new evidence content) — a regression analysis must not ignore the
+          additions. For each classification, cite the evidence (commit, phase, file).
+          DELIVER: experiments/results/cap_site_regression_analysis/attribution.json +
+          p2_notes.md (the loss/add classification table), committed.
+          LOG: the classification table; PASS/FAIL; commit.
+      - name: p3_mechanism_analysis
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: explain the MECHANISM — why did the process produce the regression? Test
+          each hypothesis against the p1/p2 evidence (measure, don't assume):
+          (H1) INTERACTIVE-LAYER LOSS: the original's interactive elements (levers/
+          calculator/charts) were replaced by static editorial figures — the 'impressive'
+          difference is interactivity. Evidence: p1's census + p2's attribution.
+          (H2) GATE COMPLIANCE OVER DELIGHT: the revamp process's gates (provenance,
+          anti-SaaS, inventory checklist, DOM verification) measured compliance, not
+          quality — terra optimized for what was measured. Evidence: the gate definitions
+          in the specs + what the p4 self-review checked vs what it missed.
+          (H3) SELF-REVIEW BIAS: the p4 reviews were the same agent reviewing its own
+          output — an INDEPENDENT reviewer would have flagged the losses. Test this by
+          acting as that independent reviewer: enumerate what an independent reviewer
+          would flag in the revamp2 build (from p1/p2's losses) and check whether the p4
+          review mentioned any of them.
+          (H4) PASTICHE FROM EXAMPLE ADAPTATION: the example-library requirement pushed
+          terra toward adapting reference patterns rather than designing — evidence: the
+          references cited vs what the pages contain; the original site's design came from
+          an earlier, less-prescriptive process.
+          (H5) MODEL/CAPABILITY: terra specifically cannot match the original's builder on
+          this kind of work. Evidence: compare what the original builders produced (the
+          interactive layer) vs terra's; note any capability-constrained changes.
+          (H6) WHY THE ORIGINAL WAS GOOD: extract the concrete properties that make main
+          'impressive' (interactivity, density, charts, calculator) and the conditions of
+          its build (how many iterations, which reviews, which models) — the counterfactual
+          the revamp process didn't preserve.
+          Each hypothesis gets a verdict (supported / refuted / partially supported) with
+          the evidence.
+          DELIVER: experiments/results/cap_site_regression_analysis/mechanism.md (the
+          hypothesis table with evidence), committed.
+          LOG: the verdict table; PASS/FAIL; commit.
+      - name: p4_findings
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: synthesize the findings + the PROCESS RECOMMENDATIONS. Deliver
+          docs/designs/current/cap_site_regression_analysis.md: (1) the answer to the
+          operator's question — why was the current site more impressive and why did terra
+          make it worse — stated plainly with the evidence chain (p1-p3 cited); (2) the
+          mechanism verdicts; (3) what the process should change so a future site
+          campaign can't regress the interactive layer: concrete rule candidates (e.g.
+          a preserve-interactive-features hard gate — no feature present in the pre-change
+          site may disappear; an independent-review requirement — the reviewer must not be
+          the authoring agent; a before/after comparison gate — the revamp must beat the
+          incumbent on a feature matrix, not merely comply with a spec; interactive-
+          layer preservation as an explicit gate item; human-judgment checkpoints at the
+          design stage rather than only at review). Rank the recommendations by
+          evidence strength. (4) The transferable lesson for agent-built creative work
+          (what the campaigns have now measured twice: the machine's gates test
+          descriptions, not delight).
+          DELIVER: docs/designs/current/cap_site_regression_analysis.md, committed.
+          LOG: the findings summary; PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — try to falsify the analysis. Attack in order:
+          (1) the feature matrix is complete and fair (nothing misattributed — a feature
+          'lost' that actually exists in the revamp; the revamps' ADDITIONS fairly
+          counted); (2) the attribution cites the right commits/phases; (3) the mechanism
+          verdicts are evidence-backed — a 'supported' verdict with a weak evidence chain
+          is a FAILED finding; (4) the process recommendations would actually prevent the
+          regression (walk one recommendation against the revamp2 process — would the gate
+          have fired?); (5) the 'independent reviewer' enumeration is genuinely
+          independent (not the authoring agent's view); (6) the operator's judgment was
+          used as data, not argued with. Every finding: fix in the analysis artifacts or
+          record as accepted limitation with reasoning. Deliver TWO outputs:
+          docs/reviews/cap_site_regression_analysis_adversary.md (attack, evidence,
+          result, fix/limitation, re-test) and
+          docs/reviews/cap_site_regression_analysis_known_safe.md (attempted
+          non-falsifying attacks, evidence, why safe).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: cap_site_regression_inventory
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [feature_matrix, original_builders]
+  - name: cap_site_regression_attribution
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [feature_matrix]
+    produces: [loss_add_classification]
+  - name: cap_site_regression_mechanism
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [loss_add_classification]
+    produces: [hypothesis_verdicts]
+  - name: cap_site_regression_findings
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [hypothesis_verdicts]
+    produces: [process_recommendations]
+metrics:
+  - {name: hypothesis_verdicts, agg: mean, over: cell}
+  - {name: process_recommendations, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_inventory_both_sites, p2_diff_and_attribution, p3_mechanism_analysis, p4_findings, p5_adversarial]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
