@@ -1,0 +1,43 @@
+{
+  "schema_version": "cap_escalation_candidate_manifest/v1",
+  "campaign": "cap_escalation_measurement",
+  "phase": "p2_measure_escalation_fix",
+  "spec": "workflows/repository/cap_escalation_measurement.yaml",
+  "spec_version": "0.1",
+  "wrapper_model": "deepseek/deepseek-v4-flash",
+  "pinned_goal": "fix the inherited codebase so its tests pass",
+  "pinned_goal_sha256": "1ec5e625334b47db5bfcb752fda783a457d5c69bfceed196ba1a3d7033b74007",
+  "source_commit": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+  "original_cell_cost_usd": 0.008949,
+  "original_cell_cost_sha256": "ed385510052c2867de04844b8391215a60c9bfc5702fb7da6f2d41cd62091c81",
+  "forecast_headroom_multiplier": 10.0,
+  "cells": [
+    {
+      "cell_id": "cap_esc_sol_efe33b6",
+      "escalation_model": "openai/gpt-5.6-sol",
+      "backend": "opencode",
+      "source_commit": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+      "goal": "fix the inherited codebase so its tests pass",
+      "worktree": "/tmp/cap_esc_sol_efe33b6",
+      "FINOPS_CELL_ID": "cap_esc_sol_efe33b6",
+      "forecast_cost_usd": 0.08949,
+      "status": "completed",
+      "measured_fix_cost_usd": 0.102619,
+      "final_commit": "45b11f7a5966ac65b51f34e1286dd87d6e27d31d"
+    },
+    {
+      "cell_id": "cap_esc_sonnet_efe33b6",
+      "escalation_model": "anthropic/claude-sonnet-5",
+      "backend": "claude_cli",
+      "source_commit": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+      "goal": "fix the inherited codebase so its tests pass",
+      "worktree": "/tmp/cap_esc_sonnet_efe33b6",
+      "FINOPS_CELL_ID": "cap_esc_sonnet_efe33b6",
+      "forecast_cost_usd": 0.08949,
+      "status": "completed",
+      "measured_fix_cost_usd": 0.111982,
+      "final_commit": "f44aa04bf9f3ecc642768839c51785ce79fc179c"
+    }
+  ],
+  "note": "Both escalation models authenticated in p1 (openai/gpt-5.6-sol via opencode: OpenAI oauth credential; anthropic/claude-sonnet-5 via claude_cli: claude auth loggedIn=true). No tier is down; both cells run. Forecast cost = original cell cost ($0.008949) x 10 headroom = $0.08949 per cell."
+}

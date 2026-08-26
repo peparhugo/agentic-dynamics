@@ -1,0 +1,72 @@
+{
+  "schema_version": "cap_escalation_measurement_score/v1",
+  "campaign": "cap_escalation_measurement",
+  "phase": "p3_compute_ex",
+  "written_at": "2026-08-26T12:57:26Z",
+  "spec": "workflows/repository/cap_escalation_measurement.yaml",
+  "spec_version": "0.1",
+  "wrapper_model": "deepseek/deepseek-v4-flash",
+  "original_cell_cost_usd": 0.008949,
+  "original_cell_cost_source": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_phase_ledger.json (total_measured_cost_usd)",
+  "original_cell_cost_sha256": "ed385510052c2867de04844b8391215a60c9bfc5702fb7da6f2d41cd62091c81",
+  "per_model": [
+    {
+      "escalation_model": "openai/gpt-5.6-sol",
+      "backend": "opencode",
+      "cell_id": "cap_esc_sol_efe33b6",
+      "run": "completed",
+      "escalation_fix_cost_usd": 0.102619,
+      "fix_cost_source": "experiments/results/cap_escalation_measurement/phase_ledger_cap_esc_sol.json (implement phase cost_usd)",
+      "fix_cost_sha256": "76f20f34599e4e4c8e56c5016d123e6b9a3d81c366941673ba911f3bef54472d",
+      "defect_fixed": true,
+      "tests_passing": true,
+      "E_x": 11.4671,
+      "E_x_formula": "0.102619 / 0.008949"
+    },
+    {
+      "escalation_model": "anthropic/claude-sonnet-5",
+      "backend": "claude_cli",
+      "cell_id": "cap_esc_sonnet_efe33b6",
+      "run": "completed",
+      "escalation_fix_cost_usd": 0.111982,
+      "fix_cost_source": "experiments/results/cap_escalation_measurement/phase_ledger_cap_esc_sonnet.json (implement phase cost_usd)",
+      "fix_cost_sha256": "6afad2c7f07e9139e02002988c0f6e0d38c735f3abcf401cd1cb4a4d530d5f68",
+      "defect_fixed": true,
+      "tests_passing": true,
+      "E_x": 12.5134,
+      "E_x_formula": "0.111982 / 0.008949"
+    }
+  ],
+  "flags": {
+    "unrun_tiers": [],
+    "note": "Both escalation models authenticated in p1 and ran to completion; no tier is flagged not-run. There is no DeepSeek floor — both levels are the expensive escalation-path models per the operator's request."
+  },
+  "base_downstream_defect_cost_usd": 0.004021,
+  "base_defect_cost_derivation": "re-derived from experiments/results/cap_2a_rerun3/cap_2a_rerun3_score_20260826T050000Z.json asymmetric_loss block: downstream_defect_cost_usd 0.11258800000000001 / E_x 28.0 = 0.004021 (not trusted from the copy in the docs supplement)",
+  "loss_table": {
+    "note": "loss = E_x x base downstream defect cost ($0.004021). baseline_arm_loss is a cost (positive = bad); gate arm records true_rework_value as negative net_loss (a gain). swing = 2 x loss.",
+    "columns": [
+      { "E_x": 3.1, "source": "measured escalation figure (handoff corpus)", "baseline_arm_loss_usd": 0.012465, "gate_arm_value_usd": -0.012465, "swing_usd": 0.02493 },
+      { "E_x": 11.4671, "source": "MEASURED — openai/gpt-5.6-sol escalation fix", "baseline_arm_loss_usd": 0.046109, "gate_arm_value_usd": -0.046109, "swing_usd": 0.092218 },
+      { "E_x": 12.5134, "source": "MEASURED — anthropic/claude-sonnet-5 escalation fix", "baseline_arm_loss_usd": 0.050316, "gate_arm_value_usd": -0.050316, "swing_usd": 0.100632 },
+      { "E_x": 28.0, "source": "pricing ratio DeepSeek -> GPT-5.6 (site economics)", "baseline_arm_loss_usd": 0.112588, "gate_arm_value_usd": -0.112588, "swing_usd": 0.225176 }
+    ]
+  },
+  "validation_note": {
+    "denominator": "0.008949 = total_measured_cost_usd in cap2a_r3_critical_baseline_phase_ledger.json (SHA256 ed385510052c2867de04844b8391215a60c9bfc5702fb7da6f2d41cd62091c81); the score JSON's cost_usd field for the same cell is also 0.008949",
+    "numerator_sol": "0.102619 = implement phase cost_usd in phase_ledger_cap_esc_sol.json",
+    "numerator_sonnet": "0.111982 = implement phase cost_usd in phase_ledger_cap_esc_sonnet.json",
+    "base": "0.004021 = 0.11258800000000001 / 28.0, re-derived from the rerun3 score JSON asymmetric_loss block",
+    "E_x_sol": "0.102619 / 0.008949 = 11.4671",
+    "E_x_sonnet": "0.111982 / 0.008949 = 12.5134",
+    "columns_comparable": "all four loss-table columns share the SAME base downstream defect cost ($0.004021); only the multiplier differs"
+  },
+  "conclusion": {
+    "direction_robust": true,
+    "break_even_multiplier": 1.42,
+    "measured_ex_range": [11.4671, 12.5134],
+    "both_measured_above_break_even": true,
+    "loss_swing_at_measured_ex_usd": [0.092218, 0.100632],
+    "note": "Both measured E_x values (11.47 and 12.51) sit between the sourced 3.1 and 28, nearer the 3.1 end of the range. The direction of the rerun3 asymmetric-loss conclusion (gate arm ahead on the loss axis) is robust at both measured multipliers; the magnitude is ~10x smaller than the E_x=28 sourced figure but ~4x larger than the 3.1 figure."
+  }
+}

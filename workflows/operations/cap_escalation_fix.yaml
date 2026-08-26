@@ -1,0 +1,54 @@
+name: cap_escalation_fix
+question: >-
+  cap_escalation_measurement p2 minimal fix cell: a fresh escalation session inherits the
+  rerun3 critical-baseline's escaped-defect commit (efe33b6fb8ad — the committed codebase + its
+  failing tests) and is given ONLY the pinned goal 'fix the inherited codebase so its tests
+  pass'. No campaign context, no verifier, no defect location, no intended fix (hard rule 2).
+  The measured fix cost vs the original cell cost IS the measured escalation multiplier E_x.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      seeded_app: >-
+        A fresh disposable worktree checked out at the escaped-defect commit efe33b6fb8ad
+        (the cap2a_r3_critical_baseline analyzed revision): calc.py + test_calc.py. The
+        escalation session inherits exactly what a downstream session inherits — the committed
+        codebase and its failing tests — and NOTHING else. No hints are added to the worktree.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py
+          - test_calc.py
+
+          Run `python -m pytest test_calc.py -q` to see the current state, then fix the
+          inherited codebase so its tests pass.
+      - name: test
+        kind: test
+        timeout: 600
+factors:
+  - {name: escalation_model, levels: [openai/gpt-5.6-sol, anthropic/claude-sonnet-5]}
+design: factorial
+rules: []
+metrics:
+  - {name: escalation_fix_cost_usd, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test]
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

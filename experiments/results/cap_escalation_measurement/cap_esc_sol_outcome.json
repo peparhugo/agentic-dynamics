@@ -1,0 +1,28 @@
+{
+  "schema_version": "cap_escalation_outcome/v1",
+  "campaign": "cap_escalation_measurement",
+  "phase": "p2_measure_escalation_fix",
+  "cell_id": "cap_esc_sol_efe33b6",
+  "escalation_model": "openai/gpt-5.6-sol",
+  "backend": "opencode",
+  "source_commit": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+  "final_commit": "45b11f7a5966ac65b51f34e1286dd87d6e27d31d",
+  "goal": "fix the inherited codebase so its tests pass",
+  "goal_sha256": "1ec5e625334b47db5bfcb752fda783a457d5c69bfceed196ba1a3d7033b74007",
+  "run_ledger": "experiments/results/cap_escalation_measurement/phase_ledger_cap_esc_sol.json",
+  "run_ledger_sha256": "76f20f34599e4e4c8e56c5016d123e6b9a3d81c366941673ba911f3bef54472d",
+  "defect_fixed": true,
+  "defect_fix_evidence": "final commit 45b11f7 changes calc.py classify band from 'elif 10 < value < 20' (strict >) to 'elif value < 20' (lower bound implied by the prior 'elif value < 10' band) — the ONE deliberate defect is removed; classify(10.0) == 'mid-a' on the final commit",
+  "tests_passing": true,
+  "tests_passed": 3,
+  "tests_total": 3,
+  "test_executed_success": true,
+  "escalation_fix_cost_usd": 0.102619,
+  "duration_s": 30.18,
+  "forecast_cost_usd": 0.08949,
+  "within_forecast": false,
+  "fix_notes": [
+    "diff restricted to calc.py's classify symbol (realized_symbol_set = {classify})",
+    "test_calc.py unchanged — the fix did NOT weaken or delete the failing test"
+  ]
+}

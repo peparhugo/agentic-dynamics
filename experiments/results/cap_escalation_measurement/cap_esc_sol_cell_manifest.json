@@ -1,0 +1,18 @@
+{
+  "schema_version": "cap_escalation_cell_manifest/v1",
+  "campaign": "cap_escalation_measurement",
+  "phase": "p2_measure_escalation_fix",
+  "cell_id": "cap_esc_sol_efe33b6",
+  "escalation_model": "openai/gpt-5.6-sol",
+  "backend": "opencode",
+  "source_commit": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+  "goal": "fix the inherited codebase so its tests pass",
+  "goal_sha256": "1ec5e625334b47db5bfcb752fda783a457d5c69bfceed196ba1a3d7033b74007",
+  "worktree": "/tmp/cap_esc_sol_efe33b6",
+  "FINOPS_CELL_ID": "cap_esc_sol_efe33b6",
+  "forecast_cost_usd": 0.08949,
+  "spec": "workflows/operations/cap_escalation_fix.yaml",
+  "spec_version": "0.1",
+  "intent": "mutate",
+  "status": "completed"
+}

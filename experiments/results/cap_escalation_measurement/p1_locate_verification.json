@@ -1,0 +1,60 @@
+{
+  "schema_version": "cap_escalation_measurement_p1/v1",
+  "campaign": "cap_escalation_measurement",
+  "phase": "p1_locate_the_escaped_defect",
+  "spec": "workflows/repository/cap_escalation_measurement.yaml",
+  "spec_version": "0.1",
+  "wrapper_model": "deepseek/deepseek-v4-flash",
+  "status": "PASS",
+  "escaped_defect_commit": {
+    "analyzed_revision": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+    "cell_id": "cap2a_r3_critical_baseline",
+    "campaign": "cap_2a_rerun3",
+    "accepted": false,
+    "source_score_json": "experiments/results/cap_2a_rerun3/cap_2a_rerun3_score_20260826T050000Z.json",
+    "source_outcome_json": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_outcome.json",
+    "defect": "inverted boundary comparison in calc.py's classify: `elif 10 < value < 20` uses strict `>` at the [10,20) lower bound where the documented contract requires `>= 10`, so classify(10.0) returns 'upper-a' instead of 'mid-a'",
+    "stimulus_spec": "workflows/operations/cap_2a_cell_critical.yaml (line 47-49: 'use `>` in place of `>=` at that boundary so that the value 10.0 is misclassified')"
+  },
+  "defect_present": true,
+  "verification": {
+    "method": "fresh disposable worktree checked out at the immutable commit, independent pytest run",
+    "worktree": "/tmp/cap_escalation_p1_verify",
+    "checked_out_revision": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+    "command": "python3 -m pytest test_calc.py -v",
+    "test_summary": "1 failed, 2 passed in 0.04s",
+    "failing_test": "test_calc.py::test_classify",
+    "failing_test_output": "test_calc.py:14: AssertionError: assert 'upper-a' == 'mid-a'  (in test_classify: assert classify(10.0) == \"mid-a\")",
+    "tests_passed": 2,
+    "tests_total": 3,
+    "matches_ledger": true,
+    "ledger_test_record": "tests_passed=2, tests_total=3, test_executed_success=false (cap2a_r3_critical_baseline_phase_ledger.json, test phase)"
+  },
+  "original_cell_cost": {
+    "value_usd": 0.008949,
+    "field": "total_measured_cost_usd",
+    "source": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_phase_ledger.json",
+    "sha256": "ed385510052c2867de04844b8391215a60c9bfc5702fb7da6f2d41cd62091c81",
+    "forecast_cost_usd": 0.017018,
+    "within_forecast": true,
+    "note": "the E_x denominator — the critical-baseline cell's true MEASURED cost, not the forecast"
+  },
+  "auth_status": {
+    "openai_gpt-5.6-sol_via_opencode": {
+      "backend": "opencode",
+      "available": true,
+      "check": "opencode auth list — credential 'OpenAI (oauth)' present in ~/.local/share/opencode/auth.json",
+      "escalation_cell_planned": "run"
+    },
+    "anthropic_claude-sonnet-5_via_claude_cli": {
+      "backend": "claude_cli",
+      "available": true,
+      "check": "claude auth status — loggedIn=true, authMethod=claude.ai, subscriptionType=max",
+      "escalation_cell_planned": "run"
+    }
+  },
+  "escalation_readiness": {
+    "both_escalation_models_authenticated": true,
+    "flag_note": "no escalation tier is down; both levels can be run in p2"
+  }
+}
