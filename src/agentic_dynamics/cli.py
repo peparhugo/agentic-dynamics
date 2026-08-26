@@ -56,6 +56,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("knowledge", "ingest"): "kb_produce.py",
     ("knowledge", "sources"): "kb_produce_sources.py",
     ("knowledge", "facts"): "kb_produce_facts.py",
+    ("knowledge", "campaign-evidence"): "kb_produce_campaign_evidence.py",
     ("knowledge", "worker"): "kb_worker.py",
     ("knowledge", "context-report"): "context_snapshot_report.py",
     ("knowledge", "shadow-report"): "shadow_decision_report.py",
