@@ -90,3 +90,7 @@ Release-candidate pages are loaded from the working tree, then checked after loc
 - RESOLVED: Initial audit: SVGs relied on aria-labelledby but lacked literal aria-label attributes.
 - RESOLVED: Initial audit: escalation SVG text omitted the full provider/model identifiers.
 - RESOLVED: Initial audit: the rules inventory entry had no SVG overview and did not render its escalation cell counts.
+
+## Deployed Gate Runs
+- PASS: `https://ai-finops-rulebook.web.app` passed the complete inventory, data wiring, gallery, interaction, and accessibility suite.
+- PASS: `https://agentic-dynamics.web.app` passed the complete inventory, data wiring, gallery, interaction, and accessibility suite.
