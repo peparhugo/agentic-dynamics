@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-26T12:44:39.881326+00:00`  ·  118 spec(s)
+Generated at: `2026-08-26T12:47:59.504787+00:00`  ·  118 spec(s)
 **Work remaining:** 29 open · 89 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |

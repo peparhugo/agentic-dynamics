@@ -79,13 +79,15 @@ workflow:
         workflows/operations/cap_2a_cell_critical.yaml (the stimulus + defect description),
         scripts/kb_produce_campaign_evidence.py (the registry report ingestion — reuse)
       run_shape: >-
-        The campaign wrapper runs on deepseek/deepseek-v4-pro (operator preference). The
-        escalation cells are ONE factor: escalation_tier — same_tier
-        (deepseek/deepseek-v4-pro — what the same economy pays to fix it) and tier_up
-        (claude-sonnet-5 or gpt-5.6 when auth is up — what the escalation path pays).
-        Each escalation cell runs in a fresh disposable worktree checked out at the escaped-
-        defect commit (efe33b6fb8ad), with the pinned goal and unique FINOPS_CELL_ID; only
-        immutable artifacts are copied out. No credentials in committed artifacts.
+        The campaign wrapper runs on deepseek/deepseek-v4-flash (cheap orchestrator — the
+        operator's explicit request). The escalation cells are ONE factor,
+        escalation_model — the ESCALATION-PATH models only (the user's explicit request:
+        no DeepSeek in the fix sessions): openai/gpt-5.6-sol (opencode backend — the site's
+        E_x reference is DeepSeek -> GPT-5.6) and anthropic/claude-sonnet-5 (claude_cli
+        backend — auto-routed by get_backend_for_model). Each escalation cell runs in a
+        fresh disposable worktree checked out at the escaped-defect commit (efe33b6fb8ad),
+        with the pinned goal and unique FINOPS_CELL_ID; only immutable artifacts are copied
+        out. No credentials in committed artifacts.
     phases:
       - name: p1_locate_the_escaped_defect
         kind: agent
@@ -101,9 +103,9 @@ workflow:
           verification, the same evaluator shape the rerun3 outcome record used). RECORD the
           original cell cost (the E_x denominator) from
           experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_phase_ledger.json with
-          its SHA256. CHECK auth status for the escalation models (same_tier =
-          deepseek/deepseek-v4-pro — operator preference; tier_up = claude-sonnet-5 or
-          gpt-5.6): a downed OAuth means the tier_up cell is a flagged not-run later, never an
+          its SHA256. CHECK auth status for the escalation models (openai/gpt-5.6-sol via
+          opencode; anthropic/claude-sonnet-5 via claude_cli — `claude auth status` first): a
+          downed auth means that escalation cell is a flagged not-run later, never an
           estimate. DELIVER: a p1_locate_verification.json (commit, failing test output,
           defect-present determination, original cell cost + SHA256, auth status per
           escalation model) under experiments/results/cap_escalation_measurement/.
@@ -113,10 +115,11 @@ workflow:
         timeout: 10800
         prompt: |
           GOAL: {goal}
-          SHAPE: run the escalation cells — ONE per available escalation tier, per the p1
-          manifest. Candidate manifest FIRST (cell_id, escalation tier, exact source commit
-          efe33b6fb8ad, model/backend, THE PINNED GOAL, fresh worktree, FINOPS_CELL_ID,
-          forecast cost from the p1 original-cell-cost x 10 headroom). The PINNED GOAL
+          SHAPE: run the escalation cells — ONE per available escalation model (the factor
+          levels: openai/gpt-5.6-sol via opencode, anthropic/claude-sonnet-5 via claude_cli),
+          per the p1 manifest. Candidate manifest FIRST (cell_id, escalation model, exact
+          source commit efe33b6fb8ad, model/backend, THE PINNED GOAL, fresh worktree,
+          FINOPS_CELL_ID, forecast cost from the p1 original-cell-cost x 10 headroom). The PINNED GOAL
           (hard rule 2 — no extra hints): fix the inherited codebase so its tests pass.
           That is ALL the session knows. Run it as a minimal workflow (implement phase + test
           phase) in a fresh worktree checked out at the escaped-defect commit, with the
@@ -132,16 +135,17 @@ workflow:
         timeout: 7200
         prompt: |
           GOAL: {goal}
-          SHAPE: compute the measured E_x per escalation tier: E_x_tier =
+          SHAPE: compute the measured E_x per escalation model: E_x_model =
           escalation_fix_cost_usd / original_cell_cost_usd, both from the MEASURED ledgers
           (the denominator cited with its SHA256). Emit
           experiments/results/cap_escalation_measurement/cap_escalation_measurement_score_<ts>.json
           with: per-tier E_x + the cost breakdown (original cell cost, escalation fix cost),
           the loss table recomputed at the MEASURED E_x alongside the 3.1 and 28 columns
           (never replacing them), the base downstream defect cost ($0.004021 from the rerun3
-          score JSON — re-derive, don't trust the copy), and denominators/flags per tier.
-          GUARD: the same-tier E_x is the floor (what the same economy pays); the tier-up E_x
-          is the escalation path; a not-run tier is listed, never estimated.
+          score JSON — re-derive, don't trust the copy), and denominators/flags per model.
+          GUARD: the E_x per escalation model is the escalation path's measured cost (both
+          levels are the expensive models — there is no DeepSeek floor per the operator's
+          request); a not-run model is listed, never estimated.
           DELIVER: the score JSON + a validation note tracing each number to a ledger field.
           LOG: E_x table; PASS/FAIL; commit.
       - name: p4_adversarial
@@ -165,11 +169,12 @@ workflow:
           docs/reviews/cap_escalation_measurement_known_safe.md (attempted non-falsifying
           attacks, what was tried, evidence, why safe). Also deliver
           docs/designs/current/cap_escalation_measurement.md — the verdict: the measured E_x
-          per tier, the loss table at the measured value vs 3.1 vs 28, and the resulting
-          statement for the rerun3 asymmetric-loss conclusion (direction robust? magnitude?).
+          per escalation model, the loss table at the measured values vs 3.1 vs 28, and the
+          resulting statement for the rerun3 asymmetric-loss conclusion (direction robust?
+          magnitude?).
           LOG: finding table + known-safe list; PASS/FAIL; commit.
 factors:
-  - {name: escalation_tier, levels: [same_tier, tier_up]}
+  - {name: escalation_model, levels: [openai/gpt-5.6-sol, anthropic/claude-sonnet-5]}
 design: factorial
 rules:
   - name: cap_escalation_defect_verified
