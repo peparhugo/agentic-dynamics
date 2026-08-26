@@ -82,16 +82,20 @@ def check_rendered_values(page: Any, component: str, payload: dict[str, Any], fa
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write-log", action="store_true", help="write visual_system_verification.md beside this script")
+    parser.add_argument("--base-url", help="verify a deployed host instead of local file URLs")
     args = parser.parse_args()
     inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))["diagrams"]
     payload = data_payload()
     failures: list[str] = []
-    proof: list[str] = ["# Visual System Verification", "", "PASS/FAIL: PASS", "", "## Diagram Coverage"]
+    target = args.base_url.rstrip("/") if args.base_url else "local file URLs"
+    proof: list[str] = ["# Visual System Verification", "", f"Target: {target}", "", "PASS/FAIL: PASS", "", "## Diagram Coverage"]
     public_components: set[str] = set()
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        def page_url(page_name: str) -> str:
+            return f"{target}/{page_name}" if args.base_url else (SITE / page_name).as_uri()
         for entry in inventory:
             component = COMPONENT_KEYS[entry["id"]]
             pages = [name.strip() for name in entry["page"].split(",")]
@@ -102,7 +106,7 @@ def main() -> int:
                 except (KeyError, TypeError):
                     failures.append(f'{entry["id"]}: data.js field is missing: {field}')
             for page_name in pages:
-                page.goto((SITE / page_name).as_uri(), wait_until="load")
+                page.goto(page_url(page_name), wait_until="load")
                 if component == "rules":
                     selector = "[data-ad-rules] .ad-rule"
                     require(page.locator(selector).count() == 10, f"{page_name}: rules card count is not 10", failures)
@@ -124,13 +128,13 @@ def main() -> int:
                 gallery_components.add(component)
         require(gallery_components <= public_components, f"gallery-only components: {sorted(gallery_components - public_components)}", failures)
 
-        page.goto((SITE / "framework.html").as_uri(), wait_until="load")
+        page.goto(page_url("framework.html"), wait_until="load")
         first_rule = page.locator("[data-ad-rules] .ad-rule__toggle").first
         first_rule.click()
         require(first_rule.get_attribute("aria-expanded") == "true", "rule card does not expose expanded state", failures)
         require(page.locator("#ad-rule-01").is_visible(), "rule card detail is not visible after activation", failures)
 
-        page.goto((SITE / "methodology.html").as_uri(), wait_until="load")
+        page.goto(page_url("methodology.html"), wait_until="load")
         curve = page.locator('[data-ad-diagram="curves"] svg path.curve-computed')
         before = curve.get_attribute("d")
         page.locator("[data-ad-beta]").evaluate("element => { element.value = '0.0050'; element.dispatchEvent(new Event('input', { bubbles: true })); }")
@@ -141,7 +145,7 @@ def main() -> int:
 
     proof.extend(["", "## Wiring", f"- PASS: all {len(inventory)} inventory entries are implemented.", f"- PASS: gallery component IDs are referenced by public pages: {', '.join(sorted(public_components))}.", "- PASS: rendered SVGs expose title, description, role, and captions; rule and beta controls respond in the DOM."])
     if failures:
-        proof[2] = "PASS/FAIL: FAIL"
+        proof[4] = "PASS/FAIL: FAIL"
         proof.extend(["", "## Failures", *[f"- FAIL: {failure}" for failure in failures]])
     output = "\n".join(proof) + "\n"
     print(output, end="")

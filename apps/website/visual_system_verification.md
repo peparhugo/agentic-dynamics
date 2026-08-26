@@ -1,5 +1,7 @@
 # Visual System Verification
 
+Target: local file URLs
+
 PASS/FAIL: PASS
 
 ## Diagram Coverage
@@ -17,3 +19,7 @@ PASS/FAIL: PASS
 - PASS: all 9 inventory entries are implemented.
 - PASS: gallery component IDs are referenced by public pages: autonomy, calibration, curves, cycle, engine, escalation, nxm, planes, rules.
 - PASS: rendered SVGs expose title, description, role, and captions; rule and beta controls respond in the DOM.
+
+## Deployed Pages
+- PASS: `https://ai-finops-rulebook.web.app` passed the same rendered-DOM coverage, data wiring, accessibility, and interaction gates after Firebase release.
+- PASS: `https://agentic-dynamics.web.app` passed the same rendered-DOM coverage, data wiring, accessibility, and interaction gates after Firebase release.
