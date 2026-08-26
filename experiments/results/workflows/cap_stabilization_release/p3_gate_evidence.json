@@ -1,0 +1,17 @@
+{
+  "phase": "p3_test_suite",
+  "run_by": "operator (two agent attempts killed — exit -15 x2, one hang; the mechanical gates run directly)",
+  "gates": {
+    "pytest": {"command": "python3 -m pytest tests/ -m 'not external' -q --timeout=600", "result": "2007 passed, 115 deselected (external: ollama/neo4j/sonar live tests), 0 failed, 50.35s"},
+    "build_data_dry_run": {"result": "OK"},
+    "sync_data_check": {"result": "OK: parquet matches the current canonical source (content + counts + identities)"},
+    "import_gate": {"result": "OK"}
+  },
+  "fixes_landed": [
+    "Chroma heartbeat guards on all live tests (wrong-protocol port-collision hang — 60-min stalls x2)",
+    "pytest-timeout policy (600s per test)",
+    "kb_produce_campaign_evidence.py registered in CLI + CONTEXT.md manifest (the one real suite failure)",
+    "doc-lifecycle frontmatter fix"
+  ],
+  "post_mortem": "p3 killed two agents (exit -15 x2) and hung once: the suite's live-service tests without guards, plus the wrong command (full suite vs deterministic). The deterministic suite is ~50s, not ~60 min."
+}
