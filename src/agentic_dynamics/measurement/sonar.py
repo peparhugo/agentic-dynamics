@@ -187,6 +187,23 @@ def compute_sonar_diff(baseline: SonarMetrics, perturbed: SonarMetrics) -> dict[
     }
 
 
+def project_key_for(worktree_path: str | Path, revision: str = "") -> str:
+    """The project key the scanner uses for a worktree (the one place the rule is defined).
+
+    ``base_key`` is the worktree dir name, prefixed ``exp_`` unless it already carries an
+    ``exp_``/``story_`` prefix; a ``revision`` scopes the key to that revision
+    (``<base>_<rev[:12]>``) so a fetch for the key can only ever return that revision's
+    analysis. :func:`run_sonar_analysis` uses this to compute its default key; the v2
+    before/after seam (``runtime.workflow_runner._sonar_evidence``) uses it to keep the parent
+    and phase revision keys consistent even when the parent is scanned from a temp checkout.
+    """
+    wt = Path(worktree_path)
+    base_key = wt.name if wt.name.startswith(("exp_", "story_")) else f"exp_{wt.name}"
+    if revision:
+        return f"{base_key}_{revision[:12]}"
+    return base_key
+
+
 def run_sonar_analysis(
     worktree_path: str,
     project_key: str = "",
@@ -234,11 +251,7 @@ def run_sonar_analysis(
     if not wt.exists():
         return SonarMetrics(project_key=project_key, error="worktree not found")
 
-    base_key = project_key or (wt.name if wt.name.startswith(("exp_", "story_")) else f"exp_{wt.name}")
-    if not project_key and revision:
-        project_key = f"{base_key}_{revision[:12]}"
-    else:
-        project_key = base_key
+    project_key = project_key or project_key_for(wt, revision)
 
     if project_key in _SONAR_CACHE:
         return _SONAR_CACHE[project_key]
@@ -502,6 +515,28 @@ class SonarIssue:
         }
 
 
+def issue_identity(issue: SonarIssue) -> tuple[str, str, int]:
+    """The ``(rule, file_path, line)`` identity for change-introduced novelty (design §RC2).
+
+    Two issues are "the same" iff they share rule, repo-relative file path, and line. This is
+    the identity the v2 reducer's ``new_sonar_critical_count`` uses to decide whether an issue
+    in the after-analysis is NEW (absent from the before-analysis) rather than pre-existing.
+    """
+    return (issue.rule, issue.file_path, issue.line)
+
+
+def new_issue_count(before: list[SonarIssue], after: list[SonarIssue]) -> int:
+    """Change-introduced issue count: ``|{identity(after)} − {identity(before)}|``.
+
+    A pre-existing issue (same identity in both analyses) never counts; an issue present only
+    in the after-analysis counts once. Pure and deterministic — the caller decides which
+    severity filter to apply by passing an already-filtered ``after``/``before`` (see
+    :func:`fetch_sonar_issues`'s ``severities`` param).
+    """
+    before_ids = {issue_identity(i) for i in before}
+    return sum(1 for i in after if issue_identity(i) not in before_ids)
+
+
 def fetch_sonar_issues(
     project_key: str,
     sonar_url: str = SONAR_URL_DEFAULT,
@@ -509,11 +544,15 @@ def fetch_sonar_issues(
     sonar_password: str = SONAR_PASSWORD_DEFAULT,
     *,
     ps: int = 500,
+    severities: str = "",
 ) -> list[SonarIssue]:
     """Fetch one :class:`SonarIssue` per line/rule from ``/api/issues/search``.
 
-    Paged to ``ps`` (capped at the API's 500). Returns ``[]`` on any API failure — an absent
-    issue surface stays absent, never fabricated.
+    ``severities`` is a comma-separated server-side filter (e.g. ``"BLOCKER,CRITICAL"``); when
+    non-empty it is passed through as the ``severities`` query param so the server returns only
+    issues at those severities (design §RC1 — the v2 severity filter). Paged to ``ps`` (capped
+    at the API's 500). Returns ``[]`` on any API failure — an absent issue surface stays
+    absent, never fabricated.
     """
     import urllib.request
     from base64 import b64encode
@@ -527,6 +566,8 @@ def fetch_sonar_issues(
             f"{sonar_url}/api/issues/search?componentKeys={project_key}"
             f"&ps={page_size}&p={page}"
         )
+        if severities:
+            url += f"&severities={severities}"
         try:
             req = urllib.request.Request(url)
             req.add_header("Authorization", f"Basic {auth_header}")

@@ -1,4 +1,4 @@
-"""Evidence-integrity e5 — the ``code_change_facts/v1`` reducer (design §5.6).
+"""Evidence-integrity e5 — the ``code_change_facts/v2`` reducer (design §5.6, cap_2a_rerun2 §2 RC1).
 
 Derives the ten job-scoped code-change facts from the TYPED CodeDelta (e2) + analyzer statuses.
 Minting-order guard (design §5.3): ``changed_symbol_count`` et al. are minted ONLY from the typed
@@ -28,17 +28,28 @@ SEMANTICS (hard rule 6 + design §5.6, DEFINED here — not delegated to the doc
 * ``changed_symbol_count`` — from the typed CodeDelta only (minting-order guard).
 * ``impacted_symbol_count`` — from the caller's ACL-scoped 1-2 hop set; OMITTED when absent.
 * ``new_lsp_error_count`` / ``new_sonar_critical_count`` — OMITTED when the analyzer did not run
-  (null-not-zero, never fabricated zeroes).
+  (null-not-zero, never fabricated zeroes). **v2 semantics (cap_2a_rerun2 §2 RC1, design doc
+  ``cap_2a_rerun2_measurement_design.md`` §3 — the PRODUCER computes the value, this reducer
+  only consumes the int):**
+    - ``new_sonar_critical_count`` is the SEVERITY-FILTERED, CHANGE-INTRODUCED count —
+      ``|{ i : i ∈ issues(after) ∧ i ∉ issues(before) ∧ i.severity ∈ {BLOCKER, CRITICAL} }|``
+      by the ``(rule, file_path, line)`` identity. A MAJOR finding (e.g. ``python:S1244``)
+      NEVER counts.
+    - ``new_lsp_error_count`` is the CHANGE-INTRODUCED ERROR count —
+      ``|{ d : d ∈ diags(after) ∧ d ∉ diags(before) ∧ d.severity == "error" }|`` by the
+      ``(file, line, code)`` identity; warnings never count.
 * ``changed_symbols_with_tests_ratio`` — ``tested_changed_symbols / changed_symbols`` where
   ``tested_changed_symbols`` follows the TESTED_BY rule (test-file→module name matching, §5.4);
   OMITTED when changed_symbols == 0 OR the rule links no changed symbol (DEFERRED — never 0).
-* ``code_change_risk`` — v1 formula:
+* ``code_change_risk`` — v1 formula (weights UNCHANGED from v1, renormalized over measurable
+  terms):
   ``risk = 0.35·min(1, new_sonar_critical/10) + 0.25·min(1, new_lsp_error/10)
           + 0.20·(1 − tests_ratio) + 0.20·min(1, impacted/10)``;
   terms whose analyzer did not run OR whose ratio is deferred are OMITTED and the remaining
   weights RENORMALIZED to sum 1; risk is None (fact omitted) when NO term is measurable. The
   weights are ``[P]`` operator policy — this provenance is the record; a weight change is a
-  reducer-version change.
+  reducer-version change. The v2 bump changes ONLY the *meaning* of the two analyzer-count
+  terms (severity-filtered + change-introduced); the formula and weights are byte-identical.
 """
 
 from __future__ import annotations
@@ -67,7 +78,7 @@ from agentic_dynamics.core.language import (
 
 # ── Reducer declaration ─────────────────────────────────────────
 
-VERSION = "code_change_facts/v1"
+VERSION = "code_change_facts/v2"
 
 #: The ten code-change predicates this reducer emits. Every name exists in FACT_PREDICATES.
 CODE_CHANGE_PREDICATES = (
@@ -83,7 +94,7 @@ CODE_CHANGE_PREDICATES = (
     "code_change_risk",
 )
 
-CODE_CHANGE_FACTS_V1 = ReducerSpec(
+CODE_CHANGE_FACTS_V2 = ReducerSpec(
     name="code_change_facts",
     version=VERSION,
     level="fact",
@@ -98,9 +109,11 @@ CODE_CHANGE_FACTS_V1 = ReducerSpec(
 _EPISTEMIC_STATUS = "derived"
 _AUTHORITY, _EVIDENCE_CLASS = EPISTEMIC_MAP[_EPISTEMIC_STATUS]
 
-#: The ``code_change_risk`` v1 weights — ``[P]`` operator policy. Provenance: this tuple IS the
-#: record; the formula is ``sum(w·term)/sum(w)`` over the MEASURABLE terms, renormalized to 1
-#: (a term whose analyzer did not run or whose ratio is deferred is omitted).
+#: The ``code_change_risk`` weights — ``[P]`` operator policy, UNCHANGED from v1 (the v2 bump
+#: redefines only the *meaning* of the two analyzer-count terms, not the weights — design doc
+#: ``cap_2a_rerun2_measurement_design.md`` §3). Provenance: this tuple IS the record; the
+#: formula is ``sum(w·term)/sum(w)`` over the MEASURABLE terms, renormalized to 1 (a term whose
+#: analyzer did not run or whose ratio is deferred is omitted).
 RISK_WEIGHTS: tuple[tuple[str, float], ...] = (
     ("new_sonar_critical", 0.35),
     ("new_lsp_error", 0.25),
@@ -181,12 +194,15 @@ def _changed_symbol_names(delta) -> tuple[set[str], set[str]]:
 # ── The reducer (pure) ──────────────────────────────────────────
 
 
-def code_change_facts_v1(inp: ReducerInput) -> list[CanonicalFact]:
+def code_change_facts_v2(inp: ReducerInput) -> list[CanonicalFact]:
     """Derive the ten job-scoped code-change facts from the typed CodeDelta + analyzer statuses.
 
     Pure and total: an absent evidence family simply omits the facts that depend on it (never a
     fabricated zero, never a crash). Deterministic: the same ``ReducerInput`` yields byte-identical
-    facts in a fixed order.
+    facts in a fixed order. The reducer's code is byte-identical to v1; the version bump records
+    the v2 *semantics* of ``new_sonar_critical_count`` (severity-filtered, change-introduced) and
+    ``new_lsp_error_count`` (change-introduced errors), which the producer computes and this
+    reducer consumes as plain ints (see the module docstring).
     """
     facts: list[CanonicalFact] = []
     evidence_ids: tuple[str, ...] = tuple(

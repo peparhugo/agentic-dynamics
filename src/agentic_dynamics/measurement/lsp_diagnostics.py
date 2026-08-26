@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -92,8 +93,14 @@ _TOOLS: dict[str, LSPToolConfig] = {
     "python_mypy": LSPToolConfig(
         name="mypy",
         language="python",
-        check_cmd=["mypy", "--version"],
-        diag_cmd=["mypy", "--no-error-summary", "--show-error-codes", "{path}"],
+        # mypy is invoked as a module (``sys.executable -m mypy``) so it runs against the same
+        # interpreter the workflow uses — mypy is pip-installable but not on PATH here (design
+        # §4 of cap_2a_rerun2_measurement_design.md). ``--show-column-numbers`` is REQUIRED:
+        # mypy 2.x's default output omits the column (``file:line: error:``), which
+        # ``_parse_mypy`` mis-parses into a "warning" severity for every diagnostic.
+        check_cmd=[sys.executable, "-m", "mypy", "--version"],
+        diag_cmd=[sys.executable, "-m", "mypy", "--show-column-numbers",
+                  "--no-error-summary", "--show-error-codes", "{path}"],
     ),
     "typescript": LSPToolConfig(
         name="tsc",
@@ -390,6 +397,29 @@ def diagnostics_delta(before: LSPReport, after: LSPReport) -> dict[str, Any]:
             f"+{after.warnings - before.warnings} warnings"
         ),
     }
+
+
+def error_identity(diag: LSPDiagnostic) -> tuple[str, int, str]:
+    """The ``(file, line, code)`` identity for change-introduced error novelty (design §4).
+
+    Two diagnostics are "the same" iff they share file, line, and rule code — the identity the
+    v2 reducer's ``new_lsp_error_count`` uses to decide whether an error in the after-state is
+    NEW (absent from the before-state) rather than pre-existing.
+    """
+    return (diag.file, diag.line, diag.code)
+
+
+def new_error_count(before: LSPReport, after: LSPReport) -> int:
+    """Change-introduced error diagnostics: ``|error ids(after) − error ids(before)|``.
+
+    Error-severity only (warnings/info/hints never count), by the ``(file, line, code)``
+    identity rule. A pre-existing error (same identity in both) never counts; an error present
+    only in the after-report counts once. Pure and deterministic.
+    """
+    before_ids = {error_identity(d) for d in before.diagnostics if d.severity == "error"}
+    return sum(
+        1 for d in after.diagnostics if d.severity == "error" and error_identity(d) not in before_ids
+    )
 
 
 def available_tools() -> dict[str, bool]:

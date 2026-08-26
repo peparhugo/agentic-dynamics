@@ -203,7 +203,7 @@ def main() -> None:
                     help="evidence-integrity e6 seam (design §5.7, review F3): inject the "
                          "concrete EvidenceChangeAnalyzer at the composition root so every "
                          "committed phase ALSO hands its typed delta to the phase-boundary "
-                         "evidence loop — code_change_facts/v1 facts + ACL-scoped executor "
+                         "evidence loop — code_change_facts/v2 facts + ACL-scoped executor "
                          "neighborhood recorded on the phase result. Best-effort — a failed "
                          "analysis never affects the phase. OFF by default (opt-in). Without "
                          "this flag the seam is byte-identical inert, even when "

@@ -34,12 +34,16 @@ never again mean "global".
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,6 +60,16 @@ from agentic_dynamics.knowledge.augment import (
     default_retrieve_fn,
 )
 from agentic_dynamics.measurement.commit_analysis import _read_commit_files
+from agentic_dynamics.measurement.lsp_diagnostics import new_error_count, run_diagnostics
+from agentic_dynamics.measurement.sonar import (
+    SONAR_STATUS_AVAILABLE,
+    SONAR_STATUS_STALE_REFUSED,
+    SONAR_STATUS_UNAVAILABLE,
+    fetch_sonar_issues,
+    new_issue_count,
+    project_key_for,
+    run_sonar_analysis,
+)
 from agentic_dynamics.runtime.change_analyzer import (
     ChangeAnalyzer,
     ChangeInput,
@@ -262,14 +276,180 @@ def _git_full_sha(workdir: Path, rev: str) -> str:
     return ""
 
 
+#: Client-side deadline for the sonar + lsp analyzer legs (cap_2a rerun2 p1, carried from the
+#: rerun). A stalled sonar-scanner, a hung mypy, or a server that never answers must degrade to
+#: its measured unavailable status within this envelope, never hang the phase (the first
+#: campaign's hang lesson). ``run_sonar_analysis``'s own subprocess timeout is 300s, so 360s
+#: lets a real scan complete while still bounding a pathological hang; ``run_diagnostics`` is
+#: bounded to ~120s internally, well under this envelope. Tests shrink this constant to prove
+#: the deadline.
+ANALYZER_LEG_TIMEOUT_SECONDS = 360.0
+
+
+def _call_with_deadline(fn: Callable[[], Any], *, timeout: float) -> tuple[bool, Any]:
+    """Run ``fn`` in a single worker thread under a hard client-side deadline.
+
+    Returns ``(returned, result)``. ``returned`` is False on a timeout (the worker is abandoned
+    and keeps running in the background — the same discipline the graph leg uses) or on any
+    raised exception; ``result`` is the call's return value on success. A non-returning analyzer
+    can never hang the phase: the deadline degrades it to its measured unavailable status in the
+    caller.
+    """
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        return True, pool.submit(fn).result(timeout=timeout)
+    except FuturesTimeout:
+        return False, None
+    except Exception:  # noqa: BLE001 — an analyzer error is a state, never a crash
+        return False, None
+    finally:
+        pool.shutdown(wait=False)
+
+
+def _materialize_revision(wd: Path, rev: str) -> Path | None:
+    """Check out ``rev`` into a fresh detached worktree under /tmp for the analyzer legs.
+
+    The sonar scanner and mypy both need a real on-disk tree for the PARENT revision (the
+    worktree itself is already at the phase commit). Returns the checkout path, or ``None`` when
+    the revision cannot be materialized — the sonar/lsp legs then degrade to their measured
+    unavailable status (null-not-zero, never a fabricated delta). The caller must remove the
+    checkout with :func:`_remove_materialized_revision`.
+    """
+    tmp = Path(tempfile.mkdtemp(prefix="wf_analyzer_", dir="/tmp"))
+    checkout = tmp / "tree"
+    try:
+        proc = subprocess.run(
+            ["git", "worktree", "add", "--detach", str(checkout), rev],
+            cwd=str(wd), capture_output=True, timeout=120,
+        )
+    except Exception:  # noqa: BLE001 — materialization is best-effort, never a gate
+        shutil.rmtree(tmp, ignore_errors=True)
+        return None
+    if proc.returncode != 0:
+        shutil.rmtree(tmp, ignore_errors=True)
+        return None
+    return checkout
+
+
+def _remove_materialized_revision(wd: Path, checkout: Path | None) -> None:
+    """Remove a materialized revision and its temp parent (idempotent — ``None`` is a no-op)."""
+    if checkout is None:
+        return
+    with contextlib.suppress(Exception):
+        subprocess.run(
+            ["git", "worktree", "remove", "--force", str(checkout)],
+            cwd=str(wd), capture_output=True, timeout=60,
+        )
+    with contextlib.suppress(Exception):
+        shutil.rmtree(checkout.parent, ignore_errors=True)
+
+
+def _sonar_evidence(
+    wd: Path, parent_checkout: Path | None, parent_rev: str, full_rev: str
+) -> dict[str, Any]:
+    """v2: the severity-filtered, change-introduced critical-issue count (design §2 RC1, §3).
+
+    Runs/fetches the revision-scoped analysis for BOTH the parent and the phase commit (fresh
+    scans are fetch-first, so an already-analyzed parent is reused), pulls each revision's
+    per-issue records filtered server-side to ``{BLOCKER, CRITICAL}``, and counts issues
+    introduced by the change under the ``(rule, file_path, line)`` identity rule. Runs under the
+    hard deadline; a non-returning or raising leg degrades to a measured
+    ``{"status": "unavailable"}`` payload (count omitted — null-not-zero, never a fabricated 0).
+
+    The evidence shape matches the reducer's ``sonar_analysis`` contract verbatim:
+    ``{"status", "revision_matches"|None, "new_critical_count"|None, "analyzed_sha"}``.
+    """
+    if parent_checkout is None:
+        return {"status": SONAR_STATUS_UNAVAILABLE, "revision_matches": None,
+                "new_critical_count": None, "analyzed_sha": ""}
+
+    parent_key = project_key_for(wd, parent_rev)
+    after_key = project_key_for(wd, full_rev)
+
+    def _leg() -> dict[str, Any]:
+        # ``project_key`` is passed explicitly for the parent so its key stays consistent with
+        # the phase revision's (same worktree base, different rev prefix) — otherwise the temp
+        # checkout's dir name would produce a different, non-comparable key.
+        before = run_sonar_analysis(str(parent_checkout), project_key=parent_key, revision=parent_rev)
+        after = run_sonar_analysis(str(wd), revision=full_rev)
+        before_status = getattr(before, "status", SONAR_STATUS_UNAVAILABLE)
+        after_status = getattr(after, "status", SONAR_STATUS_UNAVAILABLE)
+        # A stale-refused or unavailable revision cannot produce a before/after delta — fail
+        # closed with the measured status (null-not-zero, never a fabricated 0).
+        if before_status != SONAR_STATUS_AVAILABLE or after_status != SONAR_STATUS_AVAILABLE:
+            status = SONAR_STATUS_STALE_REFUSED if (
+                before_status == SONAR_STATUS_STALE_REFUSED
+                or after_status == SONAR_STATUS_STALE_REFUSED
+            ) else SONAR_STATUS_UNAVAILABLE
+            revision_matches = (
+                True if status == SONAR_STATUS_AVAILABLE
+                else False if status == SONAR_STATUS_STALE_REFUSED
+                else None
+            )
+            return {"status": status, "revision_matches": revision_matches,
+                    "new_critical_count": None, "analyzed_sha": getattr(after, "analyzed_sha", "")}
+
+        before_issues = fetch_sonar_issues(parent_key, severities="BLOCKER,CRITICAL")
+        after_issues = fetch_sonar_issues(after_key, severities="BLOCKER,CRITICAL")
+        count = new_issue_count(before_issues, after_issues)
+        return {
+            "status": SONAR_STATUS_AVAILABLE,
+            "revision_matches": True,
+            "new_critical_count": count,
+            "analyzed_sha": getattr(after, "analyzed_sha", "") or full_rev,
+        }
+
+    returned, result = _call_with_deadline(_leg, timeout=ANALYZER_LEG_TIMEOUT_SECONDS)
+    if not returned or result is None:
+        return {"status": SONAR_STATUS_UNAVAILABLE, "revision_matches": None,
+                "new_critical_count": None, "analyzed_sha": ""}
+    return result
+
+
+def _lsp_evidence(
+    wd: Path, parent_checkout: Path | None, parent_rev: str, full_rev: str, profile: Any
+) -> dict[str, Any]:
+    """v2: the change-introduced ERROR diagnostics count (design §4).
+
+    Runs mypy (``tool_name="python_mypy"``) at the parent and the phase commit, then counts
+    error-severity diagnostics introduced by the change under the ``(file, line, code)`` identity
+    rule. Warnings/info/hints never count. Runs under the hard deadline; a non-returning or
+    raising tool degrades to a measured ``{"status": "unavailable"}`` payload (count omitted).
+
+    The evidence shape matches the reducer's ``lsp_analysis`` contract verbatim:
+    ``{"status", "new_error_count"|None, "tool"}``.
+    """
+    if parent_checkout is None:
+        return {"status": "unavailable", "new_error_count": None, "tool": "mypy"}
+
+    def _leg() -> dict[str, Any]:
+        before = run_diagnostics(parent_checkout, profile, tool_name="python_mypy")
+        after = run_diagnostics(wd, profile, tool_name="python_mypy")
+        before_ok = bool(getattr(before, "available", False))
+        after_ok = bool(getattr(after, "available", False))
+        if not before_ok or not after_ok:
+            return {"status": "unavailable", "new_error_count": None,
+                    "tool": getattr(after, "tool", "") or "mypy"}
+        count = new_error_count(before, after)
+        return {"status": "available", "new_error_count": count,
+                "tool": getattr(after, "tool", "") or "mypy"}
+
+    returned, result = _call_with_deadline(_leg, timeout=ANALYZER_LEG_TIMEOUT_SECONDS)
+    if not returned or result is None:
+        return {"status": "unavailable", "new_error_count": None, "tool": "mypy"}
+    return result
+
+
 def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) -> None:
     """Best-effort phase-boundary evidence: analyze ``pr.commit_hash`` and record the result.
 
     The typed before/after CodeSnapshots + CodeDelta are materialized from git (the phase
     commit vs its parent); the analyzer (injected at the composition root — the concrete
     ``control.evidence_analyzer.EvidenceChangeAnalyzer`` or any structural match) returns the
-    code-change facts + executor neighborhood, stored on ``pr.change_analysis``. Every failure
-    path (no parent commit, unreadable revisions, an analyzer error) degrades to
+    code-change facts + executor neighborhood, stored on ``pr.change_analysis``. The sonar + lsp
+    legs (cap_2a rerun2 p1, design §2/§3/§4) run BEFORE/AFTER — the parent revision is
+    materialized once, then both legs run under the same hard deadline as the graph leg. Every
+    failure path (no parent commit, unreadable revisions, an analyzer error) degrades to
     ``change_analysis=None`` — the seam can never change the phase's outcome (design §5.7).
 
     ``ChangeInput.revision`` and both snapshot revisions are FULL commit SHAs (provenance);
@@ -284,6 +464,16 @@ def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) ->
         after_files = _read_commit_files(wd, full, profile)
         before = build_code_snapshot(before_files, revision=before_rev, profile=profile)
         after = build_code_snapshot(after_files, revision=full, profile=profile)
+
+        # Materialize the parent once; both analyzer legs share it. A failure (root commit,
+        # missing revision) degrades each leg to its measured unavailable status — never a gate.
+        parent_checkout = _materialize_revision(wd, before_rev)
+        try:
+            sonar = _sonar_evidence(wd, parent_checkout, before_rev, full)
+            lsp = _lsp_evidence(wd, parent_checkout, before_rev, full, profile)
+        finally:
+            _remove_materialized_revision(wd, parent_checkout)
+
         change = ChangeInput(
             before=before,
             after=after,
@@ -291,6 +481,8 @@ def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) ->
             revision=full,
             repository_id=cell_scope(wd),
             acl_scope=cell_scope(wd),
+            sonar=sonar,
+            lsp=lsp,
             phase_id=pr.phase,
             observed_at=_now(),
         )

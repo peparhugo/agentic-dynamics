@@ -152,3 +152,58 @@ def test_parse_measures_includes_coverage():
     metrics = sonar_mod._parse_measures("exp_src", {"coverage": "82.4", "bugs": "2"})
     assert metrics.coverage == 82.4
     assert metrics.bugs == 2
+
+
+# ── v2: severity-filtered, change-introduced issue count (cap_2a rerun2 §2 RC1) ──
+
+
+def test_new_issue_count_pre_existing_blocker_counts_zero():
+    blocker = sonar_mod.SonarIssue(rule="python:S1000", severity="BLOCKER", file_path="a.py", line=5)
+    assert sonar_mod.new_issue_count([blocker], [blocker]) == 0
+
+
+def test_new_issue_count_introduced_blocker_counts_one():
+    introduced = sonar_mod.SonarIssue(rule="python:S1000", severity="BLOCKER", file_path="b.py", line=7)
+    assert sonar_mod.new_issue_count([], [introduced]) == 1
+
+
+def test_new_issue_count_mixed_pre_existing_and_introduced():
+    pre = sonar_mod.SonarIssue(rule="python:S1000", severity="BLOCKER", file_path="a.py", line=5)
+    new = sonar_mod.SonarIssue(rule="python:S2000", severity="CRITICAL", file_path="b.py", line=7)
+    assert sonar_mod.new_issue_count([pre], [pre, new]) == 1
+
+
+def test_new_issue_count_identity_is_rule_file_line():
+    # A MAJOR finding (python:S1244) at the same file/line is a DIFFERENT identity from a
+    # BLOCKER — identity is (rule, file, line), never severity or message alone.
+    major = sonar_mod.SonarIssue(rule="python:S1244", severity="MAJOR", file_path="t.py", line=18)
+    blocker = sonar_mod.SonarIssue(rule="python:S1000", severity="BLOCKER", file_path="t.py", line=18)
+    assert sonar_mod.issue_identity(major) != sonar_mod.issue_identity(blocker)
+    # Same identity, different severity label → still "the same" issue (identity ignores severity).
+    same = sonar_mod.SonarIssue(rule="python:S1000", severity="CRITICAL", file_path="t.py", line=18)
+    assert sonar_mod.issue_identity(blocker) == sonar_mod.issue_identity(same)
+
+
+def test_fetch_sonar_issues_passes_severities_filter(monkeypatch):
+    """The v2 severity filter is SERVER-side: ``fetch_sonar_issues`` must pass
+    ``severities=BLOCKER,CRITICAL`` through so a MAJOR-only finding never reaches the diff."""
+    import urllib.request
+
+    captured = {}
+
+    class _Resp:
+        def read(self):
+            return b'{"issues": [], "paging": {"total": 0}}'
+
+    def fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        return _Resp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    sonar_mod.fetch_sonar_issues("exp_x", severities="BLOCKER,CRITICAL")
+    assert "severities=BLOCKER,CRITICAL" in captured["url"]
+
+    # Without the filter the param is absent (legacy callers unchanged).
+    captured.clear()
+    sonar_mod.fetch_sonar_issues("exp_x")
+    assert "severities=" not in captured["url"]

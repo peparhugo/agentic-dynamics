@@ -1,4 +1,4 @@
-"""Tests for code_change_facts/v1 (design §5.6 — e5 of cap_evidence_integrity).
+"""Tests for code_change_facts/v2 (design §5.6 — e5 of cap_evidence_integrity).
 
 Covers the reducer's ten predicates: status enums, defined denominators, zero-change behavior,
 null-not-zero omission (unavailable analyzers never yield fabricated zero counts), the DEFERRED
@@ -28,8 +28,8 @@ from agentic_dynamics.control.facts import (
 )
 from agentic_dynamics.control.reducers import REDUCERS, get_reducer
 from agentic_dynamics.control.reducers.code_change_facts import (
-    CODE_CHANGE_FACTS_V1,
-    code_change_facts_v1,
+    CODE_CHANGE_FACTS_V2,
+    code_change_facts_v2,
 )
 from agentic_dynamics.core.language import (
     _PROFILES,
@@ -102,7 +102,7 @@ def _facts_by_predicate(facts):
 
 
 def test_full_fixture_produces_all_measurable_facts():
-    facts = code_change_facts_v1(_inp(*_full_evidence()))
+    facts = code_change_facts_v2(_inp(*_full_evidence()))
     by = _facts_by_predicate(facts)
 
     assert by["sonar_analysis_status"].value == "available"
@@ -125,7 +125,7 @@ def test_full_fixture_produces_all_measurable_facts():
         assert fact.epistemic_status == "derived"
         assert fact.evidence_class == "[C]"
         assert fact.scope_type == "job"
-        assert fact.reducer_version == CODE_CHANGE_FACTS_V1.version
+        assert fact.reducer_version == CODE_CHANGE_FACTS_V2.version
 
 
 def test_all_facts_registered_and_produced_by_reducer():
@@ -133,9 +133,9 @@ def test_all_facts_registered_and_produced_by_reducer():
 
     for predicate in CODE_CHANGE_PREDICATES:
         assert predicate in FACT_PREDICATES
-        assert "code_change_facts/v1" in FACT_PREDICATES[predicate].produced_by
-    assert REDUCERS[CODE_CHANGE_FACTS_V1.version].produces == CODE_CHANGE_PREDICATES
-    assert get_reducer(CODE_CHANGE_FACTS_V1.version) is code_change_facts_v1
+        assert "code_change_facts/v2" in FACT_PREDICATES[predicate].produced_by
+    assert REDUCERS[CODE_CHANGE_FACTS_V2.version].produces == CODE_CHANGE_PREDICATES
+    assert get_reducer(CODE_CHANGE_FACTS_V2.version) is code_change_facts_v2
 
 
 # ── Unavailable analyzers omit counts (null-not-zero) ───────────
@@ -147,7 +147,7 @@ def test_unavailable_lsp_omits_counts_and_renormalizes_risk():
         source_type="lsp_analysis", evidence_id="lsp-1",
         payload={"status": "unavailable", "new_error_count": None, "tool": "pyright"},
     )
-    facts = code_change_facts_v1(_inp(*items))
+    facts = code_change_facts_v2(_inp(*items))
     by = _facts_by_predicate(facts)
 
     assert by["lsp_analysis_status"].value == "unavailable"
@@ -165,7 +165,7 @@ def test_stale_refused_sonar_emits_status_and_marks_revision_mismatch():
         payload={"status": "stale-refused", "revision_matches": False,
                  "new_critical_count": None, "analyzed_sha": "deadbeef"},
     )
-    facts = code_change_facts_v1(_inp(*items))
+    facts = code_change_facts_v2(_inp(*items))
     by = _facts_by_predicate(facts)
 
     assert by["sonar_analysis_status"].value == "stale-refused"
@@ -193,7 +193,7 @@ def test_no_measurable_risk_terms_yields_no_risk_fact():
     after = build_code_snapshot({"m.py": b"def f():\n    return 1\n"}, revision="rev-2", profile=PY)
     delta = compute_code_delta(before, after)  # no test file -> ratio deferred
     items = (EvidenceItem(source_type="code_delta", evidence_id="delta-1", payload=delta),) + items[1:]
-    facts = code_change_facts_v1(_inp(*items))
+    facts = code_change_facts_v2(_inp(*items))
     by = _facts_by_predicate(facts)
 
     assert "code_change_risk" not in by  # NO term measurable -> risk omitted (None), never 0
@@ -218,7 +218,7 @@ def test_ratio_deferred_when_no_test_file_links():
             payload={"status": "available", "new_error_count": 1},
         ),
     )
-    facts = code_change_facts_v1(_inp(*items))
+    facts = code_change_facts_v2(_inp(*items))
     by = _facts_by_predicate(facts)
     assert "changed_symbols_with_tests_ratio" not in by  # DEFERRED, never 0.0
 
@@ -228,7 +228,7 @@ def test_zero_change_omits_parse_coverage_denominator():
     after = build_code_snapshot({"m.py": b"def f():\n    pass\n"}, revision="rev-2", profile=PY)
     delta = compute_code_delta(before, after)
     items = (EvidenceItem(source_type="code_delta", evidence_id="delta-1", payload=delta),)
-    facts = code_change_facts_v1(_inp(*items))
+    facts = code_change_facts_v2(_inp(*items))
     by = _facts_by_predicate(facts)
     assert "ast_parse_coverage" not in by  # changed_files == 0 -> no denominator, omitted
     assert by["changed_symbol_count"].value == "0"  # a real measured zero, not a fabricated one
@@ -239,7 +239,7 @@ def test_changed_but_unparseable_file_degrades_parse_coverage():
     after = build_code_snapshot({"m.py": b"def f(:\n"}, revision="rev-2", profile=PY)
     delta = compute_code_delta(before, after)
     items = (EvidenceItem(source_type="code_delta", evidence_id="delta-1", payload=delta),)
-    facts = code_change_facts_v1(_inp(*items))
+    facts = code_change_facts_v2(_inp(*items))
     by = _facts_by_predicate(facts)
     # The delta tracks the unparseable file as changed (content hash differs), so the fact is
     # EMITTED with a degraded value — never omitted, never a structural 1.0 (review F1).
@@ -258,7 +258,7 @@ def test_parse_coverage_mixed_parsed_and_unparseable():
     )
     delta = compute_code_delta(before, after)
     items = (EvidenceItem(source_type="code_delta", evidence_id="delta-1", payload=delta),)
-    facts = code_change_facts_v1(_inp(*items))
+    facts = code_change_facts_v2(_inp(*items))
     by = _facts_by_predicate(facts)
     # a.py unchanged; b.py changed + unparseable -> 0 parsed / 1 changed file.
     assert delta.changed_files == ["b.py"]
@@ -283,7 +283,7 @@ def _fact(predicate: str, value: str) -> CanonicalFact:
         scope_path=JOB_SCOPE, abstraction_level=spec.abstraction_level,
         epistemic_status="derived", authority=authority, evidence_class=evidence_class,
         observed_at=NOW, valid_from=NOW, valid_to=None, expires_at=None,
-        reducer="code_change_facts", reducer_version="code_change_facts/v1",
+        reducer="code_change_facts", reducer_version="code_change_facts/v2",
         evidence_ids=(), inputs_digest="", supersedes=None,
         source_revision="rev-2", repository_id=REPO,
     )
@@ -413,6 +413,26 @@ def test_proposal_build_derives_rework_and_continue():
         scope=(), recorded_at="t",
     )
     assert zero.action == "continue" and zero.depth == 0
+
+
+def test_s1244_major_only_counts_zero_and_never_rework():
+    """(a) Severity regression (design §RC4): a change whose only sonar finding is
+    ``python:S1244`` (MAJOR, bug-type) mints ``new_sonar_critical_count=0`` (the v2 server-side
+    severity filter excludes MAJOR), so the proposal is ``verify``/``continue`` — NEVER
+    ``rework``. The rework branch can no longer fire on a MAJOR test-style finding."""
+    from agentic_dynamics.control.verify_proposal import build_verify_proposal
+
+    # risk 0.24 >= VERIFY_RISK_THRESHOLD, but new_sonar_critical_count=0 (S1244 filtered out).
+    proposal = build_verify_proposal(
+        facts=_proposal_facts(
+            new_sonar_critical_count={"predicate": "new_sonar_critical_count", "value": "0"},
+        ),
+        cell_id="c", baseline_revision="b" * 40, analyzed_revision="a" * 40,
+        scope=("f",), recorded_at="t",
+    )
+    assert proposal.action != "rework"
+    assert proposal.action == "verify"  # risk-driven, not critical-driven
+    assert proposal.depth == 2
 
 
 def test_proposal_build_refuses_without_halt_facts():

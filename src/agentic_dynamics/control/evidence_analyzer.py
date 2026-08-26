@@ -4,7 +4,7 @@ The implementation of the runtime-owned :class:`ChangeAnalyzer` protocol, inject
 composition root (opt-in, OFF by default). It composes the evidence loop for one change:
 
     change -> CodeSnapshot/CodeDelta -> versioned-graph update
-           -> code_change_facts/v1 emit -> executor neighborhood supplied
+           -> code_change_facts/v2 emit -> executor neighborhood supplied
 
 The concrete flow (control tier, which may see both ``runtime`` and ``control.reducers``):
 
@@ -15,7 +15,7 @@ The concrete flow (control tier, which may see both ``runtime`` and ``control.re
    symbols' ``version_id``\\ s (``expand_candidates`` with ``repository_id`` + ``acl_scope``);
    the returned symbol qualified names ARE the bounded context the executor gets, and their
    count is the ``impacted_symbol_count`` fact's input.
-3. **Facts emit** — ``code_change_facts_v1`` over the delta + analyzer statuses + impacted
+3. **Facts emit** — ``code_change_facts_v2`` over the delta + analyzer statuses + impacted
    count, de-typed to plain dicts so ``runtime`` stays free of ``control`` imports.
 
 The analyzer is a pure-ish composition: the only I/O is the duck-typed ``graph_client``
@@ -28,7 +28,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from typing import Any
 
 from agentic_dynamics.control.facts import EvidenceItem, ReducerInput
-from agentic_dynamics.control.reducers.code_change_facts import code_change_facts_v1
+from agentic_dynamics.control.reducers.code_change_facts import code_change_facts_v2
 from agentic_dynamics.core.language import (
     symbol_entity_id,
     symbol_version_id,
@@ -134,7 +134,7 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
             finally:
                 pool.shutdown(wait=False)
 
-        facts = code_change_facts_v1(self._reducer_input(change, impacted))
+        facts = code_change_facts_v2(self._reducer_input(change, impacted))
         return ChangeAnalysis(
             facts=tuple(
                 {
