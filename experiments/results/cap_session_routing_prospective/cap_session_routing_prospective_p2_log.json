@@ -1,0 +1,46 @@
+{
+  "schema_version": "cap_session_routing_phase_log/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p2_run_grid",
+  "status": "PASS",
+  "date": "2026-08-26T16:30:00+00:00",
+  "grid": "24 cells (session_policy x model x repetition); E4 (continue/pro/r1) measured in p1; 23 cells run in p2.",
+  "cells_run": 23,
+  "cells_not_run": 0,
+  "stop_reason": null,
+  "total_actual_usd": 0.139691,
+  "forecast_envelope_usd": 0.4224,
+  "stop_budget_usd": 40.0,
+  "verified_success_rate": "23/23 (100%)",
+  "arm_enforcement": {
+    "continue": "5 cells run, fork=true (chained session; session_lineage forked=[False,True]) \u2014 provable",
+    "fork_blind": "6 cells run, fork=false (cold sessions; session_lineage forked=[False,False]) \u2014 provable",
+    "fork_cached": "6 cells run, fork=true (chained session, cache reuse; forked=[False,True]) \u2014 provable",
+    "escalate": "6 cells run, all untriggered (no phase failed on the assigned model's first attempt). Mechanism proven executable via cap_session_policy_escalate_proof_cap_sesspol_escalate_mechanism_proof.json: failed phase (flash, timeout) -> new session (pro) -> success. The grid records escalate as untriggered, never narrated."
+  },
+  "analyzer_flags": "none in any cell (sonar + lsp available, graph not_requested); analyzer-down conditions would be flagged, not dropped",
+  "deliverables": [
+    "cap_session_routing_prospective_p2_execution_manifest.json (immutable pre-run manifest, 23 cells, candidate-first; cell statuses updated to completed)",
+    "cap_session_policy_phase_ledger_cap_sesspol_*.json + _escalated.json (per-cell run ledgers)",
+    "cap_session_policy_cell_manifest_cap_sesspol_*.json (per-cell immutable manifests with session_lineage + escalate_event + flags)",
+    "cap_session_policy_escalate_proof_cap_sesspol_escalate_mechanism_proof.json (escalate mechanism proof)",
+    "cap_session_routing_prospective_p2_escalate_proofs.json",
+    "cap_session_routing_prospective_p2_forecast_vs_actual.json",
+    "cap_session_routing_prospective_p2_artifact_sha256_index.json (57 artifacts)",
+    "cap_session_routing_prospective_p2_log.json (this file)"
+  ],
+  "limitations": [
+    "escalate untriggered in all 6 grid cells \u2014 the stimulus (a tiny pure helper) is completed first-attempt by both models, so no natural failure occurred; the escalation premium is therefore NOT measured from the grid (the mechanism is proven executable, not estimated)",
+    "continue and fork_cached share the runner chained-session mechanism (fork=true); the typed no-checkpoint vs checkpointed-fork distinction is I10-gated \u2014 recorded, never fabricated",
+    "cache_read_tokens is not a clean arm discriminator (provider prefix caching serves reads even in cold sessions); the provable discriminators are the session lineage fork marker (session store titles) + the runner fork flag recorded in each cell manifest",
+    "cell wall time includes the phase-boundary sonar/mypy legs (analyzer seam); agent+test durations are ~20-40s"
+  ],
+  "checks": [
+    "execution manifest written BEFORE any cell ran (candidate-first; no unlisted cells ran)",
+    "every cell ran in a fresh worktree with a unique FINOPS_CELL_ID; no worktree reused",
+    "arm session behavior enforced and provable (session_lineage fork markers)",
+    "escalate arm mechanism proven in the ledger (failed phase -> new session -> other model)",
+    "cumulative actual $0.1397 < forecast envelope $0.4224 < stop budget $40 \u2014 no stop triggered, 0 not-run cells",
+    "analyzer-down conditions would be flagged; none occurred"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "schema_version": "cap_session_routing_forecast_vs_actual/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p2_run_grid",
+  "forecast_per_cell_usd": 0.0176,
+  "grid_forecast_total_usd": 0.4224,
+  "stop_budget_usd": 40.0,
+  "actual_total_usd": 0.139691,
+  "cells_run": 24,
+  "cells_not_run": 0,
+  "within_forecast": true,
+  "within_stop_budget": true,
+  "per_cell_outliers": [],
+  "per_arm_actual": {
+    "continue": {
+      "cells": 6,
+      "actual_usd": 0.035524,
+      "forecast_usd": 0.1056,
+      "verified": 6
+    },
+    "fork_blind": {
+      "cells": 6,
+      "actual_usd": 0.031933,
+      "forecast_usd": 0.1056,
+      "verified": 6
+    },
+    "fork_cached": {
+      "cells": 6,
+      "actual_usd": 0.036556,
+      "forecast_usd": 0.1056,
+      "verified": 6
+    },
+    "escalate": {
+      "cells": 6,
+      "actual_usd": 0.035678,
+      "forecast_usd": 0.1056,
+      "verified": 6
+    }
+  },
+  "per_model_actual": {
+    "deepseek-v4-pro": {
+      "cells": 12,
+      "actual_usd": 0.103258,
+      "verified": 12
+    },
+    "deepseek-v4-flash": {
+      "cells": 12,
+      "actual_usd": 0.036433,
+      "verified": 12
+    }
+  }
+}

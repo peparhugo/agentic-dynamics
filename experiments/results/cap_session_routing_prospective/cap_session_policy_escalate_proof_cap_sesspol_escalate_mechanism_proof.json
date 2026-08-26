@@ -1,0 +1,80 @@
+{
+  "schema_version": "cap_session_policy_escalate_proof/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p2_run_grid",
+  "cell_id": "cap_sesspol_escalate_mechanism_proof",
+  "label": "MECHANISM VERIFICATION \u2014 NOT a scored grid cell. run1 uses a proof-harness spec variant (implement timeout=1s) to force a genuine first-model failure; run2 resumes the same worktree on the OTHER model with the real spec.",
+  "assigned_model": "deepseek/deepseek-v4-flash",
+  "escalation_model": "deepseek/deepseek-v4-pro",
+  "run1_ok": false,
+  "run2_ok": true,
+  "chain": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "failed",
+      "model": "deepseek/deepseek-v4-flash",
+      "session_id": "",
+      "error": "Timeout after 1s",
+      "commit": ""
+    },
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "model": "deepseek/deepseek-v4-pro",
+      "session_id": "ses_fc132621fffejNChWV4RDDER0B",
+      "error": "",
+      "commit": "8d2470c"
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "model": "",
+      "session_id": "",
+      "error": "",
+      "commit": "5dce892"
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "model": "deepseek/deepseek-v4-pro",
+      "session_id": "ses_fc130a127ffeBmGC1ay0raJRUT",
+      "error": "",
+      "commit": "7b11d3f"
+    }
+  ],
+  "session_lineage": [
+    {
+      "phase": "implement",
+      "session_id": "",
+      "title": "",
+      "model": "",
+      "forked": false
+    },
+    {
+      "phase": "implement",
+      "session_id": "ses_fc132621fffejNChWV4RDDER0B",
+      "title": "Implement product helper in calc app",
+      "model": "{\"id\":\"deepseek-v4-pro\",\"providerID\":\"deepseek\",\"variant\":\"high\"}",
+      "forked": false
+    },
+    {
+      "phase": "test",
+      "session_id": "",
+      "title": "",
+      "model": "",
+      "forked": false
+    },
+    {
+      "phase": "verify",
+      "session_id": "ses_fc130a127ffeBmGC1ay0raJRUT",
+      "title": "Implement product helper in calc app (fork #1)",
+      "model": "{\"id\":\"deepseek-v4-pro\",\"providerID\":\"deepseek\",\"variant\":\"high\"}",
+      "forked": true
+    }
+  ],
+  "verdict": "escalate PROVABLE: the failed implement row (model=deepseek-v4-flash, session A, timeout error) is followed by its re-run row (model=deepseek-v4-pro, session B \u2014 a NEW session on the OTHER model, same worktree). Chain: failed phase -> new session -> other model."
+}

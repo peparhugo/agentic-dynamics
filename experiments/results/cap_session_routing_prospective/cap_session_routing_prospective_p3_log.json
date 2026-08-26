@@ -1,0 +1,215 @@
+{
+  "schema_version": "cap_session_routing_phase_log/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p3_score",
+  "status": "PASS",
+  "date": "20260826T160605Z",
+  "scored_from": "immutable p1/p2 artifacts only (per-cell manifests + phase ledgers + p1 E4 outcome; retro session_routing_retrospective.json)",
+  "cells_scored": 24,
+  "cells_invalid_excluded": 0,
+  "per_arm_table": {
+    "continue": {
+      "n_cells": 6,
+      "n_verified": 6,
+      "verified_success_rate": 1.0,
+      "total_cost_usd": 0.035524,
+      "cpvo_usd": 0.005921,
+      "cache_read_tokens": 387968,
+      "tokens_in": 104222,
+      "cache_ratio": 0.7752,
+      "rework_total": 0,
+      "repeated_failures_total": 0,
+      "mean_latency_s": 144.82,
+      "mean_context_token_growth": 1.667
+    },
+    "fork_blind": {
+      "n_cells": 6,
+      "n_verified": 6,
+      "verified_success_rate": 1.0,
+      "total_cost_usd": 0.031933,
+      "cpvo_usd": 0.005322,
+      "cache_read_tokens": 546688,
+      "tokens_in": 91326,
+      "cache_ratio": 0.8451,
+      "rework_total": 0,
+      "repeated_failures_total": 0,
+      "mean_latency_s": 150.05,
+      "mean_context_token_growth": 1.357
+    },
+    "fork_cached": {
+      "n_cells": 6,
+      "n_verified": 6,
+      "verified_success_rate": 1.0,
+      "total_cost_usd": 0.036556,
+      "cpvo_usd": 0.006093,
+      "cache_read_tokens": 364544,
+      "tokens_in": 105874,
+      "cache_ratio": 0.7606,
+      "rework_total": 0,
+      "repeated_failures_total": 0,
+      "mean_latency_s": 145.05,
+      "mean_context_token_growth": 1.675
+    },
+    "escalate": {
+      "n_cells": 6,
+      "n_verified": 6,
+      "verified_success_rate": 1.0,
+      "total_cost_usd": 0.035678,
+      "cpvo_usd": 0.005946,
+      "cache_read_tokens": 406144,
+      "tokens_in": 105852,
+      "cache_ratio": 0.7788,
+      "rework_total": 0,
+      "repeated_failures_total": 0,
+      "mean_latency_s": 147.92,
+      "mean_context_token_growth": 1.66
+    }
+  },
+  "model_x_policy_interaction": {
+    "continue": {
+      "deepseek/deepseek-v4-pro": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.026468,
+        "cpvo_usd": 0.008823
+      },
+      "deepseek/deepseek-v4-flash": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.009056,
+        "cpvo_usd": 0.003019
+      }
+    },
+    "fork_blind": {
+      "deepseek/deepseek-v4-pro": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.022918,
+        "cpvo_usd": 0.007639
+      },
+      "deepseek/deepseek-v4-flash": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.009015,
+        "cpvo_usd": 0.003005
+      }
+    },
+    "fork_cached": {
+      "deepseek/deepseek-v4-pro": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.0277,
+        "cpvo_usd": 0.009233
+      },
+      "deepseek/deepseek-v4-flash": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.008856,
+        "cpvo_usd": 0.002952
+      }
+    },
+    "escalate": {
+      "deepseek/deepseek-v4-pro": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.026172,
+        "cpvo_usd": 0.008724
+      },
+      "deepseek/deepseek-v4-flash": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.009506,
+        "cpvo_usd": 0.003169
+      }
+    }
+  },
+  "retro_vs_live": {
+    "fork_cached": {
+      "retro": {
+        "cpvo_usd": 1.2658,
+        "n": 246,
+        "success_rate": 0.9837
+      },
+      "live": {
+        "cpvo_usd": 0.006093,
+        "n": 6,
+        "success_rate": 1.0
+      }
+    },
+    "escalate": {
+      "retro": {
+        "cpvo_usd": 3.9238,
+        "n": 7,
+        "success_rate": 1.0
+      },
+      "live": {
+        "cpvo_usd": 0.005946,
+        "n": 6,
+        "success_rate": 1.0,
+        "untriggered": "all 6 live escalate cells completed first-attempt; the arm never fired, so the live escalate cpvo reflects the no-escalation-needed case, NOT the escalation premium"
+      }
+    },
+    "continue": {
+      "retro": {
+        "cpvo_usd": null,
+        "n": 0
+      },
+      "live": {
+        "cpvo_usd": 0.005921,
+        "n": 6,
+        "success_rate": 1.0
+      }
+    },
+    "fork_blind": {
+      "retro": {
+        "cpvo_usd": null,
+        "n": 0
+      },
+      "live": {
+        "cpvo_usd": 0.005322,
+        "n": 6,
+        "success_rate": 1.0
+      }
+    },
+    "escalation_premium_3_1x": {
+      "retro": {
+        "premium": 3.1,
+        "numerator": "escalate cpvo $3.9238 n=7",
+        "denominator": "fork_cached cpvo $1.2658 n=246"
+      },
+      "live": {
+        "premium": 0.976,
+        "numerator": "escalate cpvo $0.005946 n=6",
+        "denominator": "fork_cached cpvo $0.006093 n=6"
+      }
+    }
+  },
+  "verdict_numbers": {
+    "live_escalation_premium": 0.976,
+    "retro_escalation_premium": 3.1,
+    "live_fork_cached_cpvo": 0.006093,
+    "retro_fork_cached_cpvo": 1.2658,
+    "live_escalate_cpvo": 0.005946,
+    "retro_escalate_cpvo": 3.9238
+  },
+  "key_read": "All four arms verified at 100% on this tiny stimulus, so per-arm cpvo equals per-cell cost. flash is ~3x cheaper than pro (model effect dominates). fork_blind has the lowest pro cpvo ($0.0076) and the lowest context-token growth (1.357 vs ~1.67 for the chained arms). The live escalation 'premium' is 0.976x \u2014 NOT an estimate of the 3.1x escalation-premium hypothesis: all 6 live escalate cells completed first-attempt (escalate untriggered), so its cpvo reflects the no-escalation-needed case. The 3.1x retro premium is NEITHER confirmed NOR falsified by the live grid \u2014 it is untestable here because the stimulus never required an escalation.",
+  "deliverables": [
+    "cap_session_routing_prospective_score_20260826T160605Z.json (per-cell rows + per-arm aggregates + arm_model interaction + retro comparison)",
+    "cap_session_routing_prospective_p3_validation.json (every verdict number -> source field)",
+    "cap_session_routing_prospective_p3_log.json (this file)"
+  ],
+  "checks": [
+    "join validated first: cell_id + session_policy + model + repetition joined to the phase ledger; session behavior validated against the assigned arm via re-derived session-store fork markers \u2014 0 invalid cells",
+    "cost/verified/cache/latency recomputed from the phase ledgers (spot-checked E4 + 2 flash cells \u2014 exact match)",
+    "retro numbers cited with n on both sides (retro fork_cached n=246, escalate n=7; live n=6 per arm)",
+    "no fabricated escalation: escalate reported as untriggered, never estimated"
+  ]
+}

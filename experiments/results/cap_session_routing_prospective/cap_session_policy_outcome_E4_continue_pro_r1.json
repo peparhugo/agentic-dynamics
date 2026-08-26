@@ -1,0 +1,85 @@
+{
+  "schema_version": "cap_session_policy_outcome/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p1_author_cell_and_measure",
+  "cell_id": "cap_sesspol_E4_continue_pro_r1",
+  "session_policy": "continue",
+  "model": "deepseek/deepseek-v4-pro",
+  "repetition": "r1",
+  "goal": "Implement the product(values) helper in the seeded calc app with a passing test — the session-routing cell stimulus.",
+  "goal_sha256": "c78490b12aae880833479bc8eaf35624e2ae33ce6cabad96ce3ae4dd53497d74",
+  "source_commit": "4374c771d7a6c78625b803cf0d7a8971df599df1",
+  "final_commit": "ad6a28f5046336130ee5ba3edc475fbbbb54e235",
+  "run_ledger": "experiments/results/cap_session_routing_prospective/cap_session_policy_phase_ledger_E4_continue_pro_r1.json",
+  "run_ledger_sha256": "c95bb32cf694f68001f558e256777318e4e6d62e7323cd9056f93c7c27380cef",
+  "cell_manifest": "experiments/results/cap_session_routing_prospective/cap_session_policy_cell_manifest_E4_continue_pro_r1.json",
+  "cell_manifest_sha256": "c5653ced06b41d640cbdbc952c7c9241bef8c61cf997c6fe0a07765061055451",
+  "measured_outcomes": {
+    "session_verified_success": true,
+    "session_context_growth_tokens_in": 1.673,
+    "session_context_growth_tokens_total": 1.503
+  },
+  "measured_economics": {
+    "total_cost_usd": 0.008799,
+    "cost_per_verified_success_usd": 0.008799,
+    "total_duration_s": 144.48,
+    "agent_duration_s": 28.16,
+    "cache_read_tokens": 58368,
+    "cache_write_tokens": 0,
+    "cache_hit_rate_implement": 0.8566,
+    "cache_hit_rate_verify": 0.561,
+    "rework": 0,
+    "failed_phases": 0,
+    "repeated_failures": 0
+  },
+  "per_phase": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "cost_usd": 0.003781455,
+      "duration_s": 20.07,
+      "tokens_in": 6465,
+      "tokens_total": 7395,
+      "cache_read_tokens": 44160,
+      "cache_hit_rate": 0.8566,
+      "session_id": "ses_fc173aed6ffe6VMWvMkz8kB87R",
+      "commit_hash": "9031ca1",
+      "confidence": 1.0,
+      "change_analysis": "available"
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "cost_usd": 0.0,
+      "duration_s": 0.33,
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "commit_hash": "149012c"
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "cost_usd": 0.005017899,
+      "duration_s": 8.09,
+      "tokens_in": 10819,
+      "tokens_total": 11118,
+      "cache_read_tokens": 14208,
+      "cache_hit_rate": 0.561,
+      "session_id": "ses_fc1720c8affeLVoe2BnANm0yfv",
+      "commit_hash": "ad6a28f",
+      "confidence": 1.0,
+      "change_analysis": "available"
+    }
+  ],
+  "verification": "3/3 pytest pass on the final immutable commit ad6a28f; product(values) + test_product landed; add/subtract unchanged; independent test_runner outcome test_executed_success=true.",
+  "notes": [
+    "The verify phase's session_id differs from implement's but the lineage is the fork chain (continue arm proxy): verify resumed implement's session prefix — proven by cache_read_tokens > 0 (14208) and the context-token growth (tokens_in 6465 -> 10819). This is the chained-session continue behavior, NOT fork_blind (which would show cold sessions with ~zero cache reads on the follow-up phase).",
+    "Wall duration (144.48s) exceeds the agent/test phase sum (28.49s) because the full seam runs the sonar + mypy phase-boundary legs under their hard deadline (ANALYZER_LEG_TIMEOUT_SECONDS=360).",
+    "The verify commit swept .mypy_cache/.scannerwork artifacts into the worktree (the analyzer legs write into workdir) — cosmetic only; the measured deliverable (calc.py, test_calc.py) is unaffected.",
+    "Costs are [M] measured (step_finish cumulative cost from the opencode JSONL)."
+  ]
+}

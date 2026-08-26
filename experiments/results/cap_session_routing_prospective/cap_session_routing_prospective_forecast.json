@@ -1,0 +1,62 @@
+{
+  "schema_version": "cap_session_routing_forecast/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p1_author_cell_and_measure",
+  "measured_cell": "cap_sesspol_E4_continue_pro_r1",
+  "measured_arm": "continue",
+  "measured_model": "deepseek/deepseek-v4-pro",
+  "measured_cost_usd": 0.008799,
+  "measured_duration_s": 144.48,
+  "measured_verified_success": true,
+  "forecast_rule": "FORECAST per-cell budget = measured E4 cost x 2 (labeled FORECAST). p2 uses measured costs as forecast only (campaign hard rule 6); the measured E4 supersedes the provisional reference-based $0.30 candidate forecast.",
+  "FORECAST": {
+    "per_cell_cost_usd": 0.017598,
+    "per_arm_budget_usd": 0.105588,
+    "grid_total_usd": 0.422352,
+    "grid_cells": 24,
+    "cells_per_arm": 6,
+    "note": "per_arm_budget_usd = per_cell_cost_usd x 6 cells (3 repetitions x 2 models). grid_total_usd = per_cell_cost_usd x 24. All four arms are forecast at the same x2 envelope because only the continue arm was measured in p1; fork_* and escalate cells are re-measured in p2 and the forecast is replaced by their own measured values as they land.",
+    "stop_budget_usd": 40.0,
+    "headroom_vs_stop_budget": 94.7
+  },
+  "forecast_table": {
+    "arms": [
+      {
+        "arm": "continue",
+        "measured_p1_usd": 0.008799,
+        "forecast_per_cell_usd": 0.017598,
+        "forecast_per_arm_usd": 0.105588,
+        "cells": 6
+      },
+      {
+        "arm": "fork_blind",
+        "measured_p1_usd": null,
+        "forecast_per_cell_usd": 0.017598,
+        "forecast_per_arm_usd": 0.105588,
+        "cells": 6,
+        "note": "p1 measured only the continue arm; forecast envelope carried over from E4 x2 until the first fork_blind cell measures."
+      },
+      {
+        "arm": "fork_cached",
+        "measured_p1_usd": null,
+        "forecast_per_cell_usd": 0.017598,
+        "forecast_per_arm_usd": 0.105588,
+        "cells": 6,
+        "note": "p1 measured only the continue arm; forecast envelope carried over from E4 x2 until the first fork_cached cell measures."
+      },
+      {
+        "arm": "escalate",
+        "measured_p1_usd": null,
+        "forecast_per_cell_usd": 0.017598,
+        "forecast_per_arm_usd": 0.105588,
+        "cells": 6,
+        "note": "p1 measured only the continue arm; forecast envelope carried over from E4 x2. The escalate arm's model switch (pro <-> flash) may move its realized cost materially — re-measured in p2, forecast replaced as cells land."
+      }
+    ],
+    "not_run": [
+      "fork_with_checkpoint",
+      "escalate_with_checkpoint"
+    ],
+    "not_run_reason": "typed context_snapshot_id checkpoint arms — I10 forward-only, zero production capture. Listed, never estimated."
+  }
+}

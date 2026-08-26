@@ -1,0 +1,115 @@
+name: cap_session_policy_cell
+question: >-
+  The session-policy study's cell template (cap_session_routing_prospective, design §4): one
+  small multi-phase agent_task workflow — implement + test + verify against a seeded calc app —
+  where the ASSIGNED session policy governs phase-boundary session behavior. The arm is never
+  proposed by the cell: the campaign passes it via the cell's goal/env (FINOPS_CELL_ID carries
+  the arm, e.g. E4_continue_pro_r1) and the candidate manifest (session_policy factor level).
+  This spec declares fork: false — the runner's fork flag is CONTROLLED BY THE ARM, never by
+  the spec (addendum §4.4: arms control forking, not the runner). The campaign executor maps the
+  arm to runner behavior per the design §2 arm table:
+    continue    -> one session lineage for the whole cell (the runner's chained-session fork
+                   mode: each phase resumes the prior session's context prefix — cache reuse,
+                   stale-context risk; the no-checkpoint baseline, the addendum §4.3 applied
+                   incumbent)
+    fork_blind  -> a new COLD session per phase (runner fork=false: no session chaining)
+    fork_cached -> a new session per phase, same model, WARM cache (session chaining + cache
+                   reads > 0 — the cache-reuse proxy for the I10-gated checkpoint arm)
+    escalate    -> a failed phase is re-run in a NEW session on the OTHER model (pro <-> flash);
+                   the model switch is provable in the ledger (failed phase -> new session ->
+                   other model), never narration
+  The typed checkpoint arms (fork_with_checkpoint / escalate_with_checkpoint, real
+  context_snapshot_id) are NOT executable (I10 forward-only — zero production capture); they are
+  listed as not-run, never estimated. Every cell manifest records the proxy mapping.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      seeded_app: >-
+        A fresh disposable worktree seeded with a tiny calc package: calc.py (add, subtract)
+        and test_calc.py (test_add, test_subtract). The implement phase adds a small pure helper
+        so the typed CodeDelta reports a real changed symbol. The campaign seeds the identical
+        app for every cell; only the assigned session_policy arm differs across cells.
+      arm_contract: >-
+        THE ARM IS ASSIGNED, NEVER PROPOSED (campaign hard rule 2): the session_policy factor
+        level comes from the candidate manifest + FINOPS_CELL_ID (e.g. E4_continue_pro_r1).
+        The cell's phases are arm-agnostic build steps; the assigned session behavior is
+        enforced by the campaign executor at phase boundaries per the design §2 table above.
+        A cell whose session behavior deviates from its assigned arm is invalid, never scored
+        as the arm. fork: false is declared here so the spec never forces a fork.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Implement a small pure helper function in the seeded calc app.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py        (the existing add / subtract functions)
+          - test_calc.py   (the existing test_add / test_subtract)
+
+          DO:
+          - Add a `product(values)` function to calc.py that returns the product of a non-empty
+            list of numbers, raising ValueError("empty values") on an empty list.
+          - Add a `test_product` function to test_calc.py that asserts product([1, 2, 3, 4]) == 24
+            and that product([]) raises ValueError.
+          - Do not change add / subtract or their tests.
+
+          VERIFY: `python -m pytest test_calc.py -q` passes.
+
+          DELIVER the changed calc.py and test_calc.py.
+      - name: test
+        kind: test
+        timeout: 600
+      - name: verify
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Verify the product feature landed correctly.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Confirm calc.py defines `product(values)` with a ValueError guard for the empty list.
+          - Confirm test_calc.py defines `test_product` and that `python -m pytest test_calc.py -q`
+            passes.
+          - Confirm add / subtract were left unchanged.
+
+          DELIVER a short verification note (what was checked, and the pytest result).
+factors:
+  - {name: session_policy, levels: [continue, fork_blind, fork_cached, escalate]}
+  - {name: model, levels: [deepseek/deepseek-v4-pro, deepseek/deepseek-v4-flash]}
+  - {name: repetition, levels: [r1, r2, r3]}
+design: factorial
+rules:
+  - name: session_policy_outcome
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success, confidence, tokens_in, tokens_out,
+               tokens_answer, tokens_explanation, perturbation_strength]
+    produces: [session_verified_success, session_context_growth]
+metrics:
+  - {name: session_verified_success, agg: mean, over: cell}
+  - {name: session_context_growth, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

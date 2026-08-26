@@ -1,0 +1,420 @@
+{
+  "spec_name": "cap_session_policy_cell",
+  "spec_id": "cap_session_policy_cell@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "workdir": "/tmp/cap_sesspol_fork_cached_pro_r1",
+  "goal": "Implement the product(values) helper in the seeded calc app with a passing test \u2014 the session-routing cell stimulus.",
+  "git_sha": "6ae58da",
+  "started_at": "2026-08-26T15:29:35.610591+00:00",
+  "ended_at": "2026-08-26T15:32:05.402977+00:00",
+  "total_cost_usd": 0.009205,
+  "ok": true,
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "spec_id": "cap_session_policy_cell@0.1",
+      "model": "deepseek/deepseek-v4-pro",
+      "duration_s": 20.42,
+      "commit_hash": "b7f4159",
+      "error": "",
+      "tokens": {
+        "in": 6523,
+        "out": 1065,
+        "reasoning": 9,
+        "answer": 889,
+        "explanation": 176,
+        "total": 7597
+      },
+      "cost_usd": 0.003932429,
+      "cache_read_tokens": 44288,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.8536,
+      "session_id": "ses_fc14f152effeAWojbCV0FLoxnZ",
+      "files_created": [],
+      "files_modified": [
+        "calc.py",
+        "test_calc.py"
+      ],
+      "confidence": 1.0,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": {
+        "facts": [
+          {
+            "predicate": "sonar_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "sonar:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "lsp:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae"
+            ]
+          },
+          {
+            "predicate": "lsp_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "sonar:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "lsp:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae"
+            ]
+          },
+          {
+            "predicate": "analysis_revision_matches",
+            "value": "true",
+            "value_type": "bool",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "sonar:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "lsp:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae"
+            ]
+          },
+          {
+            "predicate": "ast_parse_coverage",
+            "value": "1.0",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "sonar:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "lsp:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae"
+            ]
+          },
+          {
+            "predicate": "changed_symbol_count",
+            "value": "2",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "sonar:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "lsp:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae"
+            ]
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "sonar:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "lsp:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae"
+            ]
+          },
+          {
+            "predicate": "new_sonar_critical_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "sonar:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "lsp:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae"
+            ]
+          },
+          {
+            "predicate": "changed_symbols_with_tests_ratio",
+            "value": "0.5",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "sonar:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "lsp:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae"
+            ]
+          },
+          {
+            "predicate": "code_change_risk",
+            "value": "0.125",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "sonar:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+              "lsp:self-fork_cached_pro_r1:implement:b7f41599e82097cb1bb99be5cd93db5c724ca8ae"
+            ]
+          }
+        ],
+        "neighborhood": [
+          "product",
+          "test_product"
+        ],
+        "graph_updated": false,
+        "impacted_count": null,
+        "graph_status": "not_requested",
+        "revision": "b7f41599e82097cb1bb99be5cd93db5c724ca8ae",
+        "repository_id": "self-fork_cached_pro_r1",
+        "phase_id": "implement",
+        "observed_at": "2026-08-26T15:30:52.457933+00:00"
+      }
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "spec_id": "cap_session_policy_cell@0.1",
+      "model": "",
+      "duration_s": 0.35,
+      "commit_hash": "9b09f33",
+      "error": "",
+      "tokens": {},
+      "cost_usd": 0.0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.0,
+      "session_id": "",
+      "files_created": [],
+      "files_modified": [],
+      "confidence": null,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "change_analysis": {
+        "facts": [
+          {
+            "predicate": "sonar_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "sonar:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "lsp:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117"
+            ]
+          },
+          {
+            "predicate": "lsp_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "sonar:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "lsp:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117"
+            ]
+          },
+          {
+            "predicate": "analysis_revision_matches",
+            "value": "true",
+            "value_type": "bool",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "sonar:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "lsp:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117"
+            ]
+          },
+          {
+            "predicate": "changed_symbol_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "sonar:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "lsp:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117"
+            ]
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "sonar:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "lsp:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117"
+            ]
+          },
+          {
+            "predicate": "new_sonar_critical_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "sonar:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "lsp:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117"
+            ]
+          },
+          {
+            "predicate": "code_change_risk",
+            "value": "0.0",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "sonar:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+              "lsp:self-fork_cached_pro_r1:test:9b09f331e30c2a88f27e3d08af99eddb5b9d2117"
+            ]
+          }
+        ],
+        "neighborhood": [],
+        "graph_updated": false,
+        "impacted_count": null,
+        "graph_status": "not_requested",
+        "revision": "9b09f331e30c2a88f27e3d08af99eddb5b9d2117",
+        "repository_id": "self-fork_cached_pro_r1",
+        "phase_id": "test",
+        "observed_at": "2026-08-26T15:31:24.889667+00:00"
+      }
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "spec_id": "cap_session_policy_cell@0.1",
+      "model": "deepseek/deepseek-v4-pro",
+      "duration_s": 10.85,
+      "commit_hash": "6ae58da",
+      "error": "",
+      "tokens": {
+        "in": 11203,
+        "out": 345,
+        "reasoning": 0,
+        "answer": 190,
+        "explanation": 155,
+        "total": 11548
+      },
+      "cost_usd": 0.005272287,
+      "cache_read_tokens": 27264,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.7025,
+      "session_id": "ses_fc14d6a0fffeimio1hS1RCAkKK",
+      "files_created": [],
+      "files_modified": [
+        ".instrument/session.jsonl",
+        ".mypy_cache/.gitignore",
+        ".mypy_cache/3.10/cache.0.db",
+        ".mypy_cache/3.10/cache.1.db",
+        ".mypy_cache/3.10/cache.10.db",
+        ".mypy_cache/3.10/cache.11.db",
+        ".mypy_cache/3.10/cache.12.db",
+        ".mypy_cache/3.10/cache.13.db",
+        ".mypy_cache/3.10/cache.14.db",
+        ".mypy_cache/3.10/cache.15.db",
+        ".mypy_cache/3.10/cache.2.db",
+        ".mypy_cache/3.10/cache.3.db",
+        ".mypy_cache/3.10/cache.4.db",
+        ".mypy_cache/3.10/cache.5.db",
+        ".mypy_cache/3.10/cache.6.db",
+        ".mypy_cache/3.10/cache.7.db",
+        ".mypy_cache/3.10/cache.8.db",
+        ".mypy_cache/3.10/cache.9.db",
+        ".mypy_cache/CACHEDIR.TAG",
+        ".scannerwork/.sonar_lock",
+        ".scannerwork/report-task.txt",
+        "calc.py",
+        "test_calc.py"
+      ],
+      "confidence": 1.0,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": {
+        "facts": [
+          {
+            "predicate": "sonar_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "sonar:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "lsp:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018"
+            ]
+          },
+          {
+            "predicate": "lsp_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "sonar:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "lsp:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018"
+            ]
+          },
+          {
+            "predicate": "analysis_revision_matches",
+            "value": "true",
+            "value_type": "bool",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "sonar:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "lsp:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018"
+            ]
+          },
+          {
+            "predicate": "changed_symbol_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "sonar:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "lsp:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018"
+            ]
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "sonar:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "lsp:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018"
+            ]
+          },
+          {
+            "predicate": "new_sonar_critical_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "sonar:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "lsp:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018"
+            ]
+          },
+          {
+            "predicate": "code_change_risk",
+            "value": "0.0",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "sonar:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018",
+              "lsp:self-fork_cached_pro_r1:verify:6ae58da91c023936691326cb88b3fddb1ec5d018"
+            ]
+          }
+        ],
+        "neighborhood": [],
+        "graph_updated": false,
+        "impacted_count": null,
+        "graph_status": "not_requested",
+        "revision": "6ae58da91c023936691326cb88b3fddb1ec5d018",
+        "repository_id": "self-fork_cached_pro_r1",
+        "phase_id": "verify",
+        "observed_at": "2026-08-26T15:32:05.401774+00:00"
+      }
+    }
+  ]
+}

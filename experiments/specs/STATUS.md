@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-26T16:12:50.442381+00:00`  ·  121 spec(s)
-**Work remaining:** 29 open · 92 completed/retired
+Generated at: `2026-08-26T14:53:30.000000+00:00`  ·  122 spec(s)
+**Work remaining:** 32 open · 90 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -12,11 +12,14 @@ Generated at: `2026-08-26T16:12:50.442381+00:00`  ·  121 spec(s)
 | `cap_2a_cell_clean` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_cell_critical` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_cell_style` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_2b` | workflow | no | runnable | 0.1 | cap_2a_rerun3 | — | — | — | — | 0 |
 | `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_escalation_fix` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_grit_strength_grid` | experiment | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_session_policy_cell` | workflow | yes | runnable | 0.1 | — | 2026-08-26 14:52 | ok | deepseek/deepseek-v4-pro | $0.0088 | 1 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
+| `cap_session_routing_prospective` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | runnable | 0.1 | — | 2026-08-23 19:16 | ok | anthropic/claude-sonnet-5 | $49.5218 | 4 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
@@ -46,7 +49,6 @@ Generated at: `2026-08-26T16:12:50.442381+00:00`  ·  121 spec(s)
 | `cap_2a_rerun2` | workflow | no | completed | 0.1 | cap_2a_rerun | 2026-08-26 02:07 | ok | deepseek/deepseek-v4-pro | $1.0774 | 1 |
 | `cap_2a_rerun3` | workflow | no | completed | 0.1 | cap_2a_rerun2 | 2026-08-26 05:13 | ok | deepseek/deepseek-v4-pro | $0.4936 | 1 |
 | `cap_2a_shadow_calibration` | workflow | no | completed | 0.2 | — | 2026-08-25 22:36 | ok | deepseek/deepseek-v4-pro | $0.8251 | 1 |
-| `cap_2b` | workflow | no | completed | 0.1 | cap_2a_rerun3 | 2026-08-26 16:04 | ok | deepseek/deepseek-v4-flash | $0.2303 | 1 |
 | `cap_addendum_design` | workflow | no | completed | 0.1 | — | 2026-08-22 18:15 | ok | deepseek/deepseek-v4-pro | $0.4667 | 1 |
 | `cap_addendum_implement` | workflow | no | completed | 0.1 | — | 2026-08-24 14:07 | ok | anthropic/claude-sonnet-5 | $27.9867 | 2 |
 | `cap_e2_cascade_run` | workflow | no | completed | 0.1 | — | 2026-08-24 23:55 | ok | deepseek/deepseek-v4-flash | $0.1075 | 1 |
@@ -62,7 +64,6 @@ Generated at: `2026-08-26T16:12:50.442381+00:00`  ·  121 spec(s)
 | `cap_implement_repair` | workflow | no | completed | 0.1 | — | 2026-08-22 18:16 | ok | deepseek/deepseek-v4-pro | $0.2652 | 1 |
 | `cap_pattern_minting` | workflow | no | completed | 0.1 | — | 2026-08-24 23:57 | ok | deepseek/deepseek-v4-flash | $0.1690 | 1 |
 | `cap_routing_evidence_specs` | workflow | no | completed | 0.1 | — | 2026-08-24 00:35 | ok | anthropic/claude-sonnet-5 | $13.6310 | 1 |
-| `cap_session_routing_prospective` | workflow | no | completed | 0.1 | — | 2026-08-26 16:12 | ok | deepseek/deepseek-v4-flash | $0.1882 | 1 |
 | `cap_session_routing_spec` | workflow | no | completed | 0.1 | — | 2026-08-22 17:59 | ok | deepseek/deepseek-v4-pro | $0.1430 | 1 |
 | `cap_shadow_campaign` | workflow | no | completed | 0.1 | — | 2026-08-24 00:07 | ok | anthropic/claude-sonnet-5 | $6.7989 | 1 |
 | `cap_shadow_fact_disposition` | workflow | no | completed | 0.1 | — | 2026-08-24 00:44 | ok | deepseek/deepseek-v4-flash | $0.2045 | 1 |

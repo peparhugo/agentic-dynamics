@@ -1,0 +1,47 @@
+{
+  "schema_version": "cap_session_policy_candidate_manifest/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p1_author_cell_and_measure",
+  "spec": "workflows/operations/cap_session_policy_cell.yaml",
+  "spec_sha256": "4aacdc48ca8e5dec36e1c1f2f4865bbb648885ec85522a8da9c7837a9d8c8789",
+  "spec_version": "0.1",
+  "design": "docs/designs/current/cap_session_routing_prospective_design.md",
+  "wrapper_model": "deepseek/deepseek-v4-flash",
+  "goal": "Implement the product(values) helper in the seeded calc app with a passing test — the session-routing cell stimulus.",
+  "goal_sha256": "c78490b12aae880833479bc8eaf35624e2ae33ce6cabad96ce3ae4dd53497d74",
+  "forecast_note": "PROVISIONAL reference-based forecast (no prior session-policy cell exists): a comparable small 3-phase pro workflow (auto_posthoc_wiring) measured $0.1471; forecast set at ~2x headroom. The measured E4 cost supersedes this as the campaign's FORECAST per-arm budget (measured x 2, labeled FORECAST) once E4 completes.",
+  "proxy_mapping": {
+    "continue": "one session lineage for the whole cell (runner fork=true chained-session mode: each phase resumes the prior session's context prefix — cache reuse, stale-context risk). The addendum §4.3 applied incumbent.",
+    "fork_blind": "a new COLD session per phase (runner fork=false: no session chaining).",
+    "fork_cached": "a new session per phase, same model, WARM cache (session chaining + cache reads > 0). Cache-reuse proxy for the I10-gated fork_with_checkpoint arm.",
+    "escalate": "a failed phase is re-run in a NEW session on the OTHER model (pro <-> flash); provable in the ledger (failed phase -> new session -> other model)."
+  },
+  "not_run": [
+    "fork_with_checkpoint (typed context_snapshot_id — I10 forward-only, zero production capture)",
+    "escalate_with_checkpoint (typed context_snapshot_id — I10 forward-only)"
+  ],
+  "cells": [
+    {
+      "cell_id": "cap_sesspol_E4_continue_pro_r1",
+      "session_policy": "continue",
+      "model": "deepseek/deepseek-v4-pro",
+      "backend": "opencode",
+      "repetition": "r1",
+      "goal": "Implement the product(values) helper in the seeded calc app with a passing test — the session-routing cell stimulus.",
+      "goal_sha256": "c78490b12aae880833479bc8eaf35624e2ae33ce6cabad96ce3ae4dd53497d74",
+      "worktree": "/tmp/cap_sesspol_E4_continue_pro_r1",
+      "FINOPS_CELL_ID": "E4_continue_pro_r1",
+      "spec": "workflows/operations/cap_session_policy_cell.yaml",
+      "spec_sha256": "4aacdc48ca8e5dec36e1c1f2f4865bbb648885ec85522a8da9c7837a9d8c8789",
+      "seam": "full: change-analysis evidence seam + LivePublisher telemetry + workflow ledger + test_runner on the immutable commits",
+      "forecast_cost_usd": 0.3,
+      "status": "completed",
+      "measured_cost_usd": 0.008799,
+      "measured_verified_success": true,
+      "final_commit": "ad6a28f5046336130ee5ba3edc475fbbbb54e235",
+      "result_manifest": "experiments/results/cap_session_routing_prospective/cap_session_policy_cell_manifest_E4_continue_pro_r1.json",
+      "result_outcome": "experiments/results/cap_session_routing_prospective/cap_session_policy_outcome_E4_continue_pro_r1.json"
+    }
+  ],
+  "rule": "A cell not listed in this candidate manifest is not run (campaign hard rule 5)."
+}
