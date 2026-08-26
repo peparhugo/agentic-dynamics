@@ -129,7 +129,14 @@ def _aggregate_record(
         f"risk_mint_rate {agg.get('risk_mint_rate')}, "
         f"unknown {agg.get('n_unknown_outcome')} invalid {agg.get('n_invalid_join')} "
         f"not_run {agg.get('n_not_run')}"
-    ) + " :: " + json.dumps(payload, sort_keys=True)
+    )
+    if agg.get("n_hits") is None:
+        # escalation schema: the aggregate is the loss table + conclusion, not hit-rates.
+        text = (
+            f"{campaign} scored -> {agg.get('conclusion') or 'conclusion in payload'}"
+            f" (loss table: {json.dumps(agg.get('loss_table'))[:200]})"
+        )
+    text = text + " :: " + json.dumps(payload, sort_keys=True)
     return ki.build_record_from_parts(
         source_type="report",
         source_uri=f"file://experiments/results/{campaign}/score.json",
@@ -149,14 +156,74 @@ def _aggregate_record(
     )
 
 
+def _escalation_record(
+    row: dict, *, campaign: str, revision: str, now: str
+) -> ki.KnowledgeRecord:
+    """One [M] report per measured escalation multiplier (the cap_escalation_measurement
+    schema: per-model E_x = escalation fix cost / original cell cost, both measured)."""
+    payload = {
+        "campaign": campaign,
+        "escalation_model": row.get("escalation_model") or row.get("model"),
+        "backend": row.get("backend"),
+        "fix_cost_usd": row.get("fix_cost_usd") or row.get("escalation_fix_cost_usd"),
+        "original_cell_cost_usd": row.get("original_cell_cost_usd"),
+        "ex": row.get("ex") or row.get("E_x"),
+        "tests_passing": row.get("tests_passing"),
+        "defect_fixed": row.get("defect_fixed"),
+    }
+    one_liner = (
+        f"{campaign} escalation {payload['escalation_model']} -> "
+        f"E_x {payload['ex']}, fix ${payload['fix_cost_usd']} "
+        f"/ original ${payload['original_cell_cost_usd']}"
+    )
+    text = one_liner + " :: " + json.dumps(payload, sort_keys=True)
+    return ki.build_record_from_parts(
+        source_type="report",
+        source_uri=f"file://experiments/results/{campaign}/score.json",
+        logical_locator=f"cap_2a:{campaign}:ex:{payload['escalation_model']}",
+        repository_id=f"cap_2a:{campaign}",
+        revision=revision,
+        authority=Authority.MEASURED,
+        evidence_class="[M]",
+        text=text,
+        extra_fields={
+            "extractor_version": EXTRACTOR_VERSION,
+            "acl_scope": f"cap_2a:{campaign}",
+            "worktree_id": f"cap_2a:{campaign}",
+            "outcome_id": str(payload["escalation_model"]),
+        },
+        now=now,
+    )
+
+
 def derive_campaign_records(score: dict, *, campaign: str) -> list[ki.KnowledgeRecord]:
-    """One [M] finding per scored cell + one aggregate finding, from a cap_2a_score/v1 JSON."""
+    """One [M] report per scored cell + one aggregate, from a cap_2a_score/v1 JSON — or one
+    [M] report per measured E_x + one aggregate, from the cap_escalation_measurement schema."""
     revision = str(score.get("source_revision") or score.get("spec_version") or "")
     now = _now()
     records: list[ki.KnowledgeRecord] = []
-    for cell in score.get("cells") or []:
-        records.append(_cell_record(cell, campaign=campaign, revision=revision, now=now))
-    agg = score.get("aggregates") or {}
+    cells = score.get("cells")
+    if cells:
+        for cell in cells:
+            records.append(_cell_record(cell, campaign=campaign, revision=revision, now=now))
+    per_model = score.get("per_model")
+    if per_model:
+        for row in per_model:
+            records.append(_escalation_record(row, campaign=campaign, revision=revision, now=now))
+    agg = score.get("aggregates")
+    if agg is None:
+        # escalation schema: the loss table + conclusion are the aggregate evidence.
+        agg = {
+            "n_scored": len(per_model or []),
+            "n_hits": None,
+            "n_unknown_outcome": 0,
+            "n_invalid_join": 0,
+            "n_not_run": len(score.get("flags") or []),
+            "wilson_95_ci": [],
+            "risk_mint_rate": None,
+            "loss_table": score.get("loss_table"),
+            "conclusion": score.get("conclusion"),
+        }
     if agg:
         records.append(_aggregate_record(agg, campaign=campaign, revision=revision, now=now))
     return records

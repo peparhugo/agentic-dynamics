@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-26T12:37:57.722515+00:00",
+  "generated_at": "2026-08-26T14:14:12.204992+00:00",
   "opencode_version": "unknown",
-  "git_commit": "2ce8c771",
+  "git_commit": "26fecf23",
   "files": {
     "canonical_inputs": {
       "inventory.json": {
@@ -16,7 +16,7 @@
     },
     "canonical_outputs": {
       "data.js": {
-        "sha256": "395fa9cc25e66470c74207a47624037ab0ce20f7e5176146c60bdc0ca0a224fa",
+        "sha256": "dd9ff9284f046cd6a0a245a8b760f1ae7c2bc56c672f33688987e87808cb21a3",
         "size_bytes": 128246
       }
     },
@@ -3597,6 +3597,30 @@
           "observed_at": "2026-08-25T15:30:18.903436+00:00",
           "indexed_at": "2026-08-26T02:32:55.569273+00:00",
           "reason": "fact-content=9f4e20a82c1cc034309ddaad43a7fc0c5f5b9ba2fb7f511f26259b477f2c9342"
+        }
+      ]
+    },
+    {
+      "entity_id": "03416c275bcd049afd2048919d0d0b067d4778f920b0d9e00e8c4ab1853f1414",
+      "knowledge_id": "112a6bf506eea590e357ec1f721ddfe622a5d4c46b313d73775b9fcf6b5e6370",
+      "source_type": "fact",
+      "logical_locator": "attempt:p4_adversarial#attempt_model",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p4_adversarial:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_model",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:35.073509+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=4af09b68596afb9d21f4168ecc3344106d344af249f2e8b55f742ec2659db3f7",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "112a6bf506eea590e357ec1f721ddfe622a5d4c46b313d73775b9fcf6b5e6370",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:35.073509+00:00",
+          "reason": "fact-content=4af09b68596afb9d21f4168ecc3344106d344af249f2e8b55f742ec2659db3f7"
         }
       ]
     },
@@ -25929,6 +25953,30 @@
       ]
     },
     {
+      "entity_id": "168ef2be724edea97a3a68f4dcbc472abdefda58d4dffd3b0b90cb45bb9d8be2",
+      "knowledge_id": "74c8d7ca9cd87f2f905bb12b82dae038f033b4a8e31b5461f610df4eb37856cf",
+      "source_type": "fact",
+      "logical_locator": "workflow:wf_cap_escalation_measurement_deepseek_deepseek_v4_flash#workflow_phases_completed",
+      "source_uri": "fact://workflow/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash/workflow_phases_completed",
+      "observed_at": "2026-08-26T13:01:29.571608+00:00",
+      "indexed_at": "2026-08-26T13:01:37.062802+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=e83977b700089c416119a20f8d54dfb08d5fa482e41b021cd693cadad96ae97a",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "74c8d7ca9cd87f2f905bb12b82dae038f033b4a8e31b5461f610df4eb37856cf",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:29.571608+00:00",
+          "indexed_at": "2026-08-26T13:01:37.062802+00:00",
+          "reason": "fact-content=e83977b700089c416119a20f8d54dfb08d5fa482e41b021cd693cadad96ae97a"
+        }
+      ]
+    },
+    {
       "entity_id": "1691818538ad9ed7a77a4eb7f3ba2a5043f62029465b3bf5c7206a620352a0da",
       "knowledge_id": "d69f875260e5b9f19e552ccb047bfd23c0143e051f27c84001ea5342d3cbe6e4",
       "source_type": "fact",
@@ -27461,6 +27509,30 @@
           "observed_at": "2026-08-26T05:13:11.014894+00:00",
           "indexed_at": "2026-08-26T05:13:25.013999+00:00",
           "reason": "fact-content=b612aea1f09fdeb7af6aa83c8132859992cef5ecb668258c07134912ee477aba"
+        }
+      ]
+    },
+    {
+      "entity_id": "180812836612660a9ac31eb8e25d7f8a7fc5ea26585d43a11f9a556e26fd66e7",
+      "knowledge_id": "dfb0ed4c2cdc7ce5ae7ed013756c6e27c6e47077dcd91319cc1677b4499a7f4c",
+      "source_type": "fact",
+      "logical_locator": "attempt:p4_adversarial#attempt_tokens_in",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p4_adversarial:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_tokens_in",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:35.238609+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=8b8feb6dcc62affc5508d50b6aaa514be57dcd30dc70a86d3ee3672294a4eda6",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "dfb0ed4c2cdc7ce5ae7ed013756c6e27c6e47077dcd91319cc1677b4499a7f4c",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:35.238609+00:00",
+          "reason": "fact-content=8b8feb6dcc62affc5508d50b6aaa514be57dcd30dc70a86d3ee3672294a4eda6"
         }
       ]
     },
@@ -33049,6 +33121,30 @@
       ]
     },
     {
+      "entity_id": "1d5c7009b8f04b752f64b3dd6c06c6adfdfc78df08c97efcec0e3edec4d5b502",
+      "knowledge_id": "3e8dedecd80885613f4121cb4d879c231546bc19197202faccd212492d3b21f1",
+      "source_type": "fact",
+      "logical_locator": "attempt:p1_locate_the_escaped_defect#attempt_confidence",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p1_locate_the_escaped_defect:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_confidence",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:32.441967+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=58d0f8a3c88c3d828892b45fb45dd7154c4101b2831485b73a5f2da91a8daca1",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "3e8dedecd80885613f4121cb4d879c231546bc19197202faccd212492d3b21f1",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:32.441967+00:00",
+          "reason": "fact-content=58d0f8a3c88c3d828892b45fb45dd7154c4101b2831485b73a5f2da91a8daca1"
+        }
+      ]
+    },
+    {
       "entity_id": "1d649a7343557b8137e1f6cd9b843256ae6af88c6191fba521d33e08ae3fc5a3",
       "knowledge_id": "6cc7960dee752c0d9a45e5611f1388a67779c23d7189adf518075912b8a514b7",
       "source_type": "fact",
@@ -34149,6 +34245,30 @@
           "observed_at": "2026-08-24T19:30:31.174081+00:00",
           "indexed_at": "2026-08-26T02:32:54.952585+00:00",
           "reason": "fact-content=23d93f1b2bd38d12df4fc66a09f947ced3d53a881a085c15a668fb3bfb565c11"
+        }
+      ]
+    },
+    {
+      "entity_id": "1e57225ab7ca10a48ad4e41971194444e6a7635070caf3af31828be43428e47d",
+      "knowledge_id": "22e30cf3976141802b516907abfe7a2a3f8908166875f2cbf5ea2acc1c40a043",
+      "source_type": "fact",
+      "logical_locator": "workflow:wf_cap_escalation_measurement_deepseek_deepseek_v4_flash#workflow_phases_remaining",
+      "source_uri": "fact://workflow/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash/workflow_phases_remaining",
+      "observed_at": "2026-08-26T13:01:29.571608+00:00",
+      "indexed_at": "2026-08-26T13:01:37.228922+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=9d7f70b57175d52984922089f7c288d7ff1ad1fc81729c2ed7d29bc84b333d07",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "22e30cf3976141802b516907abfe7a2a3f8908166875f2cbf5ea2acc1c40a043",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:29.571608+00:00",
+          "indexed_at": "2026-08-26T13:01:37.228922+00:00",
+          "reason": "fact-content=9d7f70b57175d52984922089f7c288d7ff1ad1fc81729c2ed7d29bc84b333d07"
         }
       ]
     },
@@ -40129,6 +40249,30 @@
       ]
     },
     {
+      "entity_id": "231085aaa64cdbbb32b697eb3f0a01f9e1f66c9aa3e923a6dfd86dbc5061fcba",
+      "knowledge_id": "63a05c715d84a9d06e2c0393b06efae6113f5dd8ecb717ad9659583e7aad9509",
+      "source_type": "fact",
+      "logical_locator": "attempt:p3_compute_ex#attempt_cache_hit_rate",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p3_compute_ex:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_cache_hit_rate",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:34.580167+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=b6543f815ada1b5c569588a3493ab0586f0cfbc4ab8a2b6bba3527aefce609b7",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "63a05c715d84a9d06e2c0393b06efae6113f5dd8ecb717ad9659583e7aad9509",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:34.580167+00:00",
+          "reason": "fact-content=b6543f815ada1b5c569588a3493ab0586f0cfbc4ab8a2b6bba3527aefce609b7"
+        }
+      ]
+    },
+    {
       "entity_id": "2313db91c503e9ccd07a8ac2233c408f231774ab9dae3ef7afb41ab84992ccfb",
       "knowledge_id": "c673d230d56147f71a1e271ed4e74785279c0e221f3bee050654141231f27886",
       "source_type": "fact",
@@ -42413,6 +42557,30 @@
           "observed_at": "2026-08-20T22:10:36.264486+00:00",
           "indexed_at": "2026-08-26T02:32:54.050590+00:00",
           "reason": "fact-content=e6da0680271fcf6e2ca3fa67edbe89ce823fcd68240c3591eb70379554d62bf2"
+        }
+      ]
+    },
+    {
+      "entity_id": "25863f99765abdbb9f0c34f43a266950e64f027eb6ca7c7ebc7c6399496b34c5",
+      "knowledge_id": "7a9323912bdcae237111063cebcf196a311b58de1eae84a338c40246fd632543",
+      "source_type": "fact",
+      "logical_locator": "attempt:p1_locate_the_escaped_defect#phase_commit",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p1_locate_the_escaped_defect:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/phase_commit",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:31.438599+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=70d1ccf9fd49b9ea6c02eb48522c433f60fdf5157fed6f4f029a04efc96ab8da",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "7a9323912bdcae237111063cebcf196a311b58de1eae84a338c40246fd632543",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:31.438599+00:00",
+          "reason": "fact-content=70d1ccf9fd49b9ea6c02eb48522c433f60fdf5157fed6f4f029a04efc96ab8da"
         }
       ]
     },
@@ -63457,6 +63625,30 @@
       ]
     },
     {
+      "entity_id": "38c1589693a74e568409c659c12ac4fea0eadc8441ce6debf7ccaaf969cc564f",
+      "knowledge_id": "5d9773a0b2cba049fb95404e9d99f60dae377e5e385b409023ed1426e5b254f3",
+      "source_type": "fact",
+      "logical_locator": "workflow:wf_cap_escalation_measurement_deepseek_deepseek_v4_flash#projected_budget_overrun",
+      "source_uri": "fact://workflow/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash/projected_budget_overrun",
+      "observed_at": "2026-08-26T13:01:29.571608+00:00",
+      "indexed_at": "2026-08-26T13:01:37.723591+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=61f57778ca4064f414aa41c2356a7ab480f123fcc57942fdd6af96c8505f05d0",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "5d9773a0b2cba049fb95404e9d99f60dae377e5e385b409023ed1426e5b254f3",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:29.571608+00:00",
+          "indexed_at": "2026-08-26T13:01:37.723591+00:00",
+          "reason": "fact-content=61f57778ca4064f414aa41c2356a7ab480f123fcc57942fdd6af96c8505f05d0"
+        }
+      ]
+    },
+    {
       "entity_id": "38db6afa78cfbe22d3d4027a0335cea0ab9d15b07c8e03d290224d857499cb43",
       "knowledge_id": "2bf889ab71cea5c547e2dc0f9f46f171aa31d627c1e03deeaaa6f5c4112d1dee",
       "source_type": "fact",
@@ -72673,6 +72865,30 @@
       ]
     },
     {
+      "entity_id": "406a0b74028bead5d6d3ab0199beac5840a271d0fd70f614bc9571158c8ef0fd",
+      "knowledge_id": "e7fe30f3dd8f3d6371eb601ecc31a5c39a462b3a727fbc0115f721ca14b2307e",
+      "source_type": "fact",
+      "logical_locator": "job:wf_cap_escalation_measurement_deepseek_deepseek_v4_flash#job_status",
+      "source_uri": "fact://job/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash/job_status",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:36.398278+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=185374df12c476082d918099743c51980e0e9b64e050f470bb8f3f2ed15cdad4",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "e7fe30f3dd8f3d6371eb601ecc31a5c39a462b3a727fbc0115f721ca14b2307e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:36.398278+00:00",
+          "reason": "fact-content=185374df12c476082d918099743c51980e0e9b64e050f470bb8f3f2ed15cdad4"
+        }
+      ]
+    },
+    {
       "entity_id": "4071ac75b9d5c5befce6cc6e2c0382d2b2e6e86edf9b0c8a095b2608cd073ec8",
       "knowledge_id": "cb6ceecb10988b21820bf37bacc38b7a83d99059b8ae9b51fdce35c8d460842f",
       "source_type": "fact",
@@ -81837,6 +82053,30 @@
           "observed_at": "2026-08-24T02:38:44.208335+00:00",
           "indexed_at": "2026-08-26T02:26:49.111694+00:00",
           "reason": "fact-content=b3effcaad4b0d45370aa475c566505ca03bceade612003e259664ee8c6b9754b"
+        }
+      ]
+    },
+    {
+      "entity_id": "486c73ed3a3125c2c152e99a1270f882733b93534c2107ed2ab7ef2d4913ffaf",
+      "knowledge_id": "bb7432e294efc1e8e447a81a674e2d8eca4a9393246551f3368237abcfb51b99",
+      "source_type": "fact",
+      "logical_locator": "attempt:p4_adversarial#attempt_cost_usd",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p4_adversarial:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_cost_usd",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:35.568559+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=79d19e40a5b651f33fd5f11ac311c6f26f3a2f90ba9197b0ef69eafab73f6b7d",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "bb7432e294efc1e8e447a81a674e2d8eca4a9393246551f3368237abcfb51b99",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:35.568559+00:00",
+          "reason": "fact-content=79d19e40a5b651f33fd5f11ac311c6f26f3a2f90ba9197b0ef69eafab73f6b7d"
         }
       ]
     },
@@ -91193,6 +91433,30 @@
       ]
     },
     {
+      "entity_id": "4fc15ba10bcb695e8b6b774f967593239b283b6512820f90e9d1e0b6d6091dbe",
+      "knowledge_id": "acc68b51accc0429cbfcac0525f5791bcf9de068743e0ae7928336c439192927",
+      "source_type": "fact",
+      "logical_locator": "job:wf_cap_escalation_measurement_deepseek_deepseek_v4_flash#job_accumulated_cost_usd",
+      "source_uri": "fact://job/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash/job_accumulated_cost_usd",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:36.232617+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=834258d067865d481d6d54ec73373cc602b6a3ef8eea37dec5ff2099a594d226",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "acc68b51accc0429cbfcac0525f5791bcf9de068743e0ae7928336c439192927",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:36.232617+00:00",
+          "reason": "fact-content=834258d067865d481d6d54ec73373cc602b6a3ef8eea37dec5ff2099a594d226"
+        }
+      ]
+    },
+    {
       "entity_id": "4fcea64d301b7094e2ed6f48c9e6bb9858b2437201dbd9e40413fae107ffd670",
       "knowledge_id": "59b2338c1d037d56aa2f5f7e11f9cc57243777c11795add43384416e7c65f8e6",
       "source_type": "story",
@@ -91725,6 +91989,30 @@
           "observed_at": "2026-08-24T19:30:31.174081+00:00",
           "indexed_at": "2026-08-26T02:32:54.896066+00:00",
           "reason": "fact-content=ceb9882368c1566e11a64a03c0b59a3b58ef32052cd111a38d4175635dd7e352"
+        }
+      ]
+    },
+    {
+      "entity_id": "50506085e4381cab97b8982272147159047eaea198fa0bb643becfe04eb88abc",
+      "knowledge_id": "32fb9666152e9ad21dfb6ea8e00fb35b509794bcbaaf107ca84760bd32f862bb",
+      "source_type": "fact",
+      "logical_locator": "attempt:p1_locate_the_escaped_defect#attempt_cost_usd",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p1_locate_the_escaped_defect:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_cost_usd",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:32.114263+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=0536d50d20df942f7191f618655656d3719ad24b40c0c50ef1bc1bab71d5ead0",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "32fb9666152e9ad21dfb6ea8e00fb35b509794bcbaaf107ca84760bd32f862bb",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:32.114263+00:00",
+          "reason": "fact-content=0536d50d20df942f7191f618655656d3719ad24b40c0c50ef1bc1bab71d5ead0"
         }
       ]
     },
@@ -100309,6 +100597,30 @@
           "observed_at": "2026-08-12T23:23:21.376714+00:00",
           "indexed_at": "2026-08-19T19:19:38.724626+00:00",
           "reason": ""
+        }
+      ]
+    },
+    {
+      "entity_id": "581ce14c349edc628144170db4c926ddffc8b5c3f0697d6797fbc3b08cc37b68",
+      "knowledge_id": "5e9c044cb3e0402ac3d13a8d78e8475fd20b1e9c230db07daa4435b2ceaa80dc",
+      "source_type": "fact",
+      "logical_locator": "attempt:p1_locate_the_escaped_defect#attempt_cache_hit_rate",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p1_locate_the_escaped_defect:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_cache_hit_rate",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:32.276841+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=7d3f934b97d213c969640b65c6f4952a3883dab2071c17dbd80f74db1f91aff6",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "5e9c044cb3e0402ac3d13a8d78e8475fd20b1e9c230db07daa4435b2ceaa80dc",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:32.276841+00:00",
+          "reason": "fact-content=7d3f934b97d213c969640b65c6f4952a3883dab2071c17dbd80f74db1f91aff6"
         }
       ]
     },
@@ -113409,6 +113721,54 @@
       ]
     },
     {
+      "entity_id": "63c49171f2fff5cd7b8254af4b3e6d8699333d2eb53bc70cb1915b44ff793970",
+      "knowledge_id": "2086b250c374933e99525050ec3efc9dc49ae15ee54b1621b4f55f55bdfc5463",
+      "source_type": "fact",
+      "logical_locator": "attempt:p1_locate_the_escaped_defect#phase_status",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p1_locate_the_escaped_defect:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/phase_status",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:31.273230+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=59790c7f4de0e11f366c8a93bb86c657ff41369ff0d18b11b225fadd4a70c41c",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "2086b250c374933e99525050ec3efc9dc49ae15ee54b1621b4f55f55bdfc5463",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:31.273230+00:00",
+          "reason": "fact-content=59790c7f4de0e11f366c8a93bb86c657ff41369ff0d18b11b225fadd4a70c41c"
+        }
+      ]
+    },
+    {
+      "entity_id": "63c730c456e329d57a7df8f4751d5a4cf58dcda8bb70b4f03b5509128b184af7",
+      "knowledge_id": "3f8513ecebb2e5d4a3ae529f1f987e9ecafaf3523eeea23955da7ffdf03fa650",
+      "source_type": "fact",
+      "logical_locator": "attempt:p2_measure_escalation_fix#attempt_cost_usd",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p2_measure_escalation_fix:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_cost_usd",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:33.267070+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=c8f58c1e57eff568d3274a3255a4f5838797ecfdfdf5f8fb82377df9b3f39c7d",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "3f8513ecebb2e5d4a3ae529f1f987e9ecafaf3523eeea23955da7ffdf03fa650",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:33.267070+00:00",
+          "reason": "fact-content=c8f58c1e57eff568d3274a3255a4f5838797ecfdfdf5f8fb82377df9b3f39c7d"
+        }
+      ]
+    },
+    {
       "entity_id": "63ced4bf03e9e3c8e50098ead7c6ead9f776161f9177c20de33d4ca4466563d0",
       "knowledge_id": "c464c86a93ad49584eda85e420403db387c1205c7ccb26bb7881befdfde2be26",
       "source_type": "fact",
@@ -116537,6 +116897,30 @@
       ]
     },
     {
+      "entity_id": "66b25321e49ebeddd642b9d33ed6f32f24a3ca1bf1cf78ca4526d7943f090a4b",
+      "knowledge_id": "24b1c11967e4c1ec2152cb18caf406b8b36f1934e8972359b5cf6f9961eae2fb",
+      "source_type": "fact",
+      "logical_locator": "attempt:p1_locate_the_escaped_defect#attempt_tokens_in",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p1_locate_the_escaped_defect:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_tokens_in",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:31.784463+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=9b98be61c280e4977185cc12d37c02e05f085d63732b79512f146144b64a268f",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "24b1c11967e4c1ec2152cb18caf406b8b36f1934e8972359b5cf6f9961eae2fb",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:31.784463+00:00",
+          "reason": "fact-content=9b98be61c280e4977185cc12d37c02e05f085d63732b79512f146144b64a268f"
+        }
+      ]
+    },
+    {
       "entity_id": "66b5bb4ee93f48a6456b3389d05edb2578fa6f1f7cb22db68fe696922cf7bb0d",
       "knowledge_id": "787bcef5113db6a8114ec88278f16fe5d8beda0c704621011693c2bac3c399e6",
       "source_type": "fact",
@@ -116797,6 +117181,30 @@
           "observed_at": "2026-08-13T02:09:46.555855+00:00",
           "indexed_at": "2026-08-26T02:32:51.093668+00:00",
           "reason": "fact-content=2f023d84176d11636e1dbc88e86dcccb47992c50eed9037828c5628126190a4d"
+        }
+      ]
+    },
+    {
+      "entity_id": "66e9b41c55d5856e455ac5427ab2e37f8fd034a5ec914e8cdafc2305ac965797",
+      "knowledge_id": "f62552bb30910c80f6c2de2fdd3d377ad48d55f68a8ff8291c2c18449f11359c",
+      "source_type": "fact",
+      "logical_locator": "workflow:wf_cap_escalation_measurement_deepseek_deepseek_v4_flash#workflow_status",
+      "source_uri": "fact://workflow/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash/workflow_status",
+      "observed_at": "2026-08-26T13:01:29.571608+00:00",
+      "indexed_at": "2026-08-26T13:01:37.393851+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=e77cbec0417a9aa0693cb133e1cfc4d2350cff0efbf9a0ba4760e03f601e0cd9",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "f62552bb30910c80f6c2de2fdd3d377ad48d55f68a8ff8291c2c18449f11359c",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:29.571608+00:00",
+          "indexed_at": "2026-08-26T13:01:37.393851+00:00",
+          "reason": "fact-content=e77cbec0417a9aa0693cb133e1cfc4d2350cff0efbf9a0ba4760e03f601e0cd9"
         }
       ]
     },
@@ -121949,6 +122357,30 @@
           "observed_at": "2026-08-13T01:03:24.190275+00:00",
           "indexed_at": "2026-08-26T02:32:51.050638+00:00",
           "reason": "fact-content=eb778dbf1f2ff5573ceff3126d01404b316a98024aa211a8e4f9683d3033b2a8"
+        }
+      ]
+    },
+    {
+      "entity_id": "6b48da376cb37bf996eb7f463bb60d418ed04359edf6346170fb880ac9b696c0",
+      "knowledge_id": "193fd363f2421c274ef6a41877dace19865d2fe1f4176eba40291ace9cb4da7e",
+      "source_type": "fact",
+      "logical_locator": "attempt:p3_compute_ex#attempt_tokens_in",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p3_compute_ex:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_tokens_in",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:34.088456+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=a28a6ae750ebde521bc1994aea2cf536b7cc9c794acbff7f9be9e9a2bff39935",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "193fd363f2421c274ef6a41877dace19865d2fe1f4176eba40291ace9cb4da7e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:34.088456+00:00",
+          "reason": "fact-content=a28a6ae750ebde521bc1994aea2cf536b7cc9c794acbff7f9be9e9a2bff39935"
         }
       ]
     },
@@ -131905,6 +132337,30 @@
       ]
     },
     {
+      "entity_id": "74fc47239d71f9f2faaf0e4f25192cb5f4c00978cf260146157d0bd9da77d0b5",
+      "knowledge_id": "83295332dc6bdd890842492754ec32de8402e49c6e25a2d027fad22e01380122",
+      "source_type": "fact",
+      "logical_locator": "attempt:p2_measure_escalation_fix#attempt_tokens_in",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p2_measure_escalation_fix:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_tokens_in",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:32.937950+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=1ce4ffa776f959a446994510e30267a23d02e3c8badae25da15cc6093b76689c",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "83295332dc6bdd890842492754ec32de8402e49c6e25a2d027fad22e01380122",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:32.937950+00:00",
+          "reason": "fact-content=1ce4ffa776f959a446994510e30267a23d02e3c8badae25da15cc6093b76689c"
+        }
+      ]
+    },
+    {
       "entity_id": "75008415f9840746943d0d87db0421585a4a40f4516d0811d4994dd1aa728270",
       "knowledge_id": "ea20ccf2e5a25dd7f63a3e97ce504cc1a55e65fdeef33d77d1eda6a2bfbd9112",
       "source_type": "fact",
@@ -134013,6 +134469,30 @@
           "observed_at": "2026-08-20T02:44:26.621647+00:00",
           "indexed_at": "2026-08-26T02:32:53.890459+00:00",
           "reason": "fact-content=f1f49d07cb05268c20ed2c50acbc7290e9f2f55f8f55871bca3f38caecd1d310"
+        }
+      ]
+    },
+    {
+      "entity_id": "76cd3c8fd81809018e823b7a3146ba00c385392878e7f9ac153e96c03ddb21da",
+      "knowledge_id": "de8a621f19b0cfc44bc142270246f35b3d8623793c654187094dca4d4adf39f0",
+      "source_type": "fact",
+      "logical_locator": "attempt:p3_compute_ex#attempt_cost_usd",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p3_compute_ex:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_cost_usd",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:34.416503+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=4f87fc11a4ee6e350445144b12c8273bb9523bba7ddbd8da40efd82b28028ee0",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "de8a621f19b0cfc44bc142270246f35b3d8623793c654187094dca4d4adf39f0",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:34.416503+00:00",
+          "reason": "fact-content=4f87fc11a4ee6e350445144b12c8273bb9523bba7ddbd8da40efd82b28028ee0"
         }
       ]
     },
@@ -148961,6 +149441,30 @@
       ]
     },
     {
+      "entity_id": "8364fd4d999f1585b91191be6daa864b6d28fe212c3d7024e47a8502c17551ce",
+      "knowledge_id": "38d442e6aae6e464df0cdd2c8c9585526a28278ed3ed266a9b15437dec9ebd28",
+      "source_type": "fact",
+      "logical_locator": "attempt:p3_compute_ex#attempt_confidence",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p3_compute_ex:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_confidence",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:34.744666+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=0104d417a7986b3a2a43cff4651a339c2970cbf3fa0a1f0b080831122e1b6b5b",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "38d442e6aae6e464df0cdd2c8c9585526a28278ed3ed266a9b15437dec9ebd28",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:34.744666+00:00",
+          "reason": "fact-content=0104d417a7986b3a2a43cff4651a339c2970cbf3fa0a1f0b080831122e1b6b5b"
+        }
+      ]
+    },
+    {
       "entity_id": "836b1c40554e9a44034332c12513ddeb3f921d89eddbe8c74240f33624a178ba",
       "knowledge_id": "0b283515b326f5e754a47776bd2ba72a4992f033dbf418e89286a5c2618bcc07",
       "source_type": "fact",
@@ -152229,6 +152733,30 @@
           "observed_at": "2026-08-22T18:16:55.728255+00:00",
           "indexed_at": "2026-08-26T02:32:54.259990+00:00",
           "reason": "fact-content=b3dbd5aac97b5f58bb09dd88776edc8151817dff7e797e284beddb5fe9893766"
+        }
+      ]
+    },
+    {
+      "entity_id": "8694bea418103856ee9e2b42d55091e455d70c769dca122328b35fd77a4e2a58",
+      "knowledge_id": "386d465d2a174df6e377cd0207ad1b3a739682bc0f446484a4a28a2a2d180987",
+      "source_type": "fact",
+      "logical_locator": "attempt:p2_measure_escalation_fix#phase_status",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p2_measure_escalation_fix:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/phase_status",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:32.607340+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=a6edc829c8a5f683a60de2f849d69e60b0267cac0e6f61e09a1aacb7a4ae8461",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "386d465d2a174df6e377cd0207ad1b3a739682bc0f446484a4a28a2a2d180987",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:32.607340+00:00",
+          "reason": "fact-content=a6edc829c8a5f683a60de2f849d69e60b0267cac0e6f61e09a1aacb7a4ae8461"
         }
       ]
     },
@@ -156453,6 +156981,30 @@
           "observed_at": "2026-08-16T01:13:19.429697+00:00",
           "indexed_at": "2026-08-26T02:32:52.993968+00:00",
           "reason": "fact-content=e9f378a42069445d430c27a6bb3a88b7bb76680bc2bee8b5c2650fe8fc13f911"
+        }
+      ]
+    },
+    {
+      "entity_id": "8a977ba86ebea6bd1ad35c91ed09c2bf41d0d58ced9ff2b0037392f23f1f2320",
+      "knowledge_id": "566eed0aeae97b88040dfc096eeec774b162082ea80fd886b796db9c92896543",
+      "source_type": "fact",
+      "logical_locator": "attempt:p4_adversarial#phase_status",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p4_adversarial:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/phase_status",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:34.908987+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=8c45f3610af54f1d07462fd9240122976c85199449585067e39b172d950e306d",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "566eed0aeae97b88040dfc096eeec774b162082ea80fd886b796db9c92896543",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:34.908987+00:00",
+          "reason": "fact-content=8c45f3610af54f1d07462fd9240122976c85199449585067e39b172d950e306d"
         }
       ]
     },
@@ -189129,6 +189681,30 @@
       ]
     },
     {
+      "entity_id": "a7084d2c5db3365c3cb94b870b602c7beda2cdce5feb10deec78e5a8ee222bb8",
+      "knowledge_id": "9398024eced5b14cbfb64318f87fa9270cad8b25b592d76c58447d3931030e58",
+      "source_type": "fact",
+      "logical_locator": "attempt:p3_compute_ex#attempt_tokens_out",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p3_compute_ex:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_tokens_out",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:34.253158+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=29fd46bf93440807d1fde309a25606fbef5399481f0284a80598f8bf755cacb1",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "9398024eced5b14cbfb64318f87fa9270cad8b25b592d76c58447d3931030e58",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:34.253158+00:00",
+          "reason": "fact-content=29fd46bf93440807d1fde309a25606fbef5399481f0284a80598f8bf755cacb1"
+        }
+      ]
+    },
+    {
       "entity_id": "a70cbdda4af56b56c2fb58c93e19afcb2d7f95fbfc69eaabdd080428b1b2abc1",
       "knowledge_id": "92e9ff3878a8495e208981685b52e34ebce45638532204b7031490681c39121b",
       "source_type": "fact",
@@ -190805,6 +191381,30 @@
           "observed_at": "2026-08-12T00:09:04.195418+00:00",
           "indexed_at": "2026-08-26T02:32:50.576990+00:00",
           "reason": "fact-content=ed24ca9effd60224e63f6d0c5740e172bc18c55ab93642f8beb2c4a60a24ba30"
+        }
+      ]
+    },
+    {
+      "entity_id": "a877b87f74f1c063c14022b3a81f1060e19fa0d79a6cbfcc99091be803a6f89c",
+      "knowledge_id": "8688a0ea372fb5fa5e78d38a009281a9969582f7ae1895aa82f65ce941914021",
+      "source_type": "fact",
+      "logical_locator": "job:wf_cap_escalation_measurement_deepseek_deepseek_v4_flash#current_commit",
+      "source_uri": "fact://job/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash/current_commit",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:36.067382+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=eaf478f9b2048893bd6cbd98c862f7dce7cd039a580792a801a985ec840df888",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "8688a0ea372fb5fa5e78d38a009281a9969582f7ae1895aa82f65ce941914021",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:36.067382+00:00",
+          "reason": "fact-content=eaf478f9b2048893bd6cbd98c862f7dce7cd039a580792a801a985ec840df888"
         }
       ]
     },
@@ -201825,6 +202425,30 @@
       ]
     },
     {
+      "entity_id": "b1b2994e15242ee2d48239a4508bdd54a0cad246b64594f3ad728cca4272fe70",
+      "knowledge_id": "01b40c59a568c1c0a1ae8053f0569d72d7d985a0296f06008d21d55f939cc27e",
+      "source_type": "fact",
+      "logical_locator": "attempt:p4_adversarial#attempt_tokens_out",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p4_adversarial:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_tokens_out",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:35.403544+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=a48ad2546af18bd3569d89d5b4ecdf707ef983d47f304f8e6f4f850c1604df54",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "01b40c59a568c1c0a1ae8053f0569d72d7d985a0296f06008d21d55f939cc27e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:35.403544+00:00",
+          "reason": "fact-content=a48ad2546af18bd3569d89d5b4ecdf707ef983d47f304f8e6f4f850c1604df54"
+        }
+      ]
+    },
+    {
       "entity_id": "b1c21caf11e144ae2db514988e214c0c00cb8db66f9362185e7c78f064a092ca",
       "knowledge_id": "48603e99a0c423a8012d121e78899de19a74ecd797e29077accf3409533b14d7",
       "source_type": "fact",
@@ -206149,6 +206773,30 @@
           "observed_at": "2026-08-13T08:14:54.632166+00:00",
           "indexed_at": "2026-08-26T02:32:51.631346+00:00",
           "reason": "fact-content=b9ce30fe7b72abec673a7f17a990b8d277386f3f092dd6e221b0b9ecc56ac463"
+        }
+      ]
+    },
+    {
+      "entity_id": "b5fb65f52a5593d8c20ea748a65ed7bbf7a7f028f861be7b0c96568b2b70a7d5",
+      "knowledge_id": "80167306966a110656f32ea3b55ab70f5f94b5f3a0a0635e36762fc5301b6846",
+      "source_type": "fact",
+      "logical_locator": "attempt:p2_measure_escalation_fix#attempt_cache_hit_rate",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p2_measure_escalation_fix:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_cache_hit_rate",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:33.431481+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=4702c0a94cb4e85e472474ef111781139ac49ae60d47a2adbd294005fde0eda8",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "80167306966a110656f32ea3b55ab70f5f94b5f3a0a0635e36762fc5301b6846",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:33.431481+00:00",
+          "reason": "fact-content=4702c0a94cb4e85e472474ef111781139ac49ae60d47a2adbd294005fde0eda8"
         }
       ]
     },
@@ -211349,6 +211997,30 @@
           "observed_at": "2026-08-13T06:37:10.714003+00:00",
           "indexed_at": "2026-08-19T19:19:38.686907+00:00",
           "reason": ""
+        }
+      ]
+    },
+    {
+      "entity_id": "bad527cb364a30de74ff54d1a232f231cb9ba01c75a92276c223f0f4dfa2c85e",
+      "knowledge_id": "f19695a2a26814d8f5e61f5bbeb35d96fe7f5136a31f3fc5031bd08993f673b7",
+      "source_type": "fact",
+      "logical_locator": "attempt:p4_adversarial#attempt_confidence",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p4_adversarial:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_confidence",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:35.901117+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=8789d5b82e5d44f0492ffa6e2bd8a81bbd81fff14531e86cac911d33b14e36dd",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "f19695a2a26814d8f5e61f5bbeb35d96fe7f5136a31f3fc5031bd08993f673b7",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:35.901117+00:00",
+          "reason": "fact-content=8789d5b82e5d44f0492ffa6e2bd8a81bbd81fff14531e86cac911d33b14e36dd"
         }
       ]
     },
@@ -216729,6 +217401,30 @@
       ]
     },
     {
+      "entity_id": "bfc039ec693b716daf9bec0055f4709e5abbf66e98a73b09c0f2c3b3c30e92c8",
+      "knowledge_id": "96f7742564d95f45c54de53c19f6907eac338e4b074f0c071edf0d0aed5cf2db",
+      "source_type": "fact",
+      "logical_locator": "workflow:wf_cap_escalation_measurement_deepseek_deepseek_v4_flash#workflow_health",
+      "source_uri": "fact://workflow/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash/workflow_health",
+      "observed_at": "2026-08-26T13:01:29.571608+00:00",
+      "indexed_at": "2026-08-26T13:01:37.558017+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=45801f955415986b564ba3a9911d8dbe4adf19719dac4750c1ff3f5080dc9ff6",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "96f7742564d95f45c54de53c19f6907eac338e4b074f0c071edf0d0aed5cf2db",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:29.571608+00:00",
+          "indexed_at": "2026-08-26T13:01:37.558017+00:00",
+          "reason": "fact-content=45801f955415986b564ba3a9911d8dbe4adf19719dac4750c1ff3f5080dc9ff6"
+        }
+      ]
+    },
+    {
       "entity_id": "bfca27e6a9289900a79b1757704f7b36a112a1cf375f3c6677f447dc5eadacbe",
       "knowledge_id": "57c58d6c6e18bedbac73abdf94985495bd68bdc5b831fb70eccce241e0369205",
       "source_type": "fact",
@@ -218985,6 +219681,30 @@
       ]
     },
     {
+      "entity_id": "c18474b7157d4f6a7be2cf6856678ef22a78144b1f9645ea43d82c9e2bb8706c",
+      "knowledge_id": "987719cbb32dba37d51572f6e4c754644262678e123509ca500a76ddafd64706",
+      "source_type": "fact",
+      "logical_locator": "job:wf_cap_escalation_measurement_deepseek_deepseek_v4_flash#job_n_phases",
+      "source_uri": "fact://job/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash/job_n_phases",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:36.564147+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=453980f63c52ad9b70c6495b550ee21a16abb1582e5d98d8553c3f5eb4a5eecf",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "987719cbb32dba37d51572f6e4c754644262678e123509ca500a76ddafd64706",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:36.564147+00:00",
+          "reason": "fact-content=453980f63c52ad9b70c6495b550ee21a16abb1582e5d98d8553c3f5eb4a5eecf"
+        }
+      ]
+    },
+    {
       "entity_id": "c1852ca7df415ce9a323c6e9350b689bd6844215b51531f3e2acffd0ee80265a",
       "knowledge_id": "d06f116b6a278957bedeed7c25aab28b147adc511f4f4b1dafe1d3576f9aa392",
       "source_type": "fact",
@@ -220625,6 +221345,30 @@
       ]
     },
     {
+      "entity_id": "c2d283e6f2808ce5232235fea6f9528ca22b92c9ebe266b747394a5a55eddc12",
+      "knowledge_id": "b426384d6553f663bd3bb5864ab94a9fc386599d5cf7aed940f6a08450ec9e25",
+      "source_type": "fact",
+      "logical_locator": "attempt:p2_measure_escalation_fix#attempt_model",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p2_measure_escalation_fix:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_model",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:32.773700+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=53e0dbb51d1f1884629b5aba6a26da23202dc4ca0626a1d1966d6e43c629606a",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "b426384d6553f663bd3bb5864ab94a9fc386599d5cf7aed940f6a08450ec9e25",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:32.773700+00:00",
+          "reason": "fact-content=53e0dbb51d1f1884629b5aba6a26da23202dc4ca0626a1d1966d6e43c629606a"
+        }
+      ]
+    },
+    {
       "entity_id": "c2d2981f762e6df5f169136f8eaa9e7f704c43818ffa57a3a6942f4075325cfa",
       "knowledge_id": "a6f95caeb224cb71c14c78b09e1fb1a010eb96f12f8dbf0e5b122641782f7e34",
       "source_type": "fact",
@@ -222229,6 +222973,30 @@
           "observed_at": "2026-08-20T02:44:26.621647+00:00",
           "indexed_at": "2026-08-26T02:32:53.884540+00:00",
           "reason": "fact-content=da660fe3ed39a24db205598ba20fa80402326e0f1918ac5154d2d3c9827383b5"
+        }
+      ]
+    },
+    {
+      "entity_id": "c4313fc182503d872ea8ad82f8163e41ea0f0eb68cf44f4bb1abe36a09b2ec21",
+      "knowledge_id": "cf1208f17db979878dc18f67f151c254c4b7ef2794593cbd44889c5068e80437",
+      "source_type": "report",
+      "logical_locator": "cap_2a:cap_escalation_measurement:ex:anthropic/claude-sonnet-5",
+      "source_uri": "file://experiments/results/cap_escalation_measurement/score.json",
+      "observed_at": "2026-08-26T14:14:12.078176+00:00",
+      "indexed_at": "2026-08-26T14:14:12.078176+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "cf1208f17db979878dc18f67f151c254c4b7ef2794593cbd44889c5068e80437",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T14:14:12.078176+00:00",
+          "indexed_at": "2026-08-26T14:14:12.078176+00:00",
+          "reason": ""
         }
       ]
     },
@@ -225753,6 +226521,30 @@
       ]
     },
     {
+      "entity_id": "c75d4152b00276006c411f8407d89b4bf851f57613115c66af3733101b582f49",
+      "knowledge_id": "a88482614183eba4da2abc6ace879e7b7d81aaaa8311cbc356134d876d9a57b3",
+      "source_type": "fact",
+      "logical_locator": "policy:cap_escalation_measurement#max_spend_usd",
+      "source_uri": "fact://workload/cap_escalation_measurement/max_spend_usd",
+      "observed_at": "2026-08-26T13:01:29.571608+00:00",
+      "indexed_at": "2026-08-26T13:01:36.729564+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=c98ebc2b282c1321df7cab2bf9aaa84ff760a6bb863be2980305ea0a8a3d1525",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "a88482614183eba4da2abc6ace879e7b7d81aaaa8311cbc356134d876d9a57b3",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:29.571608+00:00",
+          "indexed_at": "2026-08-26T13:01:36.729564+00:00",
+          "reason": "fact-content=c98ebc2b282c1321df7cab2bf9aaa84ff760a6bb863be2980305ea0a8a3d1525"
+        }
+      ]
+    },
+    {
       "entity_id": "c76b83a0d72f422dd8951e8857049961d67bd68f5a92b3b8a9f7caccdba0bd5e",
       "knowledge_id": "08a00b5b3442025ea871d2b7207e32be6a52b0e9dc0a65ef04c88725251e6762",
       "source_type": "fact",
@@ -226817,6 +227609,30 @@
       ]
     },
     {
+      "entity_id": "c88502aa8c9827f1f04a3df9ddc19ce2a8851b220692ec14337137fc5643c90d",
+      "knowledge_id": "6b607ca07191bdbff3d39acc4b1cf6e949d9c6bcdd99dfbca38cd914385ca4e7",
+      "source_type": "report",
+      "logical_locator": "cap_2a:cap_escalation_measurement:aggregate",
+      "source_uri": "file://experiments/results/cap_escalation_measurement/score.json",
+      "observed_at": "2026-08-26T14:14:12.078176+00:00",
+      "indexed_at": "2026-08-26T14:14:12.078176+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "6b607ca07191bdbff3d39acc4b1cf6e949d9c6bcdd99dfbca38cd914385ca4e7",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T14:14:12.078176+00:00",
+          "indexed_at": "2026-08-26T14:14:12.078176+00:00",
+          "reason": ""
+        }
+      ]
+    },
+    {
       "entity_id": "c88b851013ba6ae679f523a1edbb759fce693e8da8df182a8321d48e0aee6b18",
       "knowledge_id": "2d90df00bf408cbfee3783da4d6f3e5eb9c5337168c7a72e64494070e7a2433d",
       "source_type": "review",
@@ -227005,6 +227821,30 @@
           "observed_at": "2026-08-13T02:06:45.232815+00:00",
           "indexed_at": "2026-08-26T02:32:51.075898+00:00",
           "reason": "fact-content=f0807e0d7990d7acc414d908100c2be9f283434545b3b2e7eafca0578dba0aff"
+        }
+      ]
+    },
+    {
+      "entity_id": "c8c7e17ac74ebdbf6fdba8ab7da89a34e2b40d4617ea532df75632766ce9864e",
+      "knowledge_id": "2bf6c50888ea32e335c10b5797bd14ca3fdfb855d85be13424dc970836b103c4",
+      "source_type": "fact",
+      "logical_locator": "attempt:p2_measure_escalation_fix#attempt_confidence",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p2_measure_escalation_fix:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_confidence",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:33.596459+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=5446d3e07574654ee7172da4c45684df64459c91c117a9c3c70b866ec526f67a",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "2bf6c50888ea32e335c10b5797bd14ca3fdfb855d85be13424dc970836b103c4",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:33.596459+00:00",
+          "reason": "fact-content=5446d3e07574654ee7172da4c45684df64459c91c117a9c3c70b866ec526f67a"
         }
       ]
     },
@@ -227717,6 +228557,30 @@
           "observed_at": "2026-08-12T23:08:48.410140+00:00",
           "indexed_at": "2026-08-26T02:32:50.912117+00:00",
           "reason": "fact-content=4417cc67537160c3ea284c34192b2fc8628d57f47c6bc7cfabb1d9c4f1673551"
+        }
+      ]
+    },
+    {
+      "entity_id": "c96004524240b9929e42f2e17432399a14faed96fb5bb0530cdad5cdb0f6ea14",
+      "knowledge_id": "c9214d016c8acf505a88e49462df5ed1ef8d69a1d6d3ce7d4fb6c4ffaa7150f2",
+      "source_type": "fact",
+      "logical_locator": "attempt:p4_adversarial#attempt_cache_hit_rate",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p4_adversarial:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_cache_hit_rate",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:35.734584+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=1cd86ca4f9609c2a33271a03acdadbadd76beee394db26a08082932be869f3fa",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "c9214d016c8acf505a88e49462df5ed1ef8d69a1d6d3ce7d4fb6c4ffaa7150f2",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:35.734584+00:00",
+          "reason": "fact-content=1cd86ca4f9609c2a33271a03acdadbadd76beee394db26a08082932be869f3fa"
         }
       ]
     },
@@ -235665,6 +236529,30 @@
       ]
     },
     {
+      "entity_id": "d05a2168def15c3983a6c59ce329005accf54e3ddb7351c5f72638e9f0084c90",
+      "knowledge_id": "068a286cf990424aa0f3eec1f74b35d76c6c5e0c81d34efbfd34e7ea855ebc39",
+      "source_type": "fact",
+      "logical_locator": "policy:cap_escalation_measurement#max_attempts",
+      "source_uri": "fact://workload/cap_escalation_measurement/max_attempts",
+      "observed_at": "2026-08-26T13:01:29.571608+00:00",
+      "indexed_at": "2026-08-26T13:01:36.894341+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=94d6909db52d8ded0c5842600a29ca10b8c136a72600320e1ee300084acafa4c",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "068a286cf990424aa0f3eec1f74b35d76c6c5e0c81d34efbfd34e7ea855ebc39",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:29.571608+00:00",
+          "indexed_at": "2026-08-26T13:01:36.894341+00:00",
+          "reason": "fact-content=94d6909db52d8ded0c5842600a29ca10b8c136a72600320e1ee300084acafa4c"
+        }
+      ]
+    },
+    {
       "entity_id": "d0653dfd93e402cf32b08c9c5ada67a79afc7b9921be2a5d9fbc63e7f3ba17e9",
       "knowledge_id": "5d4caa21f45b8baf59203bcacb05af390c5d59afbafae58f2c2d31d6f298d22a",
       "source_type": "fact",
@@ -239189,6 +240077,30 @@
           "observed_at": "2026-08-23T16:08:11.075135+00:00",
           "indexed_at": "2026-08-26T02:32:54.349045+00:00",
           "reason": "fact-content=54df0dc83f7d414a5128e9bf8c3caf784e7bcbc2318472c74d76a175e31f1983"
+        }
+      ]
+    },
+    {
+      "entity_id": "d3f5043392a0e640a7c6866be50927571c3ccb99d10e747fa941ffcb3b5579d1",
+      "knowledge_id": "e1ff187816635406c98c2b0b73351eaf35740d19e0c3c883741719f45358b0ab",
+      "source_type": "fact",
+      "logical_locator": "attempt:p3_compute_ex#phase_status",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p3_compute_ex:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/phase_status",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:33.760236+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=4d5226081619aa1297623dad520655bce1615b12723b586c2d6fbb6143870aa9",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "e1ff187816635406c98c2b0b73351eaf35740d19e0c3c883741719f45358b0ab",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:33.760236+00:00",
+          "reason": "fact-content=4d5226081619aa1297623dad520655bce1615b12723b586c2d6fbb6143870aa9"
         }
       ]
     },
@@ -246929,6 +247841,30 @@
       ]
     },
     {
+      "entity_id": "db543dabb0f7e69f1fc4ff4ae92b15ab250cbb256abb2a05c24514d47416afc1",
+      "knowledge_id": "ee2f8d8b495039357fcf9c3223fffbcfddafdf2f6cf95ac5cbf69db6fd31b39f",
+      "source_type": "fact",
+      "logical_locator": "attempt:p1_locate_the_escaped_defect#attempt_model",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p1_locate_the_escaped_defect:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_model",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:31.616570+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=da4f07df76fe24e434caf2051f6376074973d6c1b01fe5809f6fdb252b995325",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "ee2f8d8b495039357fcf9c3223fffbcfddafdf2f6cf95ac5cbf69db6fd31b39f",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:31.616570+00:00",
+          "reason": "fact-content=da4f07df76fe24e434caf2051f6376074973d6c1b01fe5809f6fdb252b995325"
+        }
+      ]
+    },
+    {
       "entity_id": "db54c1c487ca81e76237a2514510022c70df24c65c54700b657f842a8a63d7f9",
       "knowledge_id": "3410e1132153abbda2f54205f48019eab4783c6fea0cd09cb355d4ba028e71d0",
       "source_type": "meta_session",
@@ -248109,6 +249045,30 @@
           "observed_at": "2026-08-24T19:30:31.174081+00:00",
           "indexed_at": "2026-08-26T02:32:55.222142+00:00",
           "reason": "fact-content=4b0f5125cd090db5c3081bdc9362e823a4293b2e8e0a3e30f7bf6fc7de33b894"
+        }
+      ]
+    },
+    {
+      "entity_id": "dc71b5ba00222586366ca724047afae923916120a6bf8bc6e1464f2fdeb51cec",
+      "knowledge_id": "cd2088b52d2595a46fd1da16733888eb202071e39471aabf3df81f99d24c54d0",
+      "source_type": "report",
+      "logical_locator": "cap_2a:cap_escalation_measurement:ex:openai/gpt-5.6-sol",
+      "source_uri": "file://experiments/results/cap_escalation_measurement/score.json",
+      "observed_at": "2026-08-26T14:14:12.078176+00:00",
+      "indexed_at": "2026-08-26T14:14:12.078176+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "cd2088b52d2595a46fd1da16733888eb202071e39471aabf3df81f99d24c54d0",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T14:14:12.078176+00:00",
+          "indexed_at": "2026-08-26T14:14:12.078176+00:00",
+          "reason": ""
         }
       ]
     },
@@ -250045,6 +251005,30 @@
           "observed_at": "2026-08-13T06:13:31.727850+00:00",
           "indexed_at": "2026-08-26T02:32:51.460287+00:00",
           "reason": "fact-content=c7f5c519818ef65d5cda87ab8dbc701d219de3e7a14d07bb87d2b0dc1c136730"
+        }
+      ]
+    },
+    {
+      "entity_id": "dea76cc170c2c35b90419821d7cb06c068d91102e8925febedf486a8a1d43efe",
+      "knowledge_id": "f4a491bd5863a1c6cd5911120102ebb24a60a86df69d9b3b8adbd8e3d77f2c99",
+      "source_type": "fact",
+      "logical_locator": "attempt:p2_measure_escalation_fix#attempt_tokens_out",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p2_measure_escalation_fix:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_tokens_out",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:33.101898+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=1e2b2022899b24605ac6bc52631c2c230ff7215da01970180f9c3c1243a53a48",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "f4a491bd5863a1c6cd5911120102ebb24a60a86df69d9b3b8adbd8e3d77f2c99",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:33.101898+00:00",
+          "reason": "fact-content=1e2b2022899b24605ac6bc52631c2c230ff7215da01970180f9c3c1243a53a48"
         }
       ]
     },
@@ -268361,6 +269345,30 @@
       ]
     },
     {
+      "entity_id": "ede444fc15a07c6ec130a2ca7ddebb23a84b51bbcfb80f351efe07d87f0a2454",
+      "knowledge_id": "9d00f11ef64c91b34f3d28b95f5d00560b8dc8d581723b4d28863397e0727a7e",
+      "source_type": "fact",
+      "logical_locator": "attempt:p3_compute_ex#attempt_model",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p3_compute_ex:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_model",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:33.924427+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=0b174322bcd8646b141333ff59644556f7c9615209331a8bc90d7df51705e48c",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "9d00f11ef64c91b34f3d28b95f5d00560b8dc8d581723b4d28863397e0727a7e",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:33.924427+00:00",
+          "reason": "fact-content=0b174322bcd8646b141333ff59644556f7c9615209331a8bc90d7df51705e48c"
+        }
+      ]
+    },
+    {
       "entity_id": "ede5d06bf603581e8cf615ea890ac37dee4ae28006d5f3046323039053543fad",
       "knowledge_id": "57a2ca83b8bb52a3d68795fbb90cce14803df5da3739b47d0e65a42893d17694",
       "source_type": "fact",
@@ -284125,6 +285133,30 @@
           "observed_at": "2026-08-24T19:30:31.174081+00:00",
           "indexed_at": "2026-08-26T02:32:55.342701+00:00",
           "reason": "fact-content=c59c9d9066b032962d0cc92e846bbc5fbc847349125f8b85caa9769fb19f03ea"
+        }
+      ]
+    },
+    {
+      "entity_id": "fbee4332ead1b7d2546db0ecef6a2791dc708d241918292b93b182d5b5542edf",
+      "knowledge_id": "175ba6cf3b6add994e3655e755450e589c764f80525c4d96ec1a364d54f2c133",
+      "source_type": "fact",
+      "logical_locator": "attempt:p1_locate_the_escaped_defect#attempt_tokens_out",
+      "source_uri": "fact://attempt/wf_cap_escalation_measurement_deepseek_deepseek_v4_flash:p1_locate_the_escaped_defect:7ef75c6765d1c4272b6cc85bfdbfb27759bfd7adb73977d87fec647fbbc5da02/attempt_tokens_out",
+      "observed_at": "2026-08-26T13:01:26.288680+00:00",
+      "indexed_at": "2026-08-26T13:01:31.949826+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=e2421c0144a0a53c304805cd50426f69140ab6d128ac5a98a3bb94d8087639b4",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "175ba6cf3b6add994e3655e755450e589c764f80525c4d96ec1a364d54f2c133",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-26T13:01:26.288680+00:00",
+          "indexed_at": "2026-08-26T13:01:31.949826+00:00",
+          "reason": "fact-content=e2421c0144a0a53c304805cd50426f69140ab6d128ac5a98a3bb94d8087639b4"
         }
       ]
     },
