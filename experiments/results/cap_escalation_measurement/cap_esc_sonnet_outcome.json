@@ -1,0 +1,28 @@
+{
+  "schema_version": "cap_escalation_outcome/v1",
+  "campaign": "cap_escalation_measurement",
+  "phase": "p2_measure_escalation_fix",
+  "cell_id": "cap_esc_sonnet_efe33b6",
+  "escalation_model": "anthropic/claude-sonnet-5",
+  "backend": "claude_cli",
+  "source_commit": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+  "final_commit": "f44aa04bf9f3ecc642768839c51785ce79fc179c",
+  "goal": "fix the inherited codebase so its tests pass",
+  "goal_sha256": "1ec5e625334b47db5bfcb752fda783a457d5c69bfceed196ba1a3d7033b74007",
+  "run_ledger": "experiments/results/cap_escalation_measurement/phase_ledger_cap_esc_sonnet.json",
+  "run_ledger_sha256": "6afad2c7f07e9139e02002988c0f6e0d38c735f3abcf401cd1cb4a4d530d5f68",
+  "defect_fixed": true,
+  "defect_fix_evidence": "final commit f44aa04 changes calc.py classify band from 'elif 10 < value < 20' (strict >) to 'elif value < 20' (lower bound implied by the prior 'elif value < 10' band) — the ONE deliberate defect is removed; classify(10.0) == 'mid-a' on the final commit",
+  "tests_passing": true,
+  "tests_passed": 3,
+  "tests_total": 3,
+  "test_executed_success": true,
+  "escalation_fix_cost_usd": 0.111982,
+  "duration_s": 15.3,
+  "forecast_cost_usd": 0.08949,
+  "within_forecast": false,
+  "fix_notes": [
+    "diff restricted to calc.py's classify symbol (realized_symbol_set = {classify})",
+    "test_calc.py unchanged — the fix did NOT weaken or delete the failing test"
+  ]
+}
