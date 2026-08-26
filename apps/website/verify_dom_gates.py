@@ -114,14 +114,15 @@ def record(gate: str, page: str, selector: str, result: bool, detail: str, rows:
         failures.append(f"{gate}: {page} {selector}: {detail}")
 
 
-def page_url(page_name: str) -> str:
-    """Return a file URL for a committed public page without starting a web server."""
-    return (SITE / page_name).as_uri()
+def page_url(page_name: str, base_url: str | None) -> str:
+    """Use a deployed host when supplied; otherwise load the local release candidate."""
+    return f"{base_url.rstrip('/')}/{page_name}" if base_url else (SITE / page_name).as_uri()
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write-report", action="store_true", help="write dom_verification_report.md")
+    parser.add_argument("--base-url", help="verify a deployed host instead of local file URLs")
     args = parser.parse_args()
     inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))["diagrams"]
     data = payload()
@@ -136,7 +137,7 @@ def main() -> int:
             slot = entry["slot"]
             selector = selector_for(slot)
             for page_name in (name.strip() for name in entry["page"].split(",")):
-                page.goto(page_url(page_name), wait_until="load")
+                page.goto(page_url(page_name, args.base_url), wait_until="load")
                 count = page.locator(selector).count()
                 record("inventory coverage", page_name, selector, count == 1, f"found {count} inline SVG node(s)", rows, failures)
                 slots_on_pages.add(slot) if count else None
@@ -177,7 +178,7 @@ def main() -> int:
         for component in sorted(set(components)):
             record("gallery wiring", "_design.html", component, component in slots_on_pages, "referenced by an inventory page", rows, failures)
 
-        page.goto(page_url("framework.html"), wait_until="load")
+        page.goto(page_url("framework.html", args.base_url), wait_until="load")
         rule_cards = page.locator("[data-ad-rules] .ad-rule__toggle")
         record("interactivity", "framework.html", "[data-ad-rules] .ad-rule__toggle", rule_cards.count() == 10, f"found {rule_cards.count()} keyboard buttons", rows, failures)
         keyboard_ready = True
@@ -191,13 +192,14 @@ def main() -> int:
         record("interactivity", "framework.html", "[data-ad-rules] .ad-rule__toggle", keyboard_ready, "Enter and Space activate all 10 card buttons", rows, failures)
 
         for page_name in ("story.html", "evidence.html"):
-            page.goto(page_url(page_name), wait_until="load")
+            page.goto(page_url(page_name, args.base_url), wait_until="load")
             sticky_count = page.locator(".ad-scroll-sequence .ad-scroll-sticky").count()
             record("interactivity", page_name, ".ad-scroll-sequence .ad-scroll-sticky", sticky_count >= 1, f"found {sticky_count} sticky narrative element(s)", rows, failures)
         browser.close()
 
     status = "PASS" if not failures else "FAIL"
-    report = ["# DOM Verification Report", "", f"PASS/FAIL: {status}", "", "Release-candidate pages are loaded from the working tree, then checked after local `data.js`, `app.js`, and the inline-SVG renderer execute. The report is committed only after this PASS run.", "", "| Gate | Page | Selector | Result | Evidence |", "| --- | --- | --- | --- | --- |", *rows]
+    target = args.base_url.rstrip("/") if args.base_url else "local release candidate"
+    report = ["# DOM Verification Report", "", f"PASS/FAIL: {status}", "", f"Target: {target}. Pages are checked after `data.js`, `app.js`, and the inline-SVG renderer execute. The report is committed only after the local PASS run.", "", "| Gate | Page | Selector | Result | Evidence |", "| --- | --- | --- | --- | --- |", *rows]
     if failures:
         report.extend(["", "## Failed Findings", *[f"- {failure}" for failure in failures]])
     report.extend(["", "## Remediated Initial Findings", *[f"- RESOLVED: {finding}" for finding in REMEDIATED_FINDINGS]])
