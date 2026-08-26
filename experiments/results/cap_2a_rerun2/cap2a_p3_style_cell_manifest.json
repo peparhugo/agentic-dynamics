@@ -1,0 +1,22 @@
+{
+  "actual_cost_usd": 0.01131,
+  "backend": "opencode",
+  "campaign": "cap_2a_rerun2",
+  "cell_id": "cap2a_p3_style",
+  "finops_cell_id": "cap2a_p3_style",
+  "forecast_cost_usd": 0.02575,
+  "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+  "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "model": "deepseek/deepseek-v4-pro",
+  "phase": "p3_run_shadow_cells",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T015123Z.json",
+  "run_ledger_sha256": "379931ad1bd196d0367a9c2a268b765ae5016b76291a6d81488dd600f9c24937",
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "seeded_app_seed_revision": "6c87190048e6d9ebd3e1d0150021adeb8ba5d1b6",
+  "seeded_app_worktree": "/tmp/cap2a_cell_style_rerun2",
+  "source_baseline_revision": "723653cb1aeec978564d29d6ba793b23a1eede80",
+  "spec_id": "cap_2a_cell_style@0.1",
+  "spec_path": "workflows/operations/cap_2a_cell_style.yaml",
+  "spec_path_sha256": "eaf7e806ce8f3b7f49f3f804904df513887e58387a73e1dc2ffe1337fd994ab4"
+}

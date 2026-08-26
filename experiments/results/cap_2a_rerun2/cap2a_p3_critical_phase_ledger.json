@@ -1,0 +1,50 @@
+{
+  "backend": "opencode",
+  "campaign": "cap_2a_rerun2",
+  "cell_id": "cap2a_p3_critical",
+  "model": "deepseek/deepseek-v4-pro",
+  "ok": false,
+  "phase": "p3_run_shadow_cells",
+  "phases": [
+    {
+      "commit_hash": "7d4be30",
+      "cost_usd": 0.016622886999999996,
+      "duration_s": 225.24,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.215",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "1",
+        "sonar_analysis_status": "available"
+      },
+      "graph_status": "available",
+      "impacted_count": 4,
+      "kind": "agent",
+      "phase": "implement",
+      "status": "ok"
+    },
+    {
+      "kind": "test",
+      "phase": "test",
+      "status": "failed",
+      "test_executed_success": false,
+      "tests_passed": 2,
+      "tests_total": 3
+    }
+  ],
+  "proposal_action": "rework",
+  "proposal_applied": false,
+  "proposal_artifact_sha256": "ca794e9140c4c4c183793399c2761ce8044b910696bf0cf9a7b68b00abb69787",
+  "proposal_depth": 3,
+  "proposal_id": "49755e5691ee9909",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T014835Z.json",
+  "run_ledger_sha256": "74caa76fe8063fcda04522b99d66d06958a1ed0a6e8c2d9bde42d634988c6c0f",
+  "schema_version": "cap_2a_p3_phase_ledger/v1",
+  "spec_id": "cap_2a_cell_critical@0.1",
+  "total_cost_usd": 0.016623
+}

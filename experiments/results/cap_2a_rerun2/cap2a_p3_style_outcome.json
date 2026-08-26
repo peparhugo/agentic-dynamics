@@ -1,0 +1,18 @@
+{
+  "adjudication_note": "Independent post-hoc evaluator: rate_for() compares `score == 1.0/2.0/3.0` (direct float equality -> python:S1244, MAJOR, bug-type) with a default fallthrough, and test_rate_for asserts the deterministic values; the independent kind:test phase recorded test_executed_success=True (3/3). No defect is present \u2014 the float == is a MAJOR style finding, NOT a release-blocking defect, and the v2 severity filter correctly minted new_sonar_critical_count=0. -> no_rework.",
+  "analyzed_revision": "9b5f39e75b2c946bd2d21ff2fbeda855db688319",
+  "baseline_revision": "6c87190048e6d9ebd3e1d0150021adeb8ba5d1b6",
+  "campaign": "cap_2a_rerun2",
+  "cell_id": "cap2a_p3_style",
+  "graph_status": "available",
+  "lsp_status": "available",
+  "outcome": "no_rework",
+  "proposal_id": "cb75c4af8cd89a24",
+  "realized_depth": 0,
+  "realized_symbol_set": [],
+  "schema_version": "cap_2a_outcome/v1",
+  "sonar_status": "available",
+  "test_executed_success": true,
+  "tests_passed": 3,
+  "tests_total": 3
+}

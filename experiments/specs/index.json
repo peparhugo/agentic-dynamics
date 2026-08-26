@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-26T01:37:32.528049+00:00",
+  "generated_at": "2026-08-26T01:51:23.564162+00:00",
   "n_specs": 116,
   "specs": [
     {
@@ -157,13 +157,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
+      "last_run_at": "2026-08-26T01:48:35.993741+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.016623,
+      "latest_git_sha": "7d4be30",
+      "results_pointer": "experiments/results/workflows/cap_2a_cell_critical/20260826T014835Z.json",
+      "n_runs": 1
     },
     {
       "name": "cap_2a_cell_style",
@@ -175,13 +175,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
+      "last_run_at": "2026-08-26T01:51:23.560860+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.01131,
+      "latest_git_sha": "9b5f39e",
+      "results_pointer": "experiments/results/workflows/cap_2a_cell_style/20260826T015123Z.json",
+      "n_runs": 1
     },
     {
       "name": "cap_2a_rerun",
