@@ -1,0 +1,97 @@
+{
+  "schema_version": "cap_2b_cell_manifest/v1",
+  "campaign": "cap_2b",
+  "phase": "p2_run_randomized_cells",
+  "written_at": "2026-08-26T15:52:37Z",
+  "cell_id": "cap2b_clean_static_r3",
+  "stimulus": "clean",
+  "arm": "static",
+  "repetition": "r3",
+  "spec_path": "workflows/operations/cap_2a_cell_clean.yaml",
+  "spec_path_sha256": "65730a228e238513747fdd658679d4b89389140f92f2a26021170cab338cbba0",
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+  "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "19e47b60b57f6ff3c3d8b15cafa9daa2ac4b6cbe",
+  "seeded_app_worktree": "/tmp/cap2b_clean_static_r3",
+  "seeded_app_seed_revision": "068c4737f5b01e3929dadb23a88a83f329485b8a",
+  "finops_cell_id": "cap2b_clean_static_r3",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "analyzer_status": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available",
+    "graph_updated": true
+  },
+  "flagged": false,
+  "facts": {
+    "sonar_analysis_status": "available",
+    "lsp_analysis_status": "available",
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "impacted_symbol_count": "4",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.18"
+  },
+  "facts_omitted": [],
+  "proposal": {
+    "proposal_id": "709eb3cfcc443608",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "artifact": "experiments/results/cap_2b/proposals/709eb3cfcc443608.json",
+    "artifact_sha256": "6732a00114ed5aee9c3dae3cd6198b5444c96a0376312a4617c671042d2254aa",
+    "baseline_revision": "068c4737f5b01e3929dadb23a88a83f329485b8a",
+    "analyzed_revision": "c6e2bcced4e23cebd1c3e5c12dea307c60a2b013",
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ]
+  },
+  "gate_application": {
+    "applied_or_null": "not_applicable",
+    "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+    "commit_trail": [
+      "6f66eefa4a24fd05cdd0224ca23c974a4c22b20d [workflow] verify \u2014 add a product function to the calc app (with a test), leavin",
+      "74351dd1bdc2c0c7249b8c9324166a26d52e9b8a [workflow] test \u2014 add a product function to the calc app (with a test), leavin",
+      "c6e2bcced4e23cebd1c3e5c12dea307c60a2b013 [workflow] implement \u2014 add a product function to the calc app (with a test), leavin",
+      "068c4737f5b01e3929dadb23a88a83f329485b8a seed calc app"
+    ]
+  },
+  "outcome": {
+    "final_revision": "6f66eefa4a24fd05cdd0224ca23c974a4c22b20d",
+    "test_executed_success": true,
+    "tests_passed": 3,
+    "tests_total": 3,
+    "defect_present_on_final_commit": false,
+    "accepted": true,
+    "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+  },
+  "cost": {
+    "run_workflow_usd": 0.008958,
+    "rework_pass_usd": null,
+    "total_usd": 0.008958
+  },
+  "forecast_usd": 0.017562,
+  "within_forecast": true,
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T151519Z.json",
+  "run_ledger_sha256": "5672b00cec91c610bd3eb529672ef82d4e2e022b9cbd27c46da4063ff748b96a",
+  "status": "ok",
+  "error": ""
+}

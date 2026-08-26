@@ -1,0 +1,1195 @@
+{
+  "schema_version": "cap_2b_score/v1",
+  "campaign": "cap_2b",
+  "phase": "p3_score",
+  "written_at": "20260826T160018Z",
+  "spec_version": "cap_2b@0.1",
+  "source_revision": "19e47b60b57f6ff3c3d8b15cafa9daa2ac4b6cbe",
+  "preregistration": "docs/designs/current/cap_2b_preregistration.md",
+  "join_validation": {
+    "valid": true,
+    "errors": [],
+    "n_scored": 18
+  },
+  "outcome_definition": "accepted = test_executed_success (independent runtime.test_runner on the final commit) AND defect_present_on_final_commit == false (post-hoc evaluator) \u2014 pre-registration section 1",
+  "cpvo_definition": "cpvo_arm = total arm cost / accepted outcomes \u2014 pre-registration section 1",
+  "per_cell": [
+    {
+      "cell_id": "cap2b_clean_static_r1",
+      "arm": "static",
+      "stimulus": "clean",
+      "repetition": "r1",
+      "cost_usd": 0.008781,
+      "accepted": true,
+      "cpvo_cell_usd": 0.008781,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "99b39e560709fe02",
+      "applied_or_null": "not_applicable",
+      "application_proof": "not_applicable",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_clean_adaptive_r1",
+      "arm": "adaptive",
+      "stimulus": "clean",
+      "repetition": "r1",
+      "cost_usd": 0.008652,
+      "accepted": true,
+      "cpvo_cell_usd": 0.008652,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "77407338625fb177",
+      "applied_or_null": "null",
+      "application_proof": "provable-null:commit-trail",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_clean_adaptive_r2",
+      "arm": "adaptive",
+      "stimulus": "clean",
+      "repetition": "r2",
+      "cost_usd": 0.009344,
+      "accepted": true,
+      "cpvo_cell_usd": 0.009344,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "39be2d4b23fe19c0",
+      "applied_or_null": "null",
+      "application_proof": "provable-null:commit-trail",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_clean_static_r2",
+      "arm": "static",
+      "stimulus": "clean",
+      "repetition": "r2",
+      "cost_usd": 0.008594,
+      "accepted": true,
+      "cpvo_cell_usd": 0.008594,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "af9859ed68fc56b8",
+      "applied_or_null": "not_applicable",
+      "application_proof": "not_applicable",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_clean_static_r3",
+      "arm": "static",
+      "stimulus": "clean",
+      "repetition": "r3",
+      "cost_usd": 0.008958,
+      "accepted": true,
+      "cpvo_cell_usd": 0.008958,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "709eb3cfcc443608",
+      "applied_or_null": "not_applicable",
+      "application_proof": "not_applicable",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_clean_adaptive_r3",
+      "arm": "adaptive",
+      "stimulus": "clean",
+      "repetition": "r3",
+      "cost_usd": 0.009146,
+      "accepted": true,
+      "cpvo_cell_usd": 0.009146,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "c9979a5794d2a62d",
+      "applied_or_null": "null",
+      "application_proof": "provable-null:commit-trail",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_critical_static_r1",
+      "arm": "static",
+      "stimulus": "critical",
+      "repetition": "r1",
+      "cost_usd": 0.005682,
+      "accepted": false,
+      "cpvo_cell_usd": null,
+      "verified_success": false,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "defect_present_on_final_commit": true,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "0ff07d5ebd68ca47",
+      "applied_or_null": "not_applicable",
+      "application_proof": "not_applicable",
+      "expected_effects": [
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_sonar_critical_count"
+        },
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_lsp_error_count"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "new_sonar_critical_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        },
+        {
+          "predicate": "new_lsp_error_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_critical_static_r2",
+      "arm": "static",
+      "stimulus": "critical",
+      "repetition": "r2",
+      "cost_usd": 0.011855,
+      "accepted": false,
+      "cpvo_cell_usd": null,
+      "verified_success": false,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "defect_present_on_final_commit": true,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "6f79d3b12814beea",
+      "applied_or_null": "not_applicable",
+      "application_proof": "not_applicable",
+      "expected_effects": [
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_sonar_critical_count"
+        },
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_lsp_error_count"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "new_sonar_critical_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        },
+        {
+          "predicate": "new_lsp_error_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_critical_static_r3",
+      "arm": "static",
+      "stimulus": "critical",
+      "repetition": "r3",
+      "cost_usd": 0.0093,
+      "accepted": false,
+      "cpvo_cell_usd": null,
+      "verified_success": false,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "defect_present_on_final_commit": true,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "e11fa98adecb77b3",
+      "applied_or_null": "not_applicable",
+      "application_proof": "not_applicable",
+      "expected_effects": [
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_sonar_critical_count"
+        },
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_lsp_error_count"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "new_sonar_critical_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        },
+        {
+          "predicate": "new_lsp_error_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_critical_adaptive_r1",
+      "arm": "adaptive",
+      "stimulus": "critical",
+      "repetition": "r1",
+      "cost_usd": 0.016855,
+      "accepted": true,
+      "cpvo_cell_usd": 0.016855,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "5dcf60af28d7de37",
+      "applied_or_null": "applied",
+      "application_proof": "11918a35e2116e7ab3704d49abadf163bf823841",
+      "expected_effects": [
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_sonar_critical_count"
+        },
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_lsp_error_count"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "new_sonar_critical_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        },
+        {
+          "predicate": "new_lsp_error_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_critical_adaptive_r2",
+      "arm": "adaptive",
+      "stimulus": "critical",
+      "repetition": "r2",
+      "cost_usd": 0.013192,
+      "accepted": true,
+      "cpvo_cell_usd": 0.013192,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "7322e1b7c6432d76",
+      "applied_or_null": "applied",
+      "application_proof": "d2a1a32cf78191611d6c139b21e0f5b5e3c81e66",
+      "expected_effects": [
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_sonar_critical_count"
+        },
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_lsp_error_count"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "new_sonar_critical_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        },
+        {
+          "predicate": "new_lsp_error_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_critical_adaptive_r3",
+      "arm": "adaptive",
+      "stimulus": "critical",
+      "repetition": "r3",
+      "cost_usd": 0.010562,
+      "accepted": true,
+      "cpvo_cell_usd": 0.010562,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "7aac90eb0b1c12aa",
+      "applied_or_null": "applied",
+      "application_proof": "7056cea021ccc7a4f61eba413b746cbed501fe47",
+      "expected_effects": [
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_sonar_critical_count"
+        },
+        {
+          "direction": "decrease",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "new_lsp_error_count"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "new_sonar_critical_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        },
+        {
+          "predicate": "new_lsp_error_count",
+          "direction": "decrease",
+          "expected": "decrease",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_style_static_r1",
+      "arm": "static",
+      "stimulus": "style",
+      "repetition": "r1",
+      "cost_usd": 0.009038,
+      "accepted": true,
+      "cpvo_cell_usd": 0.009038,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "2a80bd96c5bb502a",
+      "applied_or_null": "not_applicable",
+      "application_proof": "not_applicable",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_style_static_r2",
+      "arm": "static",
+      "stimulus": "style",
+      "repetition": "r2",
+      "cost_usd": 0.008831,
+      "accepted": true,
+      "cpvo_cell_usd": 0.008831,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "2d5f2e1f221270f4",
+      "applied_or_null": "not_applicable",
+      "application_proof": "not_applicable",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_style_adaptive_r1",
+      "arm": "adaptive",
+      "stimulus": "style",
+      "repetition": "r1",
+      "cost_usd": 0.008894,
+      "accepted": true,
+      "cpvo_cell_usd": 0.008894,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "e7226be2556cd886",
+      "applied_or_null": "null",
+      "application_proof": "provable-null:commit-trail",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_style_adaptive_r2",
+      "arm": "adaptive",
+      "stimulus": "style",
+      "repetition": "r2",
+      "cost_usd": 0.008859,
+      "accepted": true,
+      "cpvo_cell_usd": 0.008859,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "e51ea80c095d75d1",
+      "applied_or_null": "null",
+      "application_proof": "provable-null:commit-trail",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_style_adaptive_r3",
+      "arm": "adaptive",
+      "stimulus": "style",
+      "repetition": "r3",
+      "cost_usd": 0.00886,
+      "accepted": true,
+      "cpvo_cell_usd": 0.00886,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "6628fb21f00a7d28",
+      "applied_or_null": "null",
+      "application_proof": "provable-null:commit-trail",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    },
+    {
+      "cell_id": "cap2b_style_static_r3",
+      "arm": "static",
+      "stimulus": "style",
+      "repetition": "r3",
+      "cost_usd": 0.009023,
+      "accepted": true,
+      "cpvo_cell_usd": 0.009023,
+      "verified_success": true,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "defect_present_on_final_commit": false,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "d5ef1fd078e74093",
+      "applied_or_null": "not_applicable",
+      "application_proof": "not_applicable",
+      "expected_effects": [
+        {
+          "direction": "unchanged",
+          "horizon": "next_phase",
+          "magnitude": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "expected_effect_checks": [
+        {
+          "predicate": "code_change_risk",
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "observed": null,
+          "held": false,
+          "measurable": false,
+          "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+        }
+      ],
+      "flagged": false
+    }
+  ],
+  "per_arm": {
+    "static": {
+      "n": 9,
+      "total_cost_usd": 0.080062,
+      "accepted_outcomes": 6,
+      "cpvo_usd": 0.013344,
+      "cpvo_ci_95": [
+        0.011744,
+        0.01477
+      ],
+      "verified_success_rate": 0.666667,
+      "verified_success_wilson_95": [
+        0.3542,
+        0.8794
+      ]
+    },
+    "adaptive": {
+      "n": 9,
+      "total_cost_usd": 0.094364,
+      "accepted_outcomes": 9,
+      "cpvo_usd": 0.010485,
+      "cpvo_ci_95": [
+        0.009522,
+        0.011569
+      ],
+      "verified_success_rate": 1.0,
+      "verified_success_wilson_95": [
+        0.7008,
+        1.0
+      ]
+    }
+  },
+  "defect_bearing": {
+    "static": {
+      "n_defect_bearing": 3,
+      "total_cost_usd": 0.026837,
+      "accepted_outcomes": 0,
+      "cpvo_usd": null,
+      "verified_success_rate": 0.0,
+      "note": "defect-bearing = critical stimulus cells (the pilot's n per pre-registration section 3). static arm: 0 accepted (defect present); adaptive arm: rework applied -> accepted."
+    },
+    "adaptive": {
+      "n_defect_bearing": 3,
+      "total_cost_usd": 0.040609,
+      "accepted_outcomes": 3,
+      "cpvo_usd": 0.013536,
+      "verified_success_rate": 1.0,
+      "note": "defect-bearing = critical stimulus cells (the pilot's n per pre-registration section 3). static arm: 0 accepted (defect present); adaptive arm: rework applied -> accepted."
+    }
+  },
+  "asymmetric_loss": {
+    "base_downstream_defect_cost_usd": 0.004021,
+    "note": "loss = E_x x $0.004021 (pre-registration section 5; escalation score JSON loss_table)",
+    "rows": [
+      {
+        "E_x": 11.4671,
+        "source": "MEASURED \u2014 openai/gpt-5.6-sol escalation fix (cap_escalation_measurement_score 20260826T125726Z.json loss_table)",
+        "per_defect_usd": 0.046109,
+        "static_arm_loss_usd": 0.138327,
+        "adaptive_arm_value_usd": -0.138327,
+        "swing_usd": 0.276654,
+        "n_static_escaped_defects": 3,
+        "n_adaptive_reworked": 3
+      },
+      {
+        "E_x": 28.0,
+        "source": "sourced pricing ratio DeepSeek -> GPT-5.6 (rerun3 value_model.E_x)",
+        "per_defect_usd": 0.112588,
+        "static_arm_loss_usd": 0.337764,
+        "adaptive_arm_value_usd": -0.337764,
+        "swing_usd": 0.675528,
+        "n_static_escaped_defects": 3,
+        "n_adaptive_reworked": 3
+      }
+    ]
+  },
+  "expected_effects": {
+    "per_cell": {
+      "cap2b_clean_static_r1": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_clean_adaptive_r1": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_clean_adaptive_r2": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_clean_static_r2": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_clean_static_r3": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_clean_adaptive_r3": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_critical_static_r1": {
+        "claims": [
+          {
+            "predicate": "new_sonar_critical_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_critical_static_r2": {
+        "claims": [
+          {
+            "predicate": "new_sonar_critical_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_critical_static_r3": {
+        "claims": [
+          {
+            "predicate": "new_sonar_critical_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_critical_adaptive_r1": {
+        "claims": [
+          {
+            "predicate": "new_sonar_critical_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_critical_adaptive_r2": {
+        "claims": [
+          {
+            "predicate": "new_sonar_critical_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_critical_adaptive_r3": {
+        "claims": [
+          {
+            "predicate": "new_sonar_critical_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_style_static_r1": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_style_static_r2": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_style_adaptive_r1": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_style_adaptive_r2": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_style_adaptive_r3": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      },
+      "cap2b_style_static_r3": {
+        "claims": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false,
+            "measurable": false,
+            "note": "no post-application change_analysis in the immutable p1/p2 artifacts (2b rework passes were not handed to the change analyzer; continue = null gate) -> unmeasurable"
+          }
+        ]
+      }
+    },
+    "aggregates": {
+      "claims_made": 24,
+      "claims_checked": 24,
+      "claims_held": 0,
+      "check_rate": 1.0,
+      "held_rate": 0.0,
+      "note": "All 24 claims (6 rework proposals x 2 + 12 continue proposals x 1) were submitted to the validator (check_rate 1.0). observed=null for every claim: 2b's rework passes were applied without a post-rework change_analysis artifact, and continue = provable null \u2014 no next-phase facts exist in the immutable p1/p2 artifacts, so no claim is measurable from them (held_rate 0)."
+    }
+  },
+  "decision_rule": {
+    "cpvo_ratio": 0.785746,
+    "cpvo_ratio_ci_95": [
+      0.6842,
+      0.9105
+    ],
+    "success_gap_static_minus_adaptive": -0.333333,
+    "margin_cpvo_ratio_le": 1.1,
+    "margin_success_gap_le": 0.05,
+    "cpvo_leg_holds": true,
+    "success_leg_holds": true,
+    "decision": "NON_INFERIOR",
+    "margin_reference": "docs/designs/current/cap_2b_preregistration.md section 2 (margin) + section 5 (analysis plan / decision rule)"
+  },
+  "denominators": {
+    "n_total": 18,
+    "n_static": 9,
+    "n_adaptive": 9,
+    "n_defect_bearing": 6,
+    "n_invalid_join": 0
+  },
+  "flags": [],
+  "score_input_artifacts": {
+    "p1_cell_manifest": "experiments/results/cap_2b/p1_cell_manifest.json",
+    "p2_cells_run": "experiments/results/cap_2b/p2_cells_run.json",
+    "p2_manifest": "experiments/results/cap_2b/p2_manifest.json"
+  }
+}

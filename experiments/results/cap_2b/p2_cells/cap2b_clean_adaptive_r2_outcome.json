@@ -1,0 +1,18 @@
+{
+  "schema_version": "cap_2b_cell_outcome/v1",
+  "campaign": "cap_2b",
+  "phase": "p2_run_randomized_cells",
+  "written_at": "2026-08-26T15:52:36Z",
+  "cell_id": "cap2b_clean_adaptive_r2",
+  "stimulus": "clean",
+  "arm": "adaptive",
+  "repetition": "r2",
+  "test_executed_success": true,
+  "tests_passed": 3,
+  "tests_total": 3,
+  "defect_present_on_final_commit": false,
+  "accepted": true,
+  "final_revision": "90eeda83626df545731d1002d6a88390b2066a5c",
+  "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit",
+  "note": "Independent outcomes: runtime.test_runner verdict + post-hoc evaluator defect determination on the immutable final commit \u2014 never the proposing agent's narrative."
+}

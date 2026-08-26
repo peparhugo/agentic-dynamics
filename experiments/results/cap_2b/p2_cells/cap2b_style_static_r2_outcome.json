@@ -1,0 +1,18 @@
+{
+  "schema_version": "cap_2b_cell_outcome/v1",
+  "campaign": "cap_2b",
+  "phase": "p2_run_randomized_cells",
+  "written_at": "2026-08-26T15:52:42Z",
+  "cell_id": "cap2b_style_static_r2",
+  "stimulus": "style",
+  "arm": "static",
+  "repetition": "r2",
+  "test_executed_success": true,
+  "tests_passed": 3,
+  "tests_total": 3,
+  "defect_present_on_final_commit": false,
+  "accepted": true,
+  "final_revision": "3b3aadf133cd296b29fabb986618c0e46cd68828",
+  "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit",
+  "note": "Independent outcomes: runtime.test_runner verdict + post-hoc evaluator defect determination on the immutable final commit \u2014 never the proposing agent's narrative."
+}

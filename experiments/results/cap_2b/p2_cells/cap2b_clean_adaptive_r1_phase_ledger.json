@@ -1,0 +1,61 @@
+{
+  "schema_version": "cap_2b_p2_phase_ledger/v1",
+  "campaign": "cap_2b",
+  "phase": "p2_run_randomized_cells",
+  "written_at": "2026-08-26T15:52:36Z",
+  "cell_id": "cap2b_clean_adaptive_r1",
+  "arm": "adaptive",
+  "stimulus": "clean",
+  "repetition": "r1",
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "status": "ok",
+  "error": "",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T150639Z.json",
+  "run_ledger_sha256": "a4130413352a2a6b4a19feee3a3d8fa1d2cd8130c38ab609840e91f3d8205816",
+  "proposal_seam_result": {
+    "proposal_id": "77407338625fb177",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "refused": false,
+    "artifact": "experiments/results/cap_2b/proposals/77407338625fb177.json",
+    "artifact_sha256": "508cf1cf973ff67347d1078795bf35c48ca77da784e4daf5d8c49e9b600c4116",
+    "note": "proposal emitted + validated BEFORE the outcome; static arm = recorded never applied; adaptive arm = applied exactly as proposed."
+  },
+  "gate_application": {
+    "applied_or_null": "null",
+    "action": "continue",
+    "rework_passes": 0,
+    "note": "continue proposal -> provable null application (no extra pass; commit trail shows only the workflow phases).",
+    "commit_trail": [
+      "06f974b6fb25c6f827fc9fdd7d4a845a48264311 [workflow] verify \u2014 add a product function to the calc app (with a test), leavin",
+      "67dc0f464cab603cba3c973696c2e4b3e0d8456c [workflow] test \u2014 add a product function to the calc app (with a test), leavin",
+      "9af470a98f900ef60c7e02c2fac1e9d04aa9ca47 [workflow] implement \u2014 add a product function to the calc app (with a test), leavin",
+      "3e1de2d05c3e878089d37500a79de224ec7442e8 seed calc app"
+    ]
+  },
+  "outcome": {
+    "final_revision": "06f974b6fb25c6f827fc9fdd7d4a845a48264311",
+    "test_executed_success": true,
+    "tests_passed": 3,
+    "tests_total": 3,
+    "defect_present_on_final_commit": false,
+    "accepted": true,
+    "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+  },
+  "analyzer_reachability": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available",
+    "graph_updated": true
+  },
+  "flagged": false,
+  "total_measured_cost_usd": 0.008652,
+  "forecast_cost_usd": 0.017562,
+  "within_forecast": true,
+  "wall_s": 159.3
+}

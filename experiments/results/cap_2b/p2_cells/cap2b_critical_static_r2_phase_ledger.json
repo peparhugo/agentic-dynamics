@@ -1,0 +1,64 @@
+{
+  "schema_version": "cap_2b_p2_phase_ledger/v1",
+  "campaign": "cap_2b",
+  "phase": "p2_run_randomized_cells",
+  "written_at": "2026-08-26T15:52:39Z",
+  "cell_id": "cap2b_critical_static_r2",
+  "arm": "static",
+  "stimulus": "critical",
+  "repetition": "r2",
+  "spec_id": "cap_2a_cell_critical@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "status": "ok",
+  "error": "",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T152342Z.json",
+  "run_ledger_sha256": "5958558bcf122aa1dbdc7c85a620ecfde8d2b89474de007c2e4d0c27a059187b",
+  "proposal_seam_result": {
+    "proposal_id": "6f79d3b12814beea",
+    "action": "rework",
+    "depth": 3,
+    "scope": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ],
+    "applied": false,
+    "refused": false,
+    "artifact": "experiments/results/cap_2b/proposals/6f79d3b12814beea.json",
+    "artifact_sha256": "eb3ca4631587f6597c65d2b741c105e467aeaf51a6e73011a49687174777e35a",
+    "note": "proposal emitted + validated BEFORE the outcome; static arm = recorded never applied; adaptive arm = applied exactly as proposed."
+  },
+  "gate_application": {
+    "applied_or_null": "not_applicable",
+    "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+    "commit_trail": [
+      "79a8bb06c46e5379690307f8700fc0efd6600681 [workflow] implement \u2014 add a classifier function with a deep nested decision tree c",
+      "8622f99a61490e2c3558e0fe2260a01fad6e48aa seed calc app"
+    ]
+  },
+  "outcome": {
+    "final_revision": "79a8bb06c46e5379690307f8700fc0efd6600681",
+    "test_executed_success": false,
+    "tests_passed": 2,
+    "tests_total": 3,
+    "defect_present_on_final_commit": true,
+    "accepted": false,
+    "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+  },
+  "analyzer_reachability": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available",
+    "graph_updated": true
+  },
+  "flagged": false,
+  "total_measured_cost_usd": 0.011855,
+  "forecast_cost_usd": 0.017562,
+  "within_forecast": true,
+  "wall_s": 204.1
+}

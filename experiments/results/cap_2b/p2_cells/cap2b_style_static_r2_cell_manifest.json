@@ -1,0 +1,97 @@
+{
+  "schema_version": "cap_2b_cell_manifest/v1",
+  "campaign": "cap_2b",
+  "phase": "p2_run_randomized_cells",
+  "written_at": "2026-08-26T15:52:42Z",
+  "cell_id": "cap2b_style_static_r2",
+  "stimulus": "style",
+  "arm": "static",
+  "repetition": "r2",
+  "spec_path": "workflows/operations/cap_2a_cell_style.yaml",
+  "spec_path_sha256": "eaf7e806ce8f3b7f49f3f804904df513887e58387a73e1dc2ffe1337fd994ab4",
+  "spec_id": "cap_2a_cell_style@0.1",
+  "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+  "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "19e47b60b57f6ff3c3d8b15cafa9daa2ac4b6cbe",
+  "seeded_app_worktree": "/tmp/cap2b_style_static_r2",
+  "seeded_app_seed_revision": "844d995f52f2576dc561aa8d8c7b2f8693e23233",
+  "finops_cell_id": "cap2b_style_static_r2",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "analyzer_status": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available",
+    "graph_updated": true
+  },
+  "flagged": false,
+  "facts": {
+    "sonar_analysis_status": "available",
+    "lsp_analysis_status": "available",
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "impacted_symbol_count": "4",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.18"
+  },
+  "facts_omitted": [],
+  "proposal": {
+    "proposal_id": "2d5f2e1f221270f4",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "artifact": "experiments/results/cap_2b/proposals/2d5f2e1f221270f4.json",
+    "artifact_sha256": "8e62a3bf4d71d71a6d45cdb95fba5f7438dd8332c601392ba91c38ff30372799",
+    "baseline_revision": "844d995f52f2576dc561aa8d8c7b2f8693e23233",
+    "analyzed_revision": "49c8c63491be9da4543ed50f36790a626784a618",
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ]
+  },
+  "gate_application": {
+    "applied_or_null": "not_applicable",
+    "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+    "commit_trail": [
+      "3b3aadf133cd296b29fabb986618c0e46cd68828 [workflow] verify \u2014 add a rate_for function that compares floating-point thresho",
+      "3329d356f364cb5e845557a16c93e152ce6240f0 [workflow] test \u2014 add a rate_for function that compares floating-point thresho",
+      "49c8c63491be9da4543ed50f36790a626784a618 [workflow] implement \u2014 add a rate_for function that compares floating-point thresho",
+      "844d995f52f2576dc561aa8d8c7b2f8693e23233 seed calc app"
+    ]
+  },
+  "outcome": {
+    "final_revision": "3b3aadf133cd296b29fabb986618c0e46cd68828",
+    "test_executed_success": true,
+    "tests_passed": 3,
+    "tests_total": 3,
+    "defect_present_on_final_commit": false,
+    "accepted": true,
+    "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+  },
+  "cost": {
+    "run_workflow_usd": 0.008831,
+    "rework_pass_usd": null,
+    "total_usd": 0.008831
+  },
+  "forecast_usd": 0.017562,
+  "within_forecast": true,
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T154052Z.json",
+  "run_ledger_sha256": "4a4ce2082b9db437f9edcf1d4731cc1906504d60c0bc9500fc302a7821683eb0",
+  "status": "ok",
+  "error": ""
+}

@@ -1,0 +1,59 @@
+{
+  "schema_version": "cap_2b_p2_phase_ledger/v1",
+  "campaign": "cap_2b",
+  "phase": "p2_run_randomized_cells",
+  "written_at": "2026-08-26T15:52:44Z",
+  "cell_id": "cap2b_style_static_r3",
+  "arm": "static",
+  "stimulus": "style",
+  "repetition": "r3",
+  "spec_id": "cap_2a_cell_style@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "status": "ok",
+  "error": "",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T155131Z.json",
+  "run_ledger_sha256": "bdc5612a17a095c5e8adfb73f11e4ba50e72db7a597e9bcfe24f7da1ded73443",
+  "proposal_seam_result": {
+    "proposal_id": "d5ef1fd078e74093",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "refused": false,
+    "artifact": "experiments/results/cap_2b/proposals/d5ef1fd078e74093.json",
+    "artifact_sha256": "d6771bf71224cfa216fb7b19a920abc49e892aca1a7c8edf4b189be044950e3f",
+    "note": "proposal emitted + validated BEFORE the outcome; static arm = recorded never applied; adaptive arm = applied exactly as proposed."
+  },
+  "gate_application": {
+    "applied_or_null": "not_applicable",
+    "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+    "commit_trail": [
+      "2aab9e6a9956aa2e68492de31507f556dd1eccf1 [workflow] verify \u2014 add a rate_for function that compares floating-point thresho",
+      "47ca06f560566ac2576c0bdc2155ef21ae0f2618 [workflow] test \u2014 add a rate_for function that compares floating-point thresho",
+      "c3d4e0ce5d209b3b4bf531cac1f5161f29c09fea [workflow] implement \u2014 add a rate_for function that compares floating-point thresho",
+      "fd43f3fda28ccb79ce15707816dc29c4f0c533db seed calc app"
+    ]
+  },
+  "outcome": {
+    "final_revision": "2aab9e6a9956aa2e68492de31507f556dd1eccf1",
+    "test_executed_success": true,
+    "tests_passed": 3,
+    "tests_total": 3,
+    "defect_present_on_final_commit": false,
+    "accepted": true,
+    "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+  },
+  "analyzer_reachability": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available",
+    "graph_updated": true
+  },
+  "flagged": false,
+  "total_measured_cost_usd": 0.009023,
+  "forecast_cost_usd": 0.017562,
+  "within_forecast": true,
+  "wall_s": 166.2
+}

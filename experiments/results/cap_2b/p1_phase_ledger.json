@@ -1,0 +1,150 @@
+{
+  "schema_version": "cap_2b_p1_ledger/v1",
+  "campaign": "cap_2b",
+  "phase": "p1_measure_one",
+  "written_at": "2026-08-26T15:00:20Z",
+  "cell_id": "cap2b_clean_static_r1",
+  "arm": "static",
+  "stimulus": "clean",
+  "repetition": "r1",
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "candidate_manifest": "experiments/results/cap_2b/p1_candidate_manifest.json",
+  "candidate_manifest_sha256": "c05c05b8a0f09f523c3abbab65466a5743181ea19b9d1c394719a6b3e5daf219",
+  "source_baseline_revision": "19e47b60b57f6ff3c3d8b15cafa9daa2ac4b6cbe",
+  "preregistration_commit": "19e47b60b57f6ff3c3d8b15cafa9daa2ac4b6cbe",
+  "seeded_app_worktree": "/tmp/cap2b_clean_static_r1",
+  "seeded_app_seed_revision": "b6cf06d6ad3fd68fc8df22dd55ec9e34bf6ab546",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T145915Z.json",
+  "run_ledger_sha256": "93292a4d8411b298cd4f68111759b8036d95e5fec28629e31a8327fe8dd48fd1",
+  "analyzer_reachability": {
+    "graph": {
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "reachable": true,
+      "uri": "bolt://localhost:7687"
+    },
+    "lsp": {
+      "reachable": true,
+      "status": "available",
+      "tool": "mypy",
+      "version": "2.3.1"
+    },
+    "sonar": {
+      "reachable": true,
+      "server": "http://localhost:9000 (UP)",
+      "status": "available"
+    }
+  },
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "33fc417",
+      "baseline_revision": "b6cf06d6ad3fd68fc8df22dd55ec9e34bf6ab546",
+      "analyzed_revision": "33fc417df30a069da0feac70ad0b243727fddd3b",
+      "cost_usd": 0.003594637,
+      "duration_s": 17.16,
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "lsp_analysis_status": "available",
+      "sonar_analysis_status": "available",
+      "code_change_risk": "0.18",
+      "facts_emitted": [
+        {
+          "predicate": "analysis_revision_matches",
+          "value": "true"
+        },
+        {
+          "predicate": "ast_parse_coverage",
+          "value": "1.0"
+        },
+        {
+          "predicate": "changed_symbol_count",
+          "value": "2"
+        },
+        {
+          "predicate": "changed_symbols_with_tests_ratio",
+          "value": "0.5"
+        },
+        {
+          "predicate": "code_change_risk",
+          "value": "0.18"
+        },
+        {
+          "predicate": "impacted_symbol_count",
+          "value": "4"
+        },
+        {
+          "predicate": "lsp_analysis_status",
+          "value": "available"
+        },
+        {
+          "predicate": "new_lsp_error_count",
+          "value": "0"
+        },
+        {
+          "predicate": "new_sonar_critical_count",
+          "value": "0"
+        },
+        {
+          "predicate": "sonar_analysis_status",
+          "value": "available"
+        }
+      ],
+      "facts_omitted": [],
+      "proposal": "99b39e560709fe02 (continue, depth 0, applied=false)",
+      "test_result": "test_executed_success = null (no test_gate on this phase; the independent kind:test phase is next)"
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "cost_usd": 0.0,
+      "duration_s": 0.36,
+      "test_result": "test_executed_success = true (3/3) \u2014 independent runtime.test_runner"
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "c05bb0a",
+      "cost_usd": 0.005186592,
+      "duration_s": 11.45,
+      "note": "Verification note produced no code diff (changed_symbol_count=0 in the verify phase's change_analysis) -> no new implementation change; the final commit c05bb0a carries the implement phase's product function.",
+      "test_result": "none (documentation/verification phase)"
+    }
+  ],
+  "proposal_seam_result": {
+    "proposal_id": "99b39e560709fe02",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "proposals_emitted": 1,
+    "refused": false,
+    "artifact": "experiments/results/cap_2b/proposals/99b39e560709fe02.json",
+    "artifact_sha256": "fe79d6586fca29a5bede71fe9a236912fd4f90b8e627425b47b6d9a1cf8a8587",
+    "note": "Emitted from the implement phase's change_analysis facts (code_change_risk=0.18, new_sonar_critical_count=0). risk 0.18 < VERIFY_RISK_THRESHOLD 0.2 and no measured criticals -> action=continue, depth=0 \u2014 the clean static cell correctly does NOT over-predict (the shadow seam emitted + validated the proposal, applied=false). Static arm: the proposal is recorded, NEVER applied."
+  },
+  "total_measured_cost_breakdown": {
+    "implement": 0.003594637,
+    "test": 0.0,
+    "verify": 0.005186592
+  },
+  "total_measured_cost_usd": 0.008781,
+  "p2_forecast_budget": {
+    "label": "FORECAST",
+    "basis": "p1 measured static-arm cost x 2 headroom",
+    "measured_cost_usd": 0.008781,
+    "forecast_per_cell_usd": 0.017562,
+    "note": "FORECAST, not measured. p2 must report each later cell's forecast and actual cost separately. The p1 measured cost ($0.008781) is the first 2b measurement (static arm, clean stimulus); the per-cell budget is its 2x headroom. This forecast applies to the remaining 17 cells until any p2 measurement revises it."
+  }
+}
