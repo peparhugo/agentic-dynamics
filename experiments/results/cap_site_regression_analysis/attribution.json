@@ -1,0 +1,179 @@
+{
+  "campaign": "cap_site_regression_analysis",
+  "phase": "p2_diff_and_attribution",
+  "generated_at": "2026-08-27T01:00:00Z",
+  "method": "For each feature in the p1 feature matrix, git log -p on feature/site-revamp (revamp1) and feature/site-revamp2 (revamp2) from their common base 0c8c734f1 to each branch tip; mapped every removed/rewritten artifact to the commit and workflow phase that changed it; classified each loss as (a) deliberate replacement, (b) accidental drop, (c) gate-driven removal; measured additions from the same diffs.",
+  "phase_map": {
+    "revamp1": {
+      "branch": "feature/site-revamp",
+      "base": "0c8c734f1",
+      "tip": "edeb2a7e5",
+      "phases": [
+        {"phase": "p0_research_and_editorial_audit", "commit": "47f639201", "date": "2026-08-26 21:07", "message": "research: cap_site_revamp editorial audit", "touched": ["apps/website/references/* (14 example-library files)", "docs/designs/current/cap_site_revamp_research.md"]},
+        {"phase": "p1_visual_system", "commit": "564641ffc", "date": "2026-08-26 21:14", "message": "site: add editorial visual system", "touched": ["apps/website/_design.html", "apps/website/assets/design-components.js", "apps/website/base.css"]},
+        {"phase": "p2_editorial_rewrite", "commit": "54201491a", "date": "2026-08-26 21:23", "message": "site: rewrite public research narrative", "touched": ["ALL pages: accelerator/databricks/evidence/framework/glossary/index/methodology/story/question html", "assets/publication.js", "base.css", "sitemap.xml"]},
+        {"phase": "p3_implementation", "commit": "80a3bd9af", "date": "2026-08-26 21:32", "message": "site: wire campaign evidence to data", "touched": ["apps/website/app.js (v0.5 -> v2 rewrite)", "design-components.js", "data.js", "scripts/build_data.py (campaign adapter)"]},
+        {"phase": "p4_truth_and_quality_review", "commit": "2b2257d15", "date": "2026-08-26 21:45", "message": "site: harden evidence publication", "touched": ["docs/reviews/cap_site_revamp_review.md", "app.js", "build_data.py (source_sha256)", "firebase.json (_design/references ignored)", "all pages"]},
+        {"phase": "p5_deploy", "commit": "b57e27595", "date": "2026-08-26 21:47", "message": "data: refresh site publication receipt", "touched": ["data.js", "manifest"]},
+        {"phase": "p5_deploy", "commit": "edeb2a7e5", "date": "2026-08-26 21:48", "message": "docs: record site deploy verification", "touched": ["docs/reviews/cap_site_revamp_deploy.md"]}
+      ],
+      "note": "revamp1 commits did NOT carry the spec's required '[workflow] <phase>' prefix (hard_rule 1 violation); phase attribution is inferred from content + sequence. app.js was still v0.5 at p2 (54201491a) when the pages were rewritten to data-ad slots, so the intermediate tree was a broken shell (0 renderDiagrams in app.js at p2); app.js v2 landed in p3 (80a3bd9af)."
+    },
+    "revamp2": {
+      "branch": "feature/site-revamp2",
+      "base": "edeb2a7e5 (revamp1 tip)",
+      "tip": "f13161f3b",
+      "phases": [
+        {"phase": "p1_implement_inventory", "commit": "b1996109c", "date": "2026-08-26 23:56", "message": "[workflow] p1_implement_inventory — Deliver the site's IMPLEMENTED visual system", "touched": ["apps/website/diagram_inventory.json", "evidence/framework/methodology/story html (diagram slots + beta control + sticky scroll)"]},
+        {"phase": "p2_editorial_integration", "commit": "dfe371072", "date": "2026-08-26 23:56", "message": "[workflow] p2_editorial_integration", "touched": ["figure_copy_reconciliation.md", "verify_figure_copy.py"]},
+        {"phase": "p3_dom_verification", "commit": "20eeb801b", "date": "2026-08-26 23:56", "message": "[workflow] p3_dom_verification", "touched": ["app.js (renderDiagrams data-aware, bindCostCurveControl, rulesOverview)", "design-components.js (components take data args)", "base.css", "verify_dom_gates.py", "verify_visual_system.py", "dom_verification_report.md"]},
+        {"phase": "p4_truth_and_visual_review", "commit": "6550334f0", "date": "2026-08-27 00:20", "message": "[workflow] p4_adversarial_review", "touched": ["app.js (lsp_available computed, escapeHtml, data-ad-receipt family)", "design-components.js", "all pages", "CONTEXT.md"]},
+        {"phase": "p4_truth_and_visual_review", "commit": "0ab90b8f9", "date": "2026-08-27 00:21", "message": "[workflow] p4_deploy_verification", "touched": ["docs/reviews/cap_site_revamp2_review.md"]},
+        {"phase": "p5_deploy", "commit": "56dcc90d0", "date": "2026-08-27 00:25", "message": "[workflow] p5_final_build", "touched": ["data.js"]},
+        {"phase": "p5_deploy", "commit": "f13161f3b", "date": "2026-08-27 00:27", "message": "[workflow] p5_dual_deploy_verification", "touched": ["deployed-page DOM verification"]}
+      ],
+      "note": "revamp2 branched FROM revamp1 tip, so it inherited all of revamp1's losses. Its phases implemented + verified the NEW visual system; none of its gates required the ORIGINAL interactive layer to survive."
+    }
+  },
+  "losses": [
+    {
+      "feature": "Framework interactive calculator (14 range sliders, 2 modes)",
+      "page": "framework.html",
+      "build": "revamp1",
+      "classification": "gate-driven removal (c)",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite", "date": "2026-08-26 21:23", "message": "site: rewrite public research narrative"},
+      "evidence": "git show 54201491a^:apps/website/framework.html | grep -cE 'input type=\"range\"|canvas id=\"costChart\"|Chart' = 19; after = 0. Full-page rewrite (1035 lines -> 79).",
+      "research_doc_directive": "cap_site_revamp_research.md:78 'Retire the sales-like calculator; preserve any transparent model as a labeled [C] explorable only.'; :146 'delete calculator/enterprise scenario as SaaS/modeling pitch. Model formulas may return as [C] explorable with explicit inputs.'; :45 anti-SaaS exclusions name 'conversion calculators'.",
+      "survived_in_revamp2": "No (revamp2 inherited revamp1; only a single beta slider restored on methodology.html)"
+    },
+    {
+      "feature": "Framework cost chart (Chart.js canvas #costChart, 3/10/25yr horizon, baseline/DS-scenario, cost/throughput views)",
+      "page": "framework.html",
+      "build": "revamp1",
+      "classification": "gate-driven removal (c) — declared SaaS/modeling; NOT replaced",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite", "date": "2026-08-26 21:23"},
+      "evidence": "Chart.js CDN tag + <canvas id=\"costChart\"> + buildChart/rebuildChart functions all removed in 54201491a. grep Chart count 19 -> 0.",
+      "research_doc_directive": ":146 framework row — 'delete calculator/enterprise scenario as SaaS/modeling pitch'; the cost-curves diagram in the research doc's inventory (4.2) was intended as the [C] replacement but revamp1 never wired data-ad-diagram=\"curves\" on any page.",
+      "survived_in_revamp2": "Partially — costCurves SVG implemented + beta slider on methodology.html (data-ad-beta), but 3/10/25yr horizon, scenario toggle, and cost/throughput views NOT ported."
+    },
+    {
+      "feature": "Evidence 5 Chart.js canvas charts (snowball, grit-matrix, narration, cost-bar, LOC-vs-cost)",
+      "page": "evidence.html",
+      "build": "revamp1",
+      "classification": "accidental drop (b) — never ported, never replaced",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite", "date": "2026-08-26 21:23"},
+      "evidence": "git show 54201491a^:apps/website/evidence.html | grep -cE '<canvas|new Chart' = 10; after = 0. All 5 canvases + Chart.js CDN removed. The research doc's diagram inventory (4.2) lists only NEW diagrams (instrument cycle, NxM, planes, engine/autonomy, cost curves, escalation, calibration, rules) — the existing charts were never inventoried, so no gate asked for them.",
+      "research_doc_directive": "none — the research doc's evidence IA (:259 'Keep as primary Evidence chapter... Remove/archive unavailable lab claims') concerned unavailable lab data, not the existing chart layer.",
+      "survived_in_revamp2": "No — replaced by 2 js-injected SVG diagrams (escalation chain, calibration arc) + a model-aggregate HTML table."
+    },
+    {
+      "feature": "Evidence Grit interactive matrix (model + perturbation-class filter buttons)",
+      "page": "evidence.html",
+      "build": "revamp1",
+      "classification": "accidental drop (b)",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "#grit-model-filters + quadrant buildChart + selectedModels/selectedPC toggles removed with the page rewrite.",
+      "survived_in_revamp2": "No."
+    },
+    {
+      "feature": "Evidence ~20 JS-populated data tables (arc, condition, grit-strength/model/class, narration, cost-ranking, AST, sonar, token-cost, model-cards, RVS, drift, recovery, coupling, stability, cascade, operator-impact, energy-ranking, strategy-distribution)",
+      "page": "evidence.html",
+      "build": "revamp1",
+      "classification": "accidental drop (b) — replaced by a single 5-column model-aggregate table",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "grep of removed lines shows id=arc-session-tbody, condition-tbody, grit-strength-tbody, cost-ranking-tbody, ast-metric-body, sonar-quality-body, token-cost-tbody, model-cards-root, rvs-body, drift-body, recovery-body, coupling-body, stability-body, cascade-body, sonar-impact-body, operator-impact-body, energy-ranking-cards, strategy-distribution all removed in 54201491a. revamp1 evidence has only data-ad-model-table.",
+      "survived_in_revamp2": "No (model-aggregate table only)."
+    },
+    {
+      "feature": "app.js shared interactive layer (theme toggle, 31-key data-stat/data-stat-fmt statMap injection, data-anal analysis-row population, floating TOC)",
+      "page": "app.js (all pages)",
+      "build": "revamp1",
+      "classification": "deliberate replacement (a) of the data-injection mechanism + accidental drop (b) of theme toggle and TOC (no equivalent in v2)",
+      "removed_at": {"commit": "80a3bd9af", "phase": "p3_implementation", "date": "2026-08-26 21:32", "message": "site: wire campaign evidence to data"},
+      "evidence": "app.js 211 lines (v0.5) -> 100 lines (v2) in 80a3bd9af. v0.5 had theme toggle (:4-20), statMap (:65-102), data-anal (:127-152), floating TOC (:156-211). v2 has none of these; replaced by data-ad-stat/data-ad-receipt/data-ad-diagram/data-ad-rules wiring.",
+      "survived_in_revamp2": "v2 kept; theme toggle + TOC never restored. revamp2 adds data-ad-receipt family + lsp_available + escapeHtml + bindCostCurveControl."
+    },
+    {
+      "feature": "Framework 13-lever section + provider playbook + 10 decision-rule cards + model cards CTA",
+      "page": "framework.html",
+      "build": "revamp1",
+      "classification": "gate-driven removal (c) + deliberate replacement (a) — rules became js-injected cards; levers/playbook dropped",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "research doc :260 'framework.html ... Remove business calculator, provider playbook, and unvalidated prescriptions.' :146 levers flagged as scenario inputs.",
+      "survived_in_revamp2": "Rules restored as interactive cards (status badges); levers + playbook not."
+    },
+    {
+      "feature": "Accelerator enterprise content (problem list, maturity ladder, enterprise projections, autonomous-workloads WFM tables, measurement tools, DIY comparison)",
+      "page": "accelerator.html",
+      "build": "revamp1",
+      "classification": "gate-driven removal (c) — page retired as SaaS surface, repurposed to 'Open questions'",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "research doc :148 'Retire page; fold only open hypotheses into Framework/Open Questions'; :261 'It is explicitly the SaaS/enterprise-acceleration surface prohibited by this positioning.' 11 h2 + 6 h3 -> 1 h2 + 5 h3; 36,954 -> 3,648 bytes.",
+      "survived_in_revamp2": "Open-questions framing kept; + data-ad-lsp-available computed slot."
+    },
+    {
+      "feature": "Databricks 4-lever comparison (their-finding vs our-measurement claim-boxes, unique-insight miss-grid)",
+      "page": "databricks.html",
+      "build": "revamp1",
+      "classification": "accidental drop (b) — fold planned (into evidence), stub shipped instead",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "research doc :259 evidence 'should absorb related-work comparison' — but the new databricks.html is a 2-section 2,610-byte stub with no lever grid, and evidence.html does not absorb the content either. No script loaded at all (no data.js/app.js).",
+      "survived_in_revamp2": "No — identical stub."
+    },
+    {
+      "feature": "Methodology instrument depth (10 perturbation operators, 7 recovery signals, basin/attractor, strategy taxonomy, efficiency equations, 22-row experiment matrix, literature mapping)",
+      "page": "methodology.html",
+      "build": "revamp1",
+      "classification": "accidental drop (b) — 'keep as Method' but the operator inventory never ported",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "research doc :258 'Keep as Method/Instrument — revalidate/retire historical literals'; the new page is 3 sections (five stages, provenance-as-method, reproducibility) — 10 operators/7 signals/matrix all dropped. 14 h2 -> 3 h2; 40,281 -> 3,910 bytes.",
+      "survived_in_revamp2": "Partially — beta curve control added; operator inventory not restored."
+    },
+    {
+      "feature": "Story 4-part narrative depth (Part 1 anomaly -> Part 4 the field)",
+      "page": "story.html",
+      "build": "revamp1",
+      "classification": "deliberate replacement (a) — rewritten per R2 positioning + editorial ledger",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "research doc :149 story row — 'Preserve $20/Rome attributed story; remove/reconcile every other stat'. 8 h2 -> 3 h2; 22,331 -> 4,134 bytes.",
+      "survived_in_revamp2": "Same rewrite + sticky-scroll NxM figure."
+    },
+    {
+      "feature": "Glossary 14 definition cards -> 6 cards",
+      "page": "glossary.html",
+      "build": "revamp1",
+      "classification": "deliberate replacement (a) — rewrite as provenance-sourced definitions",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "research doc :150 'Rewrite glossary as definitions with source links, no untagged numeric prescriptions.'",
+      "survived_in_revamp2": "Same + NULL-class legend."
+    }
+  ],
+  "additions": [
+    {"feature": "question.html (new page)", "build": "revamp1", "added_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"}, "evidence": "new file +55 lines; research doc R4 IA (named question in the narrative spine Story->Question->Method->Evidence->Framework->Open questions)"},
+    {"feature": "Provenance tags site-wide", "build": "revamp1", "added_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"}, "evidence": "main total [M/C/H/X/P]=57 concentrated on evidence(33)+methodology(13); revamp1 total=65 distributed across all 9 pages; revamp2 total=108 (framework 22, evidence 33)"},
+    {"feature": "Campaign evidence receipts (source_artifact path + sha256, decision-rule numbers)", "build": "revamp1", "added_at": {"commit": "80a3bd9af", "phase": "p3_implementation"}, "evidence": "build_data.py +106 lines campaign adapter -> data.js.campaigns.{cap_2b,escalation,session_routing,calibration}; app.js renderCampaignSlots fills data-ad-cap2b/escalation/routing/calibration slots"},
+    {"feature": "data-ad stat layer replacing data-stat", "build": "revamp1", "added_at": {"commit": "80a3bd9af", "phase": "p3_implementation"}, "evidence": "app.js v2 data-ad-stat + data-ad-model-table"},
+    {"feature": "9 js-injected SVG diagram slots (cycle/nxm/planes/engine/autonomy/curves/escalation/calibration/rules)", "build": "revamp1 (components+slots) -> revamp2 (implemented+verified)", "added_at": {"commit": "564641ffc (p1 components)", "commit2": "b1996109c + 20eeb801b (revamp2 p1/p3 data-aware implementation)"}, "evidence": "design-components.js AgenticDesign component factories; diagram_inventory.json 9 entries all status=implemented; dom_verification_report.md 100% coverage"},
+    {"feature": "10 interactive rule cards with status badges (instrumented/proposal/decided)", "build": "revamp1 (static array) -> revamp2 (data-wired rulesComponent + rulesOverview + activateRuleCards)", "added_at": {"commit": "564641ffc", "commit2": "b1996109c/20eeb801b"}, "evidence": "framework.html data-ad-rules grid; design-components.js rules array + rulesComponent(campaigns, summary, generatedAt)"},
+    {"feature": "Beta curve control (single range input, data-ad-beta)", "build": "revamp2", "added_at": {"commit": "b1996109c (p1 markup) + 20eeb801b (p3 bindCostCurveControl)"}, "evidence": "methodology.html input[data-ad-beta] min=0 max=0.01 step=0.0001; app.js bindCostCurveControl redraws only the [C] curve on input"},
+    {"feature": "Sticky-scroll narrative sequences (story/evidence)", "build": "revamp2", "added_at": {"commit": "b1996109c", "phase": "p1_implement_inventory"}, "evidence": ".ad-scroll-sequence .ad-scroll-sticky on story.html:53, evidence.html:86"},
+    {"feature": "DOM-verification tooling (diagram_inventory.json, verify_dom_gates.py, verify_visual_system.py, verify_figure_copy.py, dom_verification_report.md)", "build": "revamp2", "added_at": {"commit": "b1996109c/dfe371072/20eeb801b"}, "evidence": "committed under apps/website/; gates check inventory coverage 100%, data wiring, gallery wiring, interactivity, a11y"},
+    {"feature": "data-ad-receipt family + computed lsp_available slot", "build": "revamp2", "added_at": {"commit": "6550334f0", "phase": "p4_truth_and_visual_review"}, "evidence": "app.js renderStats receipt fields (stories_unique, re_runs, resolved_measurement_payloads, unresolved_waivered, tombstones) + lsp_available sum over analysis.models"}
+  ],
+  "classification_tally": {
+    "losses": 12,
+    "gate_driven_removal_c": 4,
+    "accidental_drop_b": 5,
+    "deliberate_replacement_a": 3,
+    "mixed": 2,
+    "note": "several losses are mixed (e.g. app.js layer is deliberate-replacement-of-mechanism + accidental-drop-of-toggle/TOC; rules are gate-driven removal + deliberate replacement). 12 loss entries classified by dominant class."
+  },
+  "key_findings": [
+    "The interactive-layer loss happened in TWO revamp1 commits: the pages (calculator, charts, levers, tables, narrative depth) in 54201491a (p2_editorial_rewrite), and app.js (theme toggle, statMap, data-anal, TOC) in 80a3bd9af (p3_implementation). Revamp2 inherited all of it.",
+    "The calculator + cost chart removals were GATE-DRIVEN (c): the research doc — authored in p0 by the same model (terra) — classified the calculator as 'SaaS-adjacent' and ordered it deleted, with only a vague '[C] explorable' future form that revamp1 never delivered and revamp2 delivered as exactly ONE slider.",
+    "The evidence charts + data tables + methodology operator inventory + databricks fold were ACCIDENTAL DROPS (b): not ordered by any research-doc decision, never inventoried, never ported. The revamp's diagram inventory listed only NEW diagrams, so no gate checked for the existing ones.",
+    "The revamp1 p4 self-review (docs/reviews/cap_site_revamp_review.md) passed with F7 = ACCEPTED LIMITATION 'no Chromium/Firefox/Node runtime' — the reviewer never rendered the site. The followup's 'deployed site had ZERO visuals' is consistent with a static-source inspection: revamp1's committed HTML has zero inline <svg> (all JS-injected), so a grep finds nothing even though the wiring exists.",
+    "Revamp1 deviated from its own spec's hard_rule 1: commits lack the '[workflow] <phase>' prefix, and p2 shipped a broken intermediate tree (pages referencing data-ad slots before app.js v2 existed).",
+    "What the revamps ADDED is real: campaign receipts with SHA256s, provenance tags site-wide (57 -> 65 -> 108), question.html, a data-wired diagram system, interactive rule cards, and DOM-verification tooling — the regression is a LOSSLESS-substitution failure, not an absence of new work."
+  ]
+}
