@@ -202,7 +202,7 @@ def derive_campaign_records(score: dict, *, campaign: str) -> list[ki.KnowledgeR
     revision = str(score.get("source_revision") or score.get("spec_version") or "")
     now = _now()
     records: list[ki.KnowledgeRecord] = []
-    cells = score.get("cells")
+    cells = score.get("cells") or score.get("per_cell")
     if cells:
         for cell in cells:
             records.append(_cell_record(cell, campaign=campaign, revision=revision, now=now))
@@ -212,16 +212,20 @@ def derive_campaign_records(score: dict, *, campaign: str) -> list[ki.KnowledgeR
             records.append(_escalation_record(row, campaign=campaign, revision=revision, now=now))
     agg = score.get("aggregates")
     if agg is None:
-        # escalation schema: the loss table + conclusion are the aggregate evidence.
+        # escalation/2b/session-routing schemas: per_arm + decision/loss data are the
+        # aggregate evidence.
         agg = {
-            "n_scored": len(per_model or []),
+            "n_scored": len(cells or []) or len(per_model or []),
             "n_hits": None,
             "n_unknown_outcome": 0,
             "n_invalid_join": 0,
             "n_not_run": len(score.get("flags") or []),
             "wilson_95_ci": [],
             "risk_mint_rate": None,
-            "loss_table": score.get("loss_table"),
+            "loss_table": score.get("loss_table") or score.get("asymmetric_loss"),
+            "decision_rule": score.get("decision_rule"),
+            "per_arm": score.get("per_arm"),
+            "retrospective_comparison": score.get("retrospective_comparison"),
             "conclusion": score.get("conclusion"),
         }
     if agg:
