@@ -1,0 +1,22 @@
+{
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "campaign": "cap_2a_rerun2",
+  "phase": "p2_measure_one_cell",
+  "written_at": "2026-08-26T03:34:00Z",
+  "candidate_id": "c1_clean_variant",
+  "spec_path": "workflows/operations/cap_2a_cell_clean.yaml",
+  "spec_path_sha256": "65730a228e238513747fdd658679d4b89389140f92f2a26021170cab338cbba0",
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "0e24d69851a7651eacfd23b21743a10574556e59",
+  "seeded_app_worktree": "/tmp/cap2a_cell_clean_rerun2",
+  "seeded_app_seed_revision": "00193d8b841c7f3cdfabfb79ae452d3d80ad2678",
+  "finops_cell_id": "cap2a_p2_clean",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "change_analysis": true,
+  "expected_realized_class": "no_rework",
+  "forecast": "FORECAST — no historical cost exists for the rerun2 clean cell; the measured cost is the first measurement and the p3 budget is its 2x headroom.",
+  "selection_reason": "Purpose-built clean stimulus (design doc §5.1): add product() + test with no defects; guarantees a real symbol change + independent test evidence in a small, fast, safe worktree. The clean variant is the no-defect baseline that must mint new_sonar_critical_count=0."
+}

@@ -1,0 +1,46 @@
+{
+  "schema_version": "cap_2a_candidate_manifest/v1",
+  "campaign": "cap_2a_rerun2",
+  "phase": "p2_measure_one_cell",
+  "written_at": "2026-08-26T03:34:00Z",
+  "source_baseline_revision": "0e24d69851a7651eacfd23b21743a10574556e59",
+  "target_model": "deepseek/deepseek-v4-pro",
+  "target_backend": "opencode",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "candidates": [
+    {
+      "candidate_id": "c1_clean_variant",
+      "path": "workflows/operations/cap_2a_cell_clean.yaml",
+      "path_sha256": "65730a228e238513747fdd658679d4b89389140f92f2a26021170cab338cbba0",
+      "phases": ["implement", "test (kind:test)", "verify"],
+      "has_kind_test": true,
+      "changes_python_symbols": true,
+      "expected_realized_class": "no_rework",
+      "note": "Deterministic clean stimulus (design doc §5.1): add product() + test, no defects. new_sonar_critical_count should mint 0 and the proposal should be continue/verify, never rework."
+    },
+    {
+      "candidate_id": "c2_critical_variant",
+      "path": "workflows/operations/cap_2a_cell_critical.yaml",
+      "path_sha256": "6ecb2bd93e8718c8c42382f648e859672c649de761e46ba74c2d7a460721e4d7",
+      "phases": ["implement", "test (kind:test)", "verify"],
+      "has_kind_test": true,
+      "changes_python_symbols": true,
+      "expected_realized_class": "targeted_rework",
+      "note": "p3 cell (design doc §5.2): deep nested classifier minting python:S3776 CRITICAL + one real boundary defect."
+    },
+    {
+      "candidate_id": "c3_style_variant",
+      "path": "workflows/operations/cap_2a_cell_style.yaml",
+      "path_sha256": "eaf7e806ce8f3b7f49f3f804904df513887e58387a73e1dc2ffe1337fd994ab4",
+      "phases": ["implement", "test (kind:test)", "verify"],
+      "has_kind_test": true,
+      "changes_python_symbols": true,
+      "expected_realized_class": "no_rework",
+      "note": "p3 cell (design doc §5.3): float == helper minting python:S1244 MAJOR only — the severity filter must exclude it."
+    }
+  ],
+  "selection": {
+    "chosen": "c1_clean_variant",
+    "reason": "p2 measures ONE cell first (E4 lesson): the clean variant is the deterministic no-defect baseline that must mint new_sonar_critical_count=0 and emit a non-rework proposal. The critical/style variants are the p3 outcome-spread cells and are NOT run until the p2 measured cost + FORECAST budget are committed."
+  }
+}
