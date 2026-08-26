@@ -1,0 +1,49 @@
+{
+  "schema_version": "cap_session_routing_phase_log/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p1_author_cell_and_measure",
+  "status": "PASS",
+  "date": "2026-08-26T14:52:30+00:00",
+  "deliverables": [
+    "workflows/operations/cap_session_policy_cell.yaml (the session-policy cell spec — calibration-cell pattern, implement + test + verify against a seeded calc app, fork controlled BY THE ARM not the spec, declared fork:false; validates through the requires/produces gate)",
+    "experiments/results/cap_session_routing_prospective/cap_session_policy_candidate_manifest.json (candidate manifest FIRST — E4 listed before the run; spec SHA256, goal SHA256, worktree, FINOPS_CELL_ID, forecast)",
+    "experiments/results/cap_session_routing_prospective/cap_session_policy_phase_ledger_E4_continue_pro_r1.json (the measured cell's ledger: per-phase tokens/cost/cache/session/confidence + change-analysis evidence)",
+    "experiments/results/cap_session_routing_prospective/cap_session_policy_cell_manifest_E4_continue_pro_r1.json (immutable per-cell manifest with the proxy mapping + measured numbers)",
+    "experiments/results/cap_session_routing_prospective/cap_session_policy_outcome_E4_continue_pro_r1.json (session_verified_success, context growth, economics, verification)",
+    "experiments/results/cap_session_routing_prospective/cap_session_routing_prospective_forecast.json (FORECAST per-arm budget = measured x 2, labeled FORECAST)"
+  ],
+  "measured_cell": {
+    "cell_id": "cap_sesspol_E4_continue_pro_r1",
+    "arm": "continue",
+    "model": "deepseek/deepseek-v4-pro",
+    "repetition": "r1",
+    "cost_usd": 0.008799,
+    "duration_s": 144.48,
+    "verified_success": true,
+    "test_executed_success": true,
+    "cache_read_tokens": 58368,
+    "session_context_growth_tokens_in": 1.673,
+    "final_commit": "ad6a28f5046336130ee5ba3edc475fbbbb54e235"
+  },
+  "forecast": {
+    "FORECAST_per_cell_cost_usd": 0.017598,
+    "FORECAST_grid_total_usd": 0.422352,
+    "label": "measured x 2",
+    "stop_budget_usd": 40.0
+  },
+  "checks": [
+    "spec validates (compile_experiment gate passed)",
+    "candidate manifest written BEFORE the cell ran (pre-registration)",
+    "arm executable: FINOPS_CELL_ID carries the arm (E4_continue_pro_r1); spec declares fork:false; the campaign executor passed fork per the assigned arm (continue -> chained-session mode)",
+    "verified success from the ledger + independent test_runner on the immutable commit (3/3) — not the cell agent's narrative",
+    "cache utilization + session lineage recorded (implement -> verify fork chain, cache_read_tokens > 0)",
+    "spec index regenerated (derived surface)",
+    "no gate-clearing claim; I10 typed checkpoint arms listed not-run"
+  ],
+  "failures": [],
+  "limitations": [
+    "Only the continue arm was measured in p1 (per the design: one cell per arm shape before p2); the forecast carries the same x2 envelope to the other three arms until they measure.",
+    "The verify commit swept .mypy_cache/.scannerwork analyzer artifacts into the worktree (cosmetic).",
+    "continue is executed as the chained-session proxy (session lineage fork chain) — the typed no-checkpoint baseline and the typed checkpoint arms remain I10-gated/not-run."
+  ]
+}
