@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-26T22:46:18.944039+00:00",
+  "generated_at": "2026-08-26T23:04:12.711712+00:00",
   "n_specs": 127,
   "specs": [
     {
@@ -190,24 +190,6 @@
       "spec_path": "experiments/definitions/cap_shadow_comparison.yaml",
       "artifact_kind": "experiment",
       "repeatable": true,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "cap_site_regression_analysis",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/cap_site_regression_analysis.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
@@ -1110,6 +1092,24 @@
       "n_runs": 1
     },
     {
+      "name": "cap_site_regression_analysis",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_site_regression_analysis.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-26T23:04:12.453006+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.17721,
+      "latest_git_sha": "8fe48330f",
+      "results_pointer": "experiments/results/workflows/cap_site_regression_analysis/20260826T230412Z.json",
+      "n_runs": 1
+    },
+    {
       "name": "cap_site_revamp",
       "version": "0.1",
       "status": "completed",
@@ -1181,7 +1181,7 @@
       "latest_cost_usd": 0.237681,
       "latest_git_sha": "f1585656c",
       "results_pointer": "experiments/results/workflows/cap_stabilization_release/20260826T223434Z.json",
-      "n_runs": 3
+      "n_runs": 4
     },
     {
       "name": "cap_story_bridge",
