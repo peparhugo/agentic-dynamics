@@ -154,20 +154,22 @@
       <text class="small" x="42" y="314">Ratios are descriptive measurements, not a provider recommendation.</text>`);
   }
 
-  function calibrationArc(campaign) {
+  function calibrationArc(calibration, campaign) {
+    const rerun = calibration && calibration.rerun ? calibration.rerun : {};
     const staticArm = campaign && campaign.static ? campaign.static : {};
     const adaptiveArm = campaign && campaign.adaptive ? campaign.adaptive : {};
     const decision = campaign && campaign.decision_rule ? campaign.decision_rule : {};
     const ci = decision.cpvo_ratio_ci_95 || [];
+    const rerunCi = rerun.wilson_95_ci || [];
     const ratio = decision.cpvo_ratio == null ? "not loaded" : Number(decision.cpvo_ratio).toFixed(4);
     const interval = ci.length === 2 ? `[${Number(ci[0]).toFixed(4)}, ${Number(ci[1]).toFixed(4)}]` : "not loaded";
-    return svg("Calibration arc from descriptive rerun to randomized decision", "Three panels show a 0 of 3 predecessor, a 2 of 3 rerun with a wide interval, and a randomized non-inferiority decision limited to design review.", `
+    const rerunInterval = rerunCi.length === 2 ? `[${Number(rerunCi[0]).toFixed(4)}, ${Number(rerunCi[1]).toFixed(4)}]` : "not loaded";
+    return svg("Calibration arc from descriptive rerun to randomized decision", "A retained descriptive calibration rerun leads to a randomized non-inferiority decision limited to design review; an earlier score is named unavailable rather than recreated.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
       <text class="micro" x="36" y="42">CALIBRATION ARC / UNCERTAINTY STAYS VISIBLE</text>
-      <path class="flow" d="M236 170H270M466 170H500"/>
-      <g transform="translate(42 96)"><rect class="node-null" width="194" height="150" rx="8"/><text class="micro" x="16" y="23">PREDECESSOR</text><text class="label" x="16" y="54">0 / 3</text><text class="small" x="16" y="77">proposal hits</text><text class="small" x="16" y="104">not a clearance</text><text class="micro" x="16" y="128">[C] descriptive rate</text></g>
-      <g transform="translate(270 96)"><rect class="node-computed" width="196" height="150" rx="8"/><text class="micro" x="16" y="23">RERUN 2</text><text class="label" x="16" y="54">2 / 3</text><text class="small" x="16" y="77">Wilson [.2077, .9385]</text><text class="small" x="16" y="104">wide interval; n = 3</text><text class="tag-c" x="16" y="128">[C] descriptive only</text></g>
-      <g transform="translate(500 96)"><rect class="node-policy" width="194" height="150" rx="8"/><text class="micro" x="16" y="23">RANDOMIZED 2B / n=${staticArm.n == null ? "?" : staticArm.n}+${adaptiveArm.n == null ? "?" : adaptiveArm.n}</text><text class="label" x="16" y="54">${decision.decision || "NOT LOADED"}</text><text class="small" x="16" y="77">CPVO ratio ${ratio} [C]</text><text class="small" x="16" y="98">CI ${interval}</text><text class="tag-p" x="16" y="128">[P] design review only</text></g>
+      <path class="flow" d="M362 170H402"/>
+      <g transform="translate(42 96)"><rect class="node-null" width="286" height="150" rx="8"/><text class="micro" x="16" y="23">EARLIER CALIBRATION</text><text class="label" x="16" y="54">score not retained</text><text class="small" x="16" y="77">no historical rate is reproduced</text><text class="small" x="16" y="104">absence is not a zero</text><text class="micro" x="16" y="128">[NULL] artifact unavailable</text></g>
+      <g transform="translate(402 96)"><rect class="node-computed" width="286" height="150" rx="8"/><text class="micro" x="16" y="23">RERUN 2 → RANDOMIZED 2B</text><text class="label" x="16" y="54">${rerun.hits == null ? "?" : rerun.hits} / ${rerun.n == null ? "?" : rerun.n} → ${decision.decision || "NOT LOADED"}</text><text class="small" x="16" y="77">rerun Wilson ${rerunInterval} [C]</text><text class="small" x="16" y="98">2b CPVO ratio ${ratio}; CI ${interval}</text><text class="tag-p" x="16" y="128">[P] design review only</text></g>
       <text class="small" x="368" y="302" text-anchor="middle">The final panel does not arm a policy or activate control.</text>`);
   }
 

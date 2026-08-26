@@ -18,6 +18,11 @@
     });
   }
 
+  function artifactReceipt(campaign) {
+    // A campaign value is only useful when its immutable score artifact is inspectable.
+    return `${campaign.source_artifact} (sha256: ${campaign.source_sha256})`;
+  }
+
   function renderStats(data) {
     if (!data || !data.summary) return;
     const summary = data.summary;
@@ -50,7 +55,7 @@
     const ci = cap2b.decision_rule.cpvo_ratio_ci_95;
     const decision = `Static n=${cap2b.static.n}, CPVO ${formatUsd(cap2b.static.cpvo_usd, 6)}, ${cap2b.static.accepted_outcomes}/${cap2b.static.n} verified; adaptive n=${cap2b.adaptive.n}, CPVO ${formatUsd(cap2b.adaptive.cpvo_usd, 6)}, ${cap2b.adaptive.accepted_outcomes}/${cap2b.adaptive.n} verified; CPVO ratio ${Number(cap2b.decision_rule.cpvo_ratio).toFixed(4)}, 95% CI [${Number(ci[0]).toFixed(4)}, ${Number(ci[1]).toFixed(4)}]; success gap ${Number(cap2b.decision_rule.success_gap_static_minus_adaptive).toFixed(4)}. The pre-registered rule decided ${cap2b.decision_rule.decision}.`;
     setText('[data-ad-cap2b-summary]', decision);
-    setText('[data-ad-cap2b-source]', cap2b.source_artifact);
+    setText('[data-ad-cap2b-source]', artifactReceipt(cap2b));
 
     const models = escalation.models;
     const escalationSummary = `[M] baseline ${formatUsd(escalation.baseline_cost_usd, 6)}; ${models.map((model) => `${model.escalation_model.split("/").pop()}: ${formatUsd(model.escalation_fix_cost_usd, 6)} [M], E_x=${Number(model.E_x).toFixed(4)} [C]`).join("; ")}.`;
@@ -58,12 +63,14 @@
     const escalationDefinition = `The measured campaign reports ${models.map((model) => `${model.escalation_model.split("/").pop()} at E_x=${Number(model.E_x).toFixed(4)} (n=${model.n_model_cells} model cell)`).join(" and ")}.`;
     setText('[data-ad-escalation-definition]', escalationDefinition);
     setText('[data-ad-escalation-n]', models.map((model) => `n=${model.n_model_cells} per model`).join(", "));
-    setText('[data-ad-escalation-source]', escalation.source_artifact);
+    setText('[data-ad-escalation-source]', artifactReceipt(escalation));
 
     const untriggered = routing.escalate_live;
     const untriggeredSummary = `All ${untriggered.n} live escalate cells completed on the first attempt. ${untriggered.untriggered}`;
     setText('[data-ad-untriggered-summary]', untriggeredSummary);
-    setText('[data-ad-routing-source]', routing.source_artifact);
+    setText('[data-ad-routing-source]', artifactReceipt(routing));
+    setText('[data-ad-calibration-source]', artifactReceipt(campaigns.calibration));
+    setText('[data-ad-generated-at]', data._meta.generated_at);
   }
 
   function renderDiagrams(data) {
@@ -77,7 +84,7 @@
       autonomy: AgenticDesign.autonomyEnvelope,
       curves: AgenticDesign.costCurves,
       escalation: () => AgenticDesign.escalationChain(campaigns.escalation),
-      calibration: () => AgenticDesign.calibrationArc(campaigns.cap_2b),
+      calibration: () => AgenticDesign.calibrationArc(campaigns.calibration, campaigns.cap_2b),
     };
     document.querySelectorAll('[data-ad-diagram]').forEach((figure) => {
       const makeDiagram = diagrams[figure.dataset.adDiagram];

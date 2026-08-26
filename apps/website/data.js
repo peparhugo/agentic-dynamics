@@ -1,9 +1,9 @@
-/* Generated 2026-08-26 19:31:29 UTC by build_data.py */
+/* Generated 2026-08-26 19:45:11 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-26T19:31:26.176655+00:00",
-    "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
+    "generated_at": "2026-08-26T19:45:08.351387+00:00",
+    "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, e[X]ternal, or [P]olicy. See methodology.html."
   },
   "summary": {
     "worktrees_total": 205,
@@ -66,7 +66,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "022ed659af231424e400cc1f5f78f7d5670207dda0976e7bb7d87e67368c72c1"
+    "generator_source_tree_identity": "41000b1744e8e98f40db9f05c82180d7426d60615938f1de5d37f3b89d2f66f5"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -3680,6 +3680,7 @@ window.DYNAMICS_DATA = {
       "status": "DECIDED",
       "authorization": "design_review_only",
       "source_artifact": "experiments/results/cap_2b/cap_2b_score_20260826T160018Z.json",
+      "source_sha256": "5f24f5072f1bb0ab17769b8db3734680b83981c2506df3b57fffa529c42ed3d9",
       "source_document": "docs/designs/current/cap_2b.md",
       "static": {
         "n": 9,
@@ -3722,6 +3723,7 @@ window.DYNAMICS_DATA = {
     "escalation": {
       "status": "MEASURED",
       "source_artifact": "experiments/results/cap_escalation_measurement/cap_escalation_measurement_score_20260826T125726Z.json",
+      "source_sha256": "6d3c7a7c48ba718b0ccd7d9e1f3a9898336ed89c83ba791274dca7330b890329",
       "baseline_cost_usd": 0.008949,
       "models": [
         {
@@ -3746,6 +3748,7 @@ window.DYNAMICS_DATA = {
     },
     "session_routing": {
       "source_artifact": "experiments/results/cap_session_routing_prospective/cap_session_routing_prospective_score_20260826T160605Z.json",
+      "source_sha256": "288e0486d684b4f5f8809f626297ce521848de47e233d9482600dd06ae1a4402",
       "escalate_live": {
         "cpvo_usd": 0.005946,
         "n": 6,
@@ -3754,6 +3757,26 @@ window.DYNAMICS_DATA = {
       },
       "_provenance": {
         "escalate_live": "M"
+      }
+    },
+    "calibration": {
+      "status": "DESCRIPTIVE_ONLY",
+      "source_artifact": "experiments/results/cap_2a_rerun2/cap_2a_rerun2_score_20260826T015846Z.json",
+      "source_sha256": "ef42f8b0ae07704cc693c51243dc755807586b0b745365d606e76410b19dd1ec",
+      "rerun": {
+        "n": 3,
+        "hits": 2,
+        "hit_rate": 0.6667,
+        "wilson_95_ci": [
+          0.2077,
+          0.9385
+        ]
+      },
+      "prior_score": "not retained in the current artifact set",
+      "_provenance": {
+        "rerun": "M/C",
+        "status": "C",
+        "prior_score": "NULL"
       }
     }
   },
@@ -4073,7 +4096,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-26T19:31:26.350133+00:00"
+    "generated_at": "2026-08-26T19:45:08.519628+00:00"
   },
   "reviews": {
     "models": [

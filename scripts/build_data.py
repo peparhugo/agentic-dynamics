@@ -99,19 +99,24 @@ def load_inventory():
     return json.loads(INVENTORY_PATH.read_text())
 
 
-def _load_latest_campaign_score(directory: str, pattern: str) -> tuple[dict[str, Any], str]:
-    """Load the newest immutable campaign score and retain its public artifact path.
+def _load_latest_campaign_score(directory: str, pattern: str) -> tuple[dict[str, Any], str, str]:
+    """Load the newest campaign score with its path and content hash.
 
     Campaign results are not part of the story registry. Publishing them through this
     narrow adapter makes their separate evidence boundary explicit and fails closed if
     a required score artifact is absent rather than leaving the website with a stale
-    hand-transcribed verdict.
+    hand-transcribed verdict. The SHA256 is calculated from the selected artifact so
+    every public campaign claim carries an immutable receipt instead of a mutable path.
     """
     candidates = sorted((RESULTS_DIR / directory).glob(pattern))
     if not candidates:
         raise RuntimeError(f"Missing required campaign score: {directory}/{pattern}")
     path = candidates[-1]
-    return json.loads(path.read_text()), str(path.relative_to(ROOT))
+    return (
+        json.loads(path.read_text()),
+        str(path.relative_to(ROOT)),
+        hashlib.sha256(path.read_bytes()).hexdigest(),
+    )
 
 
 def _load_campaign_publications() -> dict[str, Any]:
@@ -122,12 +127,17 @@ def _load_campaign_publications() -> dict[str, Any]:
     and the prospective arm's untriggered state. Each output carries the artifact path
     and per-field provenance so a new score updates the site through ``data.js``.
     """
-    cap_2b, cap_2b_path = _load_latest_campaign_score("cap_2b", "cap_2b_score_*.json")
-    escalation, escalation_path = _load_latest_campaign_score(
+    cap_2b, cap_2b_path, cap_2b_sha256 = _load_latest_campaign_score(
+        "cap_2b", "cap_2b_score_*.json"
+    )
+    escalation, escalation_path, escalation_sha256 = _load_latest_campaign_score(
         "cap_escalation_measurement", "cap_escalation_measurement_score_*.json"
     )
-    routing, routing_path = _load_latest_campaign_score(
+    routing, routing_path, routing_sha256 = _load_latest_campaign_score(
         "cap_session_routing_prospective", "cap_session_routing_prospective_score_*.json"
+    )
+    calibration, calibration_path, calibration_sha256 = _load_latest_campaign_score(
+        "cap_2a_rerun2", "cap_2a_rerun2_score_*.json"
     )
 
     static = cap_2b["per_arm"]["static"]
@@ -140,6 +150,7 @@ def _load_campaign_publications() -> dict[str, Any]:
             "status": "DECIDED",
             "authorization": "design_review_only",
             "source_artifact": cap_2b_path,
+            "source_sha256": cap_2b_sha256,
             "source_document": "docs/designs/current/cap_2b.md",
             "static": {
                 key: static[key]
@@ -170,6 +181,7 @@ def _load_campaign_publications() -> dict[str, Any]:
         "escalation": {
             "status": "MEASURED",
             "source_artifact": escalation_path,
+            "source_sha256": escalation_sha256,
             "baseline_cost_usd": escalation["original_cell_cost_usd"],
             "models": [
                 {
@@ -191,11 +203,25 @@ def _load_campaign_publications() -> dict[str, Any]:
         },
         "session_routing": {
             "source_artifact": routing_path,
+            "source_sha256": routing_sha256,
             "escalate_live": {
                 key: live_escalate[key]
                 for key in ("cpvo_usd", "n", "success_rate", "untriggered")
             },
             "_provenance": {"escalate_live": "M"},
+        },
+        "calibration": {
+            "status": "DESCRIPTIVE_ONLY",
+            "source_artifact": calibration_path,
+            "source_sha256": calibration_sha256,
+            "rerun": {
+                "n": calibration["aggregates"]["n_scored"],
+                "hits": calibration["aggregates"]["n_hits"],
+                "hit_rate": calibration["aggregates"]["hit_rate"],
+                "wilson_95_ci": calibration["aggregates"]["wilson_95_ci"],
+            },
+            "prior_score": "not retained in the current artifact set",
+            "_provenance": {"rerun": "M/C", "status": "C", "prior_score": "NULL"},
         },
     }
 
@@ -2191,7 +2217,7 @@ def build():
             "source_inventory": str(INVENTORY_PATH),
             "source_registry": str(MANIFEST_PATH),
             "source_db": str(DB_PATH),
-            "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html.",
+            "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, e[X]ternal, or [P]olicy. See methodology.html.",
         },
         "summary": {
             "worktrees_total": counts.get("worktrees_total", 0),
