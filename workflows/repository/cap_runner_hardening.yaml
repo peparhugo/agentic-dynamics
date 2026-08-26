@@ -1,0 +1,263 @@
+name: cap_runner_hardening
+question: >-
+  Harden the workflow runner against the three execution diseases this session measured
+  repeatedly: (1) SILENT AGENT STALLS — agents alive with zero session steps for 45-65
+  minutes (stabilization p3 x2 with exit -15, terra x2 in both site revamps, the terra
+  post-mortem run): the runner needs a phase WATCHDOG that detects the stall and fails the
+  phase with a stall reason instead of hanging for an hour; (2) DEPLOY OUTSIDE THE DEPLOY
+  PHASE — terra ran `firebase deploy` during p3 ('verify deployed DOM gates'), silently
+  overwriting the production site: the runner needs a DEPLOY GATE — only deploy-allowed
+  phases may deploy, enforced by post-phase detection of the deploy command in the session
+  transcript; (3) PLAIN COMMIT MESSAGES — terra committed without the '[workflow] <phase>'
+  prefix (hard-rule violation), silently breaking the resume machinery: the runner needs
+  COMMIT-PREFIX ENFORCEMENT — post-phase validation that the phase's commits match the
+  pattern, failing the phase with the evidence. All three are runner-level, testable,
+  and apply to every future campaign.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: workflow-runner hardening.
+        canonical_sources: [src/agentic_dynamics/runtime/workflow_runner.py (the runner:
+        _run_phase, _git_commit, _completed_phases at :517, the phase loop),
+        scripts/run_workflow.py (the composition root + CLI), tests/test_workflow_runner.py
+        (the runner test family), the measured evidence: experiments/results/workflows/
+        cap_stabilization_release/ (exit -15 x2, the 61-min p3), the terra post-mortem
+        transcripts (/tmp/wt_site_revamp/.instrument/session.jsonl — the ~50-min silences),
+        docs/designs/current/cap_site_revamp_followup.md (the plain-commit + early-deploy
+        findings), docs/reviews/cap_terra_postmortem_review.md (when available)].
+        policies: [fail_with_evidence, no_silent_timeouts, technical_not_prompt_enforcement]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: runner hardening.
+        deliberation: [phase watchdog, deploy gate, commit enforcement, integration +
+        tests, adversarial bypass].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        MEASURED EVIDENCE (verify from the sources, don't assume):
+        (1) STALLS: stabilization p3 was killed by exit -15 after 449s (run 1) and after
+        3684s/61min (run 2, the resume); terra stalled ~50 min twice (revamp1: last step
+        49.6 min stale, no children, idle CPU; revamp2: same pattern); the terra post-
+        mortem campaign produced NO commits (stalled before its first phase commit).
+        The runner has no stall detection: it waits on the opencode process indefinitely.
+        (2) DEPLOY VIOLATION: the revamp2 p3 phase ('verify deployed DOM gates') ran
+        firebase deploy against the live site — the production site was overwritten and
+        had to be reverted TWICE. The runner has no deploy gating.
+        (3) COMMIT VIOLATION: terra committed 7 plain-message commits in revamp2 (no
+        '[workflow] <phase>' prefix, no goal prefix) — the resume machinery
+        (_completed_phases at workflow_runner.py:517 matches '[workflow] <phase> — <goal
+        prefix>') silently skipped nothing, forcing fresh launches and a re-tagging
+        surgery. The runner never validates phase commits.
+        The runner currently: spawns the agent (opencode run), waits on the process, runs
+        _git_commit with a proper message when the phase succeeded, and moves on — no
+        watch on the session transcript, no post-phase commit validation, no deploy rule.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks — AND the hardened
+        runner itself will enforce this: the campaign's own phases must comply (the
+        enforcement must not break the campaign that ships it). (2) TECHNICAL NOT PROMPT
+        ENFORCEMENT: the watchdog, the deploy gate, and the commit validation are RUNNER
+        CODE (workflow_runner.py / run_workflow.py) with tests — never prompt-language
+        rules. (3) FAIL WITH EVIDENCE: every new failure mode (stall, deploy violation,
+        commit violation) marks the phase failed with the EVIDENCE recorded (the stale
+        transcript age, the offending command with its session line, the offending commit
+        subjects) — the ledger carries it. (4) NO SILENT TIMEOUTS: the watchdog's action
+        is documented and deterministic (SIGTERM the agent, fail the phase with
+        'STALLED' + the evidence); auto-resume is NOT in scope (the operator resumes).
+        (5) BACKWARD COMPATIBLE: existing specs/phases keep working — the deploy gate
+        only fires on phases WITHOUT the deploy_allowed marker (default: deploy not
+        allowed); the commit validation only fires on agent phases (not test phases); the
+        watchdog threshold is configurable (env/CLI) with a sensible default (20 min —
+        below the observed 45-65-min stalls, above any legit long generation). (6) The
+        runner's own suite (tests/test_workflow_runner.py + the integration tests) must
+        pass with the changes; new tests prove each hardening item in both directions
+        (fires on the violation, silent on the compliant case). (7) No generated-surface
+        edits, no secrets, no external actuation. (8) p5 adversarial mandatory: bypass
+        attempts re-verified, known-safe list, no bare PASS. (9) Resumable only when spec
+        version, goal hash, source revision, and candidate-manifest hash match.
+      read_first: >-
+        src/agentic_dynamics/runtime/workflow_runner.py (the phase loop, _git_commit,
+        _completed_phases at :517, _run_phase), scripts/run_workflow.py (the CLI + phase
+        rendering), tests/test_workflow_runner.py (the test patterns: fake agents, tmp
+        worktrees), the stall evidence (experiments/results/workflows/cap_stabilization_release/
+        20260826T205245Z.json — the 3684s p3), the deploy evidence (the revamp2 p3
+        commits + the two reverts), the plain-commit evidence (git log of
+        feature/site-revamp2)
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash (engineering with tests — the
+        operator's choice). One branch (feature/cap-runner-hardening); each phase commits
+        [workflow] <phase> (compliance with the enforcement being shipped). The campaign
+        runs through the UNHARDENED runner (it ships the hardening); the p4 integration
+        phase runs the hardened suite locally.
+    phases:
+      - name: p1_phase_watchdog
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the phase watchdog in the runner. In src/agentic_dynamics/
+          runtime/workflow_runner.py's phase loop (the wait on the opencode process): add
+          a stall monitor that watches the phase's session transcript (the worktree's
+          .instrument/session.jsonl — the opencode agent writes a step per action) and
+          fails the phase deterministically when no new step appears for the threshold:
+          - threshold: FINOPS_PHASE_WATCHDOG_MIN env / CLI --phase-watchdog-min, default
+            20 (the measured stalls were 45-65 min; no legit step gap observed beyond
+            ~10 min);
+          - action: SIGTERM the agent process, mark the phase failed with reason
+            'STALLED' and the evidence (the last-step timestamp, the stale age, the
+            transcript tail);
+          - the ledger records the stall (the phase's fail_reason carries it);
+          - the monitor must not misfire on legitimately long tool calls (only step
+            gaps count — the transcript's last-step age, not wall time);
+          - the watchdog is OFF for non-agent phases (test phases run in-process).
+          VERIFY: tests in tests/test_workflow_runner.py — (a) a fake agent that stops
+          writing steps for > threshold is SIGTERM'd and the phase fails with STALLED +
+          evidence; (b) a fake agent that keeps stepping (even slowly) is never killed;
+          (c) the threshold env override works; (d) the existing runner tests still pass
+          (no regression). The watchdog must not add meaningful overhead to compliant
+          phases (a cheap mtime poll).
+          DELIVER: the watchdog + tests, committed.
+          LOG: the implementation shape, the test results; PASS/FAIL; commit.
+      - name: p2_deploy_gate
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the deploy gate. The lesson: terra ran `firebase deploy` from a
+          non-deploy phase and overwrote production. Enforcement, technical:
+          (a) the spec schema gains an optional per-phase marker deploy_allowed: true
+          (default false) — only phases marked deploy_allowed may run firebase deploy;
+          (b) after an agent phase, the runner scans the phase's session transcript for
+          deploy commands (patterns: 'firebase deploy', 'firebase --project
+          agentic-dynamics', any command invoking firebase hosting deploy); if found AND
+          the phase was not deploy_allowed, the phase FAILS with reason 'DEPLOY_GATE'
+          + the offending command + its transcript line as evidence;
+          (c) the phase result/ledger carries the evidence;
+          (d) the deploy_allowed marker is validated by the spec validator (only the
+          deploy phase may set it — or any phase MAY set it but the post-scan enforces
+          the intent; choose the simpler honest rule and document it).
+          VERIFY: tests — (a) a fake agent session containing 'firebase deploy' in a
+          non-deploy phase fails with DEPLOY_GATE + the quoted command; (b) the same
+          command in a deploy_allowed phase passes; (c) the existing specs (which never
+          set deploy_allowed) still compile + run; (d) the detection catches the actual
+          revamp2 p3 session line (replay the evidence: grep the /tmp/wt_site_revamp2
+          session for the deploy command and prove the gate would have fired).
+          DELIVER: the gate + tests + the replay proof, committed.
+          LOG: the detection patterns, the replay result; PASS/FAIL; commit.
+      - name: p3_commit_enforcement
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement commit-prefix enforcement. The lesson: plain-message commits
+          broke the resume machinery (_completed_phases matches '[workflow] <phase> —
+          <goal prefix>'). Enforcement:
+          (a) the runner records the worktree HEAD before each agent phase; after the
+          phase (regardless of ok/fail), it lists the commits made during the phase
+          (git log pre-phase-head..HEAD);
+          (b) every such commit must match the pattern '[workflow] <phase-name> — <goal
+          prefix>' (the exact pattern _completed_phases uses); any commit that does not
+          → the phase FAILS with reason 'COMMIT_PREFIX' + the offending subjects as
+          evidence (even if the phase otherwise succeeded — the phase result flips to
+          failed and the campaign stops for the operator);
+          (c) the enforcement applies to agent phases only;
+          (d) the runner's own _git_commit already writes the correct message — the
+          enforcement catches MANUAL agent commits.
+          VERIFY: tests — (a) a fake agent that commits a plain message ('site: add
+          things') fails with COMMIT_PREFIX + the subject; (b) a fake agent whose only
+          commit matches the pattern passes; (c) the re-tagging surgery scenario is
+          reproduced: the revamp2 branch's 7 plain commits would each have failed the
+          phase (replay: prove the validator rejects them); (d) existing runner tests
+          pass (some may create commits — adjust them to the pattern if they didn't
+          already).
+          DELIVER: the enforcement + tests + the revamp2 replay proof, committed.
+          LOG: the pattern, the replay result; PASS/FAIL; commit.
+      - name: p4_integration
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: integration + live smoke. (a) Run the runner's full test surface:
+          python3 -m pytest tests/test_workflow_runner.py tests/test_experiment_spec.py
+          tests/test_compile_experiment.py tests/test_dependency_direction.py -q
+          --timeout=600 — all green. (b) Run a LIVE smoke through the hardened runner:
+          launch one tiny workflow (a 2-phase spec — reuse the smallest existing spec or
+          author a minimal one) with --phase-watchdog-min 5 through the hardened
+          run_workflow.py, confirm it completes normally (no misfires), and that a
+          deliberately stalled agent (if feasible with a fake agent in the smoke) is
+          caught. (c) Confirm the spec validator accepts the deploy_allowed marker and
+          the existing 127 specs still load. (d) Document the three hardening items +
+          their config in the runner's module docstring + scripts/CONTEXT.md manifest
+          (runner CLI flags).
+          DELIVER: the green test output + the smoke result + the doc updates, committed.
+          LOG: each gate's result; PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — try to falsify the hardening. Attack in order:
+          (1) WATCHDOG BYPASS — a stalled agent that touches the session file without
+          real progress (e.g. writes a heartbeat line): does the watchdog's step-age
+          check see through it? Is the check based on meaningful steps, not any write?
+          (2) DEPLOY GATE BYPASS — detection evasion: 'firebase deploy' via a variable,
+          an alias, 'firebase --help > /dev/null && firebase deploy', a different
+          working directory, 'npx firebase-tools deploy', a script file calling firebase:
+          does the gate catch the actual production-affecting command in each case? The
+          gate's job is catching PRODUCTION DEPLOYS — document what it can and cannot
+          catch, honestly.
+          (3) COMMIT ENFORCEMENT BYPASS — message evasion: 'git commit -m "[workflow]
+          p3_dom_verification — Deliver..."' (wrong phase name — a DIFFERENT phase's
+          name), em-dash variations, trailing content that still matches the prefix: does
+          the validator enforce the phase's OWN name + goal prefix strictly?
+          (4) REGRESSION — the hardening changes nothing for compliant campaigns (the
+          existing runner tests + the 127 specs still pass; the watchdog overhead is
+          negligible).
+          (5) the usual suite (secrets, hashes, credentials in logs).
+          Every finding: fix or record as accepted limitation with reasoning + residual
+          risk. Deliver TWO outputs: docs/reviews/cap_runner_hardening_adversary.md
+          (attack, evidence, result, fix/limitation, re-test) and
+          docs/reviews/cap_runner_hardening_known_safe.md (attempted non-falsifying
+          attacks, evidence, why safe).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: cap_runner_watchdog
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [stall_detected_with_evidence]
+  - name: cap_runner_deploy_gate
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [deploy_confined_to_allowed_phases]
+  - name: cap_runner_commit_gate
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [commits_match_the_pattern]
+  - name: cap_runner_integration
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [stall_detected_with_evidence, deploy_confined_to_allowed_phases, commits_match_the_pattern]
+    produces: [suite_green, live_smoke_ok]
+metrics:
+  - {name: stall_detected_with_evidence, agg: mean, over: cell}
+  - {name: deploy_confined_to_allowed_phases, agg: mean, over: cell}
+  - {name: commits_match_the_pattern, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_phase_watchdog, p2_deploy_gate, p3_commit_enforcement, p4_integration, p5_adversarial]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
