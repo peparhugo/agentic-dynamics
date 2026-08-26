@@ -1,0 +1,528 @@
+{
+  "schema_version": "cap_session_routing_validation_trace/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p3_score",
+  "method": "every verdict number below traces to an immutable p1/p2 artifact field (per-cell manifest measured.phase_ledger -> phase rows) or the committed retro artifact.",
+  "arm_join_validation": {
+    "rule": "cell_id + session_policy + model + repetition from the cell manifest joined to the phase ledger via measured.phase_ledger; session behavior validated against the assigned arm via opencode session-store fork markers (re-derived from ledger session_ids, never trusted from the manifest).",
+    "cells_scored": 24,
+    "cells_invalid_excluded": [],
+    "expected_fork_markers": {
+      "continue": [
+        false,
+        true
+      ],
+      "fork_cached": [
+        false,
+        true
+      ],
+      "escalate": [
+        false,
+        true
+      ],
+      "fork_blind": [
+        false,
+        false
+      ]
+    }
+  },
+  "per_arm": {
+    "continue": {
+      "n_cells": {
+        "value": 6,
+        "source": "per-cell rows joined on session_policy (cell manifest + ledger)"
+      },
+      "total_cost_usd": {
+        "value": 0.035524,
+        "source": "sum over continue cells of phase cost_usd (ledger phases[].cost_usd)"
+      },
+      "verified_success_rate": {
+        "value": 1.0,
+        "source": "n_verified 6 / n 6; per-cell verified = test phase test_executed_success is True (ledger phases[].test_executed_success)"
+      },
+      "cpvo_usd": {
+        "value": 0.005921,
+        "source": "total_cost_usd / n_verified (cost 0.035524 / verified 6) \u2014 captured-verified intersection, null-not-zero"
+      },
+      "cache_read_tokens": {
+        "value": 387968,
+        "source": "sum of phase cache_read_tokens across the arm's ledgers"
+      },
+      "tokens_in": {
+        "value": 104222,
+        "source": "sum of phase tokens.in across the arm's ledgers"
+      },
+      "cache_ratio": {
+        "value": 0.7752,
+        "source": "mean per-cell cache_read / (cache_read + tokens_in + tokens_out)"
+      },
+      "rework_total": {
+        "value": 0,
+        "source": "count of phase rows with status='failed'"
+      },
+      "repeated_failures_total": {
+        "value": 0,
+        "source": "count of failed re-attempts (a phase name with >1 occurrence whose later attempt failed)"
+      },
+      "mean_latency_s": {
+        "value": 144.82,
+        "source": "mean per-cell ledger wall = ended_at - started_at"
+      },
+      "mean_context_token_growth": {
+        "value": 1.667,
+        "source": "mean per-cell verify.tokens.in / implement.tokens.in (phase 3 vs phase 1)"
+      },
+      "per_cell_sample": [
+        {
+          "cell_id": "cap_sesspol_continue_flash_r1",
+          "cpvo_usd": 0.002972,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_flash_r1.json"
+        },
+        {
+          "cell_id": "cap_sesspol_continue_flash_r2",
+          "cpvo_usd": 0.003124,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_flash_r2.json"
+        },
+        {
+          "cell_id": "cap_sesspol_continue_flash_r3",
+          "cpvo_usd": 0.00296,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_flash_r3.json"
+        },
+        {
+          "cell_id": "cap_sesspol_continue_pro_r2",
+          "cpvo_usd": 0.008959,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_pro_r2.json"
+        },
+        {
+          "cell_id": "cap_sesspol_continue_pro_r3",
+          "cpvo_usd": 0.00871,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_pro_r3.json"
+        },
+        {
+          "cell_id": "cap_sesspol_E4_continue_pro_r1",
+          "cpvo_usd": 0.008799,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "experiments/results/cap_session_routing_prospective/cap_session_policy_phase_ledger_E4_continue_pro_r1.json"
+        }
+      ]
+    },
+    "fork_blind": {
+      "n_cells": {
+        "value": 6,
+        "source": "per-cell rows joined on session_policy (cell manifest + ledger)"
+      },
+      "total_cost_usd": {
+        "value": 0.031933,
+        "source": "sum over fork_blind cells of phase cost_usd (ledger phases[].cost_usd)"
+      },
+      "verified_success_rate": {
+        "value": 1.0,
+        "source": "n_verified 6 / n 6; per-cell verified = test phase test_executed_success is True (ledger phases[].test_executed_success)"
+      },
+      "cpvo_usd": {
+        "value": 0.005322,
+        "source": "total_cost_usd / n_verified (cost 0.031933 / verified 6) \u2014 captured-verified intersection, null-not-zero"
+      },
+      "cache_read_tokens": {
+        "value": 546688,
+        "source": "sum of phase cache_read_tokens across the arm's ledgers"
+      },
+      "tokens_in": {
+        "value": 91326,
+        "source": "sum of phase tokens.in across the arm's ledgers"
+      },
+      "cache_ratio": {
+        "value": 0.8451,
+        "source": "mean per-cell cache_read / (cache_read + tokens_in + tokens_out)"
+      },
+      "rework_total": {
+        "value": 0,
+        "source": "count of phase rows with status='failed'"
+      },
+      "repeated_failures_total": {
+        "value": 0,
+        "source": "count of failed re-attempts (a phase name with >1 occurrence whose later attempt failed)"
+      },
+      "mean_latency_s": {
+        "value": 150.05,
+        "source": "mean per-cell ledger wall = ended_at - started_at"
+      },
+      "mean_context_token_growth": {
+        "value": 1.357,
+        "source": "mean per-cell verify.tokens.in / implement.tokens.in (phase 3 vs phase 1)"
+      },
+      "per_cell_sample": [
+        {
+          "cell_id": "cap_sesspol_fork_blind_flash_r1",
+          "cpvo_usd": 0.002957,
+          "verified": true,
+          "fork_markers": [
+            false,
+            false
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_flash_r1.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_blind_flash_r2",
+          "cpvo_usd": 0.003118,
+          "verified": true,
+          "fork_markers": [
+            false,
+            false
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_flash_r2.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_blind_flash_r3",
+          "cpvo_usd": 0.00294,
+          "verified": true,
+          "fork_markers": [
+            false,
+            false
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_flash_r3.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_blind_pro_r1",
+          "cpvo_usd": 0.008395,
+          "verified": true,
+          "fork_markers": [
+            false,
+            false
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_pro_r1.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_blind_pro_r2",
+          "cpvo_usd": 0.008501,
+          "verified": true,
+          "fork_markers": [
+            false,
+            false
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_pro_r2.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_blind_pro_r3",
+          "cpvo_usd": 0.006022,
+          "verified": true,
+          "fork_markers": [
+            false,
+            false
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_pro_r3.json"
+        }
+      ]
+    },
+    "fork_cached": {
+      "n_cells": {
+        "value": 6,
+        "source": "per-cell rows joined on session_policy (cell manifest + ledger)"
+      },
+      "total_cost_usd": {
+        "value": 0.036556,
+        "source": "sum over fork_cached cells of phase cost_usd (ledger phases[].cost_usd)"
+      },
+      "verified_success_rate": {
+        "value": 1.0,
+        "source": "n_verified 6 / n 6; per-cell verified = test phase test_executed_success is True (ledger phases[].test_executed_success)"
+      },
+      "cpvo_usd": {
+        "value": 0.006093,
+        "source": "total_cost_usd / n_verified (cost 0.036556 / verified 6) \u2014 captured-verified intersection, null-not-zero"
+      },
+      "cache_read_tokens": {
+        "value": 364544,
+        "source": "sum of phase cache_read_tokens across the arm's ledgers"
+      },
+      "tokens_in": {
+        "value": 105874,
+        "source": "sum of phase tokens.in across the arm's ledgers"
+      },
+      "cache_ratio": {
+        "value": 0.7606,
+        "source": "mean per-cell cache_read / (cache_read + tokens_in + tokens_out)"
+      },
+      "rework_total": {
+        "value": 0,
+        "source": "count of phase rows with status='failed'"
+      },
+      "repeated_failures_total": {
+        "value": 0,
+        "source": "count of failed re-attempts (a phase name with >1 occurrence whose later attempt failed)"
+      },
+      "mean_latency_s": {
+        "value": 145.05,
+        "source": "mean per-cell ledger wall = ended_at - started_at"
+      },
+      "mean_context_token_growth": {
+        "value": 1.675,
+        "source": "mean per-cell verify.tokens.in / implement.tokens.in (phase 3 vs phase 1)"
+      },
+      "per_cell_sample": [
+        {
+          "cell_id": "cap_sesspol_fork_cached_flash_r1",
+          "cpvo_usd": 0.002911,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_flash_r1.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_cached_flash_r2",
+          "cpvo_usd": 0.002959,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_flash_r2.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_cached_flash_r3",
+          "cpvo_usd": 0.002986,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_flash_r3.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_cached_pro_r1",
+          "cpvo_usd": 0.009205,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_pro_r1.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_cached_pro_r2",
+          "cpvo_usd": 0.009615,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_pro_r2.json"
+        },
+        {
+          "cell_id": "cap_sesspol_fork_cached_pro_r3",
+          "cpvo_usd": 0.00888,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_pro_r3.json"
+        }
+      ]
+    },
+    "escalate": {
+      "n_cells": {
+        "value": 6,
+        "source": "per-cell rows joined on session_policy (cell manifest + ledger)"
+      },
+      "total_cost_usd": {
+        "value": 0.035678,
+        "source": "sum over escalate cells of phase cost_usd (ledger phases[].cost_usd)"
+      },
+      "verified_success_rate": {
+        "value": 1.0,
+        "source": "n_verified 6 / n 6; per-cell verified = test phase test_executed_success is True (ledger phases[].test_executed_success)"
+      },
+      "cpvo_usd": {
+        "value": 0.005946,
+        "source": "total_cost_usd / n_verified (cost 0.035678 / verified 6) \u2014 captured-verified intersection, null-not-zero"
+      },
+      "cache_read_tokens": {
+        "value": 406144,
+        "source": "sum of phase cache_read_tokens across the arm's ledgers"
+      },
+      "tokens_in": {
+        "value": 105852,
+        "source": "sum of phase tokens.in across the arm's ledgers"
+      },
+      "cache_ratio": {
+        "value": 0.7788,
+        "source": "mean per-cell cache_read / (cache_read + tokens_in + tokens_out)"
+      },
+      "rework_total": {
+        "value": 0,
+        "source": "count of phase rows with status='failed'"
+      },
+      "repeated_failures_total": {
+        "value": 0,
+        "source": "count of failed re-attempts (a phase name with >1 occurrence whose later attempt failed)"
+      },
+      "mean_latency_s": {
+        "value": 147.92,
+        "source": "mean per-cell ledger wall = ended_at - started_at"
+      },
+      "mean_context_token_growth": {
+        "value": 1.66,
+        "source": "mean per-cell verify.tokens.in / implement.tokens.in (phase 3 vs phase 1)"
+      },
+      "per_cell_sample": [
+        {
+          "cell_id": "cap_sesspol_escalate_flash_r1",
+          "cpvo_usd": 0.003438,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_flash_r1.json"
+        },
+        {
+          "cell_id": "cap_sesspol_escalate_flash_r2",
+          "cpvo_usd": 0.003021,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_flash_r2.json"
+        },
+        {
+          "cell_id": "cap_sesspol_escalate_flash_r3",
+          "cpvo_usd": 0.003047,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_flash_r3.json"
+        },
+        {
+          "cell_id": "cap_sesspol_escalate_pro_r1",
+          "cpvo_usd": 0.008689,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_pro_r1.json"
+        },
+        {
+          "cell_id": "cap_sesspol_escalate_pro_r2",
+          "cpvo_usd": 0.0087,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_pro_r2.json"
+        },
+        {
+          "cell_id": "cap_sesspol_escalate_pro_r3",
+          "cpvo_usd": 0.008783,
+          "verified": true,
+          "fork_markers": [
+            false,
+            true
+          ],
+          "ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_pro_r3.json"
+        }
+      ]
+    }
+  },
+  "retro_comparison": {
+    "continue": {
+      "retro": {
+        "cpvo_usd": null,
+        "n": 0,
+        "source": "experiments/results/session_routing_retrospective.json arms.continue.cost_per_verified_outcome.value / .n"
+      },
+      "live": {
+        "cpvo_usd": 0.005921,
+        "n": 6,
+        "source": "this score JSON per_arm cpvo_usd / n_cells"
+      }
+    },
+    "fork_blind": {
+      "retro": {
+        "cpvo_usd": null,
+        "n": 0,
+        "source": "experiments/results/session_routing_retrospective.json arms.fork_blind.cost_per_verified_outcome.value / .n"
+      },
+      "live": {
+        "cpvo_usd": 0.005322,
+        "n": 6,
+        "source": "this score JSON per_arm cpvo_usd / n_cells"
+      }
+    },
+    "fork_cached": {
+      "retro": {
+        "cpvo_usd": 1.2658,
+        "n": 246,
+        "source": "experiments/results/session_routing_retrospective.json arms.fork_cached.cost_per_verified_outcome.value / .n"
+      },
+      "live": {
+        "cpvo_usd": 0.006093,
+        "n": 6,
+        "source": "this score JSON per_arm cpvo_usd / n_cells"
+      }
+    },
+    "escalate": {
+      "retro": {
+        "cpvo_usd": 3.9238,
+        "n": 7,
+        "source": "experiments/results/session_routing_retrospective.json arms.escalate.cost_per_verified_outcome.value / .n"
+      },
+      "live": {
+        "cpvo_usd": 0.005946,
+        "n": 6,
+        "source": "this score JSON per_arm cpvo_usd / n_cells"
+      }
+    },
+    "escalation_premium": {
+      "retro": {
+        "premium": 3.1,
+        "numerator": "escalate cpvo $3.9238 n=7",
+        "denominator": "fork_cached cpvo $1.2658 n=246",
+        "source": "escalate retro cpvo / fork_cached retro cpvo (session_routing_retrospective.json)"
+      },
+      "live": {
+        "premium": 0.976,
+        "numerator": "escalate cpvo $0.005946 n=6",
+        "denominator": "fork_cached cpvo $0.006093 n=6",
+        "source": "this score JSON per_arm.escalate.cpvo / per_arm.fork_cached.cpvo"
+      },
+      "caveat": "escalate untriggered at n=6 (all cells completed first-attempt) \u2014 the live escalate cpvo measures the no-escalation-needed case, NOT the escalation premium; the live 0.976x is a cost-parity statement, not an estimate of the 3.1x escalation-premium hypothesis."
+    }
+  }
+}

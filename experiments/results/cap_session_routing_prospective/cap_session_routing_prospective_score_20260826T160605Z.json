@@ -1,0 +1,769 @@
+{
+  "schema_version": "cap_session_routing_score/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p3_score",
+  "scored_at": "20260826T160605Z",
+  "source_artifacts": "immutable p1/p2 only: cap_session_policy_cell_manifest_*.json + cap_session_policy_phase_ledger_*.json + cap_session_policy_outcome_E4_continue_pro_r1.json; retro: session_routing_retrospective.json",
+  "validation": {
+    "cells_scored": 24,
+    "cells_invalid_excluded": [],
+    "join_rule": "cell_id + session_policy + model + repetition joined to the phase ledger via measured.phase_ledger; session behavior validated against the assigned arm via opencode session-store fork markers (re-derived, not trusted from the manifest)",
+    "arm_expected_fork_markers": {
+      "continue": [
+        false,
+        true
+      ],
+      "fork_cached": [
+        false,
+        true
+      ],
+      "escalate": [
+        false,
+        true
+      ],
+      "fork_blind": [
+        false,
+        false
+      ]
+    }
+  },
+  "per_cell": [
+    {
+      "cell_id": "cap_sesspol_continue_flash_r1",
+      "session_policy": "continue",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r1",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_flash_r1.json",
+      "cost_usd": 0.002972,
+      "verified_success": true,
+      "cache_read_tokens": 70656,
+      "tokens_in": 17248,
+      "tokens_out": 1253,
+      "cache_ratio": 0.7925,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 139.68,
+      "context_token_growth": 1.664,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.002972
+    },
+    {
+      "cell_id": "cap_sesspol_continue_flash_r2",
+      "session_policy": "continue",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r2",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_flash_r2.json",
+      "cost_usd": 0.003124,
+      "verified_success": true,
+      "cache_read_tokens": 71936,
+      "tokens_in": 17643,
+      "tokens_out": 1295,
+      "cache_ratio": 0.7916,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 135.2,
+      "context_token_growth": 1.71,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.003124
+    },
+    {
+      "cell_id": "cap_sesspol_continue_flash_r3",
+      "session_policy": "continue",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r3",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_flash_r3.json",
+      "cost_usd": 0.00296,
+      "verified_success": true,
+      "cache_read_tokens": 58368,
+      "tokens_in": 17456,
+      "tokens_out": 1203,
+      "cache_ratio": 0.7578,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 136.24,
+      "context_token_growth": 1.649,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.00296
+    },
+    {
+      "cell_id": "cap_sesspol_continue_pro_r2",
+      "session_policy": "continue",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r2",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_pro_r2.json",
+      "cost_usd": 0.008959,
+      "verified_success": true,
+      "cache_read_tokens": 58112,
+      "tokens_in": 17508,
+      "tokens_out": 1280,
+      "cache_ratio": 0.7557,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 155.42,
+      "context_token_growth": 1.646,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.008959
+    },
+    {
+      "cell_id": "cap_sesspol_continue_pro_r3",
+      "session_policy": "continue",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r3",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_continue_pro_r3.json",
+      "cost_usd": 0.00871,
+      "verified_success": true,
+      "cache_read_tokens": 70528,
+      "tokens_in": 17083,
+      "tokens_out": 1143,
+      "cache_ratio": 0.7946,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 157.9,
+      "context_token_growth": 1.661,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.00871
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_flash_r1",
+      "session_policy": "escalate",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r1",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_flash_r1.json",
+      "cost_usd": 0.003438,
+      "verified_success": true,
+      "cache_read_tokens": 81920,
+      "tokens_in": 19335,
+      "tokens_out": 1725,
+      "cache_ratio": 0.7955,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 138.41,
+      "context_token_growth": 1.679,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.003438
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_flash_r2",
+      "session_policy": "escalate",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r2",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_flash_r2.json",
+      "cost_usd": 0.003021,
+      "verified_success": true,
+      "cache_read_tokens": 58752,
+      "tokens_in": 17458,
+      "tokens_out": 1399,
+      "cache_ratio": 0.757,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 144.14,
+      "context_token_growth": 1.721,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.003021
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_flash_r3",
+      "session_policy": "escalate",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r3",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_flash_r3.json",
+      "cost_usd": 0.003047,
+      "verified_success": true,
+      "cache_read_tokens": 78976,
+      "tokens_in": 17575,
+      "tokens_out": 1277,
+      "cache_ratio": 0.8073,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 136.98,
+      "context_token_growth": 1.604,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.003047
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_pro_r1",
+      "session_policy": "escalate",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r1",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_pro_r1.json",
+      "cost_usd": 0.008689,
+      "verified_success": true,
+      "cache_read_tokens": 57984,
+      "tokens_in": 17116,
+      "tokens_out": 1179,
+      "cache_ratio": 0.7602,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 162.53,
+      "context_token_growth": 1.654,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.008689
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_pro_r2",
+      "session_policy": "escalate",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r2",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_pro_r2.json",
+      "cost_usd": 0.0087,
+      "verified_success": true,
+      "cache_read_tokens": 57984,
+      "tokens_in": 17172,
+      "tokens_out": 1163,
+      "cache_ratio": 0.7598,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 157.0,
+      "context_token_growth": 1.637,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.0087
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_pro_r3",
+      "session_policy": "escalate",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r3",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_pro_r3.json",
+      "cost_usd": 0.008783,
+      "verified_success": true,
+      "cache_read_tokens": 70528,
+      "tokens_in": 17196,
+      "tokens_out": 1194,
+      "cache_ratio": 0.7932,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 148.46,
+      "context_token_growth": 1.668,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.008783
+    },
+    {
+      "cell_id": "cap_sesspol_fork_blind_flash_r1",
+      "session_policy": "fork_blind",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r1",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_flash_r1.json",
+      "cost_usd": 0.002957,
+      "verified_success": true,
+      "cache_read_tokens": 81280,
+      "tokens_in": 16272,
+      "tokens_out": 1467,
+      "cache_ratio": 0.8209,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 143.41,
+      "context_token_growth": 1.554,
+      "fork_markers": [
+        false,
+        false
+      ],
+      "cpvo_usd": 0.002957
+    },
+    {
+      "cell_id": "cap_sesspol_fork_blind_flash_r2",
+      "session_policy": "fork_blind",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r2",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_flash_r2.json",
+      "cost_usd": 0.003118,
+      "verified_success": true,
+      "cache_read_tokens": 102400,
+      "tokens_in": 16547,
+      "tokens_out": 1716,
+      "cache_ratio": 0.8486,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 152.83,
+      "context_token_growth": 1.556,
+      "fork_markers": [
+        false,
+        false
+      ],
+      "cpvo_usd": 0.003118
+    },
+    {
+      "cell_id": "cap_sesspol_fork_blind_flash_r3",
+      "session_policy": "fork_blind",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r3",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_flash_r3.json",
+      "cost_usd": 0.00294,
+      "verified_success": true,
+      "cache_read_tokens": 90240,
+      "tokens_in": 16312,
+      "tokens_out": 1388,
+      "cache_ratio": 0.836,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 134.68,
+      "context_token_growth": 1.558,
+      "fork_markers": [
+        false,
+        false
+      ],
+      "cpvo_usd": 0.00294
+    },
+    {
+      "cell_id": "cap_sesspol_fork_blind_pro_r1",
+      "session_policy": "fork_blind",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r1",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_pro_r1.json",
+      "cost_usd": 0.008395,
+      "verified_success": true,
+      "cache_read_tokens": 89344,
+      "tokens_in": 15876,
+      "tokens_out": 1311,
+      "cache_ratio": 0.8387,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 162.29,
+      "context_token_growth": 1.429,
+      "fork_markers": [
+        false,
+        false
+      ],
+      "cpvo_usd": 0.008395
+    },
+    {
+      "cell_id": "cap_sesspol_fork_blind_pro_r2",
+      "session_policy": "fork_blind",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r2",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_pro_r2.json",
+      "cost_usd": 0.008501,
+      "verified_success": true,
+      "cache_read_tokens": 89088,
+      "tokens_in": 15849,
+      "tokens_out": 1451,
+      "cache_ratio": 0.8374,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 152.73,
+      "context_token_growth": 1.435,
+      "fork_markers": [
+        false,
+        false
+      ],
+      "cpvo_usd": 0.008501
+    },
+    {
+      "cell_id": "cap_sesspol_fork_blind_pro_r3",
+      "session_policy": "fork_blind",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r3",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_blind_pro_r3.json",
+      "cost_usd": 0.006022,
+      "verified_success": true,
+      "cache_read_tokens": 94336,
+      "tokens_in": 10470,
+      "tokens_out": 1274,
+      "cache_ratio": 0.8893,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 154.37,
+      "context_token_growth": 0.613,
+      "fork_markers": [
+        false,
+        false
+      ],
+      "cpvo_usd": 0.006022
+    },
+    {
+      "cell_id": "cap_sesspol_fork_cached_flash_r1",
+      "session_policy": "fork_cached",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r1",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_flash_r1.json",
+      "cost_usd": 0.002911,
+      "verified_success": true,
+      "cache_read_tokens": 50048,
+      "tokens_in": 17277,
+      "tokens_out": 1212,
+      "cache_ratio": 0.7302,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 131.26,
+      "context_token_growth": 1.705,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.002911
+    },
+    {
+      "cell_id": "cap_sesspol_fork_cached_flash_r2",
+      "session_policy": "fork_cached",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r2",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_flash_r2.json",
+      "cost_usd": 0.002959,
+      "verified_success": true,
+      "cache_read_tokens": 58112,
+      "tokens_in": 17331,
+      "tokens_out": 1291,
+      "cache_ratio": 0.7573,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 146.28,
+      "context_token_growth": 1.664,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.002959
+    },
+    {
+      "cell_id": "cap_sesspol_fork_cached_flash_r3",
+      "session_policy": "fork_cached",
+      "model": "deepseek/deepseek-v4-flash",
+      "repetition": "r3",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_flash_r3.json",
+      "cost_usd": 0.002986,
+      "verified_success": true,
+      "cache_read_tokens": 58496,
+      "tokens_in": 17388,
+      "tokens_out": 1323,
+      "cache_ratio": 0.7577,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 137.38,
+      "context_token_growth": 1.685,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.002986
+    },
+    {
+      "cell_id": "cap_sesspol_fork_cached_pro_r1",
+      "session_policy": "fork_cached",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r1",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_pro_r1.json",
+      "cost_usd": 0.009205,
+      "verified_success": true,
+      "cache_read_tokens": 71552,
+      "tokens_in": 17726,
+      "tokens_out": 1410,
+      "cache_ratio": 0.789,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 149.79,
+      "context_token_growth": 1.717,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.009205
+    },
+    {
+      "cell_id": "cap_sesspol_fork_cached_pro_r2",
+      "session_policy": "fork_cached",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r2",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_pro_r2.json",
+      "cost_usd": 0.009615,
+      "verified_success": true,
+      "cache_read_tokens": 68096,
+      "tokens_in": 18743,
+      "tokens_out": 1328,
+      "cache_ratio": 0.7724,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 154.81,
+      "context_token_growth": 1.612,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.009615
+    },
+    {
+      "cell_id": "cap_sesspol_fork_cached_pro_r3",
+      "session_policy": "fork_cached",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r3",
+      "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_fork_cached_pro_r3.json",
+      "cost_usd": 0.00888,
+      "verified_success": true,
+      "cache_read_tokens": 58240,
+      "tokens_in": 17409,
+      "tokens_out": 1252,
+      "cache_ratio": 0.7573,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 150.79,
+      "context_token_growth": 1.668,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.00888
+    },
+    {
+      "cell_id": "cap_sesspol_E4_continue_pro_r1",
+      "session_policy": "continue",
+      "model": "deepseek/deepseek-v4-pro",
+      "repetition": "r1",
+      "phase_ledger": "experiments/results/cap_session_routing_prospective/cap_session_policy_phase_ledger_E4_continue_pro_r1.json",
+      "cost_usd": 0.008799,
+      "verified_success": true,
+      "cache_read_tokens": 58368,
+      "tokens_in": 17284,
+      "tokens_out": 1220,
+      "cache_ratio": 0.7593,
+      "rework_failed_phases": 0,
+      "failed_phases": [],
+      "repeated_failures": 0,
+      "latency_s": 144.48,
+      "context_token_growth": 1.673,
+      "fork_markers": [
+        false,
+        true
+      ],
+      "cpvo_usd": 0.008799
+    }
+  ],
+  "per_arm": {
+    "continue": {
+      "n_cells": 6,
+      "n_verified": 6,
+      "verified_success_rate": 1.0,
+      "total_cost_usd": 0.035524,
+      "cpvo_usd": 0.005921,
+      "cache_read_tokens": 387968,
+      "tokens_in": 104222,
+      "cache_ratio": 0.7752,
+      "rework_total": 0,
+      "repeated_failures_total": 0,
+      "mean_latency_s": 144.82,
+      "mean_context_token_growth": 1.667
+    },
+    "fork_blind": {
+      "n_cells": 6,
+      "n_verified": 6,
+      "verified_success_rate": 1.0,
+      "total_cost_usd": 0.031933,
+      "cpvo_usd": 0.005322,
+      "cache_read_tokens": 546688,
+      "tokens_in": 91326,
+      "cache_ratio": 0.8451,
+      "rework_total": 0,
+      "repeated_failures_total": 0,
+      "mean_latency_s": 150.05,
+      "mean_context_token_growth": 1.357
+    },
+    "fork_cached": {
+      "n_cells": 6,
+      "n_verified": 6,
+      "verified_success_rate": 1.0,
+      "total_cost_usd": 0.036556,
+      "cpvo_usd": 0.006093,
+      "cache_read_tokens": 364544,
+      "tokens_in": 105874,
+      "cache_ratio": 0.7606,
+      "rework_total": 0,
+      "repeated_failures_total": 0,
+      "mean_latency_s": 145.05,
+      "mean_context_token_growth": 1.675
+    },
+    "escalate": {
+      "n_cells": 6,
+      "n_verified": 6,
+      "verified_success_rate": 1.0,
+      "total_cost_usd": 0.035678,
+      "cpvo_usd": 0.005946,
+      "cache_read_tokens": 406144,
+      "tokens_in": 105852,
+      "cache_ratio": 0.7788,
+      "rework_total": 0,
+      "repeated_failures_total": 0,
+      "mean_latency_s": 147.92,
+      "mean_context_token_growth": 1.66
+    }
+  },
+  "arm_model_interaction": {
+    "continue": {
+      "deepseek/deepseek-v4-pro": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.026468,
+        "cpvo_usd": 0.008823
+      },
+      "deepseek/deepseek-v4-flash": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.009056,
+        "cpvo_usd": 0.003019
+      }
+    },
+    "fork_blind": {
+      "deepseek/deepseek-v4-pro": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.022918,
+        "cpvo_usd": 0.007639
+      },
+      "deepseek/deepseek-v4-flash": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.009015,
+        "cpvo_usd": 0.003005
+      }
+    },
+    "fork_cached": {
+      "deepseek/deepseek-v4-pro": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.0277,
+        "cpvo_usd": 0.009233
+      },
+      "deepseek/deepseek-v4-flash": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.008856,
+        "cpvo_usd": 0.002952
+      }
+    },
+    "escalate": {
+      "deepseek/deepseek-v4-pro": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.026172,
+        "cpvo_usd": 0.008724
+      },
+      "deepseek/deepseek-v4-flash": {
+        "n_cells": 3,
+        "n_verified": 3,
+        "verified_success_rate": 1.0,
+        "total_cost_usd": 0.009506,
+        "cpvo_usd": 0.003169
+      }
+    }
+  },
+  "retrospective_comparison": {
+    "fork_cached": {
+      "retro": {
+        "cpvo_usd": 1.2658,
+        "n": 246,
+        "success_rate": 0.9837
+      },
+      "live": {
+        "cpvo_usd": 0.006093,
+        "n": 6,
+        "success_rate": 1.0
+      }
+    },
+    "escalate": {
+      "retro": {
+        "cpvo_usd": 3.9238,
+        "n": 7,
+        "success_rate": 1.0
+      },
+      "live": {
+        "cpvo_usd": 0.005946,
+        "n": 6,
+        "success_rate": 1.0,
+        "untriggered": "all 6 live escalate cells completed first-attempt; the arm never fired, so the live escalate cpvo reflects the no-escalation-needed case, NOT the escalation premium"
+      }
+    },
+    "continue": {
+      "retro": {
+        "cpvo_usd": null,
+        "n": 0
+      },
+      "live": {
+        "cpvo_usd": 0.005921,
+        "n": 6,
+        "success_rate": 1.0
+      }
+    },
+    "fork_blind": {
+      "retro": {
+        "cpvo_usd": null,
+        "n": 0
+      },
+      "live": {
+        "cpvo_usd": 0.005322,
+        "n": 6,
+        "success_rate": 1.0
+      }
+    },
+    "escalation_premium_3_1x": {
+      "retro": {
+        "premium": 3.1,
+        "numerator": "escalate cpvo $3.9238 n=7",
+        "denominator": "fork_cached cpvo $1.2658 n=246"
+      },
+      "live": {
+        "premium": 0.976,
+        "numerator": "escalate cpvo $0.005946 n=6",
+        "denominator": "fork_cached cpvo $0.006093 n=6"
+      }
+    }
+  }
+}
