@@ -113,6 +113,10 @@
     });
     const rules = document.querySelector("[data-ad-rules]");
     if (rules) {
+      // The overview makes the inventory's rules component a complete inline SVG
+      // figure while the cards retain their semantic, keyboard-operable detail.
+      const rulesFigure = document.querySelector('[data-ad-component="rules"]');
+      if (rulesFigure) rulesFigure.insertAdjacentHTML("afterbegin", AgenticDesign.rulesOverview(campaigns, data && data.summary));
       rules.innerHTML = AgenticDesign.rulesComponent(campaigns, data && data.summary, data && data._meta && data._meta.generated_at);
       AgenticDesign.activateRuleCards(rules);
     }

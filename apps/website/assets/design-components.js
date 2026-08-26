@@ -50,7 +50,7 @@
       .replaceAll("class=\"flow-measured\"", `class="flow-measured" marker-end="url(#ad-arrow-measured${suffix})"`)
       .replaceAll("class=\"flow\"", `class="flow" marker-end="url(#ad-arrow${suffix})"`)
       .replaceAll("class=\"node-null\"", `class="node-null" style="fill:url(#ad-hatch${suffix})"`);
-    return `<svg class="ad-diagram" viewBox="${viewBox || "0 0 760 360"}" role="img" aria-labelledby="ad-title${suffix} ad-desc${suffix}"><title id="ad-title${suffix}">${title}</title><desc id="ad-desc${suffix}">${description}</desc>${scopedDefs}${scopedBody}</svg>`;
+    return `<svg class="ad-diagram" viewBox="${viewBox || "0 0 760 360"}" role="img" aria-label="${title}" aria-labelledby="ad-title${suffix} ad-desc${suffix}"><title id="ad-title${suffix}">${title}</title><desc id="ad-desc${suffix}">${description}</desc>${scopedDefs}${scopedBody}</svg>`;
   }
 
   // Adapted from references/svg-marker-flow.html and svg-animated-status.html.
@@ -193,8 +193,8 @@
       <path class="flow" d="M178 170H260"/>
       <g transform="translate(260 126)"><rect class="node" width="126" height="88" rx="8"/><text class="label" x="63" y="34" text-anchor="middle">Rejected</text><text class="small" x="63" y="53" text-anchor="middle">downstream risk</text><text class="small" x="63" y="70" text-anchor="middle">not a price list</text></g>
       <path class="flow-measured" d="M386 150H458M386 194H458"/>
-      <g transform="translate(458 94)"><rect class="node-measured" width="210" height="78" rx="8"/><text class="label" x="16" y="30">${shortName(first.escalation_model)} fix: ${usd(first.escalation_fix_cost_usd)} [M]</text><text class="small" x="16" y="49">E_x = ${ratio(first.E_x)} [C]</text><text class="micro" x="16" y="66">n = ${first.n_model_cells == null ? "not loaded" : first.n_model_cells} / model</text></g>
-      <g transform="translate(458 206)"><rect class="node-measured" width="210" height="78" rx="8"/><text class="label" x="16" y="30">${shortName(second.escalation_model)} fix: ${usd(second.escalation_fix_cost_usd)} [M]</text><text class="small" x="16" y="49">E_x = ${ratio(second.E_x)} [C]</text><text class="micro" x="16" y="66">n = ${second.n_model_cells == null ? "not loaded" : second.n_model_cells} / model</text></g>
+       <g transform="translate(458 82)"><rect class="node-measured" width="210" height="90" rx="8"/><text class="label" x="16" y="22">${shortName(first.escalation_model)} fix: ${usd(first.escalation_fix_cost_usd)} [M]</text><text class="micro" x="16" y="40">${first.escalation_model || "not loaded"}</text><text class="small" x="16" y="59">E_x = ${ratio(first.E_x)} [C]</text><text class="micro" x="16" y="78">n = ${first.n_model_cells == null ? "not loaded" : first.n_model_cells} / model</text></g>
+       <g transform="translate(458 194)"><rect class="node-measured" width="210" height="90" rx="8"/><text class="label" x="16" y="22">${shortName(second.escalation_model)} fix: ${usd(second.escalation_fix_cost_usd)} [M]</text><text class="micro" x="16" y="40">${second.escalation_model || "not loaded"}</text><text class="small" x="16" y="59">E_x = ${ratio(second.E_x)} [C]</text><text class="micro" x="16" y="78">n = ${second.n_model_cells == null ? "not loaded" : second.n_model_cells} / model</text></g>
       <text class="small" x="42" y="314">Ratios are descriptive measurements, not a provider recommendation.</text>`);
   }
 
@@ -235,6 +235,17 @@
     ["10", "Respect authorization", "decided", "A campaign decision authorizes design review only, not actuation.", "accepted verdict and authorization", "[P] authorization", "campaigns.cap_2b", "the decision does not arm control", "record a separate actuation authorization"],
   ];
 
+  function ruleStatus(number, declaredStatus, campaigns, summary) {
+    // A card becomes instrumented only when the corresponding published signal is
+    // present. This shared decision keeps the overview and card detail consistent.
+    const cap2b = campaigns && campaigns.cap_2b ? campaigns.cap_2b : {};
+    const escalation = campaigns && campaigns.escalation ? campaigns.escalation : {};
+    if (["09", "10"].includes(number)) return cap2b.status === "DECIDED" ? "decided" : "proposal";
+    if (["01", "04", "07"].includes(number) && !(summary && summary.sessions_total != null)) return "proposal";
+    if (number === "06" && escalation.status !== "MEASURED") return "proposal";
+    return declaredStatus;
+  }
+
   // Adapted from references/card-details.html and card-tooltip-badge.html.
   function rulesComponent(campaigns, summary, generatedAt) {
     // Campaign-derived cards can only be decided when the current data door says
@@ -243,19 +254,11 @@
     const cap2b = campaigns && campaigns.cap_2b ? campaigns.cap_2b : {};
     const escalation = campaigns && campaigns.escalation ? campaigns.escalation : {};
     const decision = cap2b.decision_rule ? cap2b.decision_rule.decision : "not loaded";
-    const decisionStatus = cap2b.status === "DECIDED" ? "decided" : "proposal";
-    const corpusInstrumented = summary && summary.sessions_total != null;
-    const escalationMeasured = escalation.status === "MEASURED";
+    const escalationSample = (escalation.models || []).map((model) => `n = ${model.n_model_cells == null ? "not loaded" : model.n_model_cells}`).join(", ");
     const updated = generatedAt ? String(generatedAt).slice(0, 10) : "not loaded";
     return rules.map((rule) => {
-      const [number, title, declaredStatus, summary, inputs, provenance, source, limitation, nextTest] = rule;
-      const status = ["09", "10"].includes(number)
-        ? decisionStatus
-        : ["01", "04", "07"].includes(number) && !corpusInstrumented
-          ? "proposal"
-          : number === "06" && !escalationMeasured
-            ? "proposal"
-            : declaredStatus;
+      const [number, title, declaredStatus, ruleSummary, inputs, provenance, source, limitation, nextTest] = rule;
+      const status = ruleStatus(number, declaredStatus, campaigns, summary);
       const id = `ad-rule-${number}`;
       const statusLabel = {
         instrumented: "INSTRUMENTED",
@@ -264,8 +267,32 @@
       }[status];
       const evidenceClass = provenance.slice(1, 2);
       const decisionDetail = ["09", "10"].includes(number) ? ` Current campaign decision: ${decision} [C].` : "";
-      return `<article class="ad-rule" data-status="${status}"><button class="ad-rule__toggle" type="button" aria-expanded="false" aria-controls="${id}"><span><span class="ad-rule__number">RULE ${number}</span><span class="ad-rule__status ad-evidence" data-evidence="${evidenceClass}">[${evidenceClass}] ${statusLabel}</span><span class="ad-rule__title">${title}</span></span><span class="ad-rule__icon" aria-hidden="true">+</span></button><div class="ad-rule__body" id="${id}" hidden><p>${summary}</p><p><strong>Inputs:</strong> ${inputs}.${decisionDetail}</p><p><strong>Limitation:</strong> ${limitation} <strong>Next test:</strong> ${nextTest}.</p><div class="ad-rule__meta">${provenance} | Source: ${source} | Updated: ${updated}</div></div></article>`;
+      const escalationDetail = number === "06" ? ` Current descriptive escalation sample: ${escalationSample} / model [M].` : "";
+      return `<article class="ad-rule" data-status="${status}"><button class="ad-rule__toggle" type="button" aria-expanded="false" aria-controls="${id}"><span><span class="ad-rule__number">RULE ${number}</span><span class="ad-rule__status ad-evidence" data-evidence="${evidenceClass}">[${evidenceClass}] ${statusLabel}</span><span class="ad-rule__title">${title}</span></span><span class="ad-rule__icon" aria-hidden="true">+</span></button><div class="ad-rule__body" id="${id}" hidden><p>${ruleSummary}</p><p><strong>Inputs:</strong> ${inputs}.${decisionDetail}${escalationDetail}</p><p><strong>Limitation:</strong> ${limitation} <strong>Next test:</strong> ${nextTest}.</p><div class="ad-rule__meta">${provenance} | Source: ${source} | Updated: ${updated}</div></div></article>`;
     }).join("");
+  }
+
+  // Adapted from references/card-details.html and card-tooltip-badge.html.
+  function rulesOverview(campaigns, summary) {
+    const cap2b = campaigns && campaigns.cap_2b ? campaigns.cap_2b : {};
+    const escalation = campaigns && campaigns.escalation ? campaigns.escalation : {};
+    const decision = cap2b.decision_rule ? cap2b.decision_rule.decision : "not loaded";
+    const modelCells = (escalation.models || []).map((model) => model.n_model_cells == null ? "not loaded" : model.n_model_cells).join(", ");
+    const groups = rules.reduce((result, rule) => {
+      const [number, , declaredStatus, , , provenance] = rule;
+      const status = ruleStatus(number, declaredStatus, campaigns, summary);
+      result[status].push({ number, evidence: provenance.slice(1, 2) });
+      return result;
+    }, { instrumented: [], proposal: [], decided: [] });
+    const groupText = (status) => groups[status].map((rule) => rule.number).join(", ") || "none";
+    const evidenceText = (status) => [...new Set(groups[status].map((rule) => `[${rule.evidence}]`))].join("/") || "[NULL]";
+    return svg("Ten framework rules status map", "A compact overview groups the ten framework cards by instrumented inputs, proposed arms, and decided boundaries.", `
+      <rect class="frame" x="12" y="12" width="736" height="176" rx="14"/>
+      <text class="micro" x="36" y="42">RULE STATUS MAP / CARD DETAIL FOLLOWS</text>
+      <g transform="translate(42 68)"><rect class="node-measured" width="202" height="72" rx="8"/><text class="label" x="16" y="30">Instrumented cards</text><text class="small" x="16" y="51">rules ${groupText("instrumented")} | ${evidenceText("instrumented")}</text></g>
+      <g transform="translate(278 68)"><rect class="node-policy" width="202" height="72" rx="8"/><text class="label" x="16" y="30">Proposed cards</text><text class="small" x="16" y="51">rules ${groupText("proposal")} | ${evidenceText("proposal")}</text></g>
+      <g transform="translate(514 68)"><rect class="node-computed" width="190" height="72" rx="8"/><text class="label" x="16" y="30">Decided cards</text><text class="small" x="16" y="51">rules ${groupText("decided")} | ${evidenceText("decided")}</text></g>
+      <text class="small" x="42" y="166">Campaign decision: ${decision} [C] | descriptive escalation cells: n = ${modelCells} / model [M]</text>`, "0 0 760 200");
   }
 
   function activateRuleCards(root) {
@@ -290,6 +317,7 @@
     escalationChain,
     calibrationArc,
     rulesComponent,
+    rulesOverview,
     activateRuleCards,
   };
 }());
