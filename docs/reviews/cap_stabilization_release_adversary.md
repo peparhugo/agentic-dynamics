@@ -38,6 +38,9 @@ not a limitation.
 **Evidence:** `python3 -m ruff check .` → `All checks passed!` (0 errors, whole active surface
 incl. `scripts/archive/` — the archive policy is **lint-clean, not excluded**, decided and
 documented in `scripts/CONTEXT.md`; no per-file-ignores carve-out). `ruff check scripts/kb_produce_facts.py scripts/retro_session_routing.py` → clean.
+Note: the p2-recheck commit `aa1cac2d6` restored the archive-policy note that merge `26eb0e32b`
+had silently reverted out of `scripts/CONTEXT.md` mid-campaign — the decision is now documented on
+the tip, satisfying hard rule 3 (documented, never implicit).
 
 **Result: PASS.**
 
@@ -46,18 +49,24 @@ documented in `scripts/CONTEXT.md`; no per-file-ignores carve-out). `ruff check 
 **Attack:** re-run the p3 gates and compare counts to the committed p3 log
 (`experiments/results/workflows/cap_stabilization_release/p3_gate_evidence.json`).
 
-**Evidence:**
-- `pytest tests/ -m "not external" -q --timeout=600` → **2010 passed / 115 deselected / 0 failed**
-  (51.41s). The p3 log recorded **2007 passed / 115 deselected / 0 failed**. The delta is exactly
-  **+3 = the new p5 doc-lifecycle guards** (`test_doc_lifecycle.py` gained
-  `test_stale_cap_claims_absent_from_authoritative_docs`,
-  `test_stale_cap_claim_detector_fires_on_legacy_text`, `test_readme_spec_counts_match_index`).
-  No regression: the failure set is empty, identical in kind to p3.
+**Evidence (re-run live in this pass):**
+- **FULL suite** `pytest tests/ -q --timeout=600` → **2116 passed / 9 skipped / 0 failed**
+  (372.92s, hang guard active). The 9 skips are documented reasons: 8× Chroma heartbeat-skips
+  (`Chroma server unavailable (heartbeat failed) — live-server tests skip, never hang`) + 1×
+  data-dependent skip (`No wasteful entries available`). Ollama/Neo4j/Sonar ran and passed.
+- **Deterministic** `pytest tests/ -m "not external" -q --timeout=600` → **2010 passed / 115
+  deselected / 0 failed** — matches the p3 log's `rerun_on_tip` block (the +3 vs the original
+  2007 log are the p5 doc-lifecycle guards; not a regression).
+- The p3 recheck (`0fa3f699b`) found + fixed **2 real failures** on the full suite — a
+  test-isolation defect in the live-Neo4j `test_versioned_graph.py` (global `count(*)` colliding
+  with real campaign ingestion: 29,675 SymbolVersion nodes, 469 SUPERSEDES edges). Fix: the count
+  assertions are scoped to the test's own `repository_id`. Re-test: `test_versioned_graph.py`
+  9 passed; full suite re-run green.
 - `python3 scripts/build_data.py --dry-run` → OK. `python3 scripts/sync_data.py --check` → OK
   (parquet matches canonical source). Import gate (`import agentic_dynamics`) → OK.
 
-**Result: PASS.** Counts match the p3 log modulo the +3 guard tests, which are part of this
-release's own deliverable (p5), not a regression.
+**Result: PASS.** Counts match the p3 log; the two full-suite failures were found by the p3
+recheck and are FIXED (not accepted limitations).
 
 ## Attack 4 — CI restructure + branch protection
 
@@ -131,17 +140,22 @@ confirm the manifest's data.js hash is real.
 
 ## Accepted limitations (no FAILED findings)
 
+The only real failures found in this release's verification were the two live-Neo4j
+`test_versioned_graph.py` isolation defects on the FIRST full-suite run — root-caused and FIXED in
+the p3 recheck (`0fa3f699b`, scoped counts), then re-verified green here. They are findings with
+fixes, not accepted limitations.
+
 | # | Limitation | Reasoning | Residual risk |
 |---|---|---|---|
 | L1 | The fix-isolation diff of the retro re-run cannot be re-run against the same corpus today | The workflow-run ledgers are gitignored/local-transient; the old snapshot (253 obs) has no live corpus. The structural diff (only `arm_names` added) was verified in this pass against the two committed files, and p1 verified stats-byte-identical against a live corpus at p1 time | Low — no silent overwrite is possible (the fix removed the duplicate key); the growth delta is documented |
-| L2 | Current suite count (2010) > p3 log (2007) | +3 = the p5 guard tests; zero failures | None — additive, gated by the suite itself |
-| L3 | `actuation_ingestion` has zero call sites; `--cap-shadow` decisions are recorded, never applied | By design (shadow mode; cap_2b adaptive is the single applied path). Not a regression — the fact plane is what the release stabilizes | None for this release's scope |
-| L4 | Whole-repo spend is not published (workflow ledgers gitignored) | The spend figure is explicitly **story-corpus scoped** (label + note + `measured_spend_scope` in data.js) | Low — a reader ignoring the scope label could misread the figure; the label is now in the published dataset, not only prose |
+| L2 | `actuation_ingestion` has zero call sites; `--cap-shadow` decisions are recorded, never applied | By design (shadow mode; cap_2b adaptive is the single applied path). Not a regression — the fact plane is what the release stabilizes | None for this release's scope |
+| L3 | Whole-repo spend is not published (workflow ledgers gitignored) | The spend figure is explicitly **story-corpus scoped** (label + note + `measured_spend_scope` in data.js) | Low — a reader ignoring the scope label could misread the figure; the label is now in the published dataset, not only prose |
 
 ## Re-stated release readiness
 
-**READY.** All seven attacks PASS; zero FAILED findings; four accepted limitations, each with
-reasoning and residual risk, none blocking. The branch carries the two fixes, a ruff-clean active
-surface, a green deterministic suite (2010/0), a four-job independent CI with applied branch
-protection, canonical docs with both-direction guards, and regenerated, drift-free instruction
-surfaces.
+**READY.** All seven attacks PASS; zero FAILED findings; three accepted limitations, each with
+reasoning and residual risk, none blocking. The two real failures surfaced by the full-suite run
+were fixed, not waived. The branch carries the two fixes, a ruff-clean active surface with the
+archive-policy decision documented on the tip, a green FULL suite (2116/9/0) and deterministic
+suite (2010/0), a four-job independent CI with applied branch protection, canonical docs with
+both-direction guards, and regenerated, drift-free instruction surfaces.

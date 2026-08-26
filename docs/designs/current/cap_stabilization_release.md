@@ -27,7 +27,8 @@ non-falsifying attacks, all safe).
 
 | Gate | Command | Result |
 |---|---|---|
-| Deterministic suite | `pytest tests/ -m "not external" -q --timeout=600` | **2010 passed / 115 deselected / 0 failed** (51.41s; p3 log: 2007, delta = +3 p5 guards) |
+| Full suite (hang guard) | `pytest tests/ -q --timeout=600` | **2116 passed / 9 skipped (documented reasons) / 0 failed** (~6 min; the 2 live-Neo4j isolation failures found by the p3 recheck were fixed, not waived) |
+| Deterministic suite | `pytest tests/ -m "not external" -q --timeout=600` | **2010 passed / 115 deselected / 0 failed** (p3 log 2007; delta = +3 p5 guards) |
 | Data integrity | `python3 scripts/build_data.py --dry-run` | OK |
 | Parquet parity | `python3 scripts/sync_data.py --check` | OK — parquet matches canonical source |
 | Import gate | `import agentic_dynamics`, `import scripts.kb_produce_facts` | OK |
