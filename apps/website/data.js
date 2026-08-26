@@ -1,8 +1,8 @@
-/* Generated 2026-08-26 02:22:33 UTC by build_data.py */
+/* Generated 2026-08-26 12:38:02 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-26T02:22:30.547178+00:00",
+    "generated_at": "2026-08-26T12:37:59.558387+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -61,7 +61,7 @@ window.DYNAMICS_DATA = {
     "waivers": []
   },
   "publication_contract": {
-    "registry_identity": "6bccc2ff01300612e733b753c2f9fa90055acb6289737d1ddaae6ffd973f9d30",
+    "registry_identity": "8be3f51d1d63c06a1b26e3e08b460d12323a9353fd8f7da5c7367e2492bc8841",
     "resolved_input_identity": "077f95acc9fdb7e40a132aa89c5c27c4d48eba4ba3582dc2028234723ecf7534",
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 35,
     "experiment_specs": 11,
-    "workflow_specs": 105,
+    "workflow_specs": 106,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
@@ -3991,7 +3991,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-26T02:22:30.717605+00:00"
+    "generated_at": "2026-08-26T12:37:59.727340+00:00"
   },
   "reviews": {
     "models": [

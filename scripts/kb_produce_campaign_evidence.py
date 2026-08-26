@@ -43,7 +43,7 @@ from agentic_dynamics.knowledge import knowledge_ingestion as ki  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
 from agentic_dynamics.knowledge.knowledge_ingestion import Authority  # noqa: E402
 
-EXTRACTOR_VERSION = "campaign-evidence/v1"
+EXTRACTOR_VERSION = "campaign-evidence/v2"
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 
@@ -85,7 +85,11 @@ def _cell_record(cell: dict, *, campaign: str, revision: str, now: str) -> ki.Kn
     # = the analyzed revision). ``content_hash`` covers text, so the payload is provenance.
     text = one_liner + " :: " + json.dumps(payload, sort_keys=True)
     return ki.build_record_from_parts(
-        source_type=ki.SOURCE_TYPE,  # "finding"
+        # source_type="report" (measured artifact) — NOT "finding": the canonical finding table
+        # resolves rows against the perturbation-experiment payload schema ({"runs":[...]} with
+        # workdir locators), which campaign scoring rows do not satisfy; report rows carry no
+        # canonical-table payload obligation, and report is a MEASURED [M] source_type.
+        source_type="report",
         source_uri=f"file://experiments/results/{campaign}/score.json",
         logical_locator=f"cap_2a:{campaign}:cell:{cell.get('cell_id')}",
         repository_id=f"cap_2a:{campaign}",
@@ -127,7 +131,7 @@ def _aggregate_record(
         f"not_run {agg.get('n_not_run')}"
     ) + " :: " + json.dumps(payload, sort_keys=True)
     return ki.build_record_from_parts(
-        source_type=ki.SOURCE_TYPE,
+        source_type="report",
         source_uri=f"file://experiments/results/{campaign}/score.json",
         logical_locator=f"cap_2a:{campaign}:aggregate",
         repository_id=f"cap_2a:{campaign}",
