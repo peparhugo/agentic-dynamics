@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "source": "docs/designs/current/cap_site_revamp_research.md:219-233",
+  "diagrams": [
+    {
+      "id": "instrument-cycle",
+      "title": "Instrument cycle",
+      "page": "index.html, framework.html",
+      "data_js_fields": ["summary.sessions_total", "summary.canonical_findings"],
+      "reference_citation": "cap_site_revamp_research.md:225; references/svg-marker-flow.html; references/svg-animated-status.html",
+      "status": "planned"
+    },
+    {
+      "id": "nxm-problem",
+      "title": "N x M problem",
+      "page": "story.html",
+      "data_js_fields": ["summary.sessions_total", "summary.canonical_findings"],
+      "reference_citation": "cap_site_revamp_research.md:226; references/svg-pattern-surface.html; references/type-responsive-grid.html",
+      "status": "planned"
+    },
+    {
+      "id": "eight-planes",
+      "title": "Eight planes",
+      "page": "framework.html",
+      "data_js_fields": ["summary.variants"],
+      "reference_citation": "cap_site_revamp_research.md:227; references/svg-marker-flow.html; references/svg-filter-focus.html",
+      "status": "planned"
+    },
+    {
+      "id": "one-engine-two-modes",
+      "title": "One engine / two operating modes",
+      "page": "framework.html",
+      "data_js_fields": ["summary.sessions_total"],
+      "reference_citation": "cap_site_revamp_research.md:228; references/svg-marker-flow.html",
+      "status": "planned"
+    },
+    {
+      "id": "bounded-autonomy-envelope",
+      "title": "Bounded-autonomy envelope",
+      "page": "framework.html",
+      "data_js_fields": ["summary.canonical_findings"],
+      "reference_citation": "cap_site_revamp_research.md:229; references/svg-pattern-surface.html; references/svg-filter-focus.html",
+      "status": "planned"
+    },
+    {
+      "id": "cost-curves",
+      "title": "Cost curves",
+      "page": "methodology.html",
+      "data_js_fields": ["design_parameters.beta"],
+      "reference_citation": "cap_site_revamp_research.md:230; references/d3-line-arc.html; references/d3-interactive-curve.html",
+      "status": "planned"
+    },
+    {
+      "id": "escalation-chain",
+      "title": "Escalation chain E_x",
+      "page": "evidence.html",
+      "data_js_fields": ["campaigns.escalation.baseline_cost_usd", "campaigns.escalation.models[].escalation_model", "campaigns.escalation.models[].escalation_fix_cost_usd", "campaigns.escalation.models[].E_x", "campaigns.escalation.models[].n_model_cells"],
+      "reference_citation": "cap_site_revamp_research.md:231; references/svg-marker-flow.html; references/svg-pattern-surface.html",
+      "status": "planned"
+    },
+    {
+      "id": "calibration-arc",
+      "title": "Calibration arc",
+      "page": "evidence.html",
+      "data_js_fields": ["campaigns.calibration.rerun.hits", "campaigns.calibration.rerun.n", "campaigns.calibration.rerun.wilson_95_ci", "campaigns.cap_2b.decision_rule.cpvo_ratio", "campaigns.cap_2b.decision_rule.cpvo_ratio_ci_95", "campaigns.cap_2b.decision_rule.decision"],
+      "reference_citation": "cap_site_revamp_research.md:232; references/scroll-sticky-overlay.html; references/d3-line-arc.html",
+      "status": "planned"
+    },
+    {
+      "id": "ten-rules-cards",
+      "title": "Ten rules cards",
+      "page": "framework.html",
+      "data_js_fields": ["campaigns.cap_2b.decision_rule.decision", "campaigns.escalation.models[].n_model_cells"],
+      "reference_citation": "cap_site_revamp_research.md:233; references/card-details.html; references/card-tooltip-badge.html",
+      "status": "planned"
+    }
+  ]
+}
