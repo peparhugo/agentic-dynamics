@@ -378,3 +378,88 @@ body.light .cta-btn:hover{box-shadow:0 16px 42px rgba(8,145,178,0.28)}
 @media(max-width:550px){
   .stats{grid-template-columns:1fr}
 }
+
+/* -------------------------------------------------------------------------- */
+/* Editorial v2 components                                                    */
+/* -------------------------------------------------------------------------- */
+/* New public pages opt in with .ad-page. This prevents an unfinished redesign
+   from restyling legacy pages before their content is migrated. */
+.ad-page{background:var(--paper);color:var(--ink);font-family:var(--font-serif);font-size:18px;line-height:1.62;min-height:100vh}
+.ad-page *{box-sizing:border-box}
+.ad-page :focus-visible{outline:3px solid var(--focus-v2);outline-offset:3px}
+.ad-shell{width:min(100% - 2rem,76rem);margin-inline:auto}
+.ad-reading{width:min(100%,46rem)}
+.ad-kicker{font:700 .72rem/1.2 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--measured);margin:0 0 var(--space-2)}
+.ad-page h1,.ad-page h2,.ad-page h3{font-family:var(--font-sans);color:var(--ink);text-wrap:balance}
+.ad-page h1{font-size:clamp(2.65rem,8vw,6rem);line-height:.92;letter-spacing:-.065em;margin:0 0 var(--space-4)}
+.ad-page h2{font-size:clamp(1.7rem,4vw,3.25rem);line-height:1;letter-spacing:-.045em;margin:0 0 var(--space-3)}
+.ad-page h3{font-size:1rem;line-height:1.2;margin:0}
+.ad-page p{color:var(--ink-soft);margin:0 0 var(--space-3)}
+.ad-page .ad-lead{font-size:clamp(1.1rem,2.3vw,1.45rem);line-height:1.45;color:var(--ink);max-width:44rem}
+.ad-page code{font:500 .78em/1 var(--font-mono);color:var(--ink);background:var(--paper-deep);border-radius:var(--radius-sm);padding:.18em .35em}
+.ad-section{padding:var(--space-6) 0;border-top:1px solid var(--line)}
+.ad-section:first-of-type{border-top:0}
+.ad-figure{margin:var(--space-4) 0 0;border:1px solid var(--line);border-radius:var(--radius-lg);background:#fffdf8;box-shadow:var(--shadow-paper);overflow:hidden}
+.ad-figure svg{display:block;width:100%;height:auto;background:#fffdf8}
+.ad-figure figcaption{padding:var(--space-3) var(--space-4);border-top:1px solid var(--line);font:500 .76rem/1.5 var(--font-sans);color:var(--ink-soft)}
+.ad-figure figcaption code{font-size:.95em}
+.ad-figure-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4)}
+.ad-figure-grid .ad-figure{margin:0}
+.ad-evidence{display:inline-flex;align-items:center;gap:.35rem;padding:.24rem .5rem;border:1px solid currentColor;border-radius:999px;font:700 .67rem/1 var(--font-mono);letter-spacing:.04em;white-space:nowrap}
+.ad-evidence[data-evidence="M"]{color:var(--measured)}
+.ad-evidence[data-evidence="C"]{color:var(--computed)}
+.ad-evidence[data-evidence="H"]{color:var(--heuristic)}
+.ad-evidence[data-evidence="X"]{color:var(--external)}
+.ad-evidence[data-evidence="P"]{color:var(--policy)}
+.ad-evidence[data-evidence="NULL"]{color:var(--null)}
+.ad-receipt{display:grid;grid-template-columns:auto 1fr;gap:var(--space-2);align-items:start;padding:var(--space-3);background:var(--paper-deep);border-left:3px solid var(--measured);font:500 .78rem/1.5 var(--font-sans);color:var(--ink-soft)}
+.ad-note{margin-top:var(--space-3);font:500 .78rem/1.5 var(--font-sans);color:var(--ink-soft)}
+.ad-note strong{color:var(--ink)}
+
+/* The rule cards use native buttons: no hover-only flip and no script-only state. */
+.ad-rule-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:var(--space-3)}
+.ad-rule{border:1px solid var(--line);border-radius:var(--radius-md);background:#fffdf8;overflow:hidden;box-shadow:0 2px 0 rgba(41,35,24,.03)}
+.ad-rule__toggle{width:100%;border:0;background:transparent;color:inherit;padding:var(--space-3);display:grid;grid-template-columns:1fr auto;gap:var(--space-2);text-align:left;cursor:pointer;font:inherit}
+.ad-rule__toggle:hover{background:rgba(40,114,113,.05)}
+.ad-rule__number{font:700 .72rem/1 var(--font-mono);color:var(--ink-soft);margin-bottom:var(--space-2)}
+.ad-rule__status{margin-bottom:var(--space-2)}
+.ad-rule__title{font:700 1rem/1.18 var(--font-sans);color:var(--ink)}
+.ad-rule__icon{font:700 1.25rem/1 var(--font-sans);color:var(--ink-soft);align-self:center}
+.ad-rule__body{padding:0 var(--space-3) var(--space-3);font:500 .84rem/1.55 var(--font-sans);color:var(--ink-soft)}
+.ad-rule__body[hidden]{display:none}
+.ad-rule__body p{font:inherit;color:inherit;margin:0 0 var(--space-2)}
+.ad-rule__meta{padding-top:var(--space-2);border-top:1px solid var(--line);font:500 .69rem/1.45 var(--font-mono);color:var(--ink-soft)}
+
+/* SVG components share a constrained, printable graphic vocabulary. */
+.ad-diagram .frame{fill:#fffdf8;stroke:var(--line);stroke-width:1}
+.ad-diagram .guide{fill:none;stroke:var(--line);stroke-width:1}
+.ad-diagram .guide-dash{fill:none;stroke:var(--line);stroke-width:1;stroke-dasharray:5 5}
+.ad-diagram .flow{fill:none;stroke:var(--ink);stroke-width:1.6}
+.ad-diagram .flow-measured{fill:none;stroke:var(--measured);stroke-width:2}
+.ad-diagram .flow-policy{fill:none;stroke:var(--policy);stroke-width:2}
+.ad-diagram .node{fill:#fffdf8;stroke:var(--ink);stroke-width:1.1}
+.ad-diagram .node-measured{fill:#e2f0eb;stroke:var(--measured);stroke-width:1.2}
+.ad-diagram .node-computed{fill:#f5ead8;stroke:var(--computed);stroke-width:1.2}
+.ad-diagram .node-policy{fill:#f5e4e5;stroke:var(--policy);stroke-width:1.2}
+.ad-diagram .node-null{stroke:var(--null);stroke-width:1.2}
+.ad-diagram .label{fill:var(--ink);font:700 12px var(--font-sans)}
+.ad-diagram .small{fill:var(--ink-soft);font:500 9px var(--font-sans)}
+.ad-diagram .micro{fill:var(--ink-soft);font:700 8px var(--font-mono);letter-spacing:.08em}
+.ad-diagram .tag-m{fill:var(--measured);font:700 8px var(--font-mono)}
+.ad-diagram .tag-c{fill:var(--computed);font:700 8px var(--font-mono)}
+.ad-diagram .tag-p{fill:var(--policy);font:700 8px var(--font-mono)}
+.ad-diagram .curve-measured{fill:none;stroke:var(--measured);stroke-width:2.5}
+.ad-diagram .curve-computed{fill:none;stroke:var(--computed);stroke-width:2.5;stroke-dasharray:6 4}
+.ad-diagram .point{fill:var(--measured)}
+.ad-diagram .point-computed{fill:var(--computed)}
+
+@media (max-width: 720px){
+  .ad-page{font-size:16px}
+  .ad-shell{width:min(100% - 1.25rem,76rem)}
+  .ad-section{padding:var(--space-5) 0}
+  .ad-figure-grid{grid-template-columns:1fr}
+  .ad-figure{margin-top:var(--space-3)}
+}
+@media (prefers-reduced-motion: reduce){
+  .ad-page *, .ad-page *::before, .ad-page *::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+}
