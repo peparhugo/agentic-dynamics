@@ -1,0 +1,34 @@
+{
+  "action": "continue",
+  "analyzed_revision": "629f689ee4b89c4ced20317598cfbd077aca65a5",
+  "applied": false,
+  "baseline_revision": "399e5860f2ca25f0a68c886c2fd2490b90b21302",
+  "cell_id": "cap2a_r3_clean_gate",
+  "contract_version": "verify_code_change/v1",
+  "depth": 0,
+  "expected_effect": [
+    {
+      "direction": "unchanged",
+      "horizon": "next_phase",
+      "magnitude": null,
+      "predicate": "code_change_risk"
+    }
+  ],
+  "facts_used": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "proposal_id": "c28eb202d27da59a",
+  "proposed_by": "policy_rule:verify_code_change",
+  "recorded_at": "2026-08-26T04:38:01.022229+00:00",
+  "schema_version": "verify_code_change_proposal/v1",
+  "scope": []
+}

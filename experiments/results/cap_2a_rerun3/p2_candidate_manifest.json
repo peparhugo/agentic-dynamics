@@ -1,0 +1,43 @@
+{
+  "schema_version": "cap_2a_candidate_manifest/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p2_measure_gate_cell",
+  "written_at": "2026-08-26T07:15:00Z",
+  "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "target_model": "deepseek/deepseek-v4-pro",
+  "target_backend": "opencode",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "candidates": [
+    {
+      "candidate_id": "c1_clean_gate",
+      "arm": "gate",
+      "path": "workflows/operations/cap_2a_cell_clean.yaml",
+      "path_sha256": "65730a228e238513747fdd658679d4b89389140f92f2a26021170cab338cbba0",
+      "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+      "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+      "model": "deepseek/deepseek-v4-pro",
+      "backend": "opencode",
+      "seeded_app_worktree": "/tmp/cap2a_cell_clean_rerun3_gate",
+      "seeded_app_seed_revision": "399e5860f2ca25f0a68c886c2fd2490b90b21302",
+      "finops_cell_id": "cap2a_r3_clean_gate",
+      "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+      "forecast_cost_usd": null,
+      "forecast_note": "FORECAST — first gate-arm measurement. The p1 baseline-arm measured cost is $0.008509 (recorded as an informative prior, NOT the forecast). The p2 measured gate-arm cost is the first gate-arm measurement; the p3 forecast budget for the gate arm is set to measured x 2 headroom after this run (labeled FORECAST).",
+      "expected_realized_class": "no_rework",
+      "expected_gate_application": "null",
+      "note": "p2 is the E4 gate-arm measurement of the SAME clean stimulus. Pairing: same stimulus spec path + same goal hash + same source baseline revision as p1's c1_clean_baseline (baseline arm); the worktree and FINOPS_CELL_ID are UNIQUE (never the same worktree). The clean stimulus's proposal is `continue` (depth 0), so the gate application is a PROVABLE NULL — no rework, no verify pass beyond the cell's own test phase."
+    }
+  ],
+  "selection": {
+    "chosen": "c1_clean_gate",
+    "reason": "p2 measures the gate arm's overhead on the clean stimulus (the null gate): proposal recording + the provable-null `continue` application. It also runs the first expected-effect check (validate_expected_effects) against the proposal's own claims."
+  },
+  "pairing": {
+    "stimulus": "cap_2a_cell_clean@0.1",
+    "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+    "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+    "baseline_cell_id": "cap2a_r3_clean_baseline",
+    "gate_cell_id": "cap2a_r3_clean_gate",
+    "note": "The pair shares the stimulus spec path + goal hash + source revision; only the arm, worktree, and FINOPS_CELL_ID differ."
+  }
+}

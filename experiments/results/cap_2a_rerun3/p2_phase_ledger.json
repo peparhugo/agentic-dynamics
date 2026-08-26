@@ -1,0 +1,149 @@
+{
+  "schema_version": "cap_2a_p2_ledger/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p2_measure_gate_cell",
+  "written_at": "2026-08-26T04:40:00Z",
+  "cell_id": "cap2a_r3_clean_gate",
+  "arm": "gate",
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "candidate_manifest": "experiments/results/cap_2a_rerun3/p2_candidate_manifest.json",
+  "candidate_manifest_sha256": "f3910a4a68177957bb695f12c47ecf722c4d927a08fd89efd71e3899487ae867",
+  "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "seeded_app_worktree": "/tmp/cap2a_cell_clean_rerun3_gate",
+  "seeded_app_seed_revision": "399e5860f2ca25f0a68c886c2fd2490b90b21302",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T043811Z.json",
+  "run_ledger_sha256": "86feb52d78f3df6c6b1e9d5f1692cc06ad9c717a0627247dd41e6108509b8d08",
+  "analyzer_reachability": {
+    "graph": {
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "reachable": true,
+      "uri": "bolt://localhost:7687"
+    },
+    "lsp": {
+      "reachable": true,
+      "status": "available",
+      "tool": "mypy",
+      "version": "2.3.1"
+    },
+    "sonar": {
+      "reachable": true,
+      "server": "http://localhost:9000 (UP)",
+      "status": "available"
+    }
+  },
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "629f689",
+      "baseline_revision": "399e5860f2ca25f0a68c886c2fd2490b90b21302",
+      "analyzed_revision": "629f689ee4b89c4ced20317598cfbd077aca65a5",
+      "cost_usd": 0.003790648,
+      "duration_s": 18.77,
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "lsp_analysis_status": "available",
+      "sonar_analysis_status": "available",
+      "code_change_risk": "0.18",
+      "facts_emitted": [
+        {"predicate": "analysis_revision_matches", "value": "true"},
+        {"predicate": "ast_parse_coverage", "value": "1.0"},
+        {"predicate": "changed_symbol_count", "value": "2"},
+        {"predicate": "changed_symbols_with_tests_ratio", "value": "0.5"},
+        {"predicate": "code_change_risk", "value": "0.18"},
+        {"predicate": "impacted_symbol_count", "value": "4"},
+        {"predicate": "lsp_analysis_status", "value": "available"},
+        {"predicate": "new_lsp_error_count", "value": "0"},
+        {"predicate": "new_sonar_critical_count", "value": "0"},
+        {"predicate": "sonar_analysis_status", "value": "available"}
+      ],
+      "facts_omitted": [],
+      "proposal": "c28eb202d27da59a (continue, depth 0, applied=false)",
+      "test_result": "test_executed_success = null (no test_gate on this phase; the independent kind:test phase is next)"
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "cost_usd": 0.0,
+      "duration_s": 0.33,
+      "test_result": "test_executed_success = true (3/3) — independent runtime.test_runner"
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "",
+      "cost_usd": 0.004659314,
+      "duration_s": 8.14,
+      "note": "No new commit (the verification note produced no diff) -> change_analysis=None (no symbol change). This is the provable-null gate application: `continue` applies nothing, so no rework/verify pass beyond the cell's own test phase exists.",
+      "test_result": "none (documentation/verification phase)"
+    }
+  ],
+  "proposal_seam_result": {
+    "proposal_id": "c28eb202d27da59a",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "proposals_emitted": 1,
+    "refused": false,
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/c28eb202d27da59a.json",
+    "artifact_sha256": "18541a0f1b5de23879b617824b513403b90b133230bb93eb385a9f70dc2350ed",
+    "note": "Emitted from the implement phase's change_analysis facts (code_change_risk=0.18, new_sonar_critical_count=0). risk 0.18 < VERIFY_RISK_THRESHOLD 0.2 and no measured criticals -> action=continue, depth=0."
+  },
+  "gate_application": {
+    "applied_or_null": "null",
+    "action": "continue",
+    "depth": 0,
+    "applied_exactly_as_proposed": true,
+    "extra_passes": 0,
+    "rework_passes": 0,
+    "verify_passes_beyond_cell": 0,
+    "commit_trail": [
+      "399e5860f2ca25f0a68c886c2fd2490b90b21302 (seed calc app)",
+      "629f689ee4b89c4ced20317598cfbd077aca65a5 ([workflow] implement)"
+    ],
+    "proof": "continue is a no-op by definition; applying it exactly as proposed means no rework and no verify pass beyond the cell's own test phase. The commit trail (2 commits, seed + implement) and the verify phase's empty commit_hash (no diff -> change_analysis=None) prove the null application. Nothing else changed (no control_route, no actuation, no human steering)."
+  },
+  "expected_effect_checks": [
+    {
+      "predicate": "code_change_risk",
+      "direction": "unchanged",
+      "expected": "unchanged",
+      "observed": null,
+      "held": false,
+      "reason": "Unmeasurable under the null application: `continue` commits nothing, so no next-phase change_analysis exists to re-measure code_change_risk. observed=null, held=false — an unmeasurable claim is a failed claim, never a silent pass (helper contract)."
+    }
+  ],
+  "expected_effect_check_rate": {
+    "claims_made": 1,
+    "claims_checked": 1,
+    "check_rate": 1.0,
+    "held": 0,
+    "held_rate": 0.0,
+    "note": "check_rate=1.0 (every proposal claim checked). held_rate=0.0 reflects the `unchanged` claim being unmeasurable (no next-phase re-analysis after a null application), recorded honestly — not a failed prediction, but an uncheckable one."
+  },
+  "total_measured_cost_breakdown": {
+    "implement": 0.003790648,
+    "test": 0.0,
+    "verify": 0.004659314
+  },
+  "total_measured_cost_usd": 0.00845,
+  "p3_forecast_budget": {
+    "label": "FORECAST",
+    "basis": "p2 measured gate-arm cost x 2 headroom",
+    "measured_cost_usd": 0.00845,
+    "forecast_per_cell_usd": 0.0169,
+    "note": "FORECAST, not measured. The p2 gate-arm measured cost ($0.00845) is the first gate-arm measurement; its 2x headroom is the gate-arm forecast budget. Together with p1's baseline-arm forecast ($0.017018/cell), p3 carries two arm-specific forecast lines: baseline $0.017018, gate $0.0169 per cell."
+  }
+}
