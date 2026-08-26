@@ -1,6 +1,7 @@
 """Tests for embeddings module — EmbeddingClient, ChromaStore, extract_session_text."""
 
 import contextlib
+import os
 import socket
 from pathlib import Path
 
@@ -94,8 +95,41 @@ class TestEmbeddingClient:
         assert client.model == "bge-m3:latest"
 
 
+def _chroma_reachable(timeout: float = 3.0) -> bool:
+    """True only when a REAL Chroma server answers a heartbeat.
+
+    A port with any OTHER service (this machine's 8000 held the opencode web server)
+    must count as unavailable — the live tests would otherwise hang on a mismatched
+    protocol: chromadb.HttpClient retries with backoff and no connect timeout, which
+    stalled the full deterministic suite for ~60 minutes twice during
+    cap_stabilization_release p3.
+    """
+    import json
+    import urllib.request
+
+    host = os.environ.get("CHROMA_HOST", "localhost")
+    port = int(os.environ.get("CHROMA_PORT", "8000"))
+    for path in ("/api/v2/heartbeat", "/api/v1/heartbeat"):
+        try:
+            with urllib.request.urlopen(f"http://{host}:{port}{path}", timeout=timeout) as resp:
+                body = json.loads(resp.read())
+            if isinstance(body, dict) and "heartbeat" in body:
+                return True
+        except Exception:  # noqa: BLE001 — any failure (refused, wrong protocol, timeout) = unavailable
+            continue
+    return False
+
+
+CHROMA_REACHABLE = _chroma_reachable()
+
+
 class TestChromaStore:
     TEST_COLLECTION = "test_session_embeddings"
+
+    pytestmark = pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live-server tests skip, never hang",
+    )
 
     @pytest.fixture(autouse=True)
     def setup_teardown(self):
@@ -109,9 +143,27 @@ class TestChromaStore:
             self.store._client.delete_collection(self.TEST_COLLECTION)
 
     def test_connectivity(self):
-        store = ChromaStore()
-        assert store.count() >= 0
+        """Live-server probe with an availability GUARD (cap_stabilization_release p3
+        stall post-mortem): chromadb.HttpClient retries with backoff and no connect
+        timeout, so a missing or mismatched server on CHROMA_HOST:CHROMA_PORT (which can
+        collide with another service — port 8000 held the opencode web server here) hung
+        the full deterministic suite for ~60 minutes on two occasions. A live probe in
+        the deterministic suite must SKIP when its server is unavailable — 'unavailable
+        is a measured status' — and must never hang."""
+        import socket
 
+        host = os.environ.get("CHROMA_HOST", "localhost")
+        port = int(os.environ.get("CHROMA_PORT", "8000"))
+        try:
+            with socket.create_connection((host, port), timeout=3):
+                pass
+        except OSError as exc:
+            pytest.skip(f"Chroma unavailable at {host}:{port} ({exc})")
+        try:
+            store = ChromaStore()
+            assert store.count() >= 0
+        except Exception as exc:  # noqa: BLE001 — a mismatched server is skip, not hang
+            pytest.skip(f"Chroma unavailable at count(): {exc}")
     def test_index_and_search_session(self):
         self.store.COLLECTION_NAME = self.TEST_COLLECTION
         self.store._collection = None
@@ -218,6 +270,10 @@ class TestCanonicalChromaStore:
         store = ChromaStore()
         assert store.COLLECTION_NAME == "session_embeddings"
 
+    @pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live test skips, never hang",
+    )
     def test_collection_isolation(self):
         a = ChromaStore(collection_name="test_iso_a")
         b = ChromaStore(collection_name="test_iso_b")
@@ -234,6 +290,10 @@ class TestCanonicalChromaStore:
             a._client.delete_collection("test_iso_a")
             b._client.delete_collection("test_iso_b")
 
+    @pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live test skips, never hang",
+    )
     def test_upsert_delete_inventory_round_trip(self):
         store = ChromaStore(collection_name="test_roundtrip")
         try:
@@ -258,6 +318,10 @@ class TestCanonicalChromaStore:
         finally:
             store._client.delete_collection("test_roundtrip")
 
+    @pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live test skips, never hang",
+    )
     def test_search_with_where_filter(self):
         store = ChromaStore(collection_name="test_where")
         try:
@@ -275,6 +339,10 @@ class TestCanonicalChromaStore:
         finally:
             store._client.delete_collection("test_where")
 
+    @pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live test skips, never hang",
+    )
     def test_upsert_propagates_store_failure(self):
         store = ChromaStore(collection_name="test_err")
         try:

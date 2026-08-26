@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-26T18:44:53.020910+00:00",
-  "n_specs": 124,
+  "generated_at": "2026-08-26T19:57:27.943751+00:00",
+  "n_specs": 125,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -202,31 +202,15 @@
       "n_runs": 0
     },
     {
-      "name": "cap_site_revamp",
+      "name": "cap_site_revamp2",
       "version": "0.1",
       "status": "runnable",
-      "spec_path": "workflows/repository/cap_site_revamp.yaml",
+      "spec_path": "workflows/repository/cap_site_revamp2.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "cap_stabilization_release",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/cap_stabilization_release.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
+      "supersedes": [
+        "cap_site_revamp"
+      ],
       "superseded_by": null,
       "completed_at": null,
       "last_run_at": null,
@@ -524,6 +508,24 @@
       "latest_git_sha": "2f3cbbbbc",
       "results_pointer": "experiments/results/workflows/agentic_dynamics_rebrand/20260814T220247Z.json",
       "n_runs": 2
+    },
+    {
+      "name": "cap_stabilization_release",
+      "version": "0.1",
+      "status": "failed",
+      "spec_path": "workflows/repository/cap_stabilization_release.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-26T19:46:24.143392+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.256333,
+      "latest_git_sha": "44c14d9b9",
+      "results_pointer": "experiments/results/workflows/cap_stabilization_release/20260826T194624Z.json",
+      "n_runs": 1
     },
     {
       "name": "claude_background_sessions",
@@ -1107,6 +1109,24 @@
       "latest_cost_usd": 0.204488,
       "latest_git_sha": "ba48a7f58",
       "results_pointer": "experiments/results/workflows/cap_shadow_fact_disposition/20260824T004425Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "cap_site_revamp",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_site_revamp.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-26T19:49:15.907838+00:00",
+      "latest_ok": true,
+      "latest_model": "openai/gpt-5.6-terra",
+      "latest_cost_usd": 26.659067,
+      "latest_git_sha": "edeb2a7e5",
+      "results_pointer": "experiments/results/workflows/cap_site_revamp/20260826T194916Z.json",
       "n_runs": 1
     },
     {

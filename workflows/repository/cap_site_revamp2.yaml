@@ -1,0 +1,242 @@
+name: cap_site_revamp2
+question: >-
+  Rerun of the site revamp with the visual deliverable GATED, not described. The first
+  campaign (cap_site_revamp, superseded) produced excellent research (editorial ledger,
+  local example library, diagram inventory, copy with the new evidence) and then deployed
+  a site with ZERO of the visual system implemented — no SVG diagrams, no charts, no
+  cards, no scrollytelling; components were built in a gallery but never wired into pages;
+  the review passed on truth/anti-SaaS/field tests while the visuals were absent (the
+  follow-up question: docs/designs/current/cap_site_revamp_followup.md). THIS campaign
+  starts from the research + example library + copy on feature/site-revamp and delivers
+  the IMPLEMENTED visual system, with hard measurable gates: a per-diagram inventory
+  checklist (page, file, data.js field, reference citation), DOM-level verification of the
+  built pages, gallery-to-page wiring proof, no hardcoded numbers that live in data.js,
+  and a review that FAILS unless the inventory is 100% present on the deployed pages.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+supersedes: cap_site_revamp
+workflow:
+  kind: agent_task
+  params:
+    language: javascript
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: public-facing research website / visual
+        implementation. canonical_sources: [docs/designs/current/cap_site_revamp_research.md
+        (THE research — editorial ledger, visual language, diagram inventory, IA; the
+        authority for WHAT to build), apps/website/references/ (THE local example library
+        — 10 real-code references; the authority for HOW to build), the rewritten copy on
+        feature/site-revamp (the editorial content — keep it), apps/website/_design.html +
+        assets/design-components.js (the gallery — must ALL be wired to pages),
+        apps/website/data.js (THE data door — every number on the pages comes from here),
+        docs/designs/current/cap_site_revamp_followup.md (the failure post-mortem + the
+        open question this campaign answers), docs/reviews/cap_site_revamp_review.md (the
+        review that missed the visuals — do not repeat its criteria)].
+        policies: [inventory_is_a_checklist_not_prose, no_gallery_only_components,
+        data_js_is_the_only_door, review_fails_on_missing_visuals]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: visual implementation of a research site.
+        deliberation: [implement the diagram inventory, wire every component, verify
+        DOM-level, adversarial truth + visual review, dual deploy].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        feature/site-revamp carries: the research doc (editorial ledger with every number
+        tagged + sourced; the diagram inventory: instrument cycle, N x M problem, planes,
+        ONE ENGINE / TWO OPERATING MODES, bounded-autonomy envelope, cost curves with the
+        N^2 term [C], escalation chain (E_x 11.47 measured), calibration arc (0/3 -> 2/3
+        -> randomized NON-INFERIOR), 10-rules interactive cards), the local example
+        library (10 files under apps/website/references/), the rewritten copy (with the
+        2b verdict, the honest nulls, the provenance tags), a components gallery
+        (_design.html + design-components.js) that was NEVER WIRED into the pages, and a
+        DEPLOYED SITE WITH ZERO SVG/CARDS/SCROLLYTELLING. The public site has been
+        reverted to main's pre-revamp version while this campaign runs. The failure was
+        process, not model: the gates tested descriptions, not the deliverable.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks; every phase writes
+        a durable PASS/FAIL log. (2) THE INVENTORY IS A CHECKLIST, NOT PROSE: commit
+        apps/website/diagram_inventory.json BEFORE implementation, one entry per diagram:
+        {id, title, page, data.js fields wired, reference file citation, status} — status
+        is filled IN as the diagram is implemented; the verification phase FAILS unless
+        every entry's status is implemented AND its SVG exists in the page's HTML.
+        (3) DOM-LEVEL VERIFICATION: the verification phase parses the BUILT pages and
+        checks, per inventory entry: the SVG element exists on the named page; the data.js
+        fields named in the entry appear as rendered values inside the SVG (no hardcoded
+        numbers in the SVG markup that exist in data.js); the reference citation is in the
+        source. (4) NO GALLERY-ONLY COMPONENTS: every component in _design.html /
+        design-components.js must be referenced (wired) by at least one page; the wiring
+        proof is a grep of page HTML for each component id — an unwired component is a
+        FAILED finding. (5) SCROLLYTELLING + CARDS: the story/evidence pages implement the
+        narrative structure from the example library's scroll/sticky references; the
+        10-rules cards are interactive (expand/flip + status badge) on the framework page.
+        (6) The research doc + editorial ledger are the authority for WHAT the diagrams
+        show (provenance tags on every numeric label); the example library is the
+        authority for HOW (each diagram adapts its cited reference). (7) data.js is
+        regenerated by scripts/build_data.py and stays THE only data door. (8) No
+        generated-surface edits; no secrets; no external actuation. (9) p4's review is
+        adversarial and mandatory: truth checks (every number traces to the editorial
+        ledger) AND the VISUAL gates (inventory 100%, DOM checks, wiring proof) — a
+        missing diagram is a FAILED finding, never a limitation. (10) p5 deploys BOTH
+        firebase projects from apps/website/ and verifies the deployed pages DOM-level
+        (the same inventory check against the deployed URLs). (11) Resumable only when
+        spec version, goal hash, source revision, and candidate-manifest hash match.
+      read_first: >-
+        docs/designs/current/cap_site_revamp_followup.md (the post-mortem — why gates
+        matter), docs/designs/current/cap_site_revamp_research.md §3-4 (learned patterns +
+        diagram inventory), apps/website/references/ (the example library), the rewritten
+        pages on feature/site-revamp, apps/website/_design.html + assets/design-components.js
+        (the gallery to wire), apps/website/data.js, scripts/build_data.py
+      run_shape: >-
+        EXECUTED BY gpt-terra (openai/gpt-5.6-terra) — the operator's choice; the failure
+        was the missing gates, not the model. One branch (feature/site-revamp2) created
+        FROM feature/site-revamp (the research + example library + copy are the starting
+        point). Each phase commits [workflow] <phase>. Deploy from apps/website/.
+    phases:
+      - name: p1_implement_inventory
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the visual system ON THE PAGES. FIRST commit
+          apps/website/diagram_inventory.json — one entry per diagram from the research
+          doc's inventory (instrument cycle, N x M problem, planes, ONE ENGINE / TWO
+          OPERATING MODES, bounded-autonomy envelope, cost curves [C] N^2, escalation
+          chain E_x 11.47, calibration arc, 10-rules cards): {id, title, page, data.js
+          fields, reference citation, status: planned} — commit it BEFORE any page edits
+          (hard gate: the checklist exists before implementation). THEN implement: every
+          diagram as hand-crafted inline SVG on its named page, wired to data.js fields,
+          adapting its cited reference file from apps/website/references/; the 10-rules
+          cards interactive on the framework page; the story/evidence pages' narrative
+          structure from the scroll/sticky references. WIRE EVERY gallery component into
+          the pages (no component may remain gallery-only). As each diagram lands, set its
+          inventory status to implemented. NO hardcoded numbers in SVG markup that exist
+          in data.js — the numbers come from the data door.
+          VERIFY (locally, before the phase ends): parse the built pages — every inventory
+          entry with status=implemented has its SVG in the page HTML; the data.js fields
+          render inside the SVGs; every gallery component id is referenced by a page.
+          GUARD: the research doc's provenance tags are on every numeric label.
+          DELIVER: the inventory JSON + the implemented pages + the wiring proof, committed.
+          LOG: per-diagram status + the wiring proof output; PASS/FAIL; commit.
+      - name: p2_editorial_integration
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: integrate the copy with the visuals — the rewritten editorial content from
+          feature/site-revamp stays, but its figures/headings/captions must now reference
+          the IMPLEMENTED diagrams (figure numbers, captions with provenance tags, the
+          diagrams' labels matching the prose). Fix any copy that describes a diagram,
+          chart, or interactive element that does not exist on the page — the copy must
+          never promise what the page doesn't render. Ensure reading flow: the diagrams
+          sit in the section they illustrate; the cards are styled per the visual language.
+          VERIFY: no copy references a missing figure (grep the pages for figure references
+          and check each against the inventory).
+          DELIVER: the integrated pages, committed.
+          LOG: the figure-copy reconciliation; PASS/FAIL; commit.
+      - name: p3_dom_verification
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the DOM-level verifier. Parse the BUILT pages (the committed HTML) and
+          execute the hard-rule gates mechanically:
+          (1) INVENTORY COVERAGE: for every diagram_inventory.json entry, the named page's
+          HTML contains the SVG (check by id/unique class); coverage must be 100% —
+          a missing SVG is a FAILED finding.
+          (2) DATA WIRING: each entry's named data.js fields appear as rendered values
+          inside the page (the SVG text nodes or the page's data-driven slots) — a number
+          hardcoded in the markup that exists in data.js is a FAILED finding.
+          (3) GALLERY WIRING: every component id in _design.html / design-components.js is
+          referenced by at least one page.
+          (4) INTERACTIVITY: the 10-rules cards' interaction handlers exist in app.js and
+          the card markup is on the framework page; the scroll/sticky narrative elements
+          exist on story/evidence.
+          (5) ACCESSIBILITY: SVGs have aria-labels; cards keyboard-operable.
+          Produce apps/website/dom_verification_report.md with the per-gate evidence
+          (page, selector, found/missing). Fix nothing silently — report, then fix,
+          then re-verify until all gates pass.
+          DELIVER: the verification report + any fixes, committed.
+          LOG: the gate-by-gate results; PASS/FAIL; commit.
+      - name: p4_truth_and_visual_review
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial truth + VISUAL reviewer. Attack in order:
+          (1) TRUTH — every number on every page traces to the editorial ledger + data.js;
+          the new claims cite their score JSONs; the provenance tags are present.
+          (2) THE ANTI-SAAS TEST — the site must not be misreadable as a product.
+          (3) THE FIELD TEST — named question, method, instrument, evidence, open
+          problems, limits — all present and coherent.
+          (4) THE VISUAL GATES — re-run p3's DOM verification INDEPENDENTLY (do not trust
+          the p3 report): inventory coverage 100%, data wiring, gallery wiring,
+          interactivity, accessibility. A missing diagram or an unwired component is a
+          FAILED finding — never an accepted limitation.
+          (5) VISUAL QUALITY — beyond existence: do the diagrams communicate one idea
+          each? Are the SVG designs coherent with the visual language (typography, color,
+          restraint)? Does the site look intentional, not generic? Render or structurally
+          inspect each page and note concrete visual defects (layout, spacing, contrast,
+          alignment) — fix the clear ones.
+          (6) UPDATABILITY — the new-findings pattern works (walk one finding through
+          data.js -> slot -> page).
+          Every finding: fix on the branch or record as accepted limitation with reasoning.
+          DELIVER: docs/reviews/cap_site_revamp2_review.md (findings, evidence paths,
+          fixes, the anti-SaaS verdict verbatim, the VISUAL QUALITY verdict with concrete
+          observations) + a known-safe list.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: p5_deploy
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: final build + dual deploy. Run the data chain fresh (python3
+          scripts/sync_data.py && python3 scripts/build_data.py && python3
+          scripts/generate_manifest.py), then from apps/website/: firebase deploy --only
+          hosting AND firebase deploy --only hosting --project agentic-dynamics — BOTH,
+          never one. VERIFY THE DEPLOYED PAGES DOM-LEVEL: re-run the inventory + wiring
+          checks against the DEPLOYED URLs (curl the pages and check for each diagram's
+          SVG, the cards, the scrollytelling) — the inventory must be 100% present on the
+          deployed site, not just the source. Verify both URLs 200 and the mirror serves
+          the same content as the canonical. If the agentic-dynamics project ID is
+          unavailable, STOP and ask — never pick a fallback.
+          DELIVER: the deploy output (both targets), the deployed-page DOM verification,
+          the URL checks, committed.
+          LOG: deploy + verification output; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-terra]}
+design: factorial
+rules:
+  - name: cap_site_revamp2_inventory
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [inventory_committed]
+  - name: cap_site_revamp2_implemented
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [inventory_committed]
+    produces: [diagrams_on_pages, components_wired]
+  - name: cap_site_revamp2_verified
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [diagrams_on_pages, components_wired]
+    produces: [dom_gates_passed, visual_quality_verdict]
+  - name: cap_site_revamp2_deployed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [dom_gates_passed]
+    produces: [deployed_inventory_verified]
+metrics:
+  - {name: dom_gates_passed, agg: mean, over: cell}
+  - {name: visual_quality_verdict, agg: mean, over: cell}
+  - {name: deployed_inventory_verified, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_implement_inventory, p2_editorial_integration, p3_dom_verification, p4_truth_and_visual_review, p5_deploy]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
