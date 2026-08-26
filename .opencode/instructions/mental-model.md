@@ -53,7 +53,7 @@ bounded planes (`ARCHITECTURE.md` §1; the dependency direction is enforced by
 | `runtime` | execution runtime — workflow_runner, test_runner, story, posthoc |
 | `adapters` | model backends — opencode, claude_adapter, backends |
 | `knowledge` | knowledge + augmentation — identity/authority, retrieval, prompt-construction, ingestion producers |
-| `control` | emerging control — routing, signal store, supervisor, telemetry, queue steering, observation/actuation |
+| `control` | the implemented control plane — fact plane (`facts` + `fact_ingestion` + `reducers/`), context compiler, shadow-mode controller/validator, routing, supervisor, telemetry, queue steering, observation/actuation |
 | `reporting` | research output — game_report, review, analyzers |
 
 Tier map: `core` (0) ← `experiment/measurement/runtime/adapters/knowledge/reporting` (1) ←

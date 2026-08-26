@@ -1,8 +1,8 @@
-/* Generated 2026-08-26 19:44:37 UTC by build_data.py */
+/* Generated 2026-08-26 21:48:46 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-26T19:44:34.745892+00:00",
+    "generated_at": "2026-08-26T21:48:43.911212+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -66,7 +66,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "0ab05d9223acc5d546992e5852a34cd2e95145817b5343d66abe7e819a8bba1c"
+    "generator_source_tree_identity": "762b4aa6f417b0a90691ff3fec3d4975c65bb6d785dcc216313f39e56787d8f2"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -78,12 +78,13 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 35,
     "experiment_specs": 11,
-    "workflow_specs": 113,
+    "workflow_specs": 114,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
     "lab_books_quarantined": 12,
     "measured_spend_usd": 309.17,
+    "measured_spend_scope": "story-corpus",
     "_provenance": {
       "story_sessions": "M",
       "stories_total": "C",
@@ -99,7 +100,8 @@ window.DYNAMICS_DATA = {
       "lab_books": "M",
       "lab_books_canonical": "M",
       "lab_books_quarantined": "M",
-      "measured_spend_usd": "M"
+      "measured_spend_usd": "M",
+      "measured_spend_scope": "P"
     }
   },
   "models": [
@@ -3991,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-26T19:44:34.940010+00:00"
+    "generated_at": "2026-08-26T21:48:44.078691+00:00"
   },
   "reviews": {
     "models": [

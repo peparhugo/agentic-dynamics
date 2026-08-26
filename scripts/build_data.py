@@ -2184,6 +2184,12 @@ def build():
             "lab_books_canonical": lab_counts["lab_books_canonical"],
             "lab_books_quarantined": lab_counts["lab_books_quarantined"],
             "measured_spend_usd": round(sum(m.get("total_cost", 0) for m in models), 2),
+            # The measured-spend figure is STORY-CORPUS scoped: it is the total measured cost
+            # of the canonical resolved story corpus, not "all money ever spent in this repo".
+            # Workflow-run ledger spend is NOT published (the run ledgers under
+            # experiments/results/workflows/ are gitignored, local-transient), so the public
+            # figure must never be read as the whole-repo total. cap_stabilization_release p5.
+            "measured_spend_scope": "story-corpus",
             "_provenance": {
                 "story_sessions": "M",
                 "stories_total": "C",
@@ -2200,6 +2206,7 @@ def build():
                 "lab_books_canonical": "M",
                 "lab_books_quarantined": "M",
                 "measured_spend_usd": "M",
+                "measured_spend_scope": "P",
             },
         },
         "models": models,

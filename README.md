@@ -27,7 +27,7 @@ not a single tool. The perturbation instrument is **one** of the six.
 > properties of how the agent behaves under change, and we measured them.
 
 1,067 story sessions, 10 perturbation operators, 7 model variants across 3 providers. $309.17
-measured spend.
+story-corpus measured spend.
 
 ---
 
@@ -39,7 +39,7 @@ measured spend.
 | **2. Experiment platform** | `ExperimentSpec` + the `requires`/`produces` gate: `spec → compile → DAG → cells → jobs → attempts → ledger → information → policy → grid → campaign`. **To make policies, we need information** — the compiler refuses a control rule whose inputs aren't yet measured. |
 | **3. Agent execution runtime** | The opencode + Claude CLI backends, the workflow runner (phase execution inside a git worktree), the independent test runner, and the multi-session story orchestrator. |
 | **4. Knowledge & augmentation** | The runtime-RAG knowledge base: canonical identity/authority, the nine ingestion producers, deterministic retrieval, and the `retrieve → construct → render` prompt-construction seam. |
-| **5. Emerging control** | Per-task/per-step model routing, the observe-only supervisor, Redis telemetry, and queue steering — the "telemetry up, decisions down" seam. |
+| **5. Control** | The implemented control plane — per-task/per-step model routing (`routing.py`, `step_routing.py`), the fact plane (`facts.py` + the reducers: spec-status, attempt/job/workflow/policy/story/pattern facts), the context compiler (`context_compiler.py`), the shadow-mode controller + validator (`rules.py`, `validator.py`, `decisions.py`), the observe-only supervisor, Redis telemetry, and queue steering. Consumed by live campaigns (cap_2a/2b, cap_escalation_measurement, cap_session_routing_*). The "telemetry up, decisions down" seam. |
 | **6. Research & publication** | Game reports, the cross-model review pool, and the publication surface — the website (provenance-tagged live data) and the Control Room portal. |
 
 The dependency direction is enforced by a lint (`tests/test_dependency_direction.py`): `core ←
@@ -93,16 +93,19 @@ Efficiency (durable outcome value / total cost).
 | Game reports | 344 |
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
 | Experiment configs | 35 |
-| Experiment + workflow specs | 124 (11 experiments + 113 workflows) |
+| Experiment + workflow specs | 125 (11 experiments + 114 workflows) |
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
 | Lab books | 20 (8 canonical + 12 quarantined) |
-| Total measured spend | $309.17 |
+| Story-corpus measured spend | $309.17 |
 
 These figures are the canonical public dataset: they mirror the `public_statistics`
-block of `apps/website/data.js` (story sessions = canonical resolved story corpus; spend =
-the story corpus's total measured cost). The DB session total (3,370) is the broader raw
-session count from the opencode database, reported separately from the 1,067 canonical
-story sessions.
+block of `apps/website/data.js` (story sessions = canonical resolved story corpus; the spec
+count = the generated lifecycle index `experiments/specs/index.json`; spend = the story
+corpus's total measured cost). The spend figure is **story-corpus scoped**: workflow-run
+ledger spend is not published (the run ledgers under `experiments/results/workflows/` are
+gitignored, local-transient), so it must never be read as the whole-repo total. The DB
+session total (3,370) is the broader raw session count from the opencode database, reported
+separately from the 1,067 canonical story sessions.
 
 ---
 

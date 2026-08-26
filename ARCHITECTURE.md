@@ -35,7 +35,7 @@ transient `instrument.*` compatibility shim retired at the end of Stage 1 — is
 | `runtime` | The agent execution runtime — workflow runner, independent test runner, story orchestrator, post-hoc job transport. | System 3 — execution runtime |
 | `adapters` | Model backends — OpenCode and Claude CLI drivers, and the model→backend router. | System 3 — execution runtime |
 | `knowledge` | Knowledge + augmentation — identity/authority contract, the nine ingestion producers, retrieval, prompt construction, the RAG seam. | System 4 — knowledge & augmentation |
-| `control` | The emerging control system — routing, signal store, supervisor, telemetry, queue steering, observation/actuation ingestion. | System 5 — emerging control |
+| `control` | The implemented control plane — fact plane + reducers, context compiler, shadow-mode controller/validator, routing, supervisor, telemetry, queue steering, observation/actuation ingestion. | System 5 — control |
 | `reporting` | Research + publication output — game reports, the LLM review pool, meta-analysis. | System 6 — research & publication |
 
 **System 6 completes with `apps/`** (`apps/{website,control-room}`, moved in Stage 5 — `stage_map.md`
@@ -152,28 +152,34 @@ blanket-rejected.
 - **Supervisor + workflow runner + test runner** — `supervisor.py` (observe-only), `workflow_runner.py`
   (phase execution in a worktree), `test_runner.py` (sole source of `test_executed_success`).
 
-### Reserved-but-empty — the Context Abstraction Plane homes (CAP I0–I7)
+### The Context Abstraction Plane — implementation-status map (CAP I0–I10)
 
-The CAP design (`docs/designs/current/context_abstraction_design.md` §9) is **frozen** by this
-release (`stage_map.md` §6): its implementation pauses until the operator resumes it
-(`resume_after: consolidation S6`, now complete), but its structural homes are declared here so
-post-consolidation implementation is **drop-in**. Each reserved home is an empty placeholder
-(module docstring + `# reserved for CAP I<n>`):
+The CAP design (`docs/designs/current/context_abstraction_design.md`) is **frozen** — the design
+doc is the commitment and is never revised here. This section is the CURRENT map: every increment
+I0–I7 plus the addenda (I9 `pattern/v1`, typed checkpoints, the fact auto-emit hook) is
+**implemented** and under `src/agentic_dynamics/control/` (+ `core/contracts.py` for the spec-gate
+increment). The old placeholder language is gone because the modules exist, are consumed by named
+campaigns, and are gated by real tests. Per-module status:
 
-| CAP increment | Component | Reserved home (`src/agentic_dynamics/`) |
-|---|---|---|
-| I0 | Fact schema + predicate registry (`CanonicalFact`, `FACT_PREDICATES`, `EPISTEMIC_MAP`, `verify_chain`) | `control/facts.py` |
-| I1 | `spec_status/v1` reducer | `control/reducers/` |
-| I2 | Ledger reducers (`attempt_facts/v1`, `job_facts/v1`) | `control/reducers/` |
-| I3 | Workflow reducer (`workflow_facts/v1`, `policy_facts/v1`) | `control/reducers/` |
-| I4 | Context Compiler (read-only) | `control/context_compiler.py` |
-| I5 | Fact contracts in the spec gate (`FactRequirement`, `validate_fact_contracts`) | `core/contracts.py` |
-| I6 | Controller + validator, shadow mode | `control/rules.py` + `control/validator.py` + `control/decisions.py` |
-| I7 | Apply `route` for one opted-in spec | `control/` (seam in `run_workflow`) |
+| CAP module | Design commitment (§9) | Implemented module | Current consumption state | Current gate | Current limitation |
+|---|---|---|---|---|---|
+| **Fact plane** | I0–I3, addenda | `control/facts.py` (`CanonicalFact`, `FACT_PREDICATES`, `EPISTEMIC_MAP`, `verify_chain`), `control/fact_ingestion.py` (record pipe + supersede chain), `control/reducers/` (`spec_status`, `attempt_facts`, `job_facts`, `policy_facts`, `workflow_facts`, `story_facts`, `pattern`, `code_change_facts`, `checkpoint`) | Batch producers `scripts/kb_produce_facts.py` + `kb_produce_campaign_evidence.py`; the workflow-completion auto-emit hook (`kb_produce_facts.derive_run_facts` ← `scripts/run_workflow.py`); `scripts/spec_status.py` (spec_status/v1). Campaigns cap_2b, cap_session_routing_prospective, cap_escalation_measurement read fact records back from the registry. | `test_context_plane_facts.py`, `test_context_plane_reducers.py`, `test_kb_produce_facts_integration.py`, `test_fact_auto_emit.py` (+`_adversarial`), `test_story_facts_reducer.py`, `test_code_change_facts.py` | I8+ blocked: no budget *owner* / deadline model is declared, so `budget_remaining` / `deadline_slack` predicates stay unwritten (design §9's blocked table) |
+| **Context Compiler** | I4 (read-only) | `control/context_compiler.py` (compiler + `route_next_job/v1` contract + snapshots) | `scripts/run_workflow.py --cap-snapshot` records a snapshot beside every `route_step` call; consumed internally by `control/rules.py`, `control/validator.py`, `control/profiles.py`, `control/reducers/checkpoint.py` | `test_context_plane_compiler.py`, `test_context_plane_seam.py`, `test_evidence_prereq_gate.py` | Read-only by design: admissibility/unknown/stale/conflict rates are measured, never consumed by a routing decision; `--cap-shadow` compares but the deterministic `route_step` still executes |
+| **step_routing** | Baseline (pinned, not a CAP increment) | `control/step_routing.py` (`route_step`), consumed via the dependency-inverted `runtime.routing.Router` protocol | Composition root `scripts/run_workflow.py`; `runtime.workflow_runner` consumes the protocol, never imports control | `test_step_routing.py`, `test_dependency_direction.py` | Deterministic + unconditional — the decision never yields to a shadow recommendation |
+| **evidence_analyzer** | Evidence-selection/admissibility half of I4 | `control/evidence_analyzer.py` | Phase-boundary evidence selection in `runtime/workflow_runner.py`, `runtime/change_analyzer.py`, `knowledge/graph.py`; `scripts/evidence_prereq_gate.py` | `test_evidence_prereq_gate.py` | Selection is injection-scoped (populated only when a `change_analyzer` is injected) |
+| **pattern_minting** | I9 addendum | `control/reducers/pattern.py` (`pattern/v1`) | `scripts/kb_produce_facts.py --reducer pattern/v1` (single input door: the canonical-corpus `finding` table) | `test_context_plane_pattern.py` | One input door only — an empty finding table yields no fact (coverage invariant) |
+| **checkpoint** | Typed checkpoints | `control/checkpoint.py` + `control/reducers/checkpoint.py` | The `--cap-snapshot`/`--cap-shadow` path in `scripts/run_workflow.py`; the checkpoint reducer | `test_context_plane_checkpoint.py` | Not yet consumed by a session-routing v2 with real stale context (the next release's science) |
+| **decisions + rules + validator** | I6 controller, shadow mode | `control/rules.py` (rule engine + shadow decisions), `control/validator.py` (`ControlValidator`), `control/decisions.py` (`ControlDecision`), `control/verify_proposal.py` | `scripts/run_workflow.py --cap-shadow` (decisions recorded + validated, never applied); cap_2a_shadow_calibration (agreement/divergence measured); cap_2b adaptive arm APPLIES accepted proposals — the one applied path; `compile_experiment` rule evaluator | `test_context_plane_controller.py`, `test_context_plane_contracts.py`, `test_context_plane_profiles.py` | Shadow by default — actuation only on the opted-in cap_2b path; `actuation_ingestion` still has zero call sites |
+| **Fact contracts in the spec gate** | I5 | `core/contracts.py` (`FactRequirement`, `validate_fact_contracts`, refusals R1–R10) | `compile_experiment.validate_rules` — the requires/produces gate refuses a control rule whose predicates are unproduced | `test_context_plane_contracts.py`, `test_compile_experiment.py` | Refusal-only; no dynamic/updated contracts |
+| **Scope hierarchy** | §10 (levels + two Redis planes) | `scope_path` across `control/facts.py` + the reducers (`ReducerInput.scope_path`), per-cell `repository_id` scoping in `knowledge/retrieval.py`, DB-2 KB vs DB-1 telemetry vs 6379 story sandbox | Every reducer invocation + `retrieve()` scope pre-filter | `test_context_plane_facts.py` (scope semantics), `test_kb_produce_facts_extension.py` | org/workload levels exercised; program/job/attempt levels partly declared, not fully exercised |
 
-These are the exact reserved homes of `stage_map.md` §6 ("Reserved package homes"). The dependency
-lint permits `control` to import `core` and `knowledge` — but nothing imports `control` except the
-reserved seam (§3), consistent with "control consumes facts" (rec 8).
+Consumption in production: cap_2a_rerun2/rerun3 (shadow calibration — `rules`/`validator`/
+`evidence_analyzer`), cap_2b (adaptive arm — `decisions`/`validator` + fact contracts),
+cap_escalation_measurement and cap_session_routing_prospective (fact plane + reducers),
+cap_story_bridge (story_facts reducer), cap_pattern_minting (pattern/v1). The dependency lint
+still permits `control` to import `core` and `knowledge`, and nothing below tier 2 imports
+`control` except the pinned adapter→`control.live` telemetry seam (§3) — "control consumes facts"
+(rec 8) is enforced, not assumed.
 
 ### Deferred workstreams — WS-02..08
 
