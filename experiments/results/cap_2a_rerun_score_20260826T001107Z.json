@@ -1,0 +1,174 @@
+{
+  "aggregates": {
+    "blast_radius_error_mean": 4.0,
+    "blast_radius_error_median": 4,
+    "graph_unavailable_rate": 0.0,
+    "hit_rate": 0.0,
+    "n_blast_radius_available": 3,
+    "n_hits": 0,
+    "n_invalid_join": 0,
+    "n_not_run": 0,
+    "n_ran": 3,
+    "n_scored": 3,
+    "n_unknown_outcome": 0,
+    "outcome_recorded_rate": 1.0,
+    "proposal_validation_rate": 1.0,
+    "risk_calibration": {
+      "[0.15, 0.30)": {
+        "no_rework": 2
+      },
+      "[0.30, 0.60)": {
+        "no_rework": 1
+      }
+    },
+    "risk_mint_rate": 1.0,
+    "wilson_95_ci": [
+      0.0,
+      0.5615
+    ]
+  },
+  "artifact_index": [
+    {
+      "path": "experiments/results/cap_2a_rerun/cap2a_p2_bespoke_outcome.json",
+      "sha256": "1307c0ca967033faa9d4b471ca91e9717895f0432050135302575017763880cf"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun/cap2a_p3a_outcome.json",
+      "sha256": "15b921d1237a826df523c1560d7857a9d2f619da1ca17024189e74f5e5a6e69c"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun/cap2a_p3b_outcome.json",
+      "sha256": "160ba0401b95d4b0436e30bb7604aa7b4852c175ff52f536b96eb9ab441f19ee"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun/p2_candidate_manifest.json",
+      "sha256": "62af69cd940dc30286528325773452279b2bffe4d94835713354cdba1c3ac126"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun/p2_cell_manifest.json",
+      "sha256": "ee9bbf301afa74456471993d8294c9e13022fc16e9c86ae85be39f8281c8a780"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun/p2_phase_ledger.json",
+      "sha256": "ab0bf33423802c072595c7047c149ba5b8ff9f6547152e560ea8de839d9cde69"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun/p3_execution_manifest.json",
+      "sha256": "2cf106b6f563db3c2f9314201a2b63566460f7b09ed45a6f87f021c6d819c518"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun/proposals/3566dc62cd388656.json",
+      "sha256": "664af6ffd4f848e3286b3fa3409ef5dcaf54eae53dc2310e50446ebc9c8511b1"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun/proposals/f9727f3a92a4e6c3.json",
+      "sha256": "4f75b4dfd98cc84ce6336495c9012e89edd57affb6cc1555a971e2ae710144f3"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun/proposals/fa79270a11fec8e6.json",
+      "sha256": "d8c2d9a2a1c6ddfc870fb7fdfae5b566516eee1f10b964821f07944d6912efde"
+    }
+  ],
+  "campaign": "cap_2a_rerun",
+  "candidate_manifest_sha256": "62af69cd940dc30286528325773452279b2bffe4d94835713354cdba1c3ac126",
+  "cells": [
+    {
+      "analyzed_revision": "f5547d56720e8a6c1b03f05973b0767b7febb86f",
+      "applied": false,
+      "baseline_revision": "4c9d852509a25dab191bff3c2792a7cc92684013",
+      "blast_radius_error": 4,
+      "cell_id": "cap2a_p2_bespoke",
+      "code_change_risk": 0.24,
+      "contract_version": "verify_code_change/v1",
+      "graph_status": "available",
+      "hit": 0,
+      "outcome": "no_rework",
+      "predicted_impacted_symbol_count": 4,
+      "proposal_action": "verify",
+      "proposal_depth": 2,
+      "proposal_id": "3566dc62cd388656",
+      "proposal_scope": [
+        "add",
+        "subtract",
+        "test_add",
+        "test_subtract"
+      ],
+      "realized_depth": 0,
+      "realized_symbol_set": [],
+      "reason": "verify hits verification_only when depth >= realized_depth",
+      "spec_id": "cap_2a_calibration_cell@0.1",
+      "test_executed_success": true,
+      "valid_join": true
+    },
+    {
+      "analyzed_revision": "790eb68b074a5f59274db1c2ab04e219f5e6de3c",
+      "applied": false,
+      "baseline_revision": "e8339c0508170990c02dae68c01accbec17f2866",
+      "blast_radius_error": 4,
+      "cell_id": "cap2a_p3a",
+      "code_change_risk": 0.24,
+      "contract_version": "verify_code_change/v1",
+      "graph_status": "available",
+      "hit": 0,
+      "outcome": "no_rework",
+      "predicted_impacted_symbol_count": 4,
+      "proposal_action": "verify",
+      "proposal_depth": 2,
+      "proposal_id": "fa79270a11fec8e6",
+      "proposal_scope": [
+        "add",
+        "subtract",
+        "test_add",
+        "test_subtract"
+      ],
+      "realized_depth": 0,
+      "realized_symbol_set": [],
+      "reason": "verify hits verification_only when depth >= realized_depth",
+      "spec_id": "cap_2a_calibration_cell@0.1",
+      "test_executed_success": true,
+      "valid_join": true
+    },
+    {
+      "analyzed_revision": "e136ce25dbfa88f58c3b7fd9d955d411a6867101",
+      "applied": false,
+      "baseline_revision": "171429235840d4bd74aeb44ab48aca513f1d48f9",
+      "blast_radius_error": 4,
+      "cell_id": "cap2a_p3b",
+      "code_change_risk": 0.3311,
+      "contract_version": "verify_code_change/v1",
+      "graph_status": "available",
+      "hit": 0,
+      "outcome": "no_rework",
+      "predicted_impacted_symbol_count": 4,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "f9727f3a92a4e6c3",
+      "proposal_scope": [
+        "add",
+        "subtract",
+        "test_add",
+        "test_subtract"
+      ],
+      "realized_depth": 0,
+      "realized_symbol_set": [],
+      "reason": "rework does not hit no_rework",
+      "spec_id": "cap_2a_calibration_cell_divide@0.1",
+      "test_executed_success": true,
+      "valid_join": true
+    }
+  ],
+  "first_campaign_comparison": {
+    "first_campaign_outcome": "zero-outcome (code_change_risk never minted \u2014 no sonar/lsp wired, changed_symbol_count=0)",
+    "note": "The rerun's risk_mint_rate=1.0 is the measured proof that the blocker chain is fixed (sonar+lsp wired, symbols changed, risk minted for every ran cell). The hit-rate is a SEPARATE calibration result (the verifier over-predicts).",
+    "rerun_risk_mint_rate": 1.0
+  },
+  "schema_version": "cap_2a_score/v1",
+  "scored_at": "20260826T001107Z",
+  "source_revision": "5c23cbf07a7b6374a0b19054173949781e2a7a83",
+  "spec_version": "0.1",
+  "validation": {
+    "n_invalid_joins": 0,
+    "n_valid_joins": 3,
+    "note": "Every aggregate field traces to one JSON field in `cells` (per-cell rows) \u2014 see aggregates. n_scored + n_unknown_outcome + n_invalid_join + n_not_run == n_ran."
+  }
+}
