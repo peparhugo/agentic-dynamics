@@ -126,7 +126,7 @@
       "revamp2": {"bytes": 2610, "h2": 2, "h3": 1, "interactive": "none (no scripts)", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 0, "diagrams": "0", "provenance": {"M": 0, "C": 0, "H": 0, "X": 1, "P": 0}, "content": "identical to revamp1"}
     },
     "glossary": {
-      "main": {"bytes": 9904, "h2": 0, "h3": 0, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 8, "diagrams": "0", "provenance": {"M": 1, "C": 0, "H": 0, "X": 0, "P": 0}, "content": "14 definition cards"},
+      "main": {"bytes": 9904, "h2": 0, "h3": 0, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 8, "diagrams": "0", "provenance": {"M": 1, "C": 0, "H": 0, "X": 0, "P": 0}, "content": "15 definition cards (.gcard x15, corrected from 14)"},
       "revamp1": {"bytes": 3649, "h2": 1, "h3": 6, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 2, "diagrams": "0", "provenance": {"M": 5, "C": 4, "H": 1, "X": 1, "P": 3}, "content": "6 definition cards + provenance key"},
       "revamp2": {"bytes": 3800, "h2": 1, "h3": 6, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 2, "diagrams": "0", "provenance": {"M": 5, "C": 4, "H": 1, "X": 1, "P": 3}, "content": "same as revamp1 + NULL class legend"}
     },

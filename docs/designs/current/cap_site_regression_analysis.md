@@ -28,7 +28,7 @@ tracks a measurable feature delta. The p1 census measured it feature-by-feature:
 | Chart.js canvas charts | **6** (1 cost chart + 5 evidence charts) | **0** | **0** |
 | Chart/calculator toggle controls | ~16 | 0 | 0 |
 | Grit interactive matrix filters | yes | no | no |
-| JS-populated evidence tables | ~20 | 1 (model aggregate) | 1 |
+| JS-populated evidence tables | 30 | 1 (model aggregate) | 1 |
 | `data-stat`/`data-anal` data layer | 31-key statMap | data-ad (4 keys) | data-ad (+receipts) |
 | Theme toggle + floating TOC | yes | no | no |
 | Total HTML depth | **455 KB** (framework 140 KB, evidence 169 KB) | 37 KB | 44 KB |
@@ -43,13 +43,14 @@ redeployed both times.
 
 1. **p1 (census):** the interactive layer is real, enumerable, and located. `app.js` v0.5
    (theme toggle, 31-key statMap, `data-anal` rows, floating TOC) plus page-local scripts in
-   `framework.html` (calculator, cost chart) and `evidence.html` (5 charts, grit filters).
+   `framework.html` (calculator, cost chart) and `evidence.html` (5 charts — source count; 4
+   render on current data — plus grit filters and 30 data tables).
 2. **p2 (attribution):** the entire interactive layer was removed in **exactly two revamp1
    commits** — the pages in `54201491a` (p2 editorial rewrite, "4353 deletions") and app.js in
    `80a3bd9af` (p3 implementation, 211→100 lines). Revamp2 branched from revamp1's tip and
    inherited the losses. Classification: 4 gate-driven removals (calculator, cost chart,
    levers/playbook, accelerator — the research doc ordered the calculator deleted as
-   "SaaS/modeling pitch"), 5 accidental drops (evidence charts, grit matrix, ~20 tables,
+   "SaaS/modeling pitch"), 5 accidental drops (evidence charts, grit matrix, 30 tables,
    databricks fold, methodology operator inventory — never inventoried, never ported),
    3 deliberate replacements (app.js injection mechanism, story, glossary).
 3. **p3 (mechanism):** the gate structure caused it. The anti-SaaS gate *ordered* the
@@ -94,7 +95,7 @@ walk-through test). Ranking is by the strength of the evidence chain behind it (
 > post-change build must match it 1:1 — any feature present in the pre-change site may not
 > disappear or degrade without an explicit, recorded, operator-approved exception.
 
-- **Evidence:** p1 measured the exact inventory (14 sliders, 6 charts, ~20 tables, statMap);
+- **Evidence:** p1 measured the exact inventory (14 sliders, 6 charts, 30 tables, statMap);
   p2 showed 100% of the interactive layer was removed with no one noticing; H2/H6 show the
   incumbent's interactivity was the impressive property.
 - **Would it have fired?** Yes. Revamp2 would have had to either restore the calculator +
@@ -133,7 +134,7 @@ walk-through test). Ranking is by the strength of the evidence chain behind it (
   new checklist (tags, receipts, inventory 9/9, DOM presence). The revamp2 p4 "Visual Quality"
   verdict was a same-agent self-assessment with no incumbent baseline. p1 gives the exact
   comparison axes.
-- **Would it have fired?** Yes. A comparison on the p1 matrix (interactivity, charts, tables,
+- **Would it have fired?** Yes. A comparison on the p1 matrix (interactivity, charts, 30 tables,
   depth) would have shown the revamp regressing on ~6 of 8 axes and failing.
 - **Mechanics:** the p1 feature matrix IS the gate artifact; a `compare` phase computes
   feature-by-feature delta (kept/lost/changed/added) and the review signs the delta table.
@@ -245,6 +246,18 @@ gate never compares them to what they replaced.** Both are instances of the same
 information (measurement rules) must be the precondition for policy (control rules); a gate
 that consumes no information about the incumbent is a gate that cannot protect it.
 
+## p5 adversarial verification (2026-08-27)
+
+The adversarial pass (`docs/reviews/cap_site_regression_analysis_adversary.md` +
+`..._known_safe.md`) failed to falsify the analysis. It found and fixed four count errors
+(all under-counting main: 30 not ~20 evidence tables, 15 not 14 glossary cards, populated
+not empty `labs`, 4-of-5 evidence charts rendering on current data) and added six real losses
+the p1 census had missed (the revamp data.js dropped the entire labs corpus — a build-gate
+artifact, not an editorial decision; OG/social metadata, GitHub linking 21→2, the field-map
+image, no-JS "not loaded" fallback, and methodology's footer were all lost in `54201491a`).
+A separate agent with no prior exposure to this analysis independently reproduced the loss
+list and concluded it would not have passed revamp2 — confirming the H3 independence test.
+
 ---
 
 ## Links
@@ -259,3 +272,5 @@ that consumes no information about the incumbent is a gate that cannot protect i
 - The two self-reviews: `docs/reviews/cap_site_revamp_review.md` (branch),
   `docs/reviews/cap_site_revamp2_review.md` (branch)
 - Independent review of the original: `experiments/reviews/gpt56_ux_review_v2.md`
+- Adversarial verification: `docs/reviews/cap_site_regression_analysis_adversary.md` +
+  `docs/reviews/cap_site_regression_analysis_known_safe.md`

@@ -139,13 +139,67 @@
       "survived_in_revamp2": "Same rewrite + sticky-scroll NxM figure."
     },
     {
-      "feature": "Glossary 14 definition cards -> 6 cards",
+      "feature": "Glossary 15 definition cards -> 6 cards",
       "page": "glossary.html",
       "build": "revamp1",
       "classification": "deliberate replacement (a) — rewrite as provenance-sourced definitions",
       "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
       "evidence": "research doc :150 'Rewrite glossary as definitions with source links, no untagged numeric prescriptions.'",
       "survived_in_revamp2": "Same + NULL-class legend."
+    },
+    {
+      "feature": "labs corpus (story_arc, condition_effects, grit, quality_frontier, cache_economics) dropped from data.js",
+      "page": "data.js (feeds evidence.html snowball/arc/grit/quality tables)",
+      "build": "revamp1 AND revamp2",
+      "classification": "accidental drop (b) — build-gate artifact, NOT an editorial decision",
+      "removed_at": {"commit": "54201491a (p2) then inherited by revamp2", "phase": "p2_editorial_rewrite"},
+      "evidence": "revamp1 data.js (4825 lines) and revamp2 data.js both end with '\"labs\": {}' while main data.js (6695 lines) has populated cache_economics/condition_effects/grit/quality_frontier. scripts/build_data.py's _load_labs() is byte-identical on revamp and main (diff empty) — the drop is a build-time lineage/freshness gate rejection (labs failed the registry-identity or resolved-input contract at build time), NOT a deliberate deletion. Consequence: the snowball chart, arc tables, grit tables, and quality-frontier figures CANNOT be rebuilt from the revamp data even in principle.",
+      "survived_in_revamp2": "No — inherited the empty labs."
+    },
+    {
+      "feature": "OG/social metadata (og-image.png, og:title/description, twitter:card) — dropped from all 9 pages",
+      "page": "all pages",
+      "build": "revamp1 AND revamp2",
+      "classification": "accidental drop (b)",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "grep -l og-image *.html: main = 8 pages, revamp2 = 0. og-image.png sits unused in the tree.",
+      "survived_in_revamp2": "No."
+    },
+    {
+      "feature": "GitHub repository linking (nav + footer, 21 references on main) — reduced to 2 in-repo source links",
+      "page": "all pages",
+      "build": "revamp1 AND revamp2",
+      "classification": "accidental drop (b)",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "grep github.com: main = 21 references, revamp2 = 2 (both figure-caption source links). The main nav's GitHub entry and all footer links are gone.",
+      "survived_in_revamp2": "No."
+    },
+    {
+      "feature": "field-map figure (agentic-dynamics-field-map.png on index.html)",
+      "page": "index.html",
+      "build": "revamp1 AND revamp2",
+      "classification": "accidental drop (b)",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "main index.html:85-88 renders the field-map <img>; revamp2 index.html has zero <img> tags and the PNG is never referenced.",
+      "survived_in_revamp2": "No."
+    },
+    {
+      "feature": "no-JS fallback: main hardcodes real numbers in markup (1,067 / 7 / 215 / $309.17); revamp pages show literal 'not loaded' placeholders until JS runs",
+      "page": "all pages (index/framework/evidence)",
+      "build": "revamp1 AND revamp2",
+      "classification": "structural degradation (b) — consequence of the JS-skeleton architecture",
+      "removed_at": {"commit": "54201491a (pages) + 80a3bd9af (app.js v2)", "phase": "p2/p3"},
+      "evidence": "main index.html:74-77 has <span data-stat=\"story_sessions\">1,067</span> etc. — real values in markup. revamp2 index.html:41-52 has <strong>not loaded</strong>. 12 'not loaded' occurrences across revamp2 pages (index 3, framework 1, evidence 8).",
+      "survived_in_revamp2": "No."
+    },
+    {
+      "feature": "methodology.html footer (link/attribution block) removed entirely",
+      "page": "methodology.html",
+      "build": "revamp1 AND revamp2",
+      "classification": "accidental drop (b)",
+      "removed_at": {"commit": "54201491a", "phase": "p2_editorial_rewrite"},
+      "evidence": "revamp2 methodology.html ends at line 90 with no <footer>; main methodology.html has a full footer.",
+      "survived_in_revamp2": "No."
     }
   ],
   "additions": [
@@ -161,12 +215,12 @@
     {"feature": "data-ad-receipt family + computed lsp_available slot", "build": "revamp2", "added_at": {"commit": "6550334f0", "phase": "p4_truth_and_visual_review"}, "evidence": "app.js renderStats receipt fields (stories_unique, re_runs, resolved_measurement_payloads, unresolved_waivered, tombstones) + lsp_available sum over analysis.models"}
   ],
   "classification_tally": {
-    "losses": 12,
+    "losses": 18,
     "gate_driven_removal_c": 4,
-    "accidental_drop_b": 5,
+    "accidental_drop_b": 10,
     "deliberate_replacement_a": 3,
-    "mixed": 2,
-    "note": "several losses are mixed (e.g. app.js layer is deliberate-replacement-of-mechanism + accidental-drop-of-toggle/TOC; rules are gate-driven removal + deliberate replacement). 12 loss entries classified by dominant class."
+    "structural_degradation": 1,
+    "note": "several losses are mixed (e.g. app.js layer is deliberate-replacement-of-mechanism + accidental-drop-of-toggle/TOC; rules are gate-driven removal + deliberate replacement). 18 loss entries classified by dominant class. The 6 additional losses (labs corpus, OG metadata, GitHub links, field-map, no-JS fallback, methodology footer) were found by the p5 INDEPENDENT review (separate agent, no prior exposure to the analysis)."
   },
   "key_findings": [
     "The interactive-layer loss happened in TWO revamp1 commits: the pages (calculator, charts, levers, tables, narrative depth) in 54201491a (p2_editorial_rewrite), and app.js (theme toggle, statMap, data-anal, TOC) in 80a3bd9af (p3_implementation). Revamp2 inherited all of it.",
@@ -174,6 +228,7 @@
     "The evidence charts + data tables + methodology operator inventory + databricks fold were ACCIDENTAL DROPS (b): not ordered by any research-doc decision, never inventoried, never ported. The revamp's diagram inventory listed only NEW diagrams, so no gate checked for the existing ones.",
     "The revamp1 p4 self-review (docs/reviews/cap_site_revamp_review.md) passed with F7 = ACCEPTED LIMITATION 'no Chromium/Firefox/Node runtime' — the reviewer never rendered the site. The followup's 'deployed site had ZERO visuals' is consistent with a static-source inspection: revamp1's committed HTML has zero inline <svg> (all JS-injected), so a grep finds nothing even though the wiring exists.",
     "Revamp1 deviated from its own spec's hard_rule 1: commits lack the '[workflow] <phase>' prefix, and p2 shipped a broken intermediate tree (pages referencing data-ad slots before app.js v2 existed).",
-    "What the revamps ADDED is real: campaign receipts with SHA256s, provenance tags site-wide (57 -> 65 -> 108), question.html, a data-wired diagram system, interactive rule cards, and DOM-verification tooling — the regression is a LOSSLESS-substitution failure, not an absence of new work."
+    "What the revamps ADDED is real: campaign receipts with SHA256s, provenance tags site-wide (57 -> 65 -> 108), question.html, a data-wired diagram system, interactive rule cards, and DOM-verification tooling — the regression is a LOSSLESS-substitution failure, not an absence of new work.",
+    "p5 adversarial additions (from the INDEPENDENT review): the revamp data.js dropped the entire labs corpus (build-gate artifact, not editorial); OG/social metadata, GitHub linking (21->2), the field-map image, and methodology's footer were all lost in the same p2 rewrite; and revamp pages degrade to literal 'not loaded' placeholders when JS is off (main hardcodes real numbers in markup)."
   ]
 }

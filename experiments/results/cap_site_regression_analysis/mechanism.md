@@ -102,6 +102,15 @@ feature matrix would flag, in the revamp2 build:
 (legibility/overflow/motion/origin — visual *micro* defects), A (provenance schema, SHA pin,
 no-JS limitation — A3 even *accepts* the JS-skeleton). None of the 15 findings mention the
 calculator, the charts, the tables, the depth collapse, or the theme/TOC. The review's
+
+**p5 validation of independence:** in p5_adversarial, a SEPARATE agent with no prior exposure
+to this analysis was asked to independently review revamp2 against main. It independently
+reproduced the entire loss list (calculator, cost chart, 5 evidence charts, grit filters, 30
+evidence tables, data-stat/data-anal, TOC, theme toggle, JS-skeleton, "not loaded" fallback)
+AND found additional losses this analysis had missed (labs corpus dropped from data.js, OG/
+social metadata dropped, GitHub linking 21→2, field-map image dropped, methodology footer
+gone). Its verdict matched the analysis: "No — I would not have passed revamp2." The
+independent-reviewer test for H3 therefore does not rely on the authoring agent's judgment.
 "interactivity" gate checked *only the new* rule cards and beta slider. An independent review
 grounded in the pre-change feature matrix would have failed the build on the interactive-layer
 loss alone; the authoring agent's review passed it.
@@ -177,14 +186,21 @@ conditions the revamp process did not preserve.
 **Concrete properties (from p1):**
 1. **Interactivity**: a working calculator (14 levers wired to `D.calculator.model_costs` /
    `escalation_tiers`), a 3-view Chart.js cost chart, 5 evidence charts, an interactive Grit
-   matrix — the visitor can *operate the instrument*, not just read about it.
+   matrix — the visitor can *operate the instrument*, not just read about it. (p5 correction:
+   main's 5 evidence canvases are a SOURCE count; on current data 4 render — snowball, cost-bar,
+   narration, LOC-vs-cost — and the Grit matrix is inert because `correctness_escape_quadrants`
+   is empty. This slightly undercuts "5 charts" but main still renders 4 charts + the cost
+   chart + 14 slivers of interactivity vs revamps' 1 slider + 0 charts.)
 2. **Density**: framework.html 140KB (13 levers, cost model, calculator, 10 rules, provider
-   playbook), evidence.html 169KB (~20 JS-populated tables + 5 charts + 32 h3 sections),
-   methodology 14 sections (10 operators, 7 signals, matrix), glossary 14 cards. Total HTML
-   455KB vs revamps' 44KB.
+   playbook), evidence.html 169KB (30 JS-populated tables + 5 charts + 32 h3 sections —
+   p5 corrected the table count from ~20 to 30), methodology 14 sections (10 operators, 7
+   signals, matrix), glossary 15 cards (p5 corrected from 14). Total HTML 455KB vs revamps' 44KB.
 3. **Data wiring**: a mature `data-stat`/`data-stat-fmt`/`data-anal` layer reading a 31-key
    statMap — every number live-generated from `window.DYNAMICS_DATA` (the original already
-   had the "data.js is the only door" property).
+   had the "data.js is the only door" property). p5 adds: main's data.js ALSO ships a
+   populated `labs` corpus (story_arc/condition_effects/grit/quality_frontier) that the revamp
+   data.js dropped (`"labs": {}` — a build-gate artifact, since `_load_labs()` is byte-identical
+   on both branches).
 4. **Independent review of the original**: `experiments/reviews/gpt56_ux_review_v2.md`
    reviewed the original and *praised the charts* ("Charts render (cost bar, narration,
    LOC-vs-cost scatter, Grit matrix bubble)") while flagging micro-issues — evidence that a
@@ -215,7 +231,33 @@ verdict. The interactive layer was the product of *iterated* demand, not a singl
 | H3 | Self-review bias | **SUPPORTED** | same agent reviewed own output; revamp1 review PASS with F7 "no browser installed"; revamp2's 15 findings never mention calculator/charts/tables/depth; independent reviewer (this phase) flags 8 items the review missed |
 | H4 | Example pastiche | **PARTIALLY SUPPORTED** | static SVG adapts references' grammar but drops their interactivity; downstream of H2/H3 |
 | H5 | Model/capability | **REFUTED (primary)** | "process, not model" (revamp2 spec); terra implemented interactivity when gated; sol preserved calculator when gated to preserve |
-| H6 | Why the original was good | **SUPPORTED** | interactivity + density + data wiring + independent review; built in 54-83 iterations over 2 weeks with human judgment at every commit |
+| H6 | Why the original was good | **SUPPORTED** | interactivity (14 sliders, 4-5 rendering charts) + density (455KB, 30 tables, 15 glossary cards) + data wiring + independent review; built in 54-83 iterations over 2 weeks with human judgment at every commit |
+
+## p5 adversarial addendum (2026-08-27)
+
+The p5 adversarial pass (independent agent, no exposure to this analysis) confirmed every
+verdict and found additional losses that strengthen the case:
+
+1. **labs corpus dropped from revamp data.js** — both revamp data.js files ship `"labs": {}`
+   (main's is populated with story_arc/condition_effects/grit/quality_frontier, 1870 lines).
+   This is a build-gate artifact (scripts/build_data.py `_load_labs()` is byte-identical on
+   revamp and main; the labs failed the registry lineage/freshness contract at build time),
+   NOT a deliberate editorial decision — but the consequence is real: the snowball chart and
+   lab-driven evidence cannot be rebuilt from the revamp data at all.
+2. **OG/social metadata dropped** — main: og-image on 8/8 pages; revamp2: 0/9.
+3. **GitHub linking reduced 21 → 2** (nav + footer links gone).
+4. **field-map image dropped** from index.html.
+5. **no-JS fallback degraded**: main hardcodes real numbers in markup (1,067 / 7 / 215 /
+   $309.17); revamp pages show literal "not loaded" placeholders until JS runs.
+6. **methodology.html footer removed** entirely.
+7. **Count corrections to p1**: glossary 14 → 15 cards; evidence tables ~20 → 30; evidence
+   charts are source count 5 but 4 render on current data (grit matrix inert). None of these
+   change a verdict.
+
+The p5 independent review also confirmed the p3 independent-reviewer test: the separate agent
+reproduced the loss list and its verdict was identical ("No — I would not have passed
+revamp2"), and it additionally confirmed that main's labs corpus WAS populated (the p1
+subagent's "empty labs" claim was wrong — corrected here and in feature_matrix.json/attribution.json).
 
 ## Mechanism synthesis (one paragraph)
 
