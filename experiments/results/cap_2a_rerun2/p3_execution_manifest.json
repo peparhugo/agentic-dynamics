@@ -1,0 +1,46 @@
+{
+  "schema_version": "cap_2a_p3_manifest/v1",
+  "campaign": "cap_2a_rerun2",
+  "phase": "p3_run_shadow_cells",
+  "written_at": "2026-08-26T03:45:00Z",
+  "source_baseline_revision": "723653cb1aeec978564d29d6ba793b23a1eede80",
+  "target_model": "deepseek/deepseek-v4-pro",
+  "target_backend": "opencode",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "forecast_budget_per_cell_usd": 0.02575,
+  "forecast_envelope_usd": 0.0515,
+  "stop_budget_usd": 20.0,
+  "stop_condition": "Stop before the next cell if cumulative actual cost would exceed the forecast envelope ($0.0515) or the campaign stop budget ($20). A cell whose realized class differs from expected is DATA, never a rerun reason.",
+  "cells": [
+    {
+      "cell_id": "cap2a_p3_critical",
+      "spec_path": "workflows/operations/cap_2a_cell_critical.yaml",
+      "spec_path_sha256": "6ecb2bd93e8718c8c42382f648e859672c649de761e46ba74c2d7a460721e4d7",
+      "spec_id": "cap_2a_cell_critical@0.1",
+      "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+      "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+      "seeded_app_worktree": "/tmp/cap2a_cell_critical_rerun2",
+      "seeded_app_seed_revision": "6c87190048e6d9ebd3e1d0150021adeb8ba5d1b6",
+      "finops_cell_id": "cap2a_p3_critical",
+      "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+      "forecast_cost_usd": 0.02575,
+      "expected_realized_class": "targeted_rework",
+      "stimulus": "deep nested classifier (cognitive complexity > 15 -> python:S3776 CRITICAL) + one real boundary defect ([10,20) uses `>` instead of `>=`)"
+    },
+    {
+      "cell_id": "cap2a_p3_style",
+      "spec_path": "workflows/operations/cap_2a_cell_style.yaml",
+      "spec_path_sha256": "eaf7e806ce8f3b7f49f3f804904df513887e58387a73e1dc2ffe1337fd994ab4",
+      "spec_id": "cap_2a_cell_style@0.1",
+      "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+      "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+      "seeded_app_worktree": "/tmp/cap2a_cell_style_rerun2",
+      "seeded_app_seed_revision": "6c87190048e6d9ebd3e1d0150021adeb8ba5d1b6",
+      "finops_cell_id": "cap2a_p3_style",
+      "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+      "forecast_cost_usd": 0.02575,
+      "expected_realized_class": "no_rework",
+      "stimulus": "float == comparison helper -> python:S1244 MAJOR only (the severity filter must exclude it)"
+    }
+  ]
+}
