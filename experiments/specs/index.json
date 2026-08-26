@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-26T12:47:59.504787+00:00",
+  "generated_at": "2026-08-26T13:01:26.487161+00:00",
   "n_specs": 118,
   "specs": [
     {
@@ -100,24 +100,6 @@
       "spec_path": "experiments/definitions/cap_coverage_routing_impact.yaml",
       "artifact_kind": "experiment",
       "repeatable": true,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "cap_escalation_measurement",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/cap_escalation_measurement.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
@@ -745,6 +727,24 @@
       "latest_cost_usd": 0.107522,
       "latest_git_sha": "f6274020b",
       "results_pointer": "experiments/results/workflows/cap_e2_cascade_run/20260824T235509Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "cap_escalation_measurement",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_escalation_measurement.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-26T13:01:26.288680+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.081711,
+      "latest_git_sha": "e5a16a61c",
+      "results_pointer": "experiments/results/workflows/cap_escalation_measurement/20260826T130126Z.json",
       "n_runs": 1
     },
     {

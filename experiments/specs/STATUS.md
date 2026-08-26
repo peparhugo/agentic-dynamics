@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-26T12:47:59.504787+00:00`  ·  118 spec(s)
-**Work remaining:** 29 open · 89 completed/retired
+Generated at: `2026-08-26T13:01:26.487161+00:00`  ·  118 spec(s)
+**Work remaining:** 28 open · 90 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -14,7 +14,6 @@ Generated at: `2026-08-26T12:47:59.504787+00:00`  ·  118 spec(s)
 | `cap_2a_cell_style` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_escalation_measurement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_grit_strength_grid` | experiment | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -49,6 +48,7 @@ Generated at: `2026-08-26T12:47:59.504787+00:00`  ·  118 spec(s)
 | `cap_addendum_design` | workflow | no | completed | 0.1 | — | 2026-08-22 18:15 | ok | deepseek/deepseek-v4-pro | $0.4667 | 1 |
 | `cap_addendum_implement` | workflow | no | completed | 0.1 | — | 2026-08-24 14:07 | ok | anthropic/claude-sonnet-5 | $27.9867 | 2 |
 | `cap_e2_cascade_run` | workflow | no | completed | 0.1 | — | 2026-08-24 23:55 | ok | deepseek/deepseek-v4-flash | $0.1075 | 1 |
+| `cap_escalation_measurement` | workflow | no | completed | 0.1 | — | 2026-08-26 13:01 | ok | deepseek/deepseek-v4-flash | $0.0817 | 1 |
 | `cap_evidence_adversary` | workflow | no | completed | 0.1 | — | 2026-08-25 15:30 | ok | deepseek/deepseek-v4-pro | $0.1093 | 2 |
 | `cap_evidence_integrity` | workflow | no | completed | 0.1 | — | 2026-08-25 14:33 | ok | deepseek/deepseek-v4-flash | $0.3640 | 1 |
 | `cap_fact_auto_emit` | workflow | no | completed | 0.1 | — | 2026-08-24 00:06 | ok | anthropic/claude-sonnet-5 | $6.2564 | 1 |
