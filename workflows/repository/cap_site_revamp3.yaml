@@ -1,0 +1,261 @@
+name: cap_site_revamp3
+question: >-
+  The revamp that KEEPS the instrument and adds the field layer — built on the measured
+  failures of revamp1/revamp2 (cap_site_regression_analysis, merged: main is impressive
+  because it is an instrument — 14 sliders, 6 charts, 30 data tables, Grit filters, theme
+  toggle, 31-key data layer; the revamps regressed because no gate protected the incumbent,
+  the anti-SaaS crusade ordered working widgets deleted, and self-review certified the
+  result). THIS spec encodes the regression analysis's R1-R7 as hard gates: an incumbent
+  census BEFORE anything, a mechanical preservation gate (features present pre-change must
+  survive), a scoped-crusade guard (anti-SaaS constrains claims, never deletes working
+  data-wired widgets), a before/after comparison gate (the revamp must beat the incumbent
+  on the matrix), an INDEPENDENT review (a different model/session, feature-by-feature
+  survival verdicts, the census as read_first), a HUMAN design checkpoint before
+  implementation (the operator approves keep/remove/add), small reviewable iterations, and
+  deploy only from the final phase. The design direction: keep the instrument as the
+  spine; add the field-establishment layer (story, question, provenance discipline,
+  honest nulls, the measured evidence — 2b verdict, E_x 11.47, calibration arc) around it;
+  upgrade the visuals (editorial figures + typography) as augmentation, never replacement.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+supersedes: cap_site_revamp2
+workflow:
+  kind: agent_task
+  params:
+    language: javascript
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: public-facing research website revamp v3.
+        canonical_sources: [docs/designs/current/cap_site_regression_analysis.md (THE
+        measured post-mortem — read FIRST: the feature matrix, the attribution, the R1-R7
+        rules this spec implements), experiments/results/cap_site_regression_analysis/
+        feature_matrix.json (THE incumbent census — the gate artifact), docs/designs/
+        current/cap_site_revamp_research.md (the good research from revamp1 — the
+        editorial ledger + example library + diagram inventory are REUSED, not redone),
+        apps/website/references/ (the example library), the current main site (the
+        incumbent instrument — the baseline this revamp must beat), apps/website/CONTEXT.md,
+        docs/reviews/cap_site_revamp2_review.md (the self-review that must not recur)].
+        policies: [keep_the_instrument, scoped_crusade_guard, incumbent_census_first,
+        comparison_not_compliance, independent_review, human_design_checkpoint]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: revamp with measured gates.
+        deliberation: [incumbent census, design with human checkpoint, implement as
+        augmentation, mechanical preservation + comparison gates, independent review,
+        deploy only at the end].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        The regression analysis (merged) measured: main is impressive because it is an
+        instrument the visitor can operate; revamp1 deleted the instrument in two commits
+        (4 gate-driven — the anti-SaaS gate ordered the calculator deleted; 5 accidental —
+        no census; 3 deliberate); revamp2 inherited the corpse and certified it clean
+        (self-review, no baseline). H5 REFUTED: the model delivers when gated — terra is
+        not the problem; the process never gated preservation, superiority, or delight.
+        The revamp1 research (editorial ledger, example library, diagram inventory) was
+        good and is REUSED. The incumbent census (feature_matrix.json) is the gate
+        artifact: every slider/canvas/table/filter/handler/theme-toggle/data-key counted.
+        The revamp's thesis: the instrument is the field's credibility — the revamp keeps
+        it, reframes it (never deletes it), and adds the field-establishment layer around
+        it. The operator approves the design delta BEFORE implementation (the human
+        checkpoint). Deploy only from the final phase.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks — plain commit
+        messages are a FAILED phase (the revamp2 execution lesson). (2) THE INCUMBENT
+        CENSUS IS THE GATE ARTIFACT: experiments/results/cap_site_regression_analysis/
+        feature_matrix.json — every incumbent feature must survive the revamp, verified
+        MECHANICALLY (pre/post counts: sliders, canvases, Chart instances, data tables,
+        handlers, theme toggles, data-stat keys). A feature drop is a FAILED finding
+        unless the operator's checkpoint waived it explicitly (the waiver is committed
+        with the operator's approval). (3) THE SCOPED-CRUSADE GUARD: anti-SaaS and
+        provenance gates constrain CLAIMS (no pricing, no 'get started', no
+        SaaS-framing) — they NEVER delete a working, data-wired widget; a widget that
+        reads as SaaS-adjacent is REFRAMED, never removed (removal requires the operator's
+        waiver per rule 2). (4) THE COMPARISON GATE: the revamp cannot be certified on
+        'spec satisfied' — the review phase computes the feature-by-feature delta
+        (kept/lost/changed/added) against the incumbent census, and the revamp FAILS if it
+        regresses on any axis it claims to improve. (5) INDEPENDENT REVIEW: the review
+        phase runs a DIFFERENT model/session than the implementation phases (the spec's
+        review phase uses a different model level; the reviewer's read_first is the
+        incumbent census + the feature matrix), delivers a feature-by-feature survival
+        verdict, and may not delegate its judgment to the author's self-assessment.
+        (6) THE HUMAN DESIGN CHECKPOINT: after the design phase, the operator reviews the
+        delta preview (keep X / remove Y with reason / add Z) — the campaign STOPS and
+        waits for explicit operator approval (a committed approval artifact) before any
+        implementation begins. No implementation phase may run without it. (7) SMALL
+        ITERATIONS: no 455KB->40KB big bang; each implementation phase is a reviewable
+        increment (e.g. one page family per phase), each committed separately. (8) DEPLOY
+        ONLY FROM THE FINAL PHASE: no phase other than the deploy phase may run firebase
+        deploy — a deploy elsewhere is a FAILED phase (the revamp2 p3-deploy lesson).
+        (9) data.js stays THE data door; new numbers flow through it. (10) The revamp's
+        additions (editorial figures, provenance, the new evidence) must reference the
+        example library + editorial ledger as the revamp1 research intended. (11) No
+        generated-surface edits, no secrets, no external actuation. (12) p5 adversarial
+        mandatory: findings re-verified + known-safe, no bare PASS. (13) Resumable only
+        when spec version, goal hash, source revision, and candidate-manifest hash match.
+      read_first: >-
+        docs/designs/current/cap_site_regression_analysis.md (FIRST — the measured
+        post-mortem + R1-R7), experiments/results/cap_site_regression_analysis/
+        feature_matrix.json (the incumbent census — the gate artifact),
+        docs/designs/current/cap_site_revamp_research.md (the reused research: editorial
+        ledger, example library, diagram inventory), apps/website/references/ (the example
+        library), the current main site (the incumbent), apps/website/CONTEXT.md,
+        docs/reviews/cap_site_revamp2_review.md (the self-review that must not recur)
+      run_shape: >-
+        EXECUTED BY gpt-terra (openai/gpt-5.6-terra — H5 refuted: the model delivers when
+        gated; the operator's choice). REVIEW PHASE: a different model (the review runs
+        with deepseek/deepseek-v4-pro — the independent reviewer, hard rule 5). One
+        branch (feature/site-revamp3); each phase commits [workflow] <phase>. The HUMAN
+        DESIGN CHECKPOINT (hard rule 6) stops the campaign for operator approval.
+    phases:
+      - name: p1_incumbent_census_verification
+        kind: agent
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: VERIFY the incumbent census is complete and current (the gate artifact
+          exists from the regression analysis — but the site has not changed since; still
+          re-run the census on the CURRENT main checkout: count every slider
+          (input[type=range]), canvas/Chart instance, data table, handler, theme toggle,
+          data-stat/data-anal key, and the content depth per page). Reconcile with
+          feature_matrix.json; report deltas if any. DELIVER the verified census as
+          experiments/results/cap_site_revamp3/incumbent_census.json (the mechanical
+          pre-count the preservation gate compares against), committed.
+          GUARD: the census is the law — a feature present in main but missing from the
+          census is a census error (fix it), not a free drop.
+          LOG: the census counts per feature class; PASS/FAIL; commit.
+      - name: p2_design_with_human_checkpoint
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the design phase — deliver the DELTA PREVIEW and STOP for the operator.
+          From the verified census + the reused research (editorial ledger, example
+          library, diagram inventory): design the revamp as AUGMENTATION. The delta
+          preview document (docs/designs/current/cap_site_revamp3_design.md) contains:
+          KEEP — every incumbent feature, mapped to its page (the instrument stays:
+          calculator, charts, Grit matrix, tables, theme toggle);
+          REMOVE — anything proposed for removal, WITH the reason and the operator-waiver
+          line (per hard rule 2/3, removals should be near-zero: reframe beats delete);
+          ADD — the field-establishment layer (story/question/provenance/honest-nulls/
+          the measured evidence: 2b verdict, E_x 11.47, calibration arc), the editorial
+          figures from the inventory (augmenting, not replacing), the visual upgrades
+          (typography/color system) — each mapped to its example-library reference.
+          The diagram inventory is the implementation plan; the interactive census is the
+          preservation contract. DELIVER the design doc + the APPROVAL REQUEST (a
+          committed approvals/cap_site_revamp3_design_approval.md template with the
+          keep/remove/add table and a SIGNED-by-operator field), committed. THEN STOP:
+          the campaign halts until the operator signs the approval (the runner pauses;
+          the phase log records 'awaiting operator approval'). Implementation phases
+          MUST NOT start without the signed approval committed.
+          LOG: the delta preview summary + 'awaiting operator approval'; PASS/FAIL; commit.
+      - name: p3_implement_augmentation
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the APPROVED design as augmentation, in SMALL increments
+          (hard rule 7 — one page family per commit, each committed separately with
+          [workflow] <phase> messages). The instrument pages (framework: calculator +
+          cost chart; evidence: charts + Grit matrix + tables) are TOUCHED ONLY to be
+          preserved and styled — never stripped. The field-layer additions (editorial
+          figures, provenance tags, the new evidence, the visual system) are ADDED around
+          the instrument. Every addition cites its example-library reference (the reused
+          research's rule). THE PRESERVATION GATE RUNS CONTINUOUSLY: after each increment,
+          re-run the census counts (sliders/canvases/tables/handlers/toggles/data-keys)
+          — a count below the incumbent census is a FAILED increment; restore before
+          proceeding. DELIVER: the increment commits + the per-increment census check
+          log, committed.
+          GUARD: data.js remains the only data door; the anti-SaaS guard applies to the
+          NEW copy (claims constrained, widgets untouched).
+          LOG: per-increment census counts; PASS/FAIL; commit.
+      - name: p4_comparison_gate
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the comparison gate — mechanical, before/after on the matrix: re-run the
+          full census on the revamped pages and compute the feature-by-feature delta
+          (kept/lost/changed/added) against the incumbent census. The revamp FAILS the
+          gate if: any incumbent feature is lost without the operator's committed waiver;
+          any axis it claims to improve regressed; the instrument's operation changed
+          (a visitor who could drag the levers must still be able to — test the handlers
+          structurally). DELIVER experiments/results/cap_site_revamp3/comparison_report.md
+          (the delta table, PASS/FAIL per axis, the waivers cited), committed.
+          GUARD: this is the gate revamp1/2 never had — 'spec satisfied' is not a pass;
+          only the delta table is.
+          LOG: the delta table; PASS/FAIL; commit.
+      - name: p5_independent_review
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT reviewer — a different model and session than the
+          implementation phases (hard rule 5). read_first: the incumbent census, the
+          comparison report, the approval artifact, and the pre-change feature matrix.
+          Deliver feature-by-feature survival verdicts (every incumbent feature: kept/
+          lost/changed with evidence), the field-layer quality assessment (editorial,
+          provenance, visual — with the anti-SaaS + field tests), and the comparison
+          verdict (did the revamp beat the incumbent on the matrix?). You are NOT the
+          author: your findings must address each pre-change feature explicitly — an
+          aggregate PASS is a failed review. Every finding: fix on the branch or record
+          as accepted limitation with reasoning (a lost feature is a FAILED finding
+          unless the operator's waiver is cited). Deliver docs/reviews/
+          cap_site_revamp3_review.md + a known-safe list.
+          LOG: the survival verdict table; PASS/FAIL; commit.
+      - name: p6_deploy
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: THE ONLY PHASE THAT MAY DEPLOY (hard rule 8). Run the data chain fresh
+          (sync -> build -> manifest), then deploy BOTH projects (firebase deploy --only
+          hosting + --project agentic-dynamics) from apps/website/. VERIFY the deployed
+          pages: re-run the preservation census against the DEPLOYED URLs (the instrument
+          is live: sliders/canvases/tables present) + the comparison delta + both URLs
+          200 + mirror identical. The deploy fails if the deployed census regresses.
+          If the agentic-dynamics project ID is unavailable, STOP and ask.
+          DELIVER: the deploy output, the deployed-census verification, committed.
+          LOG: deploy + deployed-census; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-terra]}
+design: factorial
+rules:
+  - name: cap_site_revamp3_census
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [incumbent_census_verified]
+  - name: cap_site_revamp3_design
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [incumbent_census_verified]
+    produces: [delta_preview, operator_approval]
+  - name: cap_site_revamp3_preservation
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [operator_approval]
+    produces: [instrument_preserved]
+  - name: cap_site_revamp3_comparison
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [instrument_preserved]
+    produces: [feature_delta, comparison_verdict]
+  - name: cap_site_revamp3_deploy
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [feature_delta, comparison_verdict]
+    produces: [deployed_preservation_verified]
+metrics:
+  - {name: feature_delta, agg: mean, over: cell}
+  - {name: comparison_verdict, agg: mean, over: cell}
+  - {name: deployed_preservation_verified, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_incumbent_census_verification, p2_design_with_human_checkpoint, p3_implement_augmentation, p4_comparison_gate, p5_independent_review, p6_deploy]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
