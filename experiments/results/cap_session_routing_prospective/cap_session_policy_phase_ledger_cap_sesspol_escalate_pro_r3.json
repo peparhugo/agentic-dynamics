@@ -1,0 +1,420 @@
+{
+  "spec_name": "cap_session_policy_cell",
+  "spec_id": "cap_session_policy_cell@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "workdir": "/tmp/cap_sesspol_escalate_pro_r3",
+  "goal": "Implement the product(values) helper in the seeded calc app with a passing test \u2014 the session-routing cell stimulus.",
+  "git_sha": "9a43729",
+  "started_at": "2026-08-26T15:49:34.623039+00:00",
+  "ended_at": "2026-08-26T15:52:03.083486+00:00",
+  "total_cost_usd": 0.008783,
+  "ok": true,
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "spec_id": "cap_session_policy_cell@0.1",
+      "model": "deepseek/deepseek-v4-pro",
+      "duration_s": 18.61,
+      "commit_hash": "72177a2",
+      "error": "",
+      "tokens": {
+        "in": 6445,
+        "out": 846,
+        "reasoning": 9,
+        "answer": 798,
+        "explanation": 48,
+        "total": 7300
+      },
+      "cost_usd": 0.0037070410000000003,
+      "cache_read_tokens": 44032,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.8578,
+      "session_id": "ses_fc13cc96cffejMPlXow7WfEEBX",
+      "files_created": [],
+      "files_modified": [
+        "calc.py",
+        "test_calc.py"
+      ],
+      "confidence": 1.0,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": {
+        "facts": [
+          {
+            "predicate": "sonar_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "sonar:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "lsp:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e"
+            ]
+          },
+          {
+            "predicate": "lsp_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "sonar:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "lsp:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e"
+            ]
+          },
+          {
+            "predicate": "analysis_revision_matches",
+            "value": "true",
+            "value_type": "bool",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "sonar:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "lsp:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e"
+            ]
+          },
+          {
+            "predicate": "ast_parse_coverage",
+            "value": "1.0",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "sonar:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "lsp:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e"
+            ]
+          },
+          {
+            "predicate": "changed_symbol_count",
+            "value": "2",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "sonar:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "lsp:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e"
+            ]
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "sonar:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "lsp:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e"
+            ]
+          },
+          {
+            "predicate": "new_sonar_critical_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "sonar:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "lsp:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e"
+            ]
+          },
+          {
+            "predicate": "changed_symbols_with_tests_ratio",
+            "value": "0.5",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "sonar:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "lsp:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e"
+            ]
+          },
+          {
+            "predicate": "code_change_risk",
+            "value": "0.125",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "sonar:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e",
+              "lsp:self-escalate_pro_r3:implement:72177a278f1cdd5910fb84aa009c487b8129fe3e"
+            ]
+          }
+        ],
+        "neighborhood": [
+          "product",
+          "test_product"
+        ],
+        "graph_updated": false,
+        "impacted_count": null,
+        "graph_status": "not_requested",
+        "revision": "72177a278f1cdd5910fb84aa009c487b8129fe3e",
+        "repository_id": "self-escalate_pro_r3",
+        "phase_id": "implement",
+        "observed_at": "2026-08-26T15:50:52.184939+00:00"
+      }
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "spec_id": "cap_session_policy_cell@0.1",
+      "model": "",
+      "duration_s": 0.34,
+      "commit_hash": "3d05431",
+      "error": "",
+      "tokens": {},
+      "cost_usd": 0.0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.0,
+      "session_id": "",
+      "files_created": [],
+      "files_modified": [],
+      "confidence": null,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "change_analysis": {
+        "facts": [
+          {
+            "predicate": "sonar_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "sonar:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "lsp:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be"
+            ]
+          },
+          {
+            "predicate": "lsp_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "sonar:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "lsp:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be"
+            ]
+          },
+          {
+            "predicate": "analysis_revision_matches",
+            "value": "true",
+            "value_type": "bool",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "sonar:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "lsp:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be"
+            ]
+          },
+          {
+            "predicate": "changed_symbol_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "sonar:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "lsp:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be"
+            ]
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "sonar:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "lsp:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be"
+            ]
+          },
+          {
+            "predicate": "new_sonar_critical_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "sonar:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "lsp:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be"
+            ]
+          },
+          {
+            "predicate": "code_change_risk",
+            "value": "0.0",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "sonar:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+              "lsp:self-escalate_pro_r3:test:3d0543105853765fe6241e6b7ee7cf79bdd5d1be"
+            ]
+          }
+        ],
+        "neighborhood": [],
+        "graph_updated": false,
+        "impacted_count": null,
+        "graph_status": "not_requested",
+        "revision": "3d0543105853765fe6241e6b7ee7cf79bdd5d1be",
+        "repository_id": "self-escalate_pro_r3",
+        "phase_id": "test",
+        "observed_at": "2026-08-26T15:51:22.503894+00:00"
+      }
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "spec_id": "cap_session_policy_cell@0.1",
+      "model": "deepseek/deepseek-v4-pro",
+      "duration_s": 10.35,
+      "commit_hash": "9a43729",
+      "error": "",
+      "tokens": {
+        "in": 10751,
+        "out": 348,
+        "reasoning": 0,
+        "answer": 190,
+        "explanation": 158,
+        "total": 11099
+      },
+      "cost_usd": 0.005075493,
+      "cache_read_tokens": 26496,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.7048,
+      "session_id": "ses_fc13b2404ffedEiqg5JeWHYDnF",
+      "files_created": [],
+      "files_modified": [
+        ".instrument/session.jsonl",
+        ".mypy_cache/.gitignore",
+        ".mypy_cache/3.10/cache.0.db",
+        ".mypy_cache/3.10/cache.1.db",
+        ".mypy_cache/3.10/cache.10.db",
+        ".mypy_cache/3.10/cache.11.db",
+        ".mypy_cache/3.10/cache.12.db",
+        ".mypy_cache/3.10/cache.13.db",
+        ".mypy_cache/3.10/cache.14.db",
+        ".mypy_cache/3.10/cache.15.db",
+        ".mypy_cache/3.10/cache.2.db",
+        ".mypy_cache/3.10/cache.3.db",
+        ".mypy_cache/3.10/cache.4.db",
+        ".mypy_cache/3.10/cache.5.db",
+        ".mypy_cache/3.10/cache.6.db",
+        ".mypy_cache/3.10/cache.7.db",
+        ".mypy_cache/3.10/cache.8.db",
+        ".mypy_cache/3.10/cache.9.db",
+        ".mypy_cache/CACHEDIR.TAG",
+        ".scannerwork/.sonar_lock",
+        ".scannerwork/report-task.txt",
+        "calc.py",
+        "test_calc.py"
+      ],
+      "confidence": 1.0,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": {
+        "facts": [
+          {
+            "predicate": "sonar_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "sonar:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "lsp:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c"
+            ]
+          },
+          {
+            "predicate": "lsp_analysis_status",
+            "value": "available",
+            "value_type": "enum",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "sonar:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "lsp:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c"
+            ]
+          },
+          {
+            "predicate": "analysis_revision_matches",
+            "value": "true",
+            "value_type": "bool",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "sonar:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "lsp:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c"
+            ]
+          },
+          {
+            "predicate": "changed_symbol_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "sonar:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "lsp:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c"
+            ]
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "sonar:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "lsp:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c"
+            ]
+          },
+          {
+            "predicate": "new_sonar_critical_count",
+            "value": "0",
+            "value_type": "int",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "sonar:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "lsp:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c"
+            ]
+          },
+          {
+            "predicate": "code_change_risk",
+            "value": "0.0",
+            "value_type": "float",
+            "evidence_ids": [
+              "delta:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "sonar:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+              "lsp:self-escalate_pro_r3:verify:9a43729bad39c2e2a6d14574dc14272565f7dd7c"
+            ]
+          }
+        ],
+        "neighborhood": [],
+        "graph_updated": false,
+        "impacted_count": null,
+        "graph_status": "not_requested",
+        "revision": "9a43729bad39c2e2a6d14574dc14272565f7dd7c",
+        "repository_id": "self-escalate_pro_r3",
+        "phase_id": "verify",
+        "observed_at": "2026-08-26T15:52:03.082372+00:00"
+      }
+    }
+  ]
+}

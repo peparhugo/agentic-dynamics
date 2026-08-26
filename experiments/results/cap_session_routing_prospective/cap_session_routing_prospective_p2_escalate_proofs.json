@@ -1,0 +1,45 @@
+{
+  "schema_version": "cap_session_routing_escalate_proofs/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p2_run_grid",
+  "summary": "6 escalate cells run; 0 triggered (no phase failed on the assigned model first attempt). The escalate mechanism is separately proven executable via a labeled mechanism verification (cap_session_policy_escalate_proof_cap_sesspol_escalate_mechanism_proof.json): failed phase -> new session -> other model chain in the merged ledger.",
+  "grid_cells": [
+    {
+      "cell_id": "cap_sesspol_escalate_flash_r1",
+      "model": "deepseek-v4-flash",
+      "rep": "r1",
+      "escalate_triggered": false
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_flash_r2",
+      "model": "deepseek-v4-flash",
+      "rep": "r2",
+      "escalate_triggered": false
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_flash_r3",
+      "model": "deepseek-v4-flash",
+      "rep": "r3",
+      "escalate_triggered": false
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_pro_r1",
+      "model": "deepseek-v4-pro",
+      "rep": "r1",
+      "escalate_triggered": false
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_pro_r2",
+      "model": "deepseek-v4-pro",
+      "rep": "r2",
+      "escalate_triggered": false
+    },
+    {
+      "cell_id": "cap_sesspol_escalate_pro_r3",
+      "model": "deepseek-v4-pro",
+      "rep": "r3",
+      "escalate_triggered": false
+    }
+  ],
+  "mechanism_proof": "experiments/results/cap_session_routing_prospective/cap_session_policy_escalate_proof_cap_sesspol_escalate_mechanism_proof.json"
+}

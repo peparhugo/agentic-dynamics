@@ -1,0 +1,62 @@
+{
+  "schema_version": "cap_session_policy_cell_manifest/v1",
+  "campaign": "cap_session_routing_prospective",
+  "phase": "p2_run_grid",
+  "cell_id": "cap_sesspol_escalate_pro_r2",
+  "session_policy": "escalate",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "repetition": "r2",
+  "goal": "Implement the product(values) helper in the seeded calc app with a passing test \u2014 the session-routing cell stimulus.",
+  "goal_sha256": "c78490b12aae880833479bc8eaf35624e2ae33ce6cabad96ce3ae4dd53497d74",
+  "worktree": "/tmp/cap_sesspol_escalate_pro_r2",
+  "FINOPS_CELL_ID": "escalate_pro_r2",
+  "spec": "workflows/operations/cap_session_policy_cell.yaml",
+  "spec_sha256": "4aacdc48ca8e5dec36e1c1f2f4865bbb648885ec85522a8da9c7837a9d8c8789",
+  "spec_version": "0.1",
+  "seam": "full: EvidenceChangeAnalyzer + LivePublisher telemetry + workflow ledger + test_runner on the immutable commits",
+  "status": "completed",
+  "measured": {
+    "cost_usd": 0.0087,
+    "duration_s": 29.88,
+    "verified_success": true,
+    "test_executed_success": true,
+    "tests_passed": 3,
+    "tests_total": 3,
+    "cache_read_tokens": 57984,
+    "failed_phases": [],
+    "final_commit": "6288760",
+    "phase_ledger": "cap_session_policy_phase_ledger_cap_sesspol_escalate_pro_r2.json"
+  },
+  "escalate_event": {
+    "triggered": false,
+    "assigned_model": "deepseek/deepseek-v4-pro",
+    "note": "no phase failed \u2014 the escalate arm ran the cell on the assigned model without needing an escalation (a re-run is conditional on failure by design)"
+  },
+  "session_lineage": [
+    {
+      "phase": "implement",
+      "session_id": "ses_fc13f2ea8ffeewXmmGyK3MPW5d",
+      "title": "Add product helper to calc app",
+      "model": "{\"id\":\"deepseek-v4-pro\",\"providerID\":\"deepseek\",\"variant\":\"high\"}",
+      "forked": false
+    },
+    {
+      "phase": "test",
+      "session_id": "",
+      "title": "",
+      "model": "",
+      "forked": false
+    },
+    {
+      "phase": "verify",
+      "session_id": "ses_fc13d6400ffefsQCJMTeCGTO56",
+      "title": "Add product helper to calc app (fork #1)",
+      "model": "{\"id\":\"deepseek-v4-pro\",\"providerID\":\"deepseek\",\"variant\":\"high\"}",
+      "forked": true
+    }
+  ],
+  "analyzer_flags": [],
+  "forecast_cost_usd": 0.0176,
+  "within_forecast": true
+}
