@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2b — design: the randomized live pilot (static vs adaptive verification)
 
 **Status: accepted** · Predecessor: `cap_2a_rerun3` (the feasibility probe) +

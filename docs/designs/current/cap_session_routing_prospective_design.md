@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_session_routing_prospective — design: the 4-arm session-policy study, LIVE
 
 **Status: accepted** · Predecessor: `cap_session_routing_spec` (retrospective, completed) +

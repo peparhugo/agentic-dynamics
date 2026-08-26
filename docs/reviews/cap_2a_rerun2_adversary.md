@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2a_rerun2 — adversarial review
 
 **Reviewed commit:** `5d8ad4841` (p5 verdict; the campaign HEAD). Attacks run in the design-doc §4 p6 order. Evidence is a path/line + a live probe where a claim about the instrument is involved. Every finding is either fixed here or recorded as an accepted limitation with residual risk.

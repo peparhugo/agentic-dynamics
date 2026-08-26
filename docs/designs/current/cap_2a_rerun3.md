@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2a_rerun3 — the FIRST control-experiment verdict (value, not prediction)
 
 **Status: accepted** · Supersedes: `cap_2a_rerun2@0.1` (verdict `docs/designs/current/cap_2a_rerun2.md`)

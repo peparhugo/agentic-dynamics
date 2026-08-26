@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_escalation_measurement — verdict
 
 **Campaign:** `cap_escalation_measurement` (`workflows/repository/cap_escalation_measurement.yaml`).

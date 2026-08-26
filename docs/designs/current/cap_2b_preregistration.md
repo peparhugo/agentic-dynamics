@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2b — pre-registration (p0): the randomized static-vs-adaptive pilot
 
 **Status: accepted · PRE-REGISTERED — committed BEFORE any cell runs.**

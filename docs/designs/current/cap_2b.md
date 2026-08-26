@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2b — verdict: the randomized static-vs-adaptive pilot (non-inferiority)
 
 **Status: accepted** · **Decision: NON-INFERIOR** · Campaign: `cap_2b`

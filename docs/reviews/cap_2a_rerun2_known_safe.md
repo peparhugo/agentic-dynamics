@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2a_rerun2 — known-safe (non-falsifying attacks)
 
 Every attack below was actually attempted and failed to falsify the campaign. For each: what was tried, the artifact/tree evidence, and why it is safe. Not a generic checklist.
