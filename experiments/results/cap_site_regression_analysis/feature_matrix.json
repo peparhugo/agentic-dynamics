@@ -1,0 +1,176 @@
+{
+  "campaign": "cap_site_regression_analysis",
+  "phase": "p1_inventory_both_sites",
+  "question": "Why did gpt-terra's site revamps (cap_site_revamp, cap_site_revamp2) make the site WORSE, in the operator's judgment, than the pre-existing site it replaced?",
+  "generated_at": "2026-08-27T00:50:00Z",
+  "method": "Static inventory of each build's committed apps/website/ (page HTML + app.js + design-components.js). Interactive elements, DYNAMICS_DATA slots, diagrams, content depth, and provenance tags counted per page. Line/bytes via wc/grep on the checked-out trees.",
+  "builds": {
+    "main": {
+      "branch": "main",
+      "ref": "795308795",
+      "path": "/home/drseuss/ai-finops-framework/apps/website",
+      "role": "live baseline — operator's 'more impressive' site (redeployed after both revamps)",
+      "pages": ["index", "framework", "evidence", "story", "methodology", "accelerator", "databricks", "glossary"],
+      "total_html_bytes": 454586
+    },
+    "revamp1": {
+      "branch": "feature/site-revamp",
+      "ref": "edeb2a7e5",
+      "path": "/tmp/wt_site_revamp/apps/website",
+      "role": "cap_site_revamp, run by openai/gpt-5.6-terra (p0 research -> p5 deploy). Operator verdict: trash; redeployed main.",
+      "pages": ["index", "question", "story", "methodology", "evidence", "framework", "accelerator", "glossary", "databricks"],
+      "total_html_bytes": 36873
+    },
+    "revamp2": {
+      "branch": "feature/site-revamp2",
+      "ref": "f13161f3b",
+      "path": "/tmp/wt_site_revamp2/apps/website",
+      "role": "cap_site_revamp2, run by openai/gpt-5.6-terra (gated visual implementation; p4 self-review PASSED with rendered inspection). Operator judged worse; reverted to main.",
+      "pages": ["index", "question", "story", "methodology", "evidence", "framework", "accelerator", "glossary", "databricks"],
+      "total_html_bytes": 44302
+    }
+  },
+  "interactive_layer_census": {
+    "original_app_js": {
+      "version": "v0.5 (main)",
+      "bytes": 10382,
+      "features": [
+        {"feature": "theme toggle", "desc": "injects ☾/☀ button, localStorage 'ai-finops-theme', toggles .light class", "app_js_line": "4-20"},
+        {"feature": "data-stat injection", "desc": "document.querySelectorAll('[data-stat]') filled from window.DYNAMICS_DATA via statMap (31 keys)", "app_js_line": "22-117"},
+        {"feature": "data-stat-fmt injection", "desc": "formatted variant of statMap (e.g. woc, woc_percent)", "app_js_line": "119-125"},
+        {"feature": "data-anal row population", "desc": "populates <tr data-anal-model> rows in analysis tables from D.analysis.models", "app_js_line": "127-152"},
+        {"feature": "floating TOC", "desc": "bottom-right ☰ button + slide panel, auto-enables when >=3 h2/h3, smooth-scroll anchors", "app_js_line": "156-211"}
+      ],
+      "statMap_keys": ["sessions", "worktrees", "reports", "cost", "architectures", "variants", "story_sessions", "stories_total", "story_total_cost", "registry_current_records", "resolved_measurement_payloads", "eligible_records", "records_used", "unresolved_waivered", "canonical_findings", "contaminated_tombstones", "no_measurement_tombstones", "tombstones_total", "costgap", "passrate", "deepseek_cost", "claude_cost", "total_tests", "woc", "woc_percent", "deepseek_cost_per", "claude_cost_per", "gpt56_cost_per", "deepseek_narration", "claude_narration", "nano_narration", "deepseek_penalty", "claude_penalty"]
+    },
+    "original_framework_page": {
+      "page": "framework.html (main, 140003 bytes)",
+      "interactive_widgets": {
+        "sliders": 14,
+        "slider_ids": ["r_eng", "r_ses", "r_vel", "r_day", "r_epm", "r_cost", "r_rate", "r_budget", "r_workload", "r_batch", "r_retry", "r_escalation", "r_ac0", "r_arate"],
+        "canvas_charts": 1,
+        "chart_js_cdn": true,
+        "chart_canvas_id": "costChart",
+        "chart_toggles": ["yr3/yr10/yr25 (horizon 3/10/25 yr)", "epmBase/epmSens (baseline vs DS scenarios)", "vwCost/vwThroughput (cost vs throughput view)"],
+        "calculator_modes": ["Augmented Workforce", "Autonomous Workloads"],
+        "calculator_functions": ["setCalcMode", "updateROI", "toggleHow", "buildChart", "rebuildChart", "updateChartToggle"],
+        "disclosures": ["howComputedToggle (Show how this is computed)", "wfm-panel <details>"]
+      },
+      "data_wiring": ["D.calculator.model_costs (8 models, c + p per model)", "D.calculator.escalation_tiers (8 tiers, 0.4x-316.5x)", "D.summary.* via 4 data-stat footer slots"]
+    },
+    "original_evidence_page": {
+      "page": "evidence.html (main, 169049 bytes)",
+      "interactive_widgets": {
+        "canvas_charts": 5,
+        "chart_js_cdn": true,
+        "chart_canvas_ids": ["snowballChart", "gritMatrixChart", "narrationChart", "costBarChart", "locVsCostChart"],
+        "interactive_filters": "grit-model-filters: one button per model + 2 perturbation-class buttons rebuild the gritMatrixChart (only active when quadrant data exists)",
+        "native_details_disclosures": 6,
+        "chart_redraw_hook": "precursor archive <details> toggle resizes/redraws all charts in precursorCharts Map"
+      },
+      "data_wiring": ["20 data-stat slots", "14 data-anal-model rows x 6 fields (84 data-anal cells) from D.analysis.models", "JS-populated tables: arc, condition, grit-strength/model/class, narration, cost-ranking, AST, sonar, token-cost, model-cards, operator-impact, energy-ranking, strategy-distribution, RVS, drift, recovery, coupling, stability, cascade, sonar-impact"]
+    },
+    "other_pages": {
+      "index": {"data-stat": 8, "chart_js_cdn_loaded": true, "widgets": "none (theme toggle + TOC only)"},
+      "story": {"data-stat": 9, "widgets": "none"},
+      "methodology": {"data-stat": 5, "native_details": 1, "widgets": "none"},
+      "accelerator": {"data-stat": 6, "data-stat-fmt": 2, "widgets": "none"},
+      "databricks": {"data-stat": 6, "data-stat-fmt": 1, "widgets": "none"},
+      "glossary": {"data-stat": 8, "widgets": "none"}
+    },
+    "survival_verdict": {
+      "theme_toggle": "disappeared in both revamps (revamp pages ship no theme toggle)",
+      "data_stat_injection": "disappeared; replaced by data-ad-stat in revamp1/revamp2 (different key set, fewer slots)",
+      "data_anal_tables": "disappeared; evidence's 14 analysis rows + JS tables gone in both revamps",
+      "floating_toc": "disappeared in both revamps",
+      "framework_calculator_14_sliders": "disappeared in revamp1 AND revamp2; revamp2 restores exactly ONE range input (beta curve control on methodology.html)",
+      "framework_costChart_canvas": "disappeared in both revamps",
+      "evidence_5_canvas_charts": "disappeared in both revamps",
+      "new_interactive_surface": "revamp2 adds: 10 expandable rule-card toggles on framework.html + 1 beta slider on methodology.html + CSS sticky-scroll on story/evidence"
+    }
+  },
+  "feature_matrix": {
+    "index": {
+      "main": {"bytes": 18699, "h2": 5, "h3": 5, "interactive": "none (theme/TOC only)", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 8, "diagrams": "0 (field-map png image)", "provenance": {"M": 0, "C": 0, "H": 0, "X": 0, "P": 0}, "content": "hero, field-map, NxM question, instrument, 4 findings, durable-value gap"},
+      "revamp1": {"bytes": 5666, "h2": 2, "h3": 1, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 4, "diagrams": "1 js-injected (cycle)", "provenance": {"M": 3, "C": 1, "H": 1, "X": 0, "P": 3}, "content": "hero + corpus receipts, method, research-program"},
+      "revamp2": {"bytes": 5672, "h2": 2, "h3": 1, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 4, "diagrams": "1 js-injected (cycle, data-wired to summary.sessions_total)", "provenance": {"M": 3, "C": 1, "H": 1, "X": 0, "P": 4}, "content": "same IA as revamp1"}
+    },
+    "framework": {
+      "main": {"bytes": 140003, "h2": 9, "h3": 14, "interactive": "14 sliders + costChart canvas + 6 chart toggles + 2 calculator modes + how-computed disclosure + wfm details", "sliders": 14, "canvases": 1, "svg": 3, "data_slots": 4, "diagrams": "3 inline SVG (workflow-map, architecture-map[hidden], autonomy-map) + costChart", "provenance": {"M": 0, "C": 0, "H": 0, "X": 0, "P": 0}, "content": "architecture, autonomy boundary, 13 levers, cost model, interactive calculator, decisions, 10 rules, provider playbook, model cards"},
+      "revamp1": {"bytes": 3617, "h2": 2, "h3": 1, "interactive": "10 rule-card expand/collapse (js-injected buttons) — the ONLY interactive control on the whole site", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 2, "diagrams": "4 js-injected slots (cycle, planes, engine, autonomy)", "provenance": {"M": 0, "C": 1, "H": 0, "X": 0, "P": 5}, "content": "information ordering, platform diagrams, rule cards, cap_2b arm"},
+      "revamp2": {"bytes": 7862, "h2": 2, "h3": 1, "interactive": "10 rule cards (static <details> + JS-injected buttons), rulesOverview SVG", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 2, "diagrams": "4 js-injected slots + rules-overview figure", "provenance": {"M": 6, "C": 4, "H": 0, "X": 0, "P": 12}, "content": "same IA as revamp1 + data-wired rules"}
+    },
+    "evidence": {
+      "main": {"bytes": 169049, "h2": 14, "h3": 32, "interactive": "5 canvas charts (Chart.js) + grit-model-filters buttons + 6 details disclosures + fragment reveal", "sliders": 0, "canvases": 5, "svg": 0, "data_slots": 20, "diagrams": "5 canvas charts + ~20 JS-populated tables", "provenance": {"M": 8, "C": 14, "H": 4, "X": 6, "P": 1}, "content": "story evidence, verification, review/static quality, solution dynamics, five-session arc, grit, precursor archive, economics, perturbation response, profiles, research notebook"},
+      "revamp1": {"bytes": 6848, "h2": 4, "h3": 4, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 14, "diagrams": "2 js-injected (calibration, escalation)", "provenance": {"M": 7, "C": 6, "H": 2, "X": 0, "P": 1}, "content": "corpus receipts, model-aggregate table, campaign arc, escalation, honest limits"},
+      "revamp2": {"bytes": 7761, "h2": 4, "h3": 4, "interactive": "CSS sticky-scroll campaign arc", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 18, "diagrams": "2 js-injected (calibration, escalation)", "provenance": {"M": 17, "C": 12, "H": 2, "X": 0, "P": 2}, "content": "same IA as revamp1 + data-ad-receipt family"}
+    },
+    "story": {
+      "main": {"bytes": 22331, "h2": 8, "h3": 0, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 9, "diagrams": "0", "provenance": {"M": 0, "C": 0, "H": 0, "X": 1, "P": 0}, "content": "4-part narrative: cost anomaly, NxM experiment, instrument, the field"},
+      "revamp1": {"bytes": 4134, "h2": 3, "h3": 1, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 1, "diagrams": "1 js-injected (nxm)", "provenance": {"M": 1, "C": 0, "H": 3, "X": 0, "P": 1}, "content": "origin hero, anomaly, NxM instrument, result"},
+      "revamp2": {"bytes": 4438, "h2": 3, "h3": 1, "interactive": "CSS sticky-scroll", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 1, "diagrams": "1 js-injected (nxm, data-wired)", "provenance": {"M": 1, "C": 0, "H": 3, "X": 0, "P": 1}, "content": "same as revamp1"}
+    },
+    "methodology": {
+      "main": {"bytes": 40281, "h2": 14, "h3": 0, "interactive": "1 native details TL;DR", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 5, "diagrams": "0", "provenance": {"M": 4, "C": 3, "H": 3, "X": 3, "P": 0}, "content": "14 sections: instrument, CLI tools, provenance, 10 operators, recovery signals, basin escape, taxonomy, efficiency, verification, reproduce, matrix, literature, limitations"},
+      "revamp1": {"bytes": 3910, "h2": 3, "h3": 1, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 0, "diagrams": "0", "provenance": {"M": 1, "C": 1, "H": 2, "X": 1, "P": 1}, "content": "five stages, provenance-as-method, reproducibility"},
+      "revamp2": {"bytes": 5170, "h2": 4, "h3": 1, "interactive": "1 range input (beta curve control, data-ad-beta)", "sliders": 1, "canvases": 0, "svg": 0, "data_slots": 2, "diagrams": "1 js-injected (curves, data-wired to design_parameters.beta)", "provenance": {"M": 1, "C": 3, "H": 2, "X": 1, "P": 5}, "content": "same as revamp1 + beta curve scenario"}
+    },
+    "accelerator": {
+      "main": {"bytes": 36954, "h2": 11, "h3": 6, "interactive": "none (data-stat-fmt woc x2)", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 8, "diagrams": "0 (styled-div escalation flow)", "provenance": {"M": 0, "C": 1, "H": 0, "X": 0, "P": 0}, "content": "enterprise accelerator: problem, deliverables, maturity ladder, projections, autonomous workloads, measurement tools, DIY comparison"},
+      "revamp1": {"bytes": 3648, "h2": 1, "h3": 5, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 2, "diagrams": "0", "provenance": {"M": 3, "C": 1, "H": 2, "X": 0, "P": 2}, "content": "repurposed as Open questions: 4 null-callout cards + next experiments"},
+      "revamp2": {"bytes": 4096, "h2": 1, "h3": 6, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 3, "diagrams": "0", "provenance": {"M": 3, "C": 3, "H": 2, "X": 0, "P": 2}, "content": "same as revamp1 + data-ad-lsp-available"}
+    },
+    "databricks": {
+      "main": {"bytes": 17365, "h2": 6, "h3": 1, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 7, "diagrams": "0", "provenance": {"M": 2, "C": 2, "H": 2, "X": 2, "P": 0}, "content": "4 lever comparisons (their-finding vs our-measurement), unique-insight grid, convergence"},
+      "revamp1": {"bytes": 2610, "h2": 2, "h3": 1, "interactive": "none (no scripts loaded at all)", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 0, "diagrams": "0", "provenance": {"M": 0, "C": 0, "H": 0, "X": 1, "P": 0}, "content": "2 sections: what the instrument adds, citation discipline"},
+      "revamp2": {"bytes": 2610, "h2": 2, "h3": 1, "interactive": "none (no scripts)", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 0, "diagrams": "0", "provenance": {"M": 0, "C": 0, "H": 0, "X": 1, "P": 0}, "content": "identical to revamp1"}
+    },
+    "glossary": {
+      "main": {"bytes": 9904, "h2": 0, "h3": 0, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 8, "diagrams": "0", "provenance": {"M": 1, "C": 0, "H": 0, "X": 0, "P": 0}, "content": "14 definition cards"},
+      "revamp1": {"bytes": 3649, "h2": 1, "h3": 6, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 2, "diagrams": "0", "provenance": {"M": 5, "C": 4, "H": 1, "X": 1, "P": 3}, "content": "6 definition cards + provenance key"},
+      "revamp2": {"bytes": 3800, "h2": 1, "h3": 6, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 2, "diagrams": "0", "provenance": {"M": 5, "C": 4, "H": 1, "X": 1, "P": 3}, "content": "same as revamp1 + NULL class legend"}
+    },
+    "question": {
+      "main": {"bytes": null, "exists": false, "note": "question.html does not exist on main"},
+      "revamp1": {"bytes": 2791, "h2": 2, "h3": 1, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 0, "diagrams": "0", "provenance": {"M": 0, "C": 0, "H": 0, "X": 0, "P": 1}, "content": "five boundaries, openable claims"},
+      "revamp2": {"bytes": 2893, "h2": 2, "h3": 1, "interactive": "none", "sliders": 0, "canvases": 0, "svg": 0, "data_slots": 0, "diagrams": "0", "provenance": {"M": 0, "C": 0, "H": 0, "X": 0, "P": 2}, "content": "same as revamp1"}
+    }
+  },
+  "regression_summary": {
+    "total_html_bytes": {"main": 454586, "revamp1": 36873, "revamp2": 44302},
+    "bytes_ratio": {"revamp1_vs_main": 0.0811, "revamp2_vs_main": 0.0975},
+    "total_sliders": {"main": 14, "revamp1": 0, "revamp2": 1},
+    "total_canvas_charts": {"main": 6, "revamp1": 0, "revamp2": 0},
+    "total_chart_js_instances": {"main": 6, "revamp1": 0, "revamp2": 0},
+    "interactive_controls_site_wide": {"main": "14 sliders + 6 chart canvases + ~16 toggle/button controls + theme toggle + TOC + grit filters", "revamp1": "10 rule-card expand buttons (js-injected)", "revamp2": "10 rule-card buttons + 1 beta slider"},
+    "inline_svg_in_committed_html": {"main": "3 on framework (workflow/architecture[hidden]/autonomy maps)", "revamp1": 0, "revamp2": 0, "note": "revamp diagrams are EMPTY <figure data-ad-diagram> slots filled only after JS runs (renderDiagrams)"},
+    "provenance_tags_total": {"main": 57, "revamp1": 65, "revamp2": 108},
+    "provenance_note": "provenance tags concentrated on main's evidence (33) + methodology (13); revamps add tags site-wide (esp. revamp2 framework 22, evidence 33) — the revamp's ADDITION, per the spec p2",
+    "added_features_in_revamps": ["question.html (new page)", "provenance tags site-wide", "data-ad receipt family (source_sha256 per campaign claim)", "9 js-injected SVG diagrams (revamp2, all 'implemented')", "10 interactive rule cards with status badges (revamp2)", "beta curve control (revamp2)", "sticky-scroll narrative (revamp2)"],
+    "lost_features_in_revamps": ["framework calculator (14 levers, 2 modes)", "costChart canvas + Chart.js", "evidence 5 canvas charts + Chart.js", "grit matrix interactive filters", "data-stat/data-stat-fmt/data-anal injection layer", "floating TOC", "theme toggle", "deep page content (framework 140KB->7.9KB, evidence 169KB->7.8KB)", "provider playbook", "maturity ladder / enterprise projections", "10 perturbation operators + recovery signals + experiment matrix on methodology"]
+  },
+  "original_builders": {
+    "summary": "The original interactive layer (calculator/levers/cost chart/evidence charts) was authored by OPERATOR-DIRECTED agent sessions (ChaosClaw then Pepar Hugo) 2026-07-30 -> 2026-08-13, BEFORE the workflow runner existed (08-14). Later workflows facelifted/re-narrated those pages and PRESERVED the interactive layer; terra's revamps removed it.",
+    "authorship_timeline": [
+      {"period": "2026-07-30 -> 2026-08-06", "author": "ChaosClaw (direct agent sessions, no workflow)", "work": "original firebase/public/ site; framework.html Chart.js + ROI calculator (2a169e934 08-02), calculator sliders + budget runway (badf25dca 08-03), EPM slider + how-computed toggle (a6203f2ce), EPM sensitivity chart toggle (373d51a3e), dual-mode calculator (4a4460760 08-06), 10 rules + autonomous workloads (5ab6a1277), shared CSS/JS extraction (e6b22b748)"},
+      {"period": "2026-08-07 -> 2026-08-13", "author": "ChaosClaw -> Pepar Hugo (direct agent sessions)", "work": "evidence.html Grit Matrix bubble chart (6938576b3 08-07), dynamic tables + reasoning data (8597072d4/adfc0d048 08-10), scatter chart + sonar deltas (1780cea76 08-11), golden-circle reframe, architecture diagrams, audits"},
+      {"period": "2026-08-14", "author": "workflow site_golden_circle / evidence_narrative / framework_facelift / evidence_redesign — openai/gpt-5.6-sol", "work": "golden-circle rewrite (f3c12046d, 2029ad594), framework face-lift + architecture SVG (f324259f4) — calculator/levers/cost chart PRESERVED VERBATIM (spec: 'must keep reading window.DYNAMICS_DATA.calculator...' — verified 7 range inputs pre/post), evidence story-first redesign (f8acafcb0/1f9a85533) — all 5 chart canvases preserved"},
+      {"period": "2026-08-15", "author": "workflow agentic_dynamics_rebrand — openai/gpt-5.6-sol", "work": "rebrand to Agentic Dynamics + homepage hero (24ce568f3, 3a73266c6)"},
+      {"period": "2026-08-17 -> 2026-08-22", "author": "workflows website_registry_repoint / website_repoint / consolidation_stage_5+6 / semantic_integrity_release / canonical_publication_closure / public_truth_closure / measurement_contribution_closure / finding_economics_closure — deepseek/deepseek-v4-pro", "work": "moved firebase/public -> apps/website (ee2f35ec8), repointed to canonical data, swept pages to canonical public_statistics (f4eafabc2 p1_static_narrative), tombstone/null-not-zero/registry work. Interactive layer PRESERVED (range-input & costChart canvas survive to main HEAD — only move_apps touches them in apps/website history)"},
+      {"period": "2026-08-26", "author": "workflow cap_site_revamp — openai/gpt-5.6-terra (feature/site-revamp)", "work": "REVAMP1: research doc + example library + copy; deployed site with ZERO implemented visuals (operator: trash). Interactive layer REMOVED (research doc: 'delete calculator/enterprise scenario as SaaS/modeling pitch')."},
+      {"period": "2026-08-26/27", "author": "workflow cap_site_revamp2 — openai/gpt-5.6-terra (feature/site-revamp2)", "work": "REVAMP2: 9 diagrams implemented + wired to data.js, DOM gates passed, self-review PASSED. Interactive calculator/charts STILL absent (only beta slider + rule cards restored)."}
+    ],
+    "models_by_role": {
+      "original_interactive_layer": "ChaosClaw + Pepar Hugo (operator-directed direct agent sessions, pre-workflow)",
+      "original_prose_facelifts": "openai/gpt-5.6-sol (site_golden_circle, evidence_narrative, framework_facelift, evidence_redesign, agentic_dynamics_rebrand)",
+      "data_pipeline_repoint": "deepseek/deepseek-v4-pro (website_registry_repoint, website_repoint, consolidation, semantic/canonical/public_truth/measurement/finding closures)",
+      "revamps": "openai/gpt-5.6-terra (cap_site_revamp, cap_site_revamp2)"
+    },
+    "evidence_paths": {
+      "framework_calculator_history": "git log -- apps/website/framework.html main -> only ee2f35ec8 (move_apps) + f4eafabc2 (static narrative sweep) since the file entered apps/website; range-input count 7 (augmented) + 7 (autonomous) preserved through f3c12046d/2029ad594/f4eafabc2",
+      "evidence_charts_history": "5 canvases + Chart.js present at main HEAD; evidence_redesign preserved them",
+      "workflow_spec_models": "workflows/repository/{site_golden_circle,framework_facelift,evidence_redesign,evidence_narrative}.yaml factors: model levels: [openai/gpt-5.6-sol]; {website_repoint,consolidation_stage_5_apps_realignment,public_truth_closure}.yaml run_shape: deepseek/deepseek-v4-pro; {cap_site_revamp,cap_site_revamp2}.yaml run_shape: EXECUTED BY gpt-5.6-terra",
+      "operator_verdicts": "docs/designs/current/cap_site_revamp_followup.md (revamp1 'trash', redeployed main); cap_site_regression_analysis spec (revamp2 also judged worse, reverted twice)"
+    }
+  }
+}
