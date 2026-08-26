@@ -151,9 +151,35 @@ workflow:
             Rome train) is the relational spine; study what makes it work.
           Every visual/editorial decision in this research doc MUST cite an exemplar it
           learns from (or be explicitly flagged as a NOVEL decision with the reasoning) —
-          no decision is 'just taste'. Define the visual language: typography (serif/sans
-          pairing for a research-field feel), color (restrained, editorial — the current
-          calculator aesthetic goes), motion (minimal, purposeful), and the DIAGRAM
+          no decision is 'just taste'.
+          R3c — THE EXAMPLE LIBRARY (REAL CODE, COLLECTED LOCALLY): go to the internet and
+          COLLECT ACTUAL WORKING EXAMPLES — real HTML/CSS/JS source, not descriptions, not
+          screenshots. Curate a LOCAL EXAMPLE LIBRARY committed at apps/website/references/
+          (one file per example, each with a header comment: source URL, license/
+          attribution note, what it demonstrates, what transfers to this site). Cover every
+          craft the site needs:
+          - SVG DIAGRAMS: 3-5 working SVG diagram patterns (cycle/flow diagrams, plane
+            maps, envelope) — from MDN, CSS-Tricks, CodePen, Observable — including at
+            least one animated/annotated SVG pattern;
+          - D3 / CHARTS: 3-5 working chart examples (labeled scatter, bar/line with axes,
+            the cost curves, a small interactive chart) in plain d3 (or the p0-chosen
+            alternative) with the boilerplate the site will actually reuse;
+          - NARRATIVE / SCROLLYTELLING: 2-3 working examples of narrative-driven pages
+            (step-through, section-progressive reveal) for the Story and Evidence pages;
+          - INTERACTIVE CARDS / UI: 2-3 working card/flip/expand/tooltip/status-badge
+            examples — the 10-rules card component's raw material;
+          - TYPOGRAPHY/LAYOUT: 2-3 working editorial-typography + responsive-layout
+            examples (reading width, grid, figure/figcaption) — base.css v2's raw material.
+          The library IS the local mental model: every later decision and every implemented
+          component cites the reference file(s) it adapts. The library is committed BEFORE
+          p1 begins (hard gate — p1 may not start without it). Licensing: prefer
+          permissive (MIT/CC/public-domain) examples; verbatim copies carry source +
+          license in the header; the site ships only adapted-and-cited code, never
+          unlicensed copies.
+          R3d — SYNTHESIS: define the visual language FROM the learned patterns + the
+          example library: typography (serif/sans pairing for a research-field feel), color
+          (restrained, editorial — the current calculator aesthetic goes), motion (minimal,
+          purposeful), and the DIAGRAM
           INVENTORY with a sketch-level spec for each: the instrument cycle
           (instrument -> derive -> write policy -> grid -> campaign), the N x M problem,
           the planes (core/experiment/measurement/runtime/adapters/knowledge/control/
@@ -161,8 +187,8 @@ workflow:
           cost curves (immediate vs cumulative with the N^2 term — modeled, [C]), the
           escalation chain (cell -> rejected outcome -> E_x 11.47x downstream cost), the
           calibration arc (0/3 -> 2/3 -> randomized NON-INFERIOR), and the 10 rules as
-          interactive cards (status: proposal vs measured vs decided) — each with its
-          exemplar citation.
+          interactive cards (status: proposal vs measured vs decided) — each diagram with
+          its exemplar citation AND its reference-file citation.
           R4 — IA + EDITORIAL MAP: the page architecture (what stays, what merges, what
           moves — e.g. databricks.html may fold into evidence; accelerator may fold into
           framework), the narrative spine (Story -> Question -> Method -> Evidence ->
