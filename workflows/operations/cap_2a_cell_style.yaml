@@ -1,0 +1,84 @@
+name: cap_2a_cell_style
+question: >-
+  cap_2a_rerun2 style-variant calibration cell: a small function that compares floating-point
+  values with direct `==` (minting python:S1244 MAJOR, bug-type) — a MAJOR-only finding that the
+  severity-filtered reducer v2 MUST exclude (new_sonar_critical_count=0). Expected realized class
+  no_rework (or verification_only). Design doc §5.3 — the same finding that falsely drove the
+  rerun's p3b rework.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      seeded_app: >-
+        A fresh disposable worktree seeded with a tiny calc package: calc.py (add, subtract)
+        and test_calc.py (test_add, test_subtract). The implement phase adds a float-equality
+        helper so the typed CodeDelta reports a real changed symbol.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Implement a small function in the seeded calc app that compares floating-point values
+          directly.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py        (the existing add / subtract functions)
+          - test_calc.py   (the existing test_add / test_subtract)
+
+          DO:
+          - Add a `rate_for(score)` function to calc.py that returns a rate by comparing `score`
+            to the thresholds 1.0, 2.0, and 3.0 with direct `==` equality checks (e.g.
+            `if score == 1.0: return 0.1`), falling through to a default rate otherwise.
+          - Add a `test_rate_for` function to test_calc.py that asserts rate_for(1.0) == 0.1 and
+            rate_for(0.0) == <default>, using values the direct comparison resolves deterministically.
+          - Do not change add / subtract or their tests.
+
+          VERIFY: `python -m pytest test_calc.py -q` passes.
+
+          DELIVER the changed calc.py and test_calc.py.
+      - name: test
+        kind: test
+        timeout: 600
+      - name: verify
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Verify the rate_for feature landed correctly.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Confirm calc.py defines `rate_for(score)` with the direct float comparisons.
+          - Confirm test_calc.py defines `test_rate_for` and that `python -m pytest test_calc.py -q`
+            passes.
+          - Confirm add / subtract were left unchanged.
+
+          DELIVER a short verification note.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: feature_implemented, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

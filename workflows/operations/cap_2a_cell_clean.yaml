@@ -1,0 +1,81 @@
+name: cap_2a_cell_clean
+question: >-
+  cap_2a_rerun2 clean-variant calibration cell: a small pure helper function (product) added to
+  the seeded calc app with a test — no defects, so the expected realized class is no_rework and
+  new_sonar_critical_count mints 0. The deterministic clean stimulus (design doc §5.1) that the
+  severity-filtered, change-introduced reducer v2 must NOT flag.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      seeded_app: >-
+        A fresh disposable worktree seeded with a tiny calc package: calc.py (add, subtract)
+        and test_calc.py (test_add, test_subtract). The implement phase adds a small pure helper
+        so the typed CodeDelta reports a real changed symbol.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Implement a small pure helper function in the seeded calc app.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py        (the existing add / subtract functions)
+          - test_calc.py   (the existing test_add / test_subtract)
+
+          DO:
+          - Add a `product(values)` function to calc.py that returns the product of a non-empty
+            list of numbers, raising ValueError("empty values") on an empty list.
+          - Add a `test_product` function to test_calc.py that asserts product([1, 2, 3, 4]) == 24
+            and that product([]) raises ValueError.
+          - Do not change add / subtract or their tests.
+
+          VERIFY: `python -m pytest test_calc.py -q` passes.
+
+          DELIVER the changed calc.py and test_calc.py.
+      - name: test
+        kind: test
+        timeout: 600
+      - name: verify
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Verify the product feature landed correctly.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Confirm calc.py defines `product(values)` with a ValueError guard for the empty list.
+          - Confirm test_calc.py defines `test_product` and that `python -m pytest test_calc.py -q`
+            passes.
+          - Confirm add / subtract were left unchanged.
+
+          DELIVER a short verification note (what was checked, and the pytest result).
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: feature_implemented, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -1,0 +1,91 @@
+name: cap_2a_cell_critical
+question: >-
+  cap_2a_rerun2 critical-variant calibration cell: a classifier function with a deep nested
+  decision tree (cognitive complexity > 15, minting python:S3776 CRITICAL — the reachable
+  BLOCKER/CRITICAL issue in api/issues/search on this server) AND one real defect (an inverted
+  boundary comparison). Expected realized class targeted_rework; new_sonar_critical_count >= 1.
+  Design doc §5.2 — the RC5 `eval` example is a SECURITY_HOTSPOT outside the pinned transport,
+  so the critical stimulus is S3776-based (recorded capability boundary).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      seeded_app: >-
+        A fresh disposable worktree seeded with a tiny calc package: calc.py (add, subtract)
+        and test_calc.py (test_add, test_subtract). The implement phase adds a complex classifier
+        with a real boundary defect so the typed CodeDelta reports a real changed symbol.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Implement a classifier function with a deep nested decision tree, containing one real
+          defect.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py        (the existing add / subtract functions)
+          - test_calc.py   (the existing test_add / test_subtract)
+
+          DO:
+          - Add a `classify(value)` function to calc.py that maps a numeric value to a label
+            through a nested conditional structure with at least 20 branches across 4 or more
+            nesting levels (a long if/elif/else chain over disjoint ranges, plus nested
+            sub-branches). This makes the function's cognitive complexity exceed SonarQube's
+            CRITICAL threshold of 15.
+          - Introduce ONE real defect in the range [10, 20): use `>` in place of `>=` at that
+            boundary so that the value 10.0 is misclassified relative to the documented
+            "value in [10, 20)" contract.
+          - Add a `test_classify` function to test_calc.py that asserts the documented contract
+            for the boundary values, including classify(10.0) mapping to the [10, 20) label.
+          - Do not change add / subtract or their tests.
+
+          VERIFY: `python -m pytest test_calc.py -q` reports the boundary assertion result exactly
+          as it is (do not weaken the test to make it pass).
+
+          DELIVER the changed calc.py and test_calc.py.
+      - name: test
+        kind: test
+        timeout: 600
+      - name: verify
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Verify the classify feature landed, including the boundary contract.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Confirm calc.py defines `classify(value)` with a deep nested decision tree.
+          - Confirm test_calc.py defines `test_classify` and record the pytest result for the
+            boundary value classify(10.0) exactly as it is.
+          - Confirm add / subtract were left unchanged.
+
+          DELIVER a short verification note.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: feature_implemented, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

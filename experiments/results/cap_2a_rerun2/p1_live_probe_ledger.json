@@ -1,0 +1,234 @@
+{
+  "campaign": "cap_2a_rerun2",
+  "clean": {
+    "cell": "p1_probe_clean",
+    "change_analysis": {
+      "facts": [
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+          ],
+          "predicate": "sonar_analysis_status",
+          "value": "available",
+          "value_type": "enum"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+          ],
+          "predicate": "lsp_analysis_status",
+          "value": "available",
+          "value_type": "enum"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+          ],
+          "predicate": "analysis_revision_matches",
+          "value": "true",
+          "value_type": "bool"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+          ],
+          "predicate": "ast_parse_coverage",
+          "value": "1.0",
+          "value_type": "float"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+          ],
+          "predicate": "changed_symbol_count",
+          "value": "2",
+          "value_type": "int"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+          ],
+          "predicate": "new_lsp_error_count",
+          "value": "0",
+          "value_type": "int"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+          ],
+          "predicate": "new_sonar_critical_count",
+          "value": "0",
+          "value_type": "int"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+          ],
+          "predicate": "changed_symbols_with_tests_ratio",
+          "value": "0.5",
+          "value_type": "float"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+          ],
+          "predicate": "code_change_risk",
+          "value": "0.125",
+          "value_type": "float"
+        }
+      ],
+      "graph_status": "not_requested",
+      "graph_updated": false,
+      "impacted_count": null,
+      "neighborhood": [],
+      "observed_at": "2026-08-26T01:28:49.068038+00:00",
+      "phase_id": "implement",
+      "repository_id": "self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro",
+      "revision": "17ccfb5ab476b355de74b2a8dd23dbd71b0b9aea"
+    },
+    "changed_symbol_count": "2",
+    "code_change_risk": "0.125",
+    "commit_hash": "17ccfb5",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available",
+    "worktree": "/tmp/p1_probe_clean"
+  },
+  "critical": {
+    "cell": "p1_probe_critical",
+    "change_analysis": {
+      "facts": [
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+          ],
+          "predicate": "sonar_analysis_status",
+          "value": "available",
+          "value_type": "enum"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+          ],
+          "predicate": "lsp_analysis_status",
+          "value": "available",
+          "value_type": "enum"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+          ],
+          "predicate": "analysis_revision_matches",
+          "value": "true",
+          "value_type": "bool"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+          ],
+          "predicate": "ast_parse_coverage",
+          "value": "1.0",
+          "value_type": "float"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+          ],
+          "predicate": "changed_symbol_count",
+          "value": "2",
+          "value_type": "int"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+          ],
+          "predicate": "new_lsp_error_count",
+          "value": "0",
+          "value_type": "int"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+          ],
+          "predicate": "new_sonar_critical_count",
+          "value": "1",
+          "value_type": "int"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+          ],
+          "predicate": "changed_symbols_with_tests_ratio",
+          "value": "0.5",
+          "value_type": "float"
+        },
+        {
+          "evidence_ids": [
+            "delta:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "sonar:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f",
+            "lsp:self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro:implement:1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+          ],
+          "predicate": "code_change_risk",
+          "value": "0.1688",
+          "value_type": "float"
+        }
+      ],
+      "graph_status": "not_requested",
+      "graph_updated": false,
+      "impacted_count": null,
+      "neighborhood": [],
+      "observed_at": "2026-08-26T01:29:43.439519+00:00",
+      "phase_id": "implement",
+      "repository_id": "self-wf_cap_2a_rerun2_deepseek_deepseek_v4_pro",
+      "revision": "1b13fdd640838a08ba1dd081ba8be3589c7f397f"
+    },
+    "changed_symbol_count": "2",
+    "code_change_risk": "0.1688",
+    "commit_hash": "1b13fdd",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "1",
+    "sonar_analysis_status": "available",
+    "worktree": "/tmp/p1_probe_critical"
+  },
+  "lsp_tool": "mypy",
+  "phase": "p1_implement_measurement",
+  "schema_version": "cap_2a_p1_live_probe/v1",
+  "sonar_server": "http://localhost:9000",
+  "written_at": "2026-08-26T01:29:43.439938+00:00"
+}

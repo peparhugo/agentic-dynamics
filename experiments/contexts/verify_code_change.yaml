@@ -2,7 +2,7 @@
 #
 # The decision-type contract for evidence-integrity e5 (design §5.6): "how confident are we in
 # this code change, and how deep should verification go" — the SHADOW-ONLY consumer of the
-# code_change_facts/v1 reducer. It is a PROPOSAL contract, mirroring session_routing.yaml's
+# code_change_facts/v2 reducer. It is a PROPOSAL contract, mirroring session_routing.yaml's
 # posture: `AUTOMATABLE_ACTIONS` (`control/decisions.py`) is UNTOUCHED — the actions below
 # cannot be applied by any control path yet; the contract only defines the *semantics* of the
 # proposal the control rule would emit.

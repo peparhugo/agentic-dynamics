@@ -1,0 +1,35 @@
+{
+  "schema_version": "cap_2a_p1_verification/v1",
+  "phase": "p1_implement_measurement",
+  "campaign": "cap_2a_rerun2",
+  "spec": "workflows/repository/cap_2a_rerun2.yaml",
+  "status": "PASS",
+  "implemented": {
+    "reducer_v2": "code_change_facts/v2 (severity-filtered {BLOCKER,CRITICAL}, change-introduced by (rule,file,line) identity; weights unchanged)",
+    "seam": "workflow_runner._sonar_evidence/_lsp_evidence before/after legs under ANALYZER_LEG_TIMEOUT_SECONDS=360",
+    "lsp_pin": "mypy via sys.executable -m mypy --show-column-numbers --no-error-summary --show-error-codes",
+    "sonar_surface": "fetch_sonar_issues(severities=BLOCKER,CRITICAL) + new_issue_count identity diff"
+  },
+  "verify": {
+    "severity_regression_test": "test_s1244_major_only_counts_zero_and_never_rework (PASS) — S1244 MAJOR mints 0, never rework",
+    "novelty_tests": "test_new_issue_count_* (pre-existing BLOCKER=0, introduced BLOCKER=1) + test_sonar_evidence_* (PASS)",
+    "deadline_tests": "test_call_with_deadline_returns_false_on_timeout (PASS)",
+    "test_suite": {
+      "command": "pytest tests/test_change_analyzer.py tests/test_workflow_runner.py tests/test_run_workflow_graph_cli.py tests/test_code_change_facts.py tests/test_versioned_graph.py tests/test_graph.py tests/test_dependency_direction.py tests/test_evidence_prereq_gate.py tests/test_sonar.py tests/test_lsp.py",
+      "passed": 177,
+      "failed": 2,
+      "note": "2 failures are PRE-EXISTING live-Neo4j state accumulation in tests/test_versioned_graph.py (SUPERSEDES/TESTED_BY edge counts 39/9 vs 1) — no graph/versioned_graph files were touched by this phase; unrelated to the measurement changes."
+    }
+  },
+  "live_probe": {
+    "ledger": "experiments/results/cap_2a_rerun2/p1_live_probe_ledger.json",
+    "clean": {"new_sonar_critical_count": 0, "new_lsp_error_count": 0, "code_change_risk": 0.125, "sonar": "available", "lsp": "available"},
+    "critical": {"new_sonar_critical_count": 1, "new_lsp_error_count": 0, "code_change_risk": 0.1688, "sonar": "available", "lsp": "available"},
+    "note": "critical variant mints python:S3776 (CRITICAL cognitive complexity) -> count 1; clean variant mints 0. Both against the live 127.0.0.1:9000 server + mypy 2.3.1."
+  },
+  "guard": {
+    "no_flag_byte_identical": true,
+    "treatment_untouched": "verify_proposal.py / _risk_depth / VERIFY_RISK_THRESHOLD unchanged",
+    "no_credentials_in_artifacts": true
+  }
+}

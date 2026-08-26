@@ -1,0 +1,278 @@
+{
+  "aggregates": {
+    "blast_radius": {
+      "mean": 3.6667,
+      "median": 4,
+      "n_available": 3
+    },
+    "graph_unavailable_rate": 0.0,
+    "hit_rate": 0.6667,
+    "hit_rate_n": 3,
+    "n_cells": 3,
+    "n_hits": 2,
+    "n_invalid_join": 0,
+    "n_not_run": 0,
+    "n_scored": 3,
+    "n_unknown_outcome": 0,
+    "outcome_recorded_rate": 1.0,
+    "proposal_validation_rate": 1.0,
+    "risk_mint_rate": 1.0,
+    "wilson_95_ci": [
+      0.2077,
+      0.9385
+    ]
+  },
+  "calibration": {
+    "finding_outcome": [
+      {
+        "broad_rework": 0,
+        "new_sonar_critical_count": "0",
+        "no_rework": 2,
+        "targeted_rework": 0,
+        "verification_only": 0
+      },
+      {
+        "broad_rework": 0,
+        "new_sonar_critical_count": ">=1",
+        "no_rework": 0,
+        "targeted_rework": 1,
+        "verification_only": 0
+      }
+    ],
+    "per_cell_rows": [
+      {
+        "action": "continue",
+        "cell_id": "cap2a_p2_clean",
+        "code_change_risk": 0.18,
+        "depth": 0,
+        "hit": true,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "realized_depth": 0,
+        "realized_outcome": "no_rework",
+        "scope_size": 0
+      },
+      {
+        "action": "rework",
+        "cell_id": "cap2a_p3_critical",
+        "code_change_risk": 0.215,
+        "depth": 3,
+        "hit": false,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 1,
+        "realized_depth": 1,
+        "realized_outcome": "targeted_rework",
+        "scope_size": 4
+      },
+      {
+        "action": "continue",
+        "cell_id": "cap2a_p3_style",
+        "code_change_risk": 0.18,
+        "depth": 0,
+        "hit": true,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "realized_depth": 0,
+        "realized_outcome": "no_rework",
+        "scope_size": 0
+      }
+    ],
+    "risk_buckets": [
+      {
+        "broad_rework": 0,
+        "bucket": "[0,0.15)",
+        "no_rework": 0,
+        "targeted_rework": 0,
+        "verification_only": 0
+      },
+      {
+        "broad_rework": 0,
+        "bucket": "[0.15,0.3)",
+        "no_rework": 2,
+        "targeted_rework": 1,
+        "verification_only": 0
+      },
+      {
+        "broad_rework": 0,
+        "bucket": "[0.3,inf)",
+        "no_rework": 0,
+        "targeted_rework": 0,
+        "verification_only": 0
+      }
+    ],
+    "risk_mint_rate": 1.0,
+    "schema_version": "cap_2a_calibration/v1",
+    "severity_strictness": [
+      {
+        "blocker_critical_introduced": [],
+        "cell_id": "cap2a_p2_clean",
+        "major_excluded": []
+      },
+      {
+        "blocker_critical_introduced": [
+          "python:S3776:calc.py:9"
+        ],
+        "cell_id": "cap2a_p3_critical",
+        "major_excluded": []
+      },
+      {
+        "blocker_critical_introduced": [],
+        "cell_id": "cap2a_p3_style",
+        "major_excluded": [
+          "python:S1244:calc.py:18",
+          "python:S1244:calc.py:20",
+          "python:S1244:calc.py:22",
+          "python:S1244:test_calc.py:13",
+          "python:S1244:test_calc.py:14"
+        ]
+      }
+    ]
+  },
+  "campaign": "cap_2a_rerun2",
+  "cells": [
+    {
+      "analyzed_revision": "79379b38baeb28aa507853d20c5daeeec1208e94",
+      "applied": false,
+      "baseline_revision": "00193d8b841c7f3cdfabfb79ae452d3d80ad2678",
+      "blast_radius_error": 4,
+      "cell_id": "cap2a_p2_clean",
+      "code_change_risk": 0.18,
+      "contract_version": "verify_code_change/v1",
+      "graph_status": "available",
+      "hit": true,
+      "lsp_status": "available",
+      "new_lsp_error_count": 0,
+      "new_sonar_critical_count": 0,
+      "predicted_impacted_symbol_count": 4,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "dfc85f15b306de84",
+      "proposal_scope": [],
+      "realized_depth": 0,
+      "realized_outcome": "no_rework",
+      "realized_symbol_set": [],
+      "reason": "continue hits no_rework",
+      "sonar_status": "available",
+      "spec_id": "cap_2a_cell_clean@0.1",
+      "test_executed_success": true,
+      "valid_join": true
+    },
+    {
+      "analyzed_revision": "7d4be30295a486a7d10965ec675e01e4b9086887",
+      "applied": false,
+      "baseline_revision": "6c87190048e6d9ebd3e1d0150021adeb8ba5d1b6",
+      "blast_radius_error": 3,
+      "cell_id": "cap2a_p3_critical",
+      "code_change_risk": 0.215,
+      "contract_version": "verify_code_change/v1",
+      "graph_status": "available",
+      "hit": false,
+      "lsp_status": "available",
+      "new_lsp_error_count": 0,
+      "new_sonar_critical_count": 1,
+      "predicted_impacted_symbol_count": 4,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "49755e5691ee9909",
+      "proposal_scope": [
+        "add",
+        "subtract",
+        "test_add",
+        "test_subtract"
+      ],
+      "realized_depth": 1,
+      "realized_outcome": "targeted_rework",
+      "realized_symbol_set": [
+        {
+          "file_path": "calc.py",
+          "kind": "function",
+          "qualified_name": "classify",
+          "repository_id": "self-cap2a_p3_critical",
+          "revision": "7d4be30295a486a7d10965ec675e01e4b9086887"
+        }
+      ],
+      "reason": "rework misses targeted_rework: depth 3 >= 1 but the scope (executor neighborhood [add,subtract,test_add,test_subtract]) does not contain the realized symbol {classify} \u2014 the scope prediction excludes the changed symbol itself",
+      "sonar_status": "available",
+      "spec_id": "cap_2a_cell_critical@0.1",
+      "test_executed_success": false,
+      "valid_join": true
+    },
+    {
+      "analyzed_revision": "9b5f39e75b2c946bd2d21ff2fbeda855db688319",
+      "applied": false,
+      "baseline_revision": "6c87190048e6d9ebd3e1d0150021adeb8ba5d1b6",
+      "blast_radius_error": 4,
+      "cell_id": "cap2a_p3_style",
+      "code_change_risk": 0.18,
+      "contract_version": "verify_code_change/v1",
+      "graph_status": "available",
+      "hit": true,
+      "lsp_status": "available",
+      "new_lsp_error_count": 0,
+      "new_sonar_critical_count": 0,
+      "predicted_impacted_symbol_count": 4,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "cb75c4af8cd89a24",
+      "proposal_scope": [],
+      "realized_depth": 0,
+      "realized_outcome": "no_rework",
+      "realized_symbol_set": [],
+      "reason": "continue hits no_rework",
+      "sonar_status": "available",
+      "spec_id": "cap_2a_cell_style@0.1",
+      "test_executed_success": true,
+      "valid_join": true
+    }
+  ],
+  "input_artifacts": [
+    {
+      "path": "experiments/results/cap_2a_rerun2/p2_cell_manifest.json",
+      "sha256": "00863d23d31025684e3716f2dc960d21057b591fd1fa7801728ca3ffcc2957f9"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/p2_phase_ledger.json",
+      "sha256": "3cf9d60589b70363321c02960da301ae0bd9d256e170795c0664a33019e4dcda"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/p3_execution_manifest.json",
+      "sha256": "20b4007d68879b3e4e59ed200214bd2d4c92de52dc80b4d2906843b3f304367e"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/p3_summary.json",
+      "sha256": "6910e4f48d265236f652af6eb84e44ba5d4a175ce447f6a3c6be5a5a0722ca4b"
+    }
+  ],
+  "join_validation": {
+    "errors": [],
+    "valid": true
+  },
+  "note": "No 2b recommendation is made in this phase (p4). Hit-rate 2/3 = 0.667 (Wilson [0.2077, 0.9385]) exceeds the 2b gate threshold of 0.6, descriptively under n=3 \u2014 the p5 verdict states whether the gate is met.",
+  "phase": "p4_score_hit_rate",
+  "rerun_comparison": {
+    "note": "The rerun's S1244-driven rework (severity conflation) is gone: style's 5 MAJOR S1244 findings minted new_sonar_critical_count=0 (server severity filter), where the rerun's p3b minted 1. See calibration.severity_strictness.",
+    "overprediction_shrank": true,
+    "remaining_miss": "cap2a_p3_critical is a scope miss (rework action correct, but scope = executor neighborhood [add,subtract,test_add,test_subtract] does not contain the realized symbol {classify}) \u2014 the scope prediction excludes the changed symbol itself.",
+    "rerun2_action_overprediction": "0/3 \u2014 no cell's action over-predicted: continue->no_rework correct 2/2; rework->targeted_rework action correct 1/1.",
+    "rerun_hit_rate": 0.0,
+    "rerun_n": 3,
+    "rerun_outcomes": "3/3 no_rework with verify/rework proposals (systematic over-prediction; S1244 MAJOR drove rework)"
+  },
+  "schema_version": "cap_2a_score/v1",
+  "scored_at": "20260826T015846Z",
+  "spec": {
+    "candidate_manifest_sha256": "c7a1afcec2ad246f5b68a11d4c95b61dd3060a6d20e957af030c7ddf79c56f4e",
+    "path": "workflows/repository/cap_2a_rerun2.yaml",
+    "source_revision": "113dc60d734ae975e2b661d7ce14c81e8b2a7264",
+    "spec_sha256": "9083d56d1e26e6b7b6536d0a8226a68010bd4e41084ba090f9360e56c5a00263",
+    "version": "0.1"
+  },
+  "traceability": {
+    "blast_radius": "abs(predicted_impacted_symbol_count - len(realized_symbol_set)) over graph-available predictions",
+    "hit_rate": "n_hits / n_scored",
+    "n_hits": "scored cells where hit==True (fixed semantics: continue hits no_rework; rework hits targeted/broad_rework only when scope contains realized scope and depth>=realized_depth)",
+    "n_scored": "cells with proposal_id != null AND realized_outcome not in (None,'unknown')",
+    "risk_mint_rate": "cells with code_change_risk minted / n_cells",
+    "wilson_95_ci": "95% Wilson interval on hit_rate"
+  }
+}

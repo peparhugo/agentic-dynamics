@@ -1,0 +1,18 @@
+{
+  "schema_version": "cap_2a_outcome/v1",
+  "campaign": "cap_2a_rerun2",
+  "cell_id": "cap2a_p2_clean",
+  "proposal_id": "dfc85f15b306de84",
+  "baseline_revision": "00193d8b841c7f3cdfabfb79ae452d3d80ad2678",
+  "analyzed_revision": "79379b38baeb28aa507853d20c5daeeec1208e94",
+  "outcome": "no_rework",
+  "realized_depth": 0,
+  "realized_symbol_set": [],
+  "test_executed_success": true,
+  "tests_passed": 3,
+  "tests_total": 3,
+  "graph_status": "available",
+  "sonar_status": "available",
+  "lsp_status": "available",
+  "adjudication_note": "Adjudicated for p4 scoring from the immutable p2 artifacts (p2_phase_ledger.json + the implement commit 79379b3): product() returns the correct fold with a ValueError guard for the empty list, test_product asserts product([1,2,3,4])==24 and the guard, and the independent kind:test phase recorded test_executed_success=True (3/3). No rework and no further verification were needed -> no_rework. The clean stimulus realized its expected class."
+}

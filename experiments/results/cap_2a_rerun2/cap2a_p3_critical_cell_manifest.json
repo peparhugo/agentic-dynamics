@@ -1,0 +1,22 @@
+{
+  "actual_cost_usd": 0.016623,
+  "backend": "opencode",
+  "campaign": "cap_2a_rerun2",
+  "cell_id": "cap2a_p3_critical",
+  "finops_cell_id": "cap2a_p3_critical",
+  "forecast_cost_usd": 0.02575,
+  "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+  "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "model": "deepseek/deepseek-v4-pro",
+  "phase": "p3_run_shadow_cells",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T014835Z.json",
+  "run_ledger_sha256": "74caa76fe8063fcda04522b99d66d06958a1ed0a6e8c2d9bde42d634988c6c0f",
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "seeded_app_seed_revision": "6c87190048e6d9ebd3e1d0150021adeb8ba5d1b6",
+  "seeded_app_worktree": "/tmp/cap2a_cell_critical_rerun2",
+  "source_baseline_revision": "723653cb1aeec978564d29d6ba793b23a1eede80",
+  "spec_id": "cap_2a_cell_critical@0.1",
+  "spec_path": "workflows/operations/cap_2a_cell_critical.yaml",
+  "spec_path_sha256": "6ecb2bd93e8718c8c42382f648e859672c649de761e46ba74c2d7a460721e4d7"
+}

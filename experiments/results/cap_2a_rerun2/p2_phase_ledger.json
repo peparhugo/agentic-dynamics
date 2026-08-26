@@ -1,0 +1,145 @@
+{
+  "analyzer_reachability": {
+    "graph": {
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "reachable": true,
+      "uri": "bolt://localhost:7687"
+    },
+    "lsp": {
+      "reachable": true,
+      "status": "available",
+      "tool": "mypy",
+      "version": "2.3.1"
+    },
+    "sonar": {
+      "reachable": true,
+      "server": "http://localhost:9000 (UP)",
+      "status": "available"
+    }
+  },
+  "backend": "opencode",
+  "campaign": "cap_2a_rerun2",
+  "cell_id": "cap2a_p2_clean",
+  "model": "deepseek/deepseek-v4-pro",
+  "ok": true,
+  "p3_forecast_budget": {
+    "basis": "p2 measured target-model cost x 2 headroom",
+    "forecast_per_cell_usd": 0.02575,
+    "label": "FORECAST",
+    "measured_cost_usd": 0.012875,
+    "note": "FORECAST, not measured. p3 must report each later cell's forecast and actual cost separately. No p3 cell may run until this p2 manifest + measured-cost JSON are committed."
+  },
+  "phase": "p2_measure_one_cell",
+  "phases": [
+    {
+      "analyzed_revision": "79379b38baeb28aa507853d20c5daeeec1208e94",
+      "baseline_revision": "00193d8b841c7f3cdfabfb79ae452d3d80ad2678",
+      "code_change_risk": "0.18",
+      "commit_hash_short": "79379b3",
+      "cost_usd": 0.0063108059999999995,
+      "duration_s": 60.7,
+      "facts_emitted": [
+        {
+          "predicate": "analysis_revision_matches",
+          "value": "true"
+        },
+        {
+          "predicate": "ast_parse_coverage",
+          "value": "1.0"
+        },
+        {
+          "predicate": "changed_symbol_count",
+          "value": "2"
+        },
+        {
+          "predicate": "changed_symbols_with_tests_ratio",
+          "value": "0.5"
+        },
+        {
+          "predicate": "code_change_risk",
+          "value": "0.18"
+        },
+        {
+          "predicate": "impacted_symbol_count",
+          "value": "4"
+        },
+        {
+          "predicate": "lsp_analysis_status",
+          "value": "available"
+        },
+        {
+          "predicate": "new_lsp_error_count",
+          "value": "0"
+        },
+        {
+          "predicate": "new_sonar_critical_count",
+          "value": "0"
+        },
+        {
+          "predicate": "sonar_analysis_status",
+          "value": "available"
+        }
+      ],
+      "facts_omitted": [],
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "kind": "agent",
+      "lsp_analysis_status": "available",
+      "note": "Real symbol change: added product() to calc.py + test_product to test_calc.py -> changed_symbol_count=2, new_sonar_critical_count=0, new_lsp_error_count=0, impacted=4, tests_ratio=0.5 -> risk 0.18.",
+      "phase": "implement",
+      "proposal": "dfc85f15b306de84 (continue, depth 0, applied=false)",
+      "sonar_analysis_status": "available",
+      "status": "ok",
+      "test_result": "test_executed_success = null (no test_gate on this phase; the independent kind:test phase is next)"
+    },
+    {
+      "cost_usd": 0.0,
+      "duration_s": 0.34,
+      "kind": "test",
+      "phase": "test",
+      "status": "ok",
+      "test_result": "test_executed_success = True (3/3) \u2014 independent runtime.test_runner"
+    },
+    {
+      "commit_hash_short": "",
+      "cost_usd": 0.006564642999999999,
+      "duration_s": 16.46,
+      "kind": "agent",
+      "note": "No new commit (the verification note produced no diff) -> change_analysis=None (no symbol change).",
+      "phase": "verify",
+      "status": "ok",
+      "test_result": "none (documentation/verification phase)"
+    }
+  ],
+  "proposal_seam_result": {
+    "action": "continue",
+    "applied": false,
+    "artifact": "experiments/results/cap_2a_rerun2/proposals/dfc85f15b306de84.json",
+    "artifact_sha256": "1e27671f7ed775993c9bfba918451a6ca9aa4337382dbfc76b24f342749f5e71",
+    "contract_version": "verify_code_change/v1",
+    "depth": 0,
+    "note": "Emitted from the implement phase's change_analysis facts (code_change_risk=0.18, new_sonar_critical_count=0). risk 0.18 < VERIFY_RISK_THRESHOLD 0.2 and no measured criticals -> action=continue, depth=0 \u2014 the clean variant correctly does NOT over-predict (the rerun's clean-equivalent minted verify/depth2).",
+    "proposal_id": "dfc85f15b306de84",
+    "proposals_emitted": 1,
+    "refused": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": []
+  },
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T013732Z.json",
+  "run_ledger_sha256": "d076aef8108e052247e2f0f9295e697a4007591f3ae6051119d169e4605bea22",
+  "schema_version": "cap_2a_p2_ledger/v1",
+  "seeded_app_seed_revision": "00193d8b841c7f3cdfabfb79ae452d3d80ad2678",
+  "seeded_app_worktree": "/tmp/cap2a_cell_clean_rerun2",
+  "source_baseline_revision": "0e24d69851a7651eacfd23b21743a10574556e59",
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "total_measured_cost_breakdown": {
+    "implement": 0.0063108059999999995,
+    "test": 0.0,
+    "verify": 0.006564642999999999
+  },
+  "total_measured_cost_usd": 0.012875,
+  "written_at": "2026-08-26T01:39:01.013873+00:00"
+}

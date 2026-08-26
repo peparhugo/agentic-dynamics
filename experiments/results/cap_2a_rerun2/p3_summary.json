@@ -1,0 +1,135 @@
+{
+  "artifact_index": [
+    {
+      "path": "experiments/results/cap_2a_rerun2/p3_execution_manifest.json",
+      "sha256": "20b4007d68879b3e4e59ed200214bd2d4c92de52dc80b4d2906843b3f304367e"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/cap2a_p3_critical_cell_manifest.json",
+      "sha256": "6587c3faebcfecdfa60e2e04bab7a6eb032ace52d45d2418adc86b96b85a163b"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/cap2a_p3_critical_outcome.json",
+      "sha256": "bb353146e6d78822679c644dd3e61b855fb11b855a7268d189d4e2389491823b"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/cap2a_p3_critical_phase_ledger.json",
+      "sha256": "7cd399755a627932a6dd3074a84449b8fd9452a49e4e4f9527e0cb0538cde363"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/proposals/49755e5691ee9909.json",
+      "sha256": "ca794e9140c4c4c183793399c2761ce8044b910696bf0cf9a7b68b00abb69787"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/cap2a_p3_style_cell_manifest.json",
+      "sha256": "96e5c936e0c1f2ccedca739adeed7caf7c79f2fb5af73ea11ef0f9e9730366d2"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/cap2a_p3_style_outcome.json",
+      "sha256": "9b615e183962a0be41848eca9dd0395593f613415499fd02b4485ea103911ce9"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/cap2a_p3_style_phase_ledger.json",
+      "sha256": "9f3e3d96c77ec44fb358f488d6050d7d6f9ea22dd5a028b3fda67487c8cce93d"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun2/proposals/cb75c4af8cd89a24.json",
+      "sha256": "41e266081bc19b232665d3dcc9d08acffeee42bb691cf772e3206386dcbe3b1d"
+    }
+  ],
+  "campaign": "cap_2a_rerun2",
+  "cells": [
+    {
+      "cell_id": "cap2a_p3_critical",
+      "code_change_risk": 0.215,
+      "cost_usd": 0.016623,
+      "duration_note": "implement phase 225.24s (agent ~5 min incl. the deep classify generation); the run stopped after the failed test phase (fail-fast) so verify never ran.",
+      "graph_status": "available",
+      "lsp_status": "available",
+      "new_sonar_critical_count": 1,
+      "outcome": "targeted_rework",
+      "proposal_action": "rework",
+      "proposal_applied": false,
+      "proposal_depth": 3,
+      "proposal_id": "49755e5691ee9909",
+      "proposal_scope": [
+        "add",
+        "subtract",
+        "test_add",
+        "test_subtract"
+      ],
+      "realized_depth": 1,
+      "realized_symbol_set": [
+        {
+          "file_path": "calc.py",
+          "kind": "function",
+          "qualified_name": "classify"
+        }
+      ],
+      "sonar_status": "available",
+      "spec": "cap_2a_cell_critical@0.1",
+      "test_executed_success": false,
+      "tests_passed": 2,
+      "tests_total": 3
+    },
+    {
+      "cell_id": "cap2a_p3_style",
+      "code_change_risk": 0.18,
+      "cost_usd": 0.01131,
+      "duration_note": "implement 47.82s + verify 11.6s.",
+      "graph_status": "available",
+      "lsp_status": "available",
+      "new_sonar_critical_count": 0,
+      "outcome": "no_rework",
+      "proposal_action": "continue",
+      "proposal_applied": false,
+      "proposal_depth": 0,
+      "proposal_id": "cb75c4af8cd89a24",
+      "proposal_scope": [],
+      "realized_depth": 0,
+      "realized_symbol_set": [],
+      "sonar_status": "available",
+      "spec": "cap_2a_cell_style@0.1",
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3
+    }
+  ],
+  "forecast_vs_actual_cost": {
+    "basis": "p2 measured target-model cost $0.012875 x 2 headroom = $0.02575 per cell (FORECAST).",
+    "campaign_stop_budget_usd": 20.0,
+    "cumulative_actual_usd": 0.027933,
+    "forecast_envelope_usd": 0.0515,
+    "note": "Cumulative actual ($0.027933) is under the forecast envelope ($0.0515) and the campaign stop budget ($20); no cell was stopped.",
+    "rows": [
+      {
+        "actual_usd": 0.016623,
+        "cell_id": "cap2a_p3_critical",
+        "forecast_usd": 0.02575,
+        "within_forecast": true
+      },
+      {
+        "actual_usd": 0.01131,
+        "cell_id": "cap2a_p3_style",
+        "forecast_usd": 0.02575,
+        "within_forecast": true
+      }
+    ],
+    "stopped_cells": []
+  },
+  "outcome_spread": {
+    "met": true,
+    "n_no_rework": 2,
+    "n_targeted_rework": 1,
+    "note": "critical -> targeted_rework (the rework branch finally has calibration data); clean + style -> no_rework. A variant whose realized class differs from expected is DATA, not a rerun reason.",
+    "requirement": ">= 1 targeted_rework AND >= 1 no_rework (the calibration contrast)"
+  },
+  "phase": "p3_run_shadow_cells",
+  "schema_version": "cap_2a_p3_summary/v1",
+  "status_flags": {
+    "analyzer_down_cells": [],
+    "graph_down_cells": [],
+    "note": "No graph-down or analyzer-down cells: graph, sonar (127.0.0.1:9000), and lsp (mypy 2.3.1) were available for every cell."
+  },
+  "written_at": "2026-08-26T03:55:00Z"
+}

@@ -236,10 +236,19 @@ def test_run_workflow_commits_per_phase(tmp_path):
     assert "[workflow] scope" in log.stdout
 
 
-def test_run_workflow_change_analysis_seam(tmp_path):
+def test_run_workflow_change_analysis_seam(tmp_path, monkeypatch):
     """Review F3: an injected ChangeAnalyzer runs over each committed phase, best-effort,
     and the analysis lands on the phase result — the seam is inert without injection."""
     from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
+
+    # The sonar/lsp legs are covered by their own unit tests; here they are stubbed to their
+    # measured unavailable status so the seam test never reaches the real scanner/mypy.
+    monkeypatch.setattr(workflow_runner, "_sonar_evidence",
+                        lambda *a, **k: {"status": "unavailable", "revision_matches": None,
+                                         "new_critical_count": None, "analyzed_sha": ""})
+    monkeypatch.setattr(workflow_runner, "_lsp_evidence",
+                        lambda *a, **k: {"status": "unavailable", "new_error_count": None,
+                                         "tool": "mypy"})
 
     class RecordingAnalyzer:
         def __init__(self):
@@ -308,13 +317,20 @@ def test_run_workflow_change_analysis_inert_without_injection(tmp_path):
     assert all("EVIDENCE" not in p for p in prompts)  # prompts byte-identical without injection
 
 
-def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path):
+def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path, monkeypatch):
     """cap_2a p1 (design §5.7): the ChangeInput revisions are FULL commit SHAs (provenance,
     the short hash stays display-only), and the NEXT phase's prompt receives a bounded,
     machine-readable evidence context (graph status, full revision, neighborhood, facts)."""
     import re
 
     from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
+
+    monkeypatch.setattr(workflow_runner, "_sonar_evidence",
+                        lambda *a, **k: {"status": "unavailable", "revision_matches": None,
+                                         "new_critical_count": None, "analyzed_sha": ""})
+    monkeypatch.setattr(workflow_runner, "_lsp_evidence",
+                        lambda *a, **k: {"status": "unavailable", "new_error_count": None,
+                                         "tool": "mypy"})
 
     class RecordingAnalyzer:
         def __init__(self):
@@ -890,3 +906,104 @@ def test_index_fallback_degrades_to_empty_on_any_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(spec_status, "index_entry", boom)
     assert _completed_phases_from_index(spec, phase_names, "g") == set()
+
+
+# ── v2 analyzer legs: severity filter + novelty + deadline (cap_2a rerun2 p1) ──
+
+
+def _avail_metrics():
+    from agentic_dynamics.measurement.sonar import SONAR_STATUS_AVAILABLE, SonarMetrics
+
+    return SonarMetrics(project_key="exp_wt", analyzed=True, status=SONAR_STATUS_AVAILABLE,
+                        analyzed_sha="c" * 40)
+
+
+def _issue(rule, severity, file_path, line):
+    from agentic_dynamics.measurement.sonar import SonarIssue
+
+    return SonarIssue(rule=rule, severity=severity, file_path=file_path, line=line)
+
+
+def test_call_with_deadline_returns_false_on_timeout():
+    """(c) A non-returning analyzer leg is bounded by the client-side deadline — it degrades to
+    ``(False, None)`` instead of hanging the phase."""
+    import time
+
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    def slow():
+        time.sleep(1.0)
+        return "never"
+
+    returned, result = wr._call_with_deadline(slow, timeout=0.05)
+    assert returned is False
+    assert result is None
+
+
+def test_sonar_evidence_no_parent_checkout_is_unavailable(tmp_path):
+    """A failed parent materialization degrades the sonar leg to its measured unavailable
+    status (count omitted — null-not-zero, never a fabricated 0)."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    payload = wr._sonar_evidence(tmp_path, None, "0" * 40, "1" * 40)
+    assert payload["status"] == "unavailable"
+    assert payload["new_critical_count"] is None
+
+
+def test_sonar_evidence_novelty_introduced_blocker_counts_one(monkeypatch, tmp_path):
+    """(b) Novelty rule: a change-introduced BLOCKER (present only in the after-analysis) counts
+    exactly 1, and the leg requests the server-side BLOCKER,CRITICAL severity filter."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    monkeypatch.setattr(wr, "run_sonar_analysis", lambda *a, **k: _avail_metrics())
+    seen = {}
+
+    def fake_fetch(key, severities="", ps=500):
+        seen["severities"] = severities
+        if key.endswith("0" * 12):  # the parent revision: no criticals
+            return []
+        return [_issue("python:S1000", "BLOCKER", "calc.py", 10)]
+
+    monkeypatch.setattr(wr, "fetch_sonar_issues", fake_fetch)
+    payload = wr._sonar_evidence(tmp_path, tmp_path, "0" * 40, "1" * 40)
+    assert payload["status"] == "available"
+    assert payload["new_critical_count"] == 1
+    assert seen["severities"] == "BLOCKER,CRITICAL"
+
+
+def test_sonar_evidence_preexisting_blocker_counts_zero(monkeypatch, tmp_path):
+    """(b) Novelty rule: a pre-existing BLOCKER (same identity in BOTH revisions, untouched by
+    the change) counts 0."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    monkeypatch.setattr(wr, "run_sonar_analysis", lambda *a, **k: _avail_metrics())
+    blocker = _issue("python:S1000", "BLOCKER", "calc.py", 5)
+    monkeypatch.setattr(wr, "fetch_sonar_issues", lambda key, severities="", ps=500: [blocker])
+
+    payload = wr._sonar_evidence(tmp_path, tmp_path, "0" * 40, "1" * 40)
+    assert payload["status"] == "available"
+    assert payload["new_critical_count"] == 0
+
+
+def test_lsp_evidence_novelty_introduced_error_counts_one(monkeypatch, tmp_path):
+    """The LSP leg counts only change-introduced ERROR diagnostics by (file, line, code)."""
+    from agentic_dynamics.measurement.lsp_diagnostics import LSPDiagnostic, LSPReport
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    calls = []
+
+    def fake_diag(path, profile, tool_name=None):
+        n = len(calls)
+        calls.append(path)
+        if n == 0:  # parent revision: clean
+            return LSPReport(tool="mypy", language="python", available=True)
+        return LSPReport(
+            tool="mypy", language="python", available=True,
+            diagnostics=[LSPDiagnostic("error", "bad", "calc.py", 10, 5, "return-value")],
+        )
+
+    monkeypatch.setattr(wr, "run_diagnostics", fake_diag)
+    payload = wr._lsp_evidence(tmp_path, tmp_path, "0" * 40, "1" * 40, None)
+    assert payload["status"] == "available"
+    assert payload["new_error_count"] == 1
+    assert payload["tool"] == "mypy"

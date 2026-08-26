@@ -1,0 +1,26 @@
+{
+  "adjudication_note": "Independent post-hoc evaluator: classify(10.0) returns 'twenties' but the documented [10,20) contract requires 'teens' \u2014 the implement phase used `elif value > 10` where the prompt's contract requires `>= 10`, so the boundary value 10.0 is misclassified (the ONE deliberate defect). The independent kind:test phase recorded test_executed_success=False (2/3 \u2014 test_classify's boundary assertion failed). The defect is present in the committed code -> targeted_rework; a single targeted edit (`>` -> `>=` at the boundary) fixes it -> realized_depth=1, realized_symbol_set={classify}.",
+  "analyzed_revision": "7d4be30295a486a7d10965ec675e01e4b9086887",
+  "baseline_revision": "6c87190048e6d9ebd3e1d0150021adeb8ba5d1b6",
+  "campaign": "cap_2a_rerun2",
+  "cell_id": "cap2a_p3_critical",
+  "graph_status": "available",
+  "lsp_status": "available",
+  "outcome": "targeted_rework",
+  "proposal_id": "49755e5691ee9909",
+  "realized_depth": 1,
+  "realized_symbol_set": [
+    {
+      "file_path": "calc.py",
+      "kind": "function",
+      "qualified_name": "classify",
+      "repository_id": "self-cap2a_p3_critical",
+      "revision": "7d4be30295a486a7d10965ec675e01e4b9086887"
+    }
+  ],
+  "schema_version": "cap_2a_outcome/v1",
+  "sonar_status": "available",
+  "test_executed_success": false,
+  "tests_passed": 2,
+  "tests_total": 3
+}
