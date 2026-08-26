@@ -1,0 +1,212 @@
+{
+  "schema_version": "cap_2b_p3_validation/v1",
+  "campaign": "cap_2b",
+  "phase": "p3_score",
+  "written_at": "2026-08-26T16:00:30Z",
+  "score_json": "experiments/results/cap_2b/cap_2b_score_20260826T160018Z.json",
+  "score_json_sha256": "5f24f5072f1bb0ab17769b8db3734680b83981c2506df3b57fffa529c42ed3d9",
+  "join_validation": {
+    "valid": true,
+    "errors": [],
+    "n_scored": 18
+  },
+  "denominators": {
+    "n_total": 18,
+    "n_static": 9,
+    "n_adaptive": 9,
+    "n_defect_bearing": 6,
+    "n_invalid_join": 0
+  },
+  "decision_reference": "docs/designs/current/cap_2b_preregistration.md section 2 (margin) + section 5 (analysis plan / decision rule)",
+  "trace": [
+    {
+      "verdict_number": "cpvo_static = $0.013344",
+      "derivation": "sum(static cell cost) / sum(static accepted) = $0.080062 / 6",
+      "source_fields": [
+        "score.per_arm.static.total_cost_usd",
+        "score.per_arm.static.accepted_outcomes",
+        "score.per_arm.static.cpvo_usd"
+      ],
+      "computed": 0.013344,
+      "ci_95": [
+        0.011744,
+        0.01477
+      ]
+    },
+    {
+      "verdict_number": "cpvo_adaptive = $0.010485",
+      "derivation": "sum(adaptive cell cost) / sum(adaptive accepted) = $0.094364 / 9",
+      "source_fields": [
+        "score.per_arm.adaptive.total_cost_usd",
+        "score.per_arm.adaptive.accepted_outcomes",
+        "score.per_arm.adaptive.cpvo_usd"
+      ],
+      "computed": 0.010485,
+      "ci_95": [
+        0.009522,
+        0.011569
+      ]
+    },
+    {
+      "verdict_number": "cpvo ratio = 0.7857",
+      "derivation": "0.010485 / 0.013344 (adaptive / static)",
+      "source_fields": [
+        "score.per_arm.*.cpvo_usd",
+        "score.decision_rule.cpvo_ratio"
+      ],
+      "computed": 0.785746,
+      "ci_95": [
+        0.6842,
+        0.9105
+      ]
+    },
+    {
+      "verdict_number": "success static = 0.6667 (6/9)",
+      "derivation": "accepted / n = 6 / 9",
+      "source_fields": [
+        "score.per_arm.static.accepted_outcomes",
+        "score.per_arm.static.n",
+        "score.per_arm.static.verified_success_rate",
+        "score.per_arm.static.verified_success_wilson_95"
+      ],
+      "computed": 0.666667,
+      "wilson_95": [
+        0.3542,
+        0.8794
+      ]
+    },
+    {
+      "verdict_number": "success adaptive = 1.0 (9/9)",
+      "derivation": "accepted / n = 9 / 9",
+      "source_fields": [
+        "score.per_arm.adaptive.accepted_outcomes",
+        "score.per_arm.adaptive.n",
+        "score.per_arm.adaptive.verified_success_rate",
+        "score.per_arm.adaptive.verified_success_wilson_95"
+      ],
+      "computed": 1.0,
+      "wilson_95": [
+        0.7008,
+        1.0
+      ]
+    },
+    {
+      "verdict_number": "success gap = -0.3333 (static - adaptive)",
+      "derivation": "0.666667 - 1.0",
+      "source_fields": [
+        "score.decision_rule.success_gap_static_minus_adaptive"
+      ],
+      "computed": -0.333333
+    },
+    {
+      "verdict_number": "margin leg (cpvo): ratio 0.7857 <= 1.10",
+      "derivation": "decision_rule.cpvo_leg_holds",
+      "source_fields": [
+        "score.decision_rule.cpvo_leg_holds",
+        "score.decision_rule.margin_cpvo_ratio_le"
+      ],
+      "computed": true
+    },
+    {
+      "verdict_number": "margin leg (success): gap -0.3333 <= 0.05",
+      "derivation": "decision_rule.success_leg_holds",
+      "source_fields": [
+        "score.decision_rule.success_leg_holds",
+        "score.decision_rule.margin_success_gap_le"
+      ],
+      "computed": true
+    },
+    {
+      "verdict_number": "decision = NON_INFERIOR",
+      "derivation": "both legs hold per pre-registration section 2 margin + section 5 decision rule",
+      "source_fields": [
+        "score.decision_rule.decision"
+      ],
+      "computed": "NON_INFERIOR"
+    },
+    {
+      "verdict_number": "defect-bearing n = 6 (3 static / 3 adaptive)",
+      "derivation": "critical-stimulus cells (the pilot's n)",
+      "source_fields": [
+        "score.defect_bearing.*.n_defect_bearing",
+        "score.denominators.n_defect_bearing"
+      ],
+      "computed": 6
+    },
+    {
+      "verdict_number": "defect-bearing static cpvo = null (0 accepted), success 0.0",
+      "derivation": "cost / 0 accepted -> undefined, recorded null; 0/3 accepted",
+      "source_fields": [
+        "score.defect_bearing.static.cpvo_usd",
+        "score.defect_bearing.static.verified_success_rate"
+      ],
+      "computed": {
+        "cpvo": null,
+        "success": 0.0
+      }
+    },
+    {
+      "verdict_number": "defect-bearing adaptive cpvo = $0.013536, success 1.0",
+      "derivation": "sum(critical adaptive cost) / 3 accepted = $0.040609 / 3",
+      "source_fields": [
+        "score.defect_bearing.adaptive.cpvo_usd",
+        "score.defect_bearing.adaptive.verified_success_rate"
+      ],
+      "computed": {
+        "cpvo": 0.013536,
+        "success": 1.0
+      }
+    },
+    {
+      "verdict_number": "asymmetric loss @ E_x=11.4671: static +$0.138327 / adaptive -$0.138327 / swing $0.276654",
+      "derivation": "3 escaped defects (static) and 3 applied reworks (adaptive) x $0.046109 per defect",
+      "source_fields": [
+        "score.asymmetric_loss.rows[E_x=11.4671]"
+      ],
+      "computed": {
+        "static": 0.138327,
+        "adaptive": -0.138327,
+        "swing": 0.276654
+      }
+    },
+    {
+      "verdict_number": "asymmetric loss @ E_x=28.0: static +$0.337764 / adaptive -$0.337764 / swing $0.675528",
+      "derivation": "3 x $0.112588 per defect",
+      "source_fields": [
+        "score.asymmetric_loss.rows[E_x=28.0]"
+      ],
+      "computed": {
+        "static": 0.337764,
+        "adaptive": -0.337764,
+        "swing": 0.675528
+      }
+    },
+    {
+      "verdict_number": "expected-effect check_rate 1.0 / held_rate 0.0",
+      "derivation": "24 claims (6 rework x 2 + 12 continue x 1) submitted; 0 measurable from the immutable artifacts (no post-rework change_analysis; continue = null)",
+      "source_fields": [
+        "score.expected_effects.aggregates"
+      ],
+      "computed": {
+        "claims_made": 24,
+        "claims_checked": 24,
+        "claims_held": 0,
+        "check_rate": 1.0,
+        "held_rate": 0.0
+      }
+    },
+    {
+      "verdict_number": "0 flagged cells, 0 invalid joins",
+      "derivation": "score.flags / score.join_validation.errors",
+      "source_fields": [
+        "score.flags",
+        "score.join_validation.errors"
+      ],
+      "computed": {
+        "flags": 0,
+        "invalid_joins": 0
+      }
+    }
+  ],
+  "guard": "arm labels in the score JSON match the pre-registered table exactly (join_validation.valid=true, 0 errors); a mismatch would be invalid, not corrected. score JSON SHA256 pinned."
+}
