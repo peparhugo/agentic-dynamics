@@ -3,13 +3,13 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-25T22:55:21.814486+00:00`  ·  112 spec(s)
-**Work remaining:** 26 open · 86 completed/retired
+Generated at: `2026-08-26T00:43:50.792866+00:00`  ·  113 spec(s)
+**Work remaining:** 26 open · 87 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
-| `cap_2a_rerun` | workflow | no | runnable | 0.1 | cap_2a_shadow_calibration | — | — | — | — | 0 |
+| `cap_2a_rerun2` | workflow | no | runnable | 0.1 | cap_2a_rerun | — | — | — | — | 0 |
 | `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_grit_strength_grid` | experiment | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -39,6 +39,7 @@ Generated at: `2026-08-25T22:55:21.814486+00:00`  ·  112 spec(s)
 | `canonical_state_finalize` | workflow | no | completed | 0.1 | — | 2026-08-18 20:38 | ok | anthropic/claude-fable-5 | $14.5891 | 1 |
 | `canonical_state_implement` | workflow | no | completed | 0.1 | — | 2026-08-18 19:51 | ok | anthropic/claude-fable-5 | $51.4204 | 1 |
 | `canonical_state_round2` | workflow | no | completed | 0.1 | — | 2026-08-18 17:55 | ok | anthropic/claude-fable-5 | $4.8433 | 2 |
+| `cap_2a_rerun` | workflow | no | completed | 0.1 | cap_2a_shadow_calibration | 2026-08-26 00:19 | ok | deepseek/deepseek-v4-pro | $0.9784 | 1 |
 | `cap_2a_shadow_calibration` | workflow | no | completed | 0.2 | — | 2026-08-25 22:36 | ok | deepseek/deepseek-v4-pro | $0.8251 | 1 |
 | `cap_addendum_design` | workflow | no | completed | 0.1 | — | 2026-08-22 18:15 | ok | deepseek/deepseek-v4-pro | $0.4667 | 1 |
 | `cap_addendum_implement` | workflow | no | completed | 0.1 | — | 2026-08-24 14:07 | ok | anthropic/claude-sonnet-5 | $27.9867 | 2 |
