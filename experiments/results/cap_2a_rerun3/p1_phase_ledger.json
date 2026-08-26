@@ -1,0 +1,117 @@
+{
+  "schema_version": "cap_2a_p1_ledger/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p1_measure_baseline_cell",
+  "written_at": "2026-08-26T04:31:00Z",
+  "cell_id": "cap2a_r3_clean_baseline",
+  "arm": "baseline",
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "candidate_manifest": "experiments/results/cap_2a_rerun3/p1_candidate_manifest.json",
+  "candidate_manifest_sha256": "c396303ee9fd222102bba4a4e355548704729d7366b479638b570e1fdcfe621e",
+  "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "seeded_app_worktree": "/tmp/cap2a_cell_clean_rerun3",
+  "seeded_app_seed_revision": "98df701107821dbe1038d28650e53c26f57e9a0b",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T042932Z.json",
+  "run_ledger_sha256": "b578eb04c07e1c056f41991f0b9036793880221c5978d109fcf60dc5bad02abc",
+  "analyzer_reachability": {
+    "graph": {
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "reachable": true,
+      "uri": "bolt://localhost:7687"
+    },
+    "lsp": {
+      "reachable": true,
+      "status": "available",
+      "tool": "mypy",
+      "version": "2.3.1"
+    },
+    "sonar": {
+      "reachable": true,
+      "server": "http://localhost:9000 (UP)",
+      "status": "available"
+    }
+  },
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "b65f2b9",
+      "baseline_revision": "98df701107821dbe1038d28650e53c26f57e9a0b",
+      "analyzed_revision": "b65f2b99e68c4bee803924d7796a2bbc8c809716",
+      "cost_usd": 0.003663918,
+      "duration_s": 18.21,
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "lsp_analysis_status": "available",
+      "sonar_analysis_status": "available",
+      "code_change_risk": "0.18",
+      "facts_emitted": [
+        {"predicate": "analysis_revision_matches", "value": "true"},
+        {"predicate": "ast_parse_coverage", "value": "1.0"},
+        {"predicate": "changed_symbol_count", "value": "2"},
+        {"predicate": "changed_symbols_with_tests_ratio", "value": "0.5"},
+        {"predicate": "code_change_risk", "value": "0.18"},
+        {"predicate": "impacted_symbol_count", "value": "4"},
+        {"predicate": "lsp_analysis_status", "value": "available"},
+        {"predicate": "new_lsp_error_count", "value": "0"},
+        {"predicate": "new_sonar_critical_count", "value": "0"},
+        {"predicate": "sonar_analysis_status", "value": "available"}
+      ],
+      "facts_omitted": [],
+      "proposal": "809c0df8bfae8772 (continue, depth 0, applied=false)",
+      "test_result": "test_executed_success = null (no test_gate on this phase; the independent kind:test phase is next)"
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "cost_usd": 0.0,
+      "duration_s": 0.33,
+      "test_result": "test_executed_success = true (3/3) — independent runtime.test_runner"
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "",
+      "cost_usd": 0.004844682,
+      "duration_s": 10.7,
+      "note": "No new commit (the verification note produced no diff) -> change_analysis=None (no symbol change).",
+      "test_result": "none (documentation/verification phase)"
+    }
+  ],
+  "proposal_seam_result": {
+    "proposal_id": "809c0df8bfae8772",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "proposals_emitted": 1,
+    "refused": false,
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/809c0df8bfae8772.json",
+    "artifact_sha256": "e35789f320898e880cf0ac0578a77f669e11d1fe8bdb91849fae89ac76ed48a1",
+    "note": "Emitted from the implement phase's change_analysis facts (code_change_risk=0.18, new_sonar_critical_count=0). risk 0.18 < VERIFY_RISK_THRESHOLD 0.2 and no measured criticals -> action=continue, depth=0 — the clean baseline correctly does NOT over-predict (the shadow seam emitted + validated the proposal, applied=false)."
+  },
+  "total_measured_cost_breakdown": {
+    "implement": 0.003663918,
+    "test": 0.0,
+    "verify": 0.004844682
+  },
+  "total_measured_cost_usd": 0.008509,
+  "p3_forecast_budget": {
+    "label": "FORECAST",
+    "basis": "p1 measured baseline-arm cost x 2 headroom",
+    "measured_cost_usd": 0.008509,
+    "forecast_per_cell_usd": 0.017018,
+    "note": "FORECAST, not measured. p3 must report each later cell's forecast and actual cost separately. The p1 measured cost ($0.008509) is the first baseline-arm measurement; the p3 budget is its 2x headroom. This forecast applies to the remaining cells (gate-arm clean + critical/style x both arms) until p2 measures the gate-arm cost."
+  }
+}

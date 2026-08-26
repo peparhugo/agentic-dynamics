@@ -1,0 +1,34 @@
+{
+  "schema_version": "cap_2a_candidate_manifest/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p1_measure_baseline_cell",
+  "written_at": "2026-08-26T07:00:00Z",
+  "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "target_model": "deepseek/deepseek-v4-pro",
+  "target_backend": "opencode",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "candidates": [
+    {
+      "candidate_id": "c1_clean_baseline",
+      "arm": "baseline",
+      "path": "workflows/operations/cap_2a_cell_clean.yaml",
+      "path_sha256": "65730a228e238513747fdd658679d4b89389140f92f2a26021170cab338cbba0",
+      "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+      "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+      "model": "deepseek/deepseek-v4-pro",
+      "backend": "opencode",
+      "seeded_app_worktree": "/tmp/cap2a_cell_clean_rerun3",
+      "seeded_app_seed_revision": "98df701107821dbe1038d28650e53c26f57e9a0b",
+      "finops_cell_id": "cap2a_r3_clean_baseline",
+      "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+      "forecast_cost_usd": null,
+      "forecast_note": "FORECAST — no historical cost exists for the rerun3 baseline arm (first measurement). The only prior is the rerun2 shadow-mode clean cell ($0.012875), recorded as an informative prior only. The p1 measured cost is the first measurement; the p3 forecast budget is set to measured x 2 headroom after this run (labeled FORECAST).",
+      "expected_realized_class": "no_rework",
+      "note": "E4 discipline: p1 measures ONE cell (the clean stimulus in the baseline arm, shadow-only applied=false) before p2 (gate arm) and p3 (critical + style x both arms). The clean stimulus is UNCHANGED from rerun2 (path_sha256 identical to rerun2's c1_clean_variant)."
+    }
+  ],
+  "selection": {
+    "chosen": "c1_clean_baseline",
+    "reason": "p1 is the E4 baseline-arm measurement of the CLEAN stimulus first: the deterministic no-defect variant that must mint new_sonar_critical_count=0 and emit a non-rework (continue) proposal, shadow-only (applied=false). The gate-arm clean cell (p2) and the critical/style x both-arm cells (p3) are not run until p1's measured cost + FORECAST budget are committed."
+  }
+}
