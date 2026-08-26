@@ -14,6 +14,15 @@ one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_trans
 - **maintained command** — reached via `agentic-dynamics <subcommand>` (the Stage 3 CLI).
 - **historical analysis** — the 19 active lab books, reached via `agentic-dynamics analyze lab <name>`.
 - **one-time migration** — archived to `scripts/archive/` (fold WS-10), not maintained.
+- **archive lint policy** (decided in `cap_stabilization_release` p2, hard rule 3) — the
+  `one-time` bucket is IMMUTABLE HISTORICAL MATERIAL (frozen migrations, never re-run), but it
+  is kept ruff-clean rather than excluded: its findings were trivial auto-fixes (unused imports
+  + import sorting, zero semantic change), so `ruff check scripts/` stays exception-free and
+  the adversarial reviewer sees a clean tree, not a carve-out. The per-file-ignores exclusion
+  was rejected because ruff 0.16 has no catch-all selector (`"*"` is refused) — exclusion
+  would mean listing rule codes, a fragile, widening-prone exception. Keep future archive
+  additions lint-clean. *(This note was dropped when merge `26eb0e32b` reverted CONTEXT.md to
+  main's version mid-campaign; restored by `cap_stabilization_release` p2-recheck.)*
 - **deprecated** — none remain: WS-09 (`review_worker.py`) retired in this phase; the WS-01
   scripts (`plan.py`, `analyze_with_ollama/opencode`, `build_graph`, 8 `*_DEPRECATED_bge_m3`)
   were retired in Stage 1.
