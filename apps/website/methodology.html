@@ -6,6 +6,8 @@
 <meta name="description" content="The Agentic Dynamics instrument captures events, derives information, and keeps evidence classes separate.">
 <title>The Instrument | Agentic Dynamics</title>
 <link rel="stylesheet" href="base.css">
+<script src="data.js">
+</script>
 <script src="assets/design-components.js">
 </script>
 <script src="app.js">
@@ -49,6 +51,20 @@
 <p>
 <span class="ad-evidence" data-evidence="P">[P] POLICY</span> a design, proposal, or authorization boundary.</p>
 </aside>
+</section>
+<section class="ad-section ad-reading">
+<p class="ad-kicker">Modeled boundary</p>
+<h2>Keep a scenario separate from a measurement.</h2>
+<p>The immediate story-cost arc is unavailable in the canonical lab output. The second panel is a transparent [C] scenario: change only the [P] context-inflation input and inspect the resulting curve without turning it into a forecast.</p>
+<figure class="ad-figure" data-ad-diagram="curves">
+<figcaption>Figure 1. Cost surfaces remain separate: unavailable immediate series [NULL] and cumulative scenario [C]. Adapted from `references/d3-line-arc.html` and `references/d3-interactive-curve.html`.</figcaption>
+</figure>
+<div class="ad-curve-control">
+<label for="ad-beta">Context-inflation beta [P]</label>
+<input id="ad-beta" data-ad-beta type="range" min="0" max="0.01" step="0.0001" aria-describedby="ad-beta-note">
+<output data-ad-beta-value for="ad-beta">not loaded</output>
+<p id="ad-beta-note" class="ad-note">[P] `design_parameters.beta`: this control redraws only the modeled curve. It cannot alter the measured or unavailable panel.</p>
+</div>
 </section>
 <section class="ad-section ad-reading">
 <p class="ad-kicker">Provenance is a method</p>

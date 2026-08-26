@@ -3,6 +3,33 @@
 
 /* --- Design Tokens --- */
 :root {
+   /* Editorial v2 publication tokens. These are defined here rather than in a
+      page-local stylesheet so every chapter and printable inline SVG agrees. */
+   --paper: #f7f4ed;
+   --paper-deep: #ebe5d8;
+   --ink: #17212b;
+   --ink-soft: #53606a;
+   --line: #d5cec1;
+   --measured: #287271;
+   --computed: #9b6a28;
+   --heuristic: #6b5f8d;
+   --external: #396f9c;
+   --policy: #8d4551;
+   --null: #6f7477;
+   --focus-v2: #155f87;
+   --font-serif: Georgia, 'Times New Roman', serif;
+   --font-sans: 'IBM Plex Sans', Arial, sans-serif;
+   --font-mono: 'SFMono-Regular', Consolas, monospace;
+   --space-1: .375rem;
+   --space-2: .75rem;
+   --space-3: 1.25rem;
+   --space-4: 2rem;
+   --space-5: 3.25rem;
+   --space-6: 5.25rem;
+   --radius-sm: .25rem;
+   --radius-md: .5rem;
+   --radius-lg: .75rem;
+   --shadow-paper: 0 10px 30px rgba(38, 34, 26, .08);
   /* Dark theme */
   --bg: #070A0F;
   --bg2: #0B111A;
@@ -418,6 +445,18 @@ body.light .cta-btn:hover{box-shadow:0 16px 42px rgba(8,145,178,0.28)}
 .ad-note{margin-top:var(--space-3);font:500 .78rem/1.5 var(--font-sans);color:var(--ink-soft)}
 .ad-note strong{color:var(--ink)}
 
+/* Adapted from the local Scrollama-derived references: sticky reading provides
+   context on wide screens while source-order stays complete and linear on mobile. */
+.ad-scroll-sequence{display:grid;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:var(--space-5);align-items:start}
+.ad-scroll-sticky{position:sticky;top:5rem}
+
+/* The lone explorable diagram has one explicit [P] input so the computed curve
+   cannot be mistaken for a hidden prediction or a measured result. */
+.ad-curve-control{display:grid;grid-template-columns:auto minmax(10rem,1fr) auto;gap:var(--space-2);align-items:center;margin-top:var(--space-3);padding:var(--space-3);border:1px solid var(--line);background:var(--paper-deep);font:700 .75rem/1.2 var(--font-sans);color:var(--ink)}
+.ad-curve-control input{inline-size:100%;accent-color:var(--computed)}
+.ad-curve-control output{font:700 .82rem/1 var(--font-mono);color:var(--computed)}
+.ad-curve-control .ad-note{grid-column:1 / -1;margin:0}
+
 /* The rule cards use native buttons: no hover-only flip and no script-only state. */
 .ad-rule-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:var(--space-3)}
 .ad-rule{border:1px solid var(--line);border-radius:var(--radius-md);background:#fffdf8;overflow:hidden;box-shadow:0 2px 0 rgba(41,35,24,.03)}
@@ -431,6 +470,9 @@ body.light .cta-btn:hover{box-shadow:0 16px 42px rgba(8,145,178,0.28)}
 .ad-rule__body[hidden]{display:none}
 .ad-rule__body p{font:inherit;color:inherit;margin:0 0 var(--space-2)}
 .ad-rule__meta{padding-top:var(--space-2);border-top:1px solid var(--line);font:500 .69rem/1.45 var(--font-mono);color:var(--ink-soft)}
+.ad-rule > summary{cursor:pointer;padding:var(--space-3);font:700 .9rem/1.4 var(--font-sans);color:var(--ink)}
+.ad-rule > summary strong{font:700 .7rem/1 var(--font-mono);color:var(--ink-soft)}
+.ad-rule > details + p,.ad-rule > p{padding:0 var(--space-3) var(--space-3);font:500 .82rem/1.5 var(--font-sans);color:var(--ink-soft)}
 
 /* SVG components share a constrained, printable graphic vocabulary. */
 .ad-diagram .frame{fill:#fffdf8;stroke:var(--line);stroke-width:1}
@@ -444,12 +486,12 @@ body.light .cta-btn:hover{box-shadow:0 16px 42px rgba(8,145,178,0.28)}
 .ad-diagram .node-computed{fill:#f5ead8;stroke:var(--computed);stroke-width:1.2}
 .ad-diagram .node-policy{fill:#f5e4e5;stroke:var(--policy);stroke-width:1.2}
 .ad-diagram .node-null{stroke:var(--null);stroke-width:1.2}
-.ad-diagram .label{fill:var(--ink);font:700 12px var(--font-sans)}
-.ad-diagram .small{fill:var(--ink-soft);font:500 9px var(--font-sans)}
-.ad-diagram .micro{fill:var(--ink-soft);font:700 8px var(--font-mono);letter-spacing:.08em}
-.ad-diagram .tag-m{fill:var(--measured);font:700 8px var(--font-mono)}
-.ad-diagram .tag-c{fill:var(--computed);font:700 8px var(--font-mono)}
-.ad-diagram .tag-p{fill:var(--policy);font:700 8px var(--font-mono)}
+.ad-diagram .label{fill:var(--ink);font:700 18px var(--font-sans)}
+.ad-diagram .small{fill:var(--ink-soft);font:500 13px var(--font-sans)}
+.ad-diagram .micro{fill:var(--ink-soft);font:700 11px var(--font-mono);letter-spacing:.08em}
+.ad-diagram .tag-m{fill:var(--measured);font:700 12px var(--font-mono)}
+.ad-diagram .tag-c{fill:var(--computed);font:700 12px var(--font-mono)}
+.ad-diagram .tag-p{fill:var(--policy);font:700 12px var(--font-mono)}
 .ad-diagram .curve-measured{fill:none;stroke:var(--measured);stroke-width:2.5}
 .ad-diagram .curve-computed{fill:none;stroke:var(--computed);stroke-width:2.5;stroke-dasharray:6 4}
 .ad-diagram .point{fill:var(--measured)}
@@ -460,7 +502,10 @@ body.light .cta-btn:hover{box-shadow:0 16px 42px rgba(8,145,178,0.28)}
   .ad-shell{width:min(100% - 1.25rem,76rem)}
   .ad-section{padding:var(--space-5) 0}
   .ad-figure-grid{grid-template-columns:1fr}
-  .ad-figure{margin-top:var(--space-3)}
+   .ad-figure{margin-top:var(--space-3)}
+   .ad-scroll-sequence{display:block}
+   .ad-scroll-sticky{position:static}
+   .ad-curve-control{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion: reduce){
   .ad-page *, .ad-page *::before, .ad-page *::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}

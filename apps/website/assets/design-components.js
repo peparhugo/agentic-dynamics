@@ -3,8 +3,9 @@
  *
  * The gallery uses this file as a source of inline SVG, rather than external images,
  * so each diagram remains selectable, accessible, printable, and easy to cite. The
- * functions intentionally contain no data fetching or rendering dependency; later
- * pages pass only already-provenanced display values into this visual layer.
+ * functions intentionally contain no data fetching or rendering dependency; pages
+ * pass only already-provenanced data.js values into this visual layer. Adapted from
+ * references/svg-marker-flow.html, svg-pattern-surface.html, and svg-filter-focus.html.
  */
 (function () {
   "use strict";
@@ -18,6 +19,14 @@
     </defs>`;
 
   let diagramCount = 0;
+
+  /**
+   * Formats a data-door number without inventing a numeric fallback. A missing
+   * publication field stays visibly unavailable, which protects the corpus boundary.
+   */
+  function count(value) {
+    return value == null ? "not loaded" : Number(value).toLocaleString();
+  }
 
   function svg(title, description, body, viewBox) {
     // Every inline SVG needs unique IDs so a screen reader resolves its own title,
@@ -44,7 +53,10 @@
     return `<svg class="ad-diagram" viewBox="${viewBox || "0 0 760 360"}" role="img" aria-labelledby="ad-title${suffix} ad-desc${suffix}"><title id="ad-title${suffix}">${title}</title><desc id="ad-desc${suffix}">${description}</desc>${scopedDefs}${scopedBody}</svg>`;
   }
 
-  function instrumentCycle() {
+  // Adapted from references/svg-marker-flow.html and svg-animated-status.html.
+  function instrumentCycle(summary) {
+    const sessions = count(summary && summary.sessions_total);
+    const findings = count(summary && summary.canonical_findings);
     return svg("The Agentic Dynamics instrument cycle", "A five-step cycle where instrumented events are derived into information before policy is written and tested.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
       <text class="micro" x="36" y="42">FIELD METHOD / ONE IDEA</text>
@@ -57,57 +69,70 @@
       <g transform="translate(515 92)"><circle class="node-policy" cx="58" cy="58" r="48"/><text class="label" x="58" y="55" text-anchor="middle">3 Write policy</text><text class="small" x="58" y="71" text-anchor="middle">consume signals</text><text class="tag-p" x="58" y="89" text-anchor="middle">[P]</text></g>
       <g transform="translate(450 214)"><circle class="node-policy" cx="58" cy="58" r="48"/><text class="label" x="58" y="55" text-anchor="middle">4 Grid</text><text class="small" x="58" y="71" text-anchor="middle">compare arms</text><text class="tag-p" x="58" y="89" text-anchor="middle">[P]</text></g>
       <g transform="translate(205 214)"><circle class="node-computed" cx="58" cy="58" r="48"/><text class="label" x="58" y="55" text-anchor="middle">5 Campaign</text><text class="small" x="58" y="71" text-anchor="middle">change one factor</text><text class="tag-c" x="58" y="89" text-anchor="middle">[C]</text></g>
-      <text class="small" x="380" y="180" text-anchor="middle">No policy consumes information that the instrument did not produce.</text>`);
+      <text class="small" x="380" y="180" text-anchor="middle">No policy consumes information that the instrument did not produce.</text>
+      <text class="micro" x="380" y="198" text-anchor="middle">CURRENT RECEIPT: ${sessions} sessions [M] / ${findings} findings [M]</text>`);
   }
 
-  function nxmProblem() {
+  // Adapted from references/svg-pattern-surface.html and type-responsive-grid.html.
+  function nxmProblem(summary) {
+    const sessions = count(summary && summary.sessions_total);
+    const findings = count(summary && summary.canonical_findings);
     return svg("N by M evidence surface", "Linked sessions cross independent measurement angles, then analysis creates a second evidence burden.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
       <text class="micro" x="36" y="42">WHY ONE TASK IS NOT ENOUGH</text>
       <text class="label" x="72" y="86">N linked sessions</text><text class="small" x="72" y="103">Each output becomes the next context.</text>
-      <text class="label" x="480" y="86">M measurement angles</text><text class="small" x="480" y="103">Tests alone do not establish durable value.</text>
-      <path class="flow" d="M235 146H330"/><path class="flow" d="M430 146H515"/>
-      <g transform="translate(72 130)"><rect class="node" width="164" height="44" rx="6"/><text class="label" x="82" y="19" text-anchor="middle">S1 -> S2 -> ... -> SN</text><text class="small" x="82" y="34" text-anchor="middle">inherited codebase</text></g>
-      <g transform="translate(330 120)"><rect class="node-computed" width="100" height="64" rx="6"/><text class="label" x="50" y="27" text-anchor="middle">N x M</text><text class="tag-c" x="50" y="45" text-anchor="middle">surface</text></g>
-      <g transform="translate(515 130)"><rect class="node" width="174" height="44" rx="6"/><text class="label" x="87" y="19" text-anchor="middle">quality | cost | recovery</text><text class="small" x="87" y="34" text-anchor="middle">verification | uncertainty</text></g>
-      <rect x="84" y="222" width="580" height="70" rx="8" fill="url(#ad-hatch)" stroke="#6f7477"/>
-      <text class="label" x="374" y="250" text-anchor="middle">A second burden: analyze across factors, commits, and positions.</text>
-      <text class="small" x="374" y="270" text-anchor="middle">Hatched surface = method map, not a measured count. [P]</text>`);
+      <text class="label" x="490" y="86">M measurement angles</text><text class="small" x="490" y="103">Tests alone do not establish durable value.</text>
+      <path class="flow" d="M92 132H292"/><path class="flow" d="M92 164H292"/><path class="flow" d="M92 196H292"/>
+      <path class="flow-measured" d="M472 118V242"/><path class="flow-measured" d="M548 118V242"/><path class="flow-measured" d="M624 118V242"/>
+      <rect x="292" y="118" width="180" height="124" rx="8" fill="url(#ad-hatch)" stroke="#6f7477"/>
+      <text class="label" x="382" y="164" text-anchor="middle">N x M evidence</text><text class="tag-c" x="382" y="181" text-anchor="middle">surface [P]</text><text class="small" x="382" y="202" text-anchor="middle">linked work x angles</text>
+      <text class="small" x="84" y="131">S1</text><text class="small" x="84" y="163">S2</text><text class="small" x="84" y="195">SN</text><text class="small" x="452" y="112">quality</text><text class="small" x="531" y="112">cost</text><text class="small" x="600" y="112">recovery</text>
+      <path class="flow-policy" d="M382 242V282H628"/><text class="label" x="492" y="278" text-anchor="middle">second pass: compare positions and factors</text>
+      <text class="micro" x="374" y="320" text-anchor="middle">CURRENT RECEIPT: ${sessions} linked sessions [M] / ${findings} clean findings [M]</text>`);
   }
 
-  function planesMap() {
-    const planes = ["core", "experiment", "measurement", "runtime", "adapters", "knowledge", "control", "reporting"];
-    const boxes = planes.map((name, index) => {
-      const x = 42 + (index % 4) * 174;
-      const y = 92 + Math.floor(index / 4) * 112;
-      const cls = name === "control" ? "node-policy" : name === "measurement" ? "node-measured" : "node";
-      return `<g transform="translate(${x} ${y})"><rect class="${cls}" width="142" height="70" rx="8"/><text class="micro" x="14" y="20">PLANE 0${index + 1}</text><text class="label" x="14" y="46">${name}</text></g>`;
+  // Adapted from references/svg-marker-flow.html and svg-filter-focus.html.
+  function planesMap(summary) {
+    const variants = count(summary && summary.variants);
+    const tierOne = ["experiment", "measurement", "runtime", "adapters", "knowledge", "reporting"];
+    const boxes = tierOne.map((name, index) => {
+      const x = 42 + index * 116;
+      const cls = name === "measurement" ? "node-measured" : "node";
+      return `<g transform="translate(${x} 142)"><rect class="${cls}" width="102" height="56" rx="8"/><text class="micro" x="10" y="18">TIER 1</text><text class="label" x="10" y="39">${name}</text></g>`;
     }).join("");
     return svg("Eight planes of Agentic Dynamics", "The eight package planes are arranged as a dependency-aware map. Control is downstream of information-producing planes.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
-      <text class="micro" x="36" y="42">PLATFORM MAP / DEPENDENCY DIRECTION</text>
-      <path class="guide" d="M74 76H686"/><text class="small" x="74" y="66">Foundation and execution planes produce the information that control consumes.</text>
-      ${boxes}
-      <path class="flow-measured" d="M286 162V204"/><path class="flow-policy" d="M460 204V162"/>
-      <text class="tag-m" x="299" y="190">measure</text><text class="tag-p" x="472" y="190">control</text>
-      <text class="small" x="42" y="304">Architecture map only [P]. It describes ownership, not system performance.</text>`);
+       <text class="micro" x="36" y="42">PLATFORM MAP / DEPENDENCY DIRECTION</text>
+       <text class="small" x="42" y="72">Arrows point from the importer to its allowed dependency. [P]</text>
+       <g transform="translate(302 86)"><rect class="node-policy" width="156" height="34" rx="8"/><text class="micro" x="12" y="14">TIER 2</text><text class="label" x="12" y="28">control</text></g>
+       ${boxes}
+       <g transform="translate(302 236)"><rect class="node" width="156" height="46" rx="8"/><text class="micro" x="12" y="17">TIER 0</text><text class="label" x="12" y="36">core</text></g>
+       <path class="flow-policy" d="M380 120V142"/><path class="flow-measured" d="M380 198V236"/>
+       <text class="small" x="42" y="308">Architecture map only [P]. It describes ownership, not system performance.</text>
+       <text class="micro" x="42" y="324">CURRENT CORPUS: ${variants} model variants [M], not a plane-performance comparison.</text>`);
   }
 
-  function engineModes() {
+  // Adapted from references/svg-marker-flow.html.
+  function engineModes(summary) {
+    const sessions = count(summary && summary.sessions_total);
     return svg("One engine, two operating modes", "Fixed factors produce one operating cell; varied factors produce a grid, but both run through the same execution engine.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
       <text class="micro" x="36" y="42">OPERATE OR EXPERIMENT</text>
-      <g transform="translate(42 78)"><rect class="node" width="172" height="72" rx="8"/><text class="micro" x="14" y="20">OPERATE</text><text class="label" x="14" y="43">Fixed factors</text><text class="small" x="14" y="59">1 selected cell</text></g>
-      <g transform="translate(42 204)"><rect class="node-computed" width="172" height="72" rx="8"/><text class="micro" x="14" y="20">EXPERIMENT</text><text class="label" x="14" y="43">Varied factors</text><text class="small" x="14" y="59">G controlled cells [C]</text></g>
-      <path class="flow" d="M214 114H286M214 240H286"/>
-      <g transform="translate(286 140)"><rect class="node-measured" width="132" height="72" rx="36"/><text class="label" x="66" y="36" text-anchor="middle">CELL</text><text class="small" x="66" y="53" text-anchor="middle">shared unit</text></g>
-      <path class="flow-measured" d="M418 176H476M574 176H624"/>
-      <g transform="translate(476 140)"><rect class="node-measured" width="98" height="72" rx="8"/><text class="label" x="49" y="34" text-anchor="middle">ENGINE</text><text class="small" x="49" y="52" text-anchor="middle">jobs</text></g>
-      <g transform="translate(624 140)"><rect class="node" width="88" height="72" rx="8"/><text class="label" x="44" y="34" text-anchor="middle">LEDGER</text><text class="small" x="44" y="52" text-anchor="middle">events</text></g>
-      <path class="flow-policy" d="M668 212V262H340"/><text class="tag-p" x="500" y="253">only G > 1: compare arms -> adapt</text>`);
+       <g transform="translate(34 78)"><rect class="node" width="150" height="72" rx="8"/><text class="micro" x="14" y="20">OPERATE</text><text class="label" x="14" y="43">Fixed factors</text><text class="small" x="14" y="59">one selected cell</text></g>
+       <g transform="translate(34 204)"><rect class="node-computed" width="150" height="72" rx="8"/><text class="micro" x="14" y="20">EXPERIMENT</text><text class="label" x="14" y="43">Varied factors</text><text class="small" x="14" y="59">controlled grid [C]</text></g>
+       <path class="flow" d="M184 114H224M184 240H224"/>
+       <g transform="translate(224 140)"><rect class="node-measured" width="88" height="72" rx="8"/><text class="label" x="44" y="34" text-anchor="middle">CELL</text><text class="small" x="44" y="52" text-anchor="middle">unit</text></g>
+       <path class="flow-measured" d="M312 176H346M426 176H460M540 176H574"/>
+       <g transform="translate(346 140)"><rect class="node" width="80" height="72" rx="8"/><text class="label" x="40" y="34" text-anchor="middle">COMPILE</text><text class="small" x="40" y="52" text-anchor="middle">jobs</text></g>
+       <g transform="translate(460 140)"><rect class="node-measured" width="80" height="72" rx="8"/><text class="label" x="40" y="34" text-anchor="middle">ATTEMPTS</text><text class="small" x="40" y="52" text-anchor="middle">events</text></g>
+       <g transform="translate(574 140)"><rect class="node" width="100" height="72" rx="8"/><text class="label" x="50" y="34" text-anchor="middle">LEDGER</text><text class="small" x="50" y="52" text-anchor="middle">record</text></g>
+       <path class="flow-policy" d="M109 276V304H574"/><text class="tag-p" x="344" y="296">only the grid: compare arms -> adapt</text>
+       <text class="micro" x="42" y="314">CURRENT RECEIPT: ${sessions} captured sessions [M]; count does not alter this architecture [P].</text>`);
   }
 
-  function autonomyEnvelope() {
+  // Adapted from references/svg-pattern-surface.html and svg-filter-focus.html.
+  function autonomyEnvelope(summary) {
+    const findings = count(summary && summary.canonical_findings);
     return svg("Bounded autonomy envelope", "Human policy defines constraints around a bounded autonomous execution and independent verification path.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
       <text class="micro" x="36" y="42">BOUNDED AUTONOMY / POLICY MAP</text>
@@ -118,20 +143,39 @@
       <g transform="translate(280 132)"><rect class="node" width="132" height="74" rx="8"/><text class="label" x="66" y="33" text-anchor="middle">Execute</text><text class="small" x="66" y="52" text-anchor="middle">attempts</text></g>
       <path class="flow-measured" d="M412 169H482"/>
       <g transform="translate(482 132)"><rect class="node-measured" width="132" height="74" rx="8"/><text class="label" x="66" y="33" text-anchor="middle">Verify</text><text class="small" x="66" y="52" text-anchor="middle">independent test</text><text class="tag-m" x="66" y="65" text-anchor="middle">[M]</text></g>
-      <path class="flow" d="M548 206V248H440"/><path class="flow-policy" d="M548 206V248H638"/>
-      <text class="label" x="405" y="266">reject / rework</text><text class="label" x="642" y="266" text-anchor="middle">accept or halt</text>
-      <text class="small" x="66" y="318">Typed checkpoints are not-run instrumentation, not an implied capability. [NULL]</text>`);
+       <path class="flow" d="M548 206V248H400"/><path class="flow-policy" d="M548 206V248H552"/><path class="flow-policy" d="M548 206V248H654"/>
+       <text class="label" x="400" y="266" text-anchor="middle">reject / rework</text><text class="label" x="552" y="266" text-anchor="middle">accept</text><text class="label" x="654" y="266" text-anchor="middle">halt / escalate</text>
+       <text class="small" x="66" y="318">Typed checkpoints are not-run instrumentation, not an implied capability. [NULL]</text>
+       <text class="micro" x="66" y="334">CURRENT RECEIPT: ${findings} clean findings [M]; no authorization is inferred.</text>`);
   }
 
-  function costCurves() {
+  // Adapted from references/d3-line-arc.html and d3-interactive-curve.html.
+  function costCurves(designParameters) {
+    const beta = designParameters && designParameters.beta ? designParameters.beta.value : null;
+    const betaLabel = beta == null ? "not loaded" : Number(beta).toFixed(4);
+    const numericBeta = Number(beta);
+    // The curve is re-derived from the displayed formula on each range input, so
+    // the visual movement represents only the declared [P] beta assumption.
+    const curvePath = Number.isFinite(numericBeta) ? (() => {
+      const maximumN = 100;
+      const scenarioCost = (n) => n + numericBeta * n * (n - 1) / 2;
+      const maximumCost = scenarioCost(maximumN);
+      return Array.from({ length: 6 }, (_, index) => {
+        const n = index * maximumN / 5;
+        const x = 42 + (204 * index / 5);
+        const y = 145 - (109 * scenarioCost(n) / maximumCost);
+        return `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+      }).join(" ");
+    })() : "M42 145";
     return svg("Observed and modeled cost curves are separate", "The current corpus has no canonical story-arc lab output, while the cumulative curve is explicitly modeled from a beta assumption.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
       <text class="micro" x="36" y="42">COST SURFACES / DO NOT MERGE EVIDENCE CLASSES</text>
       <g transform="translate(50 78)"><rect class="node-null" width="286" height="188" rx="8"/><text class="label" x="18" y="30">Immediate story arc</text><text class="small" x="18" y="49">Current canonical lab output is absent.</text><path class="guide-dash" d="M38 150H248M38 150V72"/><text class="small" x="143" y="115" text-anchor="middle">not measured</text><text class="micro" x="18" y="172">[NULL] no published series</text></g>
-      <g transform="translate(424 78)"><rect class="node-computed" width="286" height="188" rx="8"/><text class="label" x="18" y="30">Cumulative scenario</text><text class="small" x="18" y="49">C(N) = N + beta*N(N-1)/2</text><path class="guide" d="M38 150H248M38 150V72"/><path class="curve-computed" d="M42 145C96 142 144 130 181 105S234 52 246 36"/><text class="tag-c" x="158" y="77">[C] beta is an input</text><text class="small" x="18" y="172">model, not forecast</text></g>
+       <g transform="translate(424 78)"><rect class="node-computed" width="286" height="188" rx="8"/><text class="label" x="18" y="30">Cumulative scenario</text><text class="small" x="18" y="49">C(N) = N + beta*N(N-1)/2</text><path class="guide" d="M38 150H248M38 150V72"/><path class="curve-computed" d="${curvePath}"/><text class="tag-c" x="158" y="77">[C] beta = ${betaLabel}, an input</text><text class="small" x="18" y="172">model, not forecast</text></g>
       <text class="small" x="380" y="308" text-anchor="middle">A displayed curve must say whether it is observed, computed, or unavailable.</text>`);
   }
 
+  // Adapted from references/svg-marker-flow.html and svg-pattern-surface.html.
   function escalationChain(escalation) {
     // Campaign measurements arrive through data.js. Diagram structure is static;
     // values are never duplicated here as presentation fallbacks.
@@ -154,6 +198,7 @@
       <text class="small" x="42" y="314">Ratios are descriptive measurements, not a provider recommendation.</text>`);
   }
 
+  // Adapted from references/scroll-sticky-overlay.html and d3-line-arc.html.
   function calibrationArc(calibration, campaign) {
     const rerun = calibration && calibration.rerun ? calibration.rerun : {};
     const staticArm = campaign && campaign.static ? campaign.static : {};
@@ -164,38 +209,62 @@
     const ratio = decision.cpvo_ratio == null ? "not loaded" : Number(decision.cpvo_ratio).toFixed(4);
     const interval = ci.length === 2 ? `[${Number(ci[0]).toFixed(4)}, ${Number(ci[1]).toFixed(4)}]` : "not loaded";
     const rerunInterval = rerunCi.length === 2 ? `[${Number(rerunCi[0]).toFixed(4)}, ${Number(rerunCi[1]).toFixed(4)}]` : "not loaded";
+    const armRate = (arm) => arm.accepted_outcomes == null || arm.n == null
+      ? "not loaded"
+      : `${arm.accepted_outcomes} / ${arm.n}`;
     return svg("Calibration arc from descriptive rerun to randomized decision", "A retained descriptive calibration rerun leads to a randomized non-inferiority decision limited to design review; an earlier score is named unavailable rather than recreated.", `
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
       <text class="micro" x="36" y="42">CALIBRATION ARC / UNCERTAINTY STAYS VISIBLE</text>
-      <path class="flow" d="M362 170H402"/>
-      <g transform="translate(42 96)"><rect class="node-null" width="286" height="150" rx="8"/><text class="micro" x="16" y="23">EARLIER CALIBRATION</text><text class="label" x="16" y="54">score not retained</text><text class="small" x="16" y="77">no historical rate is reproduced</text><text class="small" x="16" y="104">absence is not a zero</text><text class="micro" x="16" y="128">[NULL] artifact unavailable</text></g>
-      <g transform="translate(402 96)"><rect class="node-computed" width="286" height="150" rx="8"/><text class="micro" x="16" y="23">RERUN 2 → RANDOMIZED 2B</text><text class="label" x="16" y="54">${rerun.hits == null ? "?" : rerun.hits} / ${rerun.n == null ? "?" : rerun.n} → ${decision.decision || "NOT LOADED"}</text><text class="small" x="16" y="77">rerun Wilson ${rerunInterval} [C]</text><text class="small" x="16" y="98">2b CPVO ratio ${ratio}; CI ${interval}</text><text class="tag-p" x="16" y="128">[P] design review only</text></g>
+      <path class="flow" d="M250 170H278M490 170H518"/>
+      <g transform="translate(34 96)"><rect class="node-null" width="216" height="150" rx="8"/><text class="micro" x="14" y="23">EARLIER CALIBRATION</text><text class="label" x="14" y="54">score not retained</text><text class="small" x="14" y="77">no historical rate reproduced</text><text class="small" x="14" y="100">absence is not a zero</text><text class="micro" x="14" y="128">[NULL] artifact unavailable</text></g>
+      <g transform="translate(278 96)"><rect class="node-measured" width="212" height="150" rx="8"/><text class="micro" x="14" y="23">DESCRIPTIVE RERUN</text><text class="label" x="14" y="54">${rerun.hits == null ? "?" : rerun.hits} / ${rerun.n == null ? "?" : rerun.n} hits [M]</text><text class="small" x="14" y="77">Wilson ${rerunInterval} [C]</text><text class="small" x="14" y="100">descriptive only</text><text class="tag-m" x="14" y="128">n remains visible</text></g>
+      <g transform="translate(518 96)"><rect class="node-computed" width="184" height="150" rx="8"/><text class="micro" x="14" y="23">RANDOMIZED 2B</text><text class="label" x="14" y="52">${decision.decision || "NOT LOADED"} [C]</text><text class="small" x="14" y="76">static ${armRate(staticArm)} [M]</text><text class="small" x="14" y="96">adaptive ${armRate(adaptiveArm)} [M]</text><text class="small" x="14" y="116">ratio ${ratio}; ${interval} [C]</text><text class="tag-p" x="14" y="134">design review only [P]</text></g>
       <text class="small" x="368" y="302" text-anchor="middle">The final panel does not arm a policy or activate control.</text>`);
   }
 
   const rules = [
-    ["01", "Instrument first", "measured", "Policy inputs must exist on the ledger before a policy consumes them.", "Input: captured event fields. Status: measurement premise.", "[M] ledger coverage"],
-    ["02", "Separate result from model", "decided", "A measured result and a computed extension receive different labels and figures.", "Input: provenance class and formula. Status: adopted editorial rule.", "[P] publication policy"],
-    ["03", "Show the cost surface", "proposal", "Cumulative context growth is a scenario to test, not a forecast to sell.", "Input: beta assumption. Status: proposed explorable.", "[C] modeled input"],
-    ["04", "Verify independently", "measured", "Agent self-report and independently executed tests are not interchangeable.", "Input: runtime test runner. Status: instrumented signal.", "[M] independent test"],
-    ["05", "Route as an arm", "proposal", "A route becomes evidence only when compared under a controlled assignment.", "Input: factor grid. Status: not broadly activated.", "[P] policy proposal"],
-    ["06", "Publish nulls", "measured", "Missing LSP coverage and untriggered escalation remain named outcomes.", "Input: coverage and trigger state. Status: current limitation.", "[M] absence state"],
-    ["07", "Keep a corpus boundary", "measured", "Historical precursor and current linked-story figures must not be merged.", "Input: manifest identity and date. Status: current receipt.", "[M] corpus identity"],
-    ["08", "Change one factor", "proposal", "Campaign adaptation isolates its next uncertainty rather than changing everything at once.", "Input: campaign selection. Status: design practice.", "[P] campaign rule"],
-    ["09", "State uncertainty", "decided", "The calibration record carries n and interval before any decision wording.", "Input: registered decision rule. Status: adopted reporting standard.", "[C] decision summary"],
-    ["10", "Respect authorization", "decided", "NON-INFERIOR in cap_2b authorizes design review only, not actuation.", "Input: accepted verdict. Status: decided boundary.", "[P] authorization"],
+    ["01", "Instrument first", "instrumented", "Policy inputs must exist on the ledger before a policy consumes them.", "captured event fields", "[M] ledger coverage", "experiment_spec.py ledger contract", "coverage is not universal evidence", "extend ledger coverage before a new policy arm"],
+    ["02", "Separate result from model", "decided", "A measured result and a computed extension receive different labels and figures.", "provenance class and formula", "[P] publication policy", "cap_site_revamp_research.md", "an editorial rule cannot validate an outcome", "audit new figures for tag and denominator"],
+    ["03", "Show the cost surface", "proposal", "Cumulative context growth is a scenario to test, not a forecast to sell.", "beta assumption", "[C] modeled input", "design_parameters.beta", "no canonical immediate story arc is published", "measure a canonical story-cost series"],
+    ["04", "Verify independently", "instrumented", "Agent self-report and independently executed tests are not interchangeable.", "runtime test runner", "[M] independent test", "runtime.test_runner", "a suite can be absent or incomplete", "capture test execution coverage per attempt"],
+    ["05", "Route as an arm", "proposal", "A route becomes evidence only when compared under a controlled assignment.", "factor grid", "[P] policy proposal", "experiment_spec.py factor design", "no broadly activated routing claim", "run a controlled routing comparison"],
+    ["06", "Publish nulls", "instrumented", "Missing LSP coverage and untriggered escalation remain named outcomes.", "coverage and trigger state", "[M] absence state", "campaigns.session_routing", "an untriggered arm does not estimate its premium", "create a triggered escalation campaign"],
+    ["07", "Keep a corpus boundary", "instrumented", "Historical precursor and current linked-story figures must not be merged.", "manifest identity and date", "[M] corpus identity", "data.js summary and manifest", "corpus differences constrain comparison", "publish a bridge study only with a declared join"],
+    ["08", "Change one factor", "proposal", "Campaign adaptation isolates its next uncertainty rather than changing everything at once.", "campaign selection", "[P] campaign rule", "ExperimentSpec adapt contract", "one-factor change may be slower", "select the next uncertainty explicitly"],
+    ["09", "State uncertainty", "decided", "The calibration record carries n and interval before any decision wording.", "registered decision rule", "[C] decision summary", "campaigns.calibration and cap_2b", "the calibration rerun is descriptive", "replicate the randomized comparison"],
+    ["10", "Respect authorization", "decided", "A campaign decision authorizes design review only, not actuation.", "accepted verdict and authorization", "[P] authorization", "campaigns.cap_2b", "the decision does not arm control", "record a separate actuation authorization"],
   ];
 
-  function rulesComponent() {
+  // Adapted from references/card-details.html and card-tooltip-badge.html.
+  function rulesComponent(campaigns, summary, generatedAt) {
+    // Campaign-derived cards can only be decided when the current data door says
+    // so. The remaining cards describe instrumented premises or proposals, not
+    // fabricated measurements of a policy outcome.
+    const cap2b = campaigns && campaigns.cap_2b ? campaigns.cap_2b : {};
+    const escalation = campaigns && campaigns.escalation ? campaigns.escalation : {};
+    const decision = cap2b.decision_rule ? cap2b.decision_rule.decision : "not loaded";
+    const decisionStatus = cap2b.status === "DECIDED" ? "decided" : "proposal";
+    const corpusInstrumented = summary && summary.sessions_total != null;
+    const escalationMeasured = escalation.status === "MEASURED";
+    const updated = generatedAt ? String(generatedAt).slice(0, 10) : "not loaded";
     return rules.map((rule) => {
-      const [number, title, status, summary, detail, provenance] = rule;
+      const [number, title, declaredStatus, summary, inputs, provenance, source, limitation, nextTest] = rule;
+      const status = ["09", "10"].includes(number)
+        ? decisionStatus
+        : ["01", "04", "07"].includes(number) && !corpusInstrumented
+          ? "proposal"
+          : number === "06" && !escalationMeasured
+            ? "proposal"
+            : declaredStatus;
       const id = `ad-rule-${number}`;
-      const badge = {
-        measured: ["M", "MEASURED"],
-        proposal: ["P", "PROPOSAL"],
-        decided: ["C", "DECIDED"],
+      const statusLabel = {
+        instrumented: "INSTRUMENTED",
+        proposal: "PROPOSAL",
+        decided: "DECIDED",
       }[status];
-      return `<article class="ad-rule" data-status="${status}"><button class="ad-rule__toggle" type="button" aria-expanded="false" aria-controls="${id}"><span><span class="ad-rule__number">RULE ${number}</span><span class="ad-rule__status ad-evidence" data-evidence="${badge[0]}">[${badge[0]}] ${badge[1]}</span><span class="ad-rule__title">${title}</span></span><span class="ad-rule__icon" aria-hidden="true">+</span></button><div class="ad-rule__body" id="${id}" hidden><p>${summary}</p><p>${detail}</p><div class="ad-rule__meta">${provenance}</div></div></article>`;
+      const evidenceClass = provenance.slice(1, 2);
+      const decisionDetail = ["09", "10"].includes(number) ? ` Current campaign decision: ${decision} [C].` : "";
+      return `<article class="ad-rule" data-status="${status}"><button class="ad-rule__toggle" type="button" aria-expanded="false" aria-controls="${id}"><span><span class="ad-rule__number">RULE ${number}</span><span class="ad-rule__status ad-evidence" data-evidence="${evidenceClass}">[${evidenceClass}] ${statusLabel}</span><span class="ad-rule__title">${title}</span></span><span class="ad-rule__icon" aria-hidden="true">+</span></button><div class="ad-rule__body" id="${id}" hidden><p>${summary}</p><p><strong>Inputs:</strong> ${inputs}.${decisionDetail}</p><p><strong>Limitation:</strong> ${limitation} <strong>Next test:</strong> ${nextTest}.</p><div class="ad-rule__meta">${provenance} | Source: ${source} | Updated: ${updated}</div></div></article>`;
     }).join("");
   }
 

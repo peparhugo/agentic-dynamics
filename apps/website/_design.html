@@ -40,37 +40,31 @@
 
     <section id="method" class="ad-section">
       <p class="ad-kicker">Method / hand-crafted inline SVG</p><h2>Each figure teaches one idea.</h2>
-      <div class="ad-figure-grid"><figure class="ad-figure" data-diagram="cycle"><figcaption>Figure 1. The evidence-to-policy cycle. Derived information is the gate into policy.</figcaption></figure><figure class="ad-figure" data-diagram="nxm"><figcaption>Figure 2. Linked work and multiple measurements create an evidence surface.</figcaption></figure></div>
+      <div class="ad-figure-grid"><figure class="ad-figure" data-ad-diagram="cycle"><figcaption>Figure 1. The evidence-to-policy cycle. Derived information is the gate into policy.</figcaption></figure><figure class="ad-figure" data-ad-diagram="nxm"><figcaption>Figure 2. Linked work and multiple measurements create an evidence surface.</figcaption></figure></div>
     </section>
 
     <section id="platform" class="ad-section">
       <p class="ad-kicker">Platform / policy boundary</p><h2>Architecture is distinct from evidence.</h2>
-      <div class="ad-figure-grid"><figure class="ad-figure" data-diagram="planes"><figcaption>Figure 3. The eight planes, labeled as architecture [P], not performance evidence.</figcaption></figure><figure class="ad-figure" data-diagram="engine"><figcaption>Figure 4. Fixed and varied assignments share one execution engine.</figcaption></figure></div>
-      <figure class="ad-figure" data-diagram="autonomy"><figcaption>Figure 5. The bounded-autonomy envelope keeps constraints, verification, and stop paths visible.</figcaption></figure>
+      <div class="ad-figure-grid"><figure class="ad-figure" data-ad-diagram="planes"><figcaption>Figure 3. The eight planes, labeled as architecture [P], not performance evidence.</figcaption></figure><figure class="ad-figure" data-ad-diagram="engine"><figcaption>Figure 4. Fixed and varied assignments share one execution engine.</figcaption></figure></div>
+      <figure class="ad-figure" data-ad-diagram="autonomy"><figcaption>Figure 5. The bounded-autonomy envelope keeps constraints, verification, and stop paths visible.</figcaption></figure>
     </section>
 
     <section id="evidence" class="ad-section">
       <p class="ad-kicker">Evidence / uncertainty made visible</p><h2>Do not merge what the evidence does not support.</h2>
-      <div class="ad-figure-grid"><figure class="ad-figure" data-diagram="curves"><figcaption>Figure 6. Current missing story-arc data and a modeled cumulative curve remain separate.</figcaption></figure><figure class="ad-figure" data-diagram="escalation"><figcaption>Figure 7. Measured escalation costs and computed E_x ratios retain their n=1 scope.</figcaption></figure></div>
-      <figure class="ad-figure" data-diagram="calibration"><figcaption>Figure 8. Calibration ends at a design-review boundary, not a claim of autonomous activation.</figcaption></figure>
+      <div class="ad-figure-grid"><figure class="ad-figure" data-ad-diagram="curves"><figcaption>Figure 6. Current missing story-arc data and a modeled cumulative curve remain separate.</figcaption></figure><figure class="ad-figure" data-ad-diagram="escalation"><figcaption>Figure 7. Measured escalation costs and computed E_x ratios retain their n=1 scope.</figcaption></figure></div>
+      <figure class="ad-figure" data-ad-diagram="calibration"><figcaption>Figure 8. Calibration ends at a design-review boundary, not a claim of autonomous activation.</figcaption></figure>
       <aside class="ad-receipt"><span class="ad-evidence" data-evidence="NULL">[NULL]</span><span><strong>Current story arc:</strong> no canonical lab output is available in `data.js.labs`, so this gallery deliberately does not fabricate immediate cost points.</span></aside>
     </section>
 
     <section id="rules" class="ad-section">
       <p class="ad-kicker">Interactive component / native controls</p><h2>Ten rules, each with a status.</h2>
       <p class="ad-lead">Use Tab to reach a card and Enter or Space to expand it. The summary, source class, and limitation remain readable without a hover or a script framework.</p>
-      <div id="rules-grid" class="ad-rule-grid" aria-label="Ten Agentic Dynamics rule cards"></div>
+      <div class="ad-rule-grid" data-ad-rules aria-label="Ten Agentic Dynamics rule cards"></div>
     </section>
   </main>
   <footer class="ad-shell ad-section"><p class="ad-note"><strong>Sources:</strong> the v2 rules in `docs/designs/current/cap_site_revamp_research.md` sections 3-4; the local examples in `apps/website/references/`. This is an implementation preview, not a new evidence claim.</p></footer>
+  <script src="data.js"></script>
   <script src="assets/design-components.js"></script>
-  <script>
-    /* Each gallery slot receives semantic inline SVG from the dependency-free component module. */
-    const diagrams = {cycle: AgenticDesign.instrumentCycle, nxm: AgenticDesign.nxmProblem, planes: AgenticDesign.planesMap, engine: AgenticDesign.engineModes, autonomy: AgenticDesign.autonomyEnvelope, curves: AgenticDesign.costCurves, escalation: AgenticDesign.escalationChain, calibration: AgenticDesign.calibrationArc};
-    document.querySelectorAll('[data-diagram]').forEach((figure) => { figure.insertAdjacentHTML('afterbegin', diagrams[figure.dataset.diagram]()); });
-    const rulesGrid = document.getElementById('rules-grid');
-    rulesGrid.innerHTML = AgenticDesign.rulesComponent();
-    AgenticDesign.activateRuleCards(rulesGrid);
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
