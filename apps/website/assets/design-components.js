@@ -85,7 +85,7 @@
       <path class="flow" d="M92 132H292"/><path class="flow" d="M92 164H292"/><path class="flow" d="M92 196H292"/>
       <path class="flow-measured" d="M472 118V242"/><path class="flow-measured" d="M548 118V242"/><path class="flow-measured" d="M624 118V242"/>
       <rect x="292" y="118" width="180" height="124" rx="8" fill="url(#ad-hatch)" stroke="#6f7477"/>
-      <text class="label" x="382" y="164" text-anchor="middle">N x M evidence</text><text class="tag-c" x="382" y="181" text-anchor="middle">surface [P]</text><text class="small" x="382" y="202" text-anchor="middle">linked work x angles</text>
+      <text class="label" x="382" y="164" text-anchor="middle">N x M evidence</text><text class="tag-p" x="382" y="181" text-anchor="middle">surface [P]</text><text class="small" x="382" y="202" text-anchor="middle">linked work x angles</text>
       <text class="small" x="84" y="131">S1</text><text class="small" x="84" y="163">S2</text><text class="small" x="84" y="195">SN</text><text class="small" x="452" y="112">quality</text><text class="small" x="531" y="112">cost</text><text class="small" x="600" y="112">recovery</text>
       <path class="flow-policy" d="M382 242V282H628"/><text class="label" x="492" y="278" text-anchor="middle">second pass: compare positions and factors</text>
       <text class="micro" x="374" y="320" text-anchor="middle">CURRENT RECEIPT: ${sessions} linked sessions [M] / ${findings} clean findings [M]</text>`);
@@ -119,7 +119,7 @@
       <rect class="frame" x="12" y="12" width="736" height="336" rx="14"/>
       <text class="micro" x="36" y="42">OPERATE OR EXPERIMENT</text>
        <g transform="translate(34 78)"><rect class="node" width="150" height="72" rx="8"/><text class="micro" x="14" y="20">OPERATE</text><text class="label" x="14" y="43">Fixed factors</text><text class="small" x="14" y="59">one selected cell</text></g>
-       <g transform="translate(34 204)"><rect class="node-computed" width="150" height="72" rx="8"/><text class="micro" x="14" y="20">EXPERIMENT</text><text class="label" x="14" y="43">Varied factors</text><text class="small" x="14" y="59">controlled grid [C]</text></g>
+       <g transform="translate(34 204)"><rect class="node-policy" width="150" height="72" rx="8"/><text class="micro" x="14" y="20">EXPERIMENT</text><text class="label" x="14" y="43">Varied factors</text><text class="small" x="14" y="59">G controlled cells [P]</text></g>
        <path class="flow" d="M184 114H224M184 240H224"/>
        <g transform="translate(224 140)"><rect class="node-measured" width="88" height="72" rx="8"/><text class="label" x="44" y="34" text-anchor="middle">CELL</text><text class="small" x="44" y="52" text-anchor="middle">unit</text></g>
        <path class="flow-measured" d="M312 176H346M426 176H460M540 176H574"/>

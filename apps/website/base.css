@@ -459,6 +459,7 @@ body.light .cta-btn:hover{box-shadow:0 16px 42px rgba(8,145,178,0.28)}
 
 /* The rule cards use native buttons: no hover-only flip and no script-only state. */
 .ad-rule-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:var(--space-3)}
+.ad-rules-figure{padding:var(--space-3)}
 .ad-rule{border:1px solid var(--line);border-radius:var(--radius-md);background:#fffdf8;overflow:hidden;box-shadow:0 2px 0 rgba(41,35,24,.03)}
 .ad-rule__toggle{width:100%;border:0;background:transparent;color:inherit;padding:var(--space-3);display:grid;grid-template-columns:1fr auto;gap:var(--space-2);text-align:left;cursor:pointer;font:inherit}
 .ad-rule__toggle:hover{background:rgba(40,114,113,.05)}
