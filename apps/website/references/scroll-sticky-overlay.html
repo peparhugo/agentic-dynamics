@@ -1,0 +1,7 @@
+<!--
+Source: https://raw.githubusercontent.com/russellsamora/scrollama/master/docs/sticky-overlay/index.html
+License/attribution: Scrollama is MIT; adapted to use native IntersectionObserver and no external assets.
+Demonstrates: a full-width persistent visual with text panels layered through it.
+Transfers: Evidence calibration arc, with a complete table preceding the interaction.
+-->
+<!doctype html><meta charset="utf-8"><title>Sticky overlay scrollytelling</title><style>body{margin:0;font:16px/1.5 system-ui;background:#f7f4ed;color:#17212b}.scrolly{position:relative;padding:1rem}.visual{position:sticky;top:0;height:75vh;background:linear-gradient(135deg,#17212b,#287271);color:#fff;display:grid;place-items:center;font-size:clamp(2rem,8vw,7rem)}article{position:relative;max-width:32rem;margin:-65vh auto 0}.step{margin:45vh 0;background:#fffdf7e8;border:1px solid #17212b;padding:1rem}.active{border:4px solid #9b6a28}</style><section class="scrolly"><figure class="visual" aria-live="polite">0 / 3</figure><article><section class="step">Initial calibration: 0 / 3.</section><section class="step">Rerun: 2 / 3, wide interval.</section><section class="step">Randomized pilot: a non-inferiority decision.</section></article></section><script>const steps=[...document.querySelectorAll('.step')],v=document.querySelector('.visual');steps.forEach((s,i)=>new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){steps.forEach(x=>x.classList.remove('active'));s.classList.add('active');v.textContent=`${i+1} / 3`}}),{threshold:.6}).observe(s));</script>

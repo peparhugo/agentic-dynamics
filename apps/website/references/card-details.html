@@ -1,0 +1,7 @@
+<!--
+Source: https://developer.mozilla.org/en-US/docs/Web/CSS/How_to/Layout_cookbook/Card
+License/attribution: MDN code samples are CC0; adapted from the semantic equal-height card recipe.
+Demonstrates: responsive cards whose status and source remain visible before detail expansion.
+Transfers: the 10 rules as proposal/measured/decided cards.
+-->
+<!doctype html><meta charset="utf-8"><title>Card details</title><style>body{margin:2rem;font:16px/1.5 system-ui;background:#f7f4ed;color:#17212b}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem}.card{display:flex;flex-direction:column;border:1px solid #17212b;background:#fffdf7;padding:1rem}.status{font-size:.75rem;font-weight:700;color:#287271}.card footer{margin-top:auto;padding-top:1rem;border-top:1px solid #cfc7b8}</style><section class="cards"><article class="card"><span class="status">[M] MEASURED</span><h2>Rule 1</h2><p>Keep a visible evidence status above the claim.</p><details><summary>Method and limits</summary><p>Show source field, corpus, n, and caveat in place.</p></details><footer>Updated 2026-08-26</footer></article><article class="card"><span class="status">[P] PROPOSAL</span><h2>Rule 2</h2><p>Do not imply activation.</p><details><summary>What would test it?</summary><p>A randomized policy arm with an outcome metric.</p></details><footer>Not yet executed</footer></article></section>

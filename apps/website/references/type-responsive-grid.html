@@ -1,0 +1,7 @@
+<!--
+Source: https://developer.mozilla.org/en-US/docs/Web/CSS/How_to/Layout_cookbook/Column_layouts
+License/attribution: MDN code samples are CC0; adapted from the CSS Grid layout recipe.
+Demonstrates: responsive editorial main/aside layout that becomes a single reading column.
+Transfers: evidence page figure-plus-receipt layout and mobile fallback.
+-->
+<!doctype html><meta charset="utf-8"><title>Responsive editorial grid</title><style>body{margin:0;background:#f7f4ed;color:#17212b;font:16px/1.6 system-ui}.page{width:min(100% - 2rem,70rem);margin:4rem auto;display:grid;grid-template-columns:minmax(0,2fr) minmax(16rem,1fr);gap:3rem}.receipt{align-self:start;border-top:4px solid #287271;padding:1rem;background:#fffdf7}.receipt strong{font-size:2rem}@media(max-width:700px){.page{grid-template-columns:1fr;gap:1.5rem}}</style><main class="page"><article><p>RESEARCH PROGRAM</p><h1>Evidence needs context, not a dashboard.</h1><p>A primary reading column carries the argument. A quiet secondary column carries a receipt with source, scope, and update date.</p></article><aside class="receipt"><strong>n = 18</strong><br>[C] Computed decision metric<br>Source: published score artifact</aside></main>

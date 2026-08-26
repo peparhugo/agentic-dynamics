@@ -1,0 +1,13 @@
+<!--
+Source: https://api.observablehq.com/@d3/bar-chart.js?v=3
+License/attribution: Observable D3 examples and D3 are ISC; adapted from the Observable bar-chart.
+Demonstrates: ranked bars, explicit axes, and native SVG titles.
+Transfers: model comparison with small, curated datasets.
+-->
+<!doctype html><meta charset="utf-8"><title>D3 bar axes</title><script src="https://cdn.jsdelivr.net/npm/d3@7"></script><style>body{margin:2rem;font:16px system-ui;background:#f7f4ed;color:#17212b}svg{max-width:100%;height:auto}</style><div id="chart"></div>
+<script>
+const data=[['Flash',.07],['Luna',.09],['Pro',.16],['Haiku',1.63],['Sonnet',5.17]],w=700,h=360,m={t:24,r:30,b:55,l:55};
+const x=d3.scaleBand(data.map(d=>d[0]),[m.l,w-m.r]).padding(.2),y=d3.scaleLinear().domain([0,5.5]).nice().range([h-m.b,m.t]);const svg=d3.select('#chart').append('svg').attr('viewBox',[0,0,w,h]);
+svg.append('g').attr('transform',`translate(0,${h-m.b})`).call(d3.axisBottom(x));svg.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).tickFormat(d=>`$${d}`));
+svg.selectAll('rect').data(data).join('rect').attr('x',d=>x(d[0])).attr('y',d=>y(d[1])).attr('width',x.bandwidth()).attr('height',d=>y(0)-y(d[1])).attr('fill','#9b6a28').append('title').text(d=>`${d[0]}: $${d[1]}`);
+</script>
