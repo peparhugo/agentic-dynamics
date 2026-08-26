@@ -340,6 +340,60 @@ def _proposal(scope=("Calc",), **overrides):
     )
 
 
+def test_expected_effects_validated_against_next_phase_facts():
+    """cap_2a review: the proposal's own falsifiable claims ('continue' -> risk unchanged,
+    'verify' -> lsp errors decrease) must be CHECKED against the next phase's facts — the
+    scoring never did. Shadow-mode checkable without applying anything."""
+    from agentic_dynamics.control.verify_proposal import (
+        ExpectedEffect,
+        validate_expected_effects,
+    )
+
+    def facts(**values):
+        return {k: {"predicate": k, "value": v} for k, v in values.items()}
+
+    current = facts(code_change_risk="0.18", new_lsp_error_count="1")
+    # continue: risk unchanged — holds when the next phase mints the same risk.
+    checks = validate_expected_effects(
+        (ExpectedEffect("code_change_risk", "unchanged", None, "next_phase"),),
+        current,
+        facts(code_change_risk="0.18"),
+    )
+    assert checks[0]["held"] is True and checks[0]["observed"] == 0.18
+
+    # verify: lsp errors decrease — holds when the next phase's change mints fewer.
+    checks = validate_expected_effects(
+        (ExpectedEffect("new_lsp_error_count", "decrease", None, "next_phase"),),
+        current,
+        facts(new_lsp_error_count="0"),
+    )
+    assert checks[0]["held"] is True
+
+    # A claim that does NOT hold is a failed claim.
+    checks = validate_expected_effects(
+        (ExpectedEffect("new_lsp_error_count", "decrease", None, "next_phase"),),
+        current,
+        facts(new_lsp_error_count="3"),
+    )
+    assert checks[0]["held"] is False
+
+    # An unmeasurable claim (predicate absent next phase) is failed, never a silent pass.
+    checks = validate_expected_effects(
+        (ExpectedEffect("new_lsp_error_count", "decrease", None, "next_phase"),),
+        current,
+        facts(code_change_risk="0.18"),
+    )
+    assert checks[0]["held"] is False and checks[0]["observed"] is None
+
+    # Unchanged with a real movement is a failed claim (epsilon-bounded).
+    checks = validate_expected_effects(
+        (ExpectedEffect("code_change_risk", "unchanged", None, "next_phase"),),
+        current,
+        facts(code_change_risk="0.215"),
+    )
+    assert checks[0]["held"] is False
+
+
 def test_proposal_schema_validation_with_applied_false():
     """(g) A valid shadow proposal validates, is ``applied=False``, and any ``applied=True``
     stamp is REFUSED — the seam's own enforcement of hard-rule 2 ("APPLY STAYS OFF")."""

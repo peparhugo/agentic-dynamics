@@ -340,6 +340,69 @@ def validate_verify_proposal(
     return ProposalValidation(valid=not errors, errors=tuple(errors))
 
 
+def validate_expected_effects(
+    effects: Iterable[ExpectedEffect],
+    current_facts: Mapping[str, Mapping[str, Any]],
+    next_facts: Mapping[str, Mapping[str, Any]],
+    *,
+    epsilon: float = 1e-9,
+) -> tuple[dict[str, Any], ...]:
+    """Check a proposal's falsifiable ``expected_effect`` claims against the NEXT phase's facts.
+
+    The cap_2a review finding: every proposal records its own testable predictions
+    ("``continue`` -> ``code_change_risk`` unchanged next phase", "``verify`` ->
+    ``new_lsp_error_count`` decrease") and the scoring NEVER checked them — the proposal carries
+    its own falsification and we left it on the table. This helper closes that in shadow mode
+    (no application needed for the checkable branches):
+
+    * ``decrease``  — the predicate's next value is strictly lower than its current value.
+    * ``increase``  — strictly higher.
+    * ``unchanged`` — ``|next - current| <= epsilon``.
+
+    Per effect it returns ``{"predicate", "direction", "expected", "observed", "held"}`` —
+    ``held`` is False when the direction does not hold, and also when the predicate is absent
+    from either fact set (``observed=None`` — an unmeasurable claim is a failed claim, never a
+    silent pass). ``rework``'s effects predict what APPLYING rework would do; in shadow mode
+    (nothing is applied) the observed movement measures the baseline's own next phase, so the
+    campaign must mark rework's checks ``applied=False`` in its report — the helper reports the
+    raw observation either way.
+    """
+    checks: list[dict[str, Any]] = []
+    for effect in effects:
+        pred = effect.predicate
+        current = current_facts.get(pred)
+        nxt = next_facts.get(pred)
+        observed: float | None = None
+        held: bool | None = None
+        if current is None or nxt is None:
+            held = False  # an unmeasurable claim is a failed claim
+        else:
+            try:
+                cur = float(current.get("value"))
+                observed = float(nxt.get("value"))
+            except (TypeError, ValueError):
+                held = False
+            else:
+                if effect.direction == "decrease":
+                    held = observed < cur
+                elif effect.direction == "increase":
+                    held = observed > cur
+                else:  # unchanged
+                    held = abs(observed - cur) <= epsilon
+        checks.append(
+            {
+                "predicate": pred,
+                "direction": effect.direction,
+                "expected": "decrease" if effect.direction == "decrease"
+                else "increase" if effect.direction == "increase"
+                else "unchanged",
+                "observed": observed,
+                "held": held,
+            }
+        )
+    return tuple(checks)
+
+
 def record_verify_proposal(
     proposal: VerifyProposal,
     *,
