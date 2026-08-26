@@ -1,0 +1,102 @@
+{
+  "schema_version": "cap_2b_cell_manifest/v1",
+  "campaign": "cap_2b",
+  "phase": "p2_run_randomized_cells",
+  "written_at": "2026-08-26T15:52:38Z",
+  "cell_id": "cap2b_critical_static_r1",
+  "stimulus": "critical",
+  "arm": "static",
+  "repetition": "r1",
+  "spec_path": "workflows/operations/cap_2a_cell_critical.yaml",
+  "spec_path_sha256": "6ecb2bd93e8718c8c42382f648e859672c649de761e46ba74c2d7a460721e4d7",
+  "spec_id": "cap_2a_cell_critical@0.1",
+  "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+  "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "19e47b60b57f6ff3c3d8b15cafa9daa2ac4b6cbe",
+  "seeded_app_worktree": "/tmp/cap2b_critical_static_r1",
+  "seeded_app_seed_revision": "e5032b21456a92a7ea4e0de3e2b50cc0ac97a5ee",
+  "finops_cell_id": "cap2b_critical_static_r1",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "analyzer_status": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available",
+    "graph_updated": true
+  },
+  "flagged": false,
+  "facts": {
+    "sonar_analysis_status": "available",
+    "lsp_analysis_status": "available",
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "impacted_symbol_count": "4",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "1",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.215"
+  },
+  "facts_omitted": [],
+  "proposal": {
+    "proposal_id": "0ff07d5ebd68ca47",
+    "action": "rework",
+    "depth": 3,
+    "scope": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "artifact": "experiments/results/cap_2b/proposals/0ff07d5ebd68ca47.json",
+    "artifact_sha256": "6fc1e928b8e2821319e4128144179c846f61b75905d28a1d147c1dbe3872da9a",
+    "baseline_revision": "e5032b21456a92a7ea4e0de3e2b50cc0ac97a5ee",
+    "analyzed_revision": "05c274dab51b4d8ee5f3cfdf9b50579538c323f5",
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ]
+  },
+  "gate_application": {
+    "applied_or_null": "not_applicable",
+    "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+    "commit_trail": [
+      "05c274dab51b4d8ee5f3cfdf9b50579538c323f5 [workflow] implement \u2014 add a classifier function with a deep nested decision tree c",
+      "e5032b21456a92a7ea4e0de3e2b50cc0ac97a5ee seed calc app"
+    ]
+  },
+  "outcome": {
+    "final_revision": "05c274dab51b4d8ee5f3cfdf9b50579538c323f5",
+    "test_executed_success": false,
+    "tests_passed": 2,
+    "tests_total": 3,
+    "defect_present_on_final_commit": true,
+    "accepted": false,
+    "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+  },
+  "cost": {
+    "run_workflow_usd": 0.005682,
+    "rework_pass_usd": null,
+    "total_usd": 0.005682
+  },
+  "forecast_usd": 0.017562,
+  "within_forecast": true,
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T152018Z.json",
+  "run_ledger_sha256": "c96a6ba53a2748cdec7ba03520bbf86b2f4ce8a2b3a427b7fd529543930604a1",
+  "status": "ok",
+  "error": ""
+}

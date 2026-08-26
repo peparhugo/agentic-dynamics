@@ -1,0 +1,59 @@
+{
+  "schema_version": "cap_2b_p2_phase_ledger/v1",
+  "campaign": "cap_2b",
+  "phase": "p2_run_randomized_cells",
+  "written_at": "2026-08-26T15:52:37Z",
+  "cell_id": "cap2b_clean_static_r2",
+  "arm": "static",
+  "stimulus": "clean",
+  "repetition": "r2",
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "status": "ok",
+  "error": "",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T151233Z.json",
+  "run_ledger_sha256": "185b47f01324d47e0a13ec73399b0a4c6e10762ed696ca54756ef889400e7be8",
+  "proposal_seam_result": {
+    "proposal_id": "af9859ed68fc56b8",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "refused": false,
+    "artifact": "experiments/results/cap_2b/proposals/af9859ed68fc56b8.json",
+    "artifact_sha256": "6c3060dbaa8ea1f257b83445a8c42c9a95c9ea00afb1f14f1a69525a9ea24c44",
+    "note": "proposal emitted + validated BEFORE the outcome; static arm = recorded never applied; adaptive arm = applied exactly as proposed."
+  },
+  "gate_application": {
+    "applied_or_null": "not_applicable",
+    "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+    "commit_trail": [
+      "5ad708209058bcd02238e8c40ea1be69454e99dc [workflow] verify \u2014 add a product function to the calc app (with a test), leavin",
+      "68532b1e2bfbf8beffc4f9098f326703260e8aef [workflow] test \u2014 add a product function to the calc app (with a test), leavin",
+      "3bb33851f5d5b3c1ba464bef6505b26d7589c8bd [workflow] implement \u2014 add a product function to the calc app (with a test), leavin",
+      "06cf1cb547dbb5c7123205ac74acf68de9774a96 seed calc app"
+    ]
+  },
+  "outcome": {
+    "final_revision": "5ad708209058bcd02238e8c40ea1be69454e99dc",
+    "test_executed_success": true,
+    "tests_passed": 3,
+    "tests_total": 3,
+    "defect_present_on_final_commit": false,
+    "accepted": true,
+    "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+  },
+  "analyzer_reachability": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available",
+    "graph_updated": true
+  },
+  "flagged": false,
+  "total_measured_cost_usd": 0.008594,
+  "forecast_cost_usd": 0.017562,
+  "within_forecast": true,
+  "wall_s": 166.4
+}

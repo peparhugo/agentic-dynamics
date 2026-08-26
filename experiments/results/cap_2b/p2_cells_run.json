@@ -1,0 +1,1645 @@
+{
+  "cells": [
+    {
+      "cell_id": "cap2b_clean_adaptive_r1",
+      "stimulus": "clean",
+      "arm": "adaptive",
+      "repetition": "r1",
+      "spec_id": "cap_2a_cell_clean@0.1",
+      "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+      "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+      "seeded_app_worktree": "/tmp/cap2b_clean_adaptive_r1",
+      "seeded_app_seed_revision": "3e1de2d05c3e878089d37500a79de224ec7442e8",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T150639Z.json",
+      "run_ledger_sha256": "a4130413352a2a6b4a19feee3a3d8fa1d2cd8130c38ab609840e91f3d8205816",
+      "workflow_ok": true,
+      "run_cost_usd": 0.008652,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "77407338625fb177",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/77407338625fb177.json",
+        "artifact_sha256": "508cf1cf973ff67347d1078795bf35c48ca77da784e4daf5d8c49e9b600c4116",
+        "baseline_revision": "3e1de2d05c3e878089d37500a79de224ec7442e8",
+        "analyzed_revision": "9af470a98f900ef60c7e02c2fac1e9d04aa9ca47",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "null",
+        "action": "continue",
+        "rework_passes": 0,
+        "note": "continue proposal -> provable null application (no extra pass; commit trail shows only the workflow phases).",
+        "commit_trail": [
+          "06f974b6fb25c6f827fc9fdd7d4a845a48264311 [workflow] verify \u2014 add a product function to the calc app (with a test), leavin",
+          "67dc0f464cab603cba3c973696c2e4b3e0d8456c [workflow] test \u2014 add a product function to the calc app (with a test), leavin",
+          "9af470a98f900ef60c7e02c2fac1e9d04aa9ca47 [workflow] implement \u2014 add a product function to the calc app (with a test), leavin",
+          "3e1de2d05c3e878089d37500a79de224ec7442e8 seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "06f974b6fb25c6f827fc9fdd7d4a845a48264311",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.008652,
+        "rework_pass_usd": null,
+        "total_usd": 0.008652
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 159.3
+    },
+    {
+      "cell_id": "cap2b_clean_adaptive_r2",
+      "stimulus": "clean",
+      "arm": "adaptive",
+      "repetition": "r2",
+      "spec_id": "cap_2a_cell_clean@0.1",
+      "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+      "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+      "seeded_app_worktree": "/tmp/cap2b_clean_adaptive_r2",
+      "seeded_app_seed_revision": "21f274f78a1e3cc225f5e4661d2b6300d44ee3f9",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T150946Z.json",
+      "run_ledger_sha256": "12d96e20452cd5df804ffd452abcf3888736830d3ce1898c5fc5ec53e38efa15",
+      "workflow_ok": true,
+      "run_cost_usd": 0.009344,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "39be2d4b23fe19c0",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/39be2d4b23fe19c0.json",
+        "artifact_sha256": "f5e259bba24aa07c39cb977c5592ea0eb7cf34371f3c4d6313931c3b3a7e2a51",
+        "baseline_revision": "21f274f78a1e3cc225f5e4661d2b6300d44ee3f9",
+        "analyzed_revision": "96cf6254713c194a9250b888d4ce8239e5f39980",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "null",
+        "action": "continue",
+        "rework_passes": 0,
+        "note": "continue proposal -> provable null application (no extra pass; commit trail shows only the workflow phases).",
+        "commit_trail": [
+          "90eeda83626df545731d1002d6a88390b2066a5c [workflow] verify \u2014 add a product function to the calc app (with a test), leavin",
+          "1a6ee42e789959047706448d08ea8fd12c94c56a [workflow] test \u2014 add a product function to the calc app (with a test), leavin",
+          "96cf6254713c194a9250b888d4ce8239e5f39980 [workflow] implement \u2014 add a product function to the calc app (with a test), leavin",
+          "21f274f78a1e3cc225f5e4661d2b6300d44ee3f9 seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "90eeda83626df545731d1002d6a88390b2066a5c",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.009344,
+        "rework_pass_usd": null,
+        "total_usd": 0.009344
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 174.6
+    },
+    {
+      "cell_id": "cap2b_clean_static_r2",
+      "stimulus": "clean",
+      "arm": "static",
+      "repetition": "r2",
+      "spec_id": "cap_2a_cell_clean@0.1",
+      "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+      "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+      "seeded_app_worktree": "/tmp/cap2b_clean_static_r2",
+      "seeded_app_seed_revision": "06cf1cb547dbb5c7123205ac74acf68de9774a96",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T151233Z.json",
+      "run_ledger_sha256": "185b47f01324d47e0a13ec73399b0a4c6e10762ed696ca54756ef889400e7be8",
+      "workflow_ok": true,
+      "run_cost_usd": 0.008594,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "af9859ed68fc56b8",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/af9859ed68fc56b8.json",
+        "artifact_sha256": "6c3060dbaa8ea1f257b83445a8c42c9a95c9ea00afb1f14f1a69525a9ea24c44",
+        "baseline_revision": "06cf1cb547dbb5c7123205ac74acf68de9774a96",
+        "analyzed_revision": "3bb33851f5d5b3c1ba464bef6505b26d7589c8bd",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "not_applicable",
+        "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+        "commit_trail": [
+          "5ad708209058bcd02238e8c40ea1be69454e99dc [workflow] verify \u2014 add a product function to the calc app (with a test), leavin",
+          "68532b1e2bfbf8beffc4f9098f326703260e8aef [workflow] test \u2014 add a product function to the calc app (with a test), leavin",
+          "3bb33851f5d5b3c1ba464bef6505b26d7589c8bd [workflow] implement \u2014 add a product function to the calc app (with a test), leavin",
+          "06cf1cb547dbb5c7123205ac74acf68de9774a96 seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "5ad708209058bcd02238e8c40ea1be69454e99dc",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.008594,
+        "rework_pass_usd": null,
+        "total_usd": 0.008594
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 166.4
+    },
+    {
+      "cell_id": "cap2b_clean_static_r3",
+      "stimulus": "clean",
+      "arm": "static",
+      "repetition": "r3",
+      "spec_id": "cap_2a_cell_clean@0.1",
+      "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+      "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+      "seeded_app_worktree": "/tmp/cap2b_clean_static_r3",
+      "seeded_app_seed_revision": "068c4737f5b01e3929dadb23a88a83f329485b8a",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T151519Z.json",
+      "run_ledger_sha256": "5672b00cec91c610bd3eb529672ef82d4e2e022b9cbd27c46da4063ff748b96a",
+      "workflow_ok": true,
+      "run_cost_usd": 0.008958,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "709eb3cfcc443608",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/709eb3cfcc443608.json",
+        "artifact_sha256": "6732a00114ed5aee9c3dae3cd6198b5444c96a0376312a4617c671042d2254aa",
+        "baseline_revision": "068c4737f5b01e3929dadb23a88a83f329485b8a",
+        "analyzed_revision": "c6e2bcced4e23cebd1c3e5c12dea307c60a2b013",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "not_applicable",
+        "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+        "commit_trail": [
+          "6f66eefa4a24fd05cdd0224ca23c974a4c22b20d [workflow] verify \u2014 add a product function to the calc app (with a test), leavin",
+          "74351dd1bdc2c0c7249b8c9324166a26d52e9b8a [workflow] test \u2014 add a product function to the calc app (with a test), leavin",
+          "c6e2bcced4e23cebd1c3e5c12dea307c60a2b013 [workflow] implement \u2014 add a product function to the calc app (with a test), leavin",
+          "068c4737f5b01e3929dadb23a88a83f329485b8a seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "6f66eefa4a24fd05cdd0224ca23c974a4c22b20d",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.008958,
+        "rework_pass_usd": null,
+        "total_usd": 0.008958
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 166.3
+    },
+    {
+      "cell_id": "cap2b_clean_adaptive_r3",
+      "stimulus": "clean",
+      "arm": "adaptive",
+      "repetition": "r3",
+      "spec_id": "cap_2a_cell_clean@0.1",
+      "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+      "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+      "seeded_app_worktree": "/tmp/cap2b_clean_adaptive_r3",
+      "seeded_app_seed_revision": "c29c474fab3a1422b79c2de424a9035e8cebb716",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_clean/20260826T151810Z.json",
+      "run_ledger_sha256": "e5f1940e87471f2260f7632aba634f683b697a3af4fc4e0738466bbf63063e9f",
+      "workflow_ok": true,
+      "run_cost_usd": 0.009146,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "c9979a5794d2a62d",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/c9979a5794d2a62d.json",
+        "artifact_sha256": "0c9cabca1f9e210616c9434151c0f0c04d53d46dc288d11bcba89865e896e93b",
+        "baseline_revision": "c29c474fab3a1422b79c2de424a9035e8cebb716",
+        "analyzed_revision": "90473cc4eb9c62a45f00910ae890ad04fccdfd81",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "null",
+        "action": "continue",
+        "rework_passes": 0,
+        "note": "continue proposal -> provable null application (no extra pass; commit trail shows only the workflow phases).",
+        "commit_trail": [
+          "07d4f532de92540d35a3fc11f222364e15b2a995 [workflow] verify \u2014 add a product function to the calc app (with a test), leavin",
+          "4130f76cf06cb46ab12323bd5a1f37ba70393acf [workflow] test \u2014 add a product function to the calc app (with a test), leavin",
+          "90473cc4eb9c62a45f00910ae890ad04fccdfd81 [workflow] implement \u2014 add a product function to the calc app (with a test), leavin",
+          "c29c474fab3a1422b79c2de424a9035e8cebb716 seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "07d4f532de92540d35a3fc11f222364e15b2a995",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.009146,
+        "rework_pass_usd": null,
+        "total_usd": 0.009146
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 171.3
+    },
+    {
+      "cell_id": "cap2b_critical_static_r1",
+      "stimulus": "critical",
+      "arm": "static",
+      "repetition": "r1",
+      "spec_id": "cap_2a_cell_critical@0.1",
+      "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+      "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+      "seeded_app_worktree": "/tmp/cap2b_critical_static_r1",
+      "seeded_app_seed_revision": "e5032b21456a92a7ea4e0de3e2b50cc0ac97a5ee",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T152018Z.json",
+      "run_ledger_sha256": "c96a6ba53a2748cdec7ba03520bbf86b2f4ce8a2b3a427b7fd529543930604a1",
+      "workflow_ok": false,
+      "run_cost_usd": 0.005682,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "1",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.215"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "0ff07d5ebd68ca47",
+        "action": "rework",
+        "depth": 3,
+        "scope": [
+          "add",
+          "classify",
+          "subtract",
+          "test_add",
+          "test_classify",
+          "test_subtract"
+        ],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/0ff07d5ebd68ca47.json",
+        "artifact_sha256": "6fc1e928b8e2821319e4128144179c846f61b75905d28a1d147c1dbe3872da9a",
+        "baseline_revision": "e5032b21456a92a7ea4e0de3e2b50cc0ac97a5ee",
+        "analyzed_revision": "05c274dab51b4d8ee5f3cfdf9b50579538c323f5",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "not_applicable",
+        "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+        "commit_trail": [
+          "05c274dab51b4d8ee5f3cfdf9b50579538c323f5 [workflow] implement \u2014 add a classifier function with a deep nested decision tree c",
+          "e5032b21456a92a7ea4e0de3e2b50cc0ac97a5ee seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "05c274dab51b4d8ee5f3cfdf9b50579538c323f5",
+        "test_executed_success": false,
+        "tests_passed": 2,
+        "tests_total": 3,
+        "defect_present_on_final_commit": true,
+        "accepted": false,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.005682,
+        "rework_pass_usd": null,
+        "total_usd": 0.005682
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 120.0
+    },
+    {
+      "cell_id": "cap2b_critical_static_r2",
+      "stimulus": "critical",
+      "arm": "static",
+      "repetition": "r2",
+      "spec_id": "cap_2a_cell_critical@0.1",
+      "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+      "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+      "seeded_app_worktree": "/tmp/cap2b_critical_static_r2",
+      "seeded_app_seed_revision": "8622f99a61490e2c3558e0fe2260a01fad6e48aa",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T152342Z.json",
+      "run_ledger_sha256": "5958558bcf122aa1dbdc7c85a620ecfde8d2b89474de007c2e4d0c27a059187b",
+      "workflow_ok": false,
+      "run_cost_usd": 0.011855,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "1",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.215"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "6f79d3b12814beea",
+        "action": "rework",
+        "depth": 3,
+        "scope": [
+          "add",
+          "classify",
+          "subtract",
+          "test_add",
+          "test_classify",
+          "test_subtract"
+        ],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/6f79d3b12814beea.json",
+        "artifact_sha256": "eb3ca4631587f6597c65d2b741c105e467aeaf51a6e73011a49687174777e35a",
+        "baseline_revision": "8622f99a61490e2c3558e0fe2260a01fad6e48aa",
+        "analyzed_revision": "79a8bb06c46e5379690307f8700fc0efd6600681",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "not_applicable",
+        "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+        "commit_trail": [
+          "79a8bb06c46e5379690307f8700fc0efd6600681 [workflow] implement \u2014 add a classifier function with a deep nested decision tree c",
+          "8622f99a61490e2c3558e0fe2260a01fad6e48aa seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "79a8bb06c46e5379690307f8700fc0efd6600681",
+        "test_executed_success": false,
+        "tests_passed": 2,
+        "tests_total": 3,
+        "defect_present_on_final_commit": true,
+        "accepted": false,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.011855,
+        "rework_pass_usd": null,
+        "total_usd": 0.011855
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 204.1
+    },
+    {
+      "cell_id": "cap2b_critical_static_r3",
+      "stimulus": "critical",
+      "arm": "static",
+      "repetition": "r3",
+      "spec_id": "cap_2a_cell_critical@0.1",
+      "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+      "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+      "seeded_app_worktree": "/tmp/cap2b_critical_static_r3",
+      "seeded_app_seed_revision": "1ba593951af12e3562364a0d3641a819c0b79658",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T152621Z.json",
+      "run_ledger_sha256": "cbb9c0e6992122ab7f16cb6be8c2808a547f6957a75201d20759805d1ee10ed8",
+      "workflow_ok": false,
+      "run_cost_usd": 0.0093,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "1",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.215"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "e11fa98adecb77b3",
+        "action": "rework",
+        "depth": 3,
+        "scope": [
+          "add",
+          "classify",
+          "subtract",
+          "test_add",
+          "test_classify",
+          "test_subtract"
+        ],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/e11fa98adecb77b3.json",
+        "artifact_sha256": "79e416926f47741c8f1cf892f87f9fa68a4b29bb2923489c7a198b1a07a46232",
+        "baseline_revision": "1ba593951af12e3562364a0d3641a819c0b79658",
+        "analyzed_revision": "ff038f9335b1e0a211887142f6528592cbb945b2",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "not_applicable",
+        "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+        "commit_trail": [
+          "ff038f9335b1e0a211887142f6528592cbb945b2 [workflow] implement \u2014 add a classifier function with a deep nested decision tree c",
+          "1ba593951af12e3562364a0d3641a819c0b79658 seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "ff038f9335b1e0a211887142f6528592cbb945b2",
+        "test_executed_success": false,
+        "tests_passed": 2,
+        "tests_total": 3,
+        "defect_present_on_final_commit": true,
+        "accepted": false,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.0093,
+        "rework_pass_usd": null,
+        "total_usd": 0.0093
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 159.1
+    },
+    {
+      "cell_id": "cap2b_critical_adaptive_r1",
+      "stimulus": "critical",
+      "arm": "adaptive",
+      "repetition": "r1",
+      "spec_id": "cap_2a_cell_critical@0.1",
+      "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+      "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+      "seeded_app_worktree": "/tmp/cap2b_critical_adaptive_r1",
+      "seeded_app_seed_revision": "d8c234b1b8ef71f38d3321849c62c355081c25fd",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T152949Z.json",
+      "run_ledger_sha256": "c612956b25e2001139c14bc37497e3255dc33260671f873d2bc0a25055c0229e",
+      "workflow_ok": false,
+      "run_cost_usd": 0.01268,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "1",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.215"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "5dcf60af28d7de37",
+        "action": "rework",
+        "depth": 3,
+        "scope": [
+          "add",
+          "classify",
+          "subtract",
+          "test_add",
+          "test_classify",
+          "test_subtract"
+        ],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/5dcf60af28d7de37.json",
+        "artifact_sha256": "761da85523352e8dac1a9589f78b98f244c4d0ba39e3ec8f30726fbee30d7e1f",
+        "baseline_revision": "d8c234b1b8ef71f38d3321849c62c355081c25fd",
+        "analyzed_revision": "3a2a79e5a1e55f44b097dc0a859b01dd171d04f3",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "applied",
+        "action": "rework",
+        "depth": 3,
+        "rework_passes": 1,
+        "rework_commit": "11918a35e2116e7ab3704d49abadf163bf823841",
+        "rework_diff": "diff --git a/calc.py b/calc.py\nindex 9400195..2bfea23 100644\n--- a/calc.py\n+++ b/calc.py\n@@ -94,7 +94,7 @@ def classify(value):\n             # The lower-boundary guard below should use \">=\" so that the\n             # value 10.0 is included in the [10, 20) range; it incorrectly\n             # uses \">\" (the single injected defect), so 10.0 slips through.\n-            if value > 10:\n+            if value >= 10:\n                 return \"teen\"\n             else:\n                 return \"almost_teen\"",
+        "rework_pass_cost_usd": 0.004175,
+        "rework_duration_s": 16.05887991702184,
+        "proof": "rework proposal APPLIED as ONE bounded rework pass over the proposal scope; commit trail shows a new '[workflow] rework' commit on top of the implement commit.",
+        "commit_trail": [
+          "11918a35e2116e7ab3704d49abadf163bf823841 [workflow] rework",
+          "3a2a79e5a1e55f44b097dc0a859b01dd171d04f3 [workflow] implement \u2014 add a classifier function with a deep nested decision tree c",
+          "d8c234b1b8ef71f38d3321849c62c355081c25fd seed calc app"
+        ],
+        "agent_result": {
+          "ok": true,
+          "exit_code": 0,
+          "cost_usd": 0.004175188,
+          "duration_s": 16.05887991702184,
+          "error": "",
+          "files_modified": [
+            ".instrument/session.jsonl",
+            ".mypy_cache/.gitignore",
+            ".mypy_cache/3.10/cache.0.db",
+            ".mypy_cache/3.10/cache.1.db",
+            ".mypy_cache/3.10/cache.10.db",
+            ".mypy_cache/3.10/cache.11.db",
+            ".mypy_cache/3.10/cache.12.db",
+            ".mypy_cache/3.10/cache.13.db",
+            ".mypy_cache/3.10/cache.14.db",
+            ".mypy_cache/3.10/cache.15.db",
+            ".mypy_cache/3.10/cache.2.db",
+            ".mypy_cache/3.10/cache.3.db",
+            ".mypy_cache/3.10/cache.4.db",
+            ".mypy_cache/3.10/cache.5.db",
+            ".mypy_cache/3.10/cache.6.db",
+            ".mypy_cache/3.10/cache.7.db",
+            ".mypy_cache/3.10/cache.8.db",
+            ".mypy_cache/3.10/cache.9.db",
+            ".mypy_cache/CACHEDIR.TAG",
+            ".scannerwork/.sonar_lock",
+            ".scannerwork/report-task.txt",
+            "calc.py",
+            "test_calc.py"
+          ]
+        }
+      },
+      "outcome": {
+        "final_revision": "11918a35e2116e7ab3704d49abadf163bf823841",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.01268,
+        "rework_pass_usd": 0.004175,
+        "total_usd": 0.016855
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 218.0
+    },
+    {
+      "cell_id": "cap2b_critical_adaptive_r2",
+      "stimulus": "critical",
+      "arm": "adaptive",
+      "repetition": "r2",
+      "spec_id": "cap_2a_cell_critical@0.1",
+      "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+      "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+      "seeded_app_worktree": "/tmp/cap2b_critical_adaptive_r2",
+      "seeded_app_seed_revision": "7c4cfdb54be1917a0f3a4d5046226c0e6ad96d81",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T153240Z.json",
+      "run_ledger_sha256": "92d66804580b54f951ca707f54bbb71289faf544730992b5e73b3aef4e128e28",
+      "workflow_ok": false,
+      "run_cost_usd": 0.009176,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "1",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.215"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "7322e1b7c6432d76",
+        "action": "rework",
+        "depth": 3,
+        "scope": [
+          "add",
+          "classify",
+          "subtract",
+          "test_add",
+          "test_classify",
+          "test_subtract"
+        ],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/7322e1b7c6432d76.json",
+        "artifact_sha256": "2351d87f362ea31d3b0aac66c7e2041ed4af3f4051b074a7c0e62ba79b8c5aad",
+        "baseline_revision": "7c4cfdb54be1917a0f3a4d5046226c0e6ad96d81",
+        "analyzed_revision": "426b1381e34f835f5575489635ecc6b8cd8b9421",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "applied",
+        "action": "rework",
+        "depth": 3,
+        "rework_passes": 1,
+        "rework_commit": "d2a1a32cf78191611d6c139b21e0f5b5e3c81e66",
+        "rework_diff": "diff --git a/calc.py b/calc.py\nindex 6444335..7e88c15 100644\n--- a/calc.py\n+++ b/calc.py\n@@ -59,7 +59,7 @@ def classify(value):\n     # Documented bucket [10, 20): the boundary should use \">=\" below, but the\n     # implementation uses \">\" so the value 10.0 falls through and is\n     # misclassified relative to the documented contract.\n-    elif value > 10 and value < 20:\n+    elif value >= 10 and value < 20:\n         return \"ten_to_twenty\"\n     # Bucket [20, 30) with nested sub-branches.\n     elif value >= 20 and value < 30:",
+        "rework_pass_cost_usd": 0.004016,
+        "rework_duration_s": 14.905238875886425,
+        "proof": "rework proposal APPLIED as ONE bounded rework pass over the proposal scope; commit trail shows a new '[workflow] rework' commit on top of the implement commit.",
+        "commit_trail": [
+          "d2a1a32cf78191611d6c139b21e0f5b5e3c81e66 [workflow] rework",
+          "426b1381e34f835f5575489635ecc6b8cd8b9421 [workflow] implement \u2014 add a classifier function with a deep nested decision tree c",
+          "7c4cfdb54be1917a0f3a4d5046226c0e6ad96d81 seed calc app"
+        ],
+        "agent_result": {
+          "ok": true,
+          "exit_code": 0,
+          "cost_usd": 0.0040158039999999996,
+          "duration_s": 14.905238875886425,
+          "error": "",
+          "files_modified": [
+            ".instrument/session.jsonl",
+            ".mypy_cache/.gitignore",
+            ".mypy_cache/3.10/cache.0.db",
+            ".mypy_cache/3.10/cache.1.db",
+            ".mypy_cache/3.10/cache.10.db",
+            ".mypy_cache/3.10/cache.11.db",
+            ".mypy_cache/3.10/cache.12.db",
+            ".mypy_cache/3.10/cache.13.db",
+            ".mypy_cache/3.10/cache.14.db",
+            ".mypy_cache/3.10/cache.15.db",
+            ".mypy_cache/3.10/cache.2.db",
+            ".mypy_cache/3.10/cache.3.db",
+            ".mypy_cache/3.10/cache.4.db",
+            ".mypy_cache/3.10/cache.5.db",
+            ".mypy_cache/3.10/cache.6.db",
+            ".mypy_cache/3.10/cache.7.db",
+            ".mypy_cache/3.10/cache.8.db",
+            ".mypy_cache/3.10/cache.9.db",
+            ".mypy_cache/CACHEDIR.TAG",
+            ".scannerwork/.sonar_lock",
+            ".scannerwork/report-task.txt",
+            "calc.py",
+            "test_calc.py"
+          ]
+        }
+      },
+      "outcome": {
+        "final_revision": "d2a1a32cf78191611d6c139b21e0f5b5e3c81e66",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.009176,
+        "rework_pass_usd": 0.004016,
+        "total_usd": 0.013192
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 169.7
+    },
+    {
+      "cell_id": "cap2b_critical_adaptive_r3",
+      "stimulus": "critical",
+      "arm": "adaptive",
+      "repetition": "r3",
+      "spec_id": "cap_2a_cell_critical@0.1",
+      "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+      "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+      "seeded_app_worktree": "/tmp/cap2b_critical_adaptive_r3",
+      "seeded_app_seed_revision": "1a4875a33fa9b51df8e82d9ef320b1ea6a36b5b5",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T153459Z.json",
+      "run_ledger_sha256": "775cb2c79a7244e65e9410891318c168cd82a51ad832e51a7a1289721440b2af",
+      "workflow_ok": false,
+      "run_cost_usd": 0.006651,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "1",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.215"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "7aac90eb0b1c12aa",
+        "action": "rework",
+        "depth": 3,
+        "scope": [
+          "add",
+          "classify",
+          "subtract",
+          "test_add",
+          "test_classify",
+          "test_subtract"
+        ],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/7aac90eb0b1c12aa.json",
+        "artifact_sha256": "fc380936fbbf81a033c9363fe240a967913db46a9f92c42a9b7b45e66fd515a6",
+        "baseline_revision": "1a4875a33fa9b51df8e82d9ef320b1ea6a36b5b5",
+        "analyzed_revision": "032509ff4ed90afd88c48ba94968df180bbfacfa",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "applied",
+        "action": "rework",
+        "depth": 3,
+        "rework_passes": 1,
+        "rework_commit": "7056cea021ccc7a4f61eba413b746cbed501fe47",
+        "rework_diff": "diff --git a/calc.py b/calc.py\nindex 96ac3d9..3acbcb2 100644\n--- a/calc.py\n+++ b/calc.py\n@@ -36,9 +36,7 @@ def classify(value):\n         elif value < 20:\n             # [10, 20) bucket. The documented contract is that\n             # ``10 <= value < 20`` maps to ``\"low_teens\"``.\n-            # DEFECT: ``>`` is used instead of ``>=``, so the boundary\n-            # value ``10.0`` is misclassified relative to the contract.\n-            if value > 10:\n+            if value >= 10:\n                 # Level 3: split the decade into two halves.\n                 if value < 15:\n                     return \"low_teens\"",
+        "rework_pass_cost_usd": 0.003911,
+        "rework_duration_s": 16.40879258303903,
+        "proof": "rework proposal APPLIED as ONE bounded rework pass over the proposal scope; commit trail shows a new '[workflow] rework' commit on top of the implement commit.",
+        "commit_trail": [
+          "7056cea021ccc7a4f61eba413b746cbed501fe47 [workflow] rework",
+          "032509ff4ed90afd88c48ba94968df180bbfacfa [workflow] implement \u2014 add a classifier function with a deep nested decision tree c",
+          "1a4875a33fa9b51df8e82d9ef320b1ea6a36b5b5 seed calc app"
+        ],
+        "agent_result": {
+          "ok": true,
+          "exit_code": 0,
+          "cost_usd": 0.003910795,
+          "duration_s": 16.40879258303903,
+          "error": "",
+          "files_modified": [
+            ".instrument/session.jsonl",
+            ".mypy_cache/.gitignore",
+            ".mypy_cache/3.10/cache.0.db",
+            ".mypy_cache/3.10/cache.1.db",
+            ".mypy_cache/3.10/cache.10.db",
+            ".mypy_cache/3.10/cache.11.db",
+            ".mypy_cache/3.10/cache.12.db",
+            ".mypy_cache/3.10/cache.13.db",
+            ".mypy_cache/3.10/cache.14.db",
+            ".mypy_cache/3.10/cache.15.db",
+            ".mypy_cache/3.10/cache.2.db",
+            ".mypy_cache/3.10/cache.3.db",
+            ".mypy_cache/3.10/cache.4.db",
+            ".mypy_cache/3.10/cache.5.db",
+            ".mypy_cache/3.10/cache.6.db",
+            ".mypy_cache/3.10/cache.7.db",
+            ".mypy_cache/3.10/cache.8.db",
+            ".mypy_cache/3.10/cache.9.db",
+            ".mypy_cache/CACHEDIR.TAG",
+            ".scannerwork/.sonar_lock",
+            ".scannerwork/report-task.txt",
+            "calc.py",
+            "test_calc.py"
+          ]
+        }
+      },
+      "outcome": {
+        "final_revision": "7056cea021ccc7a4f61eba413b746cbed501fe47",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.006651,
+        "rework_pass_usd": 0.003911,
+        "total_usd": 0.010562
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 140.3
+    },
+    {
+      "cell_id": "cap2b_style_static_r1",
+      "stimulus": "style",
+      "arm": "static",
+      "repetition": "r1",
+      "spec_id": "cap_2a_cell_style@0.1",
+      "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+      "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+      "seeded_app_worktree": "/tmp/cap2b_style_static_r1",
+      "seeded_app_seed_revision": "c88414b4be3ddc036cf6632f9d5f3073f68b1c0e",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T153804Z.json",
+      "run_ledger_sha256": "221147d26db9c5e2465e4ec5b8e70e653975d3ae4c3d190cb6309d40154fa904",
+      "workflow_ok": true,
+      "run_cost_usd": 0.009038,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "2a80bd96c5bb502a",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/2a80bd96c5bb502a.json",
+        "artifact_sha256": "7358ade0414d988bf58ec97d782c03a62ce2feac9612328ed483bc7e13554c19",
+        "baseline_revision": "c88414b4be3ddc036cf6632f9d5f3073f68b1c0e",
+        "analyzed_revision": "56cbf7515370f14285ee5cfc5312dd8f04341f5f",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "not_applicable",
+        "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+        "commit_trail": [
+          "ee85e511e42a2a34723553018b4e149ffc8f2113 [workflow] verify \u2014 add a rate_for function that compares floating-point thresho",
+          "c0a23efff829dcee0ecc2a0001d000fb4126d563 [workflow] test \u2014 add a rate_for function that compares floating-point thresho",
+          "56cbf7515370f14285ee5cfc5312dd8f04341f5f [workflow] implement \u2014 add a rate_for function that compares floating-point thresho",
+          "c88414b4be3ddc036cf6632f9d5f3073f68b1c0e seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "ee85e511e42a2a34723553018b4e149ffc8f2113",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.009038,
+        "rework_pass_usd": null,
+        "total_usd": 0.009038
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 163.5
+    },
+    {
+      "cell_id": "cap2b_style_static_r2",
+      "stimulus": "style",
+      "arm": "static",
+      "repetition": "r2",
+      "spec_id": "cap_2a_cell_style@0.1",
+      "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+      "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+      "seeded_app_worktree": "/tmp/cap2b_style_static_r2",
+      "seeded_app_seed_revision": "844d995f52f2576dc561aa8d8c7b2f8693e23233",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T154052Z.json",
+      "run_ledger_sha256": "4a4ce2082b9db437f9edcf1d4731cc1906504d60c0bc9500fc302a7821683eb0",
+      "workflow_ok": true,
+      "run_cost_usd": 0.008831,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "2d5f2e1f221270f4",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/2d5f2e1f221270f4.json",
+        "artifact_sha256": "8e62a3bf4d71d71a6d45cdb95fba5f7438dd8332c601392ba91c38ff30372799",
+        "baseline_revision": "844d995f52f2576dc561aa8d8c7b2f8693e23233",
+        "analyzed_revision": "49c8c63491be9da4543ed50f36790a626784a618",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "not_applicable",
+        "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+        "commit_trail": [
+          "3b3aadf133cd296b29fabb986618c0e46cd68828 [workflow] verify \u2014 add a rate_for function that compares floating-point thresho",
+          "3329d356f364cb5e845557a16c93e152ce6240f0 [workflow] test \u2014 add a rate_for function that compares floating-point thresho",
+          "49c8c63491be9da4543ed50f36790a626784a618 [workflow] implement \u2014 add a rate_for function that compares floating-point thresho",
+          "844d995f52f2576dc561aa8d8c7b2f8693e23233 seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "3b3aadf133cd296b29fabb986618c0e46cd68828",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.008831,
+        "rework_pass_usd": null,
+        "total_usd": 0.008831
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 168.3
+    },
+    {
+      "cell_id": "cap2b_style_adaptive_r1",
+      "stimulus": "style",
+      "arm": "adaptive",
+      "repetition": "r1",
+      "spec_id": "cap_2a_cell_style@0.1",
+      "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+      "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+      "seeded_app_worktree": "/tmp/cap2b_style_adaptive_r1",
+      "seeded_app_seed_revision": "7d46dbae6654ffdd9763a4ade97d7912861613f6",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T154331Z.json",
+      "run_ledger_sha256": "9aeac30489e96916008b7050d730c956078d752625b6cf82fed5a6b5726b7a69",
+      "workflow_ok": true,
+      "run_cost_usd": 0.008894,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "e7226be2556cd886",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/e7226be2556cd886.json",
+        "artifact_sha256": "c28a039a312a95bfdc8c097d0331a8dd045d3f2589ca1e01e86f5061feb8f944",
+        "baseline_revision": "7d46dbae6654ffdd9763a4ade97d7912861613f6",
+        "analyzed_revision": "9d554c2ba0b3885ed180e982b514544d2f252b6b",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "null",
+        "action": "continue",
+        "rework_passes": 0,
+        "note": "continue proposal -> provable null application (no extra pass; commit trail shows only the workflow phases).",
+        "commit_trail": [
+          "6d447bbcf18d6cf74455bdbad46ba8cf552d968a [workflow] verify \u2014 add a rate_for function that compares floating-point thresho",
+          "c3c7f13c5213ec495347a4d52f6856a72c85dfd5 [workflow] test \u2014 add a rate_for function that compares floating-point thresho",
+          "9d554c2ba0b3885ed180e982b514544d2f252b6b [workflow] implement \u2014 add a rate_for function that compares floating-point thresho",
+          "7d46dbae6654ffdd9763a4ade97d7912861613f6 seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "6d447bbcf18d6cf74455bdbad46ba8cf552d968a",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.008894,
+        "rework_pass_usd": null,
+        "total_usd": 0.008894
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 158.7
+    },
+    {
+      "cell_id": "cap2b_style_adaptive_r2",
+      "stimulus": "style",
+      "arm": "adaptive",
+      "repetition": "r2",
+      "spec_id": "cap_2a_cell_style@0.1",
+      "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+      "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+      "seeded_app_worktree": "/tmp/cap2b_style_adaptive_r2",
+      "seeded_app_seed_revision": "e7c7db8b5bbf9b5631e55ea227d9f200fad2e8d9",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T154604Z.json",
+      "run_ledger_sha256": "51aba8e101cad5a05bd2cf9965e2ace49db8c5e18a03564093946a1d842bf2f5",
+      "workflow_ok": true,
+      "run_cost_usd": 0.008859,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "e51ea80c095d75d1",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/e51ea80c095d75d1.json",
+        "artifact_sha256": "9f70c9ab0eef092ebc97653cee0b0bfa553b8f68669aed2bef48abe61788c423",
+        "baseline_revision": "e7c7db8b5bbf9b5631e55ea227d9f200fad2e8d9",
+        "analyzed_revision": "853b09cd4569dc355ffee9a7164c39f9db81817b",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "null",
+        "action": "continue",
+        "rework_passes": 0,
+        "note": "continue proposal -> provable null application (no extra pass; commit trail shows only the workflow phases).",
+        "commit_trail": [
+          "d5e0c98fe83b950e7d6af4e4c13c1f12334ec4b0 [workflow] verify \u2014 add a rate_for function that compares floating-point thresho",
+          "c40eb974aabcbd6f035844383d94da3124fcce04 [workflow] test \u2014 add a rate_for function that compares floating-point thresho",
+          "853b09cd4569dc355ffee9a7164c39f9db81817b [workflow] implement \u2014 add a rate_for function that compares floating-point thresho",
+          "e7c7db8b5bbf9b5631e55ea227d9f200fad2e8d9 seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "d5e0c98fe83b950e7d6af4e4c13c1f12334ec4b0",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.008859,
+        "rework_pass_usd": null,
+        "total_usd": 0.008859
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 153.5
+    },
+    {
+      "cell_id": "cap2b_style_adaptive_r3",
+      "stimulus": "style",
+      "arm": "adaptive",
+      "repetition": "r3",
+      "spec_id": "cap_2a_cell_style@0.1",
+      "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+      "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+      "seeded_app_worktree": "/tmp/cap2b_style_adaptive_r3",
+      "seeded_app_seed_revision": "009e51b7cc94c16d3070bc35f3433e0429d99858",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T154845Z.json",
+      "run_ledger_sha256": "0894bb71b055bec14911aea8698374ee3a267740b129f816d4f3c7cdfc6589c7",
+      "workflow_ok": true,
+      "run_cost_usd": 0.00886,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "6628fb21f00a7d28",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/6628fb21f00a7d28.json",
+        "artifact_sha256": "922821c01eb9a0b3d176444dee7e919b2cb425db049489b15bc04d0133e21ec8",
+        "baseline_revision": "009e51b7cc94c16d3070bc35f3433e0429d99858",
+        "analyzed_revision": "bcfdcacfc1e40993a9a6927f0a7484d300970a9d",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "null",
+        "action": "continue",
+        "rework_passes": 0,
+        "note": "continue proposal -> provable null application (no extra pass; commit trail shows only the workflow phases).",
+        "commit_trail": [
+          "ff40512026b0dffca25e8c4d058f4bc6197ae7f6 [workflow] verify \u2014 add a rate_for function that compares floating-point thresho",
+          "11d804c546c1297e6ee31a39b8de4cb5048a3278 [workflow] test \u2014 add a rate_for function that compares floating-point thresho",
+          "bcfdcacfc1e40993a9a6927f0a7484d300970a9d [workflow] implement \u2014 add a rate_for function that compares floating-point thresho",
+          "009e51b7cc94c16d3070bc35f3433e0429d99858 seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "ff40512026b0dffca25e8c4d058f4bc6197ae7f6",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.00886,
+        "rework_pass_usd": null,
+        "total_usd": 0.00886
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 160.8
+    },
+    {
+      "cell_id": "cap2b_style_static_r3",
+      "stimulus": "style",
+      "arm": "static",
+      "repetition": "r3",
+      "spec_id": "cap_2a_cell_style@0.1",
+      "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+      "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+      "seeded_app_worktree": "/tmp/cap2b_style_static_r3",
+      "seeded_app_seed_revision": "fd43f3fda28ccb79ce15707816dc29c4f0c533db",
+      "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T155131Z.json",
+      "run_ledger_sha256": "bdc5612a17a095c5e8adfb73f11e4ba50e72db7a597e9bcfe24f7da1ded73443",
+      "workflow_ok": true,
+      "run_cost_usd": 0.009023,
+      "facts": {
+        "sonar_analysis_status": "available",
+        "lsp_analysis_status": "available",
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "impacted_symbol_count": "4",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18"
+      },
+      "analyzer_status": {
+        "graph": "available",
+        "sonar": "available",
+        "lsp": "available",
+        "graph_updated": true
+      },
+      "flagged": false,
+      "proposal": {
+        "proposal_id": "d5ef1fd078e74093",
+        "action": "continue",
+        "depth": 0,
+        "scope": [],
+        "applied": false,
+        "schema_version": "verify_code_change_proposal/v1",
+        "contract_version": "verify_code_change/v1",
+        "artifact": "experiments/results/cap_2b/proposals/d5ef1fd078e74093.json",
+        "artifact_sha256": "d6771bf71224cfa216fb7b19a920abc49e892aca1a7c8edf4b189be044950e3f",
+        "baseline_revision": "fd43f3fda28ccb79ce15707816dc29c4f0c533db",
+        "analyzed_revision": "c3d4e0ce5d209b3b4bf531cac1f5161f29c09fea",
+        "facts_used": [
+          "analysis_revision_matches",
+          "ast_parse_coverage",
+          "changed_symbol_count",
+          "changed_symbols_with_tests_ratio",
+          "code_change_risk",
+          "impacted_symbol_count",
+          "lsp_analysis_status",
+          "new_lsp_error_count",
+          "new_sonar_critical_count",
+          "sonar_analysis_status"
+        ]
+      },
+      "gate_application": {
+        "applied_or_null": "not_applicable",
+        "note": "static arm: proposal recorded, NEVER applied (applied=false).",
+        "commit_trail": [
+          "2aab9e6a9956aa2e68492de31507f556dd1eccf1 [workflow] verify \u2014 add a rate_for function that compares floating-point thresho",
+          "47ca06f560566ac2576c0bdc2155ef21ae0f2618 [workflow] test \u2014 add a rate_for function that compares floating-point thresho",
+          "c3d4e0ce5d209b3b4bf531cac1f5161f29c09fea [workflow] implement \u2014 add a rate_for function that compares floating-point thresho",
+          "fd43f3fda28ccb79ce15707816dc29c4f0c533db seed calc app"
+        ]
+      },
+      "outcome": {
+        "final_revision": "2aab9e6a9956aa2e68492de31507f556dd1eccf1",
+        "test_executed_success": true,
+        "tests_passed": 3,
+        "tests_total": 3,
+        "defect_present_on_final_commit": false,
+        "accepted": true,
+        "test_runner": "independent pytest (runtime.test_runner) on the immutable final commit"
+      },
+      "cost": {
+        "run_workflow_usd": 0.009023,
+        "rework_pass_usd": null,
+        "total_usd": 0.009023
+      },
+      "forecast_usd": 0.017562,
+      "within_forecast": true,
+      "status": "ok",
+      "wall_s": 166.2
+    }
+  ]
+}
