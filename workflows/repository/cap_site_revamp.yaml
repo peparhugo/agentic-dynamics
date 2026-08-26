@@ -128,12 +128,31 @@ workflow:
           provenance, reproducibility), and what the site must NOT do (pricing, tiers,
           'get started', feature lists, testimonial vibes). Write the positioning statement
           VERBATIM into the doc — the editorial phase follows it.
-          R3 — VISUAL SYSTEM RESEARCH: per-visualization library decisions (d3 vs
-          hand-rolled SVG vs CSS-only) with a rationale each — the site's data is small
+          R3 — VISUAL SYSTEM RESEARCH + EXAMPLE LEARNING: per-visualization library decisions
+          (d3 vs hand-rolled SVG vs CSS-only) with a rationale each — the site's data is small
           and curated, so heavy charting frameworks are likely wrong; recommend a
           lightweight architecture (e.g. inline SVG + a tiny d3 subset or none) with the
-          trade-offs stated. Define the visual language: typography (serif/sans pairing
-          for a research-field feel), color (restrained, editorial — the current
+          trade-offs stated. BUT the visual language is NOT invented from priors: it is
+          LEARNED FROM NAMED EXEMPLARS. Study each of the following (fetch them; do not
+          rely on memory), extract the transferable pattern, and record it in a LEARNED
+          PATTERNS table (exemplar -> what was studied -> what transfers -> URL):
+          - Distill.pub — the gold standard for research communication: one-idea SVG
+            diagrams, editorial voice, provenance-adjacent rigor (the diagram inventory's
+            direct model).
+          - Santa Fe Institute — a FIELD-ESTABLISHMENT exemplar: how a discipline announces
+            itself (complex systems) — IA, tone, credibility cues.
+          - The Pudding + Financial Times graphics + NYT interactive — data storytelling,
+            chart craft, editorial restraint (the chart/evidence pages' model).
+          - Observable HQ — diagram/chart craft and exploration affordances.
+          - Bret Victor — Explorable Explanations — interactive diagrams that teach.
+          - arXiv + academic lab sites — credibility through provenance, versioning,
+            measured-vs-modeled discipline.
+          - The operator's own Story page — the first-person origin voice (the $20 key, the
+            Rome train) is the relational spine; study what makes it work.
+          Every visual/editorial decision in this research doc MUST cite an exemplar it
+          learns from (or be explicitly flagged as a NOVEL decision with the reasoning) —
+          no decision is 'just taste'. Define the visual language: typography (serif/sans
+          pairing for a research-field feel), color (restrained, editorial — the current
           calculator aesthetic goes), motion (minimal, purposeful), and the DIAGRAM
           INVENTORY with a sketch-level spec for each: the instrument cycle
           (instrument -> derive -> write policy -> grid -> campaign), the N x M problem,
@@ -142,7 +161,8 @@ workflow:
           cost curves (immediate vs cumulative with the N^2 term — modeled, [C]), the
           escalation chain (cell -> rejected outcome -> E_x 11.47x downstream cost), the
           calibration arc (0/3 -> 2/3 -> randomized NON-INFERIOR), and the 10 rules as
-          interactive cards (status: proposal vs measured vs decided).
+          interactive cards (status: proposal vs measured vs decided) — each with its
+          exemplar citation.
           R4 — IA + EDITORIAL MAP: the page architecture (what stays, what merges, what
           moves — e.g. databricks.html may fold into evidence; accelerator may fold into
           framework), the narrative spine (Story -> Question -> Method -> Evidence ->
