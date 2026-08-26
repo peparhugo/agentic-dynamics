@@ -143,8 +143,12 @@ workflow:
           GOAL: {goal}
           SHAPE: run the FULL deterministic suite on the current tip — this has NOT
           happened since the lint-gating failure (the review's key unknown). Run:
-          (a) python3 -m pytest tests/ -q (the full suite; the known environmental skips —
-          e.g. the Chroma connectivity test — are documented, not silently excluded);
+          (a) python3 -m pytest tests/ -q --timeout=600 (the full suite WITH the hang
+          guard: pytest-timeout turns a hanging test into a failure, never an infinite
+          block — the post-mortem lesson; the known environmental skips — e.g. the
+          Chroma live tests, now heartbeat-guarded — are documented, not silently
+          excluded; a test that hits the 600s cap is a FAILED finding with its root
+          cause, not a skip);
           (b) python3 scripts/build_data.py --dry-run (the integrity check);
           (c) python3 scripts/sync_data.py --check (parquet parity);
           (d) the import gate (python3 -c "import agentic_dynamics" or the CI's own gate).
