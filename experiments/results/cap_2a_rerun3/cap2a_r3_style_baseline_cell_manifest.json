@@ -1,0 +1,77 @@
+{
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "candidate_id": "c3_style_baseline",
+  "arm": "baseline",
+  "cell_id": "cap2a_r3_style_baseline",
+  "spec_path": "workflows/operations/cap_2a_cell_style.yaml",
+  "spec_path_sha256": "eaf7e806ce8f3b7f49f3f804904df513887e58387a73e1dc2ffe1337fd994ab4",
+  "spec_id": "cap_2a_cell_style@0.1",
+  "goal": "add a rate_for function that compares floating-point thresholds directly (to the calc app)",
+  "goal_sha256": "ae154219c61806137845e4e64906da05de563815b73076dfda77218172d8fcc0",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "seeded_app_worktree": "/tmp/cap2a_cell_style_rerun3",
+  "seeded_app_seed_revision": "fec7a127bafd6dc62db57fac4d0cc0ad7ece91ad",
+  "finops_cell_id": "cap2a_r3_style_baseline",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "baseline_revision": "fec7a127bafd6dc62db57fac4d0cc0ad7ece91ad",
+  "analyzed_revision": "e1d01471772b2e685c6fff44f82671dbb797897a",
+  "analyzer_status": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available (mypy 2.3.1)"
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.18",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_omitted": [],
+  "proposal": {
+    "proposal_id": "7cb946e0176d54dd",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/7cb946e0176d54dd.json",
+    "artifact_sha256": "60365a06b2c92c601f78e65e49c0e64abe306a9ba2577fc73a48f629d1711b36"
+  },
+  "gate_application": {
+    "applied_or_null": "not_applicable",
+    "note": "baseline arm: shadow-only, applied=false by design."
+  },
+  "outcome": {
+    "artifact": "experiments/results/cap_2a_rerun3/cap2a_r3_style_baseline_outcome.json",
+    "artifact_sha256": "43d56d35fa9ed8862b5910c45f293d9cad4d02ea5ae64a71e87ec139cf5f87b3",
+    "outcome": "no_rework",
+    "test_executed_success": true,
+    "defect_present_on_final_commit": false
+  },
+  "cost": {
+    "implement_usd": 0.003697471,
+    "test_usd": 0.0,
+    "verify_usd": 0.004739325,
+    "total_usd": 0.008437
+  },
+  "duration": {
+    "implement_s": 18.46,
+    "test_s": 0.32,
+    "verify_s": 8.89
+  },
+  "test_result": "test_executed_success = true (3/3) \u2014 independent runtime.test_runner",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T045310Z.json",
+  "run_ledger_sha256": "ccd6f27d7712c353b5ed568b901d7e28b936b49387a0337e9ea6699d4c325bc5",
+  "expected_realized_class": "no_rework"
+}

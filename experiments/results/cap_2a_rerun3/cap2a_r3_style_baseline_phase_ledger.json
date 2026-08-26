@@ -1,0 +1,69 @@
+{
+  "schema_version": "cap_2a_p3_phase_ledger/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "cell_id": "cap2a_r3_style_baseline",
+  "arm": "baseline",
+  "spec_id": "cap_2a_cell_style@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "baseline_revision": "fec7a127bafd6dc62db57fac4d0cc0ad7ece91ad",
+  "analyzed_revision": "e1d01471772b2e685c6fff44f82671dbb797897a",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T045310Z.json",
+  "run_ledger_sha256": "ccd6f27d7712c353b5ed568b901d7e28b936b49387a0337e9ea6699d4c325bc5",
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash": "e1d0147",
+      "cost_usd": 0.003697471,
+      "duration_s": 18.46,
+      "code_change_risk": "0.18",
+      "new_sonar_critical_count": "0",
+      "graph_status": "available",
+      "impacted_count": 4,
+      "proposal": "7cb946e0176d54dd (continue, depth 0, applied=false)"
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "cost_usd": 0.0,
+      "duration_s": 0.32,
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash": "",
+      "cost_usd": 0.004739325,
+      "duration_s": 8.89,
+      "note": "No new commit -> change_analysis=None."
+    }
+  ],
+  "proposal_seam_result": {
+    "proposal_id": "7cb946e0176d54dd",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "refused": false,
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/7cb946e0176d54dd.json",
+    "artifact_sha256": "60365a06b2c92c601f78e65e49c0e64abe306a9ba2577fc73a48f629d1711b36",
+    "note": "continue proposed: new_sonar_critical_count=0 (the MAJOR-only S1244 finding is severity-excluded), risk 0.18 < 0.2."
+  },
+  "outcome": {
+    "artifact": "experiments/results/cap_2a_rerun3/cap2a_r3_style_baseline_outcome.json",
+    "artifact_sha256": "43d56d35fa9ed8862b5910c45f293d9cad4d02ea5ae64a71e87ec139cf5f87b3",
+    "outcome": "no_rework",
+    "test_executed_success": true
+  },
+  "total_measured_cost_usd": 0.008437,
+  "forecast_cost_usd": 0.017018,
+  "within_forecast": true
+}

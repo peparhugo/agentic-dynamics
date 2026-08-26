@@ -1,0 +1,77 @@
+{
+  "schema_version": "cap_2a_p3_phase_ledger/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "cell_id": "cap2a_r3_style_gate",
+  "arm": "gate",
+  "spec_id": "cap_2a_cell_style@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "baseline_revision": "b0a8961df37970c7645956e104e5f3e13e3adcf1",
+  "analyzed_revision": "f1888c8e048b21af1c0201277c926e7c49929fc1",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_style/20260826T045533Z.json",
+  "run_ledger_sha256": "b14454b89aa3f5e9fd65ffbcfed19f9967006b564bb5b4ec886e89758880a578",
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash": "f1888c8",
+      "cost_usd": 0.003685668,
+      "duration_s": 16.4,
+      "code_change_risk": "0.18",
+      "new_sonar_critical_count": "0",
+      "graph_status": "available",
+      "impacted_count": 4,
+      "proposal": "b4c91ccfbdabeef2 (continue, depth 0, applied=false)"
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "ok",
+      "cost_usd": 0.0,
+      "duration_s": 0.33,
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3
+    },
+    {
+      "phase": "verify",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash": "",
+      "cost_usd": 0.004673234,
+      "duration_s": 9.59,
+      "note": "No new commit -> change_analysis=None (provable-null continue application)."
+    }
+  ],
+  "proposal_seam_result": {
+    "proposal_id": "b4c91ccfbdabeef2",
+    "action": "continue",
+    "depth": 0,
+    "scope": [],
+    "applied": false,
+    "refused": false,
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/b4c91ccfbdabeef2.json",
+    "artifact_sha256": "3d92bfde2920b33fb36c0aeeccb74eb5c3c36b4be99650e249c0eadcfc8dfe6b",
+    "note": "continue proposed: new_sonar_critical_count=0 (MAJOR-only S1244 severity-excluded), risk 0.18 < 0.2."
+  },
+  "gate_application": {
+    "applied_or_null": "null",
+    "extra_passes": 0,
+    "commit_trail": [
+      "b0a8961 (seed)",
+      "f1888c8 (implement)"
+    ]
+  },
+  "outcome": {
+    "artifact": "experiments/results/cap_2a_rerun3/cap2a_r3_style_gate_outcome.json",
+    "artifact_sha256": "2f1bdad5f1815dbfaf520742b54060dd2e97e726ee3371e18dfa96b3933d3246",
+    "outcome": "no_rework",
+    "test_executed_success": true
+  },
+  "total_measured_cost_usd": 0.008359,
+  "forecast_cost_usd": 0.0169,
+  "within_forecast": true
+}

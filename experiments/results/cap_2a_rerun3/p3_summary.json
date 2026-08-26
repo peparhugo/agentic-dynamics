@@ -1,0 +1,223 @@
+{
+  "schema_version": "cap_2a_p3_summary/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "written_at": "2026-08-26T05:00:00Z",
+  "cells": [
+    {
+      "cell_id": "cap2a_r3_critical_baseline",
+      "arm": "baseline",
+      "spec": "cap_2a_cell_critical@0.1",
+      "code_change_risk": 0.215,
+      "new_sonar_critical_count": 1,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "7f6ac70cbe5c7cf4",
+      "proposal_applied": false,
+      "proposal_scope": [
+        "add",
+        "classify",
+        "subtract",
+        "test_add",
+        "test_classify",
+        "test_subtract"
+      ],
+      "outcome": "targeted_rework",
+      "test_executed_success": false,
+      "tests_passed": 2,
+      "tests_total": 3,
+      "defect_present_on_final_commit": true,
+      "graph_status": "available",
+      "sonar_status": "available",
+      "lsp_status": "available",
+      "cost_usd": 0.008949
+    },
+    {
+      "cell_id": "cap2a_r3_critical_gate",
+      "arm": "gate",
+      "spec": "cap_2a_cell_critical@0.1",
+      "code_change_risk": 0.215,
+      "new_sonar_critical_count": 1,
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_id": "03962721aea0655c",
+      "proposal_applied": false,
+      "gate_applied_or_null": "applied",
+      "rework_passes": 1,
+      "rework_commit": "33211ed769f948753e1d3a141fb890cdaaf35294",
+      "outcome": "targeted_rework",
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "defect_present_on_final_commit": false,
+      "graph_status": "available",
+      "sonar_status": "available",
+      "lsp_status": "available",
+      "cost_usd": 0.014668
+    },
+    {
+      "cell_id": "cap2a_r3_style_baseline",
+      "arm": "baseline",
+      "spec": "cap_2a_cell_style@0.1",
+      "code_change_risk": 0.18,
+      "new_sonar_critical_count": 0,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "7cb946e0176d54dd",
+      "proposal_applied": false,
+      "proposal_scope": [],
+      "outcome": "no_rework",
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "defect_present_on_final_commit": false,
+      "graph_status": "available",
+      "sonar_status": "available",
+      "lsp_status": "available",
+      "cost_usd": 0.008437
+    },
+    {
+      "cell_id": "cap2a_r3_style_gate",
+      "arm": "gate",
+      "spec": "cap_2a_cell_style@0.1",
+      "code_change_risk": 0.18,
+      "new_sonar_critical_count": 0,
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "proposal_id": "b4c91ccfbdabeef2",
+      "proposal_applied": false,
+      "gate_applied_or_null": "null",
+      "outcome": "no_rework",
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "defect_present_on_final_commit": false,
+      "graph_status": "available",
+      "sonar_status": "available",
+      "lsp_status": "available",
+      "cost_usd": 0.008359
+    }
+  ],
+  "forecast_vs_actual_cost": {
+    "basis": "baseline-arm forecast $0.017018/cell (p1) + gate-arm forecast $0.0169/cell (p2); envelope = 2x0.017018 + 2x0.0169 = $0.067836.",
+    "forecast_envelope_usd": 0.067836,
+    "stop_budget_usd": 15.0,
+    "cumulative_actual_usd": 0.040413,
+    "note": "Cumulative actual ($0.040413) is under the forecast envelope ($0.067836) and the campaign stop budget ($15); no cell was stopped.",
+    "rows": [
+      {
+        "cell_id": "cap2a_r3_critical_baseline",
+        "forecast_usd": 0.017018,
+        "actual_usd": 0.008949,
+        "within_forecast": true
+      },
+      {
+        "cell_id": "cap2a_r3_critical_gate",
+        "forecast_usd": 0.0169,
+        "actual_usd": 0.014668,
+        "within_forecast": true
+      },
+      {
+        "cell_id": "cap2a_r3_style_baseline",
+        "forecast_usd": 0.017018,
+        "actual_usd": 0.008437,
+        "within_forecast": true
+      },
+      {
+        "cell_id": "cap2a_r3_style_gate",
+        "forecast_usd": 0.0169,
+        "actual_usd": 0.008359,
+        "within_forecast": true
+      }
+    ],
+    "stopped_cells": []
+  },
+  "status_flags": {
+    "graph_down_cells": [],
+    "analyzer_down_cells": [],
+    "note": "No graph-down or analyzer-down cells: graph (bolt://localhost:7687), sonar (127.0.0.1:9000), and lsp (mypy 2.3.1) were available on every cell."
+  },
+  "money_cell": {
+    "cell_id": "cap2a_r3_critical_gate",
+    "finding": "The APPLIED rework fixed the defect: one bounded rework pass (commit 33211ed, a single one-line fix `value > 10` -> `value >= 10`) took the final commit from test_executed_success=false (2/3, defect present) to true (3/3, defect absent). Cost vs baseline: gate $0.014668 vs baseline $0.008949 -> the applied-rework premium is $0.005719. The rework fixed the DEFECT (boundary), not the S3776 cognitive-complexity finding that triggered the proposal \u2014 that complexity finding persists (recorded for p4's expected-effect check).",
+    "gate_cost_usd": 0.014668,
+    "baseline_cost_usd": 0.008949,
+    "rework_premium_usd": 0.005719
+  },
+  "outcome_spread": {
+    "met": true,
+    "n_no_rework": 2,
+    "n_targeted_rework": 2,
+    "note": "critical -> targeted_rework (both arms); style -> no_rework (both arms). The critical-gate cell's applied rework is the campaign's first APPLIED rework data point."
+  },
+  "artifact_index": [
+    {
+      "path": "experiments/results/cap_2a_rerun3/p3_execution_manifest.json",
+      "sha256": "5750a98faea913e7da16d95630271736df8e89bc3cd1ffbeb4a532d703bd2ecf"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_outcome.json",
+      "sha256": "258c2d7ca13ecf391b697502c585570a0d5e6809a5aa7b9ac8f8dffcd828e745"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_cell_manifest.json",
+      "sha256": "4460debd953a950a40e2306f3670cfa35e72496cd3cd5cd9a1f79a50f1ab7bcc"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_phase_ledger.json",
+      "sha256": "ed385510052c2867de04844b8391215a60c9bfc5702fb7da6f2d41cd62091c81"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/7f6ac70cbe5c7cf4.json",
+      "sha256": "41576c3cdc94e751f94bdd2e85140cbab9b3d7a10f9e654853c0106049a1743c"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_gate_outcome.json",
+      "sha256": "6dfe331d1ed0a4ad877ecc81945e6ce56e4118e44726433e02cea0da53871dfd"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_gate_cell_manifest.json",
+      "sha256": "d30b4d4525ce5c50e76ccab6afa25742c4a32b91d0259482531a786d498c51ec"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_gate_phase_ledger.json",
+      "sha256": "ac4abfbc83ccffca5f2536bcc61892779bc16a1b81153c847f200f4063e4e1a1"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/03962721aea0655c.json",
+      "sha256": "c076e3dc16e29c5aa5d7f1302ab83a727222ee8a5601c2f4b16d68aca445364a"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_baseline_outcome.json",
+      "sha256": "43d56d35fa9ed8862b5910c45f293d9cad4d02ea5ae64a71e87ec139cf5f87b3"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_baseline_cell_manifest.json",
+      "sha256": "31ca8fcb4a117c21e8d758ed8336e5cab7ed9d08d6b7236b276ba6e8041a464f"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_baseline_phase_ledger.json",
+      "sha256": "5d3b7aa10076a9b8b0762cf6dcbfed1d70c6522ec2db3bc4ca3ba4bde32a5c04"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/7cb946e0176d54dd.json",
+      "sha256": "60365a06b2c92c601f78e65e49c0e64abe306a9ba2577fc73a48f629d1711b36"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_gate_outcome.json",
+      "sha256": "2f1bdad5f1815dbfaf520742b54060dd2e97e726ee3371e18dfa96b3933d3246"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_gate_cell_manifest.json",
+      "sha256": "61bb757ceecd7eb4cd36cb85a11b662e7412842357b9ea2efa8f8150fcb6556c"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_gate_phase_ledger.json",
+      "sha256": "dde89c16b8ea9676966bb551159b36dbf6ed95c740880eb3aa588f635afe9dc5"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/b4c91ccfbdabeef2.json",
+      "sha256": "3d92bfde2920b33fb36c0aeeccb74eb5c3c36b4be99650e249c0eadcfc8dfe6b"
+    }
+  ]
+}

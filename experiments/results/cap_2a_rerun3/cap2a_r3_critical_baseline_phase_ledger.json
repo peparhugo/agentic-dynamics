@@ -1,0 +1,69 @@
+{
+  "schema_version": "cap_2a_p3_phase_ledger/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "cell_id": "cap2a_r3_critical_baseline",
+  "arm": "baseline",
+  "spec_id": "cap_2a_cell_critical@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": false,
+  "note": "ok=false is EXPECTED for the baseline arm: the critical stimulus's deliberate boundary defect makes the independent test phase fail (2/3). This is the measurement, not a failure of the cell.",
+  "baseline_revision": "66272af150acc5a10df4efc2953ed601fdfb088b",
+  "analyzed_revision": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T044432Z.json",
+  "run_ledger_sha256": "28e3b9de1cd545fe58dc0b978b90162ed77f25d2e761cb88de8b373047414adb",
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash": "efe33b6",
+      "cost_usd": 0.00894911,
+      "duration_s": 82.85,
+      "code_change_risk": "0.215",
+      "new_sonar_critical_count": "1",
+      "new_lsp_error_count": "0",
+      "graph_status": "available",
+      "impacted_count": 4,
+      "proposal": "7f6ac70cbe5c7cf4 (rework, depth 3, applied=false)"
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "failed",
+      "cost_usd": 0.0,
+      "duration_s": 0.35,
+      "test_executed_success": false,
+      "tests_passed": 2,
+      "tests_total": 3
+    }
+  ],
+  "proposal_seam_result": {
+    "proposal_id": "7f6ac70cbe5c7cf4",
+    "action": "rework",
+    "depth": 3,
+    "scope": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ],
+    "applied": false,
+    "refused": false,
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/7f6ac70cbe5c7cf4.json",
+    "artifact_sha256": "41576c3cdc94e751f94bdd2e85140cbab9b3d7a10f9e654853c0106049a1743c",
+    "note": "rework proposed because new_sonar_critical_count=1 (>0). Scope NOW contains the changed symbol classify (the rerun2 scope-miss fix cc66efd30): neighborhood = changed symbols + dependents."
+  },
+  "outcome": {
+    "artifact": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_outcome.json",
+    "artifact_sha256": "258c2d7ca13ecf391b697502c585570a0d5e6809a5aa7b9ac8f8dffcd828e745",
+    "outcome": "targeted_rework",
+    "test_executed_success": false
+  },
+  "total_measured_cost_usd": 0.008949,
+  "forecast_cost_usd": 0.017018,
+  "within_forecast": true
+}

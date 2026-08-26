@@ -1,0 +1,83 @@
+{
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p3_run_remaining_cells",
+  "candidate_id": "c2_critical_baseline",
+  "arm": "baseline",
+  "cell_id": "cap2a_r3_critical_baseline",
+  "spec_path": "workflows/operations/cap_2a_cell_critical.yaml",
+  "spec_path_sha256": "6ecb2bd93e8718c8c42382f648e859672c649de761e46ba74c2d7a460721e4d7",
+  "spec_id": "cap_2a_cell_critical@0.1",
+  "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+  "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "seeded_app_worktree": "/tmp/cap2a_cell_critical_rerun3",
+  "seeded_app_seed_revision": "66272af150acc5a10df4efc2953ed601fdfb088b",
+  "finops_cell_id": "cap2a_r3_critical_baseline",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "baseline_revision": "66272af150acc5a10df4efc2953ed601fdfb088b",
+  "analyzed_revision": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+  "analyzer_status": {
+    "graph": "available",
+    "sonar": "available",
+    "lsp": "available (mypy 2.3.1)"
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.215",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "1",
+    "sonar_analysis_status": "available"
+  },
+  "facts_omitted": [],
+  "proposal": {
+    "proposal_id": "7f6ac70cbe5c7cf4",
+    "action": "rework",
+    "depth": 3,
+    "scope": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ],
+    "applied": false,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "artifact": "experiments/results/cap_2a_rerun3/proposals/7f6ac70cbe5c7cf4.json",
+    "artifact_sha256": "41576c3cdc94e751f94bdd2e85140cbab9b3d7a10f9e654853c0106049a1743c"
+  },
+  "gate_application": {
+    "applied_or_null": "not_applicable",
+    "note": "baseline arm: the proposal is shadow-only (applied=false by design); nothing is executed."
+  },
+  "outcome": {
+    "artifact": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_outcome.json",
+    "artifact_sha256": "258c2d7ca13ecf391b697502c585570a0d5e6809a5aa7b9ac8f8dffcd828e745",
+    "outcome": "targeted_rework",
+    "test_executed_success": false,
+    "defect_present_on_final_commit": true
+  },
+  "cost": {
+    "implement_usd": 0.00894911,
+    "test_usd": 0.0,
+    "total_usd": 0.008949
+  },
+  "duration": {
+    "implement_s": 82.85,
+    "test_s": 0.35,
+    "wall_s": 136.9
+  },
+  "test_result": "test_executed_success = false (2/3) \u2014 the boundary defect fails test_classify",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260826T044432Z.json",
+  "run_ledger_sha256": "28e3b9de1cd545fe58dc0b978b90162ed77f25d2e761cb88de8b373047414adb",
+  "expected_realized_class": "targeted_rework"
+}
