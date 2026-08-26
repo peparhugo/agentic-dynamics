@@ -1,0 +1,294 @@
+name: cap_2a_rerun3
+question: >-
+  The FIRST control experiment: does APPLYING the verify_code_change gate improve
+  cost-per-accepted-outcome (value), vs the baseline that ignores it? The prediction studies
+  are done (0/3 -> 2/3, severity fix, calibration table); control value was never measured
+  (applied=false by design). This campaign runs the SAME three stimuli (clean/critical/style)
+  under TWO arms — baseline (shadow, applied=false) and gate (the proposal is EXECUTED:
+  rework/verify/continue as proposed) — and reports the paired value delta, the asymmetric
+  loss table (E_x-scaled), and the expected-effect check rate (the proposals' own falsifiable
+  claims, finally used). Design: docs/designs/current/cap_2a_rerun3_design.md (accepted).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+supersedes: cap_2a_rerun2
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / CAP evidence integrity.
+        canonical_sources: [docs/designs/current/cap_2a_rerun3_design.md (ACCEPTED — the
+        experiment spec, read FIRST), docs/designs/current/cap_2a_rerun2.md (prior verdict),
+        workflows/operations/cap_2a_cell_clean.yaml + cap_2a_cell_critical.yaml +
+        cap_2a_cell_style.yaml (the UNCHANGED stimulus set), src/agentic_dynamics/control/
+        verify_proposal.py (the treatment — code-unchanged; validate_expected_effects at the
+        top of the module), src/agentic_dynamics/control/evidence_analyzer.py (the scope fix),
+        src/agentic_dynamics/runtime/workflow_runner.py (_run_change_analysis),
+        experiments/results/cap_2a_rerun2/cap_2a_rerun2_score_20260826T015846Z.json (prior
+        rows), the registry findings cap_2a:cap_2a_rerun2 (scripts/registry.py query)].
+        policies: [measure_before_actuate, apply_only_in_gate_arm, shadow_is_never_applied,
+        measure_one_cell_cost_before_budget, paired_comparison_discipline]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research (control experiment — the grid).
+        deliberation: [measure baseline cell, measure gate cell, run remaining 4 cells,
+        score paired value + asymmetric loss + expected effects, verdict, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        rerun2 COMPLETED (superseded): hit-rate 2/3 (Wilson [0.2077, 0.9385], descriptive-only
+        n=3), severity-conflation blocker fixed and measured, action over-prediction 0/3.
+        THREE measurement corrections are merged since the verdict: (1) the executor scope now
+        contains the change's own symbols (cc66efd30 — the rework leg is hittable); (2)
+        validate_expected_effects checks proposals' own claims against next-phase facts
+        (4fa22047c); (3) the campaign-evidence ingestion writes scored rows to the registry as
+        [M] findings (34254d15b). What has NEVER been measured: the gate APPLIED. applied=false
+        is a hard invariant of the prediction campaigns; this campaign relaxes it in the gate
+        arm ONLY. E_x (escalation multiplier) from the site's own economics: ~28x
+        (DeepSeek -> GPT-5.6) — the asymmetric-loss table uses it with its source stated.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks; every measurement phase
+        writes a durable PASS/FAIL log even when it stops early. (2) APPLIED INVARIANT: the
+        baseline arm is shadow-only (applied=false ALWAYS); the gate arm APPLIES the proposal
+        EXACTLY as proposed (rework = one bounded rework pass over the proposal scope, verify =
+        one verification pass, continue = no-op) — nothing else, no extra retries, no
+        control_route, no actuation events, no human steering mid-cell. (3) Paired discipline:
+        each stimulus runs under BOTH arms from the SAME recorded source revision, fresh
+        worktrees, unique FINOPS_CELL_IDs; the pair shares the stimulus spec path + goal hash.
+        (4) Candidate manifest FIRST (cell_id, exact spec path + SHA256, arm, goal, model/
+        backend, source baseline revision, worktree, FINOPS_CELL_ID, graph mode, forecast
+        cost); a cell not in the manifest is not run. (5) p1/p2 measure ONE baseline and ONE
+        gate cell before p3 (E4); p3 uses the measured costs as forecast only and reports
+        forecast vs actual. (6) Proposals recorded BEFORE the outcome; outcomes independent
+        (test_runner + post-hoc evaluator on the immutable commits, never the proposing
+        agent's narrative). (7) Graph-down or analyzer-down cells are FLAGGED, never silently
+        dropped; counts unknown (not zero). (8) Proposal and outcome record the same cell_id,
+        baseline/analyzed revisions, contract version; mismatches are invalid, not scored. (9)
+        Every verdict number cites a produced JSON + SHA256; unknown outcomes stay in the
+        dataset with printed denominators. (10) DESCRIPTIVE-ONLY: n=3 pairs cannot clear the 2b
+        gate or authorize anything; the verdict states the n the 2b feasibility probe implies.
+        (11) The value scoring is computed by an independent post-hoc evaluator phase over the
+        immutable commits — not by the cell agents. (12) No generated-surface edits, no secrets
+        in artifacts. (13) p6 mandatory: findings re-verified against the tree + known-safe
+        output, no bare PASS. (14) Resumable only when spec version, goal hash, source
+        revision, and candidate-manifest hash match. (15) THE TREATMENT IS CODE-UNCHANGED:
+        build_verify_proposal / _risk_depth / VERIFY_RISK_THRESHOLD / the risk weights are NOT
+        modified by this campaign; the merged measurement fixes (scope, expected-effects) are
+        consumed as-is.
+      read_first: >-
+        docs/designs/current/cap_2a_rerun3_design.md (FIRST — the experiment spec §2-§4),
+        docs/designs/current/cap_2a_rerun2.md (the prior verdict), workflows/operations/
+        cap_2a_cell_clean.yaml + cap_2a_cell_critical.yaml + cap_2a_cell_style.yaml (the
+        stimulus set), src/agentic_dynamics/control/verify_proposal.py (the treatment +
+        validate_expected_effects), src/agentic_dynamics/control/evidence_analyzer.py (scope
+        fix), scripts/kb_produce_campaign_evidence.py (the registry ingestion — reuse for the
+        rerun3 score), experiments/results/cap_2a_rerun2/cap_2a_rerun2_score_20260826T015846Z.json
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-pro --backend opencode (operator preference).
+        One branch (feature/cap-2a-rerun3); each phase commits [workflow] <phase>. Each cell
+        runs in a fresh disposable worktree from the recorded source revision with a unique
+        FINOPS_CELL_ID; only immutable ledger/proposal/outcome artifacts are copied into the
+        outer worktree. No credentials in committed artifacts.
+    phases:
+      - name: p1_measure_baseline_cell
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: E4 measurement, baseline arm. Candidate manifest FIRST (candidate_id, exact
+          stimulus spec path + SHA256, arm=baseline, goal hash, model/backend, source baseline
+          revision, fresh worktree, FINOPS_CELL_ID, graph mode, forecast cost). The stimulus is
+          the CLEAN variant (cap_2a_cell_clean.yaml — unchanged from rerun2). RUN from the
+          recorded source revision in a fresh disposable worktree: python3 scripts/
+          run_workflow.py --spec <path> --goal <short goal> --model deepseek/deepseek-v4-pro
+          --backend opencode --change-analysis [--change-analysis-graph bolt://localhost:7687]
+          --workdir <worktree>. The proposal MUST emit (shadow-only, applied=false — a refusal
+          here is a regression of the seam: record the facts present + reason and FAIL the
+          phase). RECORD one immutable cell manifest + one ledger row per committed phase:
+          cell_id, spec/version, arm=baseline, model/backend, baseline revision, analyzed full
+          revision, graph/sonar/lsp status, facts (omitted listed), proposal id/schema
+          (applied=false), cost, duration, test result, artifact SHA256s. DELIVER: candidate
+          manifest, cell manifest, phase ledger, validated proposal, analyzer statuses, exact
+          cost/duration, the p3 FORECAST budget (measured x 2, labeled FORECAST).
+          LOG: cost/duration/facts/proposal table; PASS/FAIL; commit.
+      - name: p2_measure_gate_cell
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: E4 measurement, gate arm — the FIRST APPLIED cell. Candidate manifest FIRST
+          (same fields, arm=gate). The stimulus is the SAME CLEAN variant, same source
+          revision, fresh worktree, unique FINOPS_CELL_ID (pairing = same stimulus + same
+          source revision, never the same worktree). RUN with the seam. GATE APPLICATION
+          (hard rule 2): after the proposal is recorded and validated, APPLY it exactly as
+          proposed — for the clean stimulus the proposal is `continue` (depth 0): the gate
+          application is a PROVABLE NULL (no rework, no verify pass beyond the cell's own test
+          phase). The ledger/commit trail must show the null application (the proposal record
+          + the absence of extra passes). RECORD everything per p1's shape + the expected-effect
+          validation: run validate_expected_effects(proposal.expected_effect, <analyzed
+          phase's facts>, <next phase's facts>) and record the checks (the proposal's own
+          claims, checked for the first time). DELIVER: candidate manifest, cell manifest,
+          phase ledger, applied-or-null proof, expected-effect checks, cost/duration, p3
+          FORECAST budget for the gate arm (measured x 2, labeled FORECAST).
+          LOG: cost/duration/facts/proposal/effect-checks table; PASS/FAIL; commit.
+      - name: p3_run_remaining_cells
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the remaining four cells: the CRITICAL and STYLE stimuli x BOTH arms, from
+          the p1/p2 candidate manifest (list candidates + forecast costs BEFORE running — no
+          unlisted cells). Paired discipline per cell pair (same stimulus, both arms, same
+          source revision, fresh worktrees, unique FINOPS_CELL_IDs). Per cell: baseline runs
+          exactly once; the proposal is emitted + validated BEFORE the outcome; the gate arm
+          then APPLIES it exactly as proposed — for the critical-gate cell the `rework` proposal
+          is executed as ONE bounded rework pass over the proposal scope (the changed symbols +
+          dependents — the scope fix makes the scope contain the target); for the style-gate
+          cell `continue` is a provable null. The application is provable in the commit trail
+          (a new commit / no extra commits as the case dictates); nothing else changes. Outcomes
+          INDEPENDENT: test_runner verdict + a post-hoc evaluator pass over the immutable
+          commits (defect present on the final commit? tests passing? severity-filtered counts)
+          — never the proposing agent's narrative. Graph-down/analyzer-down cells: run, flag,
+          keep in the dataset. Persist per cell: one manifest, one proposal record, one
+          independent outcome record, one cost/phase ledger; hash every artifact. Stop before
+          the next cell if cumulative actual cost exceeds the FORECAST envelope or the stop
+          budget; record stopped cells as not-run. The critical-gate cell is the campaign's
+          money cell: does the applied rework fix the defect, and at what cost vs the
+          critical-baseline cell?
+          DELIVER: immutable p3 manifest, cell ledgers, validated proposals, applied-or-null
+          proofs, independent outcomes, flags, forecast-vs-actual table, artifact SHA256 index.
+          LOG: per-cell cost/duration/proposal/outcome/application table; PASS/FAIL; commit.
+      - name: p4_score_value
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: score ONLY immutable p1-p3 artifacts; validate joins first (cell_id, baseline
+          revision, analyzed revision, proposal_id, contract version, ARM — a baseline cell
+          with applied=true or a gate cell with applied=false is invalid, never scored).
+          Emit experiments/results/cap_2a_rerun3_score_<UTC timestamp>.json (schema
+          cap_2a_rerun3_score/v1) with input artifact paths + SHA256s, spec version, source
+          revision, candidate-manifest hash, per-cell rows.
+          VALUE (design §2.3): per cell compute cell_value = -(run cost) + delta-durable-value
+          from the INDEPENDENT post-hoc evaluator: verification surface (tests authored +
+          executed on the final commit), static quality (severity-filtered sonar/lsp counts on
+          the final commit), rework cost (extra passes actually executed in the gate arm), and
+          defect presence (the critical stimulus's defect present on the final commit?). The
+          evaluator's inputs are the immutable commits + test_runner records — no model
+          narratives.
+          PAIRED DELTA (design §2.3): per stimulus, gate_value - baseline_value (the same
+          stimulus under both arms is the pair; a stimulus without both arms is invalid for the
+          delta and listed as such). ASYMMETRIC LOSS (design §2.4): per cell the misprediction
+          cost table — false_continue_cost = E_x x downstream defect cost (E_x ~28x, source
+          stated), false_rework_cost = one wasted pass (measured in the gate arm), true_rework_
+          value = defect fixed pre-propagation; report sum(asymmetric loss, gate arm) vs
+          sum(asymmetric loss, baseline arm). EXPECTED EFFECTS (design §2.5): per gate-arm cell,
+          validate_expected_effects over the proposal's claims vs the next phase's facts;
+          report check_rate (claims checked / claims made) and held_rate. Aggregates: per-stimulus
+          paired deltas, asymmetric-loss sums, expected-effect rates, denominators printed.
+          NO 2b recommendation in this phase.
+          DELIVER: the score JSON + a validation result tracing every verdict number to a field.
+          LOG: paired delta table, asymmetric-loss table, effect rates; PASS/FAIL; commit.
+      - name: p5_verdict
+        kind: agent
+        timeout: 10800
+        prompt: |
+            GOAL: {goal}
+            DELIVER exactly one file: docs/designs/current/cap_2a_rerun3.md
+            SHAPE: source revision, spec version, candidate-manifest hash, SHA256s for every p4
+            JSON; the paired table (per stimulus: baseline cost/value, gate cost/value, delta,
+            applied-or-null proof id); the asymmetric-loss comparison; the expected-effect
+            check/held rates; flagged cells.
+            VERDICT: (1) does applying the gate improve value per dollar on the stimulus set —
+            the direction of each paired delta, with the numbers; (2) the asymmetric-loss
+            comparison (E_x sourced and stated); (3) the expected-effect held rate; (4) the
+            critical-gate cell's applied-rework result (defect fixed? at what cost?); (5) the n
+            the 2b feasibility probe implies, and the eligibility statement for 2b's randomized
+            design — DESCRIPTIVE-ONLY, no gate-clearing claim at n=3 pairs. Compare with the
+            prediction studies explicitly: the gate's decisions were measured before; its VALUE
+            is measured for the first time here.
+            GUARD: every number cites a p4 JSON field; no recommendation without n, denominators,
+            and flagged-cell treatment.
+            LOG: PASS/FAIL; commit.
+      - name: p6_adversarial
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — try to falsify the campaign. Attack in THIS order
+          (design §3 p6): (1) the gate arm's application is real — applied=true provable in the
+          ledger/commit trail for every rework/verify cell, and `continue` cells are provable
+          nulls (no hidden extra passes); a narrated-but-unexecuted application is a FAILED
+          finding; (2) the pairing is paired — same stimulus, same seed/source revision, fresh
+          worktrees, no cross-cell artifacts, no arm contamination (a baseline cell that
+          consumed the gate arm's work is invalid); (3) the value scoring is independent — the
+          post-hoc evaluator is distinct from the proposing agents and its inputs are immutable
+          commits; (4) the expected-effect checks use real next-phase facts, not authored
+          values; (5) the rerun2 limitations re-attacked: novelty pre-existing branch
+          (hermetic-only), single-operator adjudication, KB fact gaps; (6) the usual suite:
+          wrong baselines, cherry-picked cells, denominators, stale sonar, weight drift,
+          applied=false in a gate cell, credentials, unclosed drivers, hash mismatches between
+          p4 JSONs and the verdict citations. Every finding: fix in code/spec/artifacts or
+          record as accepted limitation with reasoning + residual risk. Deliver TWO outputs:
+          1. docs/reviews/cap_2a_rerun3_adversary.md (attack, evidence path/line, result, fix
+             or limitation, re-test; re-stated verdict).
+          2. docs/reviews/cap_2a_rerun3_known_safe.md (every attempted non-falsifying attack,
+             what was tried, artifact/tree evidence, why safe; not a generic checklist).
+          Do not silently rewrite p4 JSONs or the p5 verdict; corrections point to the
+          corrected artifact with both old/new hashes.
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: arm, levels: [baseline, gate]}
+design: factorial
+rules:
+  - name: cap_2a_rerun3_cells_run
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [baseline_cells_run, gate_cells_run, proposals_applied]
+  - name: cap_2a_rerun3_value_scoring
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [baseline_cells_run, gate_cells_run, proposals_applied]
+    produces: [paired_value_delta, asymmetric_loss, expected_effect_rates]
+  - name: cap_2a_rerun3_gate_verdict
+    plane: control
+    evidence_class: "[H]"
+    decision_type: verify_code_change
+    requires_facts:
+      - {fact: sonar_analysis_status, scope: self, value_type: enum,
+         on_missing: classify, on_conflict: halt}
+      - {fact: lsp_analysis_status, scope: self, value_type: enum,
+         on_missing: classify, on_conflict: halt}
+      - {fact: analysis_revision_matches, scope: self, value_type: bool,
+         on_missing: classify, on_conflict: halt}
+      - {fact: changed_symbol_count, scope: self, value_type: int, on_missing: halt}
+      - {fact: ast_parse_coverage, scope: self, value_type: float,
+         on_missing: halt, on_conflict: halt}
+      - {fact: code_change_risk, scope: self, value_type: float,
+         on_missing: halt, on_conflict: halt}
+      - {fact: new_sonar_critical_count, scope: self, value_type: int,
+         on_missing: classify, on_conflict: halt}
+      - {fact: new_lsp_error_count, scope: self, value_type: int,
+         on_missing: classify, on_conflict: halt}
+      - {fact: impacted_symbol_count, scope: self, value_type: int,
+         on_missing: classify, on_conflict: halt}
+      - {fact: changed_symbols_with_tests_ratio, scope: self, value_type: float,
+         on_missing: classify, on_conflict: halt}
+    produces: [gate_value_verdict]
+metrics:
+  - {name: paired_value_delta, agg: mean, over: cell}
+  - {name: asymmetric_loss, agg: mean, over: cell}
+  - {name: expected_effect_held_rate, agg: mean, over: cell}
+  - {name: gate_value_verdict, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: arm, loss: {cost: 1.0, quality: -5.0, sla: 0.0, value: -10.0}}
+writeup:
+  format: lab_book
+  sections: [question, p1_measure_baseline_cell, p2_measure_gate_cell, p3_run_remaining_cells, p4_score_value, p5_verdict, p6_adversarial]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

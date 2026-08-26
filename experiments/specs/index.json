@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-26T02:22:24.596318+00:00",
-  "n_specs": 116,
+  "generated_at": "2026-08-26T04:06:19.884040+00:00",
+  "n_specs": 117,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -65,6 +65,26 @@
       "artifact_kind": "workflow",
       "repeatable": true,
       "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "cap_2a_rerun3",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_2a_rerun3.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [
+        "cap_2a_rerun2"
+      ],
       "superseded_by": null,
       "completed_at": null,
       "last_run_at": null,
