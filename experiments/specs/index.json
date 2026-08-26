@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-26T18:05:28.211723+00:00",
-  "n_specs": 123,
+  "generated_at": "2026-08-26T18:43:48.563068+00:00",
+  "n_specs": 124,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -206,6 +206,24 @@
       "version": "0.1",
       "status": "runnable",
       "spec_path": "workflows/repository/cap_site_revamp.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "cap_stabilization_release",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_stabilization_release.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],

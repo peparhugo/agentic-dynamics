@@ -1,0 +1,271 @@
+name: cap_stabilization_release
+question: >-
+  The stabilization release: make main indisputably green and restore one canonical account
+  of what exists. An external review (2026-08-26) verified against the tree: CI is red on
+  main (last 3 pushes failed "Tests & Lint"; the deterministic suite has NOT run on the
+  current tip because lint gates tests in one job), two real defects exist (undefined `Any`
+  in scripts/kb_produce_facts.py; duplicate "arms" dict key in scripts/retro_session_routing.py
+  that silently overwrites — can change stored analysis results), ARCHITECTURE.md still
+  describes CAP modules as reserved/frozen/empty though implemented, README reports stale
+  spec counts (83 vs the actual 122), and AGENTS.md/mental-model lag the implemented control
+  plane. The review's own verdict: "Ready for stabilization release: YES." This workflow
+  executes P0 (green main) + P1 (canonical docs + guard tests) + the release signoff.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: repository release discipline + documentation
+        authority. canonical_sources: [ARCHITECTURE.md (the stale authority — the p5
+        rewrite target), README.md (stale stats), agent_config/mental-model.md + AGENTS.md
+        (the agent-facing context — refresh + regenerate via scripts/_gen_instructions.py),
+        scripts/kb_produce_facts.py (the undefined-Any defect), scripts/retro_session_routing.py
+        (the duplicate-arms-key defect), .github/workflows/*.yml (the CI job structure),
+        experiments/specs/index.json + experiments/specs/STATUS.md (the authoritative counts),
+        tests/test_doc_lifecycle.py (the doc guard family to extend),
+        src/agentic_dynamics/reporting/strategy.py:66-67 (null-not-zero already fixed —
+        verify, don't re-fix)].
+        policies: [green_before_merge, canonical_docs, no_silent_history_rewrite]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: release stabilization.
+        deliberation: [fix the two defects, lint surface clean, full deterministic suite
+        green, CI restructure, canonical docs, guard tests, signoff].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        VERIFIED findings (do not rediscover; fix them):
+        (1) scripts/kb_produce_facts.py uses `Any` in type annotations WITHOUT importing it
+        (2 uses — ast-verified).
+        (2) scripts/retro_session_routing.py:164 `"arms": ARMS` then :171 `"arms": stats`
+        — the second key overwrites the first in the same dict literal (can change the
+        stored analysis result; re-run the script after the fix and diff the output).
+        (3) CI: .github/workflows runs lint BEFORE tests in one job — the last 3 main
+        pushes failed lint, so the deterministic suite has NOT run on the current tip.
+        (4) ARCHITECTURE.md: 6+ matches of reserved/frozen/empty describing CAP modules
+        (context_abstraction/step_routing/evidence_analyzer/pattern_minting/...) that are
+        IMPLEMENTED and in production (the cap_2b/2a/escalation campaigns consume them).
+        (5) README.md:96 "83 (6 experiments + 77 workflows)" vs index.json's actual
+        122 (11 experiments + 111 workflows); the "total measured spend" figure should be
+        labeled story-corpus-scoped or extended to include workflow spend.
+        (6) agent_config/ + AGENTS.md describe control as emerging/reserved — the agents
+        operating the repo get noncanonical context (the review's sharpest point).
+        (7) ALREADY FIXED — verify, don't re-fix: strategy.py exploration_premium and
+        thermal_efficiency are `float | None = None` ("None = denominator uncaptured").
+        Sweep for any REMAINING `= 0.0`-when-denominator-missing patterns as a guard.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks; every phase writes a
+        durable PASS/FAIL log even when it stops early. (2) GREEN BEFORE FURTHER MERGES: each
+        phase's tests must pass before the next phase starts; the p3 phase ends with the FULL
+        deterministic suite green on the branch (pytest tests/ minus the known environmental
+        skips, plus python3 scripts/build_data.py --dry-run + sync_data.py --check +
+        the import gate). (3) THE VERIFIED FINDINGS ARE THE WORK ORDER: fix the two defects,
+        don't re-derive them; the archive policy (scripts/archive/) is a DECISION with
+        reasoning (lint-clean-and-supported vs excluded-as-immutable), documented, never
+        implicit. (4) NO SILENT HISTORY REWRITE: retro_session_routing.py's stored output is
+        re-generated and the old/new outputs both committed with a note — the old result is
+        never deleted silently. (5) The doc-authority phases regenerate ALL generated
+        surfaces after editing agent_config/ (python3 scripts/_gen_instructions.py —
+        AGENTS.md/.opencode/.claude are GENERATED, never hand-edited). (6) Guard tests are
+        real tests (tests/test_doc_lifecycle.py family): the stale-phrase guard must FAIL on
+        'CAP is empty/frozen/only emerging' while the implementation exists, and the README
+        spec-count guard must reconcile against experiments/specs/index.json. (7) CI edits:
+        split lint/test/repro/packaging into INDEPENDENT required jobs; a lint failure must
+        never hide test results. Branch protection: attempt to apply via `gh api` when
+        permitted; if not permitted, DELIVER the exact settings spec (required checks,
+        PR-only, up-to-date branches, admin+automation included) as a committed doc — never
+        claim applied-when-not. (8) No generated-surface edits outside the regeneration
+        flow; no secrets; no external actuation. (9) p6 mandatory: findings re-verified +
+        known-safe output, no bare PASS. (10) Resumable only when spec version, goal hash,
+        source revision, and candidate-manifest hash match.
+      read_first: >-
+        ARCHITECTURE.md, README.md, scripts/kb_produce_facts.py:1-40 (the Any defect),
+        scripts/retro_session_routing.py:150-180 (the arms-key defect),
+        .github/workflows/ (the CI job), experiments/specs/index.json (the authoritative
+        counts), tests/test_doc_lifecycle.py (the guard family to extend),
+        agent_config/mental-model.md, scripts/_gen_instructions.py (the surface generator),
+        src/agentic_dynamics/reporting/strategy.py:60-90 (the already-fixed null semantics)
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-pro (implementation-heavy work — the
+        operator preference; sonnet when Claude OAuth is up). One branch
+        (feature/cap-stabilization-release); each phase commits [workflow] <phase>. All
+        work is local (no API cells) — the budget covers the agent phases only.
+    phases:
+      - name: p1_fix_defects
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: fix the two VERIFIED defects (current_state items 1-2):
+          (a) scripts/kb_produce_facts.py — import `Any` (or remove the annotation if
+          simpler and correct); (b) scripts/retro_session_routing.py — the duplicate
+          "arms" dict key at :164/:171: merge the two entries deliberately (the stats
+          dict should be merged INTO the ARMS entry, or the keys renamed) so nothing is
+          silently overwritten; then RE-RUN the script (python3 scripts/retro_session_routing.py
+          or its CLI per the script's own usage) and DIFF the stored output — commit BOTH
+          the old and new outputs with a note (hard rule 4). VERIFY: the file imports
+          cleanly (python3 -c "import ..."), ruff passes on both files, and the re-run
+          output changes only where the fix dictates. SWEEP (current_state item 7): grep
+          for remaining `= 0.0`-when-denominator-missing patterns in measurement/reporting
+          modules (strategy.py's exploration_premium/thermal_efficiency are ALREADY None —
+          verify only); report any remaining offenders as findings, fix the clear ones.
+          DELIVER: the two fixes + the re-run outputs + the sweep report, committed.
+          LOG: files touched, the diff summary, PASS/FAIL; commit.
+      - name: p2_lint_surface
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: make the ACTIVE source tree ruff-clean. Run python3 -m ruff check . (or
+          the repo's configured ruff invocation) and resolve every finding in active
+          sources (src/, scripts/ maintained files, tests/, apps/, workflows/). DECIDE the
+          scripts/archive/ policy explicitly (hard rule 3): either bring it to lint-clean
+          or exclude it with a documented ruff per-file-ignores entry labeled
+          'immutable historical material' — the decision + reasoning committed. Apply safe
+          auto-fixes first, then manual fixes for the rest (import ordering, unused
+          imports, modernization). VERIFY: ruff check clean on the active surface (the
+          archive exclusion documented, not silent); the deterministic test files still
+          import (python3 -m pytest tests/test_dependency_direction.py -q as a smoke).
+          DELIVER: the lint-clean tree + the archive-policy decision, committed.
+          LOG: findings count by rule, the archive decision with reasoning, PASS/FAIL;
+          commit.
+      - name: p3_test_suite
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the FULL deterministic suite on the current tip — this has NOT
+          happened since the lint-gating failure (the review's key unknown). Run:
+          (a) python3 -m pytest tests/ -q (the full suite; the known environmental skips —
+          e.g. the Chroma connectivity test — are documented, not silently excluded);
+          (b) python3 scripts/build_data.py --dry-run (the integrity check);
+          (c) python3 scripts/sync_data.py --check (parquet parity);
+          (d) the import gate (python3 -c "import agentic_dynamics" or the CI's own gate).
+          FIX everything that fails until all four gates are green ON THE BRANCH; a real
+          failure is a finding with its fix (never a skip-without-reason). RECORD the final
+          counts (tests passed/failed/skipped with the skip reasons) in the phase log.
+          DELIVER: the green gates + the counts + the failures-fixed log, committed.
+          LOG: each gate's result, every fixed failure with its root cause, PASS/FAIL;
+          commit.
+      - name: p4_ci_restructure
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: restructure the GitHub Actions workflow per the review: lint, test,
+          repro, and packaging as INDEPENDENT required jobs (a lint failure must never hide
+          test results again). Read .github/workflows/, redesign the job matrix (split the
+          current combined job; keep the existing steps — lint, deterministic tests,
+          build_data dry-run, sync_data --check, import gate, packaging, repro — each in
+          its owning job). BRANCH PROTECTION (hard rule 7): check the current protection via
+          gh api repos/{owner}/{repo}/branches/main/protection; attempt to apply the
+          required settings (PR-only, up-to-date branches, required checks incl. the four
+          jobs, protections applying to admins + automation) via gh api when permitted;
+          if not permitted, DELIVER docs/release/branch_protection_settings.md with the
+          exact settings spec — never claim applied-when-not. VERIFY: the workflow YAML
+          parses (actionlint or a yaml parse), the job names match the protection
+          requirements.
+          DELIVER: the restructured workflow + the protection status (applied or spec'd),
+          committed.
+          LOG: the job structure before/after, the protection outcome, PASS/FAIL; commit.
+      - name: p5_docs_authority
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: restore one canonical account of what exists (the review's P1).
+          (a) README.md: refresh the spec counts from experiments/specs/index.json (122:
+          11 experiments + 111 workflows — the authoritative source), label the spend
+          figures explicitly (story-corpus measured spend vs all-measured), and reconcile
+          any other stale statistics against the generated data (build_data's data.js).
+          (b) ARCHITECTURE.md: rewrite the CAP sections — the reserved/frozen/empty
+          language must go; replace with the IMPLEMENTATION-STATUS MAP: per CAP module
+          (context_abstraction, step_routing, evidence_analyzer, pattern_minting,
+          checkpoint, context_compiler, decisions, rules, fact plane): design commitment
+          -> implemented module -> current consumption state (which campaigns consume it:
+          cap_2b, cap_2a_rerun2/3, cap_escalation_measurement, cap_session_routing_*)
+          -> current gate -> current limitation. The frozen design doc stays frozen; the
+          ARCHITECTURE.md is the CURRENT map.
+          (c) agent_config/mental-model.md + AGENTS.md: refresh the control-plane
+          descriptions (implemented, consumed, gated — not emerging), then REGENERATE all
+          surfaces (python3 scripts/_gen_instructions.py) — AGENTS.md/.opencode/.claude
+          are generated, never hand-edited (hard rule 5).
+          (d) GUARD TESTS (hard rule 6): extend tests/test_doc_lifecycle.py with
+          (1) the stale-phrase guard — fails on 'CAP is empty/frozen/only emerging' while
+          the corresponding modules exist and are consumed; (2) the README-count guard —
+          reconciles README's spec figure against experiments/specs/index.json.
+          VERIFY: the guards FAIL on the old text and PASS on the new (prove both
+          directions in the log); the regeneration produced no drift (git diff clean
+          after re-running _gen_instructions twice).
+          DELIVER: README + ARCHITECTURE.md + agent_config refresh + the guards +
+          regenerated surfaces, committed.
+          LOG: the stale-phrase matches before/after, the guard proofs, PASS/FAIL; commit.
+      - name: p6_release_signoff
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial release verifier. Attack in order: (1) the two defects are
+          GONE (re-grep the exact patterns; the re-run outputs are both committed);
+          (2) ruff is clean on the active surface (re-run the p2 command);
+          (3) the full suite is green on the branch (re-run the p3 commands — the counts
+          must match the p3 log);
+          (4) CI: the workflow splits lint/test/repro/packaging; the branch-protection
+          doc (or applied state) matches the review's requirements;
+          (5) DOCS: no reserved/frozen/empty language remains for implemented modules;
+          README counts equal index.json; the generated surfaces are regenerated and
+          drift-free;
+          (6) the guard tests fail-on-old/pass-on-new (re-prove);
+          (7) the usual suite (secrets, uncommitted artifacts, hashes).
+          Every finding: fix or record as accepted limitation with reasoning + residual
+          risk. Deliver TWO outputs: docs/reviews/cap_stabilization_release_adversary.md
+          (attack, evidence path/line, result, fix/limitation, re-test, re-stated release
+          readiness) and docs/reviews/cap_stabilization_release_known_safe.md (attempted
+          non-falsifying attacks, evidence, why safe). Plus the RELEASE SUMMARY:
+          docs/designs/current/cap_stabilization_release.md — the stabilization release
+          manifest: what was fixed, the green-gate evidence with the counts, the doc
+          authority state, and the explicit statement of what the next release may
+          contain (the review's P1 science: session-routing v2 with real stale context +
+          typed checkpoints + triggered escalation; adaptive 2c with heterogeneous
+          proposals + abstention; grit/confidence calibration).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: cap_stabilization_defects
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [defects_fixed, re_runs_committed]
+  - name: cap_stabilization_gates
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [defects_fixed]
+    produces: [lint_clean, suite_green, integrity_gates_green]
+  - name: cap_stabilization_docs
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [suite_green]
+    produces: [docs_authoritative, guards_proven, surfaces_regenerated]
+  - name: cap_stabilization_signoff
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [lint_clean, suite_green, docs_authoritative]
+    produces: [release_readiness, ci_restructured]
+metrics:
+  - {name: release_readiness, agg: mean, over: cell}
+  - {name: suite_green, agg: mean, over: cell}
+  - {name: docs_authoritative, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_fix_defects, p2_lint_surface, p3_test_suite, p4_ci_restructure, p5_docs_authority, p6_release_signoff]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
