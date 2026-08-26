@@ -271,6 +271,10 @@ class TestCanonicalChromaStore:
         store = ChromaStore()
         assert store.COLLECTION_NAME == "session_embeddings"
 
+    @pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live test skips, never hang",
+    )
     def test_collection_isolation(self):
         a = ChromaStore(collection_name="test_iso_a")
         b = ChromaStore(collection_name="test_iso_b")
@@ -287,6 +291,10 @@ class TestCanonicalChromaStore:
             a._client.delete_collection("test_iso_a")
             b._client.delete_collection("test_iso_b")
 
+    @pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live test skips, never hang",
+    )
     def test_upsert_delete_inventory_round_trip(self):
         store = ChromaStore(collection_name="test_roundtrip")
         try:
@@ -311,6 +319,10 @@ class TestCanonicalChromaStore:
         finally:
             store._client.delete_collection("test_roundtrip")
 
+    @pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live test skips, never hang",
+    )
     def test_search_with_where_filter(self):
         store = ChromaStore(collection_name="test_where")
         try:
@@ -328,6 +340,10 @@ class TestCanonicalChromaStore:
         finally:
             store._client.delete_collection("test_where")
 
+    @pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live test skips, never hang",
+    )
     def test_upsert_propagates_store_failure(self):
         store = ChromaStore(collection_name="test_err")
         try:
