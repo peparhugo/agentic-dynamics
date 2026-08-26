@@ -93,8 +93,8 @@ workflow:
         agent_config/mental-model.md, scripts/_gen_instructions.py (the surface generator),
         src/agentic_dynamics/reporting/strategy.py:60-90 (the already-fixed null semantics)
       run_shape: >-
-        SINGLE-model: --model deepseek/deepseek-v4-pro (implementation-heavy work — the
-        operator preference; sonnet when Claude OAuth is up). One branch
+        SINGLE-model: --model deepseek/deepseek-v4-flash (the operator's explicit choice
+        for this campaign — flash for all phases). One branch
         (feature/cap-stabilization-release); each phase commits [workflow] <phase>. All
         work is local (no API cells) — the budget covers the agent phases only.
     phases:
@@ -237,7 +237,7 @@ workflow:
           proposals + abstention; grit/confidence calibration).
           LOG: finding table + known-safe list; PASS/FAIL; commit.
 factors:
-  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
 design: factorial
 rules:
   - name: cap_stabilization_defects
