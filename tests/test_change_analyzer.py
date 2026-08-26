@@ -134,9 +134,11 @@ def test_evidence_loop_smoke_hermetic():
     assert out.graph_status == "available"
     assert out.revision == REV  # full-revision provenance on the analysis
 
-    # Executor neighborhood: the bounded symbols (seeds excluded), ACL-scoped expansion.
-    assert out.neighborhood == ("Calc",)
-    assert out.impacted_count == 1
+    # Executor neighborhood: the change's OWN symbols (add changed, top added) UNION the
+    # ACL-scoped expansion — the cap_2a_rerun2 scope-miss fix (a rework proposal's scope must
+    # contain the changed symbols, or the fixed hit rule can never score a rework leg).
+    assert out.neighborhood == ("Calc", "add", "top")
+    assert out.impacted_count == 1  # impacted = the dependents only, not the seeds
 
     # Facts: the typed delta + analyzer statuses -> the measurable code-change facts.
     by = {f["predicate"]: f for f in out.facts}
@@ -229,6 +231,19 @@ def test_impact_expansion_allowlist_excludes_supersedes():
     assert ALLOWED_EXPANSION_RELS - {"SUPERSEDES"} == IMPACT_EXPANSION_RELS
     assert "SUPERSEDES" not in IMPACT_EXPANSION_RELS
     assert "CALLS" in IMPACT_EXPANSION_RELS and "AFFECTS" in IMPACT_EXPANSION_RELS
+
+
+def test_scope_contains_changed_symbols_even_without_graph():
+    """cap_2a_rerun2 scope-miss regression (the verdict's prescription, made structural):
+    the executor scope must contain the changed symbols themselves — the rerun2 rework
+    proposal's scope was the reachable dependents only, so the hit rule could never score
+    a rework leg. Without a graph the delta's own symbols still form a usable scope."""
+    change, _ = _change()
+    analyzer = EvidenceChangeAnalyzer(graph_client=None)  # no graph: delta-only
+    out = analyzer.analyze(change)
+    assert out.graph_status == "not_requested"
+    assert out.neighborhood == ("add", "top")  # the changed symbols, no expansion
+    assert out.impacted_count is None  # unknown, never 0
 
 
 def test_stalled_graph_degrades_within_deadline_never_hangs():

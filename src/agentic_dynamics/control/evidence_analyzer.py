@@ -41,6 +41,21 @@ from agentic_dynamics.runtime.change_analyzer import (
 )
 
 
+def _seed_scope_names(change: ChangeInput) -> list[str]:
+    """The change's OWN symbols (added/changed/removed qualified names) — the executor's
+    delta-only scope. The cap_2a_rerun2 scope-miss fix: a proposal's scope must contain the
+    symbols the rework would target, or the fixed hit rule can never score a rework leg."""
+    names: list[str] = []
+    if change.delta is None:
+        return names
+    for sym in (
+        change.delta.added_symbols + change.delta.changed_symbols + change.delta.removed_symbols
+    ):
+        if sym.qualified_name not in names:
+            names.append(sym.qualified_name)
+    return names
+
+
 def _seed_version_ids(change: ChangeInput) -> list[str]:
     """The version_ids of the change's added/changed/removed symbols (two-ID contract)."""
     delta = change.delta
@@ -133,6 +148,10 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
                 graph_status = "unavailable"
             finally:
                 pool.shutdown(wait=False)
+        else:
+            # No graph (or a failed one): the executor scope is the change's OWN symbols —
+            # the cap_2a_rerun2 scope-miss fix, delta-only. Impacted stays unknown.
+            neighborhood, impacted = _seed_scope_names(change), None
 
         facts = code_change_facts_v2(self._reducer_input(change, impacted))
         return ChangeAnalysis(
@@ -185,18 +204,23 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
         return graph_updated
 
     def _neighborhood(self, change: ChangeInput) -> tuple[list[str], int | None]:
-        """The ACL-scoped 1-2 hop reachable set from the changed symbols.
+        """The change's OWN symbols UNION their ACL-scoped 1-2 hop reachable set.
 
-        Returns (symbol qualified names for the executor, impacted count). When no graph client
-        or no seeds, the neighborhood is empty and the impacted count is None (unknown, never 0).
-        Traversal is bounded to ``IMPACT_EXPANSION_RELS`` — version history (SUPERSEDES) is not
-        an impact edge, so a changed symbol's older versions never pollute the blast radius.
+        The returned set is the executor's scope surface: the changed symbols FIRST (the
+        delta's added/changed/removed qualified names — the cap_2a_rerun2 scope miss was
+        structural: the neighborhood returned only the reachable dependents, so a rework
+        proposal's scope EXCLUDED the very symbol the rework targets, and the fixed hit rule
+        could never score a rework leg), then the 1-2 hop dependents when a graph is
+        available. Without a graph the changed symbols still form a usable (delta-only)
+        scope, and the impacted count is None (unknown, never 0). Traversal is bounded to
+        ``IMPACT_EXPANSION_RELS`` — version history (SUPERSEDES) is not an impact edge.
         """
+        seed_names = _seed_scope_names(change)
         if self.graph_client is None or change.delta is None:
-            return [], None
+            return seed_names, None
         seeds = _seed_version_ids(change)
         if not seeds:
-            return [], None
+            return seed_names, None
         expanded = self.graph_client.expand_candidates(
             seeds,
             max_depth=2,
@@ -217,7 +241,9 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
             qname = props.get("qualified_name")
             if qname:
                 neighbors.add(str(qname))
-        return sorted(neighbors), len(neighbors)
+        # The changed symbols themselves are NOT the impacted set (that is the dependents'
+        # count), but they ARE part of the executor scope — the cap_2a_rerun2 scope-miss fix.
+        return sorted(set(seed_names) | neighbors), len(neighbors)
 
     @staticmethod
     def _reducer_input(change: ChangeInput, impacted: int | None) -> ReducerInput:
