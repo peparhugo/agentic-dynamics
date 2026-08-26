@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Current Agentic Dynamics corpus, model aggregates, campaign decisions, and honest nulls.">
+<meta name="description" content="Current Agentic Dynamics corpus: 215 linked stories, 1,067 captured sessions, seven model variants, and $309.17 measured cost; model aggregates, campaign decisions, and honest nulls.">
 <title>Evidence | Agentic Dynamics</title>
 <link rel="stylesheet" href="base.css">
 <script src="data.js">
@@ -58,7 +58,7 @@
 <div class="ad-columns">
 <div class="ad-reading">
 <h2>One current corpus, explicit exclusions.</h2>
-<p>The public build contains 215 linked stories: 150 unique cells and 65 reruns. It records 1,067 captured sessions across seven model variants. The registry receipt separately reports 215 resolved measurement payloads, 0 unresolved entries, 64 clean findings, and 87 tombstones: 77 contaminated exclusions and 10 no-measurement retractions.</p>
+<p>The public build contains <span data-ad-stat="stories">not loaded</span> linked stories [C]: <span data-ad-receipt="stories_unique">not loaded</span> unique cells [C] and <span data-ad-receipt="stories_re_runs">not loaded</span> reruns [C]. It records <span data-ad-stat="sessions">not loaded</span> captured sessions [M] across <span data-ad-stat="models">not loaded</span> model variants [M]. The registry receipt separately reports <span data-ad-receipt="resolved_measurement_payloads">not loaded</span> resolved measurement payloads [M], <span data-ad-receipt="unresolved_waivered">not loaded</span> unresolved entries [M], <span data-ad-stat="findings">not loaded</span> clean findings [M], and <span data-ad-receipt="tombstones_total">not loaded</span> tombstones [M]: <span data-ad-receipt="contaminated_tombstones">not loaded</span> contaminated exclusions [M] and <span data-ad-receipt="no_measurement_tombstones">not loaded</span> no-measurement retractions [M].</p>
 <p class="ad-source">[M]/[C] `data.js.summary` fields; the ledger makes registry, resolution, eligibility, and tombstone counts distinct.</p>
 </div>
 <aside class="ad-callout">
@@ -78,13 +78,16 @@
 <p class="ad-note">
 <span class="ad-evidence" data-evidence="C">[C] PER-MODEL AGGREGATE</span> Source fields: `models[].avg_cost`, `avg_tests`, `avg_cache_hit`, and cost-record coverage. The current data contract does not yet provide per-field tags inside each raw model row; this adapter declares the aggregate boundary explicitly.</p>
 </section>
-<section class="ad-section">
+<section class="ad-section ad-scroll-sequence">
+<div class="ad-reading">
 <p class="ad-kicker">Campaign arc</p>
 <h2>The first decided arm is deliberately narrow.</h2>
+</div>
+<div class="ad-scroll-sticky">
 <div class="ad-columns">
 <div>
 <figure class="ad-figure" data-ad-diagram="calibration">
-<figcaption>Figure 3. Retained calibration and randomized 2b decision. The unavailable predecessor score is named rather than reconstructed; retained rates, intervals, arm definition, and authorization boundary remain visible.</figcaption>
+<figcaption>Figure 1. Retained calibration [M]/[C] and randomized 2b decision [C]. The unavailable predecessor score is named rather than reconstructed; retained rates, intervals, arm definition, and authorization boundary [P] remain visible.</figcaption>
 </figure>
 <p class="ad-note">
 <span class="ad-evidence" data-evidence="M">[M] INPUTS</span> <span class="ad-evidence" data-evidence="C">[C] DECISION</span> <span data-ad-cap2b-summary>Score unavailable; no finding rendered.</span></p>
@@ -95,12 +98,13 @@
 <p class="ad-source">[P] `docs/designs/current/cap_2b.md:89-96`; [M]/[C] score JSON `<span data-ad-cap2b-source>not loaded</span>`. Calibration receipt: `<span data-ad-calibration-source>not loaded</span>`.</p>
 </aside>
 </div>
+</div>
 </section>
 <section class="ad-section">
 <p class="ad-kicker">Escalation measurement</p>
 <h2>Downstream cost is now measured in two descriptive cells.</h2>
 <figure class="ad-figure" data-ad-diagram="escalation">
-<figcaption>Figure 4. Baseline and fix costs produce two measured E_x ratios. Each escalation model has <span data-ad-escalation-n>an artifact-defined n</span>, so the result is descriptive and has no confidence interval.</figcaption>
+<figcaption>Figure 2. Baseline and fix costs [M] produce two E_x ratios [C]. Each escalation model has <span data-ad-escalation-n>an artifact-defined n</span>, so the result is descriptive and has no confidence interval.</figcaption>
 </figure>
 <p class="ad-note"><span data-ad-escalation-summary>Score unavailable; no finding rendered.</span> Source: `<span data-ad-escalation-source>not loaded</span>`.</p>
 </section>
