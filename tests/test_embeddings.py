@@ -96,8 +96,41 @@ class TestEmbeddingClient:
         assert client.model == "bge-m3:latest"
 
 
+def _chroma_reachable(timeout: float = 3.0) -> bool:
+    """True only when a REAL Chroma server answers a heartbeat.
+
+    A port with any OTHER service (this machine's 8000 held the opencode web server)
+    must count as unavailable — the live tests would otherwise hang on a mismatched
+    protocol: chromadb.HttpClient retries with backoff and no connect timeout, which
+    stalled the full deterministic suite for ~60 minutes twice during
+    cap_stabilization_release p3.
+    """
+    import json
+    import urllib.request
+
+    host = os.environ.get("CHROMA_HOST", "localhost")
+    port = int(os.environ.get("CHROMA_PORT", "8000"))
+    for path in ("/api/v2/heartbeat", "/api/v1/heartbeat"):
+        try:
+            with urllib.request.urlopen(f"http://{host}:{port}{path}", timeout=timeout) as resp:
+                body = json.loads(resp.read())
+            if isinstance(body, dict) and "heartbeat" in body:
+                return True
+        except Exception:  # noqa: BLE001 — any failure (refused, wrong protocol, timeout) = unavailable
+            continue
+    return False
+
+
+CHROMA_REACHABLE = _chroma_reachable()
+
+
 class TestChromaStore:
     TEST_COLLECTION = "test_session_embeddings"
+
+    pytestmark = pytest.mark.skipif(
+        not CHROMA_REACHABLE,
+        reason="Chroma server unavailable (heartbeat failed) — live-server tests skip, never hang",
+    )
 
     @pytest.fixture(autouse=True)
     def setup_teardown(self):
@@ -120,8 +153,8 @@ class TestChromaStore:
         is a measured status' — and must never hang."""
         import socket
 
-        host = os.environ.get("CHROMA_HOST", CHROMA_HOST)
-        port = int(os.environ.get("CHROMA_PORT", str(CHROMA_PORT)))
+        host = os.environ.get("CHROMA_HOST", "localhost")
+        port = int(os.environ.get("CHROMA_PORT", "8000"))
         try:
             with socket.create_connection((host, port), timeout=3):
                 pass
