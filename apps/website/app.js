@@ -9,7 +9,11 @@
   "use strict";
 
   function formatUsd(value, digits) {
-    return `$${Number(value).toFixed(digits === undefined ? 2 : digits)}`;
+    return value == null ? "not loaded" : `$${Number(value).toFixed(digits === undefined ? 2 : digits)}`;
+  }
+
+  function formatCount(value) {
+    return value == null ? "not loaded" : Number(value).toLocaleString();
   }
 
   function setText(selector, value) {
@@ -18,20 +22,37 @@
     });
   }
 
+  function setHtml(selector, value) {
+    document.querySelectorAll(selector).forEach((element) => {
+      element.innerHTML = value;
+    });
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[character]));
+  }
+
   function artifactReceipt(campaign) {
     // A campaign value is only useful when its immutable score artifact is inspectable.
-    return `${campaign.source_artifact} (sha256: ${campaign.source_sha256})`;
+    const path = String(campaign.source_artifact);
+    const href = `https://github.com/peparhugo/agentic-dynamics/blob/main/${path.split("/").map(encodeURIComponent).join("/")}`;
+    return `<a href="${href}">${escapeHtml(path)}</a> (sha256: ${escapeHtml(campaign.source_sha256)})`;
   }
 
   function renderStats(data) {
     if (!data || !data.summary) return;
     const summary = data.summary;
-    setText('[data-ad-stat="sessions"]', Number(summary.sessions_total).toLocaleString());
-    setText('[data-ad-stat="stories"]', Number(summary.stories_total).toLocaleString());
-    setText('[data-ad-stat="models"]', String(summary.variants));
+    setText('[data-ad-stat="sessions"]', formatCount(summary.sessions_total));
+    setText('[data-ad-stat="stories"]', formatCount(summary.stories_total));
+    setText('[data-ad-stat="models"]', formatCount(summary.variants));
     setText('[data-ad-stat="cost"]', formatUsd(summary.total_cost));
-    setText('[data-ad-stat="providers"]', String(data.public_statistics.providers));
-    setText('[data-ad-stat="findings"]', String(summary.canonical_findings));
+    setText('[data-ad-stat="providers"]', formatCount(data.public_statistics.providers));
+    setText('[data-ad-stat="findings"]', formatCount(summary.canonical_findings));
+    // These receipt fields remain individual slots so their nearby prose can name
+    // the exact evidence class without freezing a corpus snapshot in HTML.
+    ["stories_unique", "stories_re_runs", "resolved_measurement_payloads", "unresolved_waivered", "tombstones_total", "contaminated_tombstones", "no_measurement_tombstones"].forEach((field) => {
+      setText(`[data-ad-receipt="${field}"]`, formatCount(summary[field]));
+    });
   }
 
   function renderModelTable(data) {
@@ -55,7 +76,7 @@
     const ci = cap2b.decision_rule.cpvo_ratio_ci_95;
     const decision = `Static n=${cap2b.static.n}, CPVO ${formatUsd(cap2b.static.cpvo_usd, 6)}, ${cap2b.static.accepted_outcomes}/${cap2b.static.n} verified; adaptive n=${cap2b.adaptive.n}, CPVO ${formatUsd(cap2b.adaptive.cpvo_usd, 6)}, ${cap2b.adaptive.accepted_outcomes}/${cap2b.adaptive.n} verified; CPVO ratio ${Number(cap2b.decision_rule.cpvo_ratio).toFixed(4)}, 95% CI [${Number(ci[0]).toFixed(4)}, ${Number(ci[1]).toFixed(4)}]; success gap ${Number(cap2b.decision_rule.success_gap_static_minus_adaptive).toFixed(4)}. The pre-registered rule decided ${cap2b.decision_rule.decision}.`;
     setText('[data-ad-cap2b-summary]', decision);
-    setText('[data-ad-cap2b-source]', artifactReceipt(cap2b));
+    setHtml('[data-ad-cap2b-source]', artifactReceipt(cap2b));
 
     const models = escalation.models;
     const escalationSummary = `[M] baseline ${formatUsd(escalation.baseline_cost_usd, 6)}; ${models.map((model) => `${model.escalation_model.split("/").pop()}: ${formatUsd(model.escalation_fix_cost_usd, 6)} [M], E_x=${Number(model.E_x).toFixed(4)} [C]`).join("; ")}.`;
@@ -63,13 +84,13 @@
     const escalationDefinition = `The measured campaign reports ${models.map((model) => `${model.escalation_model.split("/").pop()} at E_x=${Number(model.E_x).toFixed(4)} (n=${model.n_model_cells} model cell)`).join(" and ")}.`;
     setText('[data-ad-escalation-definition]', escalationDefinition);
     setText('[data-ad-escalation-n]', models.map((model) => `n=${model.n_model_cells} per model`).join(", "));
-    setText('[data-ad-escalation-source]', artifactReceipt(escalation));
+    setHtml('[data-ad-escalation-source]', artifactReceipt(escalation));
 
     const untriggered = routing.escalate_live;
     const untriggeredSummary = `All ${untriggered.n} live escalate cells completed on the first attempt. ${untriggered.untriggered}`;
     setText('[data-ad-untriggered-summary]', untriggeredSummary);
-    setText('[data-ad-routing-source]', artifactReceipt(routing));
-    setText('[data-ad-calibration-source]', artifactReceipt(campaigns.calibration));
+    setHtml('[data-ad-routing-source]', artifactReceipt(routing));
+    setHtml('[data-ad-calibration-source]', artifactReceipt(campaigns.calibration));
     setText('[data-ad-generated-at]', data._meta.generated_at);
   }
 
@@ -77,12 +98,12 @@
     if (!window.AgenticDesign) return;
     const campaigns = data && data.campaigns ? data.campaigns : {};
     const diagrams = {
-      cycle: AgenticDesign.instrumentCycle,
-      nxm: AgenticDesign.nxmProblem,
-      planes: AgenticDesign.planesMap,
-      engine: AgenticDesign.engineModes,
-      autonomy: AgenticDesign.autonomyEnvelope,
-      curves: AgenticDesign.costCurves,
+      cycle: () => AgenticDesign.instrumentCycle(data && data.summary),
+      nxm: () => AgenticDesign.nxmProblem(data && data.summary),
+      planes: () => AgenticDesign.planesMap(data && data.summary),
+      engine: () => AgenticDesign.engineModes(data && data.summary),
+      autonomy: () => AgenticDesign.autonomyEnvelope(data && data.summary),
+      curves: () => AgenticDesign.costCurves(data && data.design_parameters),
       escalation: () => AgenticDesign.escalationChain(campaigns.escalation),
       calibration: () => AgenticDesign.calibrationArc(campaigns.calibration, campaigns.cap_2b),
     };
@@ -92,9 +113,33 @@
     });
     const rules = document.querySelector("[data-ad-rules]");
     if (rules) {
-      rules.innerHTML = AgenticDesign.rulesComponent();
+      // The overview makes the inventory's rules component a complete inline SVG
+      // figure while the cards retain their semantic, keyboard-operable detail.
+      const rulesFigure = document.querySelector('[data-ad-component="rules"]');
+      if (rulesFigure) rulesFigure.insertAdjacentHTML("afterbegin", AgenticDesign.rulesOverview(campaigns, data && data.summary));
+      rules.innerHTML = AgenticDesign.rulesComponent(campaigns, data && data.summary, data && data._meta && data._meta.generated_at);
       AgenticDesign.activateRuleCards(rules);
     }
+  }
+
+  function bindCostCurveControl(data) {
+    const parameter = data && data.design_parameters && data.design_parameters.beta;
+    const input = document.querySelector("[data-ad-beta]");
+    const output = document.querySelector("[data-ad-beta-value]");
+    if (!parameter || !input || !output) return;
+
+    // The range is deliberately scoped to the [P] scenario input. It redraws only
+    // the computed figure and never changes measured corpus values or its label.
+    const render = () => {
+      const beta = Number(input.value);
+      output.textContent = beta.toFixed(4);
+      document.querySelectorAll('[data-ad-diagram="curves"] svg').forEach((previous) => {
+        previous.outerHTML = AgenticDesign.costCurves({ beta: { value: beta } });
+      });
+    };
+    input.value = String(parameter.value);
+    render();
+    input.addEventListener("input", render);
   }
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -103,5 +148,6 @@
     renderModelTable(data);
     renderCampaignSlots(data);
     renderDiagrams(data);
+    bindCostCurveControl(data);
   });
 }());
