@@ -153,3 +153,19 @@ descriptive-only and states the n-feasibility implication, not a clearance.
 Σ baseline +$0.112588 vs Σ gate −$0.112588; expected-effect check_rate 1.0, held_rate 0.25;
 cost-per-accepted-outcome $0.012948 → $0.010492; flagged cells none. **PASS** — the descriptive
 verdict is issued, the applied-gate value is measured for the first time, and no gate is cleared.
+
+## Supplement (E_x sensitivity, p6 limitation F3 — the loss table at both multipliers)
+
+The asymmetric-loss table scales linearly with the escalation multiplier E_x. The p4 score JSON
+records the base downstream defect cost (the E_x=28 figure divided out): **$0.004021**. The same
+loss table at the two sourced values:
+
+| E_x | baseline arm loss | gate arm value | swing | source |
+|---|---|---|---|---|
+| 3.1 | +$0.012465 | -$0.012465 | $0.024930 | measured escalation figure (handoff corpus) |
+| 28.0 | +$0.112588 | -$0.112588 | $0.225176 | pricing ratio DeepSeek -> GPT-5.6 (site economics) |
+
+Both multipliers keep the gate arm ahead on the loss axis (the break-even is ~1.42); the
+DIRECTION of the control result is robust, the MAGNITUDE spans ~$0.025-$0.225 pending a measured
+E_x. The escalation-measurement campaign (cap_escalation_measurement) measures the actual
+downstream cost of the critical-baseline's escaped defect in dollars.
