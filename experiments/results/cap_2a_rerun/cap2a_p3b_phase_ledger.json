@@ -1,0 +1,69 @@
+{
+  "backend": "opencode",
+  "campaign": "cap_2a_rerun",
+  "cell_id": "cap2a_p3b",
+  "model": "deepseek/deepseek-v4-pro",
+  "ok": true,
+  "phase": "p3_run_shadow_cells",
+  "phases": [
+    {
+      "commit_hash": "e136ce2",
+      "cost_usd": 0.0035436839999999996,
+      "duration_s": 16.31,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "3",
+        "changed_symbols_with_tests_ratio": "0.3333333333333333",
+        "code_change_risk": "0.3311",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "unavailable",
+        "new_sonar_critical_count": "1",
+        "sonar_analysis_status": "available"
+      },
+      "graph_status": "available",
+      "impacted_count": 4,
+      "kind": "agent",
+      "phase": "implement",
+      "status": "ok",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0
+    },
+    {
+      "commit_hash": "",
+      "cost_usd": 0.0,
+      "duration_s": 0.43,
+      "facts": {},
+      "graph_status": null,
+      "impacted_count": null,
+      "kind": "test",
+      "phase": "test",
+      "status": "ok",
+      "test_executed_success": true,
+      "tests_passed": 4,
+      "tests_total": 4
+    },
+    {
+      "commit_hash": "",
+      "cost_usd": 0.004687937,
+      "duration_s": 10.69,
+      "facts": {},
+      "graph_status": null,
+      "impacted_count": null,
+      "kind": "agent",
+      "phase": "verify",
+      "status": "ok",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0
+    }
+  ],
+  "proposal_artifact_sha256": "4f75b4dfd98cc84ce6336495c9012e89edd57affb6cc1555a971e2ae710144f3",
+  "proposal_id": "f9727f3a92a4e6c3",
+  "run_ledger": "experiments/results/workflows/cap_2a_calibration_cell_divide/20260826T000531Z.json",
+  "run_ledger_sha256": "f718b08f9b3d93f67c09fe1fc8bca242a040448015e34ed7d22ecedf86917e9f",
+  "schema_version": "cap_2a_p3_phase_ledger/v1",
+  "spec_id": "cap_2a_calibration_cell_divide@0.1",
+  "total_cost_usd": 0.008232
+}

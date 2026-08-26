@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-25T23:53:44.375858+00:00`  ·  113 spec(s)
-**Work remaining:** 104 open · 9 completed/retired
+Generated at: `2026-08-26T00:05:31.607809+00:00`  ·  114 spec(s)
+**Work remaining:** 105 open · 9 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -15,7 +15,8 @@ Generated at: `2026-08-25T23:53:44.375858+00:00`  ·  113 spec(s)
 | `canonical_state_finalize` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_round2` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_2a_calibration_cell` | workflow | yes | runnable | 0.1 | — | 2026-08-25 23:53 | ok | deepseek/deepseek-v4-pro | $0.0086 | 1 |
+| `cap_2a_calibration_cell` | workflow | yes | runnable | 0.1 | — | 2026-08-26 00:03 | ok | deepseek/deepseek-v4-pro | $0.0078 | 2 |
+| `cap_2a_calibration_cell_divide` | workflow | yes | runnable | 0.1 | — | 2026-08-26 00:05 | ok | deepseek/deepseek-v4-pro | $0.0082 | 1 |
 | `cap_2a_rerun` | workflow | no | runnable | 0.1 | cap_2a_shadow_calibration | — | — | — | — | 0 |
 | `cap_2a_shadow_calibration` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_addendum_design` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
