@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-26T04:06:19.884040+00:00`  ·  117 spec(s)
-**Work remaining:** 29 open · 88 completed/retired
+Generated at: `2026-08-26T05:13:11.288302+00:00`  ·  117 spec(s)
+**Work remaining:** 28 open · 89 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -12,7 +12,6 @@ Generated at: `2026-08-26T04:06:19.884040+00:00`  ·  117 spec(s)
 | `cap_2a_cell_clean` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_cell_critical` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_cell_style` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_2a_rerun3` | workflow | no | runnable | 0.1 | cap_2a_rerun2 | — | — | — | — | 0 |
 | `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_grit_strength_grid` | experiment | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -44,6 +43,7 @@ Generated at: `2026-08-26T04:06:19.884040+00:00`  ·  117 spec(s)
 | `canonical_state_round2` | workflow | no | completed | 0.1 | — | 2026-08-18 17:55 | ok | anthropic/claude-fable-5 | $4.8433 | 2 |
 | `cap_2a_rerun` | workflow | no | completed | 0.1 | cap_2a_shadow_calibration | 2026-08-26 00:19 | ok | deepseek/deepseek-v4-pro | $0.9784 | 1 |
 | `cap_2a_rerun2` | workflow | no | completed | 0.1 | cap_2a_rerun | 2026-08-26 02:07 | ok | deepseek/deepseek-v4-pro | $1.0774 | 1 |
+| `cap_2a_rerun3` | workflow | no | completed | 0.1 | cap_2a_rerun2 | 2026-08-26 05:13 | ok | deepseek/deepseek-v4-pro | $0.4936 | 1 |
 | `cap_2a_shadow_calibration` | workflow | no | completed | 0.2 | — | 2026-08-25 22:36 | ok | deepseek/deepseek-v4-pro | $0.8251 | 1 |
 | `cap_addendum_design` | workflow | no | completed | 0.1 | — | 2026-08-22 18:15 | ok | deepseek/deepseek-v4-pro | $0.4667 | 1 |
 | `cap_addendum_implement` | workflow | no | completed | 0.1 | — | 2026-08-24 14:07 | ok | anthropic/claude-sonnet-5 | $27.9867 | 2 |

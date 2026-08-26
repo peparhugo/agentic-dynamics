@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-26T04:06:19.884040+00:00",
+  "generated_at": "2026-08-26T05:13:11.288302+00:00",
   "n_specs": 117,
   "specs": [
     {
@@ -65,26 +65,6 @@
       "artifact_kind": "workflow",
       "repeatable": true,
       "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "cap_2a_rerun3",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/cap_2a_rerun3.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [
-        "cap_2a_rerun2"
-      ],
       "superseded_by": null,
       "completed_at": null,
       "last_run_at": null,
@@ -655,6 +635,26 @@
       "latest_cost_usd": 1.077358,
       "latest_git_sha": "9c3ea4fac",
       "results_pointer": "experiments/results/workflows/cap_2a_rerun2/20260826T020736Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "cap_2a_rerun3",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_2a_rerun3.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [
+        "cap_2a_rerun2"
+      ],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-26T05:13:11.014894+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.493568,
+      "latest_git_sha": "1c168c72e",
+      "results_pointer": "experiments/results/workflows/cap_2a_rerun3/20260826T051311Z.json",
       "n_runs": 1
     },
     {
