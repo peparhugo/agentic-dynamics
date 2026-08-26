@@ -1,7 +1,9 @@
 import hashlib
+import random
 
 import pytest
-import random
+
+from agentic_dynamics.measurement.basin import BasinMetrics
 from agentic_dynamics.measurement.perturb import (
     ALIEN_VOCABULARIES,
     PERTURBATION_CLASSES,
@@ -10,7 +12,6 @@ from agentic_dynamics.measurement.perturb import (
     perturb_prompt,
     perturbation_class_for,
 )
-from agentic_dynamics.measurement.basin import BasinMetrics
 
 
 def test_remove_critical_constraint_removes_constraint():
@@ -159,7 +160,7 @@ def test_cross_model_same_cell_same_seed():
     seed = derive_seed(task, operator, strength, variant)
     expected = int(
         hashlib.sha256(
-            f"{task}|{operator}|{strength}|{variant}".encode("utf-8")
+            f"{task}|{operator}|{strength}|{variant}".encode()
         ).hexdigest()[:8],
         16,
     )

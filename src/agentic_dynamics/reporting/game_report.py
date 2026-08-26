@@ -137,8 +137,10 @@ class GameReport:
                 f"| Architecture div [H] | {r.architecture_divergence:.3f} |",
                 f"| Structure div [H] | {r.structure_divergence:.3f} |",
                 f"| Thinking ratio [C] | {r.thinking_ratio:.1%} |",
-                f"| Quality/$ [C] | {r.quality_per_dollar:,.0f} |",
-                f"| Quality/J [C] | {r.quality_per_joule:.4f} |",
+                (f"| Quality/$ [C] | {r.quality_per_dollar:,.0f} |" if r.quality_per_dollar is not None
+                 else "| Quality/$ [C] | n/a (cost uncaptured) |"),
+                (f"| Quality/J [C] | {r.quality_per_joule:.4f} |" if r.quality_per_joule is not None
+                 else "| Quality/J [C] | n/a (energy uncaptured) |"),
                 f"| Converged back [H] | {r.converged_back} |",
             ]
             if self.repetitions > 1:
@@ -239,9 +241,12 @@ class GameReport:
                 f"| Cache cost{cost_label} | ${e.cost_cache_usd:.6f} |",
                 f"| **Total cost** | **${e.total_cost_usd:.6f}** |",
                 f"| **Total energy [X]** | **~{e.total_energy_j:.0f} J** |",
-                f"| Solution density [C] | {e.solution_density:.6f} LOC/tok |",
-                f"| Correctness/$ [C] | {e.correctness_per_dollar:.0f} |",
-                f"| Quality/J [C] | {e.quality_per_joule:.6f} |",
+                (f"| Solution density [C] | {e.solution_density:.6f} LOC/tok |"
+                 if e.solution_density is not None else "| Solution density [C] | n/a (tokens uncaptured) |"),
+                (f"| Correctness/$ [C] | {e.correctness_per_dollar:.0f} |"
+                 if e.correctness_per_dollar is not None else "| Correctness/$ [C] | n/a (cost uncaptured) |"),
+                (f"| Quality/J [C] | {e.quality_per_joule:.6f} |"
+                 if e.quality_per_joule is not None else "| Quality/J [C] | n/a (energy uncaptured) |"),
             ]
             if self.repetitions > 1:
                 costs = [rep.get('cost', 0) for rep in self.per_repetition if rep.get('cost') is not None]

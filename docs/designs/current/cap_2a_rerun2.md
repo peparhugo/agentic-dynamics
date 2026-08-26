@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2a_rerun2 — calibration verdict (2b gate) + the fitted v2 mapping
 
 **Source revision:** `4625ffe8014fb3752a317df90aa92c0179449e25` (the p4 commit where the score lives; this verdict is written at the same revision).

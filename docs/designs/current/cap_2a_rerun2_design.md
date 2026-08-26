@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2a_rerun2 — design: fixing the verifier's over-prediction (measured, not guessed)
 
 **Status: accepted** · Supersedes: `cap_2a_rerun@0.1` (verdict `docs/designs/current/cap_2a_rerun.md`)

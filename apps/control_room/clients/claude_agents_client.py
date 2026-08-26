@@ -14,6 +14,7 @@ misbehaving command can never block waiting for terminal input.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -215,10 +216,8 @@ class ClaudeAgentsClient:
         # Interrupt first. A stop against an already-stopped session is a
         # non-zero exit, which is expected and tolerated here — resume works
         # from a stopped session's on-disk conversation.
-        try:
+        with contextlib.suppress(ClaudeAgentsError):
             self.stop_agent(session_id, timeout=timeout)
-        except ClaudeAgentsError:
-            pass
         args = ["--bg", "--resume", session_id, prompt]
         if cwd:
             args.extend(["--cwd", cwd])

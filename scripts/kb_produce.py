@@ -25,7 +25,6 @@ long-running service.
 
 import argparse
 import os
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -37,10 +36,10 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
+from agentic_dynamics.control.signal_store import load_results  # noqa: E402
+from agentic_dynamics.core.paths import KB_ARTIFACT_DIR  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_ingestion as ki  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
-from agentic_dynamics.core.paths import KB_ARTIFACT_DIR  # noqa: E402
-from agentic_dynamics.control.signal_store import load_results  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))

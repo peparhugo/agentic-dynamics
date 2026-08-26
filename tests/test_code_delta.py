@@ -10,8 +10,8 @@ from pathlib import Path
 
 from agentic_dynamics.core import language as lang_mod
 from agentic_dynamics.core.language import (
-    TESTED_BY_RULE,
     _PROFILES,
+    TESTED_BY_RULE,
     build_code_snapshot,
     compute_code_delta,
     module_entity_id,
@@ -21,7 +21,11 @@ from agentic_dynamics.core.language import (
     symbol_entity_id,
     symbol_version_id,
 )
-from agentic_dynamics.measurement.commit_analysis import _read_commit_files, _run_git, compute_ast_diff
+from agentic_dynamics.measurement.commit_analysis import (
+    _read_commit_files,
+    _run_git,
+    compute_ast_diff,
+)
 
 PY = _PROFILES["python"]
 

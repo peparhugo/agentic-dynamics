@@ -62,11 +62,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from agentic_dynamics.knowledge.knowledge import Authority, KnowledgeEvent, KnowledgeRecord
-from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID, record_to_artifact, record_to_event
 from agentic_dynamics.core.paths import KB_ARTIFACT_DIR, PROJECT_ROOT, REGISTRY_INDEX_PATH
-from agentic_dynamics.knowledge.record_factory import build_record as build_record_from_parts
 from agentic_dynamics.experiment.spec_status import INDEX_FILENAME, SPECS_DIR_REL, SpecStatusEntry
+from agentic_dynamics.knowledge.knowledge import Authority, KnowledgeEvent, KnowledgeRecord
+from agentic_dynamics.knowledge.knowledge_ingestion import (
+    REPOSITORY_ID,
+    record_to_artifact,
+    record_to_event,
+)
+from agentic_dynamics.knowledge.record_factory import build_record as build_record_from_parts
 
 # ── Extractor contract constants ────────────────────────────────
 

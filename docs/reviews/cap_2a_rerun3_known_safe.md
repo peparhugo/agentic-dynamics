@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2a_rerun3 — known-safe list (non-falsifying attacks, with evidence)
 
 Every attack below was attempted and did NOT falsify the campaign. Each entry records what was

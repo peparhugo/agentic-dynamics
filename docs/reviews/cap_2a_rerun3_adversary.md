@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2a_rerun3 — adversarial verification
 
 **Role:** adversarial verifier (p6). **Source revision:** `83b65e9f58e60991acbc5500f0d6688fa7c32fe5`.

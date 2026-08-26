@@ -9,9 +9,9 @@ Produces:
     experiments/results/{name}_comparison.md   — multi-model comparison table
 """
 
+import contextlib
 import json
 import os
-import sys
 import time
 from pathlib import Path
 
@@ -21,19 +21,16 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
+from agentic_dynamics.adapters.backends import run_agentic
+from agentic_dynamics.core.language import detect_language
+from agentic_dynamics.measurement.basin import BasinMetrics, measure_basin_escape
+from agentic_dynamics.measurement.efficiency import compute_efficiency
 from agentic_dynamics.measurement.perturb import build_operators
 from agentic_dynamics.measurement.prompt_perturbation import resolve_perturbed_prompt
 from agentic_dynamics.measurement.solution import evaluate_solution
-from agentic_dynamics.measurement.efficiency import compute_efficiency
 from agentic_dynamics.measurement.strategy import classify_strategy
-from agentic_dynamics.measurement.basin import measure_basin_escape
-from agentic_dynamics.measurement.basin import BasinMetrics
 from agentic_dynamics.reporting.game_report import GameReport
-from agentic_dynamics.measurement.constraint_detection import detect_constraints
-from agentic_dynamics.runtime.test_runner import run_suite
-from agentic_dynamics.runtime.test_runner import suite_succeeded
-from agentic_dynamics.adapters.backends import run_agentic
-from agentic_dynamics.core.language import detect_language
+from agentic_dynamics.runtime.test_runner import run_suite, suite_succeeded
 
 
 def _model_label(model_id: str) -> str:
@@ -136,7 +133,6 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
                     time.sleep(2)
 
     # Aggregation
-    perturbed = [r for r in all_runs if r["type"] == "perturbed"]
     _print_summary(all_runs, name, model_label)
     _save_results(all_runs, name, model_label, results_dir, model_id)
     _generate_game_reports(all_runs, name, model_label, constraints, results_dir)
@@ -148,7 +144,7 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
                   thinking_effort="", thinking_budget_tokens=0,
                   output_token_limit=0, silent_mode=None,
                   standardize=True, enforce_pytest=True, backend="auto"):
-    print(f"[baseline] Running...", end=" ", flush=True)
+    print("[baseline] Running...", end=" ", flush=True)
     t0 = time.monotonic()
     r = run_agentic(task, model=model_id, timeout=timeout,
                     thinking_effort=thinking_effort or None,
@@ -173,7 +169,6 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
     if code_files:
         # Re-evaluate with code files for richer constraint matching
         sol = evaluate_solution(r.final_response, constraints, code_files=code_files)
-    det = detect_constraints(r.final_response, constraints, code_files=code_files)
 
     print(f"correct={sol.correctness_score:.0%} tok={r.total_tokens:,} "
           f"${r.estimated_cost_usd:.4f} tools={r.total_tool_calls} "
@@ -417,8 +412,8 @@ def _save_results(runs, name, model_label, results_dir, model_id=None):
 
 def _generate_game_reports(runs, name, model_label, constraints, results_dir):
     """Generate individual game reports in markdown with artifacts."""
-    import shutil
     import os
+    import shutil
 
     model_slug = model_label.replace(" ", "_").lower()
     reports_dir = results_dir / "reports"
@@ -512,7 +507,7 @@ def multi_model_compare(config_path, model_ids, timeout=200):
 
     # Comparison table
     print(f"\n{'='*100}")
-    print(f"MULTI-MODEL COMPARISON")
+    print("MULTI-MODEL COMPARISON")
     print(f"{'='*100}")
     print(f"{'Model':<20} {'Baseline $':>10} {'Avg Pert $':>10} {'Avg Correct':>12} {'Avg Tok':>10} {'Avg Tools':>10} {'Avg Retries':>10} {'Avg Q/$':>10}")
     print("-" * 100)
@@ -556,7 +551,7 @@ def _verify_tests(workdir: str) -> bool | None:
 
 def _collect_code(result) -> dict[str, str] | None:
     """Collect code file contents from an AgenticResult's workdir."""
-    import os, glob
+    import os
     wd = getattr(result, 'workdir', '')
     if not wd or not os.path.isdir(wd):
         return None
@@ -568,14 +563,14 @@ def _collect_code(result) -> dict[str, str] | None:
             ext = os.path.splitext(f)[1].lower()
             if ext in _SOURCE_EXTS and not f.startswith('.'):
                 fpath = os.path.join(root, f)
-                try:
-                    code[os.path.relpath(fpath, wd)] = open(fpath).read()
-                except: pass
+                with contextlib.suppress(OSError, UnicodeDecodeError):
+                    code[os.path.relpath(fpath, wd)] = Path(fpath).read_text()
     return code if code else None
 
 
 if __name__ == "__main__":
-    import argparse, yaml
+    import argparse
+
 
     parser = argparse.ArgumentParser()
     parser.add_argument("config", help="YAML config path")

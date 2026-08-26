@@ -36,6 +36,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from agentic_dynamics.core.paths import KB_ARTIFACT_DIR_REL
 from agentic_dynamics.knowledge.knowledge import (
     SCHEMA_VERSION,
     Authority,
@@ -50,7 +51,6 @@ from agentic_dynamics.knowledge.record_factory import (
 from agentic_dynamics.knowledge.record_factory import (
     build_record as build_record_from_parts,
 )
-from agentic_dynamics.core.paths import KB_ARTIFACT_DIR_REL
 from agentic_dynamics.knowledge.retrieval import build_evidence_cards
 
 # ── Extractor contract constants ────────────────────────────────

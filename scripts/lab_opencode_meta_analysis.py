@@ -9,7 +9,6 @@ Output: experiments/results/legacy_labs/lab_opencode_meta_analysis.json
 """
 
 import json
-import sys
 import time
 from pathlib import Path
 

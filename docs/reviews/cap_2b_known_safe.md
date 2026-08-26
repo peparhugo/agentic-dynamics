@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2b — known-safe list (p5 adversarial: attempted non-falsifying attacks)
 
 **Campaign:** `cap_2b` (`cap_2b@0.1`). This document records the **non-falsifying** attacks that

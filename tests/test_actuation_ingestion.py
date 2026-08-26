@@ -42,9 +42,9 @@ def test_extractor_constants():
     assert ai.EXTRACTOR_VERSION == "actuation/v1"
     assert ai.SOURCE_TYPE == "actuation"
     assert ai.ACL_SCOPE == "public"
-    assert ai.ACTUATION_KINDS == {
+    assert {
         "steer", "interrupt", "escalate", "retry", "budget", "deadline",
-    }
+    } == ai.ACTUATION_KINDS
 
 
 # ── Provenance ───────────────────────────────────────────────────

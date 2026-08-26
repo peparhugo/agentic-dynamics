@@ -305,7 +305,7 @@ def code_change_facts_v2(inp: ReducerInput) -> list[CanonicalFact]:
         terms.append(min(1.0, impacted["count"] / 10.0))
         weights.append(dict(RISK_WEIGHTS)["impacted"])
     if terms:
-        risk = sum(w * t for w, t in zip(weights, terms)) / sum(weights)
+        risk = sum(w * t for w, t in zip(weights, terms, strict=False)) / sum(weights)
         facts.append(
             _fact(inp, "code_change_risk", encode_value(round(risk, 4), "float"), evidence_ids)
         )

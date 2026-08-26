@@ -22,6 +22,7 @@ from agentic_dynamics.knowledge.retrieval import (
     Candidate,
     EvidenceCard,
     FallbackMode,
+    _dense_filter,
     build_evidence_cards,
     build_query_plan,
     collapse_redundant,
@@ -33,10 +34,9 @@ from agentic_dynamics.knowledge.retrieval import (
     graph_boost,
     is_conflict_relationship,
     resolve_fallback_mode,
+    retrieve,
     rrf_base,
     select_evidence,
-    retrieve,
-    _dense_filter,
 )
 
 NOW = datetime(2026, 8, 15, 12, 0, 0, tzinfo=timezone.utc)
@@ -717,7 +717,7 @@ def test_retrieve_collapse_redundant_wired(monkeypatch):
 
         def cosine_distance(self, a, b):
             import math
-            dot = sum(x * y for x, y in zip(a, b))
+            dot = sum(x * y for x, y in zip(a, b, strict=False))
             ma = math.sqrt(sum(x * x for x in a))
             mb = math.sqrt(sum(y * y for y in b))
             if ma == 0 or mb == 0:

@@ -12,7 +12,11 @@ from pathlib import Path
 
 from agentic_dynamics.knowledge import policy_ingestion as pi
 from agentic_dynamics.knowledge.knowledge import Authority, compute_knowledge_id
-from agentic_dynamics.knowledge.knowledge_ingestion import extract_record, record_to_artifact, record_to_event
+from agentic_dynamics.knowledge.knowledge_ingestion import (
+    extract_record,
+    record_to_artifact,
+    record_to_event,
+)
 
 REPO = "test-repo"
 REVISION = "abc1234"

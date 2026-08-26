@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2b — adversarial review (p5)
 
 **Campaign:** `cap_2b` (`cap_2b@0.1`) · **Verdict under review:**

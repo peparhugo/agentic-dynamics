@@ -11,10 +11,10 @@ Usage:
   python3 scripts/sweep_silent_mode.py --limit 1    # run 1 model
 """
 
+import contextlib
 import hashlib
 import json
 import os
-import sys
 import time
 from pathlib import Path
 
@@ -26,15 +26,13 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 
-from agentic_dynamics.measurement.perturb import build_operators
-from agentic_dynamics.measurement.perturb import perturb_prompt
-from agentic_dynamics.measurement.perturb import derive_seed
-from agentic_dynamics.measurement.solution import evaluate_solution
-from agentic_dynamics.measurement.efficiency import compute_efficiency
+from agentic_dynamics.adapters.opencode import run_opencode_agentic
 from agentic_dynamics.measurement.constraint_detection import detect_constraints
+from agentic_dynamics.measurement.efficiency import compute_efficiency
+from agentic_dynamics.measurement.perturb import build_operators, derive_seed, perturb_prompt
 from agentic_dynamics.measurement.recovery_cost import compute_recovery_cost
 from agentic_dynamics.measurement.semantic_validation import analyze_markers
-from agentic_dynamics.adapters.opencode import run_opencode_agentic
+from agentic_dynamics.measurement.solution import evaluate_solution
 
 # Core models for the sweep
 DEFAULT_MODELS = [
@@ -64,15 +62,16 @@ CONSTRAINTS = [
 
 def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
     models = models or DEFAULT_MODELS
-    if limit: models = models[:limit]
+    if limit:
+        models = models[:limit]
 
     total = len(models) * 2 * 2  # models × silent_modes × operators
     print(f"\n{'='*80}")
     print(f"SILENT MODE SWEEP — {len(models)} models × 2 silent modes × 2 operators = {total} runs")
     if dry_run:
         print("DRY RUN — showing plan only")
-        for model_id, label in models:
-            for silent_mode, mode_label in [(None, "natural"), (True, "forced-silent")]:
+        for _, label in models:
+            for _, mode_label in [(None, "natural"), (True, "forced-silent")]:
                 print(f"  {label:>20} | {mode_label:>14} | baseline + remove_critical_constraint")
         return []
 
@@ -80,7 +79,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
     results = []
 
     for model_id, label in models:
-        for silent_mode, mode_label in [(None, "natural"), (True, "forced-silent")]:
+        for silent_mode, _ in [(None, "natural"), (True, "forced-silent")]:
             sm_str = "natural" if silent_mode is None else "forced-silent"
 
             # --- Baseline ---
@@ -93,7 +92,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             _cur = _c.cursor()
             _cur.execute("SELECT cost FROM session WHERE title = ? AND cost > 0 LIMIT 1", (session_name,))
             if _cur.fetchone():
-                print(f"  [SKIP — existing session found]")
+                print("  [SKIP — existing session found]")
                 _c.close()
                 continue
             _c.close()
@@ -155,7 +154,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             _cur2 = _c2.cursor()
             _cur2.execute("SELECT cost FROM session WHERE title = ? AND cost > 0 LIMIT 1", (session_name_p,))
             if _cur2.fetchone():
-                print(f"  [SKIP — existing perturbed session]")
+                print("  [SKIP — existing perturbed session]")
                 _c2.close()
                 continue
             _c2.close()
@@ -204,7 +203,8 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
             results.append(pert_row)
             print(f"${r_pert.estimated_cost_usd:.4f} {r_pert.total_tokens:,}tok "
                   f"correct={sol_pert.correctness_score:.0%} "
-                  f"recovery={rc.recovery_cost_usd:.4f} ratio={rc.recovery_cost_ratio:.2f}x "
+                  f"recovery={rc.recovery_cost_usd:.4f} "
+                  f"ratio={(f'{rc.recovery_cost_ratio:.2f}x' if rc.recovery_cost_ratio is not None else 'n/a')} "
                   f"tests={r_pert.tests_passed}/{r_pert.tests_total}")
             time.sleep(2)
 
@@ -215,12 +215,6 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
 
 
 def _print_matrix(results):
-    KEY = ["label", "silent_mode", "type",
-           "cost", "total_tokens", "thinking_ratio", "correctness",
-           "tests_passed", "tests_total", "tools", "retries",
-           "marker_const", "recovery_cost", "recovery_factor"]
-    KEYS_LABEL = {k: k.replace("_"," ").title() for k in KEY}
-
     print(f"\n{'='*120}")
     print("SILENT MODE SWEEP — Results Matrix")
     print(f"{'='*120}")
@@ -275,14 +269,15 @@ def _save_results(results):
 
 def _collect(result):
     wd = getattr(result, 'workdir', '')
-    if not wd or not os.path.isdir(wd): return None
+    if not wd or not os.path.isdir(wd):
+        return None
     code = {}
     for root, dirs, files in os.walk(wd):
         dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__pycache__']
         for f in files:
             if f.endswith('.py') and not f.startswith('.'):
-                try: code[f] = open(os.path.join(root, f)).read()
-                except: pass
+                with contextlib.suppress(OSError, UnicodeDecodeError):
+                    code[f] = Path(os.path.join(root, f)).read_text()
     return code if code else None
 
 

@@ -1,12 +1,12 @@
 """Tests for Neo4j graph module — Neo4jClient, _BufferedResult."""
 
 import socket
-from pathlib import Path
 
+import neo4j.exceptions
 import pytest
 
-from agentic_dynamics.knowledge.graph import ALLOWED_EXPANSION_RELS, Neo4jClient, _BufferedResult
 from agentic_dynamics.knowledge.embeddings import step_doc_id
+from agentic_dynamics.knowledge.graph import ALLOWED_EXPANSION_RELS, Neo4jClient, _BufferedResult
 
 try:
     socket.create_connection(("localhost", 7687), timeout=2).close()
@@ -189,7 +189,7 @@ class TestKnowledgeSchema(_Neo4jTestBase):
             "MERGE (k:Knowledge {knowledge_id: 'ks_dup'}) SET k.entity_id = 'ent_x'"
         )
         # A second insert with the same knowledge_id must fail on the constraint.
-        with pytest.raises(Exception):
+        with pytest.raises(neo4j.exceptions.ConstraintError):
             self.client._run(
                 "CREATE (k:Knowledge {knowledge_id: 'ks_dup', entity_id: 'ent_y'})"
             )
@@ -341,11 +341,11 @@ class TestExpandCandidates(_Neo4jTestBase):
         assert "hub" in names
 
     def test_allowlisted_relationships_are_fixed(self):
-        assert ALLOWED_EXPANSION_RELS == {
+        assert {
             "DEFINES", "IMPORTS", "CALLS", "TESTED_BY",
             "PRODUCED_BY", "PRECEDES", "SUPERSEDES", "CONTRADICTS",
             "CONTAINS", "AFFECTS",  # design §5.5 — the versioned-graph traversal relations
-        }
+        } == ALLOWED_EXPANSION_RELS
 
     def test_expand_returns_rel_type_depth_path_and_origin(self):
         self._build_star()

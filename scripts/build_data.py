@@ -41,9 +41,8 @@ REPORTS_DIR = RESULTS_DIR / "reports"
 DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 OUTPUT_PATH = ROOT / "apps" / "website" / "data.js"
 
-from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
-
 from agentic_dynamics.control.routing import compute_routing  # noqa: E402
+from agentic_dynamics.core.constants import MODEL_LABELS, bootstrap_ci
 from agentic_dynamics.measurement.solution import COMPOSITE_WEIGHTS  # noqa: E402
 from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
     DATA_INTEGRITY_POLICY_VERSION,
@@ -2185,6 +2184,12 @@ def build():
             "lab_books_canonical": lab_counts["lab_books_canonical"],
             "lab_books_quarantined": lab_counts["lab_books_quarantined"],
             "measured_spend_usd": round(sum(m.get("total_cost", 0) for m in models), 2),
+            # The measured-spend figure is STORY-CORPUS scoped: it is the total measured cost
+            # of the canonical resolved story corpus, not "all money ever spent in this repo".
+            # Workflow-run ledger spend is NOT published (the run ledgers under
+            # experiments/results/workflows/ are gitignored, local-transient), so the public
+            # figure must never be read as the whole-repo total. cap_stabilization_release p5.
+            "measured_spend_scope": "story-corpus",
             "_provenance": {
                 "story_sessions": "M",
                 "stories_total": "C",
@@ -2201,6 +2206,7 @@ def build():
                 "lab_books_canonical": "M",
                 "lab_books_quarantined": "M",
                 "measured_spend_usd": "M",
+                "measured_spend_scope": "P",
             },
         },
         "models": models,

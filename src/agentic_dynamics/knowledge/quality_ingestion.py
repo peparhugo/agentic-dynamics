@@ -48,12 +48,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from agentic_dynamics.measurement.entropy import EntropyProfile, compute_entropy
-from agentic_dynamics.knowledge.knowledge import (
-    Authority,
-    KnowledgeRecord,
-)
-from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
 from agentic_dynamics.core.language import (
     LanguageProfile,
     _should_skip,
@@ -61,16 +55,22 @@ from agentic_dynamics.core.language import (
     detect_language,
     smallest_containing_symbol,
 )
-from agentic_dynamics.measurement.lsp_diagnostics import LSPDiagnostic, LSPReport, run_diagnostics
+from agentic_dynamics.knowledge.knowledge import (
+    Authority,
+    KnowledgeRecord,
+)
+from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
 from agentic_dynamics.knowledge.record_factory import build_record as build_record_from_parts
+from agentic_dynamics.measurement.entropy import EntropyProfile, compute_entropy
+from agentic_dynamics.measurement.lsp_diagnostics import LSPDiagnostic, LSPReport, run_diagnostics
 from agentic_dynamics.measurement.sonar import (
     SONAR_PASSWORD_DEFAULT,
     SONAR_STATUS_AVAILABLE,
     SONAR_STATUS_STALE_REFUSED,
     SONAR_URL_DEFAULT,
     SONAR_USER_DEFAULT,
-    SonarMetrics,
     SonarIssue,
+    SonarMetrics,
     fetch_sonar_issues,
     run_sonar_analysis,
 )

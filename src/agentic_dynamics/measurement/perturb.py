@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import hashlib
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
 
 # ── Alien vocabularies — cross-domain word sets for directional noise ──
 
@@ -302,7 +302,6 @@ def _insert_contradiction(prompt: str, strength: float, rng: random.Random) -> s
     or rationalize both — each response reveals something about its
     reasoning policy.
     """
-    import re
 
     domain_contradictions = {
         "api": [
@@ -335,8 +334,8 @@ def _insert_contradiction(prompt: str, strength: float, rng: random.Random) -> s
                   'of', 'with', 'from', 'by', 'as', 'is', 'was', 'are', 'be', 'been',
                   'it', 'its', 'use', 'all', 'this', 'that', 'has', 'have', 'not', 'no'}
     all_domains = []
-    for domain, pairs in domain_contradictions.items():
-        for a, b in pairs:
+    for _domain, pairs in domain_contradictions.items():
+        for a, _ in pairs:
             keywords = [w for w in a.lower().split()[:5] if w not in _stopwords]
             if keywords and any(kw.lower() in prompt.lower() for kw in keywords):
                 all_domains = pairs
@@ -401,9 +400,9 @@ def _remove_critical_constraint(prompt: str, strength: float, rng: random.Random
     if not candidates:
         # Fallback: try to find and remove any checklist-like item
         lines = prompt.split('\n')
-        removals = [l for l in lines if l.strip() and len(l.strip()) > 15 and (
-            l.strip().startswith('-') or l.strip().startswith('*') or
-            any(kw in l.lower() for kw in ('must', 'should', 'required', 'ensure'))
+        removals = [line for line in lines if line.strip() and len(line.strip()) > 15 and (
+            line.strip().startswith('-') or line.strip().startswith('*') or
+            any(kw in line.lower() for kw in ('must', 'should', 'required', 'ensure'))
         )]
         if removals:
             to_remove = rng.choice(removals)
@@ -428,10 +427,7 @@ def _remove_critical_constraint(prompt: str, strength: float, rng: random.Random
             score = sum(1 for kw in critical_keywords if kw.lower() in c.lower())
             scored.append((score, c))
         scored.sort(key=lambda x: x[0], reverse=True)
-        if scored and scored[0][0] > 0:
-            to_remove = scored[0][1]
-        else:
-            to_remove = rng.choice(actual_constraints)
+        to_remove = scored[0][1] if scored and scored[0][0] > 0 else rng.choice(actual_constraints)
         n_remove = max(1, int(len(actual_constraints) * 0.4))
         removals = [to_remove] + rng.sample([c for c in actual_constraints if c != to_remove], min(n_remove - 1, len(actual_constraints) - 1))
     elif strength >= 0.5:

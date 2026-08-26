@@ -24,7 +24,8 @@ The analyzer is a pure-ish composition: the only I/O is the duck-typed ``graph_c
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from typing import Any
 
 from agentic_dynamics.control.facts import EvidenceItem, ReducerInput

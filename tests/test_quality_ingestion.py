@@ -14,10 +14,14 @@ from pathlib import Path
 
 import pytest
 
+from agentic_dynamics.core.language import _PROFILES
 from agentic_dynamics.knowledge import quality_ingestion as qi
 from agentic_dynamics.knowledge.knowledge import Authority, compute_knowledge_id
-from agentic_dynamics.knowledge.knowledge_ingestion import extract_record, record_to_artifact, record_to_event
-from agentic_dynamics.core.language import _PROFILES
+from agentic_dynamics.knowledge.knowledge_ingestion import (
+    extract_record,
+    record_to_artifact,
+    record_to_event,
+)
 from agentic_dynamics.measurement.lsp_diagnostics import LSPDiagnostic, LSPReport
 from agentic_dynamics.measurement.sonar import (
     SONAR_STATUS_AVAILABLE,

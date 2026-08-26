@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -84,21 +84,21 @@ class PromptPerturbation:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "PromptPerturbation":
+    def from_dict(cls, d: dict[str, Any]) -> PromptPerturbation:
         return cls(**d)
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2)
 
     @classmethod
-    def from_json(cls, s: str) -> "PromptPerturbation":
+    def from_json(cls, s: str) -> PromptPerturbation:
         return cls.from_dict(json.loads(s))
 
     def save(self, path: Path) -> None:
         path.write_text(self.to_json())
 
     @classmethod
-    def load(cls, path: Path) -> "PromptPerturbation":
+    def load(cls, path: Path) -> PromptPerturbation:
         return cls.from_json(path.read_text())
 
 

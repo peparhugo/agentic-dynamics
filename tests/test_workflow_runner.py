@@ -379,7 +379,7 @@ def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path,
     # bounded evidence block with graph status, revision, neighborhood, and facts.
     evidence_prompts = [p for p in prompts if "EVIDENCE" in p]
     assert evidence_prompts, "the next-phase prompt must receive the evidence context"
-    line = next(l for l in evidence_prompts[0].splitlines() if l.strip().startswith("- EVIDENCE"))
+    line = next(ln for ln in evidence_prompts[0].splitlines() if ln.strip().startswith("- EVIDENCE"))
     payload = json.loads(line.split("EVIDENCE ", 1)[1])
     assert payload["graph_status"] == "available"
     assert payload["revision"] == change.revision

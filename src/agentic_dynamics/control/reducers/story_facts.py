@@ -14,7 +14,7 @@ defaulted ``0``), and the same epistemic mapping (measured → ``observed``/[M],
 
 What it adds over the p3 adaptation (all first-class, all in the reducer, none in the producer):
 
-* **``phase_test_verified`` from the cell-level ``test_executed_success``** — the 
+* **``phase_test_verified`` from the cell-level ``test_executed_success``** — the
   *test_executed_success-analogue (story-level test outcome)* the workflow names. Story cells
   record ``test_executed_success`` cell-level only (92/227 in the census); there is no per-session
   test verdict to fabricate, so the reducer attaches the cell's independent test outcome to the

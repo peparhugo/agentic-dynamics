@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_story_arc",
-  "generated_at": "2026-08-22T18:49:11.524614",
+  "generated_at": "2026-08-26T21:44:09.388203",
   "summary": {
     "snowball_factor": 2.32,
     "session1_cost": 0.173207,
@@ -140,9 +140,9 @@
   "lab_contract": {
     "lab": "lab_story_arc.py",
     "input_dataset_id": "canonical_registry/story",
-    "registry_identity_sha256": "e726d654f2d8c3cc04f892ecce52011f08a09860dfe8994a2ad156937a14f59c",
+    "registry_identity_sha256": "2a622f891f138a6292f6bf1b9d0653fc9d57bd76dd97b180504d027bd3201b6b",
     "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-    "registry_version": "data-manifest/1.0+701rows",
+    "registry_version": "data-manifest/1.0+12152rows",
     "metric_definition_version": "story_arc/v2",
     "metric_source_sha256": "1e10f13a3df8657c2e75ca2045a1bb8835fb3880b6c475f5d2da6747b40a7c95",
     "n_resolved_records": 215,
@@ -161,6 +161,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-22T16:49:11.525158+00:00"
+    "generated_at": "2026-08-26T19:44:09.388879+00:00"
   }
 }

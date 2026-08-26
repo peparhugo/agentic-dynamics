@@ -5,9 +5,7 @@ cost, correctness, and compounding effects across iterations.
 Exposes the real cost differential of session-based pricing.
 """
 
-import sys
 import time
-from pathlib import Path
 
 try:
     import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
@@ -15,8 +13,8 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
-from agentic_dynamics.measurement.solution import evaluate_solution
 from agentic_dynamics.adapters.opencode import run_opencode_agentic
+from agentic_dynamics.measurement.solution import evaluate_solution
 
 PHASES = [
     ("build", "Build a team collaboration platform with Python/Flask and SQLite. "

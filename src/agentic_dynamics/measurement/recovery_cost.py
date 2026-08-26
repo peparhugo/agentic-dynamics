@@ -45,9 +45,9 @@ class RecoveryCost:
     recovery_cost_usd: float = 0.0
     recovery_energy_j: float = 0.0
 
-    # Recovery ratio: what fraction of perturbed cost was "extra"
-    recovery_token_ratio: float = 0.0
-    recovery_cost_ratio: float = 0.0
+    # Recovery ratio: what fraction of perturbed cost was "extra" (None = denominator uncaptured)
+    recovery_token_ratio: float | None = None
+    recovery_cost_ratio: float | None = None
 
     # Correctness
     baseline_correctness: float = 0.0
@@ -92,8 +92,12 @@ class RecoveryCost:
             "recovery_tokens": self.recovery_tokens,
             "recovery_cost_usd": round(self.recovery_cost_usd, 6),
             "recovery_energy_j": round(self.recovery_energy_j, 2),
-            "recovery_token_ratio": round(self.recovery_token_ratio, 4),
-            "recovery_cost_ratio": round(self.recovery_cost_ratio, 4),
+            "recovery_token_ratio": (
+                round(self.recovery_token_ratio, 4) if self.recovery_token_ratio is not None else None
+            ),
+            "recovery_cost_ratio": (
+                round(self.recovery_cost_ratio, 4) if self.recovery_cost_ratio is not None else None
+            ),
             "baseline_correctness": round(self.baseline_correctness, 4),
             "perturbed_correctness": round(self.perturbed_correctness, 4),
             "correctness_delta": round(self.correctness_delta, 4),
@@ -145,9 +149,12 @@ def compute_recovery_cost(
     rc.recovery_cost_usd = max(0, perturbed_cost_usd - baseline_cost_usd)
     rc.recovery_energy_j = rc.recovery_tokens * energy_per_token
 
-    # Recovery ratios
-    rc.recovery_token_ratio = rc.recovery_tokens / max(perturbed_tokens, 1)
-    rc.recovery_cost_ratio = rc.recovery_cost_usd / max(perturbed_cost_usd, 0.000001)
+    # Recovery ratios — None when the denominator is uncaptured (a 0-token or $0 perturbed
+    # run), never a fabricated 0.0 nor a ``max(denom, tiny)`` superspike (null-not-zero).
+    if perturbed_tokens > 0:
+        rc.recovery_token_ratio = rc.recovery_tokens / perturbed_tokens
+    if perturbed_cost_usd > 0:
+        rc.recovery_cost_ratio = rc.recovery_cost_usd / perturbed_cost_usd
 
     rc.correctness_delta = perturbed_correctness - baseline_correctness
     rc.verdict = rc.compute_verdict()

@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_2a_rerun2 — measurement design (p0_research deliverable)
 
 **Status: accepted** · Authority this document executes: `cap_2a_rerun2_design.md` §4 (p0_research).

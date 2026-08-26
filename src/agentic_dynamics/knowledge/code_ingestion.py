@@ -38,14 +38,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentic_dynamics.measurement.codebase_graph import build_graph
-from agentic_dynamics.knowledge.knowledge import (
-    Authority,
-    KnowledgeRecord,
-)
-from agentic_dynamics.knowledge.knowledge_ingestion import (
-    REPOSITORY_ID,
-)
 from agentic_dynamics.core.language import (
     _PROFILES,
     CodebaseAST,
@@ -54,7 +46,15 @@ from agentic_dynamics.core.language import (
     detect_language,
     get_parser,
 )
+from agentic_dynamics.knowledge.knowledge import (
+    Authority,
+    KnowledgeRecord,
+)
+from agentic_dynamics.knowledge.knowledge_ingestion import (
+    REPOSITORY_ID,
+)
 from agentic_dynamics.knowledge.record_factory import build_record as build_record_from_parts
+from agentic_dynamics.measurement.codebase_graph import build_graph
 
 if TYPE_CHECKING:
     from agentic_dynamics.knowledge.graph import Neo4jClient

@@ -26,7 +26,6 @@ Usage:
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 try:
@@ -34,8 +33,8 @@ try:
 except ImportError:
     from scripts import _bootstrap  # noqa: E402,F401
 
-from agentic_dynamics.experiment.experiment_spec import load_spec
 from agentic_dynamics.experiment.compile_experiment import evaluate_rules
+from agentic_dynamics.experiment.experiment_spec import load_spec
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LEDGER_PATH = REPO_ROOT / "experiments/results/cap_grit_grid_ledger.json"
@@ -274,7 +273,7 @@ def main():
 
     # ── table ───────────────────────────────────────────────────
     print("\nPER-CELL TABLE (condition_strength | arm | n_attempts | verified_rate | cpvo | rework)")
-    for r, c, rw in zip(verified, cpvo, rework):
+    for r, c, rw in zip(verified, cpvo, rework, strict=False):
         rate = "—" if r["verified_success_rate"] is None else r["verified_success_rate"]
         cost = "—" if c["cost_per_verified_outcome"] is None else c["cost_per_verified_outcome"]
         print(f"  {r['condition_strength']:12s} {r['policy_arm']:10s} "

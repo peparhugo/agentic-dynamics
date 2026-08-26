@@ -16,9 +16,6 @@ import pytest
 from agentic_dynamics.core.language import (
     _PROFILES,
     build_code_snapshot,
-    compute_code_delta,
-    module_entity_id,
-    module_version_id,
     symbol_entity_id,
     symbol_version_id,
 )
@@ -76,12 +73,21 @@ class TestVersionedPopulation:
         assert c1["module_versions"] == 1 and c1["symbol_versions"] == 1
         assert c2["module_versions"] == 1 and c2["symbol_versions"] == 1
 
-        # Two versions of the same entity -> one SUPERSEDES edge (new -> old).
+        # Two versions of the same entity -> one SUPERSEDES edge (new -> old). Scoped to this
+        # test's OWN repository_id: the shared Neo4j may hold versioned nodes from real campaign
+        # ingestion (self-cap2a/2b ...), so an unscoped global count is not isolation-safe
+        # (full-suite finding, cap_stabilization_release p3: 469 pre-existing SUPERSEDES edges).
         assert _count(
-            client, "MATCH (:SymbolVersion)-[:SUPERSEDES]->(:SymbolVersion) RETURN count(*) AS c"
+            client,
+            "MATCH (:SymbolVersion {repository_id: $repo})-[:SUPERSEDES]->(:SymbolVersion) "
+            "RETURN count(*) AS c",
+            {"repo": REPO},
         ) == 1
         assert _count(
-            client, "MATCH (:ModuleVersion)-[:SUPERSEDES]->(:ModuleVersion) RETURN count(*) AS c"
+            client,
+            "MATCH (:ModuleVersion {repository_id: $repo})-[:SUPERSEDES]->(:ModuleVersion) "
+            "RETURN count(*) AS c",
+            {"repo": REPO},
         ) == 1
 
         # Two-ID contract on the version nodes.
@@ -109,11 +115,14 @@ class TestVersionedPopulation:
         assert counts["defines"] == 4  # add, Calc, Calc.mul, helper
         assert counts["imports"] >= 1  # math_utils imports os (via the import target slot)
 
-        # The CALCULATOR method is a qualified-name symbol, DEFINES from its module.
+        # The CALCULATOR method is a qualified-name symbol, DEFINES from its module. Scoped to
+        # this test's own repository_id (same isolation rule as above; 'Calc.mul' is absent from
+        # the campaign repos today, but a shared-Neo4j collision must not make this flaky).
         assert _count(
             client,
-            "MATCH (:ModuleVersion)-[:DEFINES]->(:SymbolVersion {qualified_name: 'Calc.mul'}) "
-            "RETURN count(*) AS c",
+            "MATCH (:ModuleVersion {repository_id: $repo})-[:DEFINES]->"
+            "(:SymbolVersion {repository_id: $repo, qualified_name: 'Calc.mul'}) RETURN count(*) AS c",
+            {"repo": REPO},
         ) == 1
 
     def test_call_and_tested_by_edges(self, client):
@@ -127,16 +136,20 @@ class TestVersionedPopulation:
         )
         counts = client.populate_versioned_graph(snap, revision="rev-1", repository_id=REPO, acl_scope="public")
         assert counts["calls"] >= 1  # top() calls add()
+        # Scoped to this test's own repository_id (same isolation rule as the SUPERSEDES
+        # assertions): campaign repos in the shared Neo4j carry their own 'top'/'add' symbols.
         assert _count(
             client,
-            "MATCH (:SymbolVersion {qualified_name: 'top'})-[:CALLS]->(:SymbolVersion {qualified_name: 'add'}) "
-            "RETURN count(*) AS c",
+            "MATCH (:SymbolVersion {repository_id: $repo, qualified_name: 'top'})-[:CALLS]->"
+            "(:SymbolVersion {repository_id: $repo, qualified_name: 'add'}) RETURN count(*) AS c",
+            {"repo": REPO},
         ) == 1
         assert counts["tested_by"] >= 1  # TESTED_BY rule: test_math_utils.py -> math_utils.py
         assert _count(
             client,
-            "MATCH (:SymbolVersion {qualified_name: 'add'})-[:TESTED_BY]->(:SymbolVersion {qualified_name: 'test_add'}) "
-            "RETURN count(*) AS c",
+            "MATCH (:SymbolVersion {repository_id: $repo, qualified_name: 'add'})-[:TESTED_BY]->"
+            "(:SymbolVersion {repository_id: $repo, qualified_name: 'test_add'}) RETURN count(*) AS c",
+            {"repo": REPO},
         ) == 1
 
     def test_affects_edges_from_issues(self, client):

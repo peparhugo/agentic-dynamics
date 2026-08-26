@@ -1,7 +1,7 @@
 {
   "schema_version": "sync-identity/v2",
-  "generated_at": "2026-08-26T17:27:41.568902+00:00",
-  "registry_identity_sha256": "b21ba6ac3459d8ea1e19d51cd17058cd0f1717bd30922a0249f46f51e4ce6bcb",
+  "generated_at": "2026-08-26T19:44:18.372872+00:00",
+  "registry_identity_sha256": "2a622f891f138a6292f6bf1b9d0653fc9d57bd76dd97b180504d027bd3201b6b",
   "resolved_input_sha256": "58e642e6b38d847304d7f3dc8e649f53fd1126cb2222ed86c52393c0bd9c7c8f",
   "rows": {
     "sessions": 1067,

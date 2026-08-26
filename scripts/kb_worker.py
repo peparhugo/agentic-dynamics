@@ -20,7 +20,6 @@ import hashlib
 import json
 import os
 import socket
-import sys
 import time
 import traceback
 from dataclasses import replace as _replace_record
@@ -36,11 +35,11 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
+from agentic_dynamics.control import observation_ingestion as oi  # noqa: E402
+from agentic_dynamics.core.paths import KB_ARTIFACT_DIR, REGISTRY_INDEX_PATH  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_ingestion as ki  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
-from agentic_dynamics.control import observation_ingestion as oi  # noqa: E402
 from agentic_dynamics.knowledge.knowledge import compute_knowledge_id  # noqa: E402
-from agentic_dynamics.core.paths import KB_ARTIFACT_DIR, REGISTRY_INDEX_PATH  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))

@@ -1,4 +1,4 @@
-name: Tests & Lint
+name: CI
 
 on:
   push:
@@ -6,7 +6,32 @@ on:
   pull_request:
     branches: [main]
 
+# Independent required jobs — lint, test, repro, packaging (cap_stabilization_release p4).
+# A lint failure must never hide test results: each job is its own status check, and branch
+# protection requires all four (docs/release/branch_protection_settings.md). The deterministic
+# suite is the test job's sole responsibility; lint owns ruff; repro owns the Docker
+# reproduction; packaging owns the wheel-honesty gates.
+
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: "3.10"
+
+      - name: Lint (ruff, whole active surface)
+        run: |
+          pip install ruff==0.16.2
+          # `ruff check .` is the p2 verification command: src/ tests/ scripts/ apps/
+          # workflows/ and scripts/archive/ are ALL kept lint-clean (archive policy:
+          # lint-clean, not excluded — decided + documented in scripts/CONTEXT.md).
+          ruff check .
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -32,11 +57,6 @@ jobs:
           pip install pytest pytest-timeout pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
           pip install -e ".[admin]"
 
-      - name: Lint (ruff)
-        run: |
-          pip install ruff==0.16.2
-          ruff check src/ tests/ scripts/
-
       - name: Run deterministic test suite (external-service tests excluded)
         run: |
           # --timeout: a hanging test is a failure, never an infinite block
@@ -53,6 +73,14 @@ jobs:
           python scripts/build_data.py --dry-run
         env:
           ALLOW_MISSING_EXPERIMENT_DATA: "1"
+
+      - name: Verify parquet parity (sync_data --check)
+        run: |
+          python scripts/sync_data.py --check
+
+      - name: Import gate
+        run: |
+          python -c "import agentic_dynamics; print('agentic_dynamics imports OK')"
 
   # Refactor-repair P1-1 gates: a clean Docker build must succeed, and both
   # reproduction entrypoints (CLI + reproduce.sh) must at least parse + dispatch.

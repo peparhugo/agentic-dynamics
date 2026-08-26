@@ -21,6 +21,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 import redis
+
 from agentic_dynamics.core.constants import SESSION_TIMEOUT, STORY_SESSIONS
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")

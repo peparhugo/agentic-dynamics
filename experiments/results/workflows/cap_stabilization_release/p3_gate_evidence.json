@@ -1,0 +1,45 @@
+{
+  "phase": "p3_test_suite",
+  "run_by": "operator (two agent attempts killed — exit -15 x2, one hang; the mechanical gates run directly)",
+  "gates": {
+    "pytest": {"command": "python3 -m pytest tests/ -m 'not external' -q --timeout=600", "result": "2007 passed, 115 deselected (external: ollama/neo4j/sonar live tests), 0 failed, 50.35s"},
+    "build_data_dry_run": {"result": "OK"},
+    "sync_data_check": {"result": "OK: parquet matches the current canonical source (content + counts + identities)"},
+    "import_gate": {"result": "OK"}
+  },
+  "fixes_landed": [
+    "Chroma heartbeat guards on all live tests (wrong-protocol port-collision hang — 60-min stalls x2)",
+    "pytest-timeout policy (600s per test)",
+    "kb_produce_campaign_evidence.py registered in CLI + CONTEXT.md manifest (the one real suite failure)",
+    "doc-lifecycle frontmatter fix"
+  ],
+  "post_mortem": "p3 killed two agents (exit -15 x2) and hung once: the suite's live-service tests without guards, plus the wrong command (full suite vs deterministic). The deterministic suite is ~50s, not ~60 min.",
+  "rerun_on_tip": {
+    "run_by": "operator (phase re-execution on the current branch tip, which now includes p4 CI restructure + p5 docs + p6 signoff)",
+    "gates": {
+      "pytest_full": {
+        "command": "python3 -m pytest tests/ -q --timeout=600",
+        "result": "2116 passed, 9 skipped (documented reasons below), 0 failed, 335s (hang guard active: 600s per test)"
+      },
+      "pytest_deterministic": {
+        "command": "python3 -m pytest tests/ -m 'not external' -q --timeout=600",
+        "result": "2010 passed, 115 deselected, 0 failed (the p5 doc-lifecycle guards added +3 vs the 2007 p3 log)"
+      },
+      "build_data_dry_run": {"result": "OK"},
+      "sync_data_check": {"result": "OK: parquet matches the current canonical source (content + counts + identities)"},
+      "import_gate": {"result": "OK: import agentic_dynamics"}
+    },
+    "skip_reasons": [
+      "8x tests/test_embeddings.py: Chroma server unavailable (heartbeat failed) — live-server tests skip, never hang (heartbeat guard)",
+      "1x tests/test_opencode_analyzer.py:148: No wasteful entries available (data-dependent skip)"
+    ],
+    "failures_fixed": [
+      {
+        "tests": ["test_versioned_graph.py::TestVersionedPopulation::test_revision_pair_produces_versions_and_supersedes", "test_versioned_graph.py::TestVersionedPopulation::test_call_and_tested_by_edges"],
+        "root_cause": "test-isolation defect: two live-Neo4j tests asserted GLOBAL count(*) over the whole graph, but the shared Neo4j holds real campaign ingestion (29,675 SymbolVersion under repository_id 'self-cap2a_p2_registry_canonicalize', 469 SUPERSEDES edges, 176 cross-repo 'top'/'add'/'test_add' symbols). The fixture purges only the e4-test-repo namespace, so the global counts were not isolation-safe. Latent in the deterministic suite (external-marked, deselected); only surfaced on the full suite WITH Neo4j up.",
+        "fix": "scoped the count assertions to the test's own repository_id ('e4-test-repo') — SymbolVersion/ModuleVersion {repository_id: $repo} in the MATCH patterns, mirroring the fixture's purge. Also scoped the DEFINES 'Calc.mul' assertion (same latent defect, 0 cross-repo matches today but flake-prone).",
+        "re_test": "python3 -m pytest tests/test_versioned_graph.py -q --timeout=600 -> 9 passed; full suite re-run -> 2116 passed / 9 skipped / 0 failed"
+      }
+    ]
+  }
+}

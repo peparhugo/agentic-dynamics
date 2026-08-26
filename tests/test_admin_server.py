@@ -117,9 +117,9 @@ class QueuePipeline:
         return self
 
     def execute(self):
-        for key in self._deleted:
+        for _ in self._deleted:
             self._redis.queue = []
-        for key, value in self._rpushes:
+        for _, value in self._rpushes:
             self._redis.queue.append(value)
 
 
@@ -464,7 +464,7 @@ def test_queue_reinterleave_spreads_providers_and_preserves_jobs(monkeypatch):
     # Consumption order (tail-first, i.e. reversed head->tail) after reorder
     # must have no two adjacent cells sharing a provider.
     after_order = body["after"]["order"]
-    for left, right in zip(after_order, after_order[1:]):
+    for left, right in zip(after_order, after_order[1:], strict=False):
         assert left != right, f"adjacent same-provider cells: {left}, {right}"
 
     # The queue still holds exactly the same cell ids (no loss, no duplication).
@@ -932,9 +932,9 @@ def _flagged_session(**overrides):
 
 def test_supervisor_steer_emits_exactly_one_actuation_record(monkeypatch):
     """A successful steer emits exactly one actuation record citing the flag's knowledge_id."""
+    from agentic_dynamics.control.observation_ingestion import derive_flag_record
     from agentic_dynamics.knowledge import knowledge_stream as ks
     from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
-    from agentic_dynamics.control.observation_ingestion import derive_flag_record
 
     redis = QueueRedis(queue=[])
     monkeypatch.setattr(server, "_redis", lambda: redis)

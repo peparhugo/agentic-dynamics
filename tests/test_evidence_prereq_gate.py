@@ -5,9 +5,6 @@ depend on the repo's live prereq state, and they are always safe to collect (unl
 gate itself, which must never be a collected test).
 """
 
-import json
-import subprocess
-import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -18,12 +15,11 @@ def _run_gate(monkeypatch, *, merged: list[str], verdicts: dict[str, str], story
     import importlib
 
     gate = importlib.import_module("scripts.evidence_prereq_gate")
-    results = Path(REPO) / "experiments" / "results" / "workflows"
 
     def fake_last_ledger(spec: str):
         if spec not in merged and spec != "cap_story_bridge":
             return None
-        return {"git_sha": "a" * 40, "ok": True if spec != "cap_story_bridge" or story_ok else False}
+        return {"git_sha": "a" * 40, "ok": bool(spec != "cap_story_bridge" or story_ok)}
 
     monkeypatch.setattr(gate, "_last_ledger", fake_last_ledger)
     monkeypatch.setattr(gate, "_git", lambda *a: (0, ""))

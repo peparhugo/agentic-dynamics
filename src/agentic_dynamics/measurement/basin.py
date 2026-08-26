@@ -48,9 +48,9 @@ class BasinMetrics:
     constraints_total: int = 0
     lines_of_code: int = 0
 
-    # Quality metric — the one that matters
-    quality_per_dollar: float = 0.0
-    quality_per_joule: float = 0.0
+    # Quality metric — the one that matters (None = denominator uncaptured)
+    quality_per_dollar: float | None = None
+    quality_per_joule: float | None = None
 
     # Sonar differential quality (optional — available when sonar-scanner runs)
     sonar_analyzed: bool = False
@@ -115,8 +115,12 @@ class BasinMetrics:
             "constraints_met": self.constraints_met,
             "constraints_total": self.constraints_total,
             "lines_of_code": self.lines_of_code,
-            "quality_per_dollar": round(self.quality_per_dollar, 2),
-            "quality_per_joule": round(self.quality_per_joule, 4),
+            "quality_per_dollar": (
+                round(self.quality_per_dollar, 2) if self.quality_per_dollar is not None else None
+            ),
+            "quality_per_joule": (
+                round(self.quality_per_joule, 4) if self.quality_per_joule is not None else None
+            ),
             "sonar_analyzed": self.sonar_analyzed,
             "sonar_bugs_delta": self.sonar_bugs_delta,
             "sonar_vulnerabilities_delta": self.sonar_vulnerabilities_delta,
@@ -251,10 +255,16 @@ def measure_basin_escape(
     m.constraints_total = constraint_count if constraint_count is not None else max(baseline_constraints_met, perturbed_constraints_met)
     m.lines_of_code = perturbed_loc
 
-    # Quality metric — the one that matters
-    correctness_ratio = perturbed_correctness / max(baseline_correctness, 0.01)
-    m.quality_per_dollar = correctness_ratio / max(m.cost_usd, 0.000001)
-    m.quality_per_joule = correctness_ratio / max(m.estimated_energy_j, 0.01)
+    # Quality metric — the one that matters. All three ratios are None when their denominator
+    # is uncaptured (a zero-correctness baseline, a $0 cost, or a 0J energy) — never a
+    # fabricated 0.0 nor a ``max(denom, tiny)`` superspike (null-not-zero, as in strategy.py).
+    correctness_ratio = None
+    if baseline_correctness > 0:
+        correctness_ratio = perturbed_correctness / baseline_correctness
+    if correctness_ratio is not None and m.cost_usd > 0:
+        m.quality_per_dollar = correctness_ratio / m.cost_usd
+    if correctness_ratio is not None and m.estimated_energy_j > 0:
+        m.quality_per_joule = correctness_ratio / m.estimated_energy_j
 
     m.converged_back = m.escape_score < 0.2
 

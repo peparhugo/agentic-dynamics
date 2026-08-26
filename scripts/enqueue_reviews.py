@@ -24,9 +24,9 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.runtime.posthoc import (  # noqa: E402
+    DEFAULT_REVIEW_MODEL,
     REVIEW_QUEUE,
     REVIEW_STATUS,
-    DEFAULT_REVIEW_MODEL,
     build_commit_review_job,
     build_story_review_job,
     enqueue_job,

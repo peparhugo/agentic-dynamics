@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_escalation_measurement — adversarial verification
 
 **Role:** adversarial verifier (p4). **Source revision:** `bc4c2c573` (p3 score JSON committed).

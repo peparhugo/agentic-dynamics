@@ -197,7 +197,7 @@ def test_readme_figures_match_public_statistics():
         "(specification corruption, objective mutation, process perturbation) |",
         f"| Lab books | {ps['lab_books']} ({ps['lab_books_canonical']} canonical + "
         f"{ps['lab_books_quarantined']} quarantined) |",
-        f"| Total measured spend | ${ps['measured_spend_usd']:,.2f} |",
+        f"| Story-corpus measured spend | ${ps['measured_spend_usd']:,.2f} |",
     ]
     for line in expected_lines:
         assert line in readme, f"README 'By the Numbers' drifted: {line!r}"

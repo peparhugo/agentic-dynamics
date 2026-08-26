@@ -695,8 +695,8 @@ def compute_deep_metrics(
     baseline; basin escape measures seed-vs-final structural divergence; and
     the strategy classifier combines those with efficiency into an archetype.
     """
-    from agentic_dynamics.measurement.basin import measure_basin_escape
     from agentic_dynamics.core.language import detect_language
+    from agentic_dynamics.measurement.basin import measure_basin_escape
     from agentic_dynamics.measurement.lsp_diagnostics import run_diagnostics
     from agentic_dynamics.measurement.solution import evaluate_solution
     from agentic_dynamics.measurement.strategy import classify_strategy

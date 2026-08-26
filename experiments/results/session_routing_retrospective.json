@@ -1,6 +1,18 @@
 {
   "study": "cap_session_routing_retrospective/v1",
   "source": "experiments/results/workflows/**/*.json (run-level phase transitions)",
+  "arm_names": [
+    "continue",
+    "fork_cached",
+    "fork_blind",
+    "escalate"
+  ],
+  "null_hypothesis": "no arm outperforms `continue` on cost per verified outcome",
+  "notes": [
+    "verified success = the phase committed with status ok (the per-phase gate)",
+    "escalate is run-level (failed run(s) then a later successful run); cost includes the failed attempts",
+    "coverage semantics: uncaptured cost is null with zero coverage, never zero"
+  ],
   "arms": {
     "continue": {
       "n": 0,
@@ -21,22 +33,22 @@
       "cache_token_ratio": null
     },
     "fork_cached": {
-      "n": 246,
-      "verified": 242,
-      "success_rate": 0.9837,
+      "n": 349,
+      "verified": 343,
+      "success_rate": 0.9828,
       "cost": {
-        "value": 1.2453,
-        "n_available": 246,
-        "n_total": 246,
+        "value": 1.4591,
+        "n_available": 349,
+        "n_total": 349,
         "coverage": 1.0
       },
       "cost_per_verified_outcome": {
-        "value": 1.2658,
-        "n_available": 246,
-        "n_verified": 242
+        "value": 1.4847,
+        "n_available": 349,
+        "n_verified": 343
       },
       "cache_reuse_rate": 1.0,
-      "cache_token_ratio": 19001.7618
+      "cache_token_ratio": 29385.0822
     },
     "fork_blind": {
       "n": 0,
@@ -57,30 +69,24 @@
       "cache_token_ratio": null
     },
     "escalate": {
-      "n": 7,
-      "verified": 7,
+      "n": 13,
+      "verified": 13,
       "success_rate": 1.0,
       "cost": {
-        "value": 3.9238,
-        "n_available": 7,
-        "n_total": 7,
+        "value": 14.6437,
+        "n_available": 13,
+        "n_total": 13,
         "coverage": 1.0
       },
       "cost_per_verified_outcome": {
-        "value": 3.9238,
-        "n_available": 7,
-        "n_verified": 7
+        "value": 14.6437,
+        "n_available": 13,
+        "n_verified": 13
       },
       "cache_reuse_rate": 0.0,
       "cache_token_ratio": null
     }
   },
-  "null_hypothesis": "no arm outperforms `continue` on cost per verified outcome",
-  "notes": [
-    "verified success = the phase committed with status ok (the per-phase gate)",
-    "escalate is run-level (failed run(s) then a later successful run); cost includes the failed attempts",
-    "coverage semantics: uncaptured cost is null with zero coverage, never zero"
-  ],
   "observations_by_spec": {
     "agentic_dynamics_rebrand": {
       "fork_cached": 1
@@ -103,16 +109,94 @@
     "canonical_state_round2": {
       "fork_cached": 6
     },
+    "cap_2a_rerun": {
+      "fork_cached": 5
+    },
+    "cap_2a_rerun2": {
+      "fork_cached": 6
+    },
+    "cap_2a_rerun3": {
+      "fork_cached": 5
+    },
+    "cap_2a_shadow_calibration": {
+      "fork_cached": 5
+    },
+    "cap_2b": {
+      "fork_cached": 5
+    },
     "cap_addendum_design": {
       "fork_cached": 3
+    },
+    "cap_addendum_implement": {
+      "fork_cached": 3,
+      "escalate": 1
+    },
+    "cap_e2_cascade_run": {
+      "fork_cached": 2
+    },
+    "cap_escalation_measurement": {
+      "fork_cached": 3
+    },
+    "cap_evidence_adversary": {
+      "escalate": 1
+    },
+    "cap_evidence_integrity": {
+      "fork_cached": 6
+    },
+    "cap_fact_auto_emit": {
+      "fork_cached": 2
+    },
+    "cap_fact_backfill": {
+      "fork_cached": 6
+    },
+    "cap_gate_migration": {
+      "fork_cached": 2
+    },
+    "cap_gate_scan": {
+      "fork_cached": 2
+    },
+    "cap_grit_grid_execute": {
+      "fork_cached": 4
+    },
+    "cap_i0_i3_remediation": {
+      "fork_cached": 3,
+      "escalate": 1
     },
     "cap_implement_repair": {
       "fork_cached": 3
     },
+    "cap_pattern_minting": {
+      "fork_cached": 2
+    },
+    "cap_routing_evidence_specs": {
+      "fork_cached": 3
+    },
+    "cap_session_routing_prospective": {
+      "fork_cached": 4
+    },
     "cap_session_routing_spec": {
       "fork_cached": 2
     },
+    "cap_shadow_campaign": {
+      "fork_cached": 2
+    },
+    "cap_shadow_fact_disposition": {
+      "fork_cached": 3
+    },
+    "cap_sonnet_adversary": {
+      "fork_cached": 3,
+      "escalate": 1
+    },
+    "cap_story_bridge": {
+      "fork_cached": 2
+    },
+    "cap_test_runner_wiring": {
+      "fork_cached": 2
+    },
     "claude_tools_to_skills": {
+      "fork_cached": 2
+    },
+    "code_review": {
       "fork_cached": 2
     },
     "consolidation_release": {
@@ -122,7 +206,8 @@
       "fork_cached": 22
     },
     "context_abstraction_implement": {
-      "fork_cached": 5
+      "fork_cached": 16,
+      "escalate": 1
     },
     "context_abstraction_plane": {
       "fork_cached": 2
@@ -132,6 +217,9 @@
     },
     "control_room_posthoc_visibility": {
       "fork_cached": 2
+    },
+    "control_room_refresh": {
+      "fork_cached": 3
     },
     "control_room_ui_implement": {
       "fork_cached": 3
@@ -157,11 +245,21 @@
     "finding_economics_closure": {
       "fork_cached": 5
     },
+    "investing_context_implement": {
+      "fork_cached": 3
+    },
     "investing_context_seed": {
       "fork_cached": 2
     },
+    "investing_context_seed_remediation": {
+      "fork_cached": 2,
+      "escalate": 1
+    },
     "investing_domain_audit": {
       "fork_cached": 3
+    },
+    "investing_paper_journal": {
+      "fork_cached": 2
     },
     "kb_event_typing": {
       "fork_cached": 2

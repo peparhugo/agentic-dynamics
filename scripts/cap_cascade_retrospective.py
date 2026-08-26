@@ -183,7 +183,7 @@ def per_model_trigger_range(rows: list[dict[str, Any]], theta: float) -> float |
             continue
         m = r["model"] or r["run_model"] or "?"
         by_model.setdefault(m, []).append(r)
-    for model, mrows in by_model.items():
+    for _, mrows in by_model.items():
         n_esc = sum(1 for r in mrows if r["confidence"] < theta)
         rates.append(n_esc / len(mrows))
     if not rates:
@@ -193,7 +193,6 @@ def per_model_trigger_range(rows: list[dict[str, Any]], theta: float) -> float |
 
 def _theta_arm(rows: list[dict[str, Any]], theta: float, *, by_job: bool = False) -> dict[str, Any]:
     non_esc, esc = _escalation_subset(rows, theta)
-    key = _THETA_KEY[theta]
     arm: dict[str, Any] = {
         "theta": theta,
         "escalation_trigger_rate": escalation_trigger_rate(rows, theta),

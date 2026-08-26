@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from agentic_dynamics.experiment.spec_status import SpecStatusEntry
 from agentic_dynamics.knowledge.knowledge import (
     ACTUATION_TYPES,
     OBSERVATION_TYPES,
@@ -30,7 +31,11 @@ from agentic_dynamics.knowledge.knowledge import (
     compute_knowledge_id,
     message_family,
 )
-from agentic_dynamics.knowledge.knowledge_ingestion import artifact_uri, extract_record, record_to_artifact
+from agentic_dynamics.knowledge.knowledge_ingestion import (
+    artifact_uri,
+    extract_record,
+    record_to_artifact,
+)
 from agentic_dynamics.knowledge.spec_ingestion import (
     ACL_SCOPE,
     EXTRACTOR_VERSION,
@@ -50,7 +55,6 @@ from agentic_dynamics.knowledge.spec_ingestion import (
     spec_reason,
     spec_text,
 )
-from agentic_dynamics.experiment.spec_status import SpecStatusEntry
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REVISION = "0123456789abcdef0123456789abcdef01234567"

@@ -6,7 +6,6 @@ stamp), the typed analyzer metadata (analyzed_sha / tool_version / config_hash /
 and the legacy no-revision behavior (unchanged fetch-first, status available).
 """
 
-import tempfile
 from pathlib import Path
 
 from agentic_dynamics.measurement import sonar as sonar_mod
