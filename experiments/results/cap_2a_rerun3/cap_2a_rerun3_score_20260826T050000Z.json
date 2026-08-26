@@ -1,0 +1,532 @@
+{
+  "schema_version": "cap_2a_rerun3_score/v1",
+  "campaign": "cap_2a_rerun3",
+  "phase": "p4_score_value",
+  "written_at": "2026-08-26T05:03:13.684743+00:00",
+  "spec_version": "cap_2a_rerun3@0.1",
+  "source_revision": "83b65e9f58e60991acbc5500f0d6688fa7c32fe5",
+  "candidate_manifests": {
+    "p1": {
+      "path": "experiments/results/cap_2a_rerun3/p1_candidate_manifest.json",
+      "sha256": "c396303ee9fd222102bba4a4e355548704729d7366b479638b570e1fdcfe621e"
+    },
+    "p2": {
+      "path": "experiments/results/cap_2a_rerun3/p2_candidate_manifest.json",
+      "sha256": "f3910a4a68177957bb695f12c47ecf722c4d927a08fd89efd71e3899487ae867"
+    },
+    "p3": {
+      "path": "experiments/results/cap_2a_rerun3/p3_execution_manifest.json",
+      "sha256": "5750a98faea913e7da16d95630271736df8e89bc3cd1ffbeb4a532d703bd2ecf"
+    }
+  },
+  "input_artifacts": [
+    {
+      "path": "experiments/results/cap_2a_rerun3/p1_candidate_manifest.json",
+      "sha256": "c396303ee9fd222102bba4a4e355548704729d7366b479638b570e1fdcfe621e"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/p1_cell_manifest.json",
+      "sha256": "833d20b9e268de6313fb64a717c7123f326e2a40399378c500f83c584bf7fb02"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/p1_phase_ledger.json",
+      "sha256": "63e0dbf2614b5d51e652039705dce5114bda5c72ab909ff0bfd9bfea4658c76c"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/809c0df8bfae8772.json",
+      "sha256": "e35789f320898e880cf0ac0578a77f669e11d1fe8bdb91849fae89ac76ed48a1"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/p2_candidate_manifest.json",
+      "sha256": "f3910a4a68177957bb695f12c47ecf722c4d927a08fd89efd71e3899487ae867"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/p2_cell_manifest.json",
+      "sha256": "43bb46b01ef6d870d990024b35644da4228b3e59e227575c5b9b7cda0d11eb11"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/p2_phase_ledger.json",
+      "sha256": "73213ccd978ad787409b109e744a8292e58e955809aaf701df80d56ffb33537b"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/c28eb202d27da59a.json",
+      "sha256": "18541a0f1b5de23879b617824b513403b90b133230bb93eb385a9f70dc2350ed"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/p3_execution_manifest.json",
+      "sha256": "5750a98faea913e7da16d95630271736df8e89bc3cd1ffbeb4a532d703bd2ecf"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/p3_summary.json",
+      "sha256": "b7276144f1c5dd81f57ede90a8964f9f5693b41497eae5352182f19637aa835e"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_cell_manifest.json",
+      "sha256": "4460debd953a950a40e2306f3670cfa35e72496cd3cd5cd9a1f79a50f1ab7bcc"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_outcome.json",
+      "sha256": "258c2d7ca13ecf391b697502c585570a0d5e6809a5aa7b9ac8f8dffcd828e745"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_phase_ledger.json",
+      "sha256": "ed385510052c2867de04844b8391215a60c9bfc5702fb7da6f2d41cd62091c81"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/7f6ac70cbe5c7cf4.json",
+      "sha256": "41576c3cdc94e751f94bdd2e85140cbab9b3d7a10f9e654853c0106049a1743c"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_gate_cell_manifest.json",
+      "sha256": "d30b4d4525ce5c50e76ccab6afa25742c4a32b91d0259482531a786d498c51ec"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_gate_outcome.json",
+      "sha256": "6dfe331d1ed0a4ad877ecc81945e6ce56e4118e44726433e02cea0da53871dfd"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_gate_phase_ledger.json",
+      "sha256": "ac4abfbc83ccffca5f2536bcc61892779bc16a1b81153c847f200f4063e4e1a1"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/03962721aea0655c.json",
+      "sha256": "c076e3dc16e29c5aa5d7f1302ab83a727222ee8a5601c2f4b16d68aca445364a"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_baseline_cell_manifest.json",
+      "sha256": "31ca8fcb4a117c21e8d758ed8336e5cab7ed9d08d6b7236b276ba6e8041a464f"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_baseline_outcome.json",
+      "sha256": "43d56d35fa9ed8862b5910c45f293d9cad4d02ea5ae64a71e87ec139cf5f87b3"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_baseline_phase_ledger.json",
+      "sha256": "5d3b7aa10076a9b8b0762cf6dcbfed1d70c6522ec2db3bc4ca3ba4bde32a5c04"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/7cb946e0176d54dd.json",
+      "sha256": "60365a06b2c92c601f78e65e49c0e64abe306a9ba2577fc73a48f629d1711b36"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_gate_cell_manifest.json",
+      "sha256": "61bb757ceecd7eb4cd36cb85a11b662e7412842357b9ea2efa8f8150fcb6556c"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_gate_outcome.json",
+      "sha256": "2f1bdad5f1815dbfaf520742b54060dd2e97e726ee3371e18dfa96b3933d3246"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/cap2a_r3_style_gate_phase_ledger.json",
+      "sha256": "dde89c16b8ea9676966bb551159b36dbf6ed95c740880eb3aa588f635afe9dc5"
+    },
+    {
+      "path": "experiments/results/cap_2a_rerun3/proposals/b4c91ccfbdabeef2.json",
+      "sha256": "3d92bfde2920b33fb36c0aeeccb74eb5c3c36b4be99650e249c0eadcfc8dfe6b"
+    }
+  ],
+  "join_validation": {
+    "valid": true,
+    "errors": []
+  },
+  "cells": [
+    {
+      "cell_id": "cap2a_r3_clean_baseline",
+      "arm": "baseline",
+      "stimulus": "clean",
+      "spec": "cap_2a_cell_clean@0.1",
+      "baseline_revision": "98df701107821dbe1038d28650e53c26f57e9a0b",
+      "analyzed_revision": "b65f2b99e68c4bee803924d7796a2bbc8c809716",
+      "proposal_id": "809c0df8bfae8772",
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "contract_version": "verify_code_change/v1",
+      "proposal_applied": false,
+      "gate_applied_or_null": "not_applicable",
+      "cost_usd": 0.008509,
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "defect_present_on_final_commit": false,
+      "new_sonar_critical_count": 0,
+      "code_change_risk": 0.18,
+      "outcome": "no_rework",
+      "join_valid": true,
+      "accepted": true,
+      "asymmetric_loss": {
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.0,
+        "note": "continue correct (no defect)."
+      },
+      "cell_value": -0.008509
+    },
+    {
+      "cell_id": "cap2a_r3_clean_gate",
+      "arm": "gate",
+      "stimulus": "clean",
+      "spec": "cap_2a_cell_clean@0.1",
+      "baseline_revision": "399e5860f2ca25f0a68c886c2fd2490b90b21302",
+      "analyzed_revision": "629f689ee4b89c4ced20317598cfbd077aca65a5",
+      "proposal_id": "c28eb202d27da59a",
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "contract_version": "verify_code_change/v1",
+      "proposal_applied": false,
+      "gate_applied_or_null": "null",
+      "cost_usd": 0.00845,
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "defect_present_on_final_commit": false,
+      "new_sonar_critical_count": 0,
+      "code_change_risk": 0.18,
+      "outcome": "no_rework",
+      "join_valid": true,
+      "accepted": true,
+      "asymmetric_loss": {
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.0,
+        "note": "continue correct (no defect)."
+      },
+      "cell_value": -0.00845
+    },
+    {
+      "cell_id": "cap2a_r3_critical_baseline",
+      "arm": "baseline",
+      "stimulus": "critical",
+      "spec": "cap_2a_cell_critical@0.1",
+      "baseline_revision": "66272af150acc5a10df4efc2953ed601fdfb088b",
+      "analyzed_revision": "efe33b6fb8ad5723c7645b0bbe953227cdd7c2fc",
+      "proposal_id": "7f6ac70cbe5c7cf4",
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "contract_version": "verify_code_change/v1",
+      "proposal_applied": false,
+      "gate_applied_or_null": "not_applicable",
+      "cost_usd": 0.008949,
+      "test_executed_success": false,
+      "tests_passed": 2,
+      "tests_total": 3,
+      "defect_present_on_final_commit": true,
+      "new_sonar_critical_count": 1,
+      "code_change_risk": 0.215,
+      "outcome": "targeted_rework",
+      "join_valid": true,
+      "accepted": false,
+      "asymmetric_loss": {
+        "false_continue_cost_usd": 0.11258800000000001,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.11258800000000001,
+        "note": "rework correct but IGNORED (baseline) -> defect propagates downstream (false_continue)."
+      },
+      "cell_value": -0.008949
+    },
+    {
+      "cell_id": "cap2a_r3_critical_gate",
+      "arm": "gate",
+      "stimulus": "critical",
+      "spec": "cap_2a_cell_critical@0.1",
+      "baseline_revision": "f451cfc4d0fd45512d187549eda3541ae465fb46",
+      "analyzed_revision": "df14d9d1e6dc9894782d38c0d788f856651e3b04",
+      "final_revision": "33211ed769f948753e1d3a141fb890cdaaf35294",
+      "proposal_id": "03962721aea0655c",
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "contract_version": "verify_code_change/v1",
+      "proposal_applied": false,
+      "gate_applied_or_null": "applied",
+      "rework_passes": 1,
+      "cost_usd": 0.014668,
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "defect_present_on_final_commit": false,
+      "new_sonar_critical_count": 1,
+      "code_change_risk": 0.215,
+      "outcome": "targeted_rework",
+      "join_valid": true,
+      "accepted": true,
+      "asymmetric_loss": {
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.11258800000000001,
+        "net_loss_usd": -0.11258800000000001,
+        "note": "rework correct + applied: defect fixed pre-propagation (true_rework_value)."
+      },
+      "cell_value": 0.09792
+    },
+    {
+      "cell_id": "cap2a_r3_style_baseline",
+      "arm": "baseline",
+      "stimulus": "style",
+      "spec": "cap_2a_cell_style@0.1",
+      "baseline_revision": "fec7a127bafd6dc62db57fac4d0cc0ad7ece91ad",
+      "analyzed_revision": "e1d01471772b2e685c6fff44f82671dbb797897a",
+      "proposal_id": "7cb946e0176d54dd",
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "contract_version": "verify_code_change/v1",
+      "proposal_applied": false,
+      "gate_applied_or_null": "not_applicable",
+      "cost_usd": 0.008437,
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "defect_present_on_final_commit": false,
+      "new_sonar_critical_count": 0,
+      "code_change_risk": 0.18,
+      "outcome": "no_rework",
+      "join_valid": true,
+      "accepted": true,
+      "asymmetric_loss": {
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.0,
+        "note": "continue correct (no defect)."
+      },
+      "cell_value": -0.008437
+    },
+    {
+      "cell_id": "cap2a_r3_style_gate",
+      "arm": "gate",
+      "stimulus": "style",
+      "spec": "cap_2a_cell_style@0.1",
+      "baseline_revision": "b0a8961df37970c7645956e104e5f3e13e3adcf1",
+      "analyzed_revision": "f1888c8e048b21af1c0201277c926e7c49929fc1",
+      "proposal_id": "b4c91ccfbdabeef2",
+      "proposal_action": "continue",
+      "proposal_depth": 0,
+      "contract_version": "verify_code_change/v1",
+      "proposal_applied": false,
+      "gate_applied_or_null": "null",
+      "cost_usd": 0.008359,
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "defect_present_on_final_commit": false,
+      "new_sonar_critical_count": 0,
+      "code_change_risk": 0.18,
+      "outcome": "no_rework",
+      "join_valid": true,
+      "accepted": true,
+      "asymmetric_loss": {
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.0,
+        "note": "continue correct (no defect)."
+      },
+      "cell_value": -0.008359
+    }
+  ],
+  "value_model": {
+    "accepted_outcome_definition": "defect absent on the final commit AND test_executed_success (independent test_runner)",
+    "cost_per_outcome_definition": "total arm cost / accepted outcomes (the site's own KPI)",
+    "delta_durable_value_definition": "downstream_defect_cost (E_x x rework_pass_cost) credited to a gate-arm cell whose applied rework fixed the critical defect; 0 otherwise",
+    "E_x": 28.0,
+    "E_x_source": "site economics: DeepSeek -> GPT-5.6 escalation ~28x (design \u00a72.4)",
+    "rework_pass_cost_usd": 0.004021,
+    "rework_pass_cost_source": "measured critical-gate rework agent pass",
+    "downstream_defect_cost_usd": 0.112588
+  },
+  "cost_per_outcome": {
+    "baseline_arm": {
+      "total_cost_usd": 0.025895,
+      "accepted_outcomes": 2,
+      "cost_per_outcome_usd": 0.012948
+    },
+    "gate_arm": {
+      "total_cost_usd": 0.031477,
+      "accepted_outcomes": 3,
+      "cost_per_outcome_usd": 0.010492
+    }
+  },
+  "paired_value_delta": [
+    {
+      "stimulus": "clean",
+      "baseline_cost_usd": 0.008509,
+      "gate_cost_usd": 0.00845,
+      "baseline_value": -0.008509,
+      "gate_value": -0.00845,
+      "delta_value_usd": 5.9e-05,
+      "baseline_accepted": true,
+      "gate_accepted": true,
+      "gate_applied_or_null": "null"
+    },
+    {
+      "stimulus": "critical",
+      "baseline_cost_usd": 0.008949,
+      "gate_cost_usd": 0.014668,
+      "baseline_value": -0.008949,
+      "gate_value": 0.09792,
+      "delta_value_usd": 0.106869,
+      "baseline_accepted": false,
+      "gate_accepted": true,
+      "gate_applied_or_null": "applied"
+    },
+    {
+      "stimulus": "style",
+      "baseline_cost_usd": 0.008437,
+      "gate_cost_usd": 0.008359,
+      "baseline_value": -0.008437,
+      "gate_value": -0.008359,
+      "delta_value_usd": 7.8e-05,
+      "baseline_accepted": true,
+      "gate_accepted": true,
+      "gate_applied_or_null": "null"
+    }
+  ],
+  "asymmetric_loss": {
+    "E_x": 28.0,
+    "downstream_defect_cost_usd": 0.112588,
+    "per_cell": [
+      {
+        "cell_id": "cap2a_r3_clean_baseline",
+        "arm": "baseline",
+        "proposal_action": "continue",
+        "gate_applied_or_null": "not_applicable",
+        "accepted": true,
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.0,
+        "note": "continue correct (no defect)."
+      },
+      {
+        "cell_id": "cap2a_r3_clean_gate",
+        "arm": "gate",
+        "proposal_action": "continue",
+        "gate_applied_or_null": "null",
+        "accepted": true,
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.0,
+        "note": "continue correct (no defect)."
+      },
+      {
+        "cell_id": "cap2a_r3_critical_baseline",
+        "arm": "baseline",
+        "proposal_action": "rework",
+        "gate_applied_or_null": "not_applicable",
+        "accepted": false,
+        "false_continue_cost_usd": 0.11258800000000001,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.11258800000000001,
+        "note": "rework correct but IGNORED (baseline) -> defect propagates downstream (false_continue)."
+      },
+      {
+        "cell_id": "cap2a_r3_critical_gate",
+        "arm": "gate",
+        "proposal_action": "rework",
+        "gate_applied_or_null": "applied",
+        "accepted": true,
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.11258800000000001,
+        "net_loss_usd": -0.11258800000000001,
+        "note": "rework correct + applied: defect fixed pre-propagation (true_rework_value)."
+      },
+      {
+        "cell_id": "cap2a_r3_style_baseline",
+        "arm": "baseline",
+        "proposal_action": "continue",
+        "gate_applied_or_null": "not_applicable",
+        "accepted": true,
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.0,
+        "note": "continue correct (no defect)."
+      },
+      {
+        "cell_id": "cap2a_r3_style_gate",
+        "arm": "gate",
+        "proposal_action": "continue",
+        "gate_applied_or_null": "null",
+        "accepted": true,
+        "false_continue_cost_usd": 0.0,
+        "false_rework_cost_usd": 0.0,
+        "true_rework_value_usd": 0.0,
+        "net_loss_usd": 0.0,
+        "note": "continue correct (no defect)."
+      }
+    ],
+    "sum_baseline_loss_usd": 0.112588,
+    "sum_gate_loss_usd": -0.112588,
+    "note": "net_loss is a cost (positive = bad). true_rework_value is recorded as a negative net_loss (a gain). The critical-gate rework pass cost ($0.004021) is already inside the gate arm's run cost, not double-counted here."
+  },
+  "expected_effects": {
+    "per_gate_cell": {
+      "cap2a_r3_clean_gate": {
+        "note": "continue null application: no next-phase change_analysis exists -> observed=null (unmeasurable).",
+        "checks": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false
+          }
+        ]
+      },
+      "cap2a_r3_critical_gate": {
+        "note": "rework APPLIED: next-phase facts measured from the rework commit's change_analysis (sonar new_critical_count=0, lsp new_error_count=0).",
+        "checks": [
+          {
+            "predicate": "new_sonar_critical_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": 0.0,
+            "held": true
+          },
+          {
+            "predicate": "new_lsp_error_count",
+            "direction": "decrease",
+            "expected": "decrease",
+            "observed": 0.0,
+            "held": false
+          }
+        ]
+      },
+      "cap2a_r3_style_gate": {
+        "note": "continue null application: no next-phase change_analysis exists -> observed=null (unmeasurable).",
+        "checks": [
+          {
+            "predicate": "code_change_risk",
+            "direction": "unchanged",
+            "expected": "unchanged",
+            "observed": null,
+            "held": false
+          }
+        ]
+      }
+    },
+    "aggregates": {
+      "claims_made": 4,
+      "claims_checked": 4,
+      "claims_held": 1,
+      "check_rate": 1.0,
+      "held_rate": 0.25,
+      "denominator_note": "held_rate denominator = claims made (4). check_rate denominator = claims made (4)."
+    }
+  },
+  "denominators": {
+    "n_cells": 6,
+    "n_baseline": 3,
+    "n_gate": 3,
+    "n_stimuli": 3,
+    "n_pairs": 3,
+    "n_scored": 6,
+    "n_invalid_join": 0,
+    "n_accepted_baseline": 2,
+    "n_accepted_gate": 3
+  }
+}
