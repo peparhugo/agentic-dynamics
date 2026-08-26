@@ -270,7 +270,9 @@ def test_stalled_graph_degrades_within_deadline_never_hangs():
     assert elapsed < 10.0  # returned despite the stalled client
     assert out.graph_status == "unavailable"
     assert out.impacted_count is None
-    assert out.neighborhood == ()
+    # The executor scope still carries the change's own symbols (the cap_2a scope-miss fix)
+    # even when the graph leg stalls — only the impacted expansion is lost.
+    assert out.neighborhood == ("add", "top")
     by = {f["predicate"] for f in out.facts}
     assert "changed_symbol_count" in by  # delta facts survived the stalled graph leg
     assert "impacted_symbol_count" not in by

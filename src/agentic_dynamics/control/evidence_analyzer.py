@@ -53,7 +53,7 @@ def _seed_scope_names(change: ChangeInput) -> list[str]:
     ):
         if sym.qualified_name not in names:
             names.append(sym.qualified_name)
-    return names
+    return sorted(names)
 
 
 def _seed_version_ids(change: ChangeInput) -> list[str]:
