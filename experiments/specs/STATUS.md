@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-26T14:59:15.335609+00:00`  ·  121 spec(s)
+Generated at: `2026-08-26T15:51:31.810753+00:00`  ·  121 spec(s)
 **Work remaining:** 112 open · 9 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
@@ -15,9 +15,9 @@ Generated at: `2026-08-26T14:59:15.335609+00:00`  ·  121 spec(s)
 | `canonical_state_finalize` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_round2` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_2a_cell_clean` | workflow | yes | runnable | 0.1 | — | 2026-08-26 14:59 | ok | deepseek/deepseek-v4-pro | $0.0088 | 1 |
-| `cap_2a_cell_critical` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_2a_cell_style` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_2a_cell_clean` | workflow | yes | runnable | 0.1 | — | 2026-08-26 15:18 | ok | deepseek/deepseek-v4-pro | $0.0091 | 6 |
+| `cap_2a_cell_critical` | workflow | yes | runnable | 0.1 | — | 2026-08-26 15:34 | fail | deepseek/deepseek-v4-pro | $0.0067 | 6 |
+| `cap_2a_cell_style` | workflow | yes | runnable | 0.1 | — | 2026-08-26 15:51 | ok | deepseek/deepseek-v4-pro | $0.0090 | 6 |
 | `cap_2a_rerun` | workflow | no | runnable | 0.1 | cap_2a_shadow_calibration | — | — | — | — | 0 |
 | `cap_2a_rerun2` | workflow | no | runnable | 0.1 | cap_2a_rerun | — | — | — | — | 0 |
 | `cap_2a_rerun3` | workflow | no | runnable | 0.1 | cap_2a_rerun2 | — | — | — | — | 0 |

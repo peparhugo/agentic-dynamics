@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-26T14:59:15.335609+00:00",
+  "generated_at": "2026-08-26T15:51:31.810753+00:00",
   "n_specs": 121,
   "specs": [
     {
@@ -139,13 +139,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-26T14:59:15.330533+00:00",
+      "last_run_at": "2026-08-26T15:18:10.484174+00:00",
       "latest_ok": true,
       "latest_model": "deepseek/deepseek-v4-pro",
-      "latest_cost_usd": 0.008781,
-      "latest_git_sha": "c05bb0a",
-      "results_pointer": "experiments/results/workflows/cap_2a_cell_clean/20260826T145915Z.json",
-      "n_runs": 1
+      "latest_cost_usd": 0.009146,
+      "latest_git_sha": "07d4f53",
+      "results_pointer": "experiments/results/workflows/cap_2a_cell_clean/20260826T151810Z.json",
+      "n_runs": 6
     },
     {
       "name": "cap_2a_cell_critical",
@@ -157,13 +157,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
+      "last_run_at": "2026-08-26T15:34:59.079729+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.006651,
+      "latest_git_sha": "032509f",
+      "results_pointer": "experiments/results/workflows/cap_2a_cell_critical/20260826T153459Z.json",
+      "n_runs": 6
     },
     {
       "name": "cap_2a_cell_style",
@@ -175,13 +175,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
+      "last_run_at": "2026-08-26T15:51:31.806325+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.009023,
+      "latest_git_sha": "2aab9e6",
+      "results_pointer": "experiments/results/workflows/cap_2a_cell_style/20260826T155131Z.json",
+      "n_runs": 6
     },
     {
       "name": "cap_2a_rerun",
