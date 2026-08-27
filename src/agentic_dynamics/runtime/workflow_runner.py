@@ -2162,14 +2162,15 @@ def run_workflow(
                     elif len(model_pool) <= 1:
                         # No router injected and a single-model workflow: use the run model
                         # directly (backward compatible — routing is a no-op here).
-                        # PER-PHASE MODEL OVERRIDE (cap_site_revamp4 p5 — the independence
-                        # lesson): a phase may declare ``model:`` in the spec (e.g. the
+                        # PER-PHASE EXECUTION OVERRIDE (cap_site_revamp4 p5 — the
+                        # independence lesson): a phase may declare ``run_model:`` (e.g. the
                         # independent review phase runs a DIFFERENT model/session than the
                         # author — the previous design promised it in prose and the runner
-                        # never implemented it). The explicit phase override wins over the
-                        # run model; a spec-declared model_pool + router still governs when
-                        # the phase declares no model.
-                        model_i = phase_def.get("model") or (
+                        # never implemented it). ``run_model`` is DISTINCT from the routing
+                        # selector key ``model`` (which is a pool member); the execution
+                        # override wins over the run model and is exempt from pool
+                        # validation by design.
+                        model_i = phase_def.get("run_model") or (
                             model_pool[0] if model_pool else model
                         )
                     else:
