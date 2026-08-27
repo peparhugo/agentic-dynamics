@@ -83,6 +83,7 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     # supervise — the P1-2 regression: the two forms MUST resolve to different scripts.
     (("supervise",), "supervise.py", ()),
     (("supervise", "claude-agents"), "claude_agents_supervisor.py", ()),
+    (("supervise", "orphans"), "orphan_sweep.py", ()),
 ]
 
 
@@ -112,6 +113,7 @@ def _documented_leaf_commands() -> set[tuple[str, ...]]:
         elif family == "supervise":
             leaves.add((family,))
             leaves.add((family, "claude-agents"))
+            leaves.add((family, "orphans"))
         else:
             for leaf in rest.split("|"):
                 leaves.add((family, leaf))
