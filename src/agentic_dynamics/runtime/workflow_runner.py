@@ -202,6 +202,9 @@ class PhaseResult:
     tests_total: int = 0
     # phase-boundary evidence (populated only when a change_analyzer is injected; design §5.7)
     change_analysis: dict[str, Any] | None = None
+    # per-phase opt-in: the phase MUST deliver a tree change (NO_CHANGES gate —
+    # the revamp3 vacuous-pass post-mortem); off by default
+    requires_deliverable: bool = False
     #: cap_runner_hardening p1: when the phase watchdog SIGTERM'd a stalled agent, the
     #: structured evidence (last-step timestamp, stale age, transcript tail). None otherwise.
     stall_evidence: dict[str, Any] | None = None
@@ -1222,8 +1225,7 @@ def _enforce_commit_prefix(
     Every commit the agent made during the phase (``git log pre_head..HEAD``; when there was
     no pre-phase HEAD — a fresh worktree — all of HEAD's commits) must match
     ``[workflow] <phase-name> — <goal prefix>``. A commit that does not fails the phase with
-    reason ``COMMIT_PREFIX`` + the offending subjects as evidence, even if the phase otherwise
-    succeeded — the phase flips to failed and ``stop_on_error`` stops the campaign for the
+    reason ``COMMIT_PREFIX`` + the offending subjects as evidence, even if the phase otherwise    succeeded — the phase flips to failed and ``stop_on_error`` stops the campaign for the
     operator. Agent phases only. The runner's OWN commits are exempt by construction: the
     runner's ``_git_commit`` message matches the pattern (and runs AFTER this check), and the
     adapter's fresh-worktree ``Initial`` commit is exempted by its author identity
@@ -1236,6 +1238,64 @@ def _enforce_commit_prefix(
         if pre_head
         else _git_log_subjects(wd, "HEAD")
     )
+    # NO_CHANGES gate (the revamp3 vacuous-pass post-mortem): an agent phase whose committed
+    # TREE is identical to its pre-phase tree certified itself ok while producing no
+    # deliverable — p3 'implemented' zero files, p5 committed no review, p6 committed no
+    # verification, and every delta-based gate (census, comparison) passed trivially
+    # because a no-op has a perfect delta. The runner's own _git_commit may still make an
+    # EMPTY commit for such a phase — the tree identity is what proves the phase produced
+    # nothing. A phase whose tree did not change is failed.
+    # NO_CHANGES is a PER-PHASE OPT-IN (requires_deliverable: true) — the revamp3
+    # vacuous-pass post-mortem: implementation/review/deploy phases MUST deliver files;
+    # the general case (analysis-only phases, verification phases that conclude 'nothing
+    # to fix') legitimately tolerates no tree change. Only phases that declare the flag
+    # are checked — the runner needs the phase definition here.
+    if getattr(pr, "requires_deliverable", False):
+        if pre_head:
+            # The agent's work is UNCOMMITTED at enforcement time (the runner's _git_commit
+            # runs after this check) — compare the WORKING TREE against the pre-phase HEAD:
+            # tracked changes (`git diff --quiet pre_head` exit 1) or new untracked files
+            # both count as a delivered tree change.
+            changed = False
+            try:
+                tracked = subprocess.run(
+                    ["git", "diff", "--quiet", pre_head, "--", "."],
+                    cwd=wd, capture_output=True, text=True, timeout=30,
+                ).returncode
+                untracked = subprocess.run(
+                    ["git", "ls-files", "--others", "--exclude-standard"],
+                    cwd=wd, capture_output=True, text=True, timeout=30,
+                ).stdout.strip()
+                changed = tracked != 0 or bool(untracked)
+            except Exception:  # noqa: BLE001 — a git problem degrades to "no change check"
+                changed = True
+        else:
+            # First phase in a fresh worktree (no pre-phase HEAD): the pre-phase state is
+            # the empty tree — any file at all is a change; nothing created is vacuous.
+            changed = False
+            try:
+                untracked = subprocess.run(
+                    ["git", "ls-files", "--others", "--exclude-standard"],
+                    cwd=wd, capture_output=True, text=True, timeout=30,
+                ).stdout.strip()
+                changed = bool(untracked)
+            except Exception:  # noqa: BLE001 — a git problem degrades to "no change check"
+                changed = True
+        if not changed:
+            pr.commit_gate = {
+                "reason": "NO_CHANGES",
+                "pre_head": pre_head[:12],
+                "expected_prefix": f"[workflow] {phase_name} — {goal_prefix}",
+            }
+            msg = (
+                f"NO_CHANGES — phase '{phase_name}' delivered no tree change since "
+                f"{pre_head[:12]}: an agent phase must deliver files (the revamp3 "
+                f"p3-p6 vacuous-pass lesson)"
+            )
+            if pr.status == "ok":
+                pr.status = "failed"
+                pr.error = msg
+            return
     bad = [
         s
         for s, author in commits
@@ -2059,7 +2119,10 @@ def run_workflow(
         name = str(phase_def.get("name", "?"))
         kind = str(phase_def.get("kind", "agent"))
         phase_timeout = int(phase_def.get("timeout", timeout))
-        pr = PhaseResult(phase=name, kind=kind, status="ok", spec_id=spec.spec_id)
+        pr = PhaseResult(
+            phase=name, kind=kind, status="ok", spec_id=spec.spec_id,
+            requires_deliverable=bool(phase_def.get("requires_deliverable", False)),
+        )
         # Publish the live phase as each phase *starts* (1-based index over the full
         # list, so resume keeps the original position). Display-only badge data.
         if publisher is not None and publisher.enabled:

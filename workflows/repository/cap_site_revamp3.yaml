@@ -156,6 +156,7 @@ workflow:
           LOG: the delta preview summary + 'awaiting operator approval'; PASS/FAIL; commit.
       - name: p3_implement_augmentation
         kind: agent
+        requires_deliverable: true
         timeout: 28800
         prompt: |
           GOAL: {goal}
@@ -176,6 +177,7 @@ workflow:
           LOG: per-increment census counts; PASS/FAIL; commit.
       - name: p4_comparison_gate
         kind: agent
+        requires_deliverable: true
         timeout: 14400
         prompt: |
           GOAL: {goal}
@@ -192,6 +194,7 @@ workflow:
           LOG: the delta table; PASS/FAIL; commit.
       - name: p5_independent_review
         kind: agent
+        requires_deliverable: true
         timeout: 14400
         prompt: |
           GOAL: {goal}
@@ -210,6 +213,7 @@ workflow:
           LOG: the survival verdict table; PASS/FAIL; commit.
       - name: p6_deploy
         kind: agent
+        requires_deliverable: true
         timeout: 14400
         prompt: |
           GOAL: {goal}

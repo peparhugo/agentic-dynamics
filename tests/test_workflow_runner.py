@@ -406,8 +406,12 @@ def test_run_workflow_change_analysis_root_commit_never_fails(tmp_path):
 
     # Commit the FIRST phase's change directly (no parent), then let the runner commit a
     # second phase whose analysis targets commit^ — the runner's own first commit is root.
+    calls = []
+
     def agent(prompt, *, model, backend, workdir, **kwargs):
-        (Path(workdir) / "app.py").write_text("def f():\n    return 1\n")
+        n = len(calls)
+        calls.append(n)
+        (Path(workdir) / "app.py").write_text(f"def f{n}():\n    return {n}\n")
         return _fake_agent(files_created=["app.py"])
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
@@ -1724,5 +1728,43 @@ def test_commit_prefix_trailing_content_after_a_valid_prefix_matches(tmp_path):
     assert wr._commit_subject_matches("[workflow] scope — g (done, extra)", "scope", "g") is True
 
 
+def _spec_with_requires_deliverable():
+    """The control_room_portal spec with the first phase's requires_deliverable on."""
+    spec = load_spec(SPEC)
+    for p in spec.workflow.params["phases"]:
+        if p.get("name") == "scope":
+            p["requires_deliverable"] = True
+    return spec
 
 
+def test_agent_phase_with_no_tree_change_fails_no_changes(tmp_path):
+    """The vacuous-pass post-mortem: a phase that DECLARES requires_deliverable and
+    delivers no tree change certifies itself ok while producing no deliverable (revamp3
+    p3-p6). The runner's own _git_commit may still make an EMPTY commit — the working
+    tree identity is what proves the phase produced nothing."""
+    spec = _spec_with_requires_deliverable()
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        return _fake_agent()  # no file writes — the phase's tree never changes
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.commit_gate is not None
+    assert p.commit_gate["reason"] == "NO_CHANGES"
+    assert "NO_CHANGES" in p.error
+
+
+def test_agent_phase_without_the_flag_tolerates_no_change(tmp_path):
+    """The opt-in default: a phase without requires_deliverable may legitimately conclude
+    with no tree change (analysis-only phases) — the vacuous-pass gate must not break
+    the general case."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        return _fake_agent()  # no file writes
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    assert all(p.status == "ok" for p in result.phases)
