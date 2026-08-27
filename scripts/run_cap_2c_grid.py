@@ -422,7 +422,6 @@ def run_independent_outcome(cell: dict, workdir: Path) -> dict:
     passed = int(m.group(1)) if m else 0
     failed = int(mf.group(1)) if mf else 0
     test_success = failed == 0 and passed > 0
-    cls = cell["class"]
     defect_present, defect_note = _defect_determination(cell, workdir)
     accepted = bool(test_success and not defect_present)
     return {
