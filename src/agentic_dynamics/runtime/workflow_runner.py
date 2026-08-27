@@ -2162,7 +2162,16 @@ def run_workflow(
                     elif len(model_pool) <= 1:
                         # No router injected and a single-model workflow: use the run model
                         # directly (backward compatible — routing is a no-op here).
-                        model_i = model_pool[0] if model_pool else model
+                        # PER-PHASE MODEL OVERRIDE (cap_site_revamp4 p5 — the independence
+                        # lesson): a phase may declare ``model:`` in the spec (e.g. the
+                        # independent review phase runs a DIFFERENT model/session than the
+                        # author — the previous design promised it in prose and the runner
+                        # never implemented it). The explicit phase override wins over the
+                        # run model; a spec-declared model_pool + router still governs when
+                        # the phase declares no model.
+                        model_i = phase_def.get("model") or (
+                            model_pool[0] if model_pool else model
+                        )
                     else:
                         raise ValueError(
                             "spec declares a multi-model model_pool but no router was injected "
