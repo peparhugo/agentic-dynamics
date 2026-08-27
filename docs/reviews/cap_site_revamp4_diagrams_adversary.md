@@ -82,6 +82,18 @@ marker flows, `svg-filter-focus.html` glow, `svg-pattern-surface.html` grid,
 and the `framework.html` field-layer comment. `references/` now resolves on the deployed
 site (200) and the citations are greppable.
 
+### Finding F3 (FIXED, surfaced during the adversarial pass) — dark-theme "black boxes"
+While the adversarial pass ran, an operator review flagged that the diagram surfaces
+(`.mode-surface`, `.rail`, `.human-surface`, `.mode-tab`, `.outcome-surface`,
+`.workflow-node`, `.plane-surface`) used `--bg2` (#0b111a) on the dark page (#070A0F) —
+a ~1.05:1 boundary, so the boxes read as invisible black blobs. Fix committed
+`2fff4ca83`: in dark mode those surfaces are bumped to `--bg3` with 0.5-alpha slate
+borders (0.7-alpha for the amber/cyan accented surfaces); light theme untouched.
+
+**Verified after the fix:** the rendering gate passes 22/22 (both viewports) and the
+real-gate contrast passes AA in BOTH themes on BOTH deployed hosts with the final
+base.css.
+
 ---
 
 ## Attack (3) — Collapse regression (the p1 CSS fixes hold across toggles)
@@ -151,6 +163,7 @@ deployed gate).
 |---|---|---|---|
 | F1 | Light-theme diagram accent text below WCAG AA (map-kicker/scale-symbol/--fw-*: 3.3–3.9:1) | Medium (AA is mandatory per the campaign gate) | **FIXED** — `body.light` accent-text overrides; committed `958f99915`; real-gate contrast now PASS in both themes on both hosts |
 | F2 | Example-library references not cited in source + directory absent | Low (hard rule 3) | **FIXED** — 14 reference files restored from the revamp audit commit `47f639201` + citations added at the grammar source (base.css + framework.html); deployed `references/` returns 200 |
+| F3 | Dark-theme diagram surfaces read as black boxes (--bg2 on --bg ≈ 1.05:1) | Medium (operator review) | **FIXED** — commit `2fff4ca83` bumps dark-mode surfaces to `--bg3` + brighter borders; rendering gate 22/22 and contrast AA PASS in both themes after it |
 | L1 | Headless environment font-less (SVG text boxes 0x0) | — (environment) | **ACCEPTED LIMITATION** — pixel-painted glyphs prove visibility; DejaVu install makes all probes lay out; the gate's checks are box-independent |
 
 ## LOG
@@ -161,5 +174,6 @@ deployed gate).
 - (4) operator approval: PASS (genuine, committed after the checkpoint).
 - (5) deploy gate: PASS on the DEPLOYED pages (both hosts, both themes, mirror identical).
 - (6) instrument untouched: PASS (census all axes ≥ baseline).
-- Phase verdict: **PASS** — two findings surfaced, both fixed; no bare PASS.
-- Commits: `958f99915` (F1), p5 commit (F2), prior p4 `3f08b3be4` + `4db83…` (data chain + deploy-gate doc).
+- F3 (dark-theme black boxes) surfaced during the pass, fixed, and re-verified deployed.
+- Phase verdict: **PASS** — three findings surfaced, all fixed; no bare PASS.
+- Commits: `958f99915` (F1), `00656f777` (F2), `2fff4ca83` (F3, operator review), `3f08b3be4` + `cb01d4003` (p4 data chain + deploy-gate doc), docs commit `d024b41aa`.

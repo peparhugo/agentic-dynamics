@@ -26,6 +26,12 @@ probed with evidence and stands verified as of the final deployed build
 - **Dark theme (default):** every text fill vs its computed background ≥ 4.5:1; deployed
   minimum 8.37:1 across all figures (gradient/pattern fills resolved, stroke halos
   count as the background, alpha composited).
+- **Dark-theme surfaces (the "black boxes" review, commit `2fff4ca83`):** the diagram
+  surfaces (`.mode-surface`, `.rail`, `.human-surface`, `.mode-tab`,
+  `.outcome-surface`, `.workflow-node`, `.plane-surface`) now use `--bg3` with
+  0.5-alpha borders in dark mode, so the figure boxes are legible against the page
+  (previously `--bg2` on `--bg` was a ~1.05:1 boundary). Verified: rendering gate
+  22/22 and contrast AA PASS in both themes after the fix.
 - **Light theme (the p5 finding's fix):** after `body.light` accent-text overrides
   (commit `958f99915`), the real gate's contrast logic passes in light mode on both
   deployed hosts — the previously-failing `.map-kicker`, `.scale-symbol`, and `--fw-*`
