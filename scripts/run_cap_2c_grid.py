@@ -253,7 +253,11 @@ def exercise_absent_refusal(cell: dict, workdir: Path, impl: dict, seed_rev: str
     seam refuse. Records the refusal + the facts present. Never a hand-authored proposal."""
     from agentic_dynamics.control.evidence_analyzer import EvidenceChangeAnalyzer
     from agentic_dynamics.control.verify_proposal import build_verify_proposal
-    from agentic_dynamics.core.language import build_code_snapshot, compute_code_delta, detect_language
+    from agentic_dynamics.core.language import (
+        build_code_snapshot,
+        compute_code_delta,
+        detect_language,
+    )
     from agentic_dynamics.measurement.commit_analysis import _read_commit_files
     from agentic_dynamics.runtime.change_analyzer import ChangeInput
     from agentic_dynamics.runtime.workflow_runner import _git_full_sha
