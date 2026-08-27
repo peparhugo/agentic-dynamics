@@ -179,6 +179,31 @@ def test_detection_is_deterministic_and_sorted():
     assert [o.orphan_id for o in first] == [o.orphan_id for o in second]
 
 
+def test_nested_delegation_duplicate_session_yields_each_orphan_once():
+    # A session that is BOTH a subagent (of a root) AND a parent (of a further subagent)
+    # is loaded once as a subagent and once as a parent — the store projection can hand the
+    # detector the SAME session twice. The pure detection rule must still emit each
+    # (parent, subagent) orphan exactly once (the live 50GB store exercises this: three
+    # nested delegations each duplicated their record in one pass).
+    root = make_session("ses_root", created=100_000_000)
+    mid = make_session("ses_mid", parent="ses_root", created=100_001_000)
+    leaf = make_session("ses_leaf", parent="ses_mid", created=100_002_000)
+    # The projection-level duplication: ``mid`` handed in twice (once as subagent, once
+    # as parent — mirroring SQLiteSessionStore._load_sessions returning subagents+parents).
+    sessions = [root, mid, leaf, mid]
+    parts = [
+        task_part("prt_root_task", "ses_root", 100_000_000, "ses_mid"),
+        task_part("prt_mid_task", "ses_mid", 100_002_000, "ses_leaf"),
+        make_part("prt_leaf_finish", "ses_leaf", 100_003_000, "step-finish"),
+        make_part("prt_leaf_text", "ses_leaf", 100_003_000, "text"),
+    ]
+    orphans = detect_orphans(sessions, parts, now_ms=100_400_000)
+
+    assert len(orphans) == 2  # ses_mid orphaned under root, ses_leaf orphaned under mid
+    assert [o.orphan_id for o in orphans] == sorted(o.orphan_id for o in orphans)
+    assert len({o.orphan_id for o in orphans}) == 2  # no duplicate orphan_id
+
+
 def test_detect_orphans_rejects_nonpositive_crash_grace():
     sessions, parts, now, _ = completed_subagent_scenario()
     with pytest.raises(ValueError):

@@ -258,10 +258,13 @@ def detect_orphans(
     by_session: dict[str, list[PartRecord]] = defaultdict(list)
     for part in parts:
         by_session[part.session_id].append(part)
+    # Dedupe by session id: the store projection may hand the SAME session twice when it is
+    # both a subagent (of one parent) and a parent (of another) — iterating the raw list
+    # would emit a duplicate orphan record for the same (parent, subagent) pair.
     by_id = {s.id: s for s in sessions}
 
     orphans: list[OrphanRecord] = []
-    for subagent in sessions:
+    for subagent in by_id.values():
         if not subagent.parent_id:
             continue
         parent = by_id.get(subagent.parent_id)
