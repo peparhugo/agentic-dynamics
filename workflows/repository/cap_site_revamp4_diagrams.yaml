@@ -1,0 +1,228 @@
+name: cap_site_revamp4_diagrams
+question: >-
+  The visual review's findings, fixed: revamp4's field-layer diagrams (a) don't render —
+  the OPERATING MODEL / SHARED EXECUTION figure collapses to 0x0 and the diagram
+  containers (diagram-scroll / system-figure / redesigned / diagram-map / workflow-map)
+  have NO rules in base.css (the p3 agent added the markup without its layout CSS), and
+  (b) are low-brow — 70-90 <text> labels per figure, text-heavy blocks instead of crafted
+  graphics, against the original site's cleaner diagrams. THIS campaign: wire the missing
+  diagram CSS, repair every rendering defect, upgrade the craft (proper visual hierarchy,
+  shapes over text walls, the example-library references genuinely adapted), verify with
+  playwright rendering gates (no 0x0, no overflow, aspect-correct, text/shape balance),
+  and STOP for the operator's visual approval BEFORE any deploy — the deploy lesson.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: javascript
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: site diagram repair + craft.
+        canonical_sources: [the revamp4 build (feature/site-revamp4 — the deployed-by-
+        mistake build the operator reviewed: framework/question/evidence/methodology),
+        /tmp/site_scan/svg_inspect.py (the rendering-gate tool — reuse + extend),
+        apps/website/base.css (the MISSING diagram rules — the root cause),
+        the example library (apps/website/references/ — the craft references),
+        the original site's diagrams (main's apps/website — the quality bar: the
+        operator's 'low brow' comparison), the design doc (cap_site_revamp3_design.md —
+        the diagram inventory with its per-figure verification rows)].
+        policies: [render_before_ship, operator_visual_approval_before_deploy,
+        shapes_over_text_walls]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: diagram repair + craft pass.
+        deliberation: [fix the CSS wiring, repair all rendering, the craft pass,
+        playwright gates, operator approval, deploy-only-after].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        MEASURED findings (the playwright inspection): framework.html svg#1 — the
+        OPERATING MODEL / SHARED EXECUTION figure — renders 0x0 (9,990 chars of content
+        invisible; viewBox 1440x760, no width/height, container classes unstyled); the
+        other framework diagrams render but carry 2,260-9,275 text chars each (70-90
+        <text> labels per figure — the 'low brow' the operator flagged); question/
+        evidence/methodology figures render at container-stretched sizes. Root cause:
+        the p3 agent added the diagram markup without the .diagram-scroll / .system-figure
+        / .redesigned / .diagram-map / .workflow-map layout rules in base.css. The
+        operator's visual verdict is DATA: 'the new svg are low brow compared to the
+        original ones and they don't render right.' NO deploy until the operator
+        visually approves the repaired build.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks. (2) RENDER BEFORE
+        SHIP: every diagram's rendering is verified with playwright (no 0x0, no overflow,
+        aspect-correct, visible on first paint) — the verification output is the phase
+        gate, not prose. (3) SHAPES OVER TEXT WALLS: the craft pass reduces <text> walls
+        to real visual hierarchy — shapes, color, grouping; a figure whose text outweighs
+        its shapes is flagged and redesigned; the example-library references are genuinely
+        adapted (cited in the source). (4) THE ORIGINAL SITE'S DIAGRAMS ARE THE QUALITY
+        BAR: the operator's comparison ('low brow vs the original') is data — the repaired
+        figures must be at least as clean as main's existing diagrams. (5) NO DEPLOY
+        WITHOUT OPERATOR VISUAL APPROVAL: the campaign stops after the visual
+        verification phase; the operator reviews the rendered pages (screenshots +
+        the local build) and signs a visual-approval artifact; only then may the deploy
+        phase run. (6) The instrument stays untouched (the census gates from revamp4
+        remain live). (7) No generated-surface edits, no secrets, no external actuation.
+        (8) p5 adversarial mandatory: findings re-verified + known-safe, no bare PASS.
+        (9) Resumable only when spec version, goal hash, source revision, and
+        candidate-manifest hash match.
+      read_first: >-
+        /tmp/site_scan/svg_inspect.py (the rendering gate), apps/website/framework.html
+        (the diagram markup), apps/website/base.css (the missing rules), the example
+        library references, main's apps/website diagrams (the quality bar),
+        docs/designs/current/cap_site_revamp3_design.md (the inventory's verification rows)
+      run_shape: >-
+        SINGLE-model: deepseek/deepseek-v4-flash (the executor that delivered revamp4).
+        One branch (feature/site-revamp4-diagrams — from feature/site-revamp4); each
+        phase commits [workflow] <phase>. The worktree serves locally for the visual
+        verification (python -m http.server on a fixed port).
+    phases:
+      - name: p1_fix_css_wiring
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: fix the root cause — the diagram containers have no layout rules. In
+          apps/website/base.css, wire the missing classes: .diagram-scroll (a scrollable
+          or full-width diagram container — never collapsible), .system-figure (the figure
+          block), .diagram-map/.workflow-map (the inline SVGs: explicit sizing via
+          width:100%;height:auto + aspect handling so a viewBox-only SVG can never
+          collapse), .redesigned (any grid/flex the figure relies on). Then verify EVERY
+          svg on framework/question/evidence/methodology renders: run the playwright
+          inspection (extend /tmp/site_scan/svg_inspect.py into the repo as
+          apps/website/verify_svg_rendering.py or tests/ — the gate tool) — zero 0x0,
+          zero overflow, every svg's rendered box > 100px on both axes.
+          VERIFY: the inspection passes on all four pages (the output table is the gate).
+          DELIVER: the CSS + the gate tool + the passing inspection, committed.
+          LOG: the per-svg table before/after; PASS/FAIL; commit.
+      - name: p2_craft_pass
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the craft pass — bring the diagrams to (or above) the original site's
+          bar (hard rule 4). For each new figure (the OPERATING MODEL / SHARED EXECUTION,
+          the eight-planes, ONE ENGINE/TWO MODES, bounded autonomy, instrument cycle,
+          N x M, the evidence figures, the methodology figure): (a) reduce the <text>
+          walls — replace label walls with visual hierarchy (grouped shapes, color-coded
+          zones, numbered callouts, small captions); (b) fix the aspect/scaling so the
+          figure fills its container without distortion; (c) genuinely adapt the cited
+          example-library reference (the source comment cites it); (d) a figure with
+          more text-characters than shape-characters is flagged and redesigned.
+          VERIFY: the inspection gate passes (rendering + a new text/shape-balance check:
+          per figure, text length <= 1.5x shape markup length, and the operator-visible
+          output — screenshots saved per page). Deliver the screenshots as the phase
+          artifact (apps/website/verification/ or the worktree), committed.
+          DELIVER: the redesigned figures + the gate output + screenshots, committed.
+          LOG: per-figure text/shape before/after; PASS/FAIL; commit.
+      - name: p3_visual_verification
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the full visual verification pass — render every page locally (serve
+          the worktree), capture full-page screenshots, run the complete gate (no 0x0,
+          no overflow, aspect, text/shape balance, first-paint visibility, console clean),
+          and assemble the operator review pack: screenshots + the per-figure rendering
+          table + the before/after comparison (the operator's 'low brow' complaint vs
+          the repaired figures). STOP THE CAMPAIGN: the operator must visually approve
+          the repaired build before ANY deploy (hard rule 5). Deliver the approval
+          request (a visual-approval artifact template with the operator signature
+          fields) and halt.
+          DELIVER: the review pack + the approval template, committed.
+          LOG: the gate table + 'awaiting operator visual approval'; PASS/FAIL; commit.
+      - name: p3b_craft_ux_pass
+        kind: agent
+        requires_deliverable: true
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the operator's figure-by-figure review (2026-08-27, REJECT recorded) —
+          the fix is explicit: (a) 'One execution engine, from cell to campaign.' is
+          BEAUTIFUL — it is the template; (b) 'Eight planes, one dependency direction.'
+          is hard to understand and does not match the above; (c) 'The instrument cycle
+          (Framework)' has terrible contrast and an unclear message; (d) 'One engine,
+          two operating modes.' is confusing — 'it's UI but not UX': the figures are
+          drawn but do not communicate. RE-DESIGN the flagged figures (eight-planes,
+          instrument-cycle, one-engine-two-modes, and ANY other figure with the same
+          disease) in the EXACT visual language of the good figure (the workflow-map /
+          execution-engine composition: its structure, hierarchy, color usage,
+          typography, spacing — extract its classes/structure and reuse them), each with
+          ONE legible message: eight-planes = a clear dependency-direction flow;
+          instrument-cycle = the cycle with REAL contrast (fix the color-on-color —
+          check every fill/text pair against WCAG AA on the figure); one-engine-two-
+          modes = the shared engine with its two modes structurally legible. A figure
+          the operator cannot read in 5 seconds fails.
+          VERIFY: the rendering gate (extend apps/website/verify_svg_rendering.py with
+          a CONTRAST check — computed color contrast of every text fill vs its
+          background >= 4.5:1) + the review pack screenshots regenerated. Then STOP
+          for the operator's approval again (the approval artifact is reset to
+          awaiting; the REJECT stays on record until the operator re-reviews).
+          DELIVER: the redesigned figures + the contrast gate + the regenerated review
+          pack, committed.
+          LOG: per-figure before/after + the contrast results; PASS/FAIL; commit.
+      - name: p4_deploy
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: THE ONLY PHASE THAT MAY DEPLOY — and ONLY after the operator's signed
+          visual-approval artifact exists at the contract path (committed after the p3
+          checkpoint commit, non-placeholder signature — the checkpoint machinery). Run
+          the data chain fresh, deploy BOTH Firebase projects from apps/website/, then
+          re-run the SVG rendering gate against the DEPLOYED URLs (no 0x0, no overflow,
+          every figure visible) + the operator's approved state. If the deployed gate
+          fails or the approval is absent, the phase fails with the evidence.
+          DELIVER: the deploy output + the deployed rendering gate, committed.
+          LOG: deploy + gate; PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — try to falsify the repair. Attack in order:
+          (1) rendering evasion — a figure that passes the gate but is invisible (white-
+          on-white, zero opacity, off-canvas, behind another element): inspect the
+          screenshots + computed styles; (2) the craft claim — a figure that swapped a
+          text wall for an empty visual (shapes with no labels = new low brow): the
+          text/shape balance must hold AND the figure must communicate its one idea;
+          (3) the collapse regression — the p1 CSS fixes hold across theme toggle +
+          reduced-motion + narrow viewport (390px); (4) the operator approval is genuine
+          (non-placeholder, committed after the checkpoint); (5) the deploy gate ran on
+          the DEPLOYED pages, not the local build; (6) the instrument untouched (the
+          census counts). Every finding: fix or record as accepted limitation with
+          reasoning. Deliver TWO outputs: docs/reviews/cap_site_revamp4_diagrams_adversary.md
+          + docs/reviews/cap_site_revamp4_diagrams_known_safe.md.
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: cap_diagrams_css_wired
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [no_collapsed_figures, no_overflow_figures]
+  - name: cap_diagrams_craft
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [no_collapsed_figures]
+    produces: [text_shape_balance, visual_approval_artifact]
+  - name: cap_diagrams_deploy
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [text_shape_balance, visual_approval_artifact]
+    produces: [deployed_gate_passed]
+metrics:
+  - {name: no_collapsed_figures, agg: mean, over: cell}
+  - {name: text_shape_balance, agg: mean, over: cell}
+  - {name: deployed_gate_passed, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_fix_css_wiring, p2_craft_pass, p3_visual_verification, p4_deploy, p5_adversarial]
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
