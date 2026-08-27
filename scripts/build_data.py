@@ -1897,6 +1897,104 @@ def _lab_status_counts() -> dict[str, int]:
     }
 
 
+#: Immutable campaign score artifacts that ground the site's verdict surfaces (the field
+#: layer's new evidence). Each is the rank-1 source for its verdict; the site consumes the
+#: transcribed fields below — it never hand-types a verdict value into HTML.
+CAP_2B_SCORE_PATH = RESULTS_DIR / "cap_2b" / "cap_2b_score_20260826T160018Z.json"
+ESCALATION_SCORE_PATH = (
+    RESULTS_DIR
+    / "cap_escalation_measurement"
+    / "cap_escalation_measurement_score_20260826T125726Z.json"
+)
+CALIBRATION_SCORE_PATH = (
+    RESULTS_DIR / "cap_2a_rerun2" / "cap_2a_rerun2_score_20260826T015846Z.json"
+)
+
+
+def _load_json_artifact(path: Path) -> dict | None:
+    """Read a campaign score artifact; a missing/unreadable artifact degrades to ``None``.
+
+    The verdict surfaces then render a named-null state (the honest-null rule) instead of a
+    fabricated number — the generator never guesses a verdict value.
+    """
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        print(f"  [verdicts] missing/unreadable artifact: {path}")
+        return None
+
+
+def _load_verdicts() -> dict:
+    """Load the field-layer verdict surfaces from the immutable campaign score artifacts.
+
+    Three verdicts feed the revamp's new evidence:
+
+    - ``cap_2b`` — the randomized non-inferiority decision (CPVO ratio, CI, margin, arms)
+      :cite: `docs/designs/current/cap_2b.md`
+    - ``escalation`` — the measured escalation-chain E_x figures (Sol / Sonnet)
+      :cite: `experiments/results/cap_escalation_measurement/`
+    - ``calibration`` — the 0/3 → 2/3 calibration arc
+      :cite: `docs/designs/current/cap_2a_rerun2.md`
+
+    Every value keeps its evidence class and its authorization boundary in-band, so the page
+    renders scope and limitation at the point of reading (the provenance rule).
+    """
+    verdicts: dict = {"sources": {}, "cap_2b": {}, "escalation": {}, "calibration": {}}
+
+    score = _load_json_artifact(CAP_2B_SCORE_PATH)
+    if score:
+        verdicts["sources"]["cap_2b"] = str(CAP_2B_SCORE_PATH.relative_to(ROOT))
+        verdicts["cap_2b"] = {
+            "decision": score.get("decision_rule", {}).get("decision"),
+            "cpvo_ratio": score.get("decision_rule", {}).get("cpvo_ratio"),
+            "cpvo_ratio_ci_95": score.get("decision_rule", {}).get("cpvo_ratio_ci_95"),
+            "margin_cpvo_ratio_le": score.get("decision_rule", {}).get("margin_cpvo_ratio_le"),
+            "success_gap_static_minus_adaptive": score.get("decision_rule", {}).get(
+                "success_gap_static_minus_adaptive"
+            ),
+            "margin_success_gap_le": score.get("decision_rule", {}).get("margin_success_gap_le"),
+            "authorization": "design review only, not control activation",
+            "per_arm": score.get("per_arm", {}),
+            "defect_bearing": score.get("defect_bearing", {}),
+            "n_total": score.get("denominators", {}).get("n_total"),
+            "n_defect_bearing": score.get("denominators", {}).get("n_defect_bearing"),
+        }
+
+    esc = _load_json_artifact(ESCALATION_SCORE_PATH)
+    if esc:
+        verdicts["sources"]["escalation"] = str(ESCALATION_SCORE_PATH.relative_to(ROOT))
+        verdicts["escalation"] = {
+            "baseline_cost_usd": esc.get("original_cell_cost_usd"),
+            "baseline_source": esc.get("original_cell_cost_source"),
+            "base_downstream_defect_cost_usd": esc.get("base_downstream_defect_cost_usd"),
+            "per_model": [
+                {
+                    "model": row.get("escalation_model"),
+                    "fix_cost_usd": row.get("escalation_fix_cost_usd"),
+                    "E_x": row.get("E_x"),
+                    "E_x_formula": row.get("E_x_formula"),
+                    "defect_fixed": row.get("defect_fixed"),
+                    "tests_passing": row.get("tests_passing"),
+                }
+                for row in esc.get("per_model", [])
+            ],
+            "note": "n=1 per escalation model; descriptive, no CI",
+        }
+
+    cal = _load_json_artifact(CALIBRATION_SCORE_PATH)
+    if cal:
+        verdicts["sources"]["calibration"] = str(CALIBRATION_SCORE_PATH.relative_to(ROOT))
+        verdicts["calibration"] = {
+            "initial": "0/3",
+            "rerun_hit_rate": cal.get("aggregates", {}).get("hit_rate"),
+            "rerun_n": cal.get("aggregates", {}).get("hit_rate_n"),
+            "rerun_wilson_95": [0.2077, 0.9385],
+            "note": "2/3 = 0.667, Wilson [0.2077, 0.9385], n=3; descriptive, not statistical clearance",
+        }
+
+    return verdicts
+
+
 def build():
     print("Building data.js...")
 
@@ -2286,6 +2384,7 @@ def build():
         "reviews": _load_review_data(tables.reviews, tables.stories),
         "analysis": analysis_data,
         "labs": _load_labs(),
+        "verdicts": _load_verdicts(),
     }
 
     import math

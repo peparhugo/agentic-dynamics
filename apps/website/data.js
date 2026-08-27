@@ -1,8 +1,8 @@
-/* Generated 2026-08-27 02:08:59 UTC by build_data.py */
+/* Generated 2026-08-27 16:26:44 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-27T02:08:55.866598+00:00",
+    "generated_at": "2026-08-27T16:26:41.507952+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -66,7 +66,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "762b4aa6f417b0a90691ff3fec3d4975c65bb6d785dcc216313f39e56787d8f2"
+    "generator_source_tree_identity": "b8826a24af1c2c10f266bd660b60755b0f89100b708e6f733bfff36f32e4a65b"
   },
   "public_statistics": {
     "story_sessions": 1067,
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 119,
+    "workflow_specs": 121,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
@@ -3993,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-27T02:08:56.056883+00:00"
+    "generated_at": "2026-08-27T16:26:41.684967+00:00"
   },
   "reviews": {
     "models": [
@@ -6690,6 +6690,111 @@ window.DYNAMICS_DATA = {
         "contract_version": "lab-contract/v6",
         "generated_at": "2026-08-27T00:54:16.579397+00:00"
       }
+    }
+  },
+  "verdicts": {
+    "sources": {
+      "cap_2b": "experiments/results/cap_2b/cap_2b_score_20260826T160018Z.json",
+      "escalation": "experiments/results/cap_escalation_measurement/cap_escalation_measurement_score_20260826T125726Z.json",
+      "calibration": "experiments/results/cap_2a_rerun2/cap_2a_rerun2_score_20260826T015846Z.json"
+    },
+    "cap_2b": {
+      "decision": "NON_INFERIOR",
+      "cpvo_ratio": 0.785746,
+      "cpvo_ratio_ci_95": [
+        0.6842,
+        0.9105
+      ],
+      "margin_cpvo_ratio_le": 1.1,
+      "success_gap_static_minus_adaptive": -0.333333,
+      "margin_success_gap_le": 0.05,
+      "authorization": "design review only, not control activation",
+      "per_arm": {
+        "static": {
+          "n": 9,
+          "total_cost_usd": 0.080062,
+          "accepted_outcomes": 6,
+          "cpvo_usd": 0.013344,
+          "cpvo_ci_95": [
+            0.011744,
+            0.01477
+          ],
+          "verified_success_rate": 0.666667,
+          "verified_success_wilson_95": [
+            0.3542,
+            0.8794
+          ]
+        },
+        "adaptive": {
+          "n": 9,
+          "total_cost_usd": 0.094364,
+          "accepted_outcomes": 9,
+          "cpvo_usd": 0.010485,
+          "cpvo_ci_95": [
+            0.009522,
+            0.011569
+          ],
+          "verified_success_rate": 1.0,
+          "verified_success_wilson_95": [
+            0.7008,
+            1.0
+          ]
+        }
+      },
+      "defect_bearing": {
+        "static": {
+          "n_defect_bearing": 3,
+          "total_cost_usd": 0.026837,
+          "accepted_outcomes": 0,
+          "cpvo_usd": null,
+          "verified_success_rate": 0.0,
+          "note": "defect-bearing = critical stimulus cells (the pilot's n per pre-registration section 3). static arm: 0 accepted (defect present); adaptive arm: rework applied -> accepted."
+        },
+        "adaptive": {
+          "n_defect_bearing": 3,
+          "total_cost_usd": 0.040609,
+          "accepted_outcomes": 3,
+          "cpvo_usd": 0.013536,
+          "verified_success_rate": 1.0,
+          "note": "defect-bearing = critical stimulus cells (the pilot's n per pre-registration section 3). static arm: 0 accepted (defect present); adaptive arm: rework applied -> accepted."
+        }
+      },
+      "n_total": 18,
+      "n_defect_bearing": 6
+    },
+    "escalation": {
+      "baseline_cost_usd": 0.008949,
+      "baseline_source": "experiments/results/cap_2a_rerun3/cap2a_r3_critical_baseline_phase_ledger.json (total_measured_cost_usd)",
+      "base_downstream_defect_cost_usd": 0.004021,
+      "per_model": [
+        {
+          "model": "openai/gpt-5.6-sol",
+          "fix_cost_usd": 0.102619,
+          "E_x": 11.4671,
+          "E_x_formula": "0.102619 / 0.008949",
+          "defect_fixed": true,
+          "tests_passing": true
+        },
+        {
+          "model": "anthropic/claude-sonnet-5",
+          "fix_cost_usd": 0.111982,
+          "E_x": 12.5134,
+          "E_x_formula": "0.111982 / 0.008949",
+          "defect_fixed": true,
+          "tests_passing": true
+        }
+      ],
+      "note": "n=1 per escalation model; descriptive, no CI"
+    },
+    "calibration": {
+      "initial": "0/3",
+      "rerun_hit_rate": 0.6667,
+      "rerun_n": 3,
+      "rerun_wilson_95": [
+        0.2077,
+        0.9385
+      ],
+      "note": "2/3 = 0.667, Wilson [0.2077, 0.9385], n=3; descriptive, not statistical clearance"
     }
   }
 };
