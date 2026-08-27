@@ -135,6 +135,36 @@ workflow:
           fields) and halt.
           DELIVER: the review pack + the approval template, committed.
           LOG: the gate table + 'awaiting operator visual approval'; PASS/FAIL; commit.
+      - name: p3b_craft_ux_pass
+        kind: agent
+        requires_deliverable: true
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the operator's figure-by-figure review (2026-08-27, REJECT recorded) —
+          the fix is explicit: (a) 'One execution engine, from cell to campaign.' is
+          BEAUTIFUL — it is the template; (b) 'Eight planes, one dependency direction.'
+          is hard to understand and does not match the above; (c) 'The instrument cycle
+          (Framework)' has terrible contrast and an unclear message; (d) 'One engine,
+          two operating modes.' is confusing — 'it's UI but not UX': the figures are
+          drawn but do not communicate. RE-DESIGN the flagged figures (eight-planes,
+          instrument-cycle, one-engine-two-modes, and ANY other figure with the same
+          disease) in the EXACT visual language of the good figure (the workflow-map /
+          execution-engine composition: its structure, hierarchy, color usage,
+          typography, spacing — extract its classes/structure and reuse them), each with
+          ONE legible message: eight-planes = a clear dependency-direction flow;
+          instrument-cycle = the cycle with REAL contrast (fix the color-on-color —
+          check every fill/text pair against WCAG AA on the figure); one-engine-two-
+          modes = the shared engine with its two modes structurally legible. A figure
+          the operator cannot read in 5 seconds fails.
+          VERIFY: the rendering gate (extend apps/website/verify_svg_rendering.py with
+          a CONTRAST check — computed color contrast of every text fill vs its
+          background >= 4.5:1) + the review pack screenshots regenerated. Then STOP
+          for the operator's approval again (the approval artifact is reset to
+          awaiting; the REJECT stays on record until the operator re-reviews).
+          DELIVER: the redesigned figures + the contrast gate + the regenerated review
+          pack, committed.
+          LOG: per-figure before/after + the contrast results; PASS/FAIL; commit.
       - name: p4_deploy
         kind: agent
         timeout: 14400
