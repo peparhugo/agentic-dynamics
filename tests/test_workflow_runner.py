@@ -1363,6 +1363,17 @@ def _git_init(tmp_path):
     subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
 
 
+def _commit_file(workdir, subject, n):
+    """Write a distinct file, commit it with ``subject``, return the full commit sha."""
+    (Path(workdir) / "docs").mkdir(exist_ok=True)
+    (Path(workdir) / "docs" / f"f{n}.md").write_text(f"{subject} {n}")
+    subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", subject], cwd=workdir, check=True)
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
 def test_commit_prefix_canonicalizes_a_plain_message_commit(tmp_path):
     """(a) A fake agent that commits a plain message: the default CANONICALIZE mode amends
     the message to the canonical pattern (the work preserved), records the original subject
@@ -1553,6 +1564,185 @@ def test_commit_prefix_exempts_the_adapters_initial_commit(tmp_path, monkeypatch
     assert result2.phases[0].status == "failed"
     assert result2.phases[0].commit_gate["reason"] == "COMMIT_PREFIX"
     assert result2.phases[0].commit_gate["subjects"] == ["site: add things"]
+
+
+# ── P0 fix: commit-prefix canonicalization is safe only for a single offender at HEAD ──
+
+
+def test_commit_prefix_seven_commit_range_with_violations_fails_strict_in_canonicalize_mode(tmp_path):
+    """(P0) A seven-commit phase range with violations at the beginning, middle, and end is
+    NOT canonicalized in the default (canonicalize) mode: ``git commit --amend`` rewrites HEAD
+    and HEAD alone, so a multi-commit range can never be self-healed — the old loop amended
+    the last commit repeatedly and reported the earlier ones canonicalized while they stayed
+    untouched. The fixed gate fails strict with COMMIT_PREFIX + every offender's sha +
+    original subject, and NO commit in the range is rewritten."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+    subjects = [
+        "beginning bad",            # violation — the FIRST commit of the range
+        "[workflow] scope — g",     # conforming
+        "[workflow] scope — g",     # conforming
+        "middle bad",               # violation — in the middle
+        "[workflow] scope — g",     # conforming
+        "[workflow] scope — g",     # conforming
+        "end bad",                  # violation — at HEAD
+    ]
+    made = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        for i, subject in enumerate(subjects):
+            made.append((_commit_file(workdir, subject, i), subject))
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.commit_gate is not None
+    assert p.commit_gate["reason"] == "COMMIT_PREFIX"
+    bad_subjects = ["beginning bad", "middle bad", "end bad"]
+    assert set(p.commit_gate["subjects"]) == set(bad_subjects)
+    offenders = {o["sha"]: o["subject"] for o in p.commit_gate["offenders"]}
+    assert set(offenders) == {sha for sha, s in made if s in bad_subjects}
+    assert set(offenders.values()) == set(bad_subjects)
+    assert p.commit_gate["expected_prefix"] == "[workflow] scope — g"
+    # no commit was rewritten — every subject AND every sha is exactly as the agent made it
+    log = subprocess.run(
+        ["git", "log", "--format=%H|%s"], cwd=tmp_path, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    assert [line.split("|", 1)[1] for line in log] == list(reversed(subjects))
+    assert [line.split("|", 1)[0] for line in log] == [sha for sha, _ in reversed(made)]
+    assert result.ok is False
+
+
+def test_commit_prefix_seven_commit_range_with_violations_fails_strict_in_strict_mode(tmp_path, monkeypatch):
+    """(P0) Same seven-commit range under FINOPS_COMMIT_GATE=strict: the strict mode never
+    amends anything, so the run fails with COMMIT_PREFIX + the same full evidence."""
+    monkeypatch.setenv("FINOPS_COMMIT_GATE", "strict")
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+    subjects = [
+        "beginning bad",
+        "[workflow] scope — g",
+        "[workflow] scope — g",
+        "middle bad",
+        "[workflow] scope — g",
+        "[workflow] scope — g",
+        "end bad",
+    ]
+    made = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        for i, subject in enumerate(subjects):
+            made.append((_commit_file(workdir, subject, i), subject))
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.commit_gate["reason"] == "COMMIT_PREFIX"
+    bad_subjects = ["beginning bad", "middle bad", "end bad"]
+    assert set(p.commit_gate["subjects"]) == set(bad_subjects)
+    offenders = {o["sha"]: o["subject"] for o in p.commit_gate["offenders"]}
+    assert set(offenders) == {sha for sha, s in made if s in bad_subjects}
+    log = subprocess.run(
+        ["git", "log", "--format=%H|%s"], cwd=tmp_path, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    assert [line.split("|", 1)[1] for line in log] == list(reversed(subjects))
+    assert [line.split("|", 1)[0] for line in log] == [sha for sha, _ in reversed(made)]
+    assert result.ok is False
+
+
+def test_commit_prefix_canonicalizes_a_single_bad_commit_at_head_with_checked_amend(tmp_path):
+    """(P0, positive) A SINGLE bad commit AT HEAD is the one shape the canonicalize mode may
+    amend: the runner verifies the offender IS HEAD, amends with a checked return code,
+    re-reads the whole range (zero violations remain), records the rewritten sha on the
+    COMMIT_PREFIX_CANONICALIZED gate, and the phase CONTINUES — the tree is preserved (only
+    the message changed)."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+    made = []
+    calls: list[int] = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        n = len(calls)
+        calls.append(n)
+        if n == 0:  # scope — the single bad commit at HEAD
+            made.append((_commit_file(workdir, "site: add things", 0), "site: add things"))
+        else:  # later agent phases commit their own canonical messages (distinct files)
+            phase = "ux_design" if n == 1 else "implement"
+            _commit_file(workdir, f"[workflow] {phase} — g", n)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "ok"  # canonicalized, not failed
+    assert p.commit_gate is not None
+    assert p.commit_gate["reason"] == "COMMIT_PREFIX_CANONICALIZED"
+    assert p.commit_gate["original_subjects"] == ["site: add things"]
+    assert p.commit_gate["expected_prefix"] == "[workflow] scope — g"
+    original_sha = made[0][0]
+    rewritten_sha = p.commit_gate["rewritten_sha"]
+    assert rewritten_sha and rewritten_sha != original_sha  # the amend rewrote HEAD
+    # the re-read after the amend shows ZERO violations — the bad subject is gone and every
+    # commit now matches its own phase's canonical pattern (scope's was amended, the later
+    # phases committed canonical messages of their own)
+    subjects = subprocess.run(
+        ["git", "log", "--format=%s"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.splitlines()
+    assert set(subjects) == {
+        "[workflow] scope — g",
+        "[workflow] ux_design — g",
+        "[workflow] implement — g",
+    }
+    assert "site: add things" not in subjects
+    # the amend preserved the TREE — only the message changed (content-addressed proof)
+    orig_tree = subprocess.run(
+        ["git", "rev-parse", f"{original_sha}^{{tree}}"],
+        cwd=tmp_path, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    new_tree = subprocess.run(
+        ["git", "rev-parse", f"{rewritten_sha}^{{tree}}"],
+        cwd=tmp_path, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    assert orig_tree == new_tree
+    assert result.ok
+
+
+def test_commit_prefix_single_bad_commit_not_head_fails_strict_without_amending(tmp_path):
+    """(P0, negative) A single bad commit that is NOT HEAD — a good commit sits on top —
+    is never amended: ``git commit --amend`` would rewrite the GOOD commit, silently
+    clobbering it with the canonical subject. The run fails strict with the offender's sha +
+    original subject, and BOTH commits stay byte-identical (no commit other than HEAD was
+    ever rewritten — and HEAD itself is not rewritten either)."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+    made = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        made.append((_commit_file(workdir, "site: add things", 0), "site: add things"))
+        made.append((_commit_file(workdir, "[workflow] scope — g", 1), "[workflow] scope — g"))
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.commit_gate is not None
+    assert p.commit_gate["reason"] == "COMMIT_PREFIX"
+    assert p.commit_gate["subjects"] == ["site: add things"]  # the single offender
+    (bad_sha, _), (good_sha, _) = made
+    assert p.commit_gate["offenders"] == [{"sha": bad_sha, "subject": "site: add things"}]
+    assert p.commit_gate["expected_prefix"] == "[workflow] scope — g"
+    # HEAD (the good commit) was NOT rewritten — the old buggy loop would have amended it
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    assert head == good_sha
+    # both subjects unchanged (no silent partial rewrite anywhere in the range)
+    log = subprocess.run(
+        ["git", "log", "--format=%s"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.splitlines()
+    assert log == ["[workflow] scope — g", "site: add things"]  # newest first
+    assert result.ok is False
 
 
 # ── Adversarial verification (cap_runner_hardening p5) ──────────

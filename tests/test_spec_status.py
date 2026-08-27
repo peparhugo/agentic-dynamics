@@ -215,9 +215,11 @@ def test_run_history_never_demotes_a_spec_to_draft(repo: Path):
 # ── P1-4: per-kind status semantics ─────────────────────────────
 
 
-def _run(ok: bool | None) -> RunSummary:
-    """A minimal run summary with the given success flag."""
-    return RunSummary(path="experiments/results/workflows/wf/run.json", timestamp="", ok=ok)
+def _run(ok: bool | None, *, awaiting: bool = False) -> RunSummary:
+    """A minimal run summary with the given success flag (and optional awaiting flag)."""
+    return RunSummary(
+        path="experiments/results/workflows/wf/run.json", timestamp="", ok=ok, awaiting=awaiting
+    )
 
 
 def _open_run(started_at: str, *, ok: bool | None = None) -> RunSummary:
@@ -275,6 +277,63 @@ def test_open_run_outside_the_window_is_blocked():
 def test_a_definitive_failure_beats_an_unresolved_run():
     # A mix of ok=False and ok=None yields `failed` (a verdict exists) over `blocked`.
     assert derive_status(_workflow(), runs=[_run(False), _run(None)]) == "failed"
+
+
+# ── P1: awaiting_approval — a checkpoint-paused run is never "failed" ──────────
+
+
+def test_nonrepeatable_workflow_whose_latest_run_is_awaiting_is_awaiting_approval():
+    # A run ledger with ok=False + awaiting:true (a checkpoint stop, or a resume refused
+    # past an unsatisfied checkpoint) is a designed pause for the operator, NOT a failure.
+    assert derive_status(_workflow(), runs=[_run(False, awaiting=True)]) == "awaiting_approval"
+    # a pause plus an unresolved earlier run is still awaiting — the pause is the verdict
+    assert derive_status(_workflow(), runs=[_run(None), _run(False, awaiting=True)]) == (
+        "awaiting_approval"
+    )
+
+
+def test_nonrepeatable_workflow_with_a_genuinely_failed_latest_run_is_still_failed():
+    # Only a definitive failure (ok=False AND not awaiting) derives `failed` — the P1 fix
+    # must not blur the two states together.
+    assert derive_status(_workflow(), runs=[_run(False, awaiting=False)]) == "failed"
+    assert derive_status(_workflow(), runs=[_run(False)]) == "failed"  # awaiting defaults off
+
+
+def test_awaiting_approval_is_scoped_to_the_latest_run():
+    # The awaiting check keys the LATEST run: a pause predating a later success is shadowed
+    # by the one-shot's completion, and a later genuine failure supersedes the pause.
+    assert derive_status(_workflow(), runs=[_run(False, awaiting=True), _run(True)]) == "completed"
+    assert derive_status(_workflow(), runs=[_run(True), _run(False, awaiting=True)]) == (
+        "awaiting_approval"
+    )
+    assert derive_status(_workflow(), runs=[_run(False, awaiting=True), _run(False)]) == "failed"
+
+
+def test_awaiting_approval_is_a_distinct_open_status_in_the_table(tmp_path: Path):
+    # End-to-end through the ledger: an awaiting:true run ledger derives `awaiting_approval`
+    # in the index (not `failed`), and the status appears in STATUS.md's legend.
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    (specs / "ship.yaml").write_text(_spec_yaml("ship", repeatable=False, artifact_kind="workflow"))
+    _write_run(
+        tmp_path,
+        "ship",
+        "20260820T120000Z",
+        spec_name="ship",
+        ok=False,
+        awaiting=True,
+        awaiting_phase="design",
+        awaiting_reason="checkpoint",
+        started_at="2026-08-20T11:00:00+00:00",
+        ended_at="2026-08-20T12:00:00+00:00",
+    )
+    entry = _by_name(collect_entries(root=tmp_path))["ship"]
+    assert entry.status == "awaiting_approval"
+    assert entry.latest_ok is False  # the terminal-success bool stays false on the ledger
+    assert entry.n_runs == 1
+    md = render_status_md(collect_entries(root=tmp_path))
+    assert "| `awaiting_approval` |" in md  # the legend documents the new status
+    assert "awaiting_approval" in STATUS_ORDER
 
 
 def test_nonrepeatable_workflow_with_a_successful_run_is_completed():

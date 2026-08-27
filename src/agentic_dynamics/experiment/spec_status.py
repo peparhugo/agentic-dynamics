@@ -60,14 +60,15 @@ INDEX_SCHEMA_VERSION = "spec-status/v2"
 MISSING = "—"
 
 #: Row ordering for ``STATUS.md``: rank by status, then by name. Runnable-now specs come
-#: first because that is what an authoring agent is scanning for; live runs and the two
-#: "needs attention" states (``failed``/``blocked``) sit just behind them; completed one-shots
-#: and retired lineage sink to the bottom. Any status outside this tuple sorts after all of
-#: them (defensive: the validator already restricts the vocabulary, but the index must never
-#: crash on a stray).
+#: first because that is what an authoring agent is scanning for; live runs and the three
+#: "needs attention" states (``awaiting_approval``/``failed``/``blocked``) sit just behind
+#: them; completed one-shots and retired lineage sink to the bottom. Any status outside this
+#: tuple sorts after all of them (defensive: the validator already restricts the vocabulary,
+#: but the index must never crash on a stray).
 STATUS_ORDER: tuple[str, ...] = (
     "runnable",
     "running",
+    "awaiting_approval",
     "failed",
     "blocked",
     "draft",
@@ -148,6 +149,11 @@ class RunSummary:
     model: str | None = None
     cost_usd: float | None = None
     git_sha: str | None = None
+    #: P1 (awaiting-approval fix): True when the run ledger carries ``awaiting: true`` — the
+    #: run stopped at a mechanical human checkpoint (or a resume refused past an unsatisfied
+    #: one). A designed stop, never a failure: the index derives ``awaiting_approval`` for a
+    #: spec whose LATEST run is awaiting, not ``failed``.
+    awaiting: bool = False
     # Current-execution evidence (review item 8): a ledger with ``started_at`` but no
     # ``ended_at`` is *open* — it may still be in flight. ``started_at`` anchors the recency
     # window that separates "running now" from "blocked (started, never resolved)".
@@ -167,6 +173,7 @@ class RunSummary:
             "model": self.model,
             "cost_usd": self.cost_usd,
             "git_sha": self.git_sha,
+            "awaiting": self.awaiting,
             "started_at": self.started_at,
             "open": self.open,
         }
@@ -192,6 +199,7 @@ def summarize_run(path: Path, payload: dict[str, Any], *, root: Path) -> RunSumm
         model=str(payload["model"]) if payload.get("model") else None,
         cost_usd=float(cost) if isinstance(cost, (int, float)) else None,
         git_sha=str(payload["git_sha"]) if payload.get("git_sha") else None,
+        awaiting=payload.get("awaiting") is True,
         started_at=_iso(started) if started else None,
         open=(ended is None and started is not None),
     )
@@ -345,13 +353,25 @@ def derive_status(
          ``runnable`` — it is re-runnable by construction;
        * a *non-repeatable* workflow derives its state from the run ledgers: ``running``
          when a run is *currently* executing (an open run within ``running_window``),
-         ``completed`` when any run succeeded, ``failed`` when a run recorded a definitive
-         failure and none is running, ``blocked`` when runs exist but none resolved (no
-         verdict and nothing in flight), and ``runnable`` when it has never been run.
+         ``awaiting_approval`` when the LATEST run stopped at a mechanical human
+         checkpoint (the ledger carries ``awaiting: true`` — a designed pause for the
+         operator, never a failure), ``completed`` when any run succeeded,
+         ``failed`` when a run recorded a definitive failure and none is running,
+         ``blocked`` when runs exist but none resolved (no verdict and nothing in
+         flight), and ``runnable`` when it has never been run.
 
     ``running`` is the one state that REQUIRES positive evidence of current execution — a
     historical failed or abandoned run never stays ``running`` indefinitely. This is the P2
     fix: "attempts but no success" is ``failed``/``blocked``, not a permanent ``running``.
+
+    The ``awaiting_approval`` state is the P1 fix: a correctly-paused run (``ok: false`` +
+    ``awaiting: true`` on the ledger — a checkpoint stop, or a resume refused past an
+    unsatisfied checkpoint) must read as "waiting for the operator", NOT as ``failed``. The
+    check keys the LATEST run only: an awaiting run that predates a later success (or a later
+    genuine failure) is shadowed by the more recent verdict, and a pause that IS the latest
+    run reads as ``awaiting_approval`` even when an earlier run succeeded (a re-run stopped
+    for the operator is active work). A definitive ``ok: false`` + ``awaiting: false`` latest
+    run still derives ``failed``.
 
     Note what is deliberately *absent*: run history never demotes a *repeatable* spec to
     ``draft``. "Never run" and "draft" are different facts, and the table shows the first
@@ -365,6 +385,13 @@ def derive_status(
         runs = runs or []
         if _is_currently_running(runs, now=now, window=running_window):
             return "running"
+        # P1: the LATEST run is awaiting operator approval — a designed pause, distinct from
+        # a definitive failure. The check keys the latest run ONLY: an awaiting run that
+        # predates a later success is shadowed by that later verdict (completed), while a
+        # pause that is itself the latest signal reads as awaiting_approval even if an
+        # earlier run succeeded (a re-run stopped for the operator IS active work).
+        if runs and runs[-1].awaiting:
+            return "awaiting_approval"
         if any(run.ok is True for run in runs):
             return "completed"
         if any(run.ok is False for run in runs):
@@ -509,9 +536,12 @@ def _fmt_repeatable(value: bool | None) -> str:
 
 
 #: The statuses an authoring agent treats as "still open" — work remaining, counted by the
-#: summary line. ``failed``/``blocked`` are open (they need a retry/unblock) but are not
-#: "runnable now"; the summary label below says "open", not "runnable-now", for that reason.
-OPEN_STATUSES = frozenset({"runnable", "running", "failed", "blocked", "draft"})
+#: summary line. ``awaiting_approval``/``failed``/``blocked`` are open (awaiting an operator
+#: decision, a retry, or an unblock) but are not "runnable now"; the summary label below says
+#: "open", not "runnable-now", for that reason.
+OPEN_STATUSES = frozenset(
+    {"runnable", "running", "awaiting_approval", "failed", "blocked", "draft"}
+)
 
 #: The statuses that mean "finished" — completed one-shots and retired lineage sink out of
 #: the open view (refactor-repair P1-4 index).
@@ -571,7 +601,9 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
         "",
         "**Status** — authored in the spec YAML's `status:` when the operator asserted one,",
         "otherwise derived: `superseded` when the spec names a `superseded_by:`; for a",
-        "non-repeatable workflow, `completed` when any run succeeded, `failed` when a run",
+        "non-repeatable workflow, `completed` when any run succeeded, `awaiting_approval`",
+        "when the latest run stopped at a mechanical human checkpoint (`awaiting: true` on",
+        "the ledger — a designed pause, never a failure), `failed` when a run",
         "recorded a definitive failure, `blocked` when runs exist but none resolved, `running`",
         "when a run is currently executing (an open, recent run), `runnable` when never run;",
         "else (a repeatable spec) `runnable`.",
@@ -580,6 +612,7 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
         "|---|---|",
         "| `runnable` | never run (a non-repeatable workflow), or a repeatable spec — ready to run |",
         "| `running` | a non-repeatable workflow currently executing — an open run within the window |",
+        "| `awaiting_approval` | the latest run stopped at a human checkpoint (`awaiting: true`) — the operator must approve before it continues |",
         "| `failed` | a non-repeatable workflow whose run(s) recorded a definitive failure |",
         "| `blocked` | a non-repeatable workflow with runs that started but never resolved |",
         "| `draft` | authored, not yet run to completion; not yet a claim about anything |",

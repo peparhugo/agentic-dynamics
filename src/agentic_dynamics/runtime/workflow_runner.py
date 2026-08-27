@@ -34,7 +34,11 @@ the commits made during the phase (``git log pre-head..HEAD``) and every one mus
 plain-message commit fails the phase with reason ``COMMIT_PREFIX`` + the offending subjects as
 evidence, even if the phase otherwise succeeded (the campaign stops for the operator), recorded
 on ``PhaseResult.commit_gate`` and the ledger. The runner's own ``_git_commit`` writes the
-correct message; the enforcement catches MANUAL agent commits.
+correct message; the enforcement catches MANUAL agent commits. Message-only violations are
+self-healing ONLY in the single-offender-at-HEAD shape (the P0 safe rule — ``git commit
+--amend`` rewrites HEAD and HEAD alone, so a multi-commit range is never amended; see
+``_enforce_commit_prefix``): one bad commit AT HEAD is amended with a checked return code and
+re-read, anything else fails strict with every offender's sha + subject.
 
 Relabel tree-identity gate (cap_runner_hardening2 §Gap 2): after each agent phase (kind !=
 ``test``), the runner compares the phase's committed tree against the discarded-trees ledger
@@ -57,7 +61,10 @@ separate post-phase check on the phase's committed tree).
 Mechanical human checkpoint (cap_runner_hardening2 §Gap 3): a phase declaring ``checkpoint: true``
 that completes successfully records the campaign state ``awaiting_operator_approval`` and EXITS
 CLEANLY — the phase status is ``awaiting`` (a designed stop, not an error; the run result carries
-``awaiting: true`` + the phase name, and the ledger writes the awaiting state). The approval
+``awaiting: true`` + the phase name, and the ledger writes the awaiting state). The run's
+terminal state is ``awaiting_approval`` (``WorkflowRunResult.state`` — ``ok`` stays ``False`` as
+the terminal-success bool, but the spec index derives ``awaiting_approval``, never ``failed``,
+for a paused run). The approval
 contract: ``approvals/<spec>/<phase>_approval.md`` must exist in the worktree, carry a REAL
 operator signature (a non-placeholder ``operator:``/``SIGNED-BY-OPERATOR:`` line + a real date),
 and its commit must be a DESCENDANT of the checkpoint phase's commit (the approval was authored
@@ -110,6 +117,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -266,6 +274,22 @@ class PhaseResult:
         }
 
 
+class RunState(str, Enum):
+    """Terminal run-state vocabulary (added by the awaiting-approval fix, P1).
+
+    ``WorkflowRunResult.ok`` used to collapse a correctly-paused checkpoint run (phase
+    status ``awaiting``, ``result.awaiting == True``) into ``ok: False``, which the spec
+    index then derived as ``failed`` — a designed stop for the operator was being read as
+    a failure. ``state`` is the lossless terminal label; ``ok`` and ``awaiting`` remain as
+    convenience fields (ledger JSON consumers and the spec index read them).
+    """
+
+    SUCCEEDED = "succeeded"
+    AWAITING_APPROVAL = "awaiting_approval"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 @dataclass
 class WorkflowRunResult:
     """Ledger for a full workflow run."""
@@ -285,7 +309,9 @@ class WorkflowRunResult:
     #: the run stopped at a checkpoint phase (or a resume refused to proceed past an unsatisfied
     #: one) with the campaign state ``awaiting_operator_approval`` — a designed stop, never an
     #: error. ``awaiting_phase`` names the phase; ``awaiting_reason`` is ``"checkpoint"`` (a
-    #: fresh stop) or ``"approval_refused"`` (a resume refused).
+    #: fresh stop) or ``"approval_refused"`` (a resume refused). The derived :attr:`state` is
+    #: ``awaiting_approval`` whenever this is True (P1 — the spec index must not read the run as
+    #: ``failed`` because ``ok`` collapsed).
     awaiting: bool = False
     awaiting_phase: str = ""
     awaiting_reason: str = ""
@@ -296,7 +322,38 @@ class WorkflowRunResult:
 
     @property
     def ok(self) -> bool:
+        """Terminal-success bool: every phase recorded ``ok`` AND at least one phase ran.
+
+        A correctly-paused checkpoint run (``awaiting``) is ``False`` here even though it is
+        a designed stop, not an error — prefer :attr:`state` for the lossless terminal label
+        (``awaiting_approval``), which the spec index now derives instead of ``failed``.
+        """
         return bool(self.phases) and all(p.status == "ok" for p in self.phases)
+
+    @property
+    def state(self) -> str:
+        """The run's terminal state as a :class:`RunState` value (the lossless label).
+
+        Precedence (P1 — awaiting is a designed stop, never a failure):
+
+        1. ``awaiting``         → ``awaiting_approval`` (checkpoint stop or a resume
+           refused past an unsatisfied checkpoint);
+        2. all phases ``ok``    → ``succeeded`` (identical condition to :attr:`ok`);
+        3. any phase not ok     → ``failed`` (only when not awaiting);
+        4. nothing ran          → ``cancelled`` (a resume whose every phase was already
+           completed, or an aborted launch — no work was performed by this run, so it is
+           neither a success nor a failure).
+
+        ``ok == (state == RunState.SUCCEEDED.value)`` — the terminal-success bool stays
+        the same for every run the ledger already records.
+        """
+        if self.awaiting:
+            return RunState.AWAITING_APPROVAL.value
+        if self.ok:
+            return RunState.SUCCEEDED.value
+        if self.phases:
+            return RunState.FAILED.value
+        return RunState.CANCELLED.value
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -311,6 +368,10 @@ class WorkflowRunResult:
             "awaiting": self.awaiting,
             "awaiting_phase": self.awaiting_phase,
             "awaiting_reason": self.awaiting_reason,
+            # ADDED key (P1 — never renames an existing key): the lossless terminal state,
+            # so a checkpoint-paused run is distinguishable from a genuine failure on the
+            # ledger without breaking consumers that read ``ok``/``awaiting``.
+            "state": self.state,
             "total_cost_usd": self.total_cost_usd,
             "ok": self.ok,
             "phases": [p.to_dict() for p in self.phases],
@@ -1186,29 +1247,43 @@ def _commit_subject_matches(subject: str, phase_name: str, goal_prefix: str) -> 
     return bool(m and m.group(1) == phase_name and m.group(2).startswith(goal_prefix))
 
 
-def _git_log_subjects(workdir: Path, rev_range: str) -> list[tuple[str, str]]:
-    """``(subject, author_email)`` pairs for commits in ``rev_range``, or [] on any git problem.
+def _git_log_commits(workdir: Path, rev_range: str) -> list[tuple[str, str, str]]:
+    """``(sha, subject, author_email)`` triples for commits in ``rev_range``, or [] on any git problem.
 
-    Author email rides along so the enforcement can exempt the runner's OWN execution-layer
-    commits (the adapter's fresh-worktree ``Initial`` commit) from the pattern check — it is
-    not a manual agent commit, exactly like ``_git_commit``'s message (exempt by matching).
+    The full 40-char sha rides along so the enforcement can (a) exempt the runner's OWN
+    execution-layer commits (the adapter's fresh-worktree ``Initial`` commit) by author, and
+    (b) prove *which* commit is HEAD before deciding whether a message-only rewrite is safe
+    (the P0 multi-commit canonicalization fix — ``git commit --amend`` rewrites HEAD only,
+    so the canonicalize path must know the offender is HEAD).
     """
     try:
         log = subprocess.run(
-            ["git", "log", "--format=%s|%ae", rev_range],
+            ["git", "log", "--format=%H|%s|%ae", rev_range],
             cwd=workdir, capture_output=True, text=True, timeout=30,
         )
     except Exception:  # noqa: BLE001 — a git problem degrades to "no commits to check"
         return []
     if log.returncode != 0:
         return []
-    out: list[tuple[str, str]] = []
+    out: list[tuple[str, str, str]] = []
     for line in log.stdout.splitlines():
         if not line.strip():
             continue
-        subject, _, email = line.partition("|")
-        out.append((subject.strip(), email.strip()))
+        sha, _, rest = line.partition("|")
+        subject, _, email = rest.partition("|")
+        out.append((sha.strip(), subject.strip(), email.strip()))
     return out
+
+
+def _git_log_subjects(workdir: Path, rev_range: str) -> list[tuple[str, str]]:
+    """``(subject, author_email)`` pairs for commits in ``rev_range``, or [] on any git problem.
+
+    Author email rides along so the enforcement can exempt the runner's OWN execution-layer
+    commits (the adapter's fresh-worktree ``Initial`` commit) from the pattern check — it is
+    not a manual agent commit, exactly like ``_git_commit``'s message (exempt by matching).
+    Delegates to :func:`_git_log_commits` (the sha-carrying source of truth).
+    """
+    return [(subject, email) for _, subject, email in _git_log_commits(workdir, rev_range)]
 
 
 #: The adapter's worktree-initialization identity (``opencode._init_git_workdir``): the
@@ -1225,18 +1300,32 @@ def _enforce_commit_prefix(
     Every commit the agent made during the phase (``git log pre_head..HEAD``; when there was
     no pre-phase HEAD — a fresh worktree — all of HEAD's commits) must match
     ``[workflow] <phase-name> — <goal prefix>``. A commit that does not fails the phase with
-    reason ``COMMIT_PREFIX`` + the offending subjects as evidence, even if the phase otherwise    succeeded — the phase flips to failed and ``stop_on_error`` stops the campaign for the
-    operator. Agent phases only. The runner's OWN commits are exempt by construction: the
-    runner's ``_git_commit`` message matches the pattern (and runs AFTER this check), and the
-    adapter's fresh-worktree ``Initial`` commit is exempted by its author identity
-    (``RUNNER_INIT_AUTHOR_EMAIL``) — the enforcement catches MANUAL agent commits. Best-effort:
-    an unreadable git state degrades to "no commits to check".
+    reason ``COMMIT_PREFIX`` + full evidence (every offender's sha + original subject), even
+    if the phase otherwise succeeded — the phase flips to failed and ``stop_on_error`` stops
+    the campaign for the operator. Agent phases only. The runner's OWN commits are exempt by
+    construction: the runner's ``_git_commit`` message matches the pattern (and runs AFTER
+    this check), and the adapter's fresh-worktree ``Initial`` commit is exempted by its author
+    identity (``RUNNER_INIT_AUTHOR_EMAIL``) — the enforcement catches MANUAL agent commits.
+    Best-effort: an unreadable git state degrades to "no commits to check".
+
+    **The safe canonicalize rule (P0 fix — ``git commit --amend`` rewrites HEAD only).** In
+    canonicalize mode (``FINOPS_COMMIT_GATE`` unset or ``canonicalize``), a message-only
+    violation is self-healing ONLY when there is exactly ONE offending commit AND that commit
+    IS HEAD (verified by ``git rev-parse HEAD`` equalling the offender's sha). In that single
+    case the runner amends the subject to the canonical pattern (tree + content intact, the
+    author's work preserved) with a CHECKED return code, re-reads the whole range, and fails
+    strict if even one violation remains. ANY other case — multiple offenders (e.g. the
+    revamp2 seven-commit shape), or a single offender that is NOT HEAD (a good commit sits on
+    top of a bad one) — is NEVER amended: amend would silently rewrite a *different* commit
+    (HEAD), so the run fails strict with ``COMMIT_PREFIX`` + every offender's sha + original
+    subject. ``FINOPS_COMMIT_GATE=strict`` restores the fail-with-evidence mode outright.
+    TREE violations (the relabel — a discarded tree re-presented) are NEVER canonicalized.
     """
     goal_prefix = goal[:40]
     commits = (
-        _git_log_subjects(wd, f"{pre_head}..HEAD")
+        _git_log_commits(wd, f"{pre_head}..HEAD")
         if pre_head
-        else _git_log_subjects(wd, "HEAD")
+        else _git_log_commits(wd, "HEAD")
     )
     # NO_CHANGES gate (the revamp3 vacuous-pass post-mortem): an agent phase whose committed
     # TREE is identical to its pre-phase tree certified itself ok while producing no
@@ -1296,11 +1385,13 @@ def _enforce_commit_prefix(
                 pr.status = "failed"
                 pr.error = msg
             return
+    # ``(sha, subject)`` for every non-conforming commit — the sha is part of the evidence
+    # (the P0 multi-commit fix: the offender's identity, not just its message).
     bad = [
-        s
-        for s, author in commits
-        if not (author == RUNNER_INIT_AUTHOR_EMAIL and s == "Initial")
-        and not _commit_subject_matches(s, phase_name, goal_prefix)
+        (sha, subject)
+        for sha, subject, author in commits
+        if not (author == RUNNER_INIT_AUTHOR_EMAIL and subject == "Initial")
+        and not _commit_subject_matches(subject, phase_name, goal_prefix)
     ]
     if not bad:
         return
@@ -1308,47 +1399,75 @@ def _enforce_commit_prefix(
     # CANONICALIZE-WITH-EVIDENCE (cap_runner_hardening2 p1 lesson — the measured pattern:
     # four operator re-tags on one phase because agents commit real work with natural
     # "fix:" messages; the byte-exact gate turned excellent work into busywork). A
-    # MESSAGE-only violation is self-healing by default: the runner amends each
-    # non-conforming commit's subject to the canonical pattern (tree + content intact,
-    # the author's work preserved), records the original subjects visibly on the gate,
-    # and the phase CONTINUES — resume reliability is preserved because the messages
-    # become canonical. FINOPS_COMMIT_GATE=strict restores the fail-with-evidence mode.
+    # MESSAGE-only violation is self-healing by default — BUT ONLY for the single
+    # offender-at-HEAD shape (P0 fix): ``git commit --amend`` rewrites HEAD and HEAD alone,
+    # so with offenders A, B, C in the range the old loop amended C repeatedly and reported
+    # A and B canonicalized while they stayed untouched. The safe rule: canonicalize ONLY
+    # when there is exactly ONE offender AND that offender IS HEAD (``git rev-parse HEAD``
+    # verified); amend with a CHECKED return code; re-read the whole range and fail strict
+    # if even one violation remains. ANY other case — multiple offenders, or the single
+    # offender not at HEAD (a good commit sits on top) — is never amended: the run fails
+    # strict with COMMIT_PREFIX + every offender's sha + original subject. No silent
+    # partial rewrite. FINOPS_COMMIT_GATE=strict restores the fail-with-evidence mode.
     # TREE violations (the relabel — a discarded tree re-presented) are NEVER canonicalized:
     # they stay strict failures (cap_runner_hardening2 p2).
-    if os.environ.get("FINOPS_COMMIT_GATE", "canonicalize") != "strict":
-        canonicalized = []
-        for subject, author in commits:
-            if author == RUNNER_INIT_AUTHOR_EMAIL and subject == "Initial":
-                continue
-            if _commit_subject_matches(subject, phase_name, goal_prefix):
-                continue
+    if os.environ.get("FINOPS_COMMIT_GATE", "canonicalize") != "strict" and len(bad) == 1:
+        offender_sha, offender_subject = bad[0]
+        # The single offender must BE HEAD — amend rewrites HEAD, never the offender's own
+        # commit when a good commit sits on top of it.
+        head_sha = _git_full_sha(wd, "HEAD")
+        if head_sha and head_sha == offender_sha:
             try:
-                subprocess.run(
+                amend = subprocess.run(
                     ["git", "commit", "--amend", "--only", "-m", expected],
                     cwd=wd, capture_output=True, text=True, timeout=30,
                 )
-                canonicalized.append(subject)
+                amend_ok = amend.returncode == 0
             except Exception:  # noqa: BLE001 — a failed amend degrades to the strict path
-                continue
-        if canonicalized:
-            pr.commit_gate = {
-                "reason": "COMMIT_PREFIX_CANONICALIZED",
-                "original_subjects": canonicalized,
-                "expected_prefix": expected,
-            }
-            pr.error = (
-                f"commit messages canonicalized to '{expected}' (original: "
-                f"{canonicalized}) — the work was preserved; see commit_gate"
-            )
-            return
+                amend_ok = False
+            if amend_ok:
+                # Re-read the WHOLE range: a successful amend must leave zero violations.
+                recheck = (
+                    _git_log_commits(wd, f"{pre_head}..HEAD")
+                    if pre_head
+                    else _git_log_commits(wd, "HEAD")
+                )
+                remaining = [
+                    (sha, subject)
+                    for sha, subject, author in recheck
+                    if not (author == RUNNER_INIT_AUTHOR_EMAIL and subject == "Initial")
+                    and not _commit_subject_matches(subject, phase_name, goal_prefix)
+                ]
+                if not remaining:
+                    rewritten_sha = _git_full_sha(wd, "HEAD") or _git_head(wd)
+                    if rewritten_sha:
+                        pr.commit_gate = {
+                            "reason": "COMMIT_PREFIX_CANONICALIZED",
+                            "original_subjects": [offender_subject],
+                            "expected_prefix": expected,
+                            "rewritten_sha": rewritten_sha,
+                        }
+                        pr.error = (
+                            f"commit message canonicalized to '{expected}' (original: "
+                            f"{offender_subject!r}) — the work was preserved; see commit_gate"
+                        )
+                        return
+                # A re-read that still shows violations (or an unresolvable HEAD) is NOT
+                # canonicalized — fall through to the strict record with the fresh evidence.
+                if remaining:
+                    bad = remaining
     pr.commit_gate = {
         "reason": "COMMIT_PREFIX",
-        "subjects": bad,
+        "subjects": [subject for _, subject in bad],
+        "offenders": [{"sha": sha, "subject": subject} for sha, subject in bad],
         "expected_prefix": expected,
     }
+    offenders_txt = ", ".join(
+        f"{subject!r} ({sha[:12]})" for sha, subject in bad
+    )
     msg = (
         f"COMMIT_PREFIX — commits made during phase '{phase_name}' do not match "
-        f"'{expected}': {bad} "
+        f"'{expected}': {offenders_txt} "
         f"(note: the separator is an EM-DASH U+2014 '—', not a hyphen; the resume "
         f"machinery matches the exact byte pattern)"
     )
@@ -1992,7 +2111,10 @@ def run_workflow(
     Mechanical human checkpoint (cap_runner_hardening2 p3): a phase declaring ``checkpoint: true``
     that completes successfully records the campaign state ``awaiting_operator_approval`` and
     EXITS CLEANLY — the phase status is ``awaiting`` (a designed stop, not an error) and the run
-    result carries ``awaiting: true`` + the phase name + reason ``"checkpoint"``. On ``--resume``
+    result carries ``awaiting: true`` + the phase name + reason ``"checkpoint"``. The run's
+    terminal ``state`` is ``awaiting_approval`` (never ``failed`` — ``ok`` remains ``False`` as
+    the terminal-success bool, but the spec index reads the awaiting flag and derives the
+    distinct status). On ``--resume``
     the runner verifies every completed checkpoint phase's approval contract
     (``approvals/<spec>/<phase>_approval.md``, committed at HEAD, authored AFTER the checkpoint
     commit, with a non-placeholder operator signature + a date) BEFORE proceeding; an

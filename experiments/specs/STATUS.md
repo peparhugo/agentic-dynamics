@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-27T20:00:22.639861+00:00`  ·  137 spec(s)
+Generated at: `2026-08-27T22:52:11.148258+00:00`  ·  137 spec(s)
 **Work remaining:** 35 open · 102 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
@@ -150,7 +150,9 @@ Generated at: `2026-08-27T20:00:22.639861+00:00`  ·  137 spec(s)
 
 **Status** — authored in the spec YAML's `status:` when the operator asserted one,
 otherwise derived: `superseded` when the spec names a `superseded_by:`; for a
-non-repeatable workflow, `completed` when any run succeeded, `failed` when a run
+non-repeatable workflow, `completed` when any run succeeded, `awaiting_approval`
+when the latest run stopped at a mechanical human checkpoint (`awaiting: true` on
+the ledger — a designed pause, never a failure), `failed` when a run
 recorded a definitive failure, `blocked` when runs exist but none resolved, `running`
 when a run is currently executing (an open, recent run), `runnable` when never run;
 else (a repeatable spec) `runnable`.
@@ -159,6 +161,7 @@ else (a repeatable spec) `runnable`.
 |---|---|
 | `runnable` | never run (a non-repeatable workflow), or a repeatable spec — ready to run |
 | `running` | a non-repeatable workflow currently executing — an open run within the window |
+| `awaiting_approval` | the latest run stopped at a human checkpoint (`awaiting: true`) — the operator must approve before it continues |
 | `failed` | a non-repeatable workflow whose run(s) recorded a definitive failure |
 | `blocked` | a non-repeatable workflow with runs that started but never resolved |
 | `draft` | authored, not yet run to completion; not yet a claim about anything |
