@@ -1,0 +1,11 @@
+<!--
+Source: https://github.com/kbroman/d3examples/tree/master/lod_curve
+License/attribution: kbroman/d3examples is MIT; adapted from its interactive curve and marker-tooltip pattern.
+Demonstrates: one bounded input changes a clearly labeled modeled curve with a local tooltip.
+Transfers: N-squared scenario chart; label input as [C] and expose assumptions beside it.
+-->
+<!doctype html><meta charset="utf-8"><title>D3 interactive curve</title><script src="https://cdn.jsdelivr.net/npm/d3@7"></script><style>body{margin:2rem;font:16px system-ui;background:#f7f4ed;color:#17212b}svg{max-width:100%;height:auto}label{display:block;margin-bottom:1rem}</style><label>Context inflation beta <input id="beta" type="range" min="0" max=".03" value=".01" step=".005"> <output></output></label><div id="chart"></div>
+<script>
+const input=document.querySelector('input'),out=document.querySelector('output'),w=700,h=360,m={t:25,r:30,b:45,l:55},svg=d3.select('#chart').append('svg').attr('viewBox',[0,0,w,h]),x=d3.scaleLinear().domain([1,25]).range([m.l,w-m.r]),y=d3.scaleLinear().range([h-m.b,m.t]);svg.append('g').attr('class','x').attr('transform',`translate(0,${h-m.b})`);svg.append('g').attr('class','y').attr('transform',`translate(${m.l},0)`);const path=svg.append('path').attr('fill','none').attr('stroke','#9b6a28').attr('stroke-width',3);
+function draw(){const beta=+input.value,data=d3.range(1,26).map(n=>({n,cost:n+beta*n*(n-1)/2}));out.value=beta.toFixed(3);y.domain([0,d3.max(data,d=>d.cost)]).nice();svg.select('.x').call(d3.axisBottom(x));svg.select('.y').call(d3.axisLeft(y));path.datum(data).attr('d',d3.line().x(d=>x(d.n)).y(d=>y(d.cost)));}input.oninput=draw;draw();
+</script>

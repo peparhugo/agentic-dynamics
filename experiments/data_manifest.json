@@ -1,13 +1,19 @@
 {
   "schema_version": "1.0",
+<<<<<<< HEAD
   "generated_at": "2026-08-27T19:25:54.874989+00:00",
   "opencode_version": "unknown",
   "git_commit": "0db475f1",
+=======
+  "generated_at": "2026-08-27T19:17:06.701716+00:00",
+  "opencode_version": "unknown",
+  "git_commit": "7bd1528e",
+>>>>>>> feature/site-revamp4-diagrams
   "files": {
     "canonical_inputs": {
       "inventory.json": {
-        "sha256": "de87c152de6bdf90c6054f48a9f55590b0f98f9bd4ec7f22ee0e4d01956fd4ae",
-        "size_bytes": 987669
+        "sha256": "31b8f4ed614fff6524a208094877f94b9cc5e50a4b9212cf157638fc128ac93b",
+        "size_bytes": 1020034
       },
       "_trajectory_aggregate.json": {
         "sha256": "a9b4eb3766c0d9a113f229db43bea414fda2847455cab1a42e5669f6f5feb93f",
@@ -16,8 +22,13 @@
     },
     "canonical_outputs": {
       "data.js": {
+<<<<<<< HEAD
         "sha256": "814f4e7434d8faa41912a3633cf2c2a02ee4c4ee4e6a526899809dabdcf28bc4",
         "size_bytes": 185537
+=======
+        "sha256": "b33d576a50b70dc865ed06b23f05f91a494f79967d0c1989f7c31bc6c924c826",
+        "size_bytes": 188969
+>>>>>>> feature/site-revamp4-diagrams
       }
     },
     "historical_artifacts": {
@@ -7402,6 +7413,7 @@
     },
     {
       "entity_id": "0658036c7cd09f57a283dddfb26e8ba9bd553df0b29dc4173c908695738a63e0",
+<<<<<<< HEAD
       "knowledge_id": "327bd097067956a6d19821537744a6ff1ac50d9014e692e26968c4bc66ede422",
       "source_type": "fact",
       "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_phases_completed",
@@ -7411,6 +7423,17 @@
       "supersedes": "3cddceda36f8b17b9e89d1c340552cca32cdda0f69aef23879141b494265faf8",
       "causes": null,
       "reason": "fact-content=27672329c9023861623cba052a7cd946afbdae8030b3421441217f1f1d6e902a",
+=======
+      "knowledge_id": "3cddceda36f8b17b9e89d1c340552cca32cdda0f69aef23879141b494265faf8",
+      "source_type": "fact",
+      "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_phases_completed",
+      "source_uri": "fact://workflow/wf_cap_site_revamp3_openai_gpt_5_6_terra/workflow_phases_completed",
+      "observed_at": "2026-08-27T15:24:12.678669+00:00",
+      "indexed_at": "2026-08-27T15:24:16.178142+00:00",
+      "supersedes": "a11f76fe704b154d54ed17a281057bb75debfef8c04cb6570d3ef90df70bdc67",
+      "causes": null,
+      "reason": "fact-content=1050399b7ee0e21f116412d9067cbe02a84eb2220cc8c99f798523ec7bfa47ea",
+>>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -7440,6 +7463,7 @@
         },
         {
           "knowledge_id": "3cddceda36f8b17b9e89d1c340552cca32cdda0f69aef23879141b494265faf8",
+<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:14.924359+00:00",
           "observed_at": "2026-08-27T15:24:12.678669+00:00",
@@ -7453,6 +7477,13 @@
           "observed_at": "2026-08-27T15:44:14.924359+00:00",
           "indexed_at": "2026-08-27T15:44:18.289486+00:00",
           "reason": "fact-content=27672329c9023861623cba052a7cd946afbdae8030b3421441217f1f1d6e902a"
+=======
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T15:24:12.678669+00:00",
+          "indexed_at": "2026-08-27T15:24:16.178142+00:00",
+          "reason": "fact-content=1050399b7ee0e21f116412d9067cbe02a84eb2220cc8c99f798523ec7bfa47ea"
+>>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -65890,6 +65921,7 @@
     },
     {
       "entity_id": "36743f9a92cd43b441137d9f71d6729dbaa81911b92ef17a00444d0b3c1d728f",
+<<<<<<< HEAD
       "knowledge_id": "6ec4150c08fa304be090298e407f53bef61bfd05edf603d13df9ea9ee5e9ae00",
       "source_type": "fact",
       "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#job_status",
@@ -65899,6 +65931,17 @@
       "supersedes": "ac0fd22cced6b5b30b30eb9efe414d821dac8f10cf1e43a93bdfd67826e6bc2c",
       "causes": null,
       "reason": "fact-content=a56ecc385a83bbc10de9af305ba5e147e80bd48e5a755f5b7e7eac02dc7a6e0b",
+=======
+      "knowledge_id": "ac0fd22cced6b5b30b30eb9efe414d821dac8f10cf1e43a93bdfd67826e6bc2c",
+      "source_type": "fact",
+      "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#job_status",
+      "source_uri": "fact://job/wf_cap_site_revamp3_openai_gpt_5_6_terra/job_status",
+      "observed_at": "2026-08-27T15:16:47.199418+00:00",
+      "indexed_at": "2026-08-27T15:16:59.003603+00:00",
+      "supersedes": "b2c437c8d099af600cda33043b6ca2cd4a47743c66794a4cdca08f5206846be5",
+      "causes": null,
+      "reason": "fact-content=6fc77aa74b029ffa2a826371021f9598ad89550281d412fcf8e819e60539ae14",
+>>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -65920,6 +65963,7 @@
         },
         {
           "knowledge_id": "ac0fd22cced6b5b30b30eb9efe414d821dac8f10cf1e43a93bdfd67826e6bc2c",
+<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:11.077837+00:00",
           "observed_at": "2026-08-27T15:16:47.199418+00:00",
@@ -65933,6 +65977,13 @@
           "observed_at": "2026-08-27T15:44:11.077837+00:00",
           "indexed_at": "2026-08-27T15:44:17.277651+00:00",
           "reason": "fact-content=a56ecc385a83bbc10de9af305ba5e147e80bd48e5a755f5b7e7eac02dc7a6e0b"
+=======
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T15:16:47.199418+00:00",
+          "indexed_at": "2026-08-27T15:16:59.003603+00:00",
+          "reason": "fact-content=6fc77aa74b029ffa2a826371021f9598ad89550281d412fcf8e819e60539ae14"
+>>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -84409,6 +84460,7 @@
       ]
     },
     {
+<<<<<<< HEAD
       "entity_id": "4595dd5127b80675d8e8e77b2d1976f20d609654b164bdb7ad5963c7c3942861",
       "knowledge_id": "c0d4df25640b11299c09e9cff3d8edb29f6cc4862a959cd44d19742570123899",
       "source_type": "fact",
@@ -84441,6 +84493,8 @@
       ]
     },
     {
+=======
+>>>>>>> feature/site-revamp4-diagrams
       "entity_id": "45a07322d228946a92a16dfa0fad4e8334fe8c4fac0e0ffb13c2c10168af25cb",
       "knowledge_id": "fd90abb908e947c94d015b8e9e63b8912a3ca157910d34708215984579babc6d",
       "source_type": "fact",
@@ -122266,6 +122320,7 @@
     },
     {
       "entity_id": "6438bdeaafcbb235a79afd14590cdb402a6e3c959ab33dd114bfc819614f959e",
+<<<<<<< HEAD
       "knowledge_id": "10aae046e32aebc36e328196671ea1c86fabedfd311c74c54ce50a2c75ceceba",
       "source_type": "fact",
       "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_health",
@@ -122275,6 +122330,17 @@
       "supersedes": "edc87599a90a063d9f6626c275fe2a5e3939d204ed428010012db7dcd5174adc",
       "causes": null,
       "reason": "fact-content=c7470951884d3c0d987d9f303e5bb0930e61d8009e0bd964c2c5757ab9825692",
+=======
+      "knowledge_id": "edc87599a90a063d9f6626c275fe2a5e3939d204ed428010012db7dcd5174adc",
+      "source_type": "fact",
+      "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_health",
+      "source_uri": "fact://workflow/wf_cap_site_revamp3_openai_gpt_5_6_terra/workflow_health",
+      "observed_at": "2026-08-27T15:16:51.154289+00:00",
+      "indexed_at": "2026-08-27T15:17:00.615522+00:00",
+      "supersedes": "a943145256af878819168cd96a8bf2483426171dc692e4bb752beb0dcacf69c7",
+      "causes": null,
+      "reason": "fact-content=175e063227cdab7323d981ef6c1f39e933bda2187040eb8441244929f9b1fc6a",
+>>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -122296,6 +122362,7 @@
         },
         {
           "knowledge_id": "edc87599a90a063d9f6626c275fe2a5e3939d204ed428010012db7dcd5174adc",
+<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:14.924359+00:00",
           "observed_at": "2026-08-27T15:16:51.154289+00:00",
@@ -122309,6 +122376,13 @@
           "observed_at": "2026-08-27T15:44:14.924359+00:00",
           "indexed_at": "2026-08-27T15:44:18.798039+00:00",
           "reason": "fact-content=c7470951884d3c0d987d9f303e5bb0930e61d8009e0bd964c2c5757ab9825692"
+=======
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T15:16:51.154289+00:00",
+          "indexed_at": "2026-08-27T15:17:00.615522+00:00",
+          "reason": "fact-content=175e063227cdab7323d981ef6c1f39e933bda2187040eb8441244929f9b1fc6a"
+>>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -124001,6 +124075,7 @@
       ]
     },
     {
+<<<<<<< HEAD
       "entity_id": "6598a02f914a72870d212d1d4369bc42b49c6cbee5b89b4578acb149fe6fa3b8",
       "knowledge_id": "efa201ee0cd7a51d8e735bd78a354eef2b311d08ed7f81b0d2533c64a96185d3",
       "source_type": "fact",
@@ -124025,6 +124100,8 @@
       ]
     },
     {
+=======
+>>>>>>> feature/site-revamp4-diagrams
       "entity_id": "659a7a1bb7c6689bea8deb491b5d3f944d5acb10360c55ddbb6e2f7b1bee711a",
       "knowledge_id": "036ee958518389cee8f8f2064b371cd25ae1f2fd0ec925e54927b4cb0d7acc27",
       "source_type": "story",
@@ -145162,6 +145239,7 @@
     },
     {
       "entity_id": "77c8b013db532427cdfc99f7b93960a63a1fffb3a23f9e0589e2b71ccf01aa30",
+<<<<<<< HEAD
       "knowledge_id": "4befae45f344fee2b3a35215cd5943fa7395c988f86379e462276238f9c30e06",
       "source_type": "fact",
       "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_phases_remaining",
@@ -145171,6 +145249,17 @@
       "supersedes": "d47eb7794606dfa93f65a3c0c6d607c4237f1c1e507483a62d8ea30f36205ed3",
       "causes": null,
       "reason": "fact-content=4f7e113dfa4b27be9c3fbb7d20da6d45a3e1695d971fe3e91cfbb26d217809cf",
+=======
+      "knowledge_id": "d47eb7794606dfa93f65a3c0c6d607c4237f1c1e507483a62d8ea30f36205ed3",
+      "source_type": "fact",
+      "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_phases_remaining",
+      "source_uri": "fact://workflow/wf_cap_site_revamp3_openai_gpt_5_6_terra/workflow_phases_remaining",
+      "observed_at": "2026-08-27T15:16:51.154289+00:00",
+      "indexed_at": "2026-08-27T15:17:00.262277+00:00",
+      "supersedes": "5577bedbe8b9f87f343007df873d39a575f9084a920ef0eb6638385d5adf374d",
+      "causes": null,
+      "reason": "fact-content=c2e2ad17cff0e5e22fb321baed7e103f8474cb0f3956af93768ff6a0ff0e3195",
+>>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -145192,6 +145281,7 @@
         },
         {
           "knowledge_id": "d47eb7794606dfa93f65a3c0c6d607c4237f1c1e507483a62d8ea30f36205ed3",
+<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:14.924359+00:00",
           "observed_at": "2026-08-27T15:16:51.154289+00:00",
@@ -145205,6 +145295,13 @@
           "observed_at": "2026-08-27T15:44:14.924359+00:00",
           "indexed_at": "2026-08-27T15:44:18.460020+00:00",
           "reason": "fact-content=4f7e113dfa4b27be9c3fbb7d20da6d45a3e1695d971fe3e91cfbb26d217809cf"
+=======
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T15:16:51.154289+00:00",
+          "indexed_at": "2026-08-27T15:17:00.262277+00:00",
+          "reason": "fact-content=c2e2ad17cff0e5e22fb321baed7e103f8474cb0f3956af93768ff6a0ff0e3195"
+>>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -223106,6 +223203,7 @@
     },
     {
       "entity_id": "b7d11a80f9428c50792bdc3cb51695336854c647accfe703553a7629c13533bd",
+<<<<<<< HEAD
       "knowledge_id": "8474b7a76523c212011430771e3a100d6284d71c1580227a7ac9d1a79a432640",
       "source_type": "fact",
       "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#current_commit",
@@ -223115,6 +223213,17 @@
       "supersedes": "fdd380ab2f668f68625a080e66e3d82eb9b7a8955c8080a57265ab1d75bb23e7",
       "causes": null,
       "reason": "fact-content=81d8ab39c9c9f36282adc773d562ec05db389fe9921cb12846996dd6643e5945",
+=======
+      "knowledge_id": "fdd380ab2f668f68625a080e66e3d82eb9b7a8955c8080a57265ab1d75bb23e7",
+      "source_type": "fact",
+      "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#current_commit",
+      "source_uri": "fact://job/wf_cap_site_revamp3_openai_gpt_5_6_terra/current_commit",
+      "observed_at": "2026-08-27T15:24:07.907394+00:00",
+      "indexed_at": "2026-08-27T15:24:14.756979+00:00",
+      "supersedes": "88fcdbaa1cfac3b3613d4b024326a0f4a71a526948e5860901bcdf88779af34c",
+      "causes": null,
+      "reason": "fact-content=1944fbeb63525ab96e9a41df8434e57909b32a6046883fa45c213d7643d4b6aa",
+>>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -223144,6 +223253,7 @@
         },
         {
           "knowledge_id": "fdd380ab2f668f68625a080e66e3d82eb9b7a8955c8080a57265ab1d75bb23e7",
+<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:11.077837+00:00",
           "observed_at": "2026-08-27T15:24:07.907394+00:00",
@@ -223157,6 +223267,13 @@
           "observed_at": "2026-08-27T15:44:11.077837+00:00",
           "indexed_at": "2026-08-27T15:44:16.936926+00:00",
           "reason": "fact-content=81d8ab39c9c9f36282adc773d562ec05db389fe9921cb12846996dd6643e5945"
+=======
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T15:24:07.907394+00:00",
+          "indexed_at": "2026-08-27T15:24:14.756979+00:00",
+          "reason": "fact-content=1944fbeb63525ab96e9a41df8434e57909b32a6046883fa45c213d7643d4b6aa"
+>>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -269994,6 +270111,7 @@
     },
     {
       "entity_id": "e00804c4a41586d908dd1232c9b260ac5b7f18b0101ccc9e88030cdc6eee5888",
+<<<<<<< HEAD
       "knowledge_id": "a6a12f4717eff0d52d1d81b235fc36ca329472b76c18278dfff0ec2140b34e6f",
       "source_type": "fact",
       "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_status",
@@ -270003,6 +270121,17 @@
       "supersedes": "f17a308c6fc9efc0c6d047b3ca801d49d4ef626269e8c873f4fbc4fc91190eb2",
       "causes": null,
       "reason": "fact-content=819b8d0dd6d59bb469a5f0dff4dbd4a5f08d202fa03265321addac14e786561d",
+=======
+      "knowledge_id": "f17a308c6fc9efc0c6d047b3ca801d49d4ef626269e8c873f4fbc4fc91190eb2",
+      "source_type": "fact",
+      "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_status",
+      "source_uri": "fact://workflow/wf_cap_site_revamp3_openai_gpt_5_6_terra/workflow_status",
+      "observed_at": "2026-08-27T15:16:51.154289+00:00",
+      "indexed_at": "2026-08-27T15:17:00.438566+00:00",
+      "supersedes": "fde2f5a52a0108461e2e3bd1b86384192715e9732bbb83830a6b5d8299594433",
+      "causes": null,
+      "reason": "fact-content=a9c200812658815d80cda745c2fe3252996ba21e8d2bb18de7c39fda1564f9ed",
+>>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -270024,6 +270153,7 @@
         },
         {
           "knowledge_id": "f17a308c6fc9efc0c6d047b3ca801d49d4ef626269e8c873f4fbc4fc91190eb2",
+<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:14.924359+00:00",
           "observed_at": "2026-08-27T15:16:51.154289+00:00",
@@ -270037,6 +270167,13 @@
           "observed_at": "2026-08-27T15:44:14.924359+00:00",
           "indexed_at": "2026-08-27T15:44:18.628617+00:00",
           "reason": "fact-content=819b8d0dd6d59bb469a5f0dff4dbd4a5f08d202fa03265321addac14e786561d"
+=======
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T15:16:51.154289+00:00",
+          "indexed_at": "2026-08-27T15:17:00.438566+00:00",
+          "reason": "fact-content=a9c200812658815d80cda745c2fe3252996ba21e8d2bb18de7c39fda1564f9ed"
+>>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -296586,6 +296723,7 @@
     },
     {
       "entity_id": "f56c9535c9fa2f44f439efcc9e12eba700f4d8967bf98003526924a9cbf958fd",
+<<<<<<< HEAD
       "knowledge_id": "106bb5f2be3e6a5f303d65b42f4951dfb905baaa171d1cb7c5a88809d53fcf5c",
       "source_type": "fact",
       "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#job_accumulated_cost_usd",
@@ -296595,6 +296733,17 @@
       "supersedes": "733e4fb5b47bcaa5357a829fe038701f68a2331ae4fa90dc8ec8fc59acb670fa",
       "causes": null,
       "reason": "fact-content=f7934fde58e203fcd0f2b69f46c83103ac7f33eb4f2d675a8bf6304c74460ec5",
+=======
+      "knowledge_id": "733e4fb5b47bcaa5357a829fe038701f68a2331ae4fa90dc8ec8fc59acb670fa",
+      "source_type": "fact",
+      "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#job_accumulated_cost_usd",
+      "source_uri": "fact://job/wf_cap_site_revamp3_openai_gpt_5_6_terra/job_accumulated_cost_usd",
+      "observed_at": "2026-08-27T15:24:07.907394+00:00",
+      "indexed_at": "2026-08-27T15:24:14.937855+00:00",
+      "supersedes": "847d6b141e6e3207c986cae396d241c41811fe350e8edd42b57aa109d551da9b",
+      "causes": null,
+      "reason": "fact-content=8868b8bbdd0ea4671fc3430c1d2aaf09fd8e86f135a9c968f4d7702ca1eb9ef3",
+>>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -296624,6 +296773,7 @@
         },
         {
           "knowledge_id": "733e4fb5b47bcaa5357a829fe038701f68a2331ae4fa90dc8ec8fc59acb670fa",
+<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:11.077837+00:00",
           "observed_at": "2026-08-27T15:24:07.907394+00:00",
@@ -296637,6 +296787,13 @@
           "observed_at": "2026-08-27T15:44:11.077837+00:00",
           "indexed_at": "2026-08-27T15:44:17.107385+00:00",
           "reason": "fact-content=f7934fde58e203fcd0f2b69f46c83103ac7f33eb4f2d675a8bf6304c74460ec5"
+=======
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T15:24:07.907394+00:00",
+          "indexed_at": "2026-08-27T15:24:14.937855+00:00",
+          "reason": "fact-content=8868b8bbdd0ea4671fc3430c1d2aaf09fd8e86f135a9c968f4d7702ca1eb9ef3"
+>>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },

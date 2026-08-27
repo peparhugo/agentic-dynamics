@@ -1,0 +1,688 @@
+{
+ "gate": "PASS",
+ "pages": [
+  "index.html",
+  "framework.html",
+  "question.html",
+  "evidence.html",
+  "methodology.html",
+  "story.html",
+  "accelerator.html",
+  "databricks.html",
+  "glossary.html"
+ ],
+ "viewports": [
+  [
+   1440,
+   900
+  ],
+  [
+   390,
+   844
+  ]
+ ],
+ "total": 22,
+ "passed": 22,
+ "skipped": 0,
+ "failed": 0,
+ "results": [
+  {
+   "name": "svg#0(diagram-map)",
+   "page": "index.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1120,
+    452
+   ],
+   "viewBox": "0 0 1440 580",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 499,
+   "shapeMarkupLen": 1588,
+   "shapes": 21,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 24,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0(diagram-map workflow-map)",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1034,
+    546
+   ],
+   "viewBox": "0 0 1440 760",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 1140,
+   "shapeMarkupLen": 2629,
+   "shapes": 36,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 10.97,
+   "contrastChecked": 70,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#1(diagram-map)",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1100,
+    429
+   ],
+   "viewBox": "0 0 1440 560",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 682,
+   "shapeMarkupLen": 1931,
+   "shapes": 28,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 44,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#2(diagram-map)",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1100,
+    444
+   ],
+   "viewBox": "0 0 1440 580",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 499,
+   "shapeMarkupLen": 1588,
+   "shapes": 21,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 24,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#3(diagram-map)",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1100,
+    399
+   ],
+   "viewBox": "0 0 1440 520",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 572,
+   "shapeMarkupLen": 1164,
+   "shapes": 16,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 21,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#4(diagram-map)",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1100,
+    429
+   ],
+   "viewBox": "0 0 1440 560",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 510,
+   "shapeMarkupLen": 1301,
+   "shapes": 17,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 8.37,
+   "contrastChecked": 21,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#5(diagram-map autonomy-map)",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1034,
+    546
+   ],
+   "viewBox": "0 0 1440 760",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 1005,
+   "shapeMarkupLen": 2389,
+   "shapes": 32,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.23,
+   "contrastChecked": 54,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0(diagram-map)",
+   "page": "question.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    980,
+    355
+   ],
+   "viewBox": "0 0 1440 520",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 433,
+   "shapeMarkupLen": 1556,
+   "shapes": 22,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 17,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0(diagram-map)",
+   "page": "evidence.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    980,
+    287
+   ],
+   "viewBox": "0 0 1440 420",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 336,
+   "shapeMarkupLen": 819,
+   "shapes": 12,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 13,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#1(diagram-map)",
+   "page": "evidence.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    980,
+    247
+   ],
+   "viewBox": "0 0 1440 360",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 406,
+   "shapeMarkupLen": 820,
+   "shapes": 12,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 14,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0:cc-plot",
+   "page": "methodology.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    668,
+    335
+   ],
+   "viewBox": "0 0 720 360",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 36,
+   "shapeMarkupLen": 546,
+   "shapes": 3,
+   "paint": [
+    "first-paint"
+   ],
+   "opacity": 1,
+   "contrast": 17.19,
+   "contrastChecked": 8,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0(diagram-map)",
+   "page": "index.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    211
+   ],
+   "viewBox": "0 0 1440 580",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 499,
+   "shapeMarkupLen": 1588,
+   "shapes": 21,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 24,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0(diagram-map workflow-map)",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    900,
+    475
+   ],
+   "viewBox": "0 0 1440 760",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 1140,
+   "shapeMarkupLen": 2629,
+   "shapes": 36,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 10.97,
+   "contrastChecked": 70,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#1(diagram-map)",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    203
+   ],
+   "viewBox": "0 0 1440 560",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 682,
+   "shapeMarkupLen": 1931,
+   "shapes": 28,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 44,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#2(diagram-map)",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    211
+   ],
+   "viewBox": "0 0 1440 580",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 499,
+   "shapeMarkupLen": 1588,
+   "shapes": 21,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 24,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#3(diagram-map)",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    189
+   ],
+   "viewBox": "0 0 1440 520",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 572,
+   "shapeMarkupLen": 1164,
+   "shapes": 16,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 21,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#4(diagram-map)",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    203
+   ],
+   "viewBox": "0 0 1440 560",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 510,
+   "shapeMarkupLen": 1301,
+   "shapes": 17,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 8.37,
+   "contrastChecked": 21,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#5(diagram-map autonomy-map)",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    900,
+    475
+   ],
+   "viewBox": "0 0 1440 760",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 1005,
+   "shapeMarkupLen": 2389,
+   "shapes": 32,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.23,
+   "contrastChecked": 54,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0(diagram-map)",
+   "page": "question.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    189
+   ],
+   "viewBox": "0 0 1440 520",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 433,
+   "shapeMarkupLen": 1556,
+   "shapes": 22,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 17,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0(diagram-map)",
+   "page": "evidence.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    153
+   ],
+   "viewBox": "0 0 1440 420",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 336,
+   "shapeMarkupLen": 819,
+   "shapes": 12,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 13,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#1(diagram-map)",
+   "page": "evidence.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    132
+   ],
+   "viewBox": "0 0 1440 360",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 406,
+   "shapeMarkupLen": 820,
+   "shapes": 12,
+   "paint": [
+    "first-paint",
+    "first-contentful-paint"
+   ],
+   "opacity": 1,
+   "contrast": 9.95,
+   "contrastChecked": 14,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0:cc-plot",
+   "page": "methodology.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    356,
+    179
+   ],
+   "viewBox": "0 0 720 360",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 36,
+   "shapeMarkupLen": 546,
+   "shapes": 3,
+   "paint": [
+    "first-paint"
+   ],
+   "opacity": 1,
+   "contrast": 17.19,
+   "contrastChecked": 8,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  }
+ ]
+}

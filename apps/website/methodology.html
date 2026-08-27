@@ -12,7 +12,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="base.css?v=5eaac84ab">
 <style>
 .sec.wide{max-width:1100px}
 .pulse{font-size:0.68rem;margin-bottom:1rem}
@@ -36,7 +36,7 @@
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
@@ -52,6 +52,16 @@
 <div class="stat"><div class="v">249</div><div class="l">Historical Sessions</div></div>
 <div class="stat"><div class="v">8</div><div class="l">Models Tested</div></div>
 </div>
+<!-- ref: type-responsive-grid.html — the provenance receipt beside the instrument hero. -->
+<aside class="field-receipt" style="max-width:800px;margin:1.25rem auto 0">
+  <div class="r-head">Instrument receipt</div>
+  <dl>
+    <dt>What this page measures</dt><dd>The perturbation instrument: cells, factor assignments, ledger events, measurement rules, and policy arms.</dd>
+    <dt>Corpus split</dt><dd>The 249 historical perturbation sessions are the precursor; the <a href="evidence.html" style="color:var(--ac)">Evidence page</a> leads with the newer 1,067-session linked-story corpus. The two are never merged.</dd>
+    <dt>Honest nulls</dt><dd>Signals the instrument has not captured are named below — never rendered as zero.</dd>
+    <dt>Updated</dt><dd>2026-08-27</dd>
+  </dl>
+</aside>
 </section>
 
 <details style="max-width:800px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
@@ -251,6 +261,83 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <div style="margin-top:2rem"><a href="/" class="cta-btn" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s;border:none;cursor:pointer">Explore Agentic Dynamics &rarr;</a></div>
 </section>
 
+<!-- FIELD LAYER: the cost-curve explorable — a bounded [C] scenario control, separate
+     from the live calculator. ref: d3-interactive-curve.html (one input, labeled
+     modeled curve), d3-line-arc.html (observed arc where a canonical series exists). -->
+<section class="sec alt wide">
+<h2>Cost Curves — Observed Arc and Modeled Scenario</h2>
+<p class="lead">Two cost curves are kept visually separate. If a canonical observed series exists, it is labeled <span class="ev-badge m">[M]/[C]</span>. The N² scenario below is a <span class="ev-badge c">[C]</span> model: one input (<span class="mono">&beta;</span> context inflation) changes a labeled curve, and the formula is exposed beside it. It never merges with observed data and never forecasts a business result.</p>
+
+<div class="edit-split">
+  <figure class="figure-edit" aria-labelledby="cc-title">
+    <span class="kicker" id="cc-title">N² scenario — modeled cumulative cost</span>
+    <svg id="cc-plot" viewBox="0 0 720 360" role="img" aria-labelledby="cc-title cc-desc" style="background:var(--bg3);border:1px solid var(--b);border-radius:12px">
+      <title id="cc-desc">A labeled modeled curve: cumulative cost grows with an N-squared term controlled by the context-inflation input.</title>
+    </svg>
+    <figcaption>Figure M1. Modeled N² cumulative cost (C = N + &beta;·v·N(N−1)/2). The curve is [C]: it exposes its formula and input and does not represent an observed series.</figcaption>
+    <div class="fig-legend"><span class="ev-badge c">[C] modeled scenario</span><span>ref: d3-interactive-curve.html</span></div>
+  </figure>
+  <aside class="field-receipt">
+    <div class="r-head">Scenario control</div>
+    <dl>
+      <dt>Input</dt><dd>&beta; — context inflation rate per line (default 0.001, [P] calibrated).</dd>
+      <dt>Fixed</dt><dd>v = 500 lines/session ([C]); N from 1 to 25 sessions.</dd>
+      <dt>Formula</dt><dd>C(N,v) = C&#8320; × [N + &beta;·v·N(N−1)/2] — the N² term is the modeled extension.</dd>
+      <dt>Boundary</dt><dd>Scenario only: never merged with observed data, never a forecast.</dd>
+    </dl>
+  </aside>
+</div>
+
+<label style="display:block;max-width:680px;margin:0.5rem auto 1rem;font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--t2)">Context inflation beta
+  <input id="cc-beta" type="range" min="0" max="0.004" value="0.001" step="0.0001" style="display:block;width:100%;margin-top:0.4rem">
+  <output id="cc-beta-out" style="color:var(--am);font-weight:700">0.0010</output>
+</label>
+
+<div class="null-state"><span class="ns-tag">not measured</span><span><strong>Observed five-session arc.</strong> No canonical current series is wired to this figure; the observed arc remains a <a href="evidence.html#arc" style="color:var(--ac)">named section on The Evidence</a>. Until a canonical lab output exists, the arc here stays a scenario — never a measured fallback.</span></div>
+<div class="null-state"><span class="ns-tag">no canonical output</span><span><strong>Lab-panel panels.</strong> The analysis surfaces without a canonical current output render their absence here explicitly.</span></div>
+</section>
+
+<script>
+/* Cost-curve explorable — one bounded [C] input redraws a labeled modeled curve.
+   ref: d3-interactive-curve.html (kbroman/d3examples LOD curve, MIT). */
+(function () {
+  var input = document.getElementById('cc-beta');
+  var out = document.getElementById('cc-beta-out');
+  var svg = document.getElementById('cc-plot');
+  if (!input || !svg) return;
+  var W = 720, H = 360, M = { t: 25, r: 35, b: 48, l: 55 };
+  function draw() {
+    var beta = +input.value;
+    var data = [];
+    for (var n = 1; n <= 25; n++) {
+      var c = n + beta * 500 * n * (n - 1) / 2;
+      data.push({ n: n, c: c });
+    }
+    out.textContent = beta.toFixed(4);
+    svg.innerHTML = '';
+    var x = function (n) { return M.l + (n - 1) / 24 * (W - M.l - M.r); };
+    var maxC = data[24].c;
+    var y = function (c) { return H - M.b - c / maxC * (H - M.t - M.b); };
+    var path = '';
+    for (var i = 0; i < data.length; i++) {
+      path += (i ? 'L' : 'M') + x(data[i].n).toFixed(1) + ' ' + y(data[i].c).toFixed(1);
+    }
+    var g = '';
+    g += '<line x1="' + M.l + '" y1="' + (H - M.b) + '" x2="' + (W - M.r) + '" y2="' + (H - M.b) + '" stroke="var(--ev-graphite)" stroke-width="1.5"/>';
+    g += '<line x1="' + M.l + '" y1="' + M.t + '" x2="' + M.l + '" y2="' + (H - M.b) + '" stroke="var(--ev-graphite)" stroke-width="1.5"/>';
+    for (var n = 1; n <= 25; n += 4) {
+      var tx = x(n);
+      g += '<text x="' + tx + '" y="' + (H - M.b + 16) + '" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">' + n + '</text>';
+    }
+    g += '<path d="' + path + '" fill="none" stroke="#287271" stroke-width="3"/>';
+    g += '<text x="' + (W - M.r) + '" y="' + (M.t + 14) + '" text-anchor="end" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">cumulative cost (modeled)</text>';
+    svg.innerHTML = g;
+  }
+  input.oninput = draw;
+  draw();
+})();
+</script>
+
 <section class="sec alt wide">
 <h2>Where This Work Fits in the Literature</h2>
 <p class="lead">The concepts in Agentic Dynamics connect to established academic and industry research. Each coined term maps to a known body of work.</p>
@@ -285,6 +372,6 @@ Known methodological constraints: <strong>insert_contradiction</strong> domain m
   <a href="/">Home</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>
 
-<script src="app.js"></script>
+<script src="app.js?v=5eaac84ab"></script>
 </body>
 </html>

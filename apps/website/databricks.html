@@ -12,7 +12,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="base.css?v=5eaac84ab">
 <style>
 article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 .db-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,0.72fr);gap:2rem;align-items:stretch;margin-bottom:3rem}
@@ -48,7 +48,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <article>
 
@@ -58,6 +58,16 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <h1>Two Methods, Convergent Questions</h1>
 <p class="lead">In July 2026, Databricks published their playbook for reducing AI coding costs at scale — based on surveys of Stripe, Coinbase, Uber, and Ramp. The sources reached related operational conclusions through different evidence: Databricks contributes enterprise survey evidence, while this instrument contributes 227 historical controlled stress tests across 8 models and 3 architectures.</p>
 <a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" class="ext-link" target="_blank">Read the original Databricks post →</a>
+<!-- ref: card-tooltip-badge.html, type-editorial-measure.html — external claims are [X]
+     with source and date; instrument comparisons stay scoped. -->
+<div class="field-receipt" style="margin-top:1rem">
+  <div class="r-head">Scope labels</div>
+  <dl>
+    <dt>[X] external</dt><dd>Databricks' survey findings are external context — quoted with their source and date (Aug 2026 blog), never used as causal support for a corpus finding.</dd>
+    <dt>[M]/[C] instrument</dt><dd>This instrument's measurements are scoped to the 227 historical controlled experiments + the 1,067-session story corpus; they are not enterprise deployment data.</dd>
+    <dt>Anti-SaaS guard</dt><dd>Related-work comparison only — no product framing, no conversion language.</dd>
+  </dl>
+</div>
 </div>
 <aside class="db-ledger">
 <h3>Two methodologies</h3>
@@ -78,8 +88,8 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <div class="claim-grid">
 <div class="claim-box">
   <div class="tag their">Databricks</div>
-  <h4>Their evidence</h4>
-  <p>Surveys of Stripe, Coinbase, Uber, and Ramp. Directional estimates. "Public benchmarks do a poor job of indicating real-world performance on coding tasks."</p>
+  <h4>Their evidence <span class="ev-badge x" style="vertical-align:middle">[X] external</span></h4>
+  <p>Surveys of Stripe, Coinbase, Uber, and Ramp. Directional estimates. "Public benchmarks do a poor job of indicating real-world performance on coding tasks." <em style="color:var(--t3)">(source: Databricks blog, Aug 2026 — [X] external context, not corpus evidence.)</em></p>
 </div>
 <div class="claim-box">
   <div class="tag ours">This instrument</div>
@@ -93,7 +103,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <div class="claim-grid">
 <div class="claim-box">
   <div class="tag their">Databricks</div>
-  <h4>Their finding</h4>
+  <h4>Their finding <span class="ev-badge x" style="vertical-align:middle">[X] external</span></h4>
   <p>"Rapidly adopting newer, more efficient models delivers the largest cost wins." ~50% savings. "The efficiency frontier is advancing far faster than the intelligence frontier."</p>
 </div>
 <div class="claim-box">
@@ -109,7 +119,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <div class="claim-grid">
 <div class="claim-box">
   <div class="tag their">Databricks</div>
-  <h4>Their finding</h4>
+  <h4>Their finding <span class="ev-badge x" style="vertical-align:middle">[X] external</span></h4>
   <p>"Internal results suggest that our AI Gateway Smart Router is able to consistently reduce average task cost by more than 30%." Request-level, task-level, and escalation routing.</p>
 </div>
 <div class="claim-box">
@@ -125,7 +135,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <div class="claim-grid">
 <div class="claim-box">
   <div class="tag their">Databricks</div>
-  <h4>Their finding</h4>
+  <h4>Their finding <span class="ev-badge x" style="vertical-align:middle">[X] external</span></h4>
   <p>"Instead of a hard user spending cap, most companies are adopting a more nuanced and progressive approach." Visibility, spend gates, downshifting, suspension. ~10% savings.</p>
 </div>
 <div class="claim-box">
@@ -141,7 +151,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <div class="claim-grid">
 <div class="claim-box">
   <div class="tag their">Databricks</div>
-  <h4>Their finding</h4>
+  <h4>Their finding <span class="ev-badge x" style="vertical-align:middle">[X] external</span></h4>
   <p>"Simple tuning of our harness and caching settings led to an almost 50% reduction in the number of generated tokens." Compaction, less chatty harnesses, cache tuning. ~10% + 50% token reduction.</p>
 </div>
 <div class="claim-box">
@@ -204,6 +214,6 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <a href="/">Home</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>
 
-<script src="app.js"></script>
+<script src="app.js?v=5eaac84ab"></script>
 </body>
 </html>

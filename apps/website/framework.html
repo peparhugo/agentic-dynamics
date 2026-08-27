@@ -12,7 +12,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="base.css?v=5eaac84ab">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 /* Semantic aliases bind the facelift to the shared theme instead of adding a page-specific palette. */
@@ -48,45 +48,11 @@
 .framework-page .architecture-section{background:var(--bg2);padding-top:clamp(4rem,8vw,7rem)}
 .framework-page .architecture-intro{display:flex;justify-content:space-between;gap:2rem;align-items:end;text-align:left;margin-bottom:1.5rem}
 .framework-page .architecture-intro .lead{max-width:39rem;margin:0}
-.framework-page .system-figure{margin:0;border:1px solid var(--fw-line-strong);border-radius:1.4rem;background:linear-gradient(145deg,var(--bg2),var(--bg));box-shadow:var(--panel-shadow);overflow:hidden;text-align:left;padding:clamp(1rem,3vw,2rem)}
-.framework-page .diagram-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-color:var(--fw-how) var(--fw-inset);border-radius:.75rem}
-.framework-page .diagram-scroll:focus-visible{outline:2px solid var(--fw-how);outline-offset:3px}
-.framework-page .diagram-map{display:block;width:100%;height:auto;min-width:980px;background:var(--bg)}
-.framework-page .diagram-map .map-ground{fill:var(--bg);stroke:var(--fw-line);stroke-width:1}
-.framework-page .diagram-map .map-grid{fill:url(#workflow-grid);opacity:.72}
-.framework-page .diagram-map .map-kicker{fill:var(--fw-how);font:700 11px 'JetBrains Mono',monospace;letter-spacing:.18em}
-.framework-page .diagram-map .map-title{fill:var(--t);font:700 23px 'JetBrains Mono',monospace;letter-spacing:.05em}
-.framework-page .diagram-map .map-copy{fill:var(--t3);font:500 10px 'JetBrains Mono',monospace;letter-spacing:.035em}
-.framework-page .diagram-map .map-label{fill:var(--t3);font:700 9px 'JetBrains Mono',monospace;letter-spacing:.12em}
-.framework-page .diagram-map .map-node{fill:var(--bg3);stroke:var(--fw-line-strong);stroke-width:1.2}
-.framework-page .diagram-map .map-node.cyan{stroke:var(--fw-how)}.framework-page .diagram-map .map-node.blue{stroke:var(--fw-what)}.framework-page .diagram-map .map-node.amber{stroke:var(--fw-why)}
-.framework-page .diagram-map .node-index{fill:var(--t3);font:700 8px 'JetBrains Mono',monospace;letter-spacing:.1em}
-.framework-page .diagram-map .node-title{fill:var(--t);font:700 14px 'JetBrains Mono',monospace;letter-spacing:.06em}
-.framework-page .diagram-map .node-copy{fill:var(--t2);font:500 9px 'JetBrains Mono',monospace}
-.framework-page .diagram-map .flow{fill:none;stroke:var(--t3);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#workflow-arrow)}
-.framework-page .diagram-map .flow.cyan{stroke:var(--fw-how);marker-end:url(#workflow-arrow-cyan)}.framework-page .diagram-map .flow.blue{stroke:var(--fw-what);marker-end:url(#workflow-arrow-blue)}.framework-page .diagram-map .flow.amber{stroke:var(--fw-why);stroke-dasharray:7 6;marker-end:url(#workflow-arrow-amber)}
-.framework-page .diagram-map .flow-note{fill:var(--t3);font:500 8px 'JetBrains Mono',monospace;paint-order:stroke;stroke:var(--bg);stroke-width:4px}
-.framework-page .diagram-map .mode-surface{fill:var(--bg2);stroke:var(--fw-line-strong);stroke-width:1}.framework-page .diagram-map .mode-surface.operate{stroke:var(--fw-how)}.framework-page .diagram-map .mode-surface.experiment{stroke:var(--fw-what)}
-.framework-page .diagram-map .rail{fill:var(--bg2);stroke:var(--fw-line-strong);stroke-width:1}.framework-page .diagram-map .rail-divider{stroke:var(--fw-line);stroke-width:1}
-.framework-page .diagram-map .scale-symbol{fill:var(--fw-how);font:800 22px 'JetBrains Mono',monospace}.framework-page .diagram-map .scale-op{fill:var(--t3);font:400 20px 'JetBrains Mono',monospace}.framework-page .diagram-map .scale-title{fill:var(--t);font:700 11px 'JetBrains Mono',monospace}.framework-page .diagram-map .scale-copy{fill:var(--t3);font:500 8px 'JetBrains Mono',monospace}
-.framework-page .diagram-map .tracer{fill:none;stroke:var(--fw-how);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:1 99;pathLength:100;opacity:.72;animation:fw-trace 8s linear infinite}.framework-page .diagram-map .tracer.return{stroke:var(--fw-why);animation-duration:11s}
-@keyframes fw-trace{to{stroke-dashoffset:-100}}
-.framework-page .system-figure.redesigned>.mode-entry-grid,.framework-page .system-figure.redesigned>.merge-label,.framework-page .system-figure.redesigned>.process-row,.framework-page .system-figure.redesigned>.system-planes{display:none}
-.framework-page .mode-entry-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-.framework-page .mode-entry{background:var(--fw-surface);border:1px solid var(--fw-line);border-top:2px solid var(--fw-how);padding:1rem;min-width:0}
-.framework-page .mode-entry.experiment{border-top-color:var(--fw-what)}
-.framework-page .mode-entry .micro-label{color:var(--fw-how)}.framework-page .mode-entry.experiment .micro-label{color:var(--fw-what)}
-.framework-page .mode-entry strong{display:block;color:var(--t);font-size:1rem;margin:.5rem 0 .35rem}.framework-page .mode-entry p{font-size:.73rem;line-height:1.6;color:var(--t2);margin:0}
-.framework-page .merge-label{display:flex;align-items:center;justify-content:center;gap:.75rem;margin:1rem 0;color:var(--fw-how);font:700 .68rem/1 'JetBrains Mono',monospace;letter-spacing:.11em;text-transform:uppercase}
-.framework-page .merge-label::before,.framework-page .merge-label::after{content:'';height:1px;flex:1;background:var(--fw-line-strong)}
-.framework-page .process-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1.2rem;list-style:none;margin:0;padding:0}
-.framework-page .process-step{position:relative;background:var(--fw-inset);border:1px solid var(--fw-line-strong);padding:1rem;min-height:7.2rem}
-.framework-page .process-step:not(:last-child)::after{content:'\2192';position:absolute;right:-1rem;top:50%;transform:translateY(-50%);color:var(--fw-how);font-size:1.1rem;z-index:2}
-.framework-page .process-step span{display:block;color:var(--t3);font:700 .58rem/1 'JetBrains Mono',monospace;letter-spacing:.1em}.framework-page .process-step strong{display:block;color:var(--t);font-size:.88rem;margin:.65rem 0 .35rem}.framework-page .process-step p{font-size:.67rem;line-height:1.5;color:var(--t2);margin:0}
-.framework-page .system-planes{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-top:1.2rem}
-.framework-page .system-plane{background:var(--bg);border:1px solid var(--fw-line);padding:1rem}.framework-page .system-plane:nth-child(2){border-top:2px solid var(--fw-what)}.framework-page .system-plane:nth-child(3){border-top:2px solid var(--fw-why)}
-.framework-page .system-plane strong{display:block;color:var(--t);font:700 .7rem/1.2 'JetBrains Mono',monospace;margin-bottom:.45rem}.framework-page .system-plane p{font-size:.69rem;line-height:1.55;color:var(--t2);margin:0}
-.framework-page .system-figure figcaption{border-top:1px solid var(--fw-line);margin:1.2rem 0 0;padding:1rem 0 0;color:var(--t2);font-size:.78rem;line-height:1.65}
+/* Diagram container + map-internal classes (ground, grid, nodes, flows,
+   scale rail, tracer) are the shared DIAGRAM SYSTEM in base.css — one figure
+   grammar reused by every page figure (site revamp4 p3b). */
+.framework-page .system-plane:nth-child(2){border-top-color:var(--fw-what)}
+.framework-page .system-plane:nth-child(3){border-top-color:var(--fw-why)}
 .framework-page .scale-band{margin-top:1rem;background:var(--fw-surface);border:1px solid var(--fw-line-strong);padding:1.25rem}
 .framework-page .scale-formula{font:700 clamp(1rem,2.5vw,1.5rem)/1.3 'JetBrains Mono',monospace;color:var(--t);text-align:center;margin-bottom:1rem}.framework-page .scale-formula span{color:var(--fw-how)}
 .framework-page .scale-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--fw-line)}
@@ -96,25 +62,8 @@
 .framework-page .architecture-text strong{display:block;color:var(--t);font:700 .7rem/1.2 'JetBrains Mono',monospace;margin-bottom:.5rem}
 
 .framework-page .autonomy-section{background:var(--bg);padding-top:clamp(4rem,8vw,7rem)}
-.framework-page .authority-map{margin:1.5rem 0 0;border:1px solid var(--fw-line-strong);border-radius:1.4rem;background:linear-gradient(145deg,var(--bg2),var(--bg));padding:clamp(1rem,3vw,2rem);box-shadow:var(--panel-shadow)}
-.framework-page .authority-map.redesigned>.human-plane,.framework-page .authority-map.redesigned>.authority-connector,.framework-page .authority-map.redesigned>.bounded-zone,.framework-page .authority-map.redesigned>.authority-outputs,.framework-page .authority-map.redesigned>.autonomy-levels{display:none}
-.framework-page .autonomy-map .boundary{fill:rgba(34,211,238,.025);stroke:var(--fw-how);stroke-width:1.5;stroke-dasharray:9 6}
-.framework-page .autonomy-map .human-surface{fill:var(--bg2);stroke:var(--fw-why);stroke-width:1.4}
-.framework-page .autonomy-map .limit-pill{fill:var(--bg);stroke:var(--fw-line-strong);stroke-width:1}.framework-page .autonomy-map .limit-text{fill:var(--t2);font:700 8px 'JetBrains Mono',monospace;letter-spacing:.08em;text-anchor:middle}
-.framework-page .autonomy-map .mode-tab{fill:var(--bg2);stroke:var(--fw-line-strong);stroke-width:1}.framework-page .autonomy-map .mode-tab.active{stroke:var(--fw-what);stroke-width:1.5}
-.framework-page .autonomy-map .outcome-surface{fill:var(--bg2);stroke:var(--fw-how);stroke-width:1}.framework-page .autonomy-map .outcome-surface.exception{stroke:var(--fw-why)}
-.framework-page .human-plane{display:grid;grid-template-columns:12rem 1fr;gap:1rem;align-items:center;background:var(--fw-surface);border:1px solid var(--fw-line);border-left:3px solid var(--fw-why);padding:1rem;text-align:left}
-.framework-page .human-plane strong{color:var(--fw-why);font:700 .72rem/1.3 'JetBrains Mono',monospace;letter-spacing:.08em}.framework-page .human-plane p{font-size:.73rem;line-height:1.6;color:var(--t2);margin:0}
-.framework-page .authority-connector{text-align:center;color:var(--fw-why);font:700 .65rem/2.4 'JetBrains Mono',monospace;letter-spacing:.08em}
-.framework-page .bounded-zone{border:1px solid var(--fw-how);padding:1.25rem;background:rgba(34,211,238,.025)}
-.framework-page .zone-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;margin-bottom:1rem}.framework-page .zone-head strong{color:var(--fw-how);font:700 .75rem/1 'JetBrains Mono',monospace;letter-spacing:.08em}.framework-page .zone-head span{color:var(--t3);font-size:.67rem}
-.framework-page .autonomy-process{display:grid;grid-template-columns:repeat(6,1fr);gap:.5rem;list-style:none;margin:0;padding:0;counter-reset:auto-step}
-.framework-page .autonomy-process li{counter-increment:auto-step;position:relative;background:var(--fw-inset);border:1px solid var(--fw-line);padding:.8rem .6rem;text-align:center;color:var(--t);font-size:.7rem;min-width:0}
-.framework-page .autonomy-process li::before{content:'0' counter(auto-step);display:block;color:var(--t3);font:700 .56rem/1 'JetBrains Mono',monospace;margin-bottom:.45rem}.framework-page .autonomy-process li:not(:last-child)::after{content:'\2192';position:absolute;right:-.48rem;top:50%;transform:translate(50%,-50%);color:var(--fw-how);z-index:2}
-.framework-page .constraint-rail{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;border-top:1px solid var(--fw-line);margin-top:1rem;padding-top:1rem}.framework-page .constraint-rail span{border:1px solid var(--fw-line);background:var(--bg);padding:.35rem .65rem;color:var(--t2);font:600 .6rem/1 'JetBrains Mono',monospace;text-transform:uppercase}
-.framework-page .authority-outputs{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-top:.7rem}.framework-page .authority-output{background:var(--fw-surface);border:1px solid var(--fw-line);padding:1rem}.framework-page .authority-output strong{display:block;color:var(--fw-how);font-size:.75rem;margin-bottom:.35rem}.framework-page .authority-output.exception strong{color:var(--fw-why)}.framework-page .authority-output p{font-size:.68rem;line-height:1.5;color:var(--t2);margin:0}
-.framework-page .autonomy-levels{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-top:1rem}.framework-page .autonomy-level{background:var(--fw-surface);border:1px solid var(--fw-line);padding:1rem;text-align:left}.framework-page .autonomy-level strong{display:block;color:var(--t);font-size:.78rem;margin-bottom:.4rem}.framework-page .autonomy-level p{font-size:.68rem;line-height:1.55;color:var(--t2);margin:0}.framework-page .autonomy-level.current{border-top:2px solid var(--fw-what)}
-.framework-page .authority-caption{margin:1rem 0 0;color:var(--t2);font-size:.76rem;line-height:1.65;text-align:left}.framework-page .authority-caption strong{color:var(--fw-what)}
+/* .authority-map container + .redesigned fallback grids + all .diagram-map
+   internal classes live in base.css DIAGRAM SYSTEM (shared figure grammar). */
 
 /* Console lanes distinguish directly operated inputs from modeled compounding without changing provenance. */
 .framework-page .lever-console{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:2rem;text-align:left}
@@ -241,7 +190,7 @@
 </head>
 <body class="framework-page">
 
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link" style="color:var(--ac)" aria-current="page">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link" style="color:var(--ac)" aria-current="page">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- SECTION: Shared execution -->
 <section class="fsec dossier-hero" id="why"><div class="inr wide">
@@ -273,6 +222,17 @@
 </div></section>
 <div class="audience-note"><strong style="color:var(--ac)">Who this is for:</strong> Organizations operating AI workflows at scale, from human-assisted engineering sessions to bounded autonomous pipelines. The current evidence is drawn from Python/Flask REST APIs and TypeScript/Node.js; validate the <a href="methodology.html" style="color:var(--ac)">instrument</a> in other domains before adopting its policy candidates.</div>
 
+<!-- ref: type-responsive-grid.html — the quiet provenance receipt beside the hero. -->
+<aside class="field-receipt" style="max-width:900px;margin:1.5rem auto 0">
+  <div class="r-head">Framework receipt</div>
+  <dl>
+    <dt>What is measured [M]</dt><dd>Observed cost, outcome, narration, and cache fields from the corpus (1,067 story sessions, 7 models).</dd>
+    <dt>What is computed [C]</dt><dd>First-pass quality, Grit, cost per accepted outcome, WOC ratio — derived from the measured fields.</dd>
+    <dt>What is modeled [P]/[X]</dt><dd>β context inflation, EPM energy horizon, batch/cascade/SLA extensions — calibrated inputs and assumptions, not measured outcomes.</dd>
+    <dt>Limitation</dt><dd>A rule's premise being measured does not make the rule measured; rules not run as policy arms remain proposals. See <a href="evidence.html" style="color:var(--ac)">The Evidence</a> for verdicts.</dd>
+  </dl>
+</aside>
+
 <!-- ARCHITECTURE: Inline source keeps the system map theme-aware, printable, and dependency-free. -->
 <section class="fsec architecture-section"><div class="inr wide">
   <div class="architecture-intro">
@@ -288,21 +248,21 @@
         <title id="workflow-map-title">One workflow engine operating as a single cell or an experimental grid</title>
         <desc id="workflow-map-desc">A fixed factor assignment and a factor cross-product converge on the same cell, compiler, jobs, attempts, and ledger. The ledger produces information for runtime policy. Experimental grids additionally compare arms and adapt the next specification. A lower rail shows grid breadth times workflow depth times measurement breadth.</desc>
         <defs>
-          <pattern id="workflow-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
-          <linearGradient id="workflow-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
-          <radialGradient id="workflow-core" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="var(--fw-how)" stop-opacity=".2"/><stop offset="1" stop-color="var(--fw-how)" stop-opacity=".025"/></radialGradient>
-          <filter id="workflow-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          <marker id="workflow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t3)"/></marker>
-          <marker id="workflow-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--fw-how)"/></marker>
-          <marker id="workflow-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--fw-what)"/></marker>
-          <marker id="workflow-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--fw-why)"/></marker>
+          <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+          <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+          <radialGradient id="diagram-core" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="var(--fw-how)" stop-opacity=".2"/><stop offset="1" stop-color="var(--fw-how)" stop-opacity=".025"/></radialGradient>
+          <filter id="diagram-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t3)"/></marker>
+          <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--fw-how)"/></marker>
+          <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--fw-what)"/></marker>
+          <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--fw-why)"/></marker>
         </defs>
-        <rect class="map-ground" x="1" y="1" width="1438" height="758" rx="24" style="fill:url(#workflow-ground)"/>
+        <rect class="map-ground" x="1" y="1" width="1438" height="758" rx="24" style="fill:url(#diagram-ground)"/>
         <rect class="map-grid" x="1" y="1" width="1438" height="758" rx="24"/>
 
         <text class="map-kicker" x="54" y="52">OPERATING MODEL / SHARED EXECUTION</text>
         <text class="map-title" x="54" y="84">ONE ENGINE, FROM CELL TO CAMPAIGN</text>
-        <text class="map-copy" x="54" y="108">FIX THE FACTORS TO OPERATE. VARY THEM TO LEARN. THE EXECUTION PATH DOES NOT CHANGE.</text>
+        <text class="map-copy" x="54" y="108">FIX THE FACTORS TO OPERATE &#x00B7; VARY THEM TO LEARN</text>
 
         <g aria-label="Operate mode: fixed factors produce one cell">
           <rect class="mode-surface operate" x="54" y="158" width="262" height="106" rx="12"/>
@@ -324,7 +284,7 @@
         <text class="flow-note" x="340" y="201">select</text><text class="flow-note" x="337" y="338">expand</text>
 
         <g aria-label="Cell: workflow and factor assignment">
-          <rect x="392" y="225" width="148" height="96" rx="48" fill="url(#workflow-core)" stroke="var(--fw-how)" stroke-width="1.6" filter="url(#workflow-glow)"/>
+          <rect x="392" y="225" width="148" height="96" rx="48" fill="url(#diagram-core)" stroke="var(--fw-how)" stroke-width="1.6" filter="url(#diagram-glow)"/>
           <text class="node-index" x="466" y="253" text-anchor="middle">SHARED UNIT</text>
           <text class="node-title" x="466" y="280" text-anchor="middle">CELL</text>
           <text class="node-copy" x="466" y="300" text-anchor="middle">workflow + assignment</text>
@@ -340,7 +300,7 @@
         <g><rect class="map-node cyan" x="1116" y="225" width="148" height="96" rx="11"/><text class="node-index" x="1134" y="247">05 / VISIBILITY</text><text class="node-title" x="1134" y="276">LEDGER</text><text class="node-copy" x="1134" y="298">append-only events</text></g>
 
         <path class="flow cyan" d="M1190 321V390"/><text class="flow-note" x="1201" y="360">derive</text>
-        <g><rect class="map-node cyan" x="1080" y="390" width="220" height="96" rx="11" filter="url(#workflow-glow)"/><text class="node-index" x="1098" y="413">MEASUREMENT RULES</text><text class="node-title" x="1098" y="442">INFORMATION</text><text class="node-copy" x="1098" y="464">quality &#x00B7; cost &#x00B7; grit &#x00B7; uncertainty</text></g>
+        <g><rect class="map-node cyan" x="1080" y="390" width="220" height="96" rx="11" filter="url(#diagram-glow)"/><text class="node-index" x="1098" y="413">MEASUREMENT RULES</text><text class="node-title" x="1098" y="442">INFORMATION</text><text class="node-copy" x="1098" y="464">quality &#x00B7; cost &#x00B7; grit &#x00B7; uncertainty</text></g>
 
         <path class="flow blue" d="M1080 438H992"/><text class="flow-note" x="1036" y="424" text-anchor="middle">consume</text>
         <g><rect class="map-node blue" x="800" y="390" width="192" height="96" rx="11"/><text class="node-index" x="818" y="413">RUNTIME CONTROL</text><text class="node-title" x="818" y="442">POLICY</text><text class="node-copy" x="818" y="461">route &#x00B7; retry &#x00B7; escalate</text><text class="node-copy" x="818" y="476">budget &#x00B7; halt</text></g>
@@ -403,151 +363,260 @@
       <article class="scale-cell"><strong>G&times;N&times;M</strong><p>Adding a factor level multiplies cells; adding a stage or measurement expands every cell.</p></article>
     </div>
   </div>
-  <figure class="architecture-figure" hidden aria-hidden="true">
-    <div class="architecture-scroll" tabindex="0" aria-label="Scrollable architecture diagram">
-<svg class="architecture-map" xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid meet"
-     role="img" aria-labelledby="architecture-title architecture-desc">
-  <title id="architecture-title">The information-acquisition machine</title>
-  <desc id="architecture-desc">An ExperimentSpec compiles into a DAG, controlled cells, jobs, and attempts. Attempts emit append-only ledger events. Measurement rules turn those events into information before a dependency gate permits policy. Policy becomes an experiment arm in a grid and campaign, outcomes are compared, and adaptation changes one variable in the next specification. The diagram also maps the machine to Why, How, What, cost levers, reversible and compounding doors, and the N by M evidence burden.</desc>
-
-  <defs>
-    <!-- Theme-aware surfaces retain standalone fallbacks when the SVG is opened directly. -->
-    <linearGradient id="ground-gradient" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#101722"/>
-      <stop offset="0.55" stop-color="#0b111a"/>
-      <stop offset="1" stop-color="#070a0f"/>
-    </linearGradient>
-    <radialGradient id="why-gradient" cx="50%" cy="45%" r="68%">
-      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.2"/>
-      <stop offset="0.58" stop-color="#f59e0b" stop-opacity="0.09"/>
-      <stop offset="1" stop-color="#f59e0b" stop-opacity="0.02"/>
-    </radialGradient>
-    <linearGradient id="instrument-gradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#152231"/>
-      <stop offset="1" stop-color="#0d1721"/>
-    </linearGradient>
-    <linearGradient id="policy-gradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#152337"/>
-      <stop offset="1" stop-color="#0c1522"/>
-    </linearGradient>
-    <pattern id="dossier-grid" width="32" height="32" patternUnits="userSpaceOnUse">
-      <path d="M32 0H0V32" fill="none" stroke="#94a3b8" stroke-opacity="0.045" stroke-width="1"/>
-    </pattern>
-    <filter id="amber-glow" x="-30%" y="-50%" width="160%" height="200%">
-      <feGaussianBlur stdDeviation="12" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <filter id="cyan-glow" x="-30%" y="-50%" width="160%" height="200%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <marker id="arrow-neutral" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" class="marker-neutral"/></marker>
-    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" class="marker-cyan"/></marker>
-    <marker id="arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" class="marker-sky"/></marker>
-    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" class="marker-amber"/></marker>
-  </defs>
-
-  <style>
-    .architecture-map{--arch-bg:var(--bg2,#0b111a);--arch-bg-deep:var(--bg,#070a0f);--arch-surface:var(--bg3,#101722);--arch-surface-raised:var(--bg4,#1b2637);--arch-line:var(--b,rgba(148,163,184,.18));--arch-line-strong:var(--ba,rgba(148,163,184,.3));--arch-text:var(--t,#f8fafc);--arch-text-soft:var(--t2,#cbd5e1);--arch-text-muted:var(--t3,#718096);--arch-cyan:var(--ac,#22d3ee);--arch-amber:var(--am,#f59e0b);--arch-sky:var(--cy,#38bdf8);--arch-success:var(--success,#22c55e);color:var(--arch-text);font-family:"JetBrains Mono","SFMono-Regular",Consolas,monospace;width:100%;height:auto;background:var(--arch-bg)}
-    .figure-ground{fill:url(#ground-gradient);stroke:var(--arch-line);stroke-width:1}.grid-texture{fill:url(#dossier-grid);opacity:.8}.region{fill:none;vector-effect:non-scaling-stroke}.region-what{stroke:var(--arch-sky);stroke-width:1.5;stroke-dasharray:10 8;opacity:.48}.region-how-outer{stroke:var(--arch-cyan);stroke-width:1.5;opacity:.52}.region-how-inner{stroke:var(--arch-cyan);stroke-width:1;opacity:.25}.region-why{fill:url(#why-gradient);stroke:var(--arch-amber);stroke-width:2}.region-label{font-size:14px;font-weight:700;letter-spacing:.18em}.region-detail{fill:var(--arch-text-muted);font-size:10px;letter-spacing:.08em}.what-label{fill:var(--arch-sky)}.how-label{fill:var(--arch-cyan)}.why-label{fill:var(--arch-amber)}.map-title{fill:var(--arch-text);font-size:21px;font-weight:700;letter-spacing:.08em}.map-subtitle{fill:var(--arch-text-muted);font-size:10px;letter-spacing:.06em}
-    .edge{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.7;vector-effect:non-scaling-stroke}.edge-neutral{stroke:var(--arch-text-muted);marker-end:url(#arrow-neutral)}.edge-cyan{stroke:var(--arch-cyan);marker-end:url(#arrow-cyan)}.edge-sky{stroke:var(--arch-sky);marker-end:url(#arrow-sky)}.edge-amber{stroke:var(--arch-amber);stroke-dasharray:7 6;marker-end:url(#arrow-amber)}.edge-faint{fill:none;stroke:var(--arch-line-strong);stroke-width:1;stroke-dasharray:3 5}.marker-neutral{fill:var(--arch-text-muted)}.marker-cyan{fill:var(--arch-cyan)}.marker-sky{fill:var(--arch-sky)}.marker-amber{fill:var(--arch-amber)}.edge-label{fill:var(--arch-text-muted);font-size:9px;letter-spacing:.04em;paint-order:stroke;stroke:var(--arch-bg);stroke-width:5px;stroke-linejoin:round}
-    .node .node-surface{stroke-width:1.4;vector-effect:non-scaling-stroke}.node-instrument .node-surface{fill:url(#instrument-gradient);stroke:var(--arch-cyan)}.node-policy .node-surface{fill:url(#policy-gradient);stroke:var(--arch-sky)}.node-adapt .node-surface{fill:var(--arch-surface);stroke:var(--arch-amber)}.node-title{fill:var(--arch-text);font-size:15px;font-weight:700;letter-spacing:.08em}.node-detail{fill:var(--arch-text-soft);font-size:10px}.node-index{fill:var(--arch-text-muted);font-size:8px;letter-spacing:.12em}
-    .concept-card{fill:var(--arch-bg-deep);fill-opacity:.7;stroke:var(--arch-line-strong);stroke-width:1}.concept-title{fill:var(--arch-cyan);font-size:11px;font-weight:700;letter-spacing:.1em}.concept-copy{fill:var(--arch-text-soft);font-size:10px}.concept-rule{stroke:var(--arch-line-strong);stroke-width:1}.why-statement{fill:var(--arch-text);font-size:21px;font-weight:700;letter-spacing:.08em}.why-substatement{fill:var(--arch-amber);font-size:15px;font-weight:700;letter-spacing:.08em}.why-caption{fill:var(--arch-text-soft);font-size:10px}.gate-diamond{fill:var(--arch-surface-raised);stroke:var(--arch-cyan);stroke-width:1.6}.gate-label{fill:var(--arch-text);font-size:9px;font-weight:700;text-anchor:middle}.gate-pass{fill:var(--arch-success)}.gate-caption{fill:var(--arch-cyan);font-size:9px;letter-spacing:.06em}
-    .door-panel{fill:var(--arch-bg-deep);fill-opacity:.82;stroke:var(--arch-line-strong);stroke-width:1}.door-key-cyan{stroke:var(--arch-cyan);stroke-width:3}.door-key-amber{stroke:var(--arch-amber);stroke-width:3}.door-title{fill:var(--arch-text);font-size:9px;font-weight:700;letter-spacing:.05em}.door-detail{fill:var(--arch-text-muted);font-size:8.5px}.brace{fill:none;stroke-width:1;vector-effect:non-scaling-stroke}.brace-cyan{stroke:var(--arch-cyan);opacity:.62}.brace-amber{stroke:var(--arch-amber);opacity:.62}.brace-label{font-size:9px;letter-spacing:.025em;text-anchor:middle}.brace-label-cyan{fill:var(--arch-cyan)}.brace-label-amber{fill:var(--arch-amber)}
-    .rail-label{fill:var(--arch-text-muted);font-size:9px;font-weight:700;letter-spacing:.1em}.rail-stage{fill:var(--arch-bg-deep);stroke:var(--arch-line-strong);stroke-width:1}.rail-stage-text{fill:var(--arch-text-soft);font-size:9px;font-weight:700;letter-spacing:.06em;text-anchor:middle}.rail-edge{fill:none;stroke:var(--arch-text-muted);stroke-width:1.2;marker-end:url(#arrow-neutral)}.rail-gate{fill:var(--arch-surface-raised);stroke:var(--arch-cyan);stroke-width:1.2}.rail-gate-caption{fill:var(--arch-cyan);font-size:8px;text-anchor:middle}.tracer{fill:none;stroke-linecap:round;stroke-width:2.4;stroke-dasharray:.8 99.2;pathLength:100;opacity:.7}.tracer-execution{stroke:var(--arch-cyan);animation:trace-forward 9s linear infinite}.tracer-feedback{stroke:var(--arch-amber);animation:trace-feedback 12s linear infinite}@keyframes trace-forward{to{stroke-dashoffset:-100}}@keyframes trace-feedback{from{stroke-dashoffset:45}to{stroke-dashoffset:-55}}
-    @media(prefers-reduced-motion:reduce){.tracer{display:none;animation:none}.architecture-map *{transition:none!important}}
-    @media(prefers-color-scheme:light){.architecture-map{--arch-bg:var(--bg2,#f1f5f9);--arch-bg-deep:var(--bg,#fff);--arch-surface:var(--bg3,#e8eef5);--arch-surface-raised:var(--bg4,#dbe5ef);--arch-line:var(--b,rgba(15,23,42,.16));--arch-line-strong:var(--ba,rgba(15,23,42,.3));--arch-text:var(--t,#0f172a);--arch-text-soft:var(--t2,#334155);--arch-text-muted:var(--t3,#64748b);--arch-cyan:var(--ac,#0891b2);--arch-amber:var(--am,#b45309);--arch-sky:var(--cy,#0284c7)}.figure-ground{fill:var(--arch-bg)}.grid-texture{opacity:.28}.node-instrument .node-surface,.node-policy .node-surface{fill:var(--arch-surface)}}
-    @media print{.figure-ground{fill:#fff;stroke:#555}.grid-texture,.tracer{display:none}.region-what{stroke:#555;stroke-dasharray:10 8}.region-how-outer,.region-how-inner,.region-why{stroke:#333;filter:none}.region-why,.node-instrument .node-surface,.node-policy .node-surface{fill:#fff}.architecture-map{--arch-text:#000;--arch-text-soft:#222;--arch-text-muted:#555;--arch-bg:#fff;--arch-bg-deep:#fff;--arch-surface:#fff;--arch-surface-raised:#eee}}
-  </style>
-
-  <!-- The dossier ground gives the formal map a bounded, printable working surface. -->
-  <rect class="figure-ground" x="1" y="1" width="1438" height="898" rx="26"/>
-  <rect class="grid-texture" x="1" y="1" width="1438" height="898" rx="26"/>
-
-  <!-- WHY, HOW, and WHAT are semantic territories, distinguished by line style as well as color. -->
-  <g class="architecture-rings">
-    <rect class="region region-what" x="24" y="24" width="1392" height="852" rx="40"/>
-    <rect class="region region-how-outer" x="168" y="104" width="1122" height="590" rx="34"/>
-    <rect class="region region-how-inner" x="176" y="112" width="1106" height="574" rx="29"/>
-    <rect class="region region-why" x="500" y="330" width="440" height="190" rx="95" filter="url(#amber-glow)"/>
-    <text class="region-label what-label" x="48" y="58">WHAT</text><text class="region-detail" x="113" y="58">DECISIONS / DOORS / CAMPAIGNS</text>
-    <text class="region-label how-label" x="190" y="137">HOW</text><text class="region-detail" x="246" y="137">INSTRUMENT / COST LEVERS / N &#x00D7; M</text>
-    <text class="region-label why-label" x="526" y="361">WHY</text>
-    <text class="map-title" x="720" y="58" text-anchor="middle">THE INFORMATION-ACQUISITION MACHINE</text>
-    <text class="map-subtitle" x="720" y="80" text-anchor="middle">EVENTS &#x2192; INFORMATION &#x2192; TESTABLE POLICY &#x2192; ADAPTATION</text>
-  </g>
-
-  <!-- Connections establish execution order first; active color begins only at measurement. -->
-  <g class="architecture-edges">
-    <path class="edge edge-neutral" d="M360 188H380"/><text class="edge-label" x="370" y="176" text-anchor="middle">compile</text>
-    <path class="edge edge-neutral" d="M560 188H582"/><text class="edge-label" x="571" y="176" text-anchor="middle">factor cross-product</text>
-    <path class="edge edge-neutral" d="M727 188H747"/><text class="edge-label" x="737" y="176" text-anchor="middle">materialize / enqueue</text>
-    <path class="edge edge-neutral" d="M892 188H912"/><text class="edge-label" x="902" y="176" text-anchor="middle">execute</text>
-    <path class="edge edge-neutral" d="M1072 188H1094"/><text class="edge-label" x="1083" y="176" text-anchor="middle">emit events</text>
-    <path class="edge edge-cyan" d="M1172 226V320"/><text class="edge-label" x="1182" y="276">instrument</text>
-    <path class="edge edge-cyan" d="M1172 390C1172 441 1158 468 1120 500"/><text class="edge-label" x="1174" y="450">derive / measurement rules</text>
-    <path class="edge edge-cyan" d="M1000 538C982 538 974 568 965 617"/><text class="edge-label" x="993" y="586" text-anchor="end">arm loss</text>
-    <path class="edge edge-neutral" d="M755 617H450"/><text class="edge-label" x="603" y="605" text-anchor="middle">compare outcomes</text>
-    <path class="edge edge-amber" d="M280 617H174V188H190"/><text class="edge-label" x="161" y="412" transform="rotate(-90 161 412)" text-anchor="middle">next specification / tweak one variable</text>
-    <path class="edge edge-cyan" d="M1120 576C1120 604 1102 612 1080 625"/><path class="edge edge-sky" d="M1080 675C1080 686 1072 692 1068 700"/>
-    <path class="edge edge-sky" d="M955 740H925"/><text class="edge-label" x="940" y="728" text-anchor="middle">arm</text>
-    <path class="edge edge-sky" d="M720 740H690"/><text class="edge-label" x="705" y="728" text-anchor="middle">grid</text>
-    <path class="edge edge-amber" d="M480 740C434 740 400 689 365 654"/><text class="edge-label" x="431" y="702" text-anchor="middle">adapt</text>
-    <!-- Faint leaders bind the ordering rail to its concrete stages without implying data flow. -->
-    <path class="edge-faint" d="M1305 820V790H1265V355H1249"/><path class="edge-faint" d="M1130 820V790H1210V538H1240"/><path class="edge-faint" d="M925 820V790H1068V780"/><path class="edge-faint" d="M740 820V790H822V780"/><path class="edge-faint" d="M550 820V790H585V780"/>
-  </g>
-
-  <!-- Every stage is an explicit title/detail pair so the system remains readable without motion. -->
-  <g class="architecture-nodes">
-    <g class="node node-instrument" aria-label="ExperimentSpec: question, workflow, factors, and rules"><title>ExperimentSpec</title><rect class="node-surface" x="190" y="150" width="170" height="76" rx="10"/><text class="node-index" x="204" y="168">01 / INTENT</text><text class="node-title" x="204" y="191">ExperimentSpec</text><text class="node-detail" x="204" y="211">question &#x00B7; workflow &#x00B7; factors &#x00B7; rules</text></g>
-    <g class="node node-instrument" aria-label="DAG: validate, cells, execute, measure, compare, and adapt"><title>DAG</title><rect class="node-surface" x="380" y="150" width="180" height="76" rx="10"/><text class="node-index" x="394" y="168">02 / ORDER</text><text class="node-title" x="394" y="191">DAG</text><text class="node-detail" x="394" y="207"><tspan x="394">validate &#x2192; cells &#x2192; execute</tspan><tspan x="394" dy="13">measure &#x2192; compare &#x2192; adapt</tspan></text></g>
-    <g class="node node-instrument" aria-label="Cells: factor cross-product"><title>Cells</title><rect class="node-surface" x="582" y="150" width="145" height="76" rx="10"/><text class="node-index" x="596" y="168">03 / DESIGN</text><text class="node-title" x="596" y="191">CELLS</text><text class="node-detail" x="596" y="211">factor cross-product</text></g>
-    <g class="node node-instrument" aria-label="Jobs: budget, deadline, and policy arm"><title>Jobs</title><rect class="node-surface" x="747" y="150" width="145" height="76" rx="10"/><text class="node-index" x="761" y="168">04 / CONTROL</text><text class="node-title" x="761" y="191">JOBS</text><text class="node-detail" x="761" y="207"><tspan x="761">budget &#x00B7; deadline</tspan><tspan x="761" dy="13">policy arm</tspan></text></g>
-    <g class="node node-instrument" aria-label="Attempts: tokens, timing, tools, and outcome"><title>Attempts</title><rect class="node-surface" x="912" y="150" width="160" height="76" rx="10"/><text class="node-index" x="926" y="168">05 / EXECUTION</text><text class="node-title" x="926" y="191">ATTEMPTS</text><text class="node-detail" x="926" y="207"><tspan x="926">tokens &#x00B7; timing &#x00B7; tools</tspan><tspan x="926" dy="13">outcome</tspan></text></g>
-    <g class="node node-instrument" aria-label="Ledger: append-only events"><title>Ledger</title><rect class="node-surface" x="1094" y="150" width="155" height="76" rx="10"/><text class="node-index" x="1108" y="168">06 / VISIBILITY</text><text class="node-title" x="1108" y="191">LEDGER</text><text class="node-detail" x="1108" y="211">append-only events</text></g>
-    <g class="node node-instrument" aria-label="Measure: measurement rules"><title>Measure</title><rect class="node-surface" x="1094" y="320" width="155" height="70" rx="10"/><text class="node-index" x="1108" y="338">07 / DERIVE</text><text class="node-title" x="1108" y="361">MEASURE</text><text class="node-detail" x="1108" y="380">measurement rules</text></g>
-    <g class="node node-instrument" aria-label="Information: first-pass, grit, cost, and uncertainty"><title>Information</title><rect class="node-surface" x="1000" y="500" width="240" height="76" rx="10" filter="url(#cyan-glow)"/><text class="node-index" x="1014" y="518">08 / DECISION INPUTS</text><text class="node-title" x="1014" y="541">INFORMATION</text><text class="node-detail" x="1014" y="561">first-pass &#x00B7; grit &#x00B7; cost &#x00B7; uncertainty</text></g>
-    <g class="node node-policy" aria-label="Compare: cost, quality, latency, SLA, and value"><title>Compare</title><rect class="node-surface" x="755" y="580" width="210" height="74" rx="10"/><text class="node-index" x="769" y="598">09 / ARM LOSS</text><text class="node-title" x="769" y="621">COMPARE</text><text class="node-detail" x="769" y="641">cost &#x00B7; quality &#x00B7; latency &#x00B7; SLA &#x00B7; value</text></g>
-    <g class="node node-adapt" aria-label="Adapt: tweak one variable"><title>Adapt</title><rect class="node-surface" x="280" y="580" width="170" height="74" rx="10"/><text class="node-index" x="294" y="598">10 / LEARNING</text><text class="node-title" x="294" y="621">ADAPT</text><text class="node-detail" x="294" y="641">tweak one variable</text></g>
-    <g class="node node-policy" aria-label="Policy: route, retry, escalate, and budget; policy is a factor level and arm"><title>Policy</title><rect class="node-surface" x="955" y="700" width="225" height="80" rx="10"/><text class="node-index" x="969" y="718">CONTROL RULE</text><text class="node-title" x="969" y="741">POLICY</text><text class="node-detail" x="969" y="758">route &#x00B7; retry &#x00B7; escalate &#x00B7; budget</text><text class="node-detail" x="969" y="772">policy = factor level / arm</text></g>
-    <g class="node node-policy" aria-label="Grid: policy as an arm"><title>Grid</title><rect class="node-surface" x="720" y="700" width="205" height="80" rx="10"/><text class="node-index" x="734" y="718">CONTROLLED TEST</text><text class="node-title" x="734" y="741">GRID</text><text class="node-detail" x="734" y="763">policy as an arm</text></g>
-    <g class="node node-policy" aria-label="Campaign: repeat the grid"><title>Campaign</title><rect class="node-surface" x="480" y="700" width="210" height="80" rx="10"/><text class="node-index" x="494" y="718">DISCIPLINE</text><text class="node-title" x="494" y="741">CAMPAIGN</text><text class="node-detail" x="494" y="763">repeat the grid</text></g>
-  </g>
-
-  <!-- Gates bind policy eligibility to measured fields and decisions to reversible or compounding doors. -->
-  <g class="architecture-gates">
-    <g aria-label="Why: measured information becomes testable policy"><text class="why-statement" x="720" y="406" text-anchor="middle">MEASURED INFORMATION</text><text class="why-substatement" x="720" y="438" text-anchor="middle">BECOMES TESTABLE POLICY</text><path d="M620 458H820" class="concept-rule"/><text class="why-caption" x="720" y="482" text-anchor="middle">unmeasured gap &#x2192; ledger visibility &#x2192; decision</text></g>
-    <g aria-label="How cost levers and calculator bind to the instrument"><rect class="concept-card" x="190" y="320" width="280" height="205" rx="12"/><text class="concept-title" x="208" y="347">HOW / COST LEVERS</text><text class="concept-copy" x="208" y="374">C&#x2080; baseline cost &#x00B7; P frontier premium</text><text class="concept-copy" x="208" y="395">e eligible share &#x00B7; r routed share</text><text class="concept-copy" x="208" y="416">&#x03B2; compounding &#x00B7; EPM effective premium</text><path class="concept-rule" d="M208 438H452"/><text class="concept-title" x="208" y="463">INTERACTIVE CALCULATOR</text><text class="concept-copy" x="208" y="486">reversible scenario test</text><text class="concept-copy" x="208" y="507">before a default becomes architecture</text></g>
-    <g aria-label="Dependency gate: required information must be a subset of produced information"><path class="gate-diamond" d="M1080 625L1110 650L1080 675L1050 650Z"/><circle class="gate-pass" cx="1080" cy="633" r="3.5"/><text class="gate-label" x="1080" y="650">requires</text><text class="gate-label" x="1080" y="662">&#x2286; produced?</text><text class="gate-caption" x="1118" y="654">information first</text></g>
-    <g aria-label="What decision surfaces: two-way route, one-way architecture, autonomous door, and provider playbook"><rect class="door-panel" x="1198" y="594" width="194" height="184" rx="12"/><line class="door-key-cyan" x1="1212" y1="611" x2="1212" y2="641"/><text class="door-title" x="1222" y="617">TWO-WAY DOOR</text><text class="door-detail" x="1222" y="633">per-task route</text><line class="door-key-amber" x1="1212" y1="652" x2="1212" y2="682"/><text class="door-title" x="1222" y="658">ONE-WAY DOOR</text><text class="door-detail" x="1222" y="674">default architecture</text><line class="door-key-cyan" x1="1212" y1="693" x2="1212" y2="723"/><text class="door-title" x="1222" y="699">AUTONOMOUS DOOR</text><text class="door-detail" x="1222" y="715">policy acts inside budget</text><line class="door-key-amber" x1="1212" y1="734" x2="1212" y2="764"/><text class="door-title" x="1222" y="740">PROVIDER PLAYBOOK</text><text class="door-detail" x="1222" y="756">route &#x00B7; reserve &#x00B7; review</text></g>
-  </g>
-
-  <!-- Symbolic N by M braces describe evidence and analysis burden without adding measured values. -->
-  <g class="architecture-burden"><path class="brace brace-cyan" d="M582 246V254Q582 264 592 264H1239Q1249 264 1249 274V282"/><path class="brace brace-cyan" d="M1249 282V306H1218V320"/><text class="brace-label brace-label-cyan" x="916" y="288">N linked sessions &#x00D7; M measurement angles = instrumented evidence surface</text><path class="brace brace-amber" d="M755 660V666Q755 676 765 676H1230Q1240 676 1240 666V660"/><path class="brace brace-amber" d="M1240 660V410H1218V390"/><text class="brace-label brace-label-amber" x="998" y="691">analysis burden = N &#x00D7; M before cross-arm aggregation</text></g>
-
-  <!-- The rail is read right-to-left, following arrows from instrumentation to campaign. -->
-  <g class="architecture-order" aria-label="Load-bearing order: instrument, derive, write policy, grid, campaign">
-    <text class="rail-label" x="62" y="842">LOAD-BEARING ORDER / FOLLOW ARROWS</text>
-    <rect class="rail-stage" x="1230" y="820" width="150" height="38" rx="9"/><text class="rail-stage-text" x="1305" y="843">INSTRUMENT</text><path class="rail-edge" d="M1230 839H1190"/>
-    <rect class="rail-stage" x="1070" y="820" width="120" height="38" rx="9"/><text class="rail-stage-text" x="1130" y="843">DERIVE</text><path class="rail-edge" d="M1070 839H1059"/>
-    <path class="rail-gate" d="M1043 824L1059 839L1043 854L1027 839Z"/><circle class="gate-pass" cx="1043" cy="839" r="3"/><path class="rail-edge" d="M1027 839H1015"/><text class="rail-gate-caption" x="1043" y="872">information first</text>
-    <rect class="rail-stage" x="835" y="820" width="180" height="38" rx="9"/><text class="rail-stage-text" x="925" y="843">WRITE POLICY</text><path class="rail-edge" d="M835 839H800"/>
-    <rect class="rail-stage" x="680" y="820" width="120" height="38" rx="9"/><text class="rail-stage-text" x="740" y="843">GRID</text><path class="rail-edge" d="M680 839H625"/>
-    <rect class="rail-stage" x="475" y="820" width="150" height="38" rx="9"/><text class="rail-stage-text" x="550" y="843">CAMPAIGN</text>
-  </g>
-  <!-- Slow tracers are redundant orientation cues; reduced-motion and print modes remove them. -->
-  <g class="architecture-motion" aria-hidden="true"><path class="tracer tracer-execution" pathLength="100" d="M190 188H1172V390C1172 441 1158 468 1120 500"/><path class="tracer tracer-feedback" pathLength="100" d="M755 617H450H280H174V188H190"/></g>
-</svg>
-    </div>
-    <figcaption>Events are not policy. Measurement creates the information that makes a policy arm writable, comparable, and adaptable.</figcaption>
-  </figure>
   <ol class="architecture-text" aria-label="Shared engine summary">
     <li><strong>1 / SELECT OR VARY</strong>Fixed factors produce one cell. Varied factors produce G cells without changing the workflow executor.</li>
     <li><strong>2 / EXECUTE AND RECORD</strong>Every cell becomes jobs and attempts that emit append-only events to the same ledger.</li>
     <li><strong>3 / MEASURE AND CONTROL</strong>Measurement rules produce information. Admissible control rules consume it inside the running workflow.</li>
     <li><strong>4 / COMPARE AND ADAPT</strong>Grids compare arms. Campaigns alter one factor and run the next evidence-acquisition pass.</li>
   </ol>
+</div></section>
+
+<!-- FIELD LAYER: the eight planes, the instrument cycle, and the two-mode / autonomy
+     editorial figures — [P] architecture explanation added AROUND the operating
+     instrument, citing ARCHITECTURE.md and the reused example library
+     (references/svg-marker-flow.html marker flows, references/svg-filter-focus.html
+     glow, references/svg-pattern-surface.html grid, references/svg-animated-status.html
+     reduced-motion tracer, references/d3-labeled-scatter.html node cards). -->
+<section class="fsec" id="field-map"><div class="inr wide">
+  <div class="architecture-intro">
+    <div>
+      <div class="section-kicker">FIELD MAP / EIGHT PLANES</div>
+      <h2>Eight planes, one dependency direction.</h2>
+    </div>
+    <p class="lead">The instrument is modular but not flat: the eight package planes form a dependency chain, and control consumes the information the lower planes produce. A plane's state is either instrumented (built and measured), proposed (designed but not run), or decided (a verdict binds it).</p>
+  </div>
+  <!-- ref: svg-marker-flow.html, svg-filter-focus.html — plane dependency flow. -->
+  <figure class="figure-edit" aria-labelledby="planes-title">
+    <span class="kicker" id="planes-title">The eight planes (source: ARCHITECTURE.md)</span>
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable eight-planes dependency diagram">
+    <svg class="diagram-map" viewBox="0 0 1440 560" role="img" aria-labelledby="planes-title planes-desc">
+      <title id="planes-desc">A one-way dependency chain: core is the foundation, six tier-1 planes build on it, control consumes the information they produce, and apps are served by control.</title>
+      <defs>
+        <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+        <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+        <radialGradient id="diagram-core" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="var(--ac)" stop-opacity=".2"/><stop offset="1" stop-color="var(--ac)" stop-opacity=".025"/></radialGradient>
+        <filter id="diagram-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t2)"/></marker>
+        <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ac)"/></marker>
+        <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--cy)"/></marker>
+        <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--am)"/></marker>
+      </defs>
+      <rect class="map-ground" x="1" y="1" width="1438" height="558" rx="24" style="fill:url(#diagram-ground)"/>
+      <rect class="map-grid" x="1" y="1" width="1438" height="558" rx="24"/>
+
+      <text class="map-kicker" x="54" y="52">FIELD MAP / EIGHT PLANES</text>
+      <text class="map-title" x="54" y="84">ONE DEPENDENCY DIRECTION</text>
+      <text class="map-copy" x="54" y="108">EACH PLANE DEPENDS ON THE PLANES BEFORE IT &#x00B7; CONTROL IS THE ONLY CONSUMER</text>
+
+      <g><rect class="map-node" x="30" y="230" width="138" height="100" rx="11"/><text class="node-index" x="48" y="253">01 / FOUNDATION</text><text class="node-title" x="48" y="281">CORE</text><text class="node-copy" x="48" y="301">tier 0 &#x00B7; the base</text></g>
+      <g><rect class="map-node cyan" x="186" y="230" width="138" height="100" rx="11"/><text class="node-index" x="204" y="253">02 / TIER 1</text><text class="node-title" x="204" y="281">EXPERIMENT</text><text class="node-copy" x="204" y="301">specs &#x2192; cells</text></g>
+      <g><rect class="map-node cyan" x="342" y="230" width="138" height="100" rx="11"/><text class="node-index" x="360" y="253">03 / TIER 1</text><text class="node-title" x="360" y="281">MEASUREMENT</text><text class="node-copy" x="360" y="301">rules &#x2192; info</text></g>
+      <g><rect class="map-node cyan" x="498" y="230" width="138" height="100" rx="11"/><text class="node-index" x="516" y="253">04 / TIER 1</text><text class="node-title" x="516" y="281">RUNTIME</text><text class="node-copy" x="516" y="301">runs the workflow</text></g>
+      <g><rect class="map-node cyan" x="654" y="230" width="138" height="100" rx="11"/><text class="node-index" x="672" y="253">05 / TIER 1</text><text class="node-title" x="672" y="281">ADAPTERS</text><text class="node-copy" x="672" y="301">model backends</text></g>
+      <g><rect class="map-node cyan" x="810" y="230" width="138" height="100" rx="11"/><text class="node-index" x="828" y="253">06 / TIER 1</text><text class="node-title" x="828" y="281">KNOWLEDGE</text><text class="node-copy" x="828" y="301">rag + context</text></g>
+      <g><rect class="map-node cyan" x="966" y="230" width="138" height="100" rx="11"/><text class="node-index" x="984" y="253">07 / TIER 1</text><text class="node-title" x="984" y="281">REPORTING</text><text class="node-copy" x="984" y="301">reviews + reports</text></g>
+      <g><rect class="map-node blue" x="1122" y="230" width="138" height="100" rx="11" filter="url(#diagram-glow)"/><text class="node-index" x="1140" y="253">08 / CONSUMER</text><text class="node-title" x="1140" y="281">CONTROL</text><text class="node-copy" x="1140" y="301">consumes info</text></g>
+      <g><rect class="map-node amber" x="1278" y="230" width="138" height="100" rx="11"/><text class="node-index" x="1296" y="253">09 / TIER 3</text><text class="node-title" x="1296" y="281">APPS</text><text class="node-copy" x="1296" y="301">portal &#x00B7; website</text></g>
+
+      <path class="flow cyan" d="M168 280H186"/><path class="flow cyan" d="M324 280H342"/><path class="flow cyan" d="M480 280H498"/><path class="flow cyan" d="M636 280H654"/><path class="flow cyan" d="M792 280H810"/><path class="flow cyan" d="M948 280H966"/>
+      <path class="flow blue" d="M1104 280H1122"/>
+      <path class="flow amber" d="M1260 280H1278"/>
+
+      <g aria-label="Tier structure">
+        <rect class="rail" x="30" y="408" width="1380" height="104" rx="14"/>
+        <text class="map-label" x="54" y="432">TIER MAP / WHAT DEPENDS ON WHAT</text>
+        <line class="rail-divider" x1="174" y1="442" x2="174" y2="494"/><line class="rail-divider" x1="1116" y1="442" x2="1116" y2="494"/><line class="rail-divider" x1="1266" y1="442" x2="1266" y2="494"/>
+        <text class="scale-symbol" x="56" y="470">0</text><text class="scale-title" x="96" y="456">CORE</text><text class="scale-copy" x="96" y="474">FOUNDATION</text>
+        <text class="scale-symbol" x="200" y="470">1</text><text class="scale-title" x="240" y="456">TIER 1 &#x2014; BUILD</text><text class="scale-copy" x="240" y="474">EXPERIMENT &#x00B7; MEASUREMENT &#x00B7; RUNTIME &#x00B7; ADAPTERS &#x00B7; KNOWLEDGE &#x00B7; REPORTING</text>
+        <text class="scale-symbol" x="1136" y="470">2</text><text class="scale-title" x="1176" y="456">CONTROL</text><text class="scale-copy" x="1176" y="474">THE ONLY CONSUMER</text>
+        <text class="scale-symbol" x="1292" y="470">3</text><text class="scale-title" x="1332" y="456">APPS</text><text class="scale-copy" x="1332" y="474">SERVED SURFACES</text>
+      </g>
+      <text class="map-copy" x="54" y="540">INSTRUMENTED [M] &#x00B7; PROPOSED [P] &#x00B7; DECIDED [C] &#x2014; STATUS, NEVER A CAPABILITY CLAIM</text>
+    </svg>
+    </div>
+    <figcaption>Figure F1. The eight planes (core → experiment → measurement → runtime → adapters → knowledge → reporting → control → apps). One dependency direction, shown as a flow: core is the only foundation, and control is the only plane that consumes information. The diagram explains dependency direction; it makes no performance or capability claim.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] architecture</span><span>source: ARCHITECTURE.md</span><span>ref: svg-marker-flow.html, svg-filter-focus.html</span></div>
+  </figure>
+
+  <!-- ref: svg-marker-flow.html, svg-animated-status.html — the instrument cycle on Framework. -->
+  <figure class="figure-edit" aria-labelledby="fw-cycle-title">
+    <span class="kicker" id="fw-cycle-title">The instrument cycle (Framework)</span>
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable instrument-cycle diagram">
+    <svg class="diagram-map" viewBox="0 0 1440 580" role="img" aria-labelledby="fw-cycle-title fw-cycle-desc">
+      <title id="fw-cycle-desc">Instrument, derive, write policy, grid, campaign, back to instrument. Derive is the only path into policy; an unmeasured requirement blocks it.</title>
+      <defs>
+        <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+        <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+        <filter id="diagram-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t2)"/></marker>
+        <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ac)"/></marker>
+        <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--cy)"/></marker>
+        <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--am)"/></marker>
+      </defs>
+      <rect class="map-ground" x="1" y="1" width="1438" height="578" rx="24" style="fill:url(#diagram-ground)"/>
+      <rect class="map-grid" x="1" y="1" width="1438" height="578" rx="24"/>
+
+      <text class="map-kicker" x="54" y="52">THE LOAD-BEARING RULE</text>
+      <text class="map-title" x="54" y="84">TO MAKE POLICIES, WE NEED INFORMATION</text>
+      <text class="map-copy" x="54" y="108">INSTRUMENT &#x2192; DERIVE &#x2192; WRITE POLICY &#x2192; GRID &#x2192; CAMPAIGN &#x2192; REPEAT</text>
+
+      <g><rect class="map-node cyan" x="120" y="220" width="300" height="100" rx="11"/><text class="node-index" x="138" y="243">01 / INSTRUMENT</text><text class="node-title" x="138" y="271">INSTRUMENT</text><text class="node-copy" x="138" y="291">ledger events: quality &#x00B7; grit &#x00B7; confidence</text></g>
+      <g><rect class="map-node cyan" x="560" y="220" width="300" height="100" rx="11" filter="url(#diagram-glow)"/><text class="node-index" x="578" y="243">02 / DERIVE</text><text class="node-title" x="578" y="271">DERIVE</text><text class="node-copy" x="578" y="291">measurement rules &#x2192; named information</text></g>
+      <g><rect class="map-node blue" x="1000" y="220" width="300" height="100" rx="11"/><text class="node-index" x="1018" y="243">03 / WRITE POLICY</text><text class="node-title" x="1018" y="271">WRITE POLICY</text><text class="node-copy" x="1018" y="291">control rules consume measured fields</text></g>
+
+      <g><rect class="map-node blue" x="1000" y="440" width="300" height="100" rx="11"/><text class="node-index" x="1018" y="463">04 / GRID</text><text class="node-title" x="1018" y="491">GRID</text><text class="node-copy" x="1018" y="511">test policy as an arm</text></g>
+      <g><rect class="map-node amber" x="560" y="440" width="300" height="100" rx="11"/><text class="node-index" x="578" y="463">05 / CAMPAIGN</text><text class="node-title" x="578" y="491">CAMPAIGN</text><text class="node-copy" x="578" y="511">change one factor &#x00B7; emit next spec</text></g>
+
+      <path class="flow cyan" d="M420 270H560"/><text class="flow-note" x="490" y="256" text-anchor="middle">emit fields</text>
+      <path class="flow blue" d="M860 270H1000"/><text class="flow-note" x="930" y="250" text-anchor="middle">produce &#x00B7; the only path</text>
+      <path class="flow blue" d="M1150 320V440"/><text class="flow-note" x="1162" y="384">assign as arm</text>
+      <path class="flow cyan" d="M1000 490H860"/><text class="flow-note" x="930" y="476" text-anchor="middle">compare arms</text>
+      <path class="flow amber" d="M560 490C560 400 270 400 270 320"/><text class="flow-note" x="415" y="402" text-anchor="middle">next spec</text>
+      <path class="tracer return" pathLength="100" d="M560 490C560 400 270 400 270 320"/>
+
+      <g aria-label="Unmeasured requirement blocks policy">
+        <line x1="935" y1="252" x2="935" y2="288" stroke="var(--danger)" stroke-width="2.5" stroke-dasharray="5 4"/>
+        <path d="M928 263L942 277" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M942 263L928 277" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round"/>
+        <text class="flow-note" x="935" y="345" text-anchor="middle">unmeasured requirement blocks policy</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Figure F2. The instrument cycle — derive is the only path into policy, and a control rule whose requirements are not measured cannot be written. The red gate on the derive → write-policy arrow is that rejection.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] method</span><span>ref: svg-marker-flow.html</span></div>
+  </figure>
+</div></section>
+
+<!-- EDITORIAL: one engine / two operating modes and the bounded-autonomy envelope, both
+     distinct from the eight-planes map above. -->
+<section class="fsec"><div class="inr wide">
+  <div class="architecture-intro">
+    <div>
+      <div class="section-kicker">TWO MODES / ONE ENGINE</div>
+      <h2>One engine, two operating modes.</h2>
+    </div>
+    <p class="lead">A fixed factor assignment produces one cell; a factor cross-product produces G cells. Both converge on the same compile → jobs → attempts → ledger path; only the grid branches to compare and adapt.</p>
+  </div>
+  <!-- ref: svg-marker-flow.html — fixed assignment vs factor cross-product convergence. -->
+  <figure class="figure-edit" aria-labelledby="twomodes-title">
+    <span class="kicker" id="twomodes-title">Fixed assignment → one cell; factor cross-product → G cells</span>
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable two-modes diagram">
+    <svg class="diagram-map" viewBox="0 0 1440 520" role="img" aria-labelledby="twomodes-title twomodes-desc">
+      <title id="twomodes-desc">Two inputs converge on one shared engine (cell → compile → jobs → attempts → ledger); only the grid adds compare and adapt downstream.</title>
+      <defs>
+        <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+        <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+        <radialGradient id="diagram-core" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="var(--ac)" stop-opacity=".2"/><stop offset="1" stop-color="var(--ac)" stop-opacity=".025"/></radialGradient>
+        <filter id="diagram-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t2)"/></marker>
+        <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ac)"/></marker>
+        <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--cy)"/></marker>
+        <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--am)"/></marker>
+      </defs>
+      <rect class="map-ground" x="1" y="1" width="1438" height="518" rx="24" style="fill:url(#diagram-ground)"/>
+      <rect class="map-grid" x="1" y="1" width="1438" height="518" rx="24"/>
+
+      <text class="map-kicker" x="54" y="52">TWO MODES / ONE ENGINE</text>
+      <text class="map-title" x="54" y="84">ONE ENGINE, TWO INPUTS</text>
+      <text class="map-copy" x="54" y="108">OPERATE: ONE FIXED ASSIGNMENT &#x2192; 1 CELL &#x00B7; EXPERIMENT: FACTOR LEVELS &#x2192; G CELLS</text>
+
+      <g aria-label="Operate mode input">
+        <rect class="mode-surface operate" x="54" y="220" width="300" height="96" rx="11"/>
+        <text class="node-index" x="72" y="243">OPERATE / FIXED ASSIGNMENT</text>
+        <text class="node-title" x="72" y="271">1 CELL</text>
+        <text class="node-copy" x="72" y="291">one model &#x00B7; condition &#x00B7; policy &#x00B7; seed</text>
+        <text class="node-copy" x="72" y="307">same workflow, every assignment</text>
+      </g>
+      <g aria-label="Experiment mode input">
+        <rect class="mode-surface experiment" x="54" y="356" width="300" height="96" rx="11"/>
+        <text class="node-index" x="72" y="379">EXPERIMENT / FACTOR LEVELS</text>
+        <text class="node-title" x="72" y="407">G CELLS</text>
+        <text class="node-copy" x="72" y="427">product of active factor levels</text>
+        <text class="node-copy" x="72" y="443">one workflow, every cell</text>
+      </g>
+
+      <rect x="400" y="276" width="420" height="90" rx="45" fill="url(#diagram-core)" stroke="var(--ac)" stroke-width="1.6" filter="url(#diagram-glow)"/>
+      <text class="node-index" x="610" y="302" text-anchor="middle">THE SAME EXECUTION ENGINE</text>
+      <text class="node-title" x="610" y="330" text-anchor="middle">ONE ENGINE</text>
+      <text class="node-copy" x="610" y="350" text-anchor="middle">cell &#x2192; compile &#x2192; jobs &#x2192; attempts &#x2192; ledger</text>
+
+      <g aria-label="Operate mode output">
+        <rect class="map-node cyan" x="900" y="220" width="340" height="96" rx="11"/>
+        <text class="node-index" x="918" y="243">OPERATE PATH</text>
+        <text class="node-title" x="918" y="271">1 CELL &#x00B7; RECORD</text>
+        <text class="node-copy" x="918" y="291">append-only ledger, no comparison</text>
+      </g>
+      <g aria-label="Experiment mode output">
+        <rect class="map-node blue" x="900" y="356" width="340" height="96" rx="11"/>
+        <text class="node-index" x="918" y="379">EXPERIMENT PATH</text>
+        <text class="node-title" x="918" y="407">G CELLS &#x00B7; COMPARE</text>
+        <text class="node-copy" x="918" y="427">arms compared &#x2192; adapt the next spec</text>
+      </g>
+
+      <path class="flow cyan" d="M354 300H400"/>
+      <path class="flow blue" d="M354 360H400"/>
+      <path class="flow cyan" d="M820 300H900"/>
+      <path class="flow blue" d="M820 360H900"/>
+      <text class="map-copy" x="720" y="494" text-anchor="middle">THE ENGINE NEVER CHANGES &#x2014; ONLY THE GRID ADDS COMPARE + ADAPT</text>
+    </svg>
+    </div>
+    <figcaption>Figure F3. One execution engine, two operating modes — both inputs converge on the same cell → compile → jobs → attempts → ledger path, and only the grid branches to compare and adapt. The written compiler/runtime, with no business KPI.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] compiler/runtime</span><span>ref: svg-marker-flow.html</span></div>
+  </figure>
+</div></section>
+
+<!-- EDITORIAL: bounded-autonomy envelope — proposed capability distinguished from a run. -->
+<section class="fsec"><div class="inr wide">
+  <div class="architecture-intro">
+    <div>
+      <div class="section-kicker kicker-what">AUTONOMY / PROPOSED NOT RUN</div>
+      <h2>A bounded-autonomy envelope.</h2>
+    </div>
+    <p class="lead">The human policy boundary sits outside; inside it, declared constraints bound execution and independent verification. Exits are accept, reject/rework, or halt/escalate. Typed checkpoints remain proposed capability, not a run state.</p>
+  </div>
+  <!-- ref: svg-pattern-surface.html, svg-filter-focus.html — proposed vs not-run distinction. -->
+  <figure class="figure-edit" aria-labelledby="envelope-title">
+    <span class="kicker" id="envelope-title">Bounded-autonomy envelope</span>
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable bounded-autonomy envelope diagram">
+    <svg class="diagram-map" viewBox="0 0 1440 560" role="img" aria-labelledby="envelope-title envelope-desc">
+      <title id="envelope-desc">A human policy boundary wraps declared constraints and independent verification; typed checkpoints are proposed, not run. Exits accept, reject/rework, or halt/escalate.</title>
+      <defs>
+        <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+        <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+        <filter id="diagram-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t2)"/></marker>
+        <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ac)"/></marker>
+        <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--cy)"/></marker>
+        <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--am)"/></marker>
+      </defs>
+      <rect class="map-ground" x="1" y="1" width="1438" height="558" rx="24" style="fill:url(#diagram-ground)"/>
+      <rect class="map-grid" x="1" y="1" width="1438" height="558" rx="24"/>
+
+      <text class="map-kicker" x="54" y="52" style="fill:var(--am)">AUTONOMY / PROPOSED NOT RUN</text>
+      <text class="map-title" x="54" y="84">A BOUNDARY, NOT AN ABSENCE</text>
+      <text class="map-copy" x="54" y="108">PEOPLE DEFINE OBJECTIVE &#x00B7; POLICY &#x00B7; BUDGET &#x00B7; LIMITS &#x2014; PROPOSED IS NOT A RUN STATE</text>
+
+      <g aria-label="Human policy boundary">
+        <rect x="54" y="160" width="1332" height="340" rx="24" fill="rgba(245,158,11,.03)" stroke="var(--am)" stroke-width="2" stroke-dasharray="10 6"/>
+        <text class="map-kicker" x="78" y="188" style="fill:var(--am)">HUMAN POLICY BOUNDARY</text>
+      </g>
+
+      <g><rect class="map-node cyan" x="96" y="214" width="300" height="110" rx="11"/><text class="node-index" x="114" y="237">INSIDE / CONSTRAINT</text><text class="node-title" x="114" y="265">DECLARED CONSTRAINTS</text><text class="node-copy" x="114" y="287">budget &#x00B7; deadline &#x00B7; quality &#x00B7; sla</text></g>
+      <g><rect class="map-node cyan" x="560" y="214" width="300" height="110" rx="11"/><text class="node-index" x="578" y="237">INSIDE / CHECK</text><text class="node-title" x="578" y="265">INDEPENDENT VERIFICATION</text><text class="node-copy" x="578" y="287">a separate acceptance gate</text></g>
+      <g><rect class="map-node amber" x="1024" y="214" width="300" height="110" rx="11" filter="url(#diagram-glow)"/><text class="node-index" x="1042" y="237">INSIDE / PROPOSED</text><text class="node-title" x="1042" y="265">TYPED CHECKPOINTS</text><text class="node-copy" x="1042" y="287">designed capability &#x2014; NOT RUN</text></g>
+
+      <g><rect class="map-node cyan" x="96" y="412" width="300" height="76" rx="11"/><text class="node-index" x="114" y="435">EXIT</text><text class="node-title" x="114" y="462">ACCEPT</text></g>
+      <g><rect class="map-node amber" x="560" y="412" width="300" height="76" rx="11"/><text class="node-index" x="578" y="435">EXIT</text><text class="node-title" x="578" y="462">REJECT &#x00B7; REWORK</text></g>
+      <g><rect class="map-node danger" x="1024" y="412" width="300" height="76" rx="11"/><text class="node-index" x="1042" y="435">EXIT</text><text class="node-title" x="1042" y="462">HALT &#x00B7; ESCALATE</text></g>
+
+      <path class="flow cyan" d="M246 324V412"/><path class="flow cyan" d="M710 324V412"/><path class="flow amber" d="M1174 324V412"/>
+      <text class="map-copy" x="1322" y="494" text-anchor="end">exceptions cross the boundary</text>
+      <text class="map-copy" x="720" y="540" text-anchor="middle">PROPOSED &#x2260; RUN &#x2014; TYPED CHECKPOINTS ARE DESIGNED CAPABILITY, NOT A MEASURED STATE</text>
+    </svg>
+    </div>
+    <figcaption>Figure F4. The bounded-autonomy envelope — a policy/architecture explanation. The typed-checkpoint cell is explicitly PROPOSED (amber, glowing), distinguished from the run-state cells.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] policy/architecture</span><span>ref: svg-pattern-surface.html, svg-filter-focus.html</span></div>
+  </figure>
 </div></section>
 
 <!-- AUTONOMY: authority is explicit rather than implied by an unsupervised job label. -->
@@ -564,18 +633,18 @@
       <svg class="diagram-map autonomy-map" viewBox="0 0 1440 760" role="img" aria-labelledby="autonomy-map-title autonomy-map-desc">
         <title id="autonomy-map-title">Human governance around a bounded autonomous workflow</title>
         <desc id="autonomy-map-desc">People set objectives, approve policies, allocate budgets, and define intervention conditions. Inside the bounded workflow, policy admits, routes, executes, verifies, retries, and escalates work. Accepted outcomes continue downstream while exhausted limits and material risk return to human adjudication. Assisted, supervised, and bounded autonomous levels can be compared as policy factors.</desc>
-        <rect class="map-ground" x="1" y="1" width="1438" height="758" rx="24" style="fill:url(#workflow-ground)"/>
+        <rect class="map-ground" x="1" y="1" width="1438" height="758" rx="24" style="fill:url(#diagram-ground)"/>
         <rect class="map-grid" x="1" y="1" width="1438" height="758" rx="24"/>
 
         <text class="map-kicker" x="54" y="52" style="fill:var(--fw-why)">AUTHORITY MAP / HUMAN CONTROL POINTS</text>
         <text class="map-title" x="54" y="84">AUTONOMY IS A BOUNDARY, NOT AN ABSENCE</text>
-        <text class="map-copy" x="54" y="108">PEOPLE GOVERN THE ENVELOPE. POLICY OPERATES THE WORK. EXCEPTIONS CROSS THE LINE.</text>
+        <text class="map-copy" x="54" y="108">PEOPLE GOVERN THE ENVELOPE &#x00B7; POLICY OPERATES INSIDE</text>
 
         <g aria-label="Human control plane">
-          <rect class="human-surface" x="96" y="142" width="1248" height="92" rx="46" filter="url(#workflow-glow)"/>
+          <rect class="human-surface" x="96" y="142" width="1248" height="92" rx="46" filter="url(#diagram-glow)"/>
           <text class="node-index" x="132" y="169" style="fill:var(--fw-why)">HUMAN CONTROL PLANE</text>
-          <text class="node-title" x="132" y="197">OBJECTIVE &#x00B7; SPECIFICATION &#x00B7; POLICY APPROVAL &#x00B7; BUDGET &#x00B7; INTERVENTION CONDITIONS</text>
-          <text class="node-copy" x="132" y="216">Humans move from operating every action to governing what the autonomous system is authorized to do.</text>
+          <text class="node-title" x="132" y="197">OBJECTIVE &#x00B7; POLICY &#x00B7; BUDGET &#x00B7; LIMITS</text>
+          <text class="node-copy" x="132" y="216">humans govern authority, not each action</text>
         </g>
 
         <path class="flow amber" d="M330 234V278"/><text class="flow-note" x="342" y="259">authorize</text>
@@ -592,7 +661,7 @@
           <g><rect class="map-node cyan" x="154" y="338" width="148" height="84" rx="10"/><text class="node-index" x="172" y="359">01 / GATE</text><text class="node-title" x="172" y="385">ADMIT</text><text class="node-copy" x="172" y="405">scope + eligibility</text></g>
           <g><rect class="map-node cyan" x="334" y="338" width="148" height="84" rx="10"/><text class="node-index" x="352" y="359">02 / SELECT</text><text class="node-title" x="352" y="385">ROUTE</text><text class="node-copy" x="352" y="405">model + depth</text></g>
           <g><rect class="map-node cyan" x="514" y="338" width="148" height="84" rx="10"/><text class="node-index" x="532" y="359">03 / ACT</text><text class="node-title" x="532" y="385">EXECUTE</text><text class="node-copy" x="532" y="405">attempt + tools</text></g>
-          <g><rect class="map-node blue" x="694" y="338" width="148" height="84" rx="10" filter="url(#workflow-glow)"/><text class="node-index" x="712" y="359">04 / DECIDE</text><text class="node-title" x="712" y="385">VERIFY</text><text class="node-copy" x="712" y="405">acceptance gate</text></g>
+          <g><rect class="map-node blue" x="694" y="338" width="148" height="84" rx="10" filter="url(#diagram-glow)"/><text class="node-index" x="712" y="359">04 / DECIDE</text><text class="node-title" x="712" y="385">VERIFY</text><text class="node-copy" x="712" y="405">acceptance gate</text></g>
           <g><rect class="map-node blue" x="874" y="338" width="148" height="84" rx="10"/><text class="node-index" x="892" y="359">05 / RECOVER</text><text class="node-title" x="892" y="385">RETRY</text><text class="node-copy" x="892" y="405">within attempt limit</text></g>
           <g><rect class="map-node amber" x="1054" y="338" width="148" height="84" rx="10"/><text class="node-index" x="1072" y="359">06 / EXIT</text><text class="node-title" x="1072" y="385">ESCALATE</text><text class="node-copy" x="1072" y="405">tier or human</text></g>
 
@@ -620,7 +689,7 @@
         </g>
 
         <g aria-label="Workflow outcomes">
-          <rect class="outcome-surface" x="720" y="610" width="304" height="92" rx="10"/><text class="node-index" x="740" y="633" style="fill:var(--fw-how)">ACCEPTED OUTCOME</text><text class="node-title" x="740" y="661">DOWNSTREAM SYSTEM &#x2192;</text><text class="node-copy" x="740" y="682">routine work continues without per-action approval</text>
+          <rect class="outcome-surface" x="720" y="610" width="304" height="92" rx="10"/><text class="node-index" x="740" y="633" style="fill:var(--fw-how)">ACCEPTED OUTCOME</text><text class="node-title" x="740" y="661">DOWNSTREAM SYSTEM &#x2192;</text><text class="node-copy" x="740" y="682">continues without per-action approval</text>
           <rect class="outcome-surface exception" x="1040" y="610" width="346" height="92" rx="10"/><text class="node-index" x="1060" y="633" style="fill:var(--fw-why)">EXCEPTION</text><text class="node-title" x="1060" y="661">HUMAN ADJUDICATION &#x2191;</text><text class="node-copy" x="1060" y="682">uncertainty &#x00B7; failed verification &#x00B7; material risk</text>
         </g>
       </svg>
@@ -775,6 +844,89 @@
 <div class="implementation-strip" aria-label="30-day implementation">
   <div class="implementation-step">Classify tasks by complexity.</div><div class="implementation-step">Default-route constrained tasks to silent models.</div><div class="implementation-step">Establish verification gates and escalation paths.</div><div class="implementation-step">Instrument cost metrics. Use CostPerOutcome as your primary KPI.</div>
 </div>
+</div></section>
+
+<!-- FIELD LAYER: the ten rules as status cards — grouped by instrumented / proposed /
+     decided. Never calls a rule "measured" if only its premise is measured. -->
+<section class="fsec" id="rule-cards"><div class="inr wide">
+  <div class="section-kicker kicker-what">POLICY / RULE STATUS</div>
+  <h2>Ten rules, three statuses.</h2>
+  <p class="lead">Each rule is grouped by its current status: <strong style="color:var(--ev-m)">instrumented</strong> (its inputs and premise are measured), <strong style="color:var(--ev-c)">proposed</strong> (modeled or designed but not run as an arm), or <strong style="color:var(--ev-p)">decided</strong> (a verdict binds it). A rule's premise being measured does not make the rule measured — a policy becomes decided only when it is run as an arm and compared.</p>
+  <!-- ref: card-details.html, card-tooltip-badge.html — status and source visible before
+       expansion; details expose method and limits. -->
+  <div class="rule-cards">
+    <article class="rule-card measured">
+      <span class="rc-status">[M] instrumented</span>
+      <h4>1. Grit (Ground-Truth Integrity)</h4>
+      <p>Default to models that keep correctness under degraded input.</p>
+      <details><summary>Source and limits</summary><p>Inputs: test-executed success under 10 perturbation operators ([M]). Evidence class [M]/[C]. Limitation: single-session + story corpus; not a universal trait. Next test: strength-grid live run.</p></details>
+      <footer>inputs [M] · premise measured</footer>
+    </article>
+    <article class="rule-card measured">
+      <span class="rc-status">[M] instrumented</span>
+      <h4>2. Explanation Tax (ε)</h4>
+      <p>Measure what resilience costs — flail rate and narration penalty.</p>
+      <details><summary>Source and limits</summary><p>Inputs: measured flail + narration overhead per model ([M]). Evidence class [M]/[C]. Limitation: descriptive; not matched-task causal evidence. Next test: re-weight by accepted outcome.</p></details>
+      <footer>inputs [M] · premise measured</footer>
+    </article>
+    <article class="rule-card measured">
+      <span class="rc-status">[M] instrumented</span>
+      <h4>5. First-Pass Rule</h4>
+      <p>Price the accepted outcome, not the prompt; derive first-pass from the attempt ledger.</p>
+      <details><summary>Source and limits</summary><p>Inputs: attempt number, acceptance, independent evaluator ([M]). Evidence class [C]. Limitation: needs per-task/per-model coverage. Next test: coverage-corrected routing.</p></details>
+      <footer>inputs [M] · premise measured</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>3. Snowball Rule (N²)</h4>
+      <p>Codebase growth compounds quadratically; β is calibrated, not measured.</p>
+      <details><summary>Source and limits</summary><p>Inputs: β (calibrated, [P]), v ([C]). Evidence class [C]/[P]. Limitation: N² is a modeled extension beyond the measured arc. Next test: canonical lab output for the arc.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>4. EPM Horizon</h4>
+      <p>Energy prices inflate compute; EPM(t) is externally calibrated.</p>
+      <details><summary>Source and limits</summary><p>Inputs: IEA projections ([X]), rate r ([P]). Evidence class [X]/[P]. Limitation: external scenario, not a corpus outcome. Next test: energy-measured campaign.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>6. Batch Discount</h4>
+      <p>Deferred batch work is cheaper (50%) with a 72-hour horizon.</p>
+      <details><summary>Source and limits</summary><p>Inputs: provider batch pricing ([X]), queue model ([P]). Evidence class [X]/[P]. Limitation: modeled; batch experiments not yet executed. Next test: batch-vs-on-demand arm.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>7. Budget Ceiling</h4>
+      <p>Throughput = Budget / (cost per job × (1 + retry)).</p>
+      <details><summary>Source and limits</summary><p>Inputs: measured retry rate r=0.115 ([M]), WFM theory ([P]). Evidence class [C]/[P]. Limitation: capacity formula, not a verified SLA. Next test: budget-policy arm.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>8. Cascade Rule</h4>
+      <p>Failures auto-escalate through model tiers; design for &lt;1% human escalation.</p>
+      <details><summary>Source and limits</summary><p>Inputs: price ratios ([X]), escalation design ([P]). Evidence class [X]/[P]. Limitation: cascade experiments not yet executed. Next test: escalation arm.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>9. SLA Buffer</h4>
+      <p>Completion time = queue × job time + retry buffer; never batch under 2× queue depth.</p>
+      <details><summary>Source and limits</summary><p>Inputs: queue theory ([P]), retry buffer ([P]). Evidence class [P]. Limitation: modeled from WFM, not measured. Next test: live queue-depth validation.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>10. Outcome Multiplier</h4>
+      <p>Maximize outcomes per dollar (BVI = outcomes / total cost).</p>
+      <details><summary>Source and limits</summary><p>Inputs: accepted outcomes and total cost ([M]), BVI definition ([P]). Evidence class [C]/[P]. Limitation: business-value framing, not a verified outcome metric. Next test: value-weighted arm comparison.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+  </div>
+  <p class="note">Decided status is reserved for a rule whose verdict binds it (see the <a href="evidence.html" style="color:var(--ac)">2b decision on The Evidence</a>). No rule card above over-claims a measured rule when only its premise is measured.</p>
 </div></section>
 
 <!-- SECTION: The Ten Rules -->
@@ -976,6 +1128,6 @@ document.addEventListener('DOMContentLoaded',function(){
   });
 });
 </script>
-<script src="app.js"></script>
+<script src="app.js?v=5eaac84ab"></script>
 </body>
 </html>

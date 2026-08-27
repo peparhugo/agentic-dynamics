@@ -12,102 +12,128 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="base.css?v=5eaac84ab">
 <style>
 .glossary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1rem;margin:2rem 0}
 .gcard{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.5rem;transition:border-color .2s,transform .2s}
 .gcard:hover{border-color:var(--ba);transform:translateY(-2px)}
 .gcard .gname{font-size:0.95rem;font-weight:700;color:var(--ac);margin-bottom:0.6rem}
 .gcard .gdef{font-size:0.82rem;color:var(--t2);line-height:1.6}
+.gcard .gmeta{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.7rem;padding-top:0.6rem;border-top:1px solid var(--b);font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--t3);letter-spacing:0.03em}
+.gcard .gmeta .gcl{margin-left:auto;white-space:nowrap}
 @media(max-width:768px){.glossary-grid{grid-template-columns:1fr}}
 </style>
 <script src="data.js"></script>
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <section class="sec" style="padding-top:6rem">
 <h1>Glossary</h1>
 <p class="lead" style="font-size:1.05rem;color:var(--t)">Terms used in Agentic Dynamics, defined in one place.</p>
+<!-- ref: card-tooltip-badge.html, type-editorial-measure.html — every definition carries a
+     source anchor and an evidence-class line; a term is not a claim. -->
+<aside class="field-receipt" style="max-width:700px;margin:1.25rem auto 0">
+  <div class="r-head">Glossary receipt</div>
+  <dl>
+    <dt>What a definition is</dt><dd>A coined term anchored to its method or artifact — not an untagged numeric prescription.</dd>
+    <dt>Evidence classes</dt><dd>[M] measured · [C] computed · [H] heuristic · [X] external · [P] policy/proposal. Each card below names its class and source.</dd>
+    <dt>Limitation</dt><dd>A definition does not generalize beyond the corpus or artifact it cites.</dd>
+  </dl>
+</aside>
 </section>
 
 <section class="sec alt">
 <div class="glossary-grid">
-
 <div class="gcard">
 <div class="gname">Grit (Ground-Truth Integrity)</div>
 <div class="gdef">How well test-executed task success is preserved as specification quality degrades. Operational definition: Grit(s) = P(test-executed&nbsp;success | perturbation&nbsp;strength=s). Retention R(s) = Grit(s)/Grit(0). Recovery premium &Delta;C = C(successful&nbsp;perturbed)/C(successful&nbsp;baseline). Measured by 10 perturbation operators across three classes: specification corruption, objective mutation, and process perturbation. This is the <strong>only</strong> meaning of Grit on this site and in the repository: the correctness&times;escape quadrant chart that once shared the name is now &ldquo;Correctness &times; Escape Quadrants&rdquo;.</div>
+<div class="gmeta"><span class="gcl">[M]/[C]</span><span>source: methodology.html, lab_grit.py; 10 perturbation operators</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Explanation Tax (&epsilon;)</div>
 <div class="gdef">The cost premium a model pays to work through confused or degraded input. Measured as flail rate (% sessions producing zero code) and narration penalty (% cost overhead on successful sessions). Claude: <span data-stat="claude_narration">11%</span> flail, <span data-stat="claude_penalty">8.0%</span> penalty. DeepSeek: <span data-stat="deepseek_narration">8%</span> flail, <span data-stat="deepseek_penalty">0.0%</span> penalty. [M]</div>
+<div class="gmeta"><span class="gcl">[M]/[C]</span><span>source: evidence.html narration/penalty cells; data.js model rows</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Silent Inference</div>
 <div class="gdef">An observed pattern where some models produce fewer billable reasoning tokens while maintaining performance. Whether this is caused by training architecture (e.g. GRPO), provider-side caching, or some combination is not yet determined by this experiment.</div>
+<div class="gmeta"><span class="gcl">[H]</span><span>source: observed pattern, methodology.html; cause undetermined</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Snowball Effect (&beta;, v, N&sup2;)</div>
 <div class="gdef">The quadratic compounding of AI costs as a codebase grows. Each new line of generated code increases the context window for every future session. Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]. &beta; = context inflation rate per line (default 0.001 — calibrate to your codebase). v = code velocity (lines/session). N = number of sessions. The N&sup2; term compounds per-session growth — model the curve before architectural commitments. The empirical basis for Rule 3.</div>
+<div class="gmeta"><span class="gcl">[C]/[P]</span><span>source: framework.html Rule 3; β calibrated, N² modeled</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">EPM (Energy Price Multiplier)</div>
 <div class="gdef">A function that models how local energy prices affect long-term AI compute costs. EPM(t) = 1.00 + r(t&minus;2024), where r depends on regional energy markets. IEA baseline: r = 0.016 (1.6%/yr). Aggressive scenario: r = 0.025 (2.5%/yr). Based on the 4Ms Framework (Google Cloud, 2025). The empirical basis for Rule 4.</div>
+<div class="gmeta"><span class="gcl">[X]/[P]</span><span>source: IEA WEO 2024 + 4Ms Framework (Google Cloud, 2025)</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">WOC Ratio (Work Overhead Cost) / First-Pass</div>
 <div class="gdef">First-pass success rate: WOC = 1/(1+r) where r is retry rate. With measured r=0.115: WOC=0.90. At or above 0.90 = healthy. Below 0.70 = critical. Price the outcome, not the prompt: CostPerOutcome(K,v) = C(K/P, v) / K. A model at half the cost but half the pass rate costs the same per outcome with double the latency. The empirical basis for Rule 5.</div>
+<div class="gmeta"><span class="gcl">[C]/[M]</span><span>source: retry rate r=0.115 measured; WOC computed</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">BVI (Business Value Index)</div>
 <div class="gdef">Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. The goal isn't to minimize cost &mdash; it's to maximize outcomes per dollar. The empirical basis for Rule 10.</div>
+<div class="gmeta"><span class="gcl">[P]/[C]</span><span>source: framework.html Rule 10; value framing, not verified</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">GRPO (Group Relative Policy Optimization)</div>
 <div class="gdef">DeepSeek's reinforcement learning method that optimizes for correct answers rather than imitating human-like reasoning paths. May contribute to lower reasoning-token overhead (hypothesis, not confirmed by this experiment). Contrasts with supervised fine-tuning (SFT) approaches used by other providers.</div>
+<div class="gmeta"><span class="gcl">[X]</span><span>source: DeepSeek public architecture docs (hypothesis)</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Attractor Basin</div>
 <div class="gdef">A model's default solution topology — the structural pattern it falls into when unconstrained. Measured by comparing perturbed vs baseline code structure (module count, class hierarchy, dependency graph). Models with deep attractor basins resist perturbation and recover to familiar patterns. Models with shallow basins explore novel solutions. Architecture labels ("dense", "MoE") are inferred from public information and may not be verifiable for closed models.</div>
+<div class="gmeta"><span class="gcl">[H]</span><span>source: methodology.html basin section; architecture labels inferred</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Basin Escape Score</div>
 <div class="gdef">A composite metric (0&ndash;1) measuring how far perturbation pushes a model from its default solution topology. Combines architecture divergence and structural novelty. A score of 1.0 means the model fully abandoned its default pattern. DeepSeek: higher escape scores under manifold perturbations than semantic ones.</div>
+<div class="gmeta"><span class="gcl">[H]</span><span>source: methodology.html escape score; algorithm + author thresholds</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Recovery Multiplier</div>
 <div class="gdef">How perturbation changes cost relative to baseline. Below 1.0: perturbation reduces cost (model explores). Above 1.0: perturbation increases cost (model recovers through narration). Values per model are in the live data (see evidence page). The empirical basis for the Explanation Tax.</div>
+<div class="gmeta"><span class="gcl">[M]/[C]</span><span>source: evidence.html recovery data; ratio of measured costs</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Strategy Archetypes</div>
 <div class="gdef">Four computed classifications based on exploration-to-recovery token ratios: CONSERVATIVE (low explore, high recover), EXPLORATORY (high escape, low recover), WASTEFUL (high explore, low quality), EFFICIENT (high explore, high quality, low cost). Per-model classifications depend on the regenerated corpus and should not be taken as fixed; they shift with each new experiment.</div>
+<div class="gmeta"><span class="gcl">[C]/[H]</span><span>source: methodology.html strategy taxonomy; depends on corpus</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Dual-Signal Verification</div>
 <div class="gdef">The method for validating that models implement constraints. Two independent scans: (1) reasoning text &mdash; does the model mention the constraint? (2) generated code &mdash; does the code actually implement the constraint? DeepSeek implements all 7 constraints without mentioning them in reasoning. Claude mentions and implements all 7 in billable output tokens.</div>
+<div class="gmeta"><span class="gcl">[M]</span><span>source: methodology.html constraint detection; reasoning + code scans</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Cache Strategy</div>
 <div class="gdef">A two-way door affecting C&#8320;. Cache-write stores context at $3.75/Mtok (Anthropic default). Cache-read retrieves at $0.14/Mtok (DeepSeek default). Measure cache hit rate: if &lt;50%, use cache-read. If &gt;80%, cache-write pays off.</div>
+<div class="gmeta"><span class="gcl">[X]/[P]</span><span>source: provider list pricing; measured cache hit rates in data.js</span></div>
 </div>
 
 <div class="gcard">
 <div class="gname">Grit Spectrum</div>
 <div class="gdef">The unified measurement of how models handle degraded input. From Flail (complete breakdown, 100% failure) through Expensive Grit (correct but costly recovery) to Efficient Grit (correct and cheap recovery).</div>
+<div class="gmeta"><span class="gcl">[H]</span><span>source: methodology.html perturbation taxonomy; threshold-specific</span></div>
 </div>
 
 </div>
@@ -122,6 +148,6 @@
   <a href="/">Home</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> · <a href="glossary.html">Glossary</a>
 </footer>
 
-<script src="app.js"></script>
+<script src="app.js?v=5eaac84ab"></script>
 </body>
 </html>

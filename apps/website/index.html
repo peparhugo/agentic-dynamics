@@ -12,7 +12,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="base.css?v=5eaac84ab">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 .home-hero h1{max-width:780px;font-size:clamp(1.9rem,4.2vw,3.2rem)}
@@ -59,7 +59,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 </head>
 <body class="home">
 
-<nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <section class="dossier-hero home-hero"><div class="hero-grid">
   <div>
@@ -67,7 +67,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
     <h1>Systems are constantly evolving. Scaling agents means measuring that evolution.</h1>
     <p class="lead">Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This repository is its founding instrument and corpus.</p>
     <blockquote class="pullquote">&ldquo;The system shapes the agent — and the agent reshapes the system. Read that again.&rdquo;</blockquote>
-    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">Examine the Method</a><a href="evidence.html" class="cta-btn ghost">Inspect the Evidence →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
+    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">Examine the Method</a><a href="evidence.html" class="cta-btn ghost">Inspect the Evidence →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a><a href="question.html" class="cta-btn ghost">The Question →</a></div>
   </div>
   <aside class="proof-ledger" aria-label="Key numbers">
     <h3>Evidence behind the discovery</h3>
@@ -75,6 +75,15 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
     <div class="proof-card"><span class="label">Models</span><div class="value"><span data-stat="variants">7</span></div></div>
     <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">215</span></div></div>
     <div class="proof-card success"><span class="label">Total measured cost</span><div class="value">$<span data-stat="story_total_cost">309.17</span></div></div>
+    <div class="field-receipt" style="margin-top:0.9rem">
+      <div class="r-head">Field receipt</div>
+      <dl>
+        <dt>Statement</dt><dd>Agentic Dynamics is the empirical study of how agents behave as tasks, environments, workflows, and time change — starting from what an agentic outcome costs once verification, recovery, inherited context, and downstream consequences are included.</dd>
+        <dt>Evidence class</dt><dd>[P] editorial framing — names the question; the corpus is in <a href="evidence.html" style="color:var(--ac)">The Evidence</a>.</dd>
+        <dt>Corpus / date</dt><dd>1,067 story sessions, 7 models (measured [M]); updated 2026-08-27.</dd>
+        <dt>Limitation</dt><dd>This statement is the field's question, not a claim of a universal best practice.</dd>
+      </dl>
+    </div>
   </aside>
 </div></section>
 
@@ -137,6 +146,54 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
     <div class="pipe-step"><div class="ps-label">Grid — test policy as an arm</div>Compare policy choices across controlled factor combinations</div>
     <div class="pipe-step"><div class="ps-label">Campaign — change one variable and repeat</div>Use the remaining uncertainty to select the next measurement</div>
   </div>
+  <!-- ref: svg-marker-flow.html, svg-animated-status.html — the instrument cycle.
+       A returning five-node path: derive is the only route into policy. -->
+  <figure class="figure-edit" aria-labelledby="cycle-title">
+    <span class="kicker" id="cycle-title">The instrument cycle</span>
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable instrument-cycle diagram">
+    <svg class="diagram-map" viewBox="0 0 1440 580" role="img" aria-labelledby="cycle-title cycle-desc">
+      <title id="cycle-desc">Instrument to derive to write policy to grid to campaign and back to instrument. Derive is the only path into policy; unmeasured requirements block it.</title>
+      <defs>
+        <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+        <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+        <filter id="diagram-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t2)"/></marker>
+        <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ac)"/></marker>
+        <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--cy)"/></marker>
+        <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--am)"/></marker>
+      </defs>
+      <rect class="map-ground" x="1" y="1" width="1438" height="578" rx="24" style="fill:url(#diagram-ground)"/>
+      <rect class="map-grid" x="1" y="1" width="1438" height="578" rx="24"/>
+
+      <text class="map-kicker" x="54" y="52">THE LOAD-BEARING RULE</text>
+      <text class="map-title" x="54" y="84">TO MAKE POLICIES, WE NEED INFORMATION</text>
+      <text class="map-copy" x="54" y="108">INSTRUMENT &#x2192; DERIVE &#x2192; WRITE POLICY &#x2192; GRID &#x2192; CAMPAIGN &#x2192; REPEAT</text>
+
+      <g><rect class="map-node cyan" x="120" y="220" width="300" height="100" rx="11"/><text class="node-index" x="138" y="243">01 / INSTRUMENT</text><text class="node-title" x="138" y="271">INSTRUMENT</text><text class="node-copy" x="138" y="291">ledger events: quality &#x00B7; grit &#x00B7; confidence</text></g>
+      <g><rect class="map-node cyan" x="560" y="220" width="300" height="100" rx="11" filter="url(#diagram-glow)"/><text class="node-index" x="578" y="243">02 / DERIVE</text><text class="node-title" x="578" y="271">DERIVE</text><text class="node-copy" x="578" y="291">measurement rules &#x2192; named information</text></g>
+      <g><rect class="map-node blue" x="1000" y="220" width="300" height="100" rx="11"/><text class="node-index" x="1018" y="243">03 / WRITE POLICY</text><text class="node-title" x="1018" y="271">WRITE POLICY</text><text class="node-copy" x="1018" y="291">control rules consume measured fields</text></g>
+
+      <g><rect class="map-node blue" x="1000" y="440" width="300" height="100" rx="11"/><text class="node-index" x="1018" y="463">04 / GRID</text><text class="node-title" x="1018" y="491">GRID</text><text class="node-copy" x="1018" y="511">test policy as an arm</text></g>
+      <g><rect class="map-node amber" x="560" y="440" width="300" height="100" rx="11"/><text class="node-index" x="578" y="463">05 / CAMPAIGN</text><text class="node-title" x="578" y="491">CAMPAIGN</text><text class="node-copy" x="578" y="511">change one factor &#x00B7; emit next spec</text></g>
+
+      <path class="flow cyan" d="M420 270H560"/><text class="flow-note" x="490" y="256" text-anchor="middle">emit fields</text>
+      <path class="flow blue" d="M860 270H1000"/><text class="flow-note" x="930" y="250" text-anchor="middle">produce &#x00B7; the only path</text>
+      <path class="flow blue" d="M1150 320V440"/><text class="flow-note" x="1162" y="384">assign as arm</text>
+      <path class="flow cyan" d="M1000 490H860"/><text class="flow-note" x="930" y="476" text-anchor="middle">compare arms</text>
+      <path class="flow amber" d="M560 490C560 400 270 400 270 320"/><text class="flow-note" x="415" y="402" text-anchor="middle">next spec</text>
+      <path class="tracer return" pathLength="100" d="M560 490C560 400 270 400 270 320"/>
+
+      <g aria-label="Unmeasured requirement blocks policy">
+        <line x1="935" y1="252" x2="935" y2="288" stroke="var(--danger)" stroke-width="2.5" stroke-dasharray="5 4"/>
+        <path d="M928 263L942 277" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M942 263L928 277" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round"/>
+        <text class="flow-note" x="935" y="345" text-anchor="middle">unmeasured requirement blocks policy</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Figure H1. The instrument cycle — Instrument → Derive → Write policy → Grid → Campaign, returning to Instrument. Derive is the only path into policy, and a control rule whose requirements are not measured cannot be written.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] method structure</span><span>ref: svg-marker-flow.html</span></div>
+  </figure>
   <div class="hero-actions"><a href="methodology.html" class="cta-btn">Examine the Method →</a><a href="https://github.com/peparhugo/agentic-dynamics" class="cta-btn ghost">Inspect the Source →</a></div>
 </div></section>
 
@@ -201,6 +258,6 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   <a href="evidence.html">Evidence</a> · <a href="databricks.html">Related Work</a>
 </footer>
 
-<script src="app.js"></script>
+<script src="app.js?v=5eaac84ab"></script>
 </body>
 </html>

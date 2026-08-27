@@ -1,0 +1,134 @@
+{
+  "schema_version": "cap-site-deployed-census/v1",
+  "campaign": "cap_site_revamp4",
+  "phase": "p6_deploy",
+  "baseline": "experiments/results/cap_site_revamp3/incumbent_census.json",
+  "deployed_hosts": [
+    "https://ai-finops-rulebook.web.app",
+    "https://agentic-dynamics.web.app"
+  ],
+  "status": "PASS",
+  "failures": [],
+  "checked_at": "2026-08-27T17:01:14.386110+00:00",
+  "site_totals": {
+    "sliders": 15,
+    "canvas_hosts": 6,
+    "chart_construction_sites": 7,
+    "semantic_tables": 38,
+    "handler_attachment_sites": 50,
+    "theme_toggles": 1,
+    "data_stat_literal_attributes": 72,
+    "data_stat_fmt_literal_attributes": 3,
+    "data_anal_literal_attributes": 84,
+    "data_stat_unique_markup_keys": 22,
+    "data_anal_unique_keys": 12,
+    "data_stat_supported_keys": 33
+  },
+  "slider_items": [
+    {
+      "page": "framework.html",
+      "id": "r_eng",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_ses",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_vel",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_day",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_epm",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_cost",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_rate",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_budget",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_workload",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_batch",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_retry",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_escalation",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_ac0",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "framework.html",
+      "id": "r_arate",
+      "oninput": "updateROI()"
+    },
+    {
+      "page": "methodology.html",
+      "id": "cc-beta",
+      "oninput": null
+    }
+  ],
+  "canvas_items": [
+    {
+      "page": "framework.html",
+      "id": "costChart"
+    },
+    {
+      "page": "evidence.html",
+      "id": "snowballChart"
+    },
+    {
+      "page": "evidence.html",
+      "id": "gritMatrixChart"
+    },
+    {
+      "page": "evidence.html",
+      "id": "narrationChart"
+    },
+    {
+      "page": "evidence.html",
+      "id": "costBarChart"
+    },
+    {
+      "page": "evidence.html",
+      "id": "locVsCostChart"
+    }
+  ],
+  "theme_toggle_persisted": true,
+  "verdicts_in_data_js": true,
+  "mirror_identical": true,
+  "all_http_200": true
+}
