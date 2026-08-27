@@ -1186,6 +1186,42 @@ def _enforce_commit_prefix(
     if not bad:
         return
     expected = f"[workflow] {phase_name} — {goal_prefix}"
+    # CANONICALIZE-WITH-EVIDENCE (cap_runner_hardening2 p1 lesson — the measured pattern:
+    # four operator re-tags on one phase because agents commit real work with natural
+    # "fix:" messages; the byte-exact gate turned excellent work into busywork). A
+    # MESSAGE-only violation is self-healing by default: the runner amends each
+    # non-conforming commit's subject to the canonical pattern (tree + content intact,
+    # the author's work preserved), records the original subjects visibly on the gate,
+    # and the phase CONTINUES — resume reliability is preserved because the messages
+    # become canonical. FINOPS_COMMIT_GATE=strict restores the fail-with-evidence mode.
+    # TREE violations (the relabel — a discarded tree re-presented) are NEVER canonicalized:
+    # they stay strict failures (cap_runner_hardening2 p2).
+    if os.environ.get("FINOPS_COMMIT_GATE", "canonicalize") != "strict":
+        canonicalized = []
+        for subject, author in commits:
+            if author == RUNNER_INIT_AUTHOR_EMAIL and subject == "Initial":
+                continue
+            if _commit_subject_matches(subject, phase_name, goal_prefix):
+                continue
+            try:
+                subprocess.run(
+                    ["git", "commit", "--amend", "--only", "-m", expected],
+                    cwd=wd, capture_output=True, text=True, timeout=30,
+                )
+                canonicalized.append(subject)
+            except Exception:  # noqa: BLE001 — a failed amend degrades to the strict path
+                continue
+        if canonicalized:
+            pr.commit_gate = {
+                "reason": "COMMIT_PREFIX_CANONICALIZED",
+                "original_subjects": canonicalized,
+                "expected_prefix": expected,
+            }
+            pr.error = (
+                f"commit messages canonicalized to '{expected}' (original: "
+                f"{canonicalized}) — the work was preserved; see commit_gate"
+            )
+            return
     pr.commit_gate = {
         "reason": "COMMIT_PREFIX",
         "subjects": bad,

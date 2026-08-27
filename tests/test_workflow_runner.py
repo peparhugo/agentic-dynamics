@@ -1359,9 +1359,39 @@ def _git_init(tmp_path):
     subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
 
 
-def test_commit_prefix_fails_a_plain_message_commit(tmp_path):
-    """(a) A fake agent that commits a plain message fails with COMMIT_PREFIX + the subject,
-    and the evidence rides the phase's ledger record."""
+def test_commit_prefix_canonicalizes_a_plain_message_commit(tmp_path):
+    """(a) A fake agent that commits a plain message: the default CANONICALIZE mode amends
+    the message to the canonical pattern (the work preserved), records the original subject
+    on the gate, and the phase CONTINUES — resume reliability is preserved because the
+    message becomes canonical."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "scope.md").write_text("scope")
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "ok"  # canonicalized, not failed
+    assert p.commit_gate is not None
+    assert p.commit_gate["reason"] == "COMMIT_PREFIX_CANONICALIZED"
+    assert p.commit_gate["original_subjects"] == ["site: add things"]
+    assert p.commit_gate["expected_prefix"] == "[workflow] scope — g"
+    # the message on disk IS canonical now — resume will match it
+    subjects = subprocess.run(
+        ["git", "log", "--format=%s"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.splitlines()
+    assert subjects[0] == "[workflow] scope — g"
+
+
+def test_commit_prefix_strict_mode_fails_a_plain_message_commit(tmp_path, monkeypatch):
+    """FINOPS_COMMIT_GATE=strict restores the fail-with-evidence mode: a plain-message
+    commit fails the phase with COMMIT_PREFIX + the subject as evidence."""
+    monkeypatch.setenv("FINOPS_COMMIT_GATE", "strict")
     spec = load_spec(SPEC)
     _git_init(tmp_path)
 
@@ -1409,9 +1439,10 @@ def test_commit_prefix_passes_a_matching_commit(tmp_path):
     assert all(p.commit_gate is None for p in result.phases)
 
 
-def test_commit_prefix_fires_even_when_the_phase_already_failed(tmp_path):
-    """The enforcement runs regardless of ok/fail: a phase that failed for another reason but
-    also made a plain commit carries BOTH reasons (its own error + the COMMIT_PREFIX note)."""
+def test_commit_prefix_fires_even_when_the_phase_already_failed(tmp_path, monkeypatch):
+    """The enforcement runs regardless of ok/fail (strict mode): a phase that failed for
+    another reason but also made a plain commit carries BOTH reasons."""
+    monkeypatch.setenv("FINOPS_COMMIT_GATE", "strict")
     spec = load_spec(SPEC)
     _git_init(tmp_path)
 
@@ -1441,7 +1472,8 @@ def test_commit_prefix_rejects_a_different_phases_name(tmp_path):
     assert wr._commit_subject_matches("site: add things", "scope", "g") is False
 
 
-def test_commit_prefix_replay_rejects_revamp2_plain_commits(tmp_path):
+def test_commit_prefix_replay_rejects_revamp2_plain_commits(tmp_path, monkeypatch):
+    monkeypatch.setenv("FINOPS_COMMIT_GATE", "strict")
     """(c) Replay proof: the revamp2 branch's 7 plain commits would each have failed the phase
     (COMMIT_PREFIX) — the validator rejects every one, accepts the phase's own [workflow]
     commit, and an end-to-end phase that made those 7 commits fails with them as evidence."""
@@ -1479,7 +1511,8 @@ def test_commit_prefix_replay_rejects_revamp2_plain_commits(tmp_path):
     assert result.ok is False
 
 
-def test_commit_prefix_exempts_the_adapters_initial_commit(tmp_path):
+def test_commit_prefix_exempts_the_adapters_initial_commit(tmp_path, monkeypatch):
+    monkeypatch.setenv("FINOPS_COMMIT_GATE", "strict")
     """The runner's own execution-layer commits are exempt: the adapter's fresh-worktree
     ``Initial`` commit (subject ``Initial`` + the runner's init author) never trips the gate,
     while a plain-message commit under the SAME forged identity still does — the enforcement
