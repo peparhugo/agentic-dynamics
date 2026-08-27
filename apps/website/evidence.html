@@ -94,6 +94,16 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 </div>
 <p class="fn"><strong>Canonical registry:</strong> <span data-stat="registry_current_records">215</span> current story rows &middot; <span data-stat="resolved_measurement_payloads">215</span> resolved measurement payloads (<span data-stat="unresolved_waivered">0</span> unresolved) &middot; <span data-stat="canonical_findings">64</span> clean single-task findings &middot; <span data-stat="tombstones_total">87</span> tombstoned &mdash; <span data-stat="contaminated_tombstones">77</span> contaminated (excluded) and <span data-stat="no_measurement_tombstones">10</span> retracted for no usable measurement payload. The registry claim and what actually resolved are reported separately, never merged into a single &ldquo;canonical stories&rdquo; count.</p>
 <p class="fn"><strong>Provenance:</strong> Numbers are tagged by provenance: [M] measured &middot; [C] computed &middot; [H] heuristic &middot; [X] external.</p>
+<!-- ref: type-responsive-grid.html — the provenance receipt beside the evidence hero. -->
+<aside class="field-receipt" style="max-width:820px;margin:1.25rem auto 0">
+  <div class="r-head">Evidence receipt</div>
+  <dl>
+    <dt>Corpus / denominator</dt><dd><span data-stat="story_sessions">1,067</span> captured story sessions, <span data-stat="stories_total">215</span> stories, <span data-stat="variants">7</span> models — the current build (generated <span data-stat="variants">7</span>… see data.js <code>_meta.generated_at</code>).</dd>
+    <dt>Source / artifact</dt><dd>Generated <code>apps/website/data.js</code> from the canonical registry; verdict surfaces below read <code>window.DYNAMICS_DATA.verdicts</code>.</dd>
+    <dt>Limitation</dt><dd>An absent measurement is rendered as a named null, never a zero or a historical fallback.</dd>
+    <dt>Updated</dt><dd>2026-08-27</dd>
+  </dl>
+</aside>
 </section>
 
 <!-- Current linked-story instrument and findings. -->
@@ -1119,6 +1129,90 @@ All cost values measured directly from provider API responses via the openCode d
 </div>
 </details>
 
+<!-- FIELD LAYER: the verdict surfaces — cap_2b decision, escalation E_x, calibration arc.
+     Every value flows through data.js (window.DYNAMICS_DATA.verdicts); an absent field
+     renders as a named null. ref: card-details.html, svg-marker-flow.html,
+     scroll-sticky-overlay.html, d3-line-arc.html. -->
+<section class="sec alt">
+<h2 id="verdicts">Verdicts and Calibration</h2>
+<p class="lead">Three measured verdicts bound what the instrument authorizes. Each is scoped: it names its evidence class, its denominator/n, and what it does <em>not</em> authorize.</p>
+
+<div class="decision-card" id="cap2b-card">
+  <span class="dc-status">[C] decision over [M] outcomes</span>
+  <h3 id="cap2b-title">cap_2b — randomized non-inferiority verdict</h3>
+  <ul>
+    <li><strong>Decision:</strong> <span id="cap2b-decision">NON-INFERIOR</span> (n=9 per arm, randomized DeepSeek v4 Pro pilot).</li>
+    <li><strong>CPVO ratio:</strong> <span id="cap2b-ratio">0.7857</span>, 95% CI [<span id="cap2b-ci-lo">0.6842</span>, <span id="cap2b-ci-hi">0.9105</span>], margin ≤ 1.10 — adaptive is no worse per verified outcome.</li>
+    <li><strong>Static arm:</strong> <span id="cap2b-static-cost">$0.080062</span> total, <span id="cap2b-static-cpvo">$0.013344</span> CPVO, <span id="cap2b-static-ok">6/9</span> verified.</li>
+    <li><strong>Adaptive arm:</strong> <span id="cap2b-adaptive-cost">$0.094364</span> total, <span id="cap2b-adaptive-cpvo">$0.010485</span> CPVO, <span id="cap2b-adaptive-ok">9/9</span> verified.</li>
+  </ul>
+  <div class="dc-bound"><strong>Authorization boundary:</strong> the verdict authorizes design review only — it does not arm a control policy. Source: <code class="mono">experiments/results/cap_2b/cap_2b_score_20260826T160018Z.json</code>.</div>
+  <details><summary>Method and limits</summary><p>Decision rule: CPVO ratio ≤ 1.10 with the success gap within margin, per <code>docs/designs/current/cap_2b_preregistration.md</code>. Descriptive decision over measured outcomes; no causal generalization to other tasks or models.</p></details>
+</div>
+
+<div class="edit-split" style="margin-top:2rem">
+  <figure class="figure-edit" aria-labelledby="escalation-title">
+    <span class="kicker" id="escalation-title">Escalation E_x — the measured fix multiplier</span>
+    <svg viewBox="0 0 720 260" role="img" aria-labelledby="escalation-title escalation-desc">
+      <title id="escalation-desc">Cell baseline $0.008949, then the measured Sol and Sonnet escalation-fix costs with their E_x multipliers.</title>
+      <defs>
+        <marker id="escArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
+      </defs>
+      <rect x="30" y="120" width="150" height="52" rx="8" fill="#287271" opacity=".85"/><text x="105" y="143" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="#fff">baseline cell</text><text x="105" y="160" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">$0.008949</text>
+      <path d="M180 146H230" stroke="#287271" stroke-width="2" marker-end="url(#escArrow)"/>
+      <rect x="230" y="40" width="220" height="52" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2"/><text x="340" y="63" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="currentColor">Sol fix · $0.102619</text><text x="340" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#9b6a28">E_x = 11.4671</text>
+      <rect x="230" y="150" width="220" height="52" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2"/><text x="340" y="173" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="currentColor">Sonnet fix · $0.111982</text><text x="340" y="190" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#9b6a28">E_x = 12.5134</text>
+      <path d="M340 92V150" stroke="#8b8375" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="580" y="110" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">n=1 per escalation model</text>
+      <text x="580" y="130" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">descriptive, no CI, no causal claim</text>
+    </svg>
+    <figcaption>Figure E1. The escalation chain — [M] costs ($0.008949 baseline; $0.102619 Sol; $0.111982 Sonnet) and [C] ratios (E_x = 11.4671; 12.5134), n=1 per model, scoped to the measured escalation path.</figcaption>
+    <div class="fig-legend"><span class="ev-badge m">[M] costs</span><span class="ev-badge c">[C] ratios</span><span>ref: svg-marker-flow.html, svg-pattern-surface.html</span></div>
+  </figure>
+  <aside class="field-receipt">
+    <div class="r-head">Escalation receipt</div>
+    <dl>
+      <dt>Baseline</dt><dd>$0.008949 — cap_2a_rerun3 critical baseline phase ledger.</dd>
+      <dt>Measured fixes</dt><dd>Sol $0.102619 · Sonnet $0.111982 ([M], implement-phase cost).</dd>
+      <dt>Computed</dt><dd>E_x = fix ÷ baseline ([C]): 11.4671 and 12.5134.</dd>
+      <dt>Scope / n</dt><dd>n=1 per escalation model; descriptive — no causal generalization.</dd>
+    </dl>
+  </aside>
+</div>
+
+<div class="edit-split">
+  <figure class="figure-edit" aria-labelledby="calibration-title">
+    <span class="kicker" id="calibration-title">Calibration arc — 0/3 → 2/3 → 2b</span>
+    <svg viewBox="0 0 720 220" role="img" aria-labelledby="calibration-title calibration-desc">
+      <title id="calibration-desc">Three panels: initial 0/3, rerun 2/3 with Wilson interval, then the 2b non-inferiority decision.</title>
+      <defs>
+        <marker id="calArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
+      </defs>
+      <rect x="20" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#287271" stroke-width="1.5"/><text x="120" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:700" fill="currentColor">0 / 3</text><text x="120" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">initial calibration</text><text x="120" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">n=3</text>
+      <path d="M220 90H260" stroke="#287271" stroke-width="2" marker-end="url(#calArrow)"/>
+      <rect x="260" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#9b6a28" stroke-width="1.5"/><text x="360" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:700" fill="currentColor">2 / 3</text><text x="360" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">rerun · Wilson [0.2077, 0.9385]</text><text x="360" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">n=3 · descriptive</text>
+      <path d="M460 90H500" stroke="#287271" stroke-width="2" marker-end="url(#calArrow)"/>
+      <rect x="500" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#8a2f2f" stroke-width="2"/><text x="600" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:700" fill="currentColor">2b NON-INFERIOR</text><text x="600" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">CPVO ratio [0.6842, 0.9105]</text><text x="600" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">authorizes design review only</text>
+    </svg>
+    <figcaption>Figure E2. The calibration arc — 0/3 initial, 2/3 rerun (Wilson [0.2077, 0.9385], n=3), then the 2b decision. Each panel names its n and interval; the final label states its authorization boundary.</figcaption>
+    <div class="fig-legend"><span class="ev-badge c">[C] over [M]</span><span>ref: scroll-sticky-overlay.html, d3-line-arc.html</span></div>
+  </figure>
+  <aside class="field-receipt">
+    <div class="r-head">Calibration receipt</div>
+    <dl>
+      <dt>0/3</dt><dd>Initial calibration hit rate (n=3).</dd>
+      <dt>2/3 rerun</dt><dd>0.667, Wilson [0.2077, 0.9385], n=3 — descriptive, not statistical clearance.</dd>
+      <dt>2b decision</dt><dd>NON-INFERIOR CPVO ratio, authorizing design review only.</dd>
+      <dt>Source</dt><dd>cap_2a_rerun2 score JSON + cap_2b score JSON.</dd>
+    </dl>
+  </aside>
+</div>
+
+<div class="null-state"><span class="ns-tag">not measured</span><span><strong>Escalate-arm trigger remains untriggered.</strong> All six escalate cells passed first attempt — the no-escalation cost ($0.005946) is published, not a premium estimate. See <code>docs/designs/current/cap_session_routing_prospective.md</code>.</span></div>
+<div class="null-state"><span class="ns-tag">not measured</span><span><strong>LSP diagnostics.</strong> No current canonical LSP series — rendered as <em>not measured</em>, never "0 errors".</span></div>
+<div class="null-state"><span class="ns-tag">no canonical output</span><span><strong>Lab panels.</strong> Several analysis surfaces have no canonical current output; the placeholders render that absence explicitly.</span></div>
+</section>
+
 <!-- Measured dimensions and the control questions they motivate. -->
 <section class="sec">
 <h2 id="field-visible">The Field Now Visible</h2>
@@ -1937,6 +2031,37 @@ document.addEventListener('DOMContentLoaded', function () {
     var barHtml = '<div style="display:flex;height:32px;border-radius:6px;overflow:hidden;margin:1rem 0;border:1px solid var(--b)">' + barParts + '</div>';
     var tagsHtml = '<div style="display:flex;gap:0.8rem;flex-wrap:wrap;margin:0.5rem 0;font-size:0.75rem;color:var(--t2)">' + tagParts + '</div>';
     stratDiv.innerHTML = barHtml + tagsHtml;
+  }
+})();
+
+/* FIELD LAYER: hydrate the verdict surfaces from data.js (the only data door).
+   If a field is absent, the span keeps its authored value or shows a named null —
+   the generator never fabricates a verdict. */
+(function () {
+  var D = window.DYNAMICS_DATA;
+  if (!D || !D.verdicts) return;
+  var v = D.verdicts;
+  function setIf(id, val) {
+    var el = document.getElementById(id);
+    if (el && val !== null && val !== undefined) el.textContent = val;
+  }
+  if (v.cap_2b && v.cap_2b.per_arm) {
+    var dr = v.cap_2b;
+    setIf('cap2b-decision', dr.decision === 'NON_INFERIOR' ? 'NON-INFERIOR' : dr.decision);
+    if (dr.cpvo_ratio !== null && dr.cpvo_ratio !== undefined)
+      setIf('cap2b-ratio', (+dr.cpvo_ratio).toFixed(4).replace(/0+$/, '').replace(/\.$/, ''));
+    if (dr.cpvo_ratio_ci_95) { setIf('cap2b-ci-lo', dr.cpvo_ratio_ci_95[0]); setIf('cap2b-ci-hi', dr.cpvo_ratio_ci_95[1]); }
+    var s = dr.per_arm.static, a = dr.per_arm.adaptive;
+    if (s) {
+      setIf('cap2b-static-cost', '$' + (+s.total_cost_usd).toFixed(6));
+      setIf('cap2b-static-cpvo', '$' + (+s.cpvo_usd).toFixed(6));
+      setIf('cap2b-static-ok', s.accepted_outcomes + '/' + s.n);
+    }
+    if (a) {
+      setIf('cap2b-adaptive-cost', '$' + (+a.total_cost_usd).toFixed(6));
+      setIf('cap2b-adaptive-cpvo', '$' + (+a.cpvo_usd).toFixed(6));
+      setIf('cap2b-adaptive-ok', a.accepted_outcomes + '/' + a.n);
+    }
   }
 })();
 </script>
