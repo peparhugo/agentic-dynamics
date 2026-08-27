@@ -691,6 +691,15 @@ svg[viewBox]{max-width:100%;height:auto}
 .diagram-map .map-ground{fill:var(--bg);stroke:var(--ba);stroke-width:1}
 .diagram-map .map-grid{fill:url(#diagram-grid);opacity:.72}
 .diagram-map .map-kicker{fill:var(--ac);font:700 11px 'JetBrains Mono',monospace;letter-spacing:.18em}
+/* Light-theme diagram accent contrast (WCAG AA on light surfaces):
+   the accent text fills above are var(--ac)/var(--cy)/var(--am), which in
+   light mode are mid-tone (3.3-3.9:1 on white — below AA). These overrides
+   pin the diagram TEXT accents to AA-passing dark shades; the inline
+   style="fill:var(--am)" kickers (envelope) already pass and are untouched
+   (inline style wins). Dark theme is unchanged (default var fills). */
+body.light .diagram-map .map-kicker,
+body.light .diagram-map .scale-symbol{fill:#155E75}
+body.light.framework-page{--fw-why:#92400E;--fw-how:#155E75;--fw-what:#0E7490}
 .diagram-map .map-title{fill:var(--t);font:700 23px 'JetBrains Mono',monospace;letter-spacing:.05em}
 .diagram-map .map-copy{fill:var(--t2);font:500 10px 'JetBrains Mono',monospace;letter-spacing:.035em}
 .diagram-map .map-label{fill:var(--t2);font:700 9px 'JetBrains Mono',monospace;letter-spacing:.12em}
