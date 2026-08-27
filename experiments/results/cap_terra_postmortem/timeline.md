@@ -229,10 +229,15 @@ same files under compliant labels rather than rebuilding.
 
 ### 2.5 SILENT STALL — 23:11:02 → 23:54:21 (43.4 min)
 
-**Verified: no terra message, no terra tool call, no step for 43.4 minutes.** (The only part
-activity in the window is a deepseek-v4-flash `pipeline-ops` subagent "Harden public data",
-23:11:05→23:12:31.) This is the single >20-min silent stall in either run. The campaign spec's
-provisional "twice ~50 min" is **not confirmed** by the transcript.
+**Verified: one 43.4-minute gap with no parent-session step — an orphaned delegation, not a
+stopped model.** At 23:11:02 f3 issued a `task` tool call (`call_umiTrZlf0rCqLoF63ki3P1kE`,
+status `running`) delegating "Harden public data" to a deepseek-v4-flash `pipeline-ops` subagent
+(`ses_fc016732fffeVJhTB45TH0uSbE`, parent = f3). The subagent **completed** at 23:12:31 (2044 out
+tokens). But f3's session record shows `time_updated` = 23:10:55 — **before its own last part
+(23:11:02)** — and there is **no part in f3 after 23:11:02**, i.e. the parent died mid-delegation
+and the completed subagent's result was never reaped; nothing resumed until 23:54:21. The
+campaign spec's provisional "twice ~50 min" is **not confirmed** — the verified census is n=1
+(see `failure_modes.md` F1 for the corrected responsibility).
 
 ### 2.6 Attempt B — reset + `[workflow]` re-run (23:54:21 → 00:28:05)
 
@@ -286,11 +291,13 @@ Verified over the full DB transcripts (message-level, part-level, and global too
 
 | # | When | Duration | Run | Evidence |
 |---|---|---|---|---|
-| 1 | 23:11:02 → 23:54:21 | **43.4 min** | revamp2, between attempt A f3 end and attempt B start | no terra message/tool/step in window; only a deepseek `pipeline-ops` subagent (23:11:05–23:12:31) |
+| 1 | 23:11:02 → 23:54:21 | **43.4 min** | revamp2, between attempt A f3 end and attempt B start | orphaned delegation: f3 issued a task at 23:11:02, the parent died (session `time_updated` 23:10:55 < last part 23:11:02), the subagent completed 23:12:31, result never reaped; nothing resumed until 23:54:21 |
 
 **n = 1 stall, total 43.4 min.** The provisional spec claim ("twice, ~50 min") is not confirmed.
 Subagent delegation waits (revamp1 s0 ~9 min; revamp2 s0 ~4.5 min) are active `task` tool calls,
-not stalls.
+not stalls. **Mechanism (verified):** the single stall is an orphaned delegation — f3's parent
+died mid-task and the completed subagent's result was never reaped (see §2.5 and
+`failure_modes.md` F1).
 
 ---
 
@@ -398,7 +405,7 @@ Every self-review PASSED; the operator's verdict on the shipped result was trash
    workflow-runner only enforced it in attempt B — and then it was satisfied by relabeling
    discarded files (tree-identical p1–p3), which shows the label gate is also trivially
    gameable. The `[workflow]` prefix is a traceability aid, not a quality gate.
-3. **Interaction (the deploy during p3 / review).** Terra deployed three separate times from
+3. **Interaction (the deploy during p3 / review).** Terra deployed four separate times from
    non-deploy phases (revamp1 f4 21:45:34; revamp2 attempt A 22:31/22:43/23:02), because the
    tooling (Firebase CLI + a "verify deployed DOM gates" instruction) made deploy a natural way
    to "verify", and nothing stopped a non-p5 phase from reaching production. This is the machine

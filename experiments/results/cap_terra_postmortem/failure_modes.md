@@ -10,7 +10,7 @@
 
 | # | Failure mode | Verdict | Responsibility split | What the process could have caught |
 |---|---|---|---|---|
-| F1 | Silent stalls | **1 verified stall (43.4 min)**, not "2+ × ~50 min" — model stepping is the proximate cause, the process had no watchdog | model 60% / process 30% / interaction 10% | a watchdog on step-liveness (no step for N minutes → alert/reconnect) |
+| F1 | Silent stalls | **1 verified stall (43.4 min)**, not "2+ × ~50 min" — the stall is an **orphaned delegation**: f3 died mid-task, the completed subagent's result was never reaped, nothing watched the run | model 20% / process 55% / interaction 25% | a run-level watchdog + orphaned-task sweep |
 | F2 | Process violations (plain commits, early deploy) | Hard rule 1 existed but was **never enforced**; deploy was performed from a non-deploy phase 3 times | process 60% / model 30% / interaction 10% | pre-commit `[workflow]` check + deploy-phase-only shell guard |
 | F3 | Self-review passing trash | Both p4 reviews measured **compliance, not quality**; the review rubric was the process's, and terra filled it | process 50% / model 40% / interaction 10% | independent reviewer + rendered-output screenshot gate + operator sign-off |
 | F4 | Static over interactive | The anti-SaaS constraint was **scoped by the process as "retire the calculator"**; the interactive layer was **never gated or inventoried**; terra chose the safe/cheap reading | process 50% / model 35% / interaction 15% | preserve-baseline gate + anti-SaaS scoping that names what survives |
@@ -29,14 +29,14 @@
 
 > `08-26 23:11:02 (revamp2 attempt A f3 end) → 23:54:21 (attempt B brief start): 43.4 min`
 
-The window contains no terra message, no terra tool call, no step — only a deepseek-v4-flash `pipeline-ops` subagent ("Harden public data", 23:11:05→23:12:31). The two subagent-heavy waits in run 1 s0 (~9 min) and run 2 s0 (~4.5 min) are active `task` tool calls, not stalls. The provisional "twice ~50 min" is **not confirmed**; the verified census is n=1, 43.4 min (see `timeline.md` §3).
+**The mechanism is an orphaned delegation, not a model that stopped thinking.** The gap's opening is a `task` tool call terra's own f3 session issued at 23:11:02 (callID `call_umiTrZlf0rCqLoF63ki3P1kE`, status `running`), delegating "Harden public data" to a deepseek-v4-flash `pipeline-ops` subagent (`ses_fc016732fffeVJhTB45TH0uSbE`, parent = f3). The subagent **completed** at 23:12:31 (2044 output tokens). But the parent session record shows f3's `time_updated` = 23:10:55 — **before its own last part (23:11:02)** — and there is **no part in f3 after 23:11:02**, i.e. the task result was never reaped by the parent. The parent session died mid-delegation; the completed subagent's result went nowhere; nothing resumed until 23:54:21. The two subagent-heavy waits in run 1 s0 (~9 min) and run 2 s0 (~4.5 min) are active `task` tool calls, not stalls. The provisional "twice ~50 min" is **not confirmed**; the verified census is n=1, 43.4 min (see `timeline.md` §3).
 
-**Responsibility:**
-- **Model (60%):** a stepping model that can go 43 minutes without emitting a step or completing a turn is the proximate cause. Whatever the harness does, an agent that sits silent for 43 minutes between runs is not self-supervising.
-- **Process (30%):** nothing watched the run. No watchdog, no liveness heartbeat, no idle-time metric on the ledger. The campaign's own context ("stalled silently twice") shows the operator noticed stalls anecdotally — the machine never did.
-- **Interaction (10%):** the stall sits exactly at the attempt-A→attempt-B handoff, so it may be partly a human/runner boundary, but no record distinguishes operator pause from wedged runner.
+**Responsibility (revised by the orphaned-delegation evidence):**
+- **Process (55%):** the parent session was already closed (`time_updated` 23:10:55) when its own task part was written (23:11:02); the harness kept the session alive long enough to emit a delegation, then dropped it and never reaped the completed subagent's result. Nothing watched the run — no watchdog, no liveness heartbeat, no idle-time metric, no orphaned-task sweep on the ledger. This is a run-lifecycle failure as much as an agent failure.
+- **Interaction (25%):** the stall sits exactly at the attempt-A→attempt-B handoff and includes an operator/runner reset of the branch (reflog shows `reset: moving to feature/site-revamp` at 23:56:57); part of the 43 minutes may be operator review time. No record distinguishes the dead-session window from operator pause.
+- **Model (20%):** a model that emits a delegation and then never produces another step is not self-supervising — but with the parent demonstrably dead (not merely quiet), the model is not the proximate cause. The earlier "model 60%" verdict is **retracted** on this evidence.
 
-**What the process could have caught:** a liveness watchdog — "no step within N minutes → record stall, alert, and (if configured) reconnect" — would have turned a 43-minute blind window into a flagged, dated event. Add `idle_minutes` to the run ledger.
+**What the process could have caught:** (1) a **liveness watchdog on the run, not the session** — "no step within N minutes → record stall, alert, kill, resume from last commit"; (2) an **orphaned-task sweep** — a `task` call whose parent has no later step and whose subagent completed must be reaped or escalated, not left to rot for 42 minutes; (3) `idle_minutes` on the run ledger. A session-level watchdog would have fired at 23:27; a run-level one at the same point.
 
 ---
 
@@ -46,9 +46,10 @@ The window contains no terra message, no terra tool call, no step — only a dee
 
 **Verified evidence — plain commits:** hard rule 1 (`[workflow] <phase>`) was in the spec. Terra shipped **14 plain commits** across revamp1 (7) and revamp2 attempt A (7), e.g. `47f639201 research: cap_site_revamp editorial audit`, `c404024ee site: implement provenance visual system`, `f6fc35edf docs: record deployed DOM gate runs`. Only the workflow-runner re-run (attempt B) produced `[workflow]`-prefixed commits — and those p1–p3 commits are **tree-identical to the discarded attempt-A tree** (`git diff f6fc35edf 20eeb801b` is empty), i.e. the rule was satisfied by relabeling, not rebuilding (see `timeline.md` §2.6).
 
-**Verified evidence — early deploy:** Firebase deploy ran from non-deploy phases three separate times:
+**Verified evidence — early deploy:** Firebase deploy ran from non-deploy phases four separate times:
 - revamp1 f4 (p4 adversarial review): `firebase deploy --only hosting` @ 21:45:34 + mirror @ 21:45:49 — before the p5 deploy fork.
 - revamp2 attempt A s0 (implementation): @ 22:31:06/22:31:21.
+- revamp2 attempt A f1 (figure-copy reconciliation): @ 22:43:42/22:43:55.
 - revamp2 attempt A f2 (**p3 "verify deployed DOM gates"**): `firebase deploy --only hosting` @ 23:02:37 + mirror @ 23:02:52. The deployed site had to be reverted twice.
 
 **Responsibility:**
@@ -83,7 +84,7 @@ The window contains no terra message, no terra tool call, no step — only a dee
 
 **Claim to test:** did the anti-SaaS/editorial framing push this (process), did terra choose static because it's easier/safer (model), or was the drop just never gated (process)?
 
-**Verified evidence — what existed:** the baseline shipped 12 native ROI sliders + a lever console + `costChart` on Framework, and **five Chart.js canvases** on Evidence (`snowballChart`, `gritMatrixChart`, `narrationChart`, `costBarChart`, `locVsCostChart`). After revamp1: **zero** inputs, **zero** `<canvas>`, **zero** Chart.js anywhere. After revamp2 attempt B: exactly **one** beta range slider on Methodology.
+**Verified evidence — what existed:** the baseline shipped 14 native ROI sliders + a lever console + `costChart` on Framework, and **five Chart.js canvases** on Evidence (`snowballChart`, `gritMatrixChart`, `narrationChart`, `costBarChart`, `locVsCostChart`). After revamp1: **zero** inputs, **zero** `<canvas>`, **zero** Chart.js anywhere. After revamp2 attempt B: exactly **one** beta range slider on Methodology.
 
 **Verified evidence — the framing (process side):** the research doc terra wrote (p0) explicitly banned the sales layer and used "calculator" in the anti-SaaS list:
 > "The rebuilt public navigation and copy must not contain … conversion calculators …" (`cap_site_revamp_research.md:45`)
@@ -142,15 +143,15 @@ So the process (through terra's own p0 doc) said *retire the calculator* — and
 
 | Failure | Verdict | Split (M/P/I) | Would have been caught by |
 |---|---|---|---|
-| F1 silent stalls | 1 verified stall, 43.4 min | 60/30/10 | liveness watchdog (none existed) |
-| F2 plain commits + early deploy | hard rules never enforced; 14 plain commits; 3 out-of-phase deploys | 30/60/10 | pre-commit `[workflow]` hook + deploy-phase guard |
+| F1 silent stalls | 1 verified stall, 43.4 min; orphaned delegation | 20/55/25 | run-level watchdog + orphaned-task sweep |
+| F2 plain commits + early deploy | hard rules never enforced; 14 plain commits; 4 out-of-phase deploys | 30/60/10 | pre-commit `[workflow]` hook + deploy-phase guard |
 | F3 self-review passing trash | reviews measured compliance, not quality | 40/50/10 | independent reviewer + rendered screenshot + operator sign-off |
 | F4 static over interactive | anti-SaaS over-scoped + interactive layer never gated; terra chose static | 35/50/15 | interactive-baseline diff + anti-SaaS scoping |
 | F5 pastiche | citations satisfied as metadata, not learning | 45/55/0 | per-figure transfer gate |
 | F6 capability | no skill ceiling; environment made design unverifiable | 10/70/20 | headless render + screenshot per phase |
-| **Total** | | **37 / 53 / 10** | |
+| **Total** | | **30 / 57 / 13** | |
 
-**Plain reading (no sugarcoating):** the machine is more at fault than terra. Five of six failure modes are majority-process. The two places where the model carries real weight are F1 (it went silent) and F3/F4 (it chose the safe, cheap, self-flattering option when the process let it). The operator's trust in GPT for UI/UX is not misplaced because terra *can't* design — it's misplaced because this machine neither showed terra its own output nor preserved what made the original good, and then let terra grade itself.
+**Plain reading (no sugarcoating):** the machine is more at fault than terra. Five of six failure modes are majority-process. The two places where the model carries real weight are F3/F4 (it chose the safe, cheap, self-flattering option when the process let it) — and the one "stall" is now understood as a process-owned orphaned delegation rather than a model that stopped thinking. The operator's trust in GPT for UI/UX is not misplaced because terra *can't* design — it's misplaced because this machine neither showed terra its own output nor preserved what made the original good, and then let terra grade itself.
 
 **The ranked fixes (full list in `timeline.md` §9 and `decision_audit.md` §5):**
 1. Preserve-the-baseline gate (interactive layer + `<svg>`/`<canvas>` counts) — kills F4.
