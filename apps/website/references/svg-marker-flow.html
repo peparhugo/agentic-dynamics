@@ -1,0 +1,9 @@
+<!--
+Source: https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/marker
+License/attribution: MDN code samples are CC0; adapted locally from the arrowhead example.
+Demonstrates: semantic SVG nodes connected by marker-end arrows.
+Transfers: instrument cycle, escalation chain, and plane-map flows.
+-->
+<!doctype html><meta charset="utf-8"><title>SVG marker flow</title>
+<style>body{margin:2rem;font:16px system-ui;background:#f7f4ed;color:#17212b}svg{max-width:100%;height:auto}.node{fill:#fffdf7;stroke:#17212b;stroke-width:1.5}.flow{fill:none;stroke:#287271;stroke-width:2.5}.label{font-weight:700;text-anchor:middle}</style>
+<svg viewBox="0 0 720 180" role="img" aria-labelledby="title desc"><title id="title">An arrowed process flow</title><desc id="desc">Three named steps are connected left to right.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker></defs><path class="flow" d="M190 90H285M435 90H530" marker-end="url(#arrow)"/><g><rect class="node" x="30" y="55" width="160" height="70" rx="10"/><text class="label" x="110" y="96">Instrument</text></g><g><rect class="node" x="285" y="55" width="150" height="70" rx="10"/><text class="label" x="360" y="96">Derive</text></g><g><rect class="node" x="530" y="55" width="160" height="70" rx="10"/><text class="label" x="610" y="96">Policy</text></g></svg>

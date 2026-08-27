@@ -1,0 +1,9 @@
+<!--
+Source: https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/filter
+License/attribution: MDN code samples are CC0; adapted locally from the Gaussian blur example.
+Demonstrates: visual focus without deleting contextual branches.
+Transfers: highlight a selected plane or a selected policy arm in a static diagram.
+-->
+<!doctype html><meta charset="utf-8"><title>SVG filter focus</title>
+<style>body{margin:2rem;font:16px system-ui;background:#f7f4ed;color:#17212b}svg{max-width:100%;height:auto}.node{fill:#fffdf7;stroke:#17212b}.active{fill:#287271;stroke:#17212b}.t{text-anchor:middle;font-weight:700}</style>
+<svg viewBox="0 0 720 220" role="img" aria-labelledby="title desc"><title id="title">Focused branch</title><desc id="desc">The active branch remains crisp while adjacent choices fade.</desc><defs><filter id="blur"><feGaussianBlur stdDeviation="2.5"/></filter></defs><g filter="url(#blur)" opacity=".45"><rect class="node" x="50" y="50" width="160" height="70" rx="8"/><rect class="node" x="50" y="140" width="160" height="40" rx="8"/><text class="t" x="130" y="92">Other arm</text></g><path d="M210 85H330M210 160H330" stroke="#17212b" fill="none"/><rect class="active" x="330" y="50" width="210" height="70" rx="8"/><text class="t" x="435" y="92" fill="white">Selected evidence</text><text x="330" y="155">Context stays present, not erased.</text></svg>

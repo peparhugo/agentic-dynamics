@@ -1,0 +1,9 @@
+<!--
+Source: https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/pattern
+License/attribution: MDN code samples are CC0; adapted locally from the pattern example.
+Demonstrates: a repeated SVG pattern encoding a bounded, modeled, or uncertain surface.
+Transfers: modeled N-squared region and excluded/unmeasured areas.
+-->
+<!doctype html><meta charset="utf-8"><title>SVG pattern surface</title>
+<style>body{margin:2rem;font:16px system-ui;background:#f7f4ed;color:#17212b}svg{max-width:100%;height:auto}.label{font-weight:700}</style>
+<svg viewBox="0 0 720 240" role="img" aria-labelledby="title desc"><title id="title">Pattern-filled evidence surface</title><desc id="desc">A solid observed region joins a hatched modeled region.</desc><defs><pattern id="hatch" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="12" stroke="#9b6a28" stroke-width="3"/></pattern></defs><rect x="40" y="50" width="320" height="130" fill="#287271" opacity=".85" rx="8"/><rect x="360" y="50" width="320" height="130" fill="url(#hatch)" stroke="#9b6a28" stroke-width="2" rx="8"/><text class="label" x="60" y="90" fill="white">Observed corpus [M]</text><text class="label" x="380" y="90">Modeled extension [C]</text><text x="60" y="145" fill="white">publish basis and n</text><text x="380" y="145">publish assumptions and formula</text></svg>

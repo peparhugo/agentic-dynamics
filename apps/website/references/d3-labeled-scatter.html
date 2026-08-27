@@ -1,0 +1,17 @@
+<!--
+Source: https://api.observablehq.com/@d3/scatterplot.js?v=3
+License/attribution: Observable D3 examples and D3 are ISC; adapted from the Observable scatterplot.
+Demonstrates: labeled points, axes, and title tooltips with D3 only.
+Transfers: verification-depth versus cost evidence chart.
+-->
+<!doctype html><meta charset="utf-8"><title>D3 labeled scatter</title><script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<style>body{margin:2rem;font:16px system-ui;background:#f7f4ed;color:#17212b}svg{max-width:100%;height:auto}.axis text{font-size:12px}</style><div id="chart"></div>
+<script>
+const data=[{name:'Flash',cost:.07,tests:34},{name:'Luna',cost:.09,tests:7},{name:'Pro',cost:.16,tests:34},{name:'Haiku',cost:1.63,tests:117},{name:'Sonnet',cost:5.17,tests:122}];
+const w=700,h=360,m={t:25,r:30,b:55,l:55},x=d3.scaleLog().domain([.05,6]).range([m.l,w-m.r]),y=d3.scaleLinear().domain([0,130]).nice().range([h-m.b,m.t]);
+const svg=d3.select('#chart').append('svg').attr('viewBox',[0,0,w,h]).attr('role','img').attr('aria-label','Cost and tests scatterplot');
+svg.append('g').attr('transform',`translate(0,${h-m.b})`).call(d3.axisBottom(x).ticks(5,'$~s')).append('text').attr('x',w-m.r).attr('y',42).attr('fill','currentColor').attr('text-anchor','end').text('Cost per story');
+svg.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y)).append('text').attr('x',0).attr('y',-10).attr('fill','currentColor').text('Tests per story');
+svg.selectAll('circle').data(data).join('circle').attr('cx',d=>x(d.cost)).attr('cy',d=>y(d.tests)).attr('r',6).attr('fill','#287271').append('title').text(d=>`${d.name}: $${d.cost}, ${d.tests} tests`);
+svg.selectAll('.label').data(data).join('text').attr('x',d=>x(d.cost)+8).attr('y',d=>y(d.tests)+4).text(d=>d.name);
+</script>

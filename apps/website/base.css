@@ -684,9 +684,16 @@ svg[viewBox]{max-width:100%;height:auto}
    CONTRAST RULE: text sits on --bg* surfaces only (--t / --t2 fills);
    accent colors are reserved for strokes, markers, kickers, and symbols.
    Every fill/text pair clears WCAG AA (>= 4.5:1) at the default dark theme.
-   Standard defs ids: diagram-grid / diagram-ground / diagram-core /
-   diagram-glow / diagram-arrow[-cyan|-blue|-amber] (define per svg).
-   ========================================================================== */
+    Standard defs ids: diagram-grid / diagram-ground / diagram-core /
+    diagram-glow / diagram-arrow[-cyan|-blue|-amber] (define per svg).
+    EXAMPLE-LIBRARY ADAPTATION (hard rule 3 — the citations): the grammar's
+    marker-end flows adapt references/svg-marker-flow.html; the glow filter and
+    grid surface adapt references/svg-filter-focus.html and
+    references/svg-pattern-surface.html; the reduced-motion tracer adapts
+    references/svg-animated-status.html; the node-card/labeled composition
+    adapts references/d3-labeled-scatter.html (MDN CC0 samples, attribution
+    kept in the reference files' headers).
+    ========================================================================== */
 
 .diagram-map .map-ground{fill:var(--bg);stroke:var(--ba);stroke-width:1}
 .diagram-map .map-grid{fill:url(#diagram-grid);opacity:.72}

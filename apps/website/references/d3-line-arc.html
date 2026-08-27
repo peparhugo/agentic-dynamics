@@ -1,0 +1,11 @@
+<!--
+Source: https://api.observablehq.com/@d3/line-chart.js?v=3
+License/attribution: Observable D3 examples and D3 are ISC; adapted from the Observable line-chart.
+Demonstrates: a line chart with direct axes and a labeled observed range.
+Transfers: the five-session immediate-cost arc; replace sample data with a data.js field.
+-->
+<!doctype html><meta charset="utf-8"><title>D3 line arc</title><script src="https://cdn.jsdelivr.net/npm/d3@7"></script><style>body{margin:2rem;font:16px system-ui;background:#f7f4ed;color:#17212b}svg{max-width:100%;height:auto}</style><div id="chart"></div>
+<script>
+const data=[.16,.19,.23,.28,.34].map((cost,i)=>({session:i+1,cost})),w=700,h=360,m={t:25,r:35,b:48,l:55},x=d3.scaleLinear().domain([1,5]).range([m.l,w-m.r]),y=d3.scaleLinear().domain([0,.4]).range([h-m.b,m.t]);const svg=d3.select('#chart').append('svg').attr('viewBox',[0,0,w,h]);
+svg.append('g').attr('transform',`translate(0,${h-m.b})`).call(d3.axisBottom(x).ticks(5).tickFormat(d=>`S${d}`));svg.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).tickFormat(d=>`$${d.toFixed(2)}`));svg.append('path').datum(data).attr('fill','none').attr('stroke','#287271').attr('stroke-width',3).attr('d',d3.line().x(d=>x(d.session)).y(d=>y(d.cost)));svg.selectAll('circle').data(data).join('circle').attr('cx',d=>x(d.session)).attr('cy',d=>y(d.cost)).attr('r',5).attr('fill','#287271');
+</script>

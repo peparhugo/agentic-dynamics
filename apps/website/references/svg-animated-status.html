@@ -1,0 +1,9 @@
+<!--
+Source: https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/animate
+License/attribution: MDN code samples are CC0; adapted locally from the animate example.
+Demonstrates: a small status motion with a reduced-motion alternative.
+Transfers: a single active dot for the instrument cycle, never decorative ambient motion.
+-->
+<!doctype html><meta charset="utf-8"><title>SVG animated status</title>
+<style>body{margin:2rem;font:16px system-ui;background:#f7f4ed;color:#17212b}svg{max-width:100%;height:auto}@media(prefers-reduced-motion:reduce){animate{display:none}}</style>
+<svg viewBox="0 0 720 150" role="img" aria-labelledby="title desc"><title id="title">A measured status pulse</title><desc id="desc">A dot moves along an instrument-to-policy path; it is static when reduced motion is requested.</desc><path d="M70 75H650" stroke="#8b8375" stroke-width="3"/><circle cx="70" cy="75" r="11" fill="#287271"><animate attributeName="cx" values="70;650;70" dur="5s" repeatCount="indefinite"/></circle><text x="55" y="118">instrument</text><text x="610" y="118">policy</text></svg>
