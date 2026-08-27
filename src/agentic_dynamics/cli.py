@@ -33,6 +33,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("story", "batch"): "batch_stories.py",
     # workflow
     ("workflow", "run"): "run_workflow.py",
+    ("workflow", "discard-tree"): "record_discarded_tree.py",
     # queue
     ("queue", "enqueue"): "enqueue.py",
     ("queue", "worker"): "worker.py",
@@ -77,6 +78,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # supervise
     ("supervise",): "supervise.py",
     ("supervise", "claude-agents"): "claude_agents_supervisor.py",
+    ("supervise", "orphans"): "orphan_sweep.py",
 }
 
 #: ``_COMMANDS`` keys ordered longest-first. ``_resolve`` iterates THIS list rather than
@@ -99,7 +101,7 @@ Subcommands (each forwards to its backing script):
 
   experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase
   story       run|batch
-  workflow    run
+  workflow    run|discard-tree
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
   analyze     worktrees|trajectories|stories|session-routing|lab <name>
   data        build|sync|manifest|inventory
@@ -108,7 +110,7 @@ Subcommands (each forwards to its backing script):
   review      all|stories|trigger|enqueue|finalize
   spec        status|pipeline
   validate    session|tests|prereq
-  supervise   [claude-agents]
+  supervise   [claude-agents|orphans]
 
 Run `agentic-dynamics <subcommand> --help` for the backing script's own options.
 

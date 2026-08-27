@@ -37,6 +37,8 @@ from . import (
     evidence_analyzer,
     live,
     observation_ingestion,
+    orphan_ingestion,
+    orphan_sweep,
     pipeline_status,
     queue_reinterleave,
     routing,
@@ -46,4 +48,4 @@ from . import (
     verify_proposal,
 )
 
-__all__ = ['actuation_ingestion', 'evidence_analyzer', 'live', 'observation_ingestion', 'pipeline_status', 'queue_reinterleave', 'routing', 'signal_store', 'step_routing', 'supervisor', 'verify_proposal']
+__all__ = ['actuation_ingestion', 'evidence_analyzer', 'live', 'observation_ingestion', 'orphan_ingestion', 'orphan_sweep', 'pipeline_status', 'queue_reinterleave', 'routing', 'signal_store', 'step_routing', 'supervisor', 'verify_proposal']

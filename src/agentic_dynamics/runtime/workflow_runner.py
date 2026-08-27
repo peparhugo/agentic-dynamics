@@ -36,6 +36,47 @@ evidence, even if the phase otherwise succeeded (the campaign stops for the oper
 on ``PhaseResult.commit_gate`` and the ledger. The runner's own ``_git_commit`` writes the
 correct message; the enforcement catches MANUAL agent commits.
 
+Relabel tree-identity gate (cap_runner_hardening2 §Gap 2): after each agent phase (kind !=
+``test``), the runner compares the phase's committed tree against the discarded-trees ledger
+(``experiments/results/workflows/<spec>/discarded_trees.jsonl`` — the reset/rollback path
+records every tree it discards, keyed ``(spec, branch, tree_hash, discarded_at)``). A tree
+that was discarded and is now re-presented as this phase's fresh work — the revamp2 shape,
+``git diff f6fc35edf 20eeb801b`` is empty — fails the phase with reason ``RELABEL`` + the
+identical-tree proof (both hashes + the matching discarded-tree record), recorded on
+``PhaseResult.relabel_gate`` and the ledger. Strict by construction: a tree violation is NEVER
+canonicalized (unlike a message-only COMMIT_PREFIX violation). The operator-approval escape
+(the legit-reuse path): an approval artifact (``approvals/<spec>/<phase>_tree_reuse.md``)
+committed BEFORE the phase (so it is present in the tree at the phase's pre-head) that names
+the tree hash + the phase + a REAL operator signature + a date authorizes the reuse and the
+gate passes. The compared tree EXCLUDES the ``approvals/`` subtree — scaffolding never changes
+the identity of the work underneath, and a relabel cannot dodge the gate by burying the discard
+under an approval-shaped commit. The gate is off for non-agent phases and the runner's own
+``_git_commit`` path is exempt by construction (it never consults the ledger; the gate is a
+separate post-phase check on the phase's committed tree).
+
+Mechanical human checkpoint (cap_runner_hardening2 §Gap 3): a phase declaring ``checkpoint: true``
+that completes successfully records the campaign state ``awaiting_operator_approval`` and EXITS
+CLEANLY — the phase status is ``awaiting`` (a designed stop, not an error; the run result carries
+``awaiting: true`` + the phase name, and the ledger writes the awaiting state). The approval
+contract: ``approvals/<spec>/<phase>_approval.md`` must exist in the worktree, carry a REAL
+operator signature (a non-placeholder ``operator:``/``SIGNED-BY-OPERATOR:`` line + a real date),
+and its commit must be a DESCENDANT of the checkpoint phase's commit (the approval was authored
+after the checkpoint's work — a signed-before-the-work artifact does not authorize it). On
+``--resume`` the runner checks the contract for every completed checkpoint phase BEFORE proceeding:
+no artifact / placeholder signature / wrong commit order → the run stops again with
+``awaiting_operator_approval`` (refuses to proceed); a valid contract → proceeds. The revamp3
+violation — p2 committed the delta preview AND the unsigned approval template, then the runner
+moved straight into p3-p6 and recorded ``ok: True`` — is mechanically impossible: the unsigned
+template fails the placeholder check, and an approval committed WITH the checkpoint work fails the
+descendant-order check.
+
+The third hardening-2 mechanism — the server-level ORPHAN sweep — does not live in this runner:
+an orphaned delegation (a parent session that died mid-task, its completed subagent never reaped)
+lives in the opencode SERVER layer, which the runner never observes (it watches its own agent
+process). It is implemented in ``agentic_dynamics/control/orphan_sweep.py`` + ``scripts/orphan_sweep.py``
+(flag-only, default 5-min cadence, CLI ``agentic-dynamics supervise orphans``) — see
+``docs/designs/current/cap_runner_hardening2_design.md`` §Gap 1.
+
 The agent works directly in ``workdir``; prior-phase artifacts are committed there, so
 later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
@@ -174,6 +215,12 @@ class PhaseResult:
     #: the resume machinery matches) — the structured evidence (reason + offending subjects).
     #: None otherwise.
     commit_gate: dict[str, Any] | None = None
+    #: cap_runner_hardening2 p2: when the relabel tree-identity gate fired (or approved) — the
+    #: phase's committed tree matches a recorded discarded tree for this spec+branch. The
+    #: structured evidence (reason RELABEL / APPROVED, phase tree hash, the matching discarded-
+    #: tree record, the identical-tree proof, the approval verdict). A RELABEL flips the phase
+    #: to failed; an approved reuse keeps it ok. None otherwise.
+    relabel_gate: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -212,6 +259,7 @@ class PhaseResult:
             "stall_evidence": self.stall_evidence,
             "deploy_gate": self.deploy_gate,
             "commit_gate": self.commit_gate,
+            "relabel_gate": self.relabel_gate,
         }
 
 
@@ -230,6 +278,14 @@ class WorkflowRunResult:
     git_sha: str = ""
     started_at: str = ""
     ended_at: str = ""
+    #: cap_runner_hardening2 §Gap 3 — the mechanical human checkpoint. ``awaiting`` is True when
+    #: the run stopped at a checkpoint phase (or a resume refused to proceed past an unsatisfied
+    #: one) with the campaign state ``awaiting_operator_approval`` — a designed stop, never an
+    #: error. ``awaiting_phase`` names the phase; ``awaiting_reason`` is ``"checkpoint"`` (a
+    #: fresh stop) or ``"approval_refused"`` (a resume refused).
+    awaiting: bool = False
+    awaiting_phase: str = ""
+    awaiting_reason: str = ""
 
     @property
     def total_cost_usd(self) -> float:
@@ -249,6 +305,9 @@ class WorkflowRunResult:
             "git_sha": self.git_sha,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
+            "awaiting": self.awaiting,
+            "awaiting_phase": self.awaiting_phase,
+            "awaiting_reason": self.awaiting_reason,
             "total_cost_usd": self.total_cost_usd,
             "ok": self.ok,
             "phases": [p.to_dict() for p in self.phases],
@@ -1240,6 +1299,518 @@ def _enforce_commit_prefix(
         pr.error = f"{pr.error}\n{msg}"
 
 
+# ── Relabel tree-identity gate (cap_runner_hardening2 §Gap 2) ─────────────────────────────
+#
+# The revamp2 measured disease: attempt A's tree was reset away (discarded), then attempt B
+# (the "resume") committed a byte-IDENTICAL copy under compliant ``[workflow]`` messages —
+# ``git diff f6fc35edf 20eeb801b`` is empty (both trees are
+# ``f22dbe994439074b47586b0846c033becbf53400``). The merged commit-prefix enforcement checks
+# the MESSAGE, and the relabel's messages matched — so the relabel passed. The tree gate closes
+# that: it records every discarded tree on a durable ledger and fails any phase whose committed
+# tree is EXACTLY a recorded discarded tree (the revamp2 measured case) with the identical-tree
+# proof, unless an operator-signed approval artifact (committed before the phase) names the tree
+# + phase. The identity check is exact-tree (content-addressed), deliberately not a similarity
+# heuristic: a tree with a trivial delta is technically not identical and does not fire — the p5
+# adversarial phase documents that boundary honestly (a similarity gate would produce
+# false-positive churn on legitimately divergent work, which the campaign rejects).
+#
+# The ledger: ``experiments/results/workflows/<spec>/discarded_trees.jsonl``, one JSONL entry
+# per discard, keyed ``(spec, branch, tree_hash, discarded_at)`` — appended by
+# :func:`record_discarded_tree` (the reset/rollback path, reachable via the
+# ``workflow discard-tree`` CLI). The gate reads it read-only.
+
+#: Discarded-trees ledger filename, under ``experiments/results/workflows/<spec>/``.
+DISCARDED_TREES_FILENAME = "discarded_trees.jsonl"
+#: Approval artifacts live in the worktree under ``approvals/<spec>/<phase>_tree_reuse.md``.
+APPROVALS_DIRNAME = "approvals"
+#: Operator-signature placeholders — an approval carrying one of these (case-insensitive,
+#: whitespace-collapsed) is unsigned and refuses to authorize a reuse.
+PLACEHOLDER_OPERATORS = frozenset(
+    {
+        "operator", "your name", "your-name", "your signature", "sign here", "sign-here",
+        "todo", "tbd", "n/a", "na", "xxx", "???", "<name>", "placeholder", "name",
+    }
+)
+
+
+def discarded_trees_path(spec_name: str) -> Path:
+    """The discarded-trees ledger for a spec (append-only JSONL)."""
+    return PROJECT_ROOT / "experiments" / "results" / "workflows" / spec_name / DISCARDED_TREES_FILENAME
+
+
+def _git_tree_hash(workdir: Path, rev: str = "HEAD") -> str:
+    """``git rev-parse <rev>^{tree}`` with the ``approvals/`` subtree EXCLUDED, or ``""``.
+
+    The relabel gate compares WORK-product trees, and approval artifacts are scaffolding,
+    not work product: an operator committing ``approvals/<spec>/<phase>_tree_reuse.md``
+    into the worktree must not change the identity of the work underneath — and a relabel
+    must not be able to dodge the gate by burying the discard under an approval-shaped
+    commit. The excluded hash is computed by re-reading ``rev`` into a throwaway index,
+    dropping every path under ``approvals/``, and ``git write-tree``-ing the rest —
+    deterministic, and byte-equal to the plain ``^{tree}`` hash whenever the tree contains
+    no ``approvals/`` (the common case). Best-effort by construction: any git problem
+    degrades to ``""`` (the gate then cannot fire — never a crash, never a blocker).
+    """
+    fd, tmp_index = tempfile.mkstemp(prefix="wf_treeidx_", dir="/tmp")
+    os.close(fd)
+    env = dict(os.environ, GIT_INDEX_FILE=tmp_index)
+    try:
+        read = subprocess.run(
+            ["git", "read-tree", rev], cwd=workdir, env=env, capture_output=True, timeout=30
+        )
+        if read.returncode != 0:
+            return ""
+        files = subprocess.run(
+            ["git", "ls-files", "-z", "--", "approvals"],
+            cwd=workdir, env=env, capture_output=True, timeout=30,
+        )
+        if files.returncode == 0 and files.stdout:
+            subprocess.run(
+                ["git", "update-index", "--force-remove", "-z", "--stdin"],
+                cwd=workdir, env=env, input=files.stdout, capture_output=True, timeout=30,
+            )
+        written = subprocess.run(
+            ["git", "write-tree"], cwd=workdir, env=env, capture_output=True, text=True, timeout=30
+        )
+        return written.stdout.strip() if written.returncode == 0 else ""
+    except Exception:  # noqa: BLE001 — a git problem degrades to "no tree"
+        return ""
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_index)
+
+
+def _worktree_branch(workdir: Path) -> str:
+    """The worktree's current branch (``git rev-parse --abbrev-ref HEAD``); detached = ``HEAD``."""
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=workdir, capture_output=True, text=True, timeout=30,
+        )
+        return r.stdout.strip() if r.returncode == 0 else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def load_discarded_trees(spec_name: str, *, ledger_path: Path | None = None) -> list[dict[str, Any]]:
+    """Read the discarded-trees ledger for ``spec_name`` (one dict per entry; bad lines skipped)."""
+    path = Path(ledger_path) if ledger_path is not None else discarded_trees_path(spec_name)
+    try:
+        lines = path.read_text().splitlines()
+    except FileNotFoundError:
+        return []
+    entries: list[dict[str, Any]] = []
+    for line in lines:
+        try:
+            decoded = json.loads(line)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if isinstance(decoded, dict):
+            entries.append(decoded)
+    return entries
+
+
+def record_discarded_tree(
+    spec_name: str,
+    workdir: str | Path,
+    *,
+    branch: str | None = None,
+    commit: str = "HEAD",
+    reason: str = "reset",
+    ledger_path: Path | None = None,
+) -> str:
+    """Record the tree the worktree is about to discard — the runner's reset/rollback path.
+
+    Computes ``git rev-parse <commit>^{tree}`` for the worktree and appends a dated entry to
+    the discarded-trees ledger, keyed ``(spec, branch, tree_hash, discarded_at)``. Re-recording
+    the same (spec, branch, tree) is a no-op (the ledger keeps the first discard — idempotent).
+    Returns the recorded tree hash, or ``""`` when the tree cannot be resolved (a git problem
+    degrades to "nothing recorded", never a crash). The operator reaches this through
+    ``agentic-dynamics workflow discard-tree`` (``scripts/record_discarded_tree.py``).
+    """
+    wd = Path(workdir).resolve()
+    tree_hash = _git_tree_hash(wd, commit)
+    if not tree_hash:
+        return ""
+    resolved_branch = branch if branch is not None else _worktree_branch(wd)
+    path = Path(ledger_path) if ledger_path is not None else discarded_trees_path(spec_name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = load_discarded_trees(spec_name, ledger_path=path)
+    if any(
+        e.get("tree_hash") == tree_hash and e.get("branch") == resolved_branch for e in existing
+    ):
+        return tree_hash
+    entry = {
+        "spec": spec_name,
+        "branch": resolved_branch,
+        "tree_hash": tree_hash,
+        "commit": _git_full_sha(wd, commit) or commit,
+        "discarded_at": _now(),
+        "reason": reason,
+    }
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry) + "\n")
+    return tree_hash
+
+
+# ── the operator-approval escape (the legit-reuse path) ───────────────────────────────────
+
+
+def _approval_path(wd: Path, spec_name: str, phase_name: str) -> Path:
+    """``approvals/<spec>/<phase>_tree_reuse.md`` inside the worktree."""
+    return wd / APPROVALS_DIRNAME / spec_name / f"{phase_name}_tree_reuse.md"
+
+
+def _parse_approval(text: str) -> dict[str, str]:
+    """Extract ``tree`` / ``phase`` / ``operator`` / ``date`` from the approval markdown.
+
+    The artifact is a simple ``- key: value`` list (the operator fills it by hand); the parser
+    accepts any ``key: value`` line whose key is one of the four contract fields, so an
+    approval written with natural prose around it still parses. Missing/empty fields simply
+    fail their check downstream (no defaulting).
+    """
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        stripped = line.strip().lstrip("-* ").strip()
+        if ":" not in stripped:
+            continue
+        key, _, value = stripped.partition(":")
+        key = key.strip().lower()
+        if key in ("tree", "phase", "operator", "date"):
+            out[key] = value.strip()
+    return out
+
+
+def _date_is_valid(value: str) -> bool:
+    """A real date (ISO-8601 or ``YYYY-MM-DD``); empty/unparseable is not a signature date."""
+    if not value:
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return True
+    except ValueError:
+        return False
+
+
+def _operator_is_placeholder(operator: str) -> bool:
+    """True when the signature line is empty or a recognizable placeholder.
+
+    An operator signature is the human identity that signed the approval. A single initial or
+    a generic word ("operator", "your name", "sign here", "TODO", "???" ...) is not a
+    signature — the revamp3 lesson is that placeholder text must refuse to authorize anything.
+    An angle-bracketed template value (``<name>``, ``<required: ...>``, ``<your signature>``) is
+    a placeholder even when the generic-word list does not name it.
+    """
+    stripped = operator.strip()
+    norm = " ".join(stripped.lower().split())
+    return (
+        norm in PLACEHOLDER_OPERATORS
+        or len(stripped) < 2
+        or (stripped.startswith("<") and stripped.endswith(">"))
+    )
+
+
+def approval_authorizes_tree(
+    wd: Path,
+    spec_name: str,
+    phase_name: str,
+    tree_hash: str,
+    *,
+    pre_head: str,
+) -> tuple[bool, dict[str, Any]]:
+    """Resolve the operator-approval escape for one (phase, tree). Returns ``(authorized, evidence)``.
+
+    Contract (design §Gap 2): the artifact ``approvals/<spec>/<phase>_tree_reuse.md`` must
+    (1) EXIST in the worktree and be committed BEFORE the phase ran — i.e. present in the
+    committed tree at ``pre_head`` (an approval the phase itself commits is the gaming move,
+    not an approval; with no pre-head no committed approval can predate the phase, so it is
+    refused); (2) name the EXACT committed tree hash; (3) name THIS phase; (4) carry a REAL
+    operator signature (non-placeholder) + a date. All four must hold — the gate checks the
+    approval ledger first, and an approved reuse passes.
+    """
+    evidence: dict[str, Any] = {
+        "authorized": False,
+        "path": str(_approval_path(wd, spec_name, phase_name)),
+        "present_at_pre_head": False,
+    }
+    path = _approval_path(wd, spec_name, phase_name)
+    if pre_head:
+        rel = path.relative_to(wd).as_posix()
+        try:
+            present = subprocess.run(
+                ["git", "cat-file", "-e", f"{pre_head}:{rel}"],
+                cwd=wd, capture_output=True, timeout=30,
+            ).returncode == 0
+        except Exception:  # noqa: BLE001 — an unresolvable pre-head refuses the approval
+            present = False
+        evidence["present_at_pre_head"] = present
+    if not evidence["present_at_pre_head"]:
+        evidence["failed_checks"] = ["committed_before_phase"]
+        return False, evidence
+
+    parsed = _parse_approval(path.read_text(encoding="utf-8"))
+    evidence["parsed"] = parsed
+    failed: list[str] = []
+    if parsed.get("tree") != tree_hash:
+        failed.append("tree")
+    if parsed.get("phase") != phase_name:
+        failed.append("phase")
+    if _operator_is_placeholder(parsed.get("operator", "")):
+        failed.append("operator")
+    if not _date_is_valid(parsed.get("date", "")):
+        failed.append("date")
+    evidence["failed_checks"] = failed
+    if not failed:
+        evidence["authorized"] = True
+        evidence["operator"] = parsed["operator"]
+        evidence["date"] = parsed["date"]
+    return evidence["authorized"], evidence
+
+
+def _enforce_tree_gate(
+    pr: PhaseResult,
+    wd: Path,
+    spec_name: str,
+    phase_name: str,
+    *,
+    pre_head: str,
+    ledger_path: Path | None = None,
+) -> None:
+    """Post-phase relabel tree-identity gate (cap_runner_hardening2 §Gap 2) — STRICT.
+
+    Computes the phase's committed tree (HEAD after the phase). If it is EXACTLY a recorded
+    discarded tree for this spec+branch, the phase is a relabel: discarded work re-presented
+    as fresh work. The gate then resolves the operator-approval escape; an approved reuse
+    passes (the evidence is recorded with ``authorized: true`` and the phase keeps its
+    status); an unapproved one FAILS the phase with reason ``RELABEL`` + the identical-tree
+    proof (both hashes + the matching discarded-tree record) on ``PhaseResult.relabel_gate``
+    and the ledger. Agent phases only (the caller skips ``kind == "test"``); the runner's own
+    ``_git_commit`` never consults this ledger — the gate is a separate post-phase check on
+    the phase's committed tree. Best-effort by construction: an unresolvable git state
+    degrades to "no tree, no match" (never a crash, never a gate that blocks on git problems).
+    """
+    phase_tree = _git_tree_hash(wd)
+    if not phase_tree:
+        return
+    branch = _worktree_branch(wd)
+    discarded = load_discarded_trees(spec_name, ledger_path=ledger_path)
+    match = next(
+        (
+            d for d in discarded
+            if d.get("tree_hash") == phase_tree and d.get("branch") == branch
+        ),
+        None,
+    )
+    if match is None:
+        return
+    authorized, approval = approval_authorizes_tree(
+        wd, spec_name, phase_name, phase_tree, pre_head=pre_head
+    )
+    pr.relabel_gate = {
+        "reason": "APPROVED" if authorized else "RELABEL",
+        "phase_tree": phase_tree,
+        "branch": branch,
+        "matching_discarded_tree": match,
+        "identical_tree_proof": {
+            "discarded_tree_hash": match["tree_hash"],
+            "phase_tree_hash": phase_tree,
+            "empty_diff": True,  # identical content-addressed tree → byte-identical by construction
+        },
+        "approval": approval,
+    }
+    if authorized:
+        return  # operator-approved reuse — the legit-restore path; the phase keeps its status
+    msg = (
+        f"RELABEL — phase '{phase_name}' committed tree {phase_tree}, which was recorded as "
+        f"DISCARDED on {match.get('discarded_at')} (commit {match.get('commit')}, "
+        f"reason={match.get('reason')}): discarded work re-presented as fresh work — the "
+        f"identical-tree proof is that both trees ARE {phase_tree} (byte-identical). The "
+        f"operator-approval escape is not in effect: an operator-signed "
+        f"approvals/{spec_name}/{phase_name}_tree_reuse.md naming this tree + phase, "
+        f"committed before the phase, authorizes the reuse."
+    )
+    if pr.status == "ok":
+        pr.status = "failed"
+        pr.error = msg
+    else:
+        pr.error = f"{pr.error}\n{msg}"
+
+
+# ── Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) ──────────────────────────────
+#
+# The revamp3 measured disease: p2 (the design + human checkpoint) committed the delta preview
+# AND the unsigned approval template, then the runner moved straight into p3-p6, ran them
+# (vacuous, no commits), and recorded ``ok: True`` while the approval sat unsigned — "STOP for
+# the operator" was a sentence in the prompt, and prompt rules without mechanics get ignored
+# (measured three times). The mechanical fix: a phase declaring ``checkpoint: true`` that
+# completes successfully records the campaign state ``awaiting_operator_approval`` and EXITS
+# CLEANLY (status ``awaiting`` — a designed stop, not an error). The approval contract is
+# verified on ``--resume`` BEFORE any further phase runs: no artifact / placeholder signature /
+# wrong commit order → the resume refuses to proceed and stops awaiting again.
+#
+# The approval contract (design §Gap 3): ``approvals/<spec>/<phase>_approval.md`` must
+#   (1) exist in the worktree and be COMMITTED (tracked at HEAD);
+#   (2) carry a REAL operator signature — a non-placeholder ``operator:`` (or
+#       ``SIGNED-BY-OPERATOR:``) line + a real date (the revamp3 unsigned template's
+#       ``<required: ...>`` values are placeholders and refuse to authorize);
+#   (3) be a DESCENDANT of the checkpoint phase's commit — the approval file must NOT have
+#       existed at the checkpoint commit AND the checkpoint commit must be an ancestor of HEAD,
+#       so an approval committed WITH the checkpoint's work (or before it) never authorizes.
+
+#: The phase-marker key: ``checkpoint: true`` declares a mechanical human stop.
+CHECKPOINT_MARKER = "checkpoint"
+#: The status value recorded when the run stops at (or refuses past) a checkpoint — a designed
+#: stop, never an error; the operator's tools read "waiting", not "failed".
+AWAITING_STATUS = "awaiting"
+
+
+def _checkpoint_approval_path(wd: Path, spec_name: str, phase_name: str) -> Path:
+    """``approvals/<spec>/<phase>_approval.md`` inside the worktree."""
+    return wd / APPROVALS_DIRNAME / spec_name / f"{phase_name}_approval.md"
+
+
+def _parse_checkpoint_approval(text: str) -> dict[str, str]:
+    """Extract the operator signature + date from a checkpoint approval artifact.
+
+    Accepts both the canonical ``- operator:`` / ``- date:`` lines and the revamp3 template's
+    ``SIGNED-BY-OPERATOR:`` / ``DATE:`` lines (case-insensitive), so the real revamp3 artifact
+    parses. Missing/placeholder fields fail their check downstream (no defaulting).
+    """
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        stripped = line.strip().lstrip("-* ").strip()
+        if ":" not in stripped:
+            continue
+        key, _, value = stripped.partition(":")
+        key = key.strip().lower()
+        if key in ("operator", "signed-by-operator"):
+            out["operator"] = value.strip()
+        elif key in ("date",):
+            out["date"] = value.strip()
+    return out
+
+
+def _phase_commit_sha(workdir: Path, phase_name: str, goal: str) -> str:
+    """The full SHA of the phase's own ``[workflow] <phase> — <goal>`` commit, or ``""``.
+
+    Mirrors ``_completed_phases``' subject matching exactly, so a phase the resume machinery
+    considers completed is exactly one whose commit this finds. ``git log`` is newest-first, so
+    the first match is the phase's LATEST commit — the state the approval must descend from.
+    """
+    try:
+        log = subprocess.run(
+            ["git", "log", "--format=%H %s"], cwd=workdir, capture_output=True, text=True, timeout=30
+        )
+    except Exception:  # noqa: BLE001 — a git problem degrades to "no checkpoint commit"
+        return ""
+    if log.returncode != 0:
+        return ""
+    goal_prefix = goal[:40]
+    for line in log.stdout.splitlines():
+        sha, _, subject = line.partition(" ")
+        m = COMMIT_SUBJECT_RE.search(subject)
+        if m and m.group(1) == phase_name and m.group(2).startswith(goal_prefix):
+            return sha.strip()
+    return ""
+
+
+def _checkpoint_approval_valid(
+    wd: Path,
+    spec_name: str,
+    phase_name: str,
+    checkpoint_commit: str,
+) -> tuple[bool, dict[str, Any]]:
+    """Verify the approval contract for one completed checkpoint phase. ``(valid, evidence)``.
+
+    The contract: the artifact ``approvals/<spec>/<phase>_approval.md`` is committed at HEAD,
+    was NOT present at the checkpoint commit (it was authored AFTER the checkpoint's work), the
+    checkpoint commit is an ancestor of HEAD (the lineage is intact), and the artifact carries a
+    REAL operator signature (non-placeholder) + a date. Any failure → ``(False, evidence)`` with
+    the named reason — the resume refuses to proceed.
+    """
+    evidence: dict[str, Any] = {
+        "valid": False,
+        "path": str(_checkpoint_approval_path(wd, spec_name, phase_name)),
+        "committed_at_head": False,
+        "absent_at_checkpoint_commit": False,
+        "checkpoint_is_ancestor": False,
+    }
+    path = _checkpoint_approval_path(wd, spec_name, phase_name)
+    if not checkpoint_commit:
+        evidence["failed_checks"] = ["no_checkpoint_commit"]
+        return False, evidence
+    if not path.exists():
+        evidence["failed_checks"] = ["no_artifact"]
+        return False, evidence
+    rel = path.relative_to(wd).as_posix()
+    try:
+        at_head = subprocess.run(
+            ["git", "cat-file", "-e", f"HEAD:{rel}"],
+            cwd=wd, capture_output=True, timeout=30,
+        ).returncode == 0
+        at_checkpoint = subprocess.run(
+            ["git", "cat-file", "-e", f"{checkpoint_commit}:{rel}"],
+            cwd=wd, capture_output=True, timeout=30,
+        ).returncode == 0
+        ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", checkpoint_commit, "HEAD"],
+            cwd=wd, capture_output=True, timeout=30,
+        ).returncode == 0
+    except Exception:  # noqa: BLE001 — an unresolvable git state refuses the approval
+        at_head, at_checkpoint, ancestor = False, True, False
+    evidence["committed_at_head"] = at_head
+    evidence["absent_at_checkpoint_commit"] = not at_checkpoint
+    evidence["checkpoint_is_ancestor"] = ancestor
+
+    failed: list[str] = []
+    if not at_head:
+        failed.append("committed_at_head")
+    if at_checkpoint:
+        failed.append("authored_after_checkpoint")
+    if not ancestor:
+        failed.append("checkpoint_lineage_intact")
+    if not failed:
+        parsed = _parse_checkpoint_approval(path.read_text(encoding="utf-8"))
+        evidence["parsed"] = parsed
+        if _operator_is_placeholder(parsed.get("operator", "")):
+            failed.append("operator")
+        if not _date_is_valid(parsed.get("date", "")):
+            failed.append("date")
+        if not failed:
+            evidence["valid"] = True
+            evidence["operator"] = parsed["operator"]
+            evidence["date"] = parsed["date"]
+    evidence["failed_checks"] = failed
+    return evidence["valid"], evidence
+
+
+def _first_unsatisfied_checkpoint(
+    wd: Path,
+    spec: ExperimentSpec,
+    phases: list[dict[str, Any]],
+    completed: set[str],
+    goal: str,
+) -> tuple[str, dict[str, Any]] | None:
+    """The first completed checkpoint phase whose approval contract is unsatisfied, or ``None``.
+
+    Used by the resume gate: every completed ``checkpoint: true`` phase must carry a valid
+    operator approval BEFORE the run proceeds past it. Returns ``(phase_name, evidence)`` for
+    the first violation (in phase order), so a resume stops at the earliest unsatisfied
+    checkpoint — the revamp3 "ran p3-p6 past an unsigned template" shape is refused up front.
+    """
+    for phase_def in phases:
+        if not phase_def.get(CHECKPOINT_MARKER):
+            continue
+        name = str(phase_def.get("name", "?"))
+        if name not in completed:
+            continue
+        commit_sha = _phase_commit_sha(wd, name, goal)
+        valid, evidence = _checkpoint_approval_valid(wd, spec.name, name, commit_sha)
+        if not valid:
+            return (name, evidence)
+    return None
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -1269,6 +1840,7 @@ def run_workflow(
     rag_params: dict[str, Any] | None = None,
     change_analyzer: ChangeAnalyzer | None = None,
     phase_watchdog_min: float | None = None,
+    discarded_trees_ledger: Path | str | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
@@ -1343,6 +1915,29 @@ def run_workflow(
     subjects, recorded on ``PhaseResult.commit_gate`` and the ledger, even if the phase
     otherwise succeeded — the campaign stops for the operator and the bad commit is never
     propagated by the commit gate (which runs after).
+
+    Relabel tree-identity gate (cap_runner_hardening2 p2): after every agent phase the runner
+    compares the phase's committed tree (``git rev-parse HEAD^{tree}``) against the
+    discarded-trees ledger (``experiments/results/workflows/<spec>/discarded_trees.jsonl``).
+    A tree recorded as discarded — the revamp2 relabel, attempt A's tree reset away then
+    re-committed byte-identical under compliant messages — fails the phase with reason
+    ``RELABEL`` + the identical-tree proof (both hashes + the matching discarded-tree record),
+    recorded on ``PhaseResult.relabel_gate`` and the ledger. Strict always (never
+    canonicalized). The operator-approval escape passes an approved reuse: an artifact
+    ``approvals/<spec>/<phase>_tree_reuse.md`` committed before the phase (present at
+    pre-head) that names the tree + phase + a real operator signature + a date. Off for
+    non-agent phases; the runner's own ``_git_commit`` path is exempt (never consults the
+    ledger).
+
+    Mechanical human checkpoint (cap_runner_hardening2 p3): a phase declaring ``checkpoint: true``
+    that completes successfully records the campaign state ``awaiting_operator_approval`` and
+    EXITS CLEANLY — the phase status is ``awaiting`` (a designed stop, not an error) and the run
+    result carries ``awaiting: true`` + the phase name + reason ``"checkpoint"``. On ``--resume``
+    the runner verifies every completed checkpoint phase's approval contract
+    (``approvals/<spec>/<phase>_approval.md``, committed at HEAD, authored AFTER the checkpoint
+    commit, with a non-placeholder operator signature + a date) BEFORE proceeding; an
+    unsatisfied checkpoint stops the resume with ``awaiting_operator_approval`` (reason
+    ``"approval_refused"``) and NO further phase runs.
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -1405,6 +2000,7 @@ def run_workflow(
 
     prior: list[str] = []
     start_idx = 0
+    completed: set[str] = set()
     if resume:
         phase_names = [str(p.get("name", "?")) for p in phases]
         # The git-log path stays primary and unchanged: a ``[workflow] <phase>`` commit in
@@ -1421,6 +2017,24 @@ def run_workflow(
                 start_idx = i + 1
             else:
                 break
+
+    # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — resume gating. BEFORE any
+    # further phase runs, every completed checkpoint phase's approval contract must be valid;
+    # an unsatisfied checkpoint stops the resume with ``awaiting_operator_approval`` (refuses
+    # to proceed). The revamp3 violation — p3-p6 ran past an unsigned approval template — is
+    # refused here up front, deterministically.
+    if resume:
+        unsatisfied = _first_unsatisfied_checkpoint(wd, spec, phases, completed, goal)
+        if unsatisfied is not None:
+            phase_name, evidence = unsatisfied
+            result.awaiting = True
+            result.awaiting_phase = phase_name
+            result.awaiting_reason = "approval_refused"
+            result.ended_at = _now()
+            result.git_sha = _git_head(wd)
+            if publisher is not None and publisher.enabled:
+                publisher.set_status("awaiting")
+            return result
 
     fork_enabled = fork if fork is not None else bool(spec.workflow.params.get("fork", False))
 
@@ -1661,6 +2275,27 @@ def run_workflow(
             if rag_params.get("emit_self") and pr.commit_hash:
                 _emit_self_finding(pr, goal=goal, scope=cell_scope(wd))
 
+        # Relabel tree-identity gate (cap_runner_hardening2 §Gap 2) — post-phase, agent phases
+        # only, run AFTER the commit so the phase's committed tree is final. The phase's
+        # committed tree (git rev-parse HEAD^{tree}) is compared against the discarded-trees
+        # ledger (experiments/results/workflows/<spec>/discarded_trees.jsonl — the reset path
+        # records every tree it discards). A tree that was discarded and is now re-presented
+        # as this phase's fresh work fails RELABEL with the identical-tree proof, unless an
+        # operator-signed approval artifact (approvals/<spec>/<phase>_tree_reuse.md, committed
+        # before the phase) names the tree + phase. Strict always — a tree violation is never
+        # canonicalized (unlike a message-only COMMIT_PREFIX violation). Off for non-agent
+        # phases; the runner's own _git_commit path is exempt by construction (this gate is a
+        # separate post-phase check and never runs inside _git_commit).
+        if kind != "test":
+            _enforce_tree_gate(
+                pr,
+                wd,
+                spec.name,
+                name,
+                pre_head=pre_head,
+                ledger_path=Path(discarded_trees_ledger) if discarded_trees_ledger else None,
+            )
+
         prior.append(f"{name} ({pr.status})")
         result.phases.append(pr)
 
@@ -1683,8 +2318,25 @@ def run_workflow(
         if pr.status == "failed" and stop_on_error:
             break
 
+        # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — the designed stop. A
+        # phase declaring ``checkpoint: true`` that completes successfully (all gates passed, the
+        # work committed) records the campaign state ``awaiting_operator_approval`` and EXITS
+        # CLEANLY: the phase status flips to ``awaiting`` (a designed stop, not an error), the
+        # run result carries the awaiting state, and the phase loop breaks. The approval
+        # contract is enforced on --resume: the resume refuses to proceed past an unsatisfied
+        # checkpoint. Agent phases only.
+        if kind != "test" and phase_def.get(CHECKPOINT_MARKER) and pr.status == "ok":
+            pr.status = AWAITING_STATUS
+            result.awaiting = True
+            result.awaiting_phase = name
+            result.awaiting_reason = "checkpoint"
+            break
+
     result.ended_at = _now()
     result.git_sha = _git_head(wd)
     if publisher is not None and publisher.enabled:
-        publisher.set_status("done" if result.ok else "failed")
+        if result.awaiting:
+            publisher.set_status("awaiting")
+        else:
+            publisher.set_status("done" if result.ok else "failed")
     return result

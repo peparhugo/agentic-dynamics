@@ -158,6 +158,14 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     # made from via one knowledge_id, rather than an unbounded list. A snapshot states what a
     # decision was ALLOWED to see, never an instruction to act — observation family.
     "context_snapshot": SourceTypeSpec("observation", Authority.DERIVED, "[C]"),
+    # cap_runner_hardening2 §Gap 1 (the server-level orphan sweep): the deterministic
+    # detection of an orphaned delegation (a subagent whose parent went silent before the
+    # result was reaped — a dated, flagged event, never an anecdote). MEASURED "[M]", NOT the
+    # ADVISORY "[H]" of a supervisor flag: an orphan is a deterministic function of the
+    # session store's transcript timestamps, not a heuristic judgment (see
+    # control/orphan_sweep.py + control/orphan_ingestion.py). Observation family — it states
+    # what IS and never instructs anything to act.
+    "orphan": SourceTypeSpec("observation", Authority.MEASURED, "[M]"),
     # Delta 3: the single actuation-family member.
     "actuation": SourceTypeSpec("actuation", Authority.POLICY, "[P]"),
 }

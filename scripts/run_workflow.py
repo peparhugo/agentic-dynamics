@@ -321,7 +321,18 @@ def main() -> None:
     out_path = out_dir / f"{ts}.json"
     out_path.write_text(json.dumps(result.to_dict(), indent=2))
     print(f"\nledger: {out_path}", file=sys.stderr)
-    print(f"cost: ${result.total_cost_usd:.4f}  ok: {result.ok}", file=sys.stderr)
+    # ``getattr`` so the composition-root tests that substitute a minimal result namespace
+    # (no ``awaiting`` field) keep working unchanged.
+    if getattr(result, "awaiting", False):
+        # cap_runner_hardening2 §Gap 3 — a designed stop, not a failure: the operator's tools
+        # read "awaiting operator approval", never a bare ok/failed. Exits 0 (a designed stop).
+        print(
+            f"awaiting_operator_approval: phase '{getattr(result, 'awaiting_phase', '?')}' "
+            f"(reason: {getattr(result, 'awaiting_reason', '?')})  cost: ${result.total_cost_usd:.4f}",
+            file=sys.stderr,
+        )
+    else:
+        print(f"cost: ${result.total_cost_usd:.4f}  ok: {result.ok}", file=sys.stderr)
 
     _refresh_index(spec.name)
     _emit_spec_record(spec.name, revision=result.git_sha)
