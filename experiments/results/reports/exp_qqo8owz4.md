@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-terra  |  **Task:** [inject_phantom_success_s0.5] task_manager...
 **Operator:** perturbed (specification_corruption, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:05
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T20:33:48
 
 ---
 

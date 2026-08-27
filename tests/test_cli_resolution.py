@@ -33,6 +33,10 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("experiment", "batch"), "batch_run.py", ()),
     (("experiment", "remaining"), "remaining_batch.py", ()),
     (("experiment", "multi-phase"), "multi_phase.py", ()),
+    (("experiment", "cap-grit-grid"), "run_cap_grit_grid.py", ()),
+    (("experiment", "cap-grit-measure"), "measure_cap_grit_grid.py", ()),
+    (("experiment", "cap-2c-grid"), "run_cap_2c_grid.py", ()),
+    (("experiment", "cap-2c-score"), "score_cap_2c.py", ()),
     # story
     (("story", "run"), "run_story.py", ()),
     (("story", "batch"), "batch_stories.py", ()),

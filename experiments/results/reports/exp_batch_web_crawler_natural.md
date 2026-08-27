@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:web_crawler:baseline] ds_natural...
 **Operator:** baseline (baseline, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:03
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T20:33:47
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.812
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.56) with moderate resource use ($0.0640, ~20850J). Model absorbed the perturbation without divergence.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.61) with moderate resource use ($0.0640, ~20850J). Model absorbed the perturbation without divergence.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 43% (3/7 constraints) |
+| Constraint satisfaction [H] | 57% (4/7 constraints) |
 | Lines of code [M] | 1977 |
 | Cyclomatic complexity [C] | 437.0 |
 | Code quality [H] | 0.051 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.564** |
+| **Composite [H]** | **0.607** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~20850 J** |
 | Solution density [C] | 0.027714 LOC/tok |
 | Correctness/$ [C] | 6 |
-| Quality/J [C] | 0.000027 |
+| Quality/J [C] | 0.000029 |
 
 ---
 

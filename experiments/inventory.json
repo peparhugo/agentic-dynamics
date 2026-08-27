@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-08-27T19:16:54.209189+00:00",
+  "generated_at": "2026-08-27T20:33:39.858767+00:00",
   "counts": {
-    "db_sessions_total": 5592,
+    "db_sessions_total": 5593,
     "db_sessions_experiments": 1697,
     "worktrees_total": 1771,
     "worktrees_experiments": 222,
     "worktrees_other": 1549,
-    "result_files": 34,
+    "result_files": 35,
     "config_files": 0
   },
   "costs": {
-    "total_all_sessions": 603.2281,
+    "total_all_sessions": 603.6432,
     "total_experiment_sessions": 42.0932,
-    "tokens_all_sessions": 573345808,
+    "tokens_all_sessions": 574373242,
     "tokens_experiment_sessions": 86713178
   },
   "model_breakdown": {
@@ -191,11 +191,11 @@
       "num_runs": 5,
       "total_cost": 2.3825,
       "operators": [
-        "reverse_causality",
-        "shift_framing",
-        "inject_alien_vocab",
         "force_abandonment",
-        "baseline"
+        "reverse_causality",
+        "inject_alien_vocab",
+        "baseline",
+        "shift_framing"
       ]
     },
     {
@@ -205,11 +205,11 @@
       "num_runs": 5,
       "total_cost": 0.0676,
       "operators": [
-        "reverse_causality",
-        "shift_framing",
-        "inject_alien_vocab",
         "force_abandonment",
-        "baseline"
+        "reverse_causality",
+        "inject_alien_vocab",
+        "baseline",
+        "shift_framing"
       ]
     },
     {
@@ -219,11 +219,11 @@
       "num_runs": 5,
       "total_cost": 2.0064,
       "operators": [
-        "reverse_causality",
-        "shift_framing",
-        "inject_alien_vocab",
         "force_abandonment",
-        "baseline"
+        "reverse_causality",
+        "inject_alien_vocab",
+        "baseline",
+        "shift_framing"
       ]
     },
     {
@@ -233,11 +233,11 @@
       "num_runs": 5,
       "total_cost": 0,
       "operators": [
-        "reverse_causality",
-        "shift_framing",
-        "inject_alien_vocab",
         "force_abandonment",
-        "baseline"
+        "reverse_causality",
+        "inject_alien_vocab",
+        "baseline",
+        "shift_framing"
       ]
     },
     {
@@ -256,12 +256,12 @@
       "total_cost": 0.3097,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -272,12 +272,12 @@
       "total_cost": 1.296,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -288,12 +288,12 @@
       "total_cost": 0.0672,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -304,12 +304,12 @@
       "total_cost": 0.1357,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -320,12 +320,12 @@
       "total_cost": 0.1211,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -336,12 +336,12 @@
       "total_cost": 3.377,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -352,12 +352,12 @@
       "total_cost": 1.3082,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -368,12 +368,12 @@
       "total_cost": 0.8173,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -384,12 +384,12 @@
       "total_cost": 0.0039,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -400,12 +400,12 @@
       "total_cost": 0.1044,
       "operators": [
         "remove_critical_constraint",
-        "inject_competing_goal",
-        "shift_framing",
         "inject_alien_vocab",
-        "invert_constraint",
+        "baseline",
         "inject_phantom_success",
-        "baseline"
+        "invert_constraint",
+        "inject_competing_goal",
+        "shift_framing"
       ]
     },
     {
@@ -418,6 +418,14 @@
         "inject_alien_vocab",
         "baseline"
       ]
+    },
+    {
+      "file": "experiments/results/verified_tests.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
     }
   ],
   "configs": [],

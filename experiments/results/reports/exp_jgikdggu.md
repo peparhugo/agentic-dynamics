@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_alien_vocab_s0.5] task_manager...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:04
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T20:33:48
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 71% (5/7 constraints) |
+| Constraint satisfaction [H] | 57% (4/7 constraints) |
 | Lines of code [M] | 926 |
 | Cyclomatic complexity [C] | 115.0 |
 | Code quality [H] | 0.108 |
 | Novelty vs baseline [H] | 0.615 |
-| **Composite [H]** | **0.678** |
+| **Composite [H]** | **0.635** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~5005 J** |
 | Solution density [C] | 0.035713 LOC/tok |
 | Correctness/$ [C] | 21 |
-| Quality/J [C] | 0.000135 |
+| Quality/J [C] | 0.000127 |
 
 ---
 
