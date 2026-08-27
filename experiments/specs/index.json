@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-27T00:37:23.394325+00:00",
-  "n_specs": 129,
+  "generated_at": "2026-08-27T02:02:31.460983+00:00",
+  "n_specs": 130,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -135,6 +135,24 @@
       "status": "runnable",
       "spec_path": "experiments/definitions/cap_grit_strength_grid.yaml",
       "artifact_kind": "experiment",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "cap_runner_hardening2",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_runner_hardening2.yaml",
+      "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],
       "superseded_by": null,

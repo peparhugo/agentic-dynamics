@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-27T00:37:23.394325+00:00`  ·  129 spec(s)
-**Work remaining:** 31 open · 98 completed/retired
+Generated at: `2026-08-27T02:02:31.460983+00:00`  ·  130 spec(s)
+**Work remaining:** 32 open · 98 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -16,6 +16,7 @@ Generated at: `2026-08-27T00:37:23.394325+00:00`  ·  129 spec(s)
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_escalation_fix` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_grit_strength_grid` | experiment | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_runner_hardening2` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_policy_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |

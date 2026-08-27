@@ -1,0 +1,215 @@
+name: cap_runner_hardening2
+question: >-
+  Close the two execution gaps the terra post-mortem and the hardening review identified:
+  (1) the SERVER-LEVEL ORPHAN SWEEP — the verified 43.4-minute stall was an orphaned
+  delegation (the parent agent session died mid-task; the completed subagent was never
+  reaped), which the merged runner-level watchdog cannot see (it watches the runner's own
+  agent process; an orphan lives in the opencode server's session/task layer) — this
+  campaign builds the sweep at that layer, flag-only, with the orphan recorded as a dated,
+  flagged event; (2) the RELABEL TREE-DIFF GATE — revamp2's attempt A was reset away and
+  attempt B re-committed a TREE-IDENTICAL copy under compliant [workflow] messages (git
+  diff f6fc35edf 20eeb801b is empty) — the merged commit enforcement checks the message,
+  so the relabel would pass; this campaign adds the tree-identity gate (a phase whose
+  committed tree matches a recorded discarded tree fails RELABEL) WITH the operator-
+  approval escape (a committed approval artifact names the tree hash + phase authorized
+  to reuse it — the legit-resume path). Design:
+  docs/designs/current/cap_runner_hardening2_design.md (accepted).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: workflow-runner + server hardening (round 2).
+        canonical_sources: [docs/designs/current/cap_runner_hardening2_design.md (ACCEPTED
+        — the two designs, read FIRST), docs/designs/current/cap_terra_postmortem.md (F1
+        orphaned delegation with the timestamp evidence; P5 run-level liveness + orphan
+        sweep; P6 relabel), docs/reviews/cap_runner_hardening_adversary.md (the two
+        accepted-limitation gaps this campaign closes), src/agentic_dynamics/runtime/
+        workflow_runner.py (the merged hardening: _git_commit, the commit gate, the
+        watchdog), apps/control_room/ (the supervisor rail — the orphan sweep's home),
+        the opencode server's session store (the observation surface: session.jsonl
+        transcripts + task state — the same surface the Control Room reads),
+        tests/test_workflow_runner.py + tests/test_supervise.py (the test families)].
+        policies: [flag_only_never_steer, approval_before_reuse, evidence_per_verdict]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: execution-hardening round 2.
+        deliberation: [orphan sweep, relabel tree gate, integration + smokes,
+        adversarial bypass].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        MERGED (cap_runner_hardening): phase watchdog (meaningful-step clock, 20m),
+        deploy gate (deploy_allowed + transcript + output-tier detection), commit
+        enforcement (message pattern, byte-identical to the resume matcher). TWO GAPS
+        remain, both measured: (1) the orphaned delegation — the terra post-mortem's F1
+        verified one 43.4-min episode: parent session died mid-task, the subagent
+        completed, its result was never reaped, nothing noticed (the runner watchdog
+        watches the runner's own agent process — the orphan lives in the opencode server
+        layer); (2) the relabel — revamp2's attempt-A tree was reset away and attempt-B's
+        commits are tree-identical to the discarded tree under compliant [workflow]
+        messages (git diff f6fc35edf 20eeb801b is empty) — the message gate cannot see
+        it. The discarded-trees ledger does not exist yet. The runner's resume machinery
+        (matching hashes) is the legit-reuse path the approval escape must not break.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks (the merged commit
+        enforcement will verify this campaign's own phases — comply). (2) FLAG-ONLY,
+        NEVER STEER: the orphan sweep records, kills orphaned subagents, and surfaces the
+        record — it NEVER restarts, retries, resumes, or otherwise steers a session (the
+        supervisor discipline; the sweep is observation + reaping, not control). (3) THE
+        APPROVAL ESCAPE IS OPERATOR-SIGNED AND COMMITTED FIRST: a tree-hash reuse passes
+        ONLY with a committed approval artifact naming the tree hash + the phase + an
+        operator signature field, committed BEFORE the phase runs (or attached at resume
+        time) — an unsigned or post-hoc approval is not an approval. (4) The relabel gate
+        must not break the legit resume path (matching hashes + commits) — the two
+        mechanisms stay distinct (resume = hashes; tree gate = no silent re-presentation
+        of DISCARDED work). (5) FAIL WITH EVIDENCE: both mechanisms record their verdicts
+        with the evidence (the orphan's timestamps; the identical-tree proof with both
+        hashes) on the ledger. (6) BACKWARD COMPATIBLE: existing campaigns/specs are
+        unaffected; the sweep's default cadence is configurable; the tree gate is off for
+        non-agent phases and exempts the runner's own _git_commit path. (7) The runner +
+        control-room test surfaces stay green; both-direction tests for every mechanism;
+        the revamp2 relabel + the terra orphan are REPLAYED as regression proofs. (8) No
+        generated-surface edits, no secrets, no external actuation. (9) p4 adversarial
+        mandatory: bypass attempts re-verified + known-safe, no bare PASS. (10) Resumable
+        only when spec version, goal hash, source revision, and candidate-manifest hash
+        match.
+      read_first: >-
+        docs/designs/current/cap_runner_hardening2_design.md (FIRST), docs/designs/current/
+        cap_terra_postmortem.md (F1 + P5 + P6), docs/reviews/cap_runner_hardening_adversary.md,
+        src/agentic_dynamics/runtime/workflow_runner.py (the merged hardening),
+        apps/control_room/server.py + apps/control_room/services/supervisor.py (the
+        supervisor rail — the sweep's home), the opencode session store layout,
+        tests/test_workflow_runner.py + tests/test_supervise.py
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash (engineering + tests). One
+        branch (feature/cap-runner-hardening2); each phase commits [workflow] <phase>.
+        The campaign runs through the HARDENED runner (the merged hardening — its own
+        commits must comply).
+    phases:
+      - name: p1_orphan_sweep
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the server-level orphan sweep per the design doc §Gap 1. It
+          observes the opencode server's session/task layer (the surface the Control Room
+          already reads) and detects orphans: a task whose parent session has no step
+          after the task's spawn time AND whose subagent session/process has terminated
+          (completed or crashed). On detection: record the orphan (idle_minutes, parent,
+          subagent, result-availability) on the registry/ledger as a dated, flagged
+          event, kill the orphaned subagent process if still alive, and surface the
+          record. FLAG-ONLY (hard rule 2) — no steering. Cadence: configurable sweep
+          (default 5 min), deterministic on the transcript timestamps.
+          VERIFY (both directions): a synthetic orphan (parent silent, subagent
+          completed) is detected within one cycle with the evidence; a live parent still
+          stepping with a running subagent is NEVER flagged; the record lands on the
+          ledger (dated, flagged, queryable); the sweep never restarts/retries a session.
+          The terra orphan is REPLAYED as the regression proof (the design doc cites the
+          timestamps — reproduce the detection against the reconstructed session state).
+          DELIVER: the sweep + tests + the replay proof, committed.
+          LOG: the detection signals, the test results; PASS/FAIL; commit.
+      - name: p2_relabel_tree_gate
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the relabel tree-identity gate per the design doc §Gap 2, on
+          top of the merged commit enforcement: (a) a discarded-trees ledger — the
+          runner's reset/rollback path records the tree hash (git rev-parse <commit>
+          ^{tree}) of every state it discards, keyed (spec, branch, tree-hash,
+          discarded_at); (b) post-phase: if the phase's committed tree hash matches a
+          recorded discarded tree -> the phase FAILS RELABEL with the identical-tree
+          proof (both hashes + the discarded record), recorded on the ledger; (c) THE
+          OPERATOR-APPROVAL ESCAPE: an approval artifact (approvals/<spec>/<phase>
+          _tree_reuse.md, operator-signed, committed BEFORE the phase or attached at
+          resume time) naming the tree hash + the phase authorizes the reuse — the gate
+          checks the approval ledger first; (d) the gate is off for non-agent phases and
+          exempts the runner's own _git_commit path; (e) the legit resume path
+          (matching hashes + commits) is untouched.
+          VERIFY (both directions): the revamp2 RELABEL SCENARIO REPLAYED — the
+          discarded attempt-A tree re-committed under compliant messages WITHOUT
+          approval fails RELABEL; WITH the committed approval artifact passes; a genuine
+          resume of never-discarded work never fires; non-agent phases unaffected; the
+          runner's own commit path exempt. The existing commit-enforcement tests stay
+          green.
+          DELIVER: the gate + the approval escape + the ledger + the replay proof,
+          committed.
+          LOG: the gate mechanics, the replay results; PASS/FAIL; commit.
+      - name: p3_integration
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: integration + live smokes. (a) python3 -m pytest tests/test_workflow_runner.py
+          tests/test_supervise.py tests/test_control_room*.py tests/test_dependency_direction.py
+          -q --timeout=600 — all green. (b) LIVE smokes: (1) a synthetic orphan in a
+          fixture session store is detected by the sweep within one cycle; (2) a relabel
+          attempt through the hardened runner (a discarded tree re-committed without
+          approval) fails RELABEL; (3) the approved reuse passes; (4) a legit resume of
+          committed work is unaffected. (c) Document both mechanisms in the runner's
+          module docstring + the control-room supervisor docs + scripts/CONTEXT.md.
+          DELIVER: the green surfaces + the four smoke results + the docs, committed.
+          LOG: each gate's result; PASS/FAIL; commit.
+      - name: p4_adversarial
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — try to falsify the hardening. Attack in order:
+          (1) ORPHAN EVASION — a parent that writes a heartbeat step after the subagent
+          terminates (does the sweep require MEANINGFUL parent steps, not any write?); a
+          subagent that never terminates (zombie — is it reaped?); session-state
+          ambiguity (which session is the parent?).
+          (2) RELABEL EVASION — tree-hash spoofing (an empty commit changes the tree
+          hash — can the gate be evaded by one no-op commit? The revamp2 relabel's
+          IDENTICAL tree is the measured case — but a tree with a trivial delta is
+          technically not identical: is the gate's identity check enough, or does the
+          spirit require a similarity check? Document the boundary honestly); approval
+          forgery (an unsigned or post-hoc approval — does the gate verify the signature
+          field + the commit order?); the legit-resume false positive (an operator
+          restoring a discarded tree WITHOUT the approval artifact — does it fail RELABEL
+          as designed, or is the escape reachable?).
+          (3) REGRESSION — existing campaigns/specs unaffected; the runner + control-room
+          surfaces green; the merged hardening's gates still fire.
+          (4) the usual suite (secrets, hashes, credentials in logs).
+          Every finding: fix or record as accepted limitation with reasoning + residual
+          risk. Deliver TWO outputs: docs/reviews/cap_runner_hardening2_adversary.md
+          (attack, evidence, result, fix/limitation, re-test) and
+          docs/reviews/cap_runner_hardening2_known_safe.md (attempted non-falsifying
+          attacks, evidence, why safe).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: cap_runner2_orphan_sweep
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [orphans_detected_and_recorded]
+  - name: cap_runner2_relabel_gate
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [relabeled_trees_fail, approved_reuse_passes]
+  - name: cap_runner2_integration
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [orphans_detected_and_recorded, relabeled_trees_fail]
+    produces: [surfaces_green, smokes_pass]
+metrics:
+  - {name: orphans_detected_and_recorded, agg: mean, over: cell}
+  - {name: relabeled_trees_fail, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_orphan_sweep, p2_relabel_tree_gate, p3_integration, p4_adversarial]
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
