@@ -520,3 +520,51 @@ def test_cli_resolves_supervise_orphans():
     assert script == "orphan_sweep.py"
     assert rest == []
     assert (cli._SCRIPTS_DIR / script).exists()
+
+
+# ── the daemon script runs (the p1 live smoke) ───────────────────────────────
+
+
+def _scripts_dir():
+    return Path(__file__).resolve().parent.parent / "scripts"
+
+
+def test_daemon_script_imports_and_runs_help():
+    """The daemon resolves the package standalone — regression for the missing
+    ``_bootstrap`` sys.path wiring (ModuleNotFoundError on ``python scripts/orphan_sweep.py``
+    even for ``--help``)."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, str(_scripts_dir() / "orphan_sweep.py"), "--help"],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Server-level orphan sweep" in result.stdout
+    assert "--once" in result.stdout
+
+
+def test_daemon_once_smoke_detects_and_records(store_db, tmp_path):
+    """The full CLI daemon (not just the library): one ``--once`` pass over a real
+    session store detects the orphan and lands the dated, flagged record on the ledger."""
+    import os
+    import subprocess
+    import sys
+
+    db, _ = store_db
+    ledger = tmp_path / "orphans.jsonl"
+    env = dict(os.environ, FINOPS_KB_WRITE="", FINOPS_REDIS_PORT="6399")
+    result = subprocess.run(
+        [
+            sys.executable, str(_scripts_dir() / "orphan_sweep.py"), "--once",
+            "--db", str(db), "--ledger", str(ledger), "--crash-grace", "300",
+        ],
+        capture_output=True, text=True, timeout=120, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "[ORPHAN] ses_sub" in result.stdout
+    recorded = json.loads(ledger.read_text())
+    assert recorded["subagent_session_id"] == "ses_sub"
+    assert recorded["flagged"] is True
+    assert recorded["detected_at"].endswith("Z")
