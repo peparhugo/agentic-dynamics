@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-27T02:41:35.194889+00:00",
+  "generated_at": "2026-08-27T05:44:59.931141+00:00",
   "n_specs": 130,
   "specs": [
     {
@@ -488,24 +488,6 @@
       "latest_git_sha": "2f3cbbbbc",
       "results_pointer": "experiments/results/workflows/agentic_dynamics_rebrand/20260814T220247Z.json",
       "n_runs": 2
-    },
-    {
-      "name": "cap_runner_hardening2",
-      "version": "0.1",
-      "status": "failed",
-      "spec_path": "workflows/repository/cap_runner_hardening2.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-27T02:37:06.776747+00:00",
-      "latest_ok": false,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.131459,
-      "latest_git_sha": "612799740",
-      "results_pointer": "experiments/results/workflows/cap_runner_hardening2/20260827T023706Z.json",
-      "n_runs": 1
     },
     {
       "name": "claude_background_sessions",
@@ -1036,6 +1018,24 @@
       "latest_git_sha": "1c08ecc71",
       "results_pointer": "experiments/results/workflows/cap_runner_hardening/20260827T003723Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "cap_runner_hardening2",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_runner_hardening2.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-27T05:44:59.684840+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.465125,
+      "latest_git_sha": "3c48c4b88",
+      "results_pointer": "experiments/results/workflows/cap_runner_hardening2/20260827T054459Z.json",
+      "n_runs": 5
     },
     {
       "name": "cap_session_routing_prospective",
