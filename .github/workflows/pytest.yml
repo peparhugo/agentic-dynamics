@@ -40,6 +40,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          # The checkpoint/relabel replay fixtures (tags replay/*) live on unmerged
+          # campaign branches — a depth-1 checkout never fetches their objects, so the
+          # replay tests fail in CI while passing locally. Full history + tags fixes it.
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
