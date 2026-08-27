@@ -1040,7 +1040,14 @@ def _scan_transcript_for_deploys(transcript: Path) -> list[dict[str, Any]]:
                 continue
             # OUTPUT tier (indirection — a script/alias/variable that reached firebase deploy):
             # a real production deploy prints its banner in the tool output no matter how it
-            # was invoked, so catch it there when the literal command did not match.
+            # was invoked, so catch it there when the literal command did not match. The tier
+            # applies ONLY to deploy-INDICATING commands (the indirection case still carries
+            # firebase/deploy/hosting vocabulary in the command) — scanning every command's
+            # output produced a false positive on `git log` whose output echoed old commit
+            # messages about deploys (the revamp3 p1 misfire, fixed here; pure-variable
+            # indirection with no vocabulary and no banner stays the documented residual).
+            if not re.search(r"\b(firebase|deploy|hosting)\b", command):
+                continue
             output = _output_from_event(event)
             matched_out = _deploy_output_pattern_match(output)
             if matched_out is not None:
@@ -1186,7 +1193,9 @@ def _enforce_commit_prefix(
     }
     msg = (
         f"COMMIT_PREFIX — commits made during phase '{phase_name}' do not match "
-        f"'{expected}': {bad}"
+        f"'{expected}': {bad} "
+        f"(note: the separator is an EM-DASH U+2014 '—', not a hyphen; the resume "
+        f"machinery matches the exact byte pattern)"
     )
     if pr.status == "ok":
         pr.status = "failed"
