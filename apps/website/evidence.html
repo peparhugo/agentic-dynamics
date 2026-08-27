@@ -1797,10 +1797,10 @@ document.addEventListener('DOMContentLoaded', function () {
     var m = sortedFb.find(function(f){ return dm.label===f.name || dm.id.indexOf(f.id)>=0; });
     if(!m) return;
     m._data = dm;
-    if(dataPerturb.semantic[dm.label]){
+    if(dataPerturb.semantic && dataPerturb.semantic[dm.label]){
       m.perturbation.semantic = dataPerturb.semantic[dm.label];
     }
-    if(dataPerturb.manifold[dm.label]){
+    if(dataPerturb.manifold && dataPerturb.manifold[dm.label]){
       m.perturbation.manifold = dataPerturb.manifold[dm.label];
     }
   });
