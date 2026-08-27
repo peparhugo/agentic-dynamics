@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-27T02:02:31.460983+00:00`  ·  130 spec(s)
-**Work remaining:** 32 open · 98 completed/retired
+Generated at: `2026-08-27T02:41:35.194889+00:00`  ·  130 spec(s)
+**Work remaining:** 31 open · 99 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -16,11 +16,9 @@ Generated at: `2026-08-27T02:02:31.460983+00:00`  ·  130 spec(s)
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_escalation_fix` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_grit_strength_grid` | experiment | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_runner_hardening2` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_policy_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_site_revamp3` | workflow | no | runnable | 0.1 | cap_site_revamp2 | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | runnable | 0.1 | — | 2026-08-23 19:16 | ok | anthropic/claude-sonnet-5 | $49.5218 | 4 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
@@ -37,6 +35,7 @@ Generated at: `2026-08-27T02:02:31.460983+00:00`  ·  130 spec(s)
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `agentic_dynamics_rebrand` | workflow | no | failed | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
+| `cap_runner_hardening2` | workflow | no | failed | 0.1 | — | 2026-08-27 02:37 | fail | deepseek/deepseek-v4-flash | $0.1315 | 1 |
 | `claude_background_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
@@ -73,6 +72,7 @@ Generated at: `2026-08-27T02:02:31.460983+00:00`  ·  130 spec(s)
 | `cap_site_regression_analysis` | workflow | no | completed | 0.1 | — | 2026-08-26 23:04 | ok | deepseek/deepseek-v4-flash | $0.1772 | 1 |
 | `cap_site_revamp` | workflow | no | completed | 0.1 | — | 2026-08-26 19:49 | ok | openai/gpt-5.6-terra | $26.6591 | 1 |
 | `cap_site_revamp2` | workflow | no | completed | 0.1 | cap_site_revamp | 2026-08-26 22:28 | ok | openai/gpt-5.6-terra | $7.9998 | 3 |
+| `cap_site_revamp3` | workflow | no | completed | 0.1 | cap_site_revamp2 | 2026-08-27 02:37 | ok | openai/gpt-5.6-terra | $2.0145 | 2 |
 | `cap_sonnet_adversary` | workflow | no | completed | 0.1 | — | 2026-08-25 02:20 | ok | anthropic/claude-sonnet-5 | $18.1312 | 2 |
 | `cap_stabilization_release` | workflow | no | completed | 0.1 | — | 2026-08-26 22:34 | ok | deepseek/deepseek-v4-flash | $0.2377 | 4 |
 | `cap_story_bridge` | workflow | no | completed | 0.1 | — | 2026-08-25 00:53 | ok | deepseek/deepseek-v4-flash | $0.0917 | 1 |

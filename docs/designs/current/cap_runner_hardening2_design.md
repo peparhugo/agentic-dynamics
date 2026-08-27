@@ -100,6 +100,42 @@ A **tree-identity gate** on top of the commit enforcement:
 4. The gate is off for non-agent phases; the runner's own `_git_commit` path is exempt
    (it never re-commits discarded trees).
 
+## Gap 3 — the mechanical human checkpoint (the revamp3 violation)
+
+### The measured problem
+
+revamp3's p2 (the design + human checkpoint) committed the delta preview AND the approval
+template — then the runner moved straight into p3–p6, ran them (vacuous, no commits), and
+recorded `ok: True` while the approval artifact sat **unsigned**. The "STOP for the operator"
+was a sentence in the prompt; the runner has no pause. The machine measured this exact
+pattern three times already: prompt rules without mechanics get ignored.
+
+### The design
+
+A **checkpoint phase kind** in the runner:
+
+- **Schema:** a phase may declare `checkpoint: true`. When a checkpoint phase completes
+  successfully, the runner records the campaign state `awaiting_operator_approval`, writes
+  the ledger, and EXITS CLEANLY (status awaiting — not an error, a designed stop).
+- **The approval contract:** an artifact `approvals/<spec>/<phase>_approval.md` must exist
+  in the worktree, contain a REAL operator signature (a non-placeholder `operator:` line +
+  a date), and its commit must be a DESCENDANT of the checkpoint phase's commit (commit
+  order — a signed-before-the-work artifact does not authorize it).
+- **Resume gating:** on `--resume`, the runner checks the approval contract for every
+  completed checkpoint phase BEFORE proceeding: no artifact / placeholder signature / wrong
+  commit order → the run stops again with `awaiting_operator_approval` (refuses to proceed).
+  With a valid contract → proceeds past the checkpoint.
+- **Exits:** awaiting stops exit 0 with a distinct ledger status (the operator's tools see
+  "waiting", not "failed").
+
+### Acceptance criteria
+
+1. A checkpoint phase without the signed artifact: the run stops with awaiting status;
+   a resume refuses to proceed (both verified by test).
+2. With the signed artifact committed after the checkpoint commit: the resume proceeds.
+3. A placeholder/unsigned signature or a pre-checkpoint-commit artifact: refused.
+4. Non-checkpoint campaigns are unaffected; the existing phases/kinds unchanged.
+
 ## The campaign (cap_runner_hardening2)
 
 - **p1_orphan_sweep** — implement the server-level sweep (observation, detection, the

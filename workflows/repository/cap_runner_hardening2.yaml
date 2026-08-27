@@ -1,6 +1,7 @@
 name: cap_runner_hardening2
 question: >-
-  Close the two execution gaps the terra post-mortem and the hardening review identified:
+  Close the THREE execution gaps the terra post-mortem, the hardening review, and the
+  revamp3 checkpoint violation identified:
   (1) the SERVER-LEVEL ORPHAN SWEEP — the verified 43.4-minute stall was an orphaned
   delegation (the parent agent session died mid-task; the completed subagent was never
   reaped), which the merged runner-level watchdog cannot see (it watches the runner's own
@@ -12,7 +13,13 @@ question: >-
   so the relabel would pass; this campaign adds the tree-identity gate (a phase whose
   committed tree matches a recorded discarded tree fails RELABEL) WITH the operator-
   approval escape (a committed approval artifact names the tree hash + phase authorized
-  to reuse it — the legit-resume path). Design:
+  to reuse it — the legit-resume path); (3) THE MECHANICAL HUMAN CHECKPOINT — revamp3's
+  p2 'STOP for the operator' was a sentence in a prompt: the runner moved straight to
+  p3-p6 and recorded ok:True while the approval artifact sat unsigned. This campaign adds
+  a checkpoint phase kind: a completed checkpoint phase stops the run with
+  awaiting_operator_approval and exits cleanly; a resume REFUSES to proceed past a
+  checkpoint unless an operator-signed approval artifact (non-placeholder signature,
+  committed AFTER the checkpoint commit) exists. Design:
   docs/designs/current/cap_runner_hardening2_design.md (accepted).
 version: "0.1"
 artifact_kind: workflow
@@ -143,7 +150,35 @@ workflow:
           DELIVER: the gate + the approval escape + the ledger + the replay proof,
           committed.
           LOG: the gate mechanics, the replay results; PASS/FAIL; commit.
-      - name: p3_integration
+      - name: p3_checkpoint_mechanism
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the mechanical human checkpoint per the design doc §Gap 3. A
+          phase kind: a phase declaring checkpoint: true that completes successfully
+          records the campaign state awaiting_operator_approval, writes the ledger, and
+          exits CLEANLY (status awaiting — a designed stop, not an error). The approval
+          contract: approvals/<spec>/<phase>_approval.md must exist in the worktree, carry
+          a REAL operator signature (a non-placeholder operator: line + a date), and its
+          commit must be a DESCENDANT of the checkpoint phase's commit (commit order). On
+          --resume, the runner checks the contract for every completed checkpoint phase
+          BEFORE proceeding: no artifact / placeholder signature / wrong commit order ->
+          the run stops again with awaiting_operator_approval (refuses to proceed); a
+          valid contract -> proceeds. The revamp3 scenario is the regression proof: a
+          checkpoint phase whose approval template is unsigned must STOP the run and a
+          resume must REFUSE to proceed (replay the revamp3 p2 state).
+          VERIFY (both directions): (a) checkpoint without the signed artifact -> run
+          stops awaiting, resume refuses; (b) with the signed artifact committed after
+          the checkpoint commit -> resume proceeds; (c) placeholder signature or
+          pre-checkpoint-commit artifact -> refused; (d) non-checkpoint campaigns
+          unaffected (the existing 129 specs load, the existing phase kinds unchanged);
+          (e) the revamp3 p2 approval template replayed — the unsigned template must not
+          authorize a resume.
+          DELIVER: the checkpoint mechanism + the approval-contract verification + the
+          tests + the revamp3 replay proof, committed.
+          LOG: the mechanism shape, the replay result; PASS/FAIL; commit.
+      - name: p4_integration
         kind: agent
         timeout: 14400
         prompt: |
@@ -154,11 +189,15 @@ workflow:
           fixture session store is detected by the sweep within one cycle; (2) a relabel
           attempt through the hardened runner (a discarded tree re-committed without
           approval) fails RELABEL; (3) the approved reuse passes; (4) a legit resume of
-          committed work is unaffected. (c) Document both mechanisms in the runner's
-          module docstring + the control-room supervisor docs + scripts/CONTEXT.md.
-          DELIVER: the green surfaces + the four smoke results + the docs, committed.
+          committed work is unaffected; (5) a two-phase spec whose p1 declares
+          checkpoint: true runs to the checkpoint, stops with awaiting_operator_approval
+          and exits 0, a resume WITHOUT the signed artifact refuses, and a resume WITH
+          the signed artifact (committed after the checkpoint commit) proceeds. (c)
+          Document the three mechanisms in the runner's module docstring + the
+          control-room supervisor docs + scripts/CONTEXT.md.
+          DELIVER: the green surfaces + the five smoke results + the docs, committed.
           LOG: each gate's result; PASS/FAIL; commit.
-      - name: p4_adversarial
+      - name: p5_adversarial
         kind: agent
         timeout: 10800
         prompt: |
@@ -177,7 +216,15 @@ workflow:
           field + the commit order?); the legit-resume false positive (an operator
           restoring a discarded tree WITHOUT the approval artifact — does it fail RELABEL
           as designed, or is the escape reachable?).
-          (3) REGRESSION — existing campaigns/specs unaffected; the runner + control-room
+          (3) CHECKPOINT EVASION — a forged signature (any non-placeholder line counts?),
+          an approval committed on the SAME commit as the checkpoint (is descendant strict?),
+          an approval for the WRONG phase/spec (artifact naming — is it validated?), a
+          resume that re-runs the checkpoint phase itself instead of honoring it (does the
+          checkpoint phase's [workflow] commit make the resume skip it and check the
+          contract, or re-run it and re-stop?), a campaign whose p2 checkpoint is followed
+          by p3 running before the runner records the awaiting state (the revamp3
+          violation exactly — is the stop order deterministic?).
+          (4) REGRESSION — existing campaigns/specs unaffected; the runner + control-room
           surfaces green; the merged hardening's gates still fire.
           (4) the usual suite (secrets, hashes, credentials in logs).
           Every finding: fix or record as accepted limitation with reasoning + residual
@@ -200,16 +247,21 @@ rules:
     evidence_class: "[M]"
     requires: []
     produces: [relabeled_trees_fail, approved_reuse_passes]
+  - name: cap_runner2_checkpoint
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [checkpoint_stops_awaiting, unsigned_approval_refused]
   - name: cap_runner2_integration
     plane: measurement
     evidence_class: "[M]"
-    requires: [orphans_detected_and_recorded, relabeled_trees_fail]
+    requires: [orphans_detected_and_recorded, relabeled_trees_fail, checkpoint_stops_awaiting]
     produces: [surfaces_green, smokes_pass]
 metrics:
   - {name: orphans_detected_and_recorded, agg: mean, over: cell}
   - {name: relabeled_trees_fail, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, p1_orphan_sweep, p2_relabel_tree_gate, p3_integration, p4_adversarial]
+  sections: [question, p1_orphan_sweep, p2_relabel_tree_gate, p3_checkpoint_mechanism, p4_integration, p5_adversarial]
 stop: {budget_usd: 15.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
