@@ -1,0 +1,49 @@
+{
+  "action": "rework",
+  "analyzed_revision": "97c2924a46127b0ef1c44902ebf0a09456b598b4",
+  "applied": false,
+  "baseline_revision": "a26f16ac3ec3c7813f7fa6c6bc542e87f118e444",
+  "cell_id": "cap2c_competing_static_r1",
+  "confidence": 0.6667,
+  "confidence_note": "MEASURED [H] per-attempt execution-confidence of the analyzed attempt (implement phase, AgenticResult.confidence) \u2014 pre-registration section 7; recorded BEFORE the outcome.",
+  "contract_version": "verify_code_change/v1",
+  "depth": 3,
+  "expected_effect": [
+    {
+      "direction": "decrease",
+      "horizon": "next_phase",
+      "magnitude": null,
+      "predicate": "new_sonar_critical_count"
+    },
+    {
+      "direction": "decrease",
+      "horizon": "next_phase",
+      "magnitude": null,
+      "predicate": "new_lsp_error_count"
+    }
+  ],
+  "facts_used": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "proposal_id": "24c29efeca4ce752",
+  "proposed_by": "policy_rule:verify_code_change",
+  "recorded_at": "2026-08-27T16:18:21.708994+00:00",
+  "schema_version": "verify_code_change_proposal/v1",
+  "scope": [
+    "add",
+    "classify",
+    "subtract",
+    "test_add",
+    "test_classify",
+    "test_subtract"
+  ]
+}

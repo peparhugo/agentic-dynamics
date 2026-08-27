@@ -1,0 +1,129 @@
+{
+  "analyzer_status": {
+    "graph": "unavailable (designed)",
+    "lsp": "unavailable (designed)",
+    "sonar": "unavailable (designed)"
+  },
+  "application": {
+    "action": null,
+    "applied_or_null": "null",
+    "note": "no proposal emitted (seam refused) -> provable null application; the refusal is the abstention case."
+  },
+  "arm": "adaptive",
+  "backend": "opencode",
+  "cell_id": "cap2c_absent-clean_adaptive_r1",
+  "class": "absent",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.007367,
+    "total_usd": 0.007367
+  },
+  "facts": {
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "1",
+    "lsp_analysis_status": "unavailable",
+    "sonar_analysis_status": "unavailable"
+  },
+  "facts_present": [
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "lsp_analysis_status",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2c_absent-clean_adaptive_r1",
+  "flags": [],
+  "forecast_usd": 0.031707,
+  "goal": "add a trivial pure helper widget(x) that returns x, in a NEW module widgets.py (no test file, not imported anywhere)",
+  "goal_sha256": "353971837448d2dbd8b85eb766751a8bef4ac9694405a620a450a913167fd977",
+  "impl": {
+    "commit_hash": "41a1122",
+    "confidence": 1.0,
+    "cost_usd": 0.003233645,
+    "duration_s": 14.51
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "clean change \u2014 no defect (the refusal is value-preserving)",
+    "defect_present_on_final_commit": false,
+    "final_revision": "41a11225d9754c3001c6dc4430a7fa39e40b6ff8",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 2,
+    "tests_total": 2
+  },
+  "proposal": null,
+  "repetition": "r1",
+  "run_ledger": "/tmp/wt_adaptive_2c/experiments/results/workflows/cap_2c_cell_absent/20260827T162856Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "25082b758a7ef25a695411790d61a45eef492190d332d754f84e30a604c3b504",
+  "schema_version": "cap_adaptive_2c_cell/v1",
+  "seam": {
+    "error": "cannot propose verify_code_change: required fact 'code_change_risk' not measured (contract on_missing: halt) \u2014 refusing rather than guessing",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8",
+          "sonar:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8",
+          "lsp:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "unavailable",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8",
+          "sonar:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8",
+          "lsp:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "unavailable",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8",
+          "sonar:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8",
+          "lsp:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8",
+          "sonar:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8",
+          "lsp:self-cap2c_absent-clean_adaptive_r1:implement:41a11225d9754c3001c6dc4430a7fa39e40b6ff8"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "1",
+        "value_type": "int"
+      }
+    ],
+    "facts_present": [
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "lsp_analysis_status",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "not_requested",
+    "impacted_count": null,
+    "neighborhood": [
+      "widget"
+    ],
+    "note": "designed degraded state: sonar + lsp unavailable + graph unavailable -> code_change_risk unmeasurable -> the seam refuses (never a hand-authored proposal).",
+    "proposal": null,
+    "refused": true
+  },
+  "seeded_app_seed_revision": "361d3a682f5e5191f98f15231968422e2ad49757",
+  "seeded_app_worktree": "/tmp/cap2c_absent-clean_adaptive_r1",
+  "slot": 2,
+  "spec_id": "cap_2c_cell_absent@0.1",
+  "status": "ok",
+  "variant": "clean",
+  "wall_s": 35.3,
+  "within_forecast": true,
+  "written_at": "2026-08-27T16:29:04.072428+00:00"
+}

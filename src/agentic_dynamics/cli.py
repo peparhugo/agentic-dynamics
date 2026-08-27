@@ -23,6 +23,8 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("experiment", "run"): "run.py",
     ("experiment", "cap-grit-grid"): "run_cap_grit_grid.py",
     ("experiment", "cap-grit-measure"): "measure_cap_grit_grid.py",
+    ("experiment", "cap-2c-grid"): "run_cap_2c_grid.py",
+    ("experiment", "cap-2c-score"): "score_cap_2c.py",
     ("experiment", "sweep-parallel"): "sweep_parallel.py",
     ("experiment", "sweep-silent"): "sweep_silent_mode.py",
     ("experiment", "batch"): "batch_run.py",
@@ -99,7 +101,7 @@ agentic-dynamics — one entry point over the maintained scripts/ surface.
 
 Subcommands (each forwards to its backing script):
 
-  experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase
+  experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase|cap-grit-grid|cap-grit-measure|cap-2c-grid|cap-2c-score
   story       run|batch
   workflow    run|discard-tree
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker

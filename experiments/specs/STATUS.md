@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-27T15:34:55.935597+00:00`  ·  131 spec(s)
-**Work remaining:** 122 open · 9 completed/retired
+Generated at: `2026-08-27T17:49:31.020099+00:00`  ·  135 spec(s)
+**Work remaining:** 126 open · 9 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -15,14 +15,18 @@ Generated at: `2026-08-27T15:34:55.935597+00:00`  ·  131 spec(s)
 | `canonical_state_finalize` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_round2` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_2a_cell_clean` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_2a_cell_critical` | workflow | yes | runnable | 0.1 | — | 2026-08-27 15:34 | fail | deepseek/deepseek-v4-pro | $0.0120 | 1 |
+| `cap_2a_cell_clean` | workflow | yes | runnable | 0.1 | — | 2026-08-27 16:15 | ok | deepseek/deepseek-v4-pro | $0.0092 | 4 |
+| `cap_2a_cell_critical` | workflow | yes | runnable | 0.1 | — | 2026-08-27 15:54 | fail | deepseek/deepseek-v4-pro | $0.0120 | 4 |
 | `cap_2a_cell_style` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_rerun` | workflow | no | runnable | 0.1 | cap_2a_shadow_calibration | — | — | — | — | 0 |
 | `cap_2a_rerun2` | workflow | no | runnable | 0.1 | cap_2a_rerun | — | — | — | — | 0 |
 | `cap_2a_rerun3` | workflow | no | runnable | 0.1 | cap_2a_rerun2 | — | — | — | — | 0 |
 | `cap_2a_shadow_calibration` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_2b` | workflow | no | runnable | 0.1 | cap_2a_rerun3 | — | — | — | — | 0 |
+| `cap_2c_cell_absent` | workflow | yes | runnable | 0.1 | — | 2026-08-27 16:30 | ok | deepseek/deepseek-v4-pro | $0.0073 | 4 |
+| `cap_2c_cell_competing` | workflow | yes | runnable | 0.1 | — | 2026-08-27 16:27 | fail | deepseek/deepseek-v4-pro | $0.0095 | 4 |
+| `cap_2c_cell_incorrect` | workflow | yes | runnable | 0.1 | — | 2026-08-27 16:04 | ok | deepseek/deepseek-v4-pro | $0.0092 | 4 |
+| `cap_2c_cell_unseen_family` | workflow | yes | runnable | 0.1 | — | 2026-08-27 17:49 | fail | deepseek/deepseek-v4-pro | $0.0041 | 4 |
 | `cap_adaptive_2c` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_addendum_design` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_addendum_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |

@@ -1,0 +1,23 @@
+{
+  "audit_note": "competing-adaptive r1/r2: the p2 evaluator's defect determination asserted hardcoded label strings; the label-agnostic boundary check on the immutable final commits shows both defects FIXED by the applied rework (git diff `>=`, tests 3/3) \u2014 the recorded defect_present=True is a false positive; the score uses the audited determination, flagged in per_cell[].outcome_audit.",
+  "campaign": "cap_adaptive_2c",
+  "guard": "class labels match the pre-registered table exactly (join_validation.valid); the abstention analysis is labeled exploratory.",
+  "phase": "p3_score",
+  "schema_version": "cap_adaptive_2c_validation/v1",
+  "score_json": "experiments/results/cap_adaptive_2c/cap_adaptive_2c_score_20260827T180241Z.json",
+  "score_json_sha256": "076751e4b14d74085fba46581a9bf9bd6bb627bee1089a5afce4c87d5cde60f7",
+  "scored_at": "20260827T180241Z",
+  "traces": {
+    "abstention_curve": "abstention_analysis.threshold_curve[].cpvo_gated_usd <- (sum cost + sum harm under the gated regime) / sum accepted (preregistration section 2); cpvo_gated_harm_11/28 are the harm-inclusive variants",
+    "abstention_verdict": "abstention_analysis.improving_threshold_exists <- any theta in (0,1) with cpvo_gated(theta) < cpvo_gated(0)",
+    "cpvo_adaptive": "decision_rule.cpvo_adaptive_usd <- sum(per_cell[].cost_usd for adaptive) / sum(per_cell[].accepted for adaptive)",
+    "cpvo_ratio": "decision_rule.cpvo_ratio = cpvo_adaptive / cpvo_static",
+    "cpvo_static": "decision_rule.cpvo_static_usd <- sum(per_cell[].cost_usd for static) / sum(per_cell[].accepted for static)",
+    "escaped_defect_count": "per_cell[].escaped_defect_count <- defect_present determination per class (correct 1 / competing 2 / unseen-family 1 / absent-defective 1)",
+    "margin": "decision_rule.margin_cpvo_ratio_le / margin_success_gap_le (preregistration section 2)",
+    "success_gap": "decision_rule.success_gap_static_minus_adaptive = success_static - success_adaptive (both from per_cell[].accepted / per_arm[].n)",
+    "wrong_apply": "harm_table.wrong_apply.total_usd_measured <- constructible false-positive verify passes applied (incorrect class): adaptive minus matched-static cost; NONE applied (construction failed -> continue) so $0 measured; a correct rework's cost is cpvo, not harm",
+    "wrong_continue_11": "harm_table.wrong_continue.at_E_x_11 <- escaped_defect_count x 0.046109 (E_x 11.4671 x $0.004021)",
+    "wrong_continue_28": "harm_table.wrong_continue.at_E_x_28 <- escaped_defect_count x 0.112588 (E_x 28 x $0.004021)"
+  }
+}

@@ -1,0 +1,261 @@
+{
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": null,
+    "applied_or_null": "not_applicable",
+    "note": "static arm: proposal recorded, NEVER applied."
+  },
+  "arm": "static",
+  "backend": "opencode",
+  "cell_id": "cap2c_incorrect_static_r1",
+  "class": "incorrect",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.009124,
+    "total_usd": 0.009124
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "20",
+    "changed_symbols_with_tests_ratio": "0.05",
+    "code_change_risk": "0.19",
+    "impacted_symbol_count": "0",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2c_incorrect_static_r1",
+  "flags": [
+    "construction-failure: expected proposal verify, got continue"
+  ],
+  "forecast_usd": 0.031707,
+  "goal": "modify add(a, b) in calc.py with a behavior-preserving body change (result = a + b; return result) AND add 19 trivial distinct pure helpers widget_1(x)..widget_19(x) returning x + k in a NEW module widgets.py with NO test file \u2014 the change is defect-free; do not change add's behavior, do not change subtract or its test",
+  "goal_sha256": "24748af32527282cbdc722beaa3d0407de0d54ce7a97502e307a910b9de36362",
+  "impl": {
+    "commit_hash": "4d71f11",
+    "confidence": 1.0,
+    "cost_usd": 0.003622013,
+    "duration_s": 16.78
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+    "defect_present_on_final_commit": false,
+    "final_revision": "4dbf128107c8898b1c10892d049f7f44dd104ac2",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 2,
+    "tests_total": 2
+  },
+  "proposal": {
+    "action": "continue",
+    "analyzed_revision": "4d71f11e4d733a17e40cf682717b4e127b404877",
+    "applied": false,
+    "artifact": "experiments/results/cap_adaptive_2c/proposals/dffcc066c4ef18aa.json",
+    "artifact_sha256": "b2d2b0bf5da09a4d0bdbc1425837f849ada8cf81ce6c7f91c46ba323dd4fab2a",
+    "baseline_revision": "8a5a813f17433ba48679d118bf88fd8beb090425",
+    "confidence": 1.0,
+    "contract_version": "verify_code_change/v1",
+    "depth": 0,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "dffcc066c4ef18aa",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": []
+  },
+  "repetition": "r1",
+  "run_ledger": "/tmp/wt_adaptive_2c/experiments/results/workflows/cap_2c_cell_incorrect/20260827T160157Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "1556936b7913a1250cc5c775ee41cd940fdf07ff3fed19d0323a14437f40c69c",
+  "schema_version": "cap_adaptive_2c_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "20",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "0.05",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "sonar:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "lsp:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877",
+          "impacted:self-cap2c_incorrect_static_r1:implement:4d71f11e4d733a17e40cf682717b4e127b404877"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.19",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 0,
+    "neighborhood": [
+      "add",
+      "widget_1",
+      "widget_10",
+      "widget_11",
+      "widget_12",
+      "widget_13",
+      "widget_14",
+      "widget_15",
+      "widget_16",
+      "widget_17",
+      "widget_18",
+      "widget_19",
+      "widget_2",
+      "widget_3",
+      "widget_4",
+      "widget_5",
+      "widget_6",
+      "widget_7",
+      "widget_8",
+      "widget_9"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "8a5a813f17433ba48679d118bf88fd8beb090425",
+  "seeded_app_worktree": "/tmp/cap2c_incorrect_static_r1",
+  "slot": 3,
+  "spec_id": "cap_2c_cell_incorrect@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 159.7,
+  "within_forecast": true,
+  "written_at": "2026-08-27T16:02:05.655560+00:00"
+}
