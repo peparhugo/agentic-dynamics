@@ -60,6 +60,7 @@ PAGES = [
     "accelerator.html",
     "databricks.html",
     "glossary.html",
+    "question.html",
 ]
 
 ONATTR_RE = re.compile(r"\son\w+\s*=")
