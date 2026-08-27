@@ -267,6 +267,12 @@ def detect_orphans(
     for subagent in by_id.values():
         if not subagent.parent_id:
             continue
+        # A self-referential ``parent_id`` is malformed data (a top-level session's parent is
+        # NULL — no session is its own delegation), and without a guard it would be flagged as
+        # its own orphan (a spurious ``parent==subagent`` record poisoning the ledger with
+        # nonsense). Adversarial p5 probe O3.
+        if subagent.parent_id == subagent.id:
+            continue
         parent = by_id.get(subagent.parent_id)
         if parent is None:
             continue

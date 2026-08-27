@@ -218,6 +218,20 @@ def test_dangling_parent_is_skipped():
     assert orphans == []
 
 
+def test_self_referential_parent_id_never_yields_a_self_orphan():
+    # Adversarial p5 probe O3: a malformed row whose ``parent_id`` points at ITSELF (a top-level
+    # session's parent is NULL — no session is its own delegation) must never be flagged as its
+    # own orphan, even when it looks terminated (a spurious parent==subagent record would poison
+    # the ledger with nonsense).
+    malformed = make_session("ses_self", parent="ses_self", created=100_000_000, updated=100_060_000)
+    parts = [
+        make_part("prt_ss", "ses_self", 100_000_000, "step-start"),
+        make_part("prt_sf", "ses_self", 100_060_000, "step-finish"),
+    ]
+    orphans = detect_orphans([malformed], parts, now_ms=100_400_000)
+    assert orphans == []
+
+
 # ── the terra-orphan REPLAY (the regression proof) ───────────────────────────
 
 
