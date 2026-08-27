@@ -96,6 +96,7 @@ workflow:
           DELIVER docs/consolidation/stage_6_gates.md (PASS/FAIL per check).
       - name: release
         kind: agent
+        deploy_allowed: true
         timeout: 7200
         prompt: |
           Deploy the dual-Firebase sites in sync and write the final verification report.

@@ -121,6 +121,7 @@ workflow:
           LOG: per-figure text/shape before/after; PASS/FAIL; commit.
       - name: p3_visual_verification
         kind: agent
+        checkpoint: true
         timeout: 14400
         prompt: |
           GOAL: {goal}
@@ -138,6 +139,7 @@ workflow:
       - name: p3b_craft_ux_pass
         kind: agent
         requires_deliverable: true
+        checkpoint: true
         timeout: 21600
         prompt: |
           GOAL: {goal}
@@ -167,12 +169,16 @@ workflow:
           LOG: per-figure before/after + the contrast results; PASS/FAIL; commit.
       - name: p4_deploy
         kind: agent
+        deploy_allowed: true
         timeout: 14400
         prompt: |
           GOAL: {goal}
           SHAPE: THE ONLY PHASE THAT MAY DEPLOY — and ONLY after the operator's signed
-          visual-approval artifact exists at the contract path (committed after the p3
-          checkpoint commit, non-placeholder signature — the checkpoint machinery). Run
+          visual-approval artifact exists at the approval contract path
+          (approvals/cap_site_revamp4_diagrams/p3_visual_verification_approval.md and
+          approvals/cap_site_revamp4_diagrams/p3b_craft_ux_pass_approval.md — committed
+          AFTER the p3/p3b checkpoint commits, non-placeholder signature — the checkpoint
+          machinery refuses to resume past an unsatisfied checkpoint). Run
           the data chain fresh, deploy BOTH Firebase projects from apps/website/, then
           re-run the SVG rendering gate against the DEPLOYED URLs (no 0x0, no overflow,
           every figure visible) + the operator's approved state. If the deployed gate

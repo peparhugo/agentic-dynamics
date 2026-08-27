@@ -82,6 +82,8 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("supervise",): "supervise.py",
     ("supervise", "claude-agents"): "claude_agents_supervisor.py",
     ("supervise", "orphans"): "orphan_sweep.py",
+    # release
+    ("release", "check-protection"): "check_branch_protection.py",
 }
 
 #: ``_COMMANDS`` keys ordered longest-first. ``_resolve`` iterates THIS list rather than
@@ -114,6 +116,7 @@ Subcommands (each forwards to its backing script):
   spec        status|pipeline
   validate    session|tests|prereq
   supervise   [claude-agents|orphans]
+  release     check-protection
 
 Run `agentic-dynamics <subcommand> --help` for the backing script's own options.
 

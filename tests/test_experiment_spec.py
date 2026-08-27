@@ -455,3 +455,82 @@ def test_committed_specs_all_load_without_unknown_key_warnings(recwarn):
         w for w in recwarn.list if "unknown top-level key" in str(w.message)
     ]
     assert unknown_key_warnings == []
+
+
+# ── Prose-vs-schema safety gate (review P1) ─────────────────────────────────
+# A safety requirement in prompt prose is advisory; in the schema it is enforceable.
+# The gate fires when a phase orders an operator halt without checkpoint: true, or issues
+# a production deploy command without deploy_allowed: true.
+
+
+def _phase_spec(phases):
+    return _minimal_spec(workflow=Workflow("agent_task", {"phases": phases}))
+
+
+HALT_PROMPT = "Build the thing. STOP THE CAMPAIGN: the operator must visually approve."
+DEPLOY_PROMPT = "Build the site, then firebase deploy --only hosting (canonical ai-finops-rulebook)."
+
+
+def test_halt_prose_without_checkpoint_is_rejected():
+    errors = validate_spec(_phase_spec([{"name": "p1", "kind": "agent", "prompt": HALT_PROMPT}]))
+    assert any("orders an operator halt" in e and "checkpoint: true" in e for e in errors)
+
+
+def test_halt_prose_with_checkpoint_is_accepted():
+    errors = validate_spec(
+        _phase_spec([{"name": "p1", "kind": "agent", "checkpoint": True, "prompt": HALT_PROMPT}])
+    )
+    assert errors == []
+
+
+def test_deploy_command_without_deploy_allowed_is_rejected():
+    errors = validate_spec(_phase_spec([{"name": "p1", "kind": "agent", "prompt": DEPLOY_PROMPT}]))
+    assert any("production deploy command" in e and "deploy_allowed: true" in e for e in errors)
+
+
+def test_deploy_command_with_deploy_allowed_is_accepted():
+    errors = validate_spec(
+        _phase_spec([{"name": "p1", "kind": "agent", "deploy_allowed": True, "prompt": DEPLOY_PROMPT}])
+    )
+    assert errors == []
+
+
+def test_dry_run_deploy_mentions_are_not_commands():
+    prompt = "Check the deploy with firebase deploy --only hosting --dry-run before anything."
+    errors = validate_spec(_phase_spec([{"name": "p1", "kind": "agent", "prompt": prompt}]))
+    assert errors == []
+
+
+def test_quoted_or_bare_deploy_mentions_are_not_commands():
+    prompt = (
+        "The lesson: terra ran `firebase deploy` during p3, silently. "
+        "Bypass shapes: 'firebase --help > /dev/null && firebase deploy', "
+        "'npx firebase-tools deploy'. The p2 deploy gate must catch them."
+    )
+    errors = validate_spec(_phase_spec([{"name": "p1", "kind": "agent", "prompt": prompt}]))
+    assert errors == []
+
+
+def test_machinery_mentions_do_not_trigger_halt_rule():
+    prompt = "Implement the checkpoint phase kind: a phase declaring checkpoint: true that completes successfully stops with awaiting_operator_approval."
+    errors = validate_spec(_phase_spec([{"name": "p1", "kind": "agent", "prompt": prompt}]))
+    assert errors == []
+
+
+def test_committed_spec_corpus_passes_the_prose_safety_gate():
+    """Every committed spec validates clean under the prose-vs-schema safety gate.
+
+    This is the regression guard for the review's flagship finding: the
+    cap_site_revamp4_diagrams workflow ordered operator halts and a deploy in prose
+    while declaring no checkpoint/deploy_allowed markers. A workflow that stops or
+    deploys in prose must declare the mechanical markers, or this test fails.
+    """
+    specs_dir = Path(__file__).resolve().parent.parent
+    paths = sorted((specs_dir / "experiments" / "definitions").glob("*.yaml"))
+    paths += sorted((specs_dir / "workflows").rglob("*.yaml"))
+    assert len(paths) >= 63, f"expected the committed spec corpus, found {len(paths)}"
+    for path in paths:
+        spec = load_spec(path)
+        errors = validate_spec(spec)
+        assert errors == [], f"{path} fails validation: {errors}"
+

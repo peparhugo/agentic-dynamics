@@ -12,6 +12,7 @@ Design: ``code_reviews/2026-08-14_experiment-spec-and-compiler-design.md``.
 
 from __future__ import annotations
 
+import re
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -682,6 +683,84 @@ def validate_rules(
     return errors
 
 
+def _prose_safety_violations(spec: ExperimentSpec) -> list[str]:
+    """Prose-vs-schema safety gate (review P1) — errors, or [].
+
+    A phase whose prompt ORDERS an operator halt without declaring ``checkpoint: true``, or
+    ISSUES a production firebase deploy command without declaring ``deploy_allowed: true``,
+    is a safety requirement expressed in prose only — the runner's mechanical gates never
+    engage, exactly the cap_site_revamp4_diagrams regression (its prompts said "STOP THE
+    CAMPAIGN" / "ONLY AFTER the operator's signed approval" with no markers anywhere).
+
+    Detection is deliberately narrow and tuned against the committed corpus:
+
+    * CHECKPOINT: halt-instruction language — ``stop``/``halt``/``await`` within a short
+      window of the operator/human + approval vocabulary. A line that mentions the
+      machinery itself (the word ``checkpoint``) is never a halt instruction — the
+      runner-hardening specs discuss the checkpoint phase kind as their subject.
+    * DEPLOY: the same production-deploy command shapes the runner's gate matches
+      (``firebase ... deploy`` / ``firebase --project <production-host>`` /
+      ``firebase hosting deploy`` — kept in lockstep with
+      :data:`agentic_dynamics.runtime.workflow_runner.DEPLOY_PATTERNS`, which cannot be
+      imported here without a cycle), minus dry-runs and minus lines whose subject is the
+      deploy gate itself (``deploy gate``/``DEPLOY_GATE``/``bypass``/``detection``/
+      ``may run``/``implement``/``patterns``) — the hardening specs quote deploy commands
+      while implementing their detection.
+
+    The rule fires only for phases WITHOUT the marker — a phase that declares the marker
+    is valid regardless of its prose (the runner's post-phase gates enforce the intent).
+    """
+    errors: list[str] = []
+    # Lockstep with runtime.workflow_runner.DEPLOY_PATTERNS (:1060), narrowed to the repo's
+    # actual production invocations: `firebase deploy --only ...` / `firebase --project
+    # <production-host>`. A bare `firebase deploy` mention (the hardening specs' evasion
+    # lists: "an alias, 'firebase --help > /dev/null && firebase deploy'") is prose ABOUT
+    # commands, not a command — it carries no --only/--project, so it never matches here.
+    # A leading negative lookbehind additionally skips quoted/backticked occurrences.
+    deploy_patterns = [
+        re.compile(r'(?<![\w`"\'])\bfirebase\b[^\n]*\bdeploy\b[^\n]*--only\b'),
+        re.compile(
+            r'(?<![\w`"\'])\bfirebase\b[^\n]*--project\s+'
+            r"(?:agentic-dynamics|ai-finops-rulebook)\b"
+        ),
+    ]
+    deploy_subject_excludes = ("--dry-run", "deploy gate", "DEPLOY_GATE")
+    checkpoint_patterns = [
+        re.compile(r"(?i)\bstop\b[^\n.]{0,80}\b(?:the\s+)?(?:operator|human)\b"),
+        re.compile(r"(?i)\bhalt\b[^\n.]{0,80}\b(?:operator|human|approval|campaign)\b"),
+        re.compile(
+            r"(?i)\bawait(?:ing)?\s+(?:the\s+)?(?:operator|human)\b[^\n.]{0,60}\bapproval\b"
+        ),
+    ]
+    for ph in spec.workflow.params.get("phases") or []:
+        if not isinstance(ph, dict):
+            continue
+        name = ph.get("name", "?")
+        prompt = ph.get("prompt") or ""
+        for line in str(prompt).splitlines():
+            if "checkpoint" in line:
+                continue
+            if not ph.get("checkpoint") and any(
+                pat.search(line) for pat in checkpoint_patterns
+            ):
+                errors.append(
+                    f'phase "{name}" orders an operator halt in prose '
+                    f'("{line.strip()[:80]}") but does not declare checkpoint: true — '
+                    f"the mechanical stop (cap_runner_hardening2) never engages"
+                )
+            if ph.get("deploy_allowed"):
+                continue
+            if any(exc in line for exc in deploy_subject_excludes):
+                continue
+            if any(pat.search(line) for pat in deploy_patterns):
+                errors.append(
+                    f'phase "{name}" issues a production deploy command in prose '
+                    f'("{line.strip()[:80]}") but does not declare deploy_allowed: true — '
+                    f"the deploy gate (cap_runner_hardening p2) never engages"
+                )
+    return errors
+
+
 def validate_spec(
     spec: ExperimentSpec,
     *,
@@ -774,6 +853,18 @@ def validate_spec(
                 f'phase "{ph.get("name", "?")}": checkpoint must be a boolean '
                 f"(got {ph.get('checkpoint')!r})"
             )
+
+    # ── Phase-level gate: prose-required safety (review P1) ──────────────────
+    # The principle: a safety requirement expressed only in natural-language prompt text is
+    # ADVISORY; a safety requirement expressed in the workflow schema is ENFORCEABLE. A phase
+    # that orders an operator halt ("STOP for the operator's approval") must declare
+    # ``checkpoint: true`` (the mechanical stop), and a phase that issues a production deploy
+    # command must declare ``deploy_allowed: true`` (the deploy gate) — otherwise the runner's
+    # gates never engage. The detector is deliberately narrow: it flags halt-INSTRUCTION
+    # language and deploy COMMANDS, never mentions of the machinery itself (lines that discuss
+    # checkpoints/deploy gates as their subject are excluded, so the runner-hardening specs
+    # stay valid). :func:`_prose_safety_violations` is the single implementation.
+    errors.extend(_prose_safety_violations(spec))
 
     # ── Artifact-identity gate (refactor-repair P1-3) ─────────────────────────
     # Identity is declared, not guessed. ``artifact_kind``/``intent`` are validated enums.

@@ -89,6 +89,8 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("supervise",), "supervise.py", ()),
     (("supervise", "claude-agents"), "claude_agents_supervisor.py", ()),
     (("supervise", "orphans"), "orphan_sweep.py", ()),
+    # release
+    (("release", "check-protection"), "check_branch_protection.py", ()),
 ]
 
 

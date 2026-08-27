@@ -292,6 +292,7 @@ workflow:
           LOG: finding table; PASS/FAIL; commit.
       - name: p5_deploy
         kind: agent
+        deploy_allowed: true
         timeout: 14400
         prompt: |
           GOAL: {goal}
