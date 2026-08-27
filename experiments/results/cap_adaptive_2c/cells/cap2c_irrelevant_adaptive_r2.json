@@ -1,0 +1,247 @@
+{
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": "continue",
+    "applied_or_null": "null",
+    "note": "continue proposal -> provable null application (no extra pass).",
+    "proof": "provable-null:commit-trail",
+    "rework_passes": 0
+  },
+  "arm": "adaptive",
+  "backend": "opencode",
+  "cell_id": "cap2c_irrelevant_adaptive_r2",
+  "class": "irrelevant",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.009172,
+    "total_usd": 0.009172
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.18",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2c_irrelevant_adaptive_r2",
+  "flags": [],
+  "forecast_usd": 0.031707,
+  "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+  "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+  "impl": {
+    "commit_hash": "ac37f48",
+    "confidence": 1.0,
+    "cost_usd": 0.0038215330000000002,
+    "duration_s": 21.59
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+    "defect_present_on_final_commit": false,
+    "final_revision": "95e72d0d0004087184cbce91c40815cda5c8134f",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 3,
+    "tests_total": 3
+  },
+  "proposal": {
+    "action": "continue",
+    "analyzed_revision": "ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+    "applied": false,
+    "artifact": "experiments/results/cap_adaptive_2c/proposals/df33bb7cc52d1693.json",
+    "artifact_sha256": "c6a36dbf953d72e9d7d5bd3013f4e61dbac8585cfe4039fbc31921ff283eb1ac",
+    "baseline_revision": "169a25c4a4532d57fc2b3a8084d764937a13cc80",
+    "confidence": 1.0,
+    "contract_version": "verify_code_change/v1",
+    "depth": 0,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "df33bb7cc52d1693",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": []
+  },
+  "repetition": "r2",
+  "run_ledger": "/tmp/wt_adaptive_2c/experiments/results/workflows/cap_2a_cell_clean/20260827T161531Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "fb94fd9afb3938cd6f3564613aafc801d80e10895ae1dda39864006490c457be",
+  "schema_version": "cap_adaptive_2c_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "2",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "4",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "0.5",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "sonar:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "lsp:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a",
+          "impacted:self-cap2c_irrelevant_adaptive_r2:implement:ac37f48778795891ba6d5c7a65cfb6d43e3a669a"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.18",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 4,
+    "neighborhood": [
+      "add",
+      "product",
+      "subtract",
+      "test_add",
+      "test_product",
+      "test_subtract"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "169a25c4a4532d57fc2b3a8084d764937a13cc80",
+  "seeded_app_worktree": "/tmp/cap2c_irrelevant_adaptive_r2",
+  "slot": 4,
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 159.6,
+  "within_forecast": true,
+  "written_at": "2026-08-27T16:15:40.043461+00:00"
+}

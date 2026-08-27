@@ -1,0 +1,263 @@
+{
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": "continue",
+    "applied_or_null": "null",
+    "note": "continue proposal -> provable null application (no extra pass).",
+    "proof": "provable-null:commit-trail",
+    "rework_passes": 0
+  },
+  "arm": "adaptive",
+  "backend": "opencode",
+  "cell_id": "cap2c_incorrect_adaptive_r2",
+  "class": "incorrect",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.00923,
+    "total_usd": 0.00923
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "20",
+    "changed_symbols_with_tests_ratio": "0.05",
+    "code_change_risk": "0.19",
+    "impacted_symbol_count": "0",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2c_incorrect_adaptive_r2",
+  "flags": [
+    "construction-failure: expected proposal verify, got continue"
+  ],
+  "forecast_usd": 0.031707,
+  "goal": "modify add(a, b) in calc.py with a behavior-preserving body change (result = a + b; return result) AND add 19 trivial distinct pure helpers widget_1(x)..widget_19(x) returning x + k in a NEW module widgets.py with NO test file \u2014 the change is defect-free; do not change add's behavior, do not change subtract or its test",
+  "goal_sha256": "24748af32527282cbdc722beaa3d0407de0d54ce7a97502e307a910b9de36362",
+  "impl": {
+    "commit_hash": "57e0526",
+    "confidence": 1.0,
+    "cost_usd": 0.0036094559999999996,
+    "duration_s": 16.78
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+    "defect_present_on_final_commit": false,
+    "final_revision": "fdb75b22abf78c436e1cf535632e42c876a64dc0",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 2,
+    "tests_total": 2
+  },
+  "proposal": {
+    "action": "continue",
+    "analyzed_revision": "57e0526467d682fd3cb56728c6330818075c388c",
+    "applied": false,
+    "artifact": "experiments/results/cap_adaptive_2c/proposals/454cb6252066fcdd.json",
+    "artifact_sha256": "dd2d91724689c2f38624592c03b9fe02e2e4bc1c9dd722d03538f844380073c5",
+    "baseline_revision": "ac7e97a0ae4cb2e80d9fbb73ffa769c1710efc14",
+    "confidence": 1.0,
+    "contract_version": "verify_code_change/v1",
+    "depth": 0,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "454cb6252066fcdd",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": []
+  },
+  "repetition": "r2",
+  "run_ledger": "/tmp/wt_adaptive_2c/experiments/results/workflows/cap_2c_cell_incorrect/20260827T155917Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "aabfa9082f62351fa7e211bcaf0bed5b1d4372131275b86897a8c7e4b73c795a",
+  "schema_version": "cap_adaptive_2c_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "20",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "0.05",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "sonar:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "lsp:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c",
+          "impacted:self-cap2c_incorrect_adaptive_r2:implement:57e0526467d682fd3cb56728c6330818075c388c"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.19",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 0,
+    "neighborhood": [
+      "add",
+      "widget_1",
+      "widget_10",
+      "widget_11",
+      "widget_12",
+      "widget_13",
+      "widget_14",
+      "widget_15",
+      "widget_16",
+      "widget_17",
+      "widget_18",
+      "widget_19",
+      "widget_2",
+      "widget_3",
+      "widget_4",
+      "widget_5",
+      "widget_6",
+      "widget_7",
+      "widget_8",
+      "widget_9"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "ac7e97a0ae4cb2e80d9fbb73ffa769c1710efc14",
+  "seeded_app_worktree": "/tmp/cap2c_incorrect_adaptive_r2",
+  "slot": 2,
+  "spec_id": "cap_2c_cell_incorrect@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 158.1,
+  "within_forecast": true,
+  "written_at": "2026-08-27T15:59:26.002294+00:00"
+}

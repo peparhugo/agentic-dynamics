@@ -1,0 +1,1956 @@
+{
+  "abstention_analysis": {
+    "cells_without_confidence": [
+      "cap2c_absent-clean_adaptive_r1",
+      "cap2c_absent-clean_static_r1",
+      "cap2c_absent-defective_adaptive_r1",
+      "cap2c_absent-defective_static_r1"
+    ],
+    "confidence_basis": "proposal-record confidence ([H] per-attempt execution-confidence of the analyzed implement attempt), recorded BEFORE the outcome; a proposal record without the field is invalid and never imputed (preregistration \u00a77).",
+    "cpvo_gated_at_theta0": {
+      "accepted_outcomes": 14,
+      "cpvo_gated_harm_11": 0.054931,
+      "cpvo_gated_harm_28": 0.111913,
+      "cpvo_gated_usd": 0.015409,
+      "n_declined": 0,
+      "theta": 0.0,
+      "total_cost_usd": 0.215727
+    },
+    "exploratory_label": "EXPLORATORY (post-hoc) \u2014 the pre-registration fixes no threshold it cannot know (preregistration \u00a72 / \u00a75); descriptive at the campaign's n.",
+    "improving_threshold_exists": false,
+    "improving_thresholds": [],
+    "n_without_confidence": 4,
+    "note": "an improving threshold exists iff some theta in (0,1) yields cpvo_gated(theta) < cpvo_gated(0) \u2014 i.e. confidence-gated abstention would improve value.",
+    "observed_confidences": [
+      0.6667,
+      1.0
+    ],
+    "per_decile": {
+      "6": {
+        "cells_abstain": [
+          "cap2c_competing_static_r1",
+          "cap2c_competing_static_r2",
+          "cap2c_correct_static_r1",
+          "cap2c_correct_static_r2",
+          "cap2c_unseen_family_static_r1",
+          "cap2c_unseen_family_static_r2"
+        ],
+        "cells_apply": [
+          "cap2c_competing_adaptive_r1",
+          "cap2c_competing_adaptive_r2",
+          "cap2c_correct_adaptive_r1",
+          "cap2c_correct_adaptive_r2",
+          "cap2c_unseen_family_adaptive_r1",
+          "cap2c_unseen_family_adaptive_r2"
+        ],
+        "decile": "[0.6, 0.7)",
+        "n_abstain": 6,
+        "n_apply": 6,
+        "value_abstain_accepted": 0,
+        "value_abstain_cpvo_harm_11": null,
+        "value_abstain_cpvo_harm_28": null,
+        "value_abstain_cpvo_usd": null,
+        "value_abstain_total_cost_usd": 0.048484,
+        "value_apply_accepted": 4,
+        "value_apply_cpvo_harm_11": 0.039447,
+        "value_apply_cpvo_harm_28": 0.072686,
+        "value_apply_cpvo_usd": 0.016392,
+        "value_apply_total_cost_usd": 0.06557
+      },
+      "9": {
+        "cells_abstain": [
+          "cap2c_incorrect_static_r1",
+          "cap2c_incorrect_static_r2",
+          "cap2c_irrelevant_static_r1",
+          "cap2c_irrelevant_static_r2"
+        ],
+        "cells_apply": [
+          "cap2c_incorrect_adaptive_r1",
+          "cap2c_incorrect_adaptive_r2",
+          "cap2c_irrelevant_adaptive_r1",
+          "cap2c_irrelevant_adaptive_r2"
+        ],
+        "decile": "[0.9, 1.0]",
+        "n_abstain": 4,
+        "n_apply": 4,
+        "value_abstain_accepted": 4,
+        "value_abstain_cpvo_harm_11": 0.00906,
+        "value_abstain_cpvo_harm_28": 0.00906,
+        "value_abstain_cpvo_usd": 0.00906,
+        "value_abstain_total_cost_usd": 0.036242,
+        "value_apply_accepted": 4,
+        "value_apply_cpvo_harm_11": 0.009089,
+        "value_apply_cpvo_harm_28": 0.009089,
+        "value_apply_cpvo_usd": 0.009089,
+        "value_apply_total_cost_usd": 0.036357
+      }
+    },
+    "threshold_curve": [
+      {
+        "accepted_outcomes": 14,
+        "cpvo_gated_harm_11": 0.054931,
+        "cpvo_gated_harm_28": 0.111913,
+        "cpvo_gated_usd": 0.015409,
+        "n_declined": 0,
+        "theta": 0.0,
+        "total_cost_usd": 0.215727
+      },
+      {
+        "accepted_outcomes": 14,
+        "cpvo_gated_harm_11": 0.054931,
+        "cpvo_gated_harm_28": 0.111913,
+        "cpvo_gated_usd": 0.015409,
+        "n_declined": 0,
+        "theta": 0.6667,
+        "total_cost_usd": 0.215727
+      },
+      {
+        "accepted_outcomes": 10,
+        "cpvo_gated_harm_11": 0.10286,
+        "cpvo_gated_harm_28": 0.222522,
+        "cpvo_gated_usd": 0.019864,
+        "n_declined": 6,
+        "theta": 1.0,
+        "total_cost_usd": 0.198641
+      }
+    ]
+  },
+  "campaign": "cap_adaptive_2c",
+  "cpvo_definition": "cpvo_arm = (sum measured cell cost over the arm) / (sum accepted outcomes over the arm); accepted = test_executed_success AND defect_present_on_final_commit == false (preregistration section 1)",
+  "decision_rule": {
+    "abstention": {
+      "improving_threshold_exists": false,
+      "improving_thresholds": [],
+      "verdict": "confidence-gated abstention does NOT improve cpvo at any observed threshold -> the gate should NOT decline to adapt on the confidence signal alone"
+    },
+    "cpvo_adaptive_usd": 0.012957,
+    "cpvo_leg_holds": true,
+    "cpvo_ratio": 0.653666,
+    "cpvo_static_usd": 0.019822,
+    "decision": "NON_INFERIOR",
+    "margin_cpvo_ratio_le": 1.1,
+    "margin_reference": "docs/designs/current/cap_adaptive_2c_preregistration.md section 2 (margin, the 2b rule reused verbatim on the full heterogeneous grid) + section 5 (analysis plan / decision rule)",
+    "margin_success_gap_le": 0.05,
+    "success_adaptive": 0.75,
+    "success_gap_static_minus_adaptive": -0.3333,
+    "success_leg_holds": true,
+    "success_static": 0.4167
+  },
+  "denominators": {
+    "defect_bearing_adaptive": 7,
+    "defect_bearing_static": 7,
+    "n_cells_adaptive": 12,
+    "n_cells_static": 12,
+    "n_dropped": 0,
+    "n_not_run": 0,
+    "note": "absent-defective is a DESIGNED analyzer/graph-down cell (preregistration section 1 denominator discipline) \u2014 flagged, never dropped."
+  },
+  "flags": {
+    "construction_failures": [
+      {
+        "cell_id": "cap2c_incorrect_adaptive_r1",
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ]
+      },
+      {
+        "cell_id": "cap2c_incorrect_adaptive_r2",
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ]
+      },
+      {
+        "cell_id": "cap2c_incorrect_static_r1",
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ]
+      },
+      {
+        "cell_id": "cap2c_incorrect_static_r2",
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ]
+      }
+    ],
+    "flagged_cells": [
+      "cap2c_competing_adaptive_r1",
+      "cap2c_competing_adaptive_r2",
+      "cap2c_incorrect_adaptive_r1",
+      "cap2c_incorrect_adaptive_r2",
+      "cap2c_incorrect_static_r1",
+      "cap2c_incorrect_static_r2"
+    ],
+    "n_flagged_cells": 6,
+    "outcome_audit_corrections": [
+      {
+        "cell_id": "cap2c_competing_adaptive_r1",
+        "evidence": [
+          "label-agnostic boundary check on immutable final commit: 10-edge correct=True, 20-edge correct=True"
+        ]
+      },
+      {
+        "cell_id": "cap2c_competing_adaptive_r2",
+        "evidence": [
+          "label-agnostic boundary check on immutable final commit: 10-edge correct=True, 20-edge correct=True"
+        ]
+      }
+    ]
+  },
+  "harm_table": {
+    "per_cell": [
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_absent-clean_adaptive_r1",
+        "class": "absent",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_absent-clean_static_r1",
+        "class": "absent",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_absent-defective_adaptive_r1",
+        "class": "absent",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_absent-defective_static_r1",
+        "class": "absent",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_competing_adaptive_r1",
+        "class": "competing",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_competing_adaptive_r2",
+        "class": "competing",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_competing_static_r1",
+        "class": "competing",
+        "escaped_defect_count": 2,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.092218,
+        "wrong_continue_usd_28": 0.225176
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_competing_static_r2",
+        "class": "competing",
+        "escaped_defect_count": 2,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.092218,
+        "wrong_continue_usd_28": 0.225176
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_correct_adaptive_r1",
+        "class": "correct",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_correct_adaptive_r2",
+        "class": "correct",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_correct_static_r1",
+        "class": "correct",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_correct_static_r2",
+        "class": "correct",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_incorrect_adaptive_r1",
+        "class": "incorrect",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_incorrect_adaptive_r2",
+        "class": "incorrect",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_incorrect_static_r1",
+        "class": "incorrect",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_incorrect_static_r2",
+        "class": "incorrect",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_irrelevant_adaptive_r1",
+        "class": "irrelevant",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_irrelevant_adaptive_r2",
+        "class": "irrelevant",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_irrelevant_static_r1",
+        "class": "irrelevant",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_irrelevant_static_r2",
+        "class": "irrelevant",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_unseen_family_adaptive_r1",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "adaptive",
+        "cell_id": "cap2c_unseen_family_adaptive_r2",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_unseen_family_static_r1",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "static",
+        "cell_id": "cap2c_unseen_family_static_r2",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      }
+    ],
+    "wrong_apply": {
+      "note": "wrong-apply = measured pass delta (adaptive cell cost minus matched static). In this campaign the only constructible false-positive is the verify pass; the incorrect-class construction failed to emit verify (risk 0.19 < 0.2) so NO verify pass was ever applied -> wrong-apply harm = $0 measured (the pre-registered filter-strength statement, \u00a71 component 1).",
+      "total_usd_measured": 0.0
+    },
+    "wrong_continue": {
+      "at_E_x_11": {
+        "per_escaped_defect_usd": 0.046109,
+        "total_escaped_defects": 12,
+        "total_usd": 0.553311
+      },
+      "at_E_x_28": {
+        "per_escaped_defect_usd": 0.112588,
+        "total_escaped_defects": 12,
+        "total_usd": 1.351056
+      },
+      "note": "wrong-continue = E_x x base_downstream_defect_cost ($0.004021); E_x 11.4671 measured (sol, n=1), E_x 28 sourced \u2014 sensitivity reported."
+    }
+  },
+  "join_validation": {
+    "invalid_cells": [],
+    "n_cells": 24,
+    "n_invalid": 0,
+    "n_table_rows": 24,
+    "note": "a cell scored under a different arm/class than its pre-registered assignment is invalid, not corrected",
+    "per_cell": [
+      {
+        "cell_id": "cap2c_absent-clean_adaptive_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_absent-clean_static_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_absent-defective_adaptive_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_absent-defective_static_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_competing_adaptive_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_competing_adaptive_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_competing_static_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_competing_static_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_correct_adaptive_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_correct_adaptive_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_correct_static_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_correct_static_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_incorrect_adaptive_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_incorrect_adaptive_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_incorrect_static_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_incorrect_static_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_irrelevant_adaptive_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_irrelevant_adaptive_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_irrelevant_static_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_irrelevant_static_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_unseen_family_adaptive_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_unseen_family_adaptive_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_unseen_family_static_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2c_unseen_family_static_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      }
+    ],
+    "valid": true
+  },
+  "outcome_definition": "accepted per cell = independent runtime pytest on the immutable final commit AND the post-hoc evaluator's defect determination on the same commit; competing additionally requires BOTH defects absent",
+  "per_arm": {
+    "adaptive": {
+      "accepted_outcomes": 9,
+      "arm": "adaptive",
+      "cpvo_ci_95": [
+        0.011164,
+        0.015193
+      ],
+      "cpvo_usd": 0.012957,
+      "escaped_defect_count": 3,
+      "n": 12,
+      "total_cost_usd": 0.116615,
+      "verified_success_rate": 0.75,
+      "verified_success_wilson_95": [
+        0.4677,
+        0.9111
+      ]
+    },
+    "static": {
+      "accepted_outcomes": 5,
+      "arm": "static",
+      "cpvo_ci_95": [
+        0.016101,
+        0.025406
+      ],
+      "cpvo_usd": 0.019822,
+      "escaped_defect_count": 9,
+      "n": 12,
+      "total_cost_usd": 0.099112,
+      "verified_success_rate": 0.4167,
+      "verified_success_wilson_95": [
+        0.1933,
+        0.6805
+      ]
+    }
+  },
+  "per_cell": [
+    {
+      "accepted": true,
+      "application_proof": "no proposal emitted (seam refused) -> provable null application; the refusal is the abstention case.",
+      "applied_or_null": "null",
+      "arm": "adaptive",
+      "cell_id": "cap2c_absent-clean_adaptive_r1",
+      "class": "absent",
+      "cost_usd": 0.007367,
+      "cpvo_cell_usd": 0.007367,
+      "defect_note": "clean change \u2014 no defect (the refusal is value-preserving)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "null",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_absent-clean_adaptive_r1",
+        "class": "absent",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "2/2"
+      },
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "proposal_depth": null,
+      "proposal_id": null,
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "clean"
+    },
+    {
+      "accepted": true,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_absent-clean_static_r1",
+      "class": "absent",
+      "cost_usd": 0.006992,
+      "cpvo_cell_usd": 0.006992,
+      "defect_note": "clean change \u2014 no defect (the refusal is value-preserving)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_absent-clean_static_r1",
+        "class": "absent",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "2/2"
+      },
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "proposal_depth": null,
+      "proposal_id": null,
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "clean"
+    },
+    {
+      "accepted": false,
+      "application_proof": "no proposal emitted (seam refused) -> provable null application; the refusal is the abstention case.",
+      "applied_or_null": "null",
+      "arm": "adaptive",
+      "cell_id": "cap2c_absent-defective_adaptive_r1",
+      "class": "absent",
+      "cost_usd": 0.007321,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: wrong-operation (wrong_op returns a+b not a-b) present (escaped \u2014 the seam refused)",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "null",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_absent-defective_adaptive_r1",
+        "class": "absent",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": true,
+        "tests": "2/2"
+      },
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "proposal_depth": null,
+      "proposal_id": null,
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "defective"
+    },
+    {
+      "accepted": false,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_absent-defective_static_r1",
+      "class": "absent",
+      "cost_usd": 0.007394,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: wrong-operation (wrong_op returns a+b not a-b) present (escaped \u2014 the seam refused)",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_absent-defective_static_r1",
+        "class": "absent",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": true,
+        "tests": "2/2"
+      },
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "proposal_depth": null,
+      "proposal_id": null,
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "defective"
+    },
+    {
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 04eb7be78f58e874b48fcdf3c35bf6d35a666cea",
+      "applied_or_null": "applied",
+      "arm": "adaptive",
+      "cell_id": "cap2c_competing_adaptive_r1",
+      "class": "competing",
+      "cost_usd": 0.016449,
+      "cpvo_cell_usd": 0.016449,
+      "defect_note": "family: boundary-compare x2 ([10,20) inverted boundary, [20,30) inverted boundary) present on the final commit",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "applied",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_competing_adaptive_r1",
+        "class": "competing",
+        "differs": true,
+        "evidence": [
+          "label-agnostic boundary check on immutable final commit: 10-edge correct=True, 20-edge correct=True"
+        ],
+        "recorded_defect_present": true,
+        "tests": "3/3"
+      },
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "dcab238a871b9bd9",
+      "repetition": "r1",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit d550447bb2369fe1786c23df39a5ed2d5a594344",
+      "applied_or_null": "applied",
+      "arm": "adaptive",
+      "cell_id": "cap2c_competing_adaptive_r2",
+      "class": "competing",
+      "cost_usd": 0.014164,
+      "cpvo_cell_usd": 0.014164,
+      "defect_note": "family: boundary-compare x2 ([10,20) inverted boundary, [20,30) inverted boundary) present on the final commit",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "applied",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_competing_adaptive_r2",
+        "class": "competing",
+        "differs": true,
+        "evidence": [
+          "label-agnostic boundary check on immutable final commit: 10-edge correct=True, 20-edge correct=True"
+        ],
+        "recorded_defect_present": true,
+        "tests": "3/3"
+      },
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "2efbc48f21a79f28",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "accepted": false,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_competing_static_r1",
+      "class": "competing",
+      "cost_usd": 0.009196,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: boundary-compare x2 ([10,20) inverted boundary, [20,30) inverted boundary) present on the final commit",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 2,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.092218,
+      "harm_28": 0.225176,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_competing_static_r1",
+        "class": "competing",
+        "differs": false,
+        "evidence": [
+          "label-agnostic boundary check on immutable final commit: 10-edge correct=False, 20-edge correct=False"
+        ],
+        "recorded_defect_present": true,
+        "tests": "2/3"
+      },
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "24c29efeca4ce752",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "accepted": false,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_competing_static_r2",
+      "class": "competing",
+      "cost_usd": 0.009459,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: boundary-compare x2 ([10,20) inverted boundary, [20,30) inverted boundary) present on the final commit",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 2,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.092218,
+      "harm_28": 0.225176,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_competing_static_r2",
+        "class": "competing",
+        "differs": false,
+        "evidence": [
+          "label-agnostic boundary check on immutable final commit: 10-edge correct=False, 20-edge correct=False"
+        ],
+        "recorded_defect_present": true,
+        "tests": "2/3"
+      },
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "8effe59790e8e827",
+      "repetition": "r2",
+      "slot": 2,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "E4 adaptive-arm measurement of the correct class per the pre-registered assignment table (docs/designs/current/cap_adaptive_2c_preregistration.md section 4, cell cap2c_correct_adaptive_r1, slot 1). The proposal emitted and validated: rework",
+      "applied_or_null": "applied",
+      "arm": "adaptive",
+      "cell_id": "cap2c_correct_adaptive_r1",
+      "class": "correct",
+      "cost_usd": 0.015853,
+      "cpvo_cell_usd": 0.015853,
+      "defect_note": "test_executed_success = true (3/3) on the final commit 3afd822 (independent runtime pytest) \u2014 the implement-phase test gate failed (2/3, boundary defect present) as constructed; the applied rework fixed the [10,20) boundary and the final commit passes.",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "applied",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_correct_adaptive_r1",
+        "class": "correct",
+        "differs": false,
+        "evidence": [
+          "rework applied \u2014 boundary-checked on the immutable final commit"
+        ],
+        "recorded_defect_present": false,
+        "tests": "3/3"
+      },
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "dbc3e5a7da98141b",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit af0f7bc4f0101bd2fd89d602a44d53604aeeaa99",
+      "applied_or_null": "applied",
+      "arm": "adaptive",
+      "cell_id": "cap2c_correct_adaptive_r2",
+      "class": "correct",
+      "cost_usd": 0.011078,
+      "cpvo_cell_usd": 0.011078,
+      "defect_note": "boundary-compare defect absent",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "applied",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_correct_adaptive_r2",
+        "class": "correct",
+        "differs": false,
+        "evidence": [
+          "rework applied \u2014 boundary-checked on the immutable final commit"
+        ],
+        "recorded_defect_present": false,
+        "tests": "3/3"
+      },
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "3d3433ea3dec852c",
+      "repetition": "r2",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "accepted": false,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_correct_static_r1",
+      "class": "correct",
+      "cost_usd": 0.009957,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: boundary-compare ([10,20) inverted boundary) present",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_correct_static_r1",
+        "class": "correct",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": true,
+        "tests": "2/3"
+      },
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "cdae9978c6af6ef0",
+      "repetition": "r1",
+      "slot": 3,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "accepted": false,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_correct_static_r2",
+      "class": "correct",
+      "cost_usd": 0.012018,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: boundary-compare ([10,20) inverted boundary) present",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_correct_static_r2",
+        "class": "correct",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": true,
+        "tests": "2/3"
+      },
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "96332d8e53aac0e4",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "adaptive",
+      "cell_id": "cap2c_incorrect_adaptive_r1",
+      "class": "incorrect",
+      "cost_usd": 0.00913,
+      "cpvo_cell_usd": 0.00913,
+      "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [
+        "construction-failure: expected proposal verify, got continue"
+      ],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "null",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_incorrect_adaptive_r1",
+        "class": "incorrect",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "2/2"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "45636b9729a527ad",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "adaptive",
+      "cell_id": "cap2c_incorrect_adaptive_r2",
+      "class": "incorrect",
+      "cost_usd": 0.00923,
+      "cpvo_cell_usd": 0.00923,
+      "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [
+        "construction-failure: expected proposal verify, got continue"
+      ],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "null",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_incorrect_adaptive_r2",
+        "class": "incorrect",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "2/2"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "454cb6252066fcdd",
+      "repetition": "r2",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_incorrect_static_r1",
+      "class": "incorrect",
+      "cost_usd": 0.009124,
+      "cpvo_cell_usd": 0.009124,
+      "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [
+        "construction-failure: expected proposal verify, got continue"
+      ],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_incorrect_static_r1",
+        "class": "incorrect",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "2/2"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "dffcc066c4ef18aa",
+      "repetition": "r1",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_incorrect_static_r2",
+      "class": "incorrect",
+      "cost_usd": 0.009173,
+      "cpvo_cell_usd": 0.009173,
+      "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [
+        "construction-failure: expected proposal verify, got continue"
+      ],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_incorrect_static_r2",
+        "class": "incorrect",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "2/2"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "e193ef337b6c4dbe",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "adaptive",
+      "cell_id": "cap2c_irrelevant_adaptive_r1",
+      "class": "irrelevant",
+      "cost_usd": 0.008825,
+      "cpvo_cell_usd": 0.008825,
+      "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "null",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_irrelevant_adaptive_r1",
+        "class": "irrelevant",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "3/3"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "7aa00f44ac03bc7c",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "adaptive",
+      "cell_id": "cap2c_irrelevant_adaptive_r2",
+      "class": "irrelevant",
+      "cost_usd": 0.009172,
+      "cpvo_cell_usd": 0.009172,
+      "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "null",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_irrelevant_adaptive_r2",
+        "class": "irrelevant",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "3/3"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "df33bb7cc52d1693",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_irrelevant_static_r1",
+      "class": "irrelevant",
+      "cost_usd": 0.009082,
+      "cpvo_cell_usd": 0.009082,
+      "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_irrelevant_static_r1",
+        "class": "irrelevant",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "3/3"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "19f934ad2c6437ea",
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "accepted": true,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_irrelevant_static_r2",
+      "class": "irrelevant",
+      "cost_usd": 0.008863,
+      "cpvo_cell_usd": 0.008863,
+      "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": false,
+        "cell_id": "cap2c_irrelevant_static_r2",
+        "class": "irrelevant",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": false,
+        "tests": "3/3"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "ec23bbef481ffe4c",
+      "repetition": "r2",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "accepted": false,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "adaptive",
+      "cell_id": "cap2c_unseen_family_adaptive_r1",
+      "class": "unseen_family",
+      "cost_usd": 0.00389,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "null",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_unseen_family_adaptive_r1",
+        "class": "unseen_family",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": true,
+        "tests": "2/3"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 0,
+      "proposal_id": "2b2ddd04e11851a8",
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "accepted": false,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "adaptive",
+      "cell_id": "cap2c_unseen_family_adaptive_r2",
+      "class": "unseen_family",
+      "cost_usd": 0.004136,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "null",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_unseen_family_adaptive_r2",
+        "class": "unseen_family",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": true,
+        "tests": "2/3"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 0,
+      "proposal_id": "8a05d557a51a3d5e",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "accepted": false,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_unseen_family_static_r1",
+      "class": "unseen_family",
+      "cost_usd": 0.003805,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_unseen_family_static_r1",
+        "class": "unseen_family",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": true,
+        "tests": "2/3"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 0,
+      "proposal_id": "0fa8d029d3beab4b",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "accepted": false,
+      "application_proof": "static arm: proposal recorded, NEVER applied.",
+      "applied_or_null": "not_applicable",
+      "arm": "static",
+      "cell_id": "cap2c_unseen_family_static_r2",
+      "class": "unseen_family",
+      "cost_usd": 0.004049,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "outcome_audit": {
+        "applied_or_null": "not_applicable",
+        "audited_defect_present": true,
+        "cell_id": "cap2c_unseen_family_static_r2",
+        "class": "unseen_family",
+        "differs": false,
+        "evidence": [],
+        "recorded_defect_present": true,
+        "tests": "2/3"
+      },
+      "proposal_action": "continue",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 0,
+      "proposal_id": "d8b7388d798a70ff",
+      "repetition": "r2",
+      "slot": 3,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    }
+  ],
+  "per_class": {
+    "absent": {
+      "adaptive": {
+        "accepted_outcomes": 1,
+        "cpvo_usd": 0.014688,
+        "escaped_defect_count": 1,
+        "flags": [],
+        "harm_11": 0.046109,
+        "harm_28": 0.112588,
+        "n": 2,
+        "total_cost_usd": 0.014688,
+        "verified_success_rate": 0.5
+      },
+      "static": {
+        "accepted_outcomes": 1,
+        "cpvo_usd": 0.014386,
+        "escaped_defect_count": 1,
+        "flags": [],
+        "harm_11": 0.046109,
+        "harm_28": 0.112588,
+        "n": 2,
+        "total_cost_usd": 0.014386,
+        "verified_success_rate": 0.5
+      }
+    },
+    "competing": {
+      "adaptive": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.015306,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.030613,
+        "verified_success_rate": 1.0
+      },
+      "static": {
+        "accepted_outcomes": 0,
+        "cpvo_usd": null,
+        "escaped_defect_count": 4,
+        "flags": [],
+        "harm_11": 0.184436,
+        "harm_28": 0.450352,
+        "n": 2,
+        "total_cost_usd": 0.018655,
+        "verified_success_rate": 0.0
+      }
+    },
+    "correct": {
+      "adaptive": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.013465,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.026931,
+        "verified_success_rate": 1.0
+      },
+      "static": {
+        "accepted_outcomes": 0,
+        "cpvo_usd": null,
+        "escaped_defect_count": 2,
+        "flags": [],
+        "harm_11": 0.092218,
+        "harm_28": 0.225176,
+        "n": 2,
+        "total_cost_usd": 0.021975,
+        "verified_success_rate": 0.0
+      }
+    },
+    "incorrect": {
+      "adaptive": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.00918,
+        "escaped_defect_count": 0,
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.01836,
+        "verified_success_rate": 1.0
+      },
+      "static": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.009149,
+        "escaped_defect_count": 0,
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.018297,
+        "verified_success_rate": 1.0
+      }
+    },
+    "irrelevant": {
+      "adaptive": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.008998,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.017997,
+        "verified_success_rate": 1.0
+      },
+      "static": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.008972,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.017945,
+        "verified_success_rate": 1.0
+      }
+    },
+    "unseen_family": {
+      "adaptive": {
+        "accepted_outcomes": 0,
+        "cpvo_usd": null,
+        "escaped_defect_count": 2,
+        "flags": [],
+        "harm_11": 0.092218,
+        "harm_28": 0.225176,
+        "n": 2,
+        "total_cost_usd": 0.008026,
+        "verified_success_rate": 0.0
+      },
+      "static": {
+        "accepted_outcomes": 0,
+        "cpvo_usd": null,
+        "escaped_defect_count": 2,
+        "flags": [],
+        "harm_11": 0.092218,
+        "harm_28": 0.225176,
+        "n": 2,
+        "total_cost_usd": 0.007854,
+        "verified_success_rate": 0.0
+      }
+    }
+  },
+  "phase": "p3_score",
+  "preregistration": "docs/designs/current/cap_adaptive_2c_preregistration.md",
+  "preregistration_revision": "104a8eade91c8b77849d9db5fcd0f1e99d7925ad",
+  "schema_version": "cap_adaptive_2c_score/v1",
+  "score_input_artifacts": [
+    {
+      "path": "experiments/results/cap_adaptive_2c/p2_execution_manifest.json",
+      "role": "the pre-registered assignment table (section 4)"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2c/p1_cell_manifest.json",
+      "role": "E4 (cap2c_correct_adaptive_r1) p1 measurement"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2c/p1_phase_ledger.json",
+      "role": "E4 phase ledger"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2c/cells",
+      "role": "p2 per-cell records (23 cells)"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2c/proposals",
+      "role": "durable proposal records (confidence-carrying)"
+    }
+  ],
+  "scored_at": "20260827T180241Z",
+  "seed": "92983f6f06f8b5a13d24ecfae87aac5b6f707b780e716a5bf434a244c3e0f252",
+  "spec_id": "cap_adaptive_2c@0.1"
+}

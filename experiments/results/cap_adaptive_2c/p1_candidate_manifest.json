@@ -1,0 +1,46 @@
+{
+  "schema_version": "cap_adaptive_2c_candidate_manifest/v1",
+  "campaign": "cap_adaptive_2c",
+  "phase": "p1_measure_one",
+  "written_at": "2026-08-27T15:31:40Z",
+  "source_baseline_revision": "104a8eade91c8b77849d9db5fcd0f1e99d7925ad",
+  "preregistration": "docs/designs/current/cap_adaptive_2c_preregistration.md",
+  "preregistration_commit": "104a8eade91c8b77849d9db5fcd0f1e99d7925ad",
+  "assignment_row": {
+    "cell_id": "cap2c_correct_adaptive_r1",
+    "block": "correct",
+    "arm": "adaptive",
+    "repetition": "r1",
+    "slot": 1
+  },
+  "target_model": "deepseek/deepseek-v4-pro",
+  "target_backend": "opencode",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "candidates": [
+    {
+      "candidate_id": "c1_correct_adaptive_r1",
+      "cell_id": "cap2c_correct_adaptive_r1",
+      "class": "correct",
+      "arm": "adaptive",
+      "repetition": "r1",
+      "path": "workflows/operations/cap_2a_cell_critical.yaml",
+      "path_sha256": "6ecb2bd93e8718c8c42382f648e859672c649de761e46ba74c2d7a460721e4d7",
+      "spec_id": "cap_2a_cell_critical@0.1",
+      "goal": "add a classifier function with a deep nested decision tree containing one real boundary defect (to the calc app)",
+      "goal_sha256": "dca20cf53555f15499f0afa5dc3df2241143b65279840d8609f6ab054096c5d7",
+      "model": "deepseek/deepseek-v4-pro",
+      "backend": "opencode",
+      "seeded_app_worktree": "/tmp/cap2c_correct_adaptive_r1",
+      "finops_cell_id": "cap2c_correct_adaptive_r1",
+      "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+      "forecast_cost_usd": null,
+      "forecast_note": "FORECAST - p1 is the first 2c measurement. The prior is the 2b critical-gate adaptive cell ($0.016855 = 0.01268 run + 0.004175 rework pass, score JSON cap_2b_score_20260826T160018Z.json per_cell cap2b_critical_adaptive_r1), recorded as an informative prior only. The forecast per-cell budget (measured x 2, labeled FORECAST) is set after this run in the p1 phase ledger.",
+      "expected_realized_class": "rework",
+      "note": "E4 discipline: p1 measures ONE cell per the pre-registered assignment table (docs/designs/current/cap_adaptive_2c_preregistration.md section 4) - the correct-class adaptive arm first: cap2c_correct_adaptive_r1 (slot 1). Correct = the 2b-critical shape (S3776 complex-method + one inverted boundary defect); expected proposal rework/depth 3. Adaptive arm: proposal APPLIED exactly as proposed (rework = ONE bounded pass over the proposal scope, provable [workflow] rework commit). The proposal MUST emit (a refusal here is a seam regression - the absent class is a DIFFERENT cell, constructed to refuse). The proposal record MUST carry the measured confidence field (pre-registration section 7), recorded BEFORE the outcome."
+    }
+  ],
+  "selection": {
+    "chosen": "c1_correct_adaptive_r1",
+    "reason": "p1 is the E4 measurement: the first adaptive-arm cell in the pre-registered assignment table (cap2c_correct_adaptive_r1, correct class, slot 1). The correct class is the only cell whose proposal must emit rework on a real defect (the baseline for the boundary campaign); the adaptive arm applies it as ONE bounded pass. No other cell runs until p1's measured cost + FORECAST budget are committed."
+  }
+}
