@@ -1,6 +1,6 @@
 # Visual approval — site revamp4 diagrams (repair + craft)
 
-**Status: AWAITING OPERATOR VISUAL APPROVAL — campaign halted, no deploy.**
+**Status: REJECTED by operator review (2026-08-27) — the craft still misses: "it's not really better, it has a lot of visual problems." No deploy.**
 
 Hard rule 5: the repaired build is not deployed until the operator visually
 approves it. Review the screenshots in this directory (and the per-figure table
@@ -49,7 +49,7 @@ rendering table, and I approve deploying this build to BOTH Firebase hosts.
 Decision (check one):
   [ ] APPROVE  — proceed to deploy (firebase deploy --only hosting
                  and firebase deploy --only hosting --project agentic-dynamics)
-  [ ] REJECT   — do not deploy; changes requested below
+  [x] REJECT   — do not deploy; changes requested below
 
 Operator name:   ______________________________________
 Role / title:    ______________________________________
