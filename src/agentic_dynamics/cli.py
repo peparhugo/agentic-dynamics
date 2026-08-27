@@ -33,6 +33,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("story", "batch"): "batch_stories.py",
     # workflow
     ("workflow", "run"): "run_workflow.py",
+    ("workflow", "discard-tree"): "record_discarded_tree.py",
     # queue
     ("queue", "enqueue"): "enqueue.py",
     ("queue", "worker"): "worker.py",
@@ -100,7 +101,7 @@ Subcommands (each forwards to its backing script):
 
   experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase
   story       run|batch
-  workflow    run
+  workflow    run|discard-tree
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
   analyze     worktrees|trajectories|stories|session-routing|lab <name>
   data        build|sync|manifest|inventory

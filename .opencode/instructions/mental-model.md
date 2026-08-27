@@ -398,7 +398,7 @@ each subcommand forwards argv to its backing script; the CLI composes, never re-
 agentic-dynamics
 ├─ experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase
 ├─ story       run|batch
-├─ workflow    run
+├─ workflow    run|discard-tree
 ├─ queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
 ├─ analyze     worktrees|trajectories|stories|lab <name>
 ├─ data        build|sync|manifest|inventory
@@ -407,7 +407,7 @@ agentic-dynamics
 ├─ review      all|stories|trigger|enqueue|finalize
 ├─ spec        status|pipeline
 ├─ validate    session|tests
-└─ supervise   [claude-agents]
+└─ supervise   [claude-agents|orphans]
 ```
 
 ## Navigation
