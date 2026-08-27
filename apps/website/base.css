@@ -698,6 +698,24 @@ svg[viewBox]{max-width:100%;height:auto}
 .diagram-map .map-ground{fill:var(--bg);stroke:var(--ba);stroke-width:1}
 .diagram-map .map-grid{fill:url(#diagram-grid);opacity:.72}
 .diagram-map .map-kicker{fill:var(--ac);font:700 11px 'JetBrains Mono',monospace;letter-spacing:.18em}
+
+/* --- Dark-theme diagram contrast (operator review: the figures read as black
+   boxes — the surfaces used --bg2 (#0b111a) on the --bg page (#070A0F), a
+   ~1.05:1 boundary. Bump the surfaces + borders so the boxes are legible on
+   the dark theme; the light theme keeps its existing palette.) --- */
+body:not(.light) .diagram-map .mode-surface,
+body:not(.light) .diagram-map .rail,
+body:not(.light) .diagram-map .human-surface,
+body:not(.light) .diagram-map .mode-tab,
+body:not(.light) .diagram-map .outcome-surface,
+body:not(.light) .diagram-map .workflow-node,
+body:not(.light) .diagram-map .plane-surface{
+  fill:var(--bg3);
+  stroke:rgba(148,163,184,0.5);
+}
+body:not(.light) .diagram-map .human-surface{stroke:rgba(245,158,11,0.7)}
+body:not(.light) .diagram-map .outcome-surface{stroke:rgba(34,211,238,0.7)}
+
 /* Light-theme diagram accent contrast (WCAG AA on light surfaces):
    the accent text fills above are var(--ac)/var(--cy)/var(--am), which in
    light mode are mid-tone (3.3-3.9:1 on white — below AA). These overrides
