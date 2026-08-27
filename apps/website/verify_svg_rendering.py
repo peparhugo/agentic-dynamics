@@ -48,7 +48,6 @@ import argparse
 import asyncio
 import functools
 import json
-import os
 import sys
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -357,7 +356,7 @@ def _evaluate(svg, viewport):
         for f in cfails[:4]:
             parts.append(f"{f['t'][:28]!r}@"
                          + (f"{f['ratio']:.2f}:1" if f["ratio"] else "invisible"))
-        fails.append(f"CONTRAST " + "; ".join(parts))
+        fails.append("CONTRAST " + "; ".join(parts))
     elif contrast.get("min") is not None and contrast["min"] < CONTRAST_MIN:
         fails.append(f"CONTRAST min {contrast['min']:.2f}:1 < {CONTRAST_MIN:.1f}:1")
 
