@@ -1,0 +1,155 @@
+{
+  "schema_version": "cap_adaptive_2c_p1_ledger/v1",
+  "campaign": "cap_adaptive_2c",
+  "phase": "p1_measure_one",
+  "written_at": "2026-08-27T15:37:30Z",
+  "cell_id": "cap2c_correct_adaptive_r1",
+  "class": "correct",
+  "arm": "adaptive",
+  "repetition": "r1",
+  "spec_id": "cap_2a_cell_critical@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "ok": true,
+  "candidate_manifest": "experiments/results/cap_adaptive_2c/p1_candidate_manifest.json",
+  "candidate_manifest_sha256": "5bdc4e64de147aa9829385c2440ae7a5d82b091b2e24ba18792a3ba33967b4c5",
+  "source_baseline_revision": "104a8eade91c8b77849d9db5fcd0f1e99d7925ad",
+  "preregistration_commit": "104a8eade91c8b77849d9db5fcd0f1e99d7925ad",
+  "seeded_app_worktree": "/tmp/cap2c_correct_adaptive_r1",
+  "seeded_app_seed_revision": "d92ec7ea5817702e730345503f46d572145c93a2",
+  "run_ledger": "experiments/results/workflows/cap_2a_cell_critical/20260827T153455Z.json",
+  "run_ledger_sha256": "e08be4e006e4b7ad8205960c0fc306e22ffda75235e7f02e2713a3dc4417620e",
+  "analyzer_reachability": {
+    "graph": {
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "reachable": true,
+      "uri": "bolt://localhost:7687"
+    },
+    "lsp": {
+      "reachable": true,
+      "status": "available",
+      "tool": "mypy",
+      "version": "2.3.1"
+    },
+    "sonar": {
+      "reachable": true,
+      "server": "http://localhost:9000 (UP)",
+      "status": "available"
+    }
+  },
+  "phases": [
+    {
+      "phase": "implement",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "1481b9d",
+      "baseline_revision": "d92ec7ea5817702e730345503f46d572145c93a2",
+      "analyzed_revision": "1481b9d5a3459c33aceba8097789f9d5fa99679d",
+      "cost_usd": 0.0120147,
+      "duration_s": 123.31,
+      "confidence": 0.6667,
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 4,
+      "lsp_analysis_status": "available",
+      "sonar_analysis_status": "available",
+      "code_change_risk": "0.215",
+      "new_sonar_critical_count": "1",
+      "facts_emitted": [
+        {"predicate": "analysis_revision_matches", "value": "true"},
+        {"predicate": "ast_parse_coverage", "value": "1.0"},
+        {"predicate": "changed_symbol_count", "value": "2"},
+        {"predicate": "changed_symbols_with_tests_ratio", "value": "0.5"},
+        {"predicate": "code_change_risk", "value": "0.215"},
+        {"predicate": "impacted_symbol_count", "value": "4"},
+        {"predicate": "lsp_analysis_status", "value": "available"},
+        {"predicate": "new_lsp_error_count", "value": "0"},
+        {"predicate": "new_sonar_critical_count", "value": "1"},
+        {"predicate": "sonar_analysis_status", "value": "available"}
+      ],
+      "facts_omitted": [],
+      "proposal": "dbc3e5a7da98141b (rework, depth 3, applied=false, confidence 0.6667)",
+      "test_result": "test_executed_success = null (no test_gate on this phase; the independent kind:test phase is next)"
+    },
+    {
+      "phase": "test",
+      "kind": "test",
+      "status": "failed",
+      "cost_usd": 0.0,
+      "duration_s": 0.36,
+      "test_result": "test_executed_success = false (2/3) — test_classify asserts classify(10.0) == \"ten_to_twenty\", got \"twenty_to_thirty\": the injected [10,20) boundary defect is present. The workflow stopped before the verify phase (test gate), exactly the 2b critical-cell shape."
+    },
+    {
+      "phase": "rework",
+      "kind": "agent",
+      "status": "ok",
+      "commit_hash_short": "3afd822",
+      "cost_usd": 0.003838585,
+      "duration_s": 13.104,
+      "confidence": 1.0,
+      "test_result": "the rework agent's own run reported 3/3; the independent runtime pytest on the final commit 3afd822 confirms 3/3.",
+      "note": "ONE bounded pass over the proposal scope: the [10,20) boundary guard changed `value > 10` -> `value >= 10` in classify only; nothing else touched."
+    }
+  ],
+  "proposal_seam_result": {
+    "proposal_id": "dbc3e5a7da98141b",
+    "action": "rework",
+    "depth": 3,
+    "scope": ["add", "classify", "subtract", "test_add", "test_classify", "test_subtract"],
+    "applied": false,
+    "confidence": 0.6667,
+    "schema_version": "verify_code_change_proposal/v1",
+    "contract_version": "verify_code_change/v1",
+    "proposals_emitted": 1,
+    "refused": false,
+    "artifact": "experiments/results/cap_adaptive_2c/proposals/dbc3e5a7da98141b.json",
+    "artifact_sha256": "1655721d042c60041b87c43a929c2c7e99dad0e9741cbf91be20fdb6ba1dd36c",
+    "note": "Emitted from the implement phase's change_analysis facts (new_sonar_critical_count=1, code_change_risk=0.215). has_critical -> action=rework, depth=3. The proposal record carries the measured confidence field 0.6667 ([H] implement-phase execution-confidence, recorded BEFORE the outcome) per pre-registration section 7. Static arm records the same proposal with applied=false; this cell is the ADAPTIVE arm, so the proposal is applied next."
+  },
+  "gate_application": {
+    "applied_or_null": "applied",
+    "action": "rework",
+    "depth": 3,
+    "rework_passes": 1,
+    "rework_commit": "3afd8222e4b9d141a2d8db5f0bd193c199c5ed30",
+    "rework_diff": "diff --git a/calc.py b/calc.py\nindex 5a3460c..61b242d 100644\n--- a/calc.py\n+++ b/calc.py\n@@ -63,7 +63,7 @@ def classify(value):\n                 return \"zero_to_five\"\n             return \"five_to_ten\"\n         # The documented [10, 20) boundary lives here.\n-        if value > 10 and value < 20:\n+        if value >= 10 and value < 20:\n             return \"ten_to_twenty\"",
+    "rework_pass_cost_usd": 0.003838585,
+    "rework_duration_s": 13.104,
+    "proof": "rework proposal APPLIED as ONE bounded rework pass over the proposal scope; commit trail shows a new '[workflow] rework' commit 3afd822 on top of the implement commit 1481b9d.",
+    "commit_trail": [
+      "3afd8222e4b9d141a2d8db5f0bd193c199c5ed30 [workflow] rework",
+      "1481b9d5a3459c33aceba8097789f9d5fa99679d [workflow] implement - add a classifier function with a deep nested decision tree containing one real boundary defect",
+      "d92ec7ea5817702e730345503f46d572145c93a2 seed calc app"
+    ]
+  },
+  "outcome": {
+    "final_revision": "3afd8222e4b9d141a2d8db5f0bd193c199c5ed30",
+    "test_executed_success": true,
+    "tests_passed": 3,
+    "tests_total": 3,
+    "defect_present_on_final_commit": false,
+    "accepted": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit"
+  },
+  "cost": {
+    "run_workflow_usd": 0.0120147,
+    "rework_pass_usd": 0.003838585,
+    "total_usd": 0.015853
+  },
+  "total_measured_cost_breakdown": {
+    "implement": 0.0120147,
+    "test": 0.0,
+    "verify": null,
+    "rework": 0.003838585
+  },
+  "total_measured_cost_usd": 0.015853,
+  "p2_forecast_budget": {
+    "label": "FORECAST",
+    "basis": "p1 measured adaptive-arm cost x 2 headroom",
+    "measured_cost_usd": 0.015853,
+    "forecast_per_cell_usd": 0.031707,
+    "note": "FORECAST, not measured. p2 must report each later cell's forecast and actual cost separately. The p1 measured cost ($0.015853 = implement $0.0120147 + rework $0.003838585, correct-class adaptive) is the first 2c measurement and sits within the 2b critical-adaptive prior ($0.016855); the per-cell budget is its 2x headroom. This forecast applies to the remaining 23 cells until any p2 measurement revises it."
+  }
+}
