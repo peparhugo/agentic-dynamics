@@ -1190,9 +1190,9 @@ All cost values measured directly from provider API responses via the openCode d
       </defs>
       <rect x="20" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#287271" stroke-width="1.5"/><text x="120" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:700" fill="currentColor">0 / 3</text><text x="120" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">initial calibration</text><text x="120" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">n=3</text>
       <path d="M220 90H260" stroke="#287271" stroke-width="2" marker-end="url(#calArrow)"/>
-      <rect x="260" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#9b6a28" stroke-width="1.5"/><text x="360" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:700" fill="currentColor">2 / 3</text><text x="360" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">rerun · Wilson [0.2077, 0.9385]</text><text x="360" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">n=3 · descriptive</text>
+      <rect x="260" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#9b6a28" stroke-width="1.5"/><text x="360" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:700" fill="currentColor"><tspan id="cal-rerun">2 / 3</tspan></text><text x="360" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">rerun · Wilson [<tspan id="cal-wilson-lo">0.2077</tspan>, <tspan id="cal-wilson-hi">0.9385</tspan>]</text><text x="360" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">n=3 · descriptive</text>
       <path d="M460 90H500" stroke="#287271" stroke-width="2" marker-end="url(#calArrow)"/>
-      <rect x="500" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#8a2f2f" stroke-width="2"/><text x="600" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:700" fill="currentColor">2b NON-INFERIOR</text><text x="600" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">CPVO ratio [0.6842, 0.9105]</text><text x="600" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">authorizes design review only</text>
+      <rect x="500" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#8a2f2f" stroke-width="2"/><text x="600" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:700" fill="currentColor">2b NON-INFERIOR</text><text x="600" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">CPVO ratio [<tspan id="cal-cpvo-lo">0.6842</tspan>, <tspan id="cal-cpvo-hi">0.9105</tspan>]</text><text x="600" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">authorizes design review only</text>
     </svg>
     <figcaption>Figure E2. The calibration arc — 0/3 initial, 2/3 rerun (Wilson [0.2077, 0.9385], n=3), then the 2b decision. Each panel names its n and interval; the final label states its authorization boundary.</figcaption>
     <div class="fig-legend"><span class="ev-badge c">[C] over [M]</span><span>ref: scroll-sticky-overlay.html, d3-line-arc.html</span></div>
@@ -2062,6 +2062,32 @@ document.addEventListener('DOMContentLoaded', function () {
       setIf('cap2b-adaptive-cpvo', '$' + (+a.cpvo_usd).toFixed(6));
       setIf('cap2b-adaptive-ok', a.accepted_outcomes + '/' + a.n);
     }
+    // calibration-arc 2b panel mirrors the same decision fields
+    if (dr.cpvo_ratio_ci_95) { setIf('cal-cpvo-lo', dr.cpvo_ratio_ci_95[0]); setIf('cal-cpvo-hi', dr.cpvo_ratio_ci_95[1]); }
+  }
+  if (v.escalation) {
+    var e = v.escalation;
+    if (e.baseline_cost_usd !== null && e.baseline_cost_usd !== undefined)
+      setIf('esc-baseline', '$' + (+e.baseline_cost_usd).toFixed(6));
+    var rows = e.per_model || [];
+    for (var ei = 0; ei < rows.length; ei++) {
+      var r = rows[ei];
+      if (!r || !r.model) continue;
+      if (r.model.indexOf('sol') !== -1) {
+        if (r.fix_cost_usd !== null && r.fix_cost_usd !== undefined)
+          setIf('esc-sol-cost', '$' + (+r.fix_cost_usd).toFixed(6));
+        if (r.E_x !== null && r.E_x !== undefined) setIf('esc-sol-ex', String(r.E_x));
+      } else if (r.model.indexOf('sonnet') !== -1) {
+        if (r.fix_cost_usd !== null && r.fix_cost_usd !== undefined)
+          setIf('esc-sonnet-cost', '$' + (+r.fix_cost_usd).toFixed(6));
+        if (r.E_x !== null && r.E_x !== undefined) setIf('esc-sonnet-ex', String(r.E_x));
+      }
+    }
+  }
+  if (v.calibration) {
+    var cal = v.calibration;
+    if (cal.rerun_n) setIf('cal-rerun', cal.rerun_hit_rate + ' / ' + cal.rerun_n);
+    if (cal.rerun_wilson_95) { setIf('cal-wilson-lo', cal.rerun_wilson_95[0]); setIf('cal-wilson-hi', cal.rerun_wilson_95[1]); }
   }
 })();
 </script>
