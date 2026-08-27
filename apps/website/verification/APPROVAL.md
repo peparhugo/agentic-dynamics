@@ -62,15 +62,15 @@ approve deploying this build to BOTH Firebase hosts.
 
 ```
 Decision (check one):
-  [ ] APPROVE  — proceed to deploy (firebase deploy --only hosting
+  [x] APPROVE  — proceed to deploy (firebase deploy --only hosting
                  and firebase deploy --only hosting --project agentic-dynamics)
   [ ] REJECT   — do not deploy; changes requested below
 
-Operator name:   ______________________________________
-Role / title:    ______________________________________
-Date (YYYY-MM-DD): ______________________________________
-Signature / token: ______________________________________
-Approval ref (branch + commit): ______________________________________
+Operator name:   peparhugo
+Role / title:    Operator
+Date (YYYY-MM-DD): 2026-08-27
+Signature / token: peparhugo
+Approval ref (branch + commit): feature/site-revamp4-diagrams (p3b re-craft reviewed)
 Changes requested (if REJECT):
   1. ____________________________________________________
   2. ____________________________________________________
