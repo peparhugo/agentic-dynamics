@@ -14,6 +14,9 @@ checks, per SVG:
   BALANCE  text/shape balance — the rendered <text> label wall must stay
            <= 1.5x the shape markup length (label walls are flagged and the
            figure redesigned), and never an empty shell or a pure text wall
+  PAINT    first-paint visibility — the page reports a first paint and every
+           visible svg is actually painted (opaque, non-zero box, laid out)
+  CONSOLE  the page loads console-clean — no console error or page exception
 
 An svg that is intentionally hidden ([hidden], display:none, visibility:hidden,
 aria-hidden="true") is reported as SKIP and is not a gate failure.
@@ -114,6 +117,9 @@ PROBE = """
       docScroll: [doc.scrollWidth, doc.scrollHeight],
       textEls, shapeMarkupLen, textLen: s.textContent.trim().length,
       shapes, hidden,
+      opacity: parseFloat(cs.opacity || '1'),
+      rects: s.getClientRects().length,
+      paint: performance.getEntriesByType('paint').map(e => e.name),
     });
   });
   return out;
@@ -160,6 +166,15 @@ def _evaluate(svg, viewport):
     elif shapes < 3 or text < 10:
         flags.append(f"WARN sparse text={text} shapes={shapes}")
 
+    # PAINT — first-paint visibility: the page reported a paint and this svg is
+    # actually painted (opaque, non-zero box, laid out — not display:none).
+    if "first-paint" not in svg.get("paint", []):
+        flags.append("WARN no first-paint timing entry")
+    if svg["opacity"] < 0.05 and w > 0 and h > 0:
+        fails.append(f"PAINT opacity={svg['opacity']:.2f} (invisible)")
+    if svg["rects"] == 0:
+        fails.append("PAINT no client rects (not laid out)")
+
     verdict = "PASS" if not fails else "FAIL"
     return {
         "name": name,
@@ -171,9 +186,31 @@ def _evaluate(svg, viewport):
         "textLen": text,
         "shapeMarkupLen": shape_markup,
         "shapes": shapes,
+        "paint": svg.get("paint", []),
+        "opacity": svg["opacity"],
         "flags": flags,
         "fails": fails,
         "verdict": verdict,
+    }
+
+
+def _console_row(page, viewport, kind, messages):
+    """A synthetic FAIL row for the CONSOLE gate (console error / page exception)."""
+    return {
+        "name": f"console[{kind}]",
+        "page": page,
+        "viewport": viewport,
+        "rect": [0, 0],
+        "viewBox": None,
+        "attrs": [],
+        "textLen": 0,
+        "shapeMarkupLen": 0,
+        "shapes": 0,
+        "paint": [],
+        "opacity": 1.0,
+        "flags": [],
+        "fails": [f"CONSOLE {kind}: " + " | ".join(messages[:3])],
+        "verdict": "FAIL",
     }
 
 
@@ -187,7 +224,11 @@ async def _run_pages(pw, pages, base, viewport, out, screenshots):
         ctx = await browser.new_context(
             viewport={"width": viewport[0], "height": viewport[1]})
         page = await ctx.new_page()
+        page_errors = []
+        console_errors = []
         page.on("pageerror", lambda e: page_errors.append(str(e)[:200]))
+        page.on("console", lambda m: console_errors.append(str(m.text)[:200])
+                if m.type == "error" else None)
         try:
             await page.goto(f"{base}/{pg}", wait_until="domcontentloaded", timeout=45000)
             await page.wait_for_function("document.readyState === 'complete'", timeout=45000)
@@ -202,6 +243,11 @@ async def _run_pages(pw, pages, base, viewport, out, screenshots):
                 await page.screenshot(
                     path=str(out / f"revamp4_{safe}_{viewport[0]}x{viewport[1]}.png"),
                     full_page=True)
+            # CONSOLE gate: any console error or page exception fails the page.
+            if page_errors:
+                rows.append(_console_row(pg, viewport, "pageerror", page_errors))
+            if console_errors:
+                rows.append(_console_row(pg, viewport, "console", console_errors))
             return rows, None
         except Exception as exc:  # TargetClosedError etc.
             return None, exc

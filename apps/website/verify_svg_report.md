@@ -1,4 +1,4 @@
-# SVG rendering gate — PASS (site revamp4 diagrams, craft pass)
+# SVG rendering gate — PASS (site revamp4 diagrams, full verification pass)
 
 Gate: `apps/website/verify_svg_rendering.py` — playwright rendering gate for the site's
 inline SVGs. Criteria per SVG:
@@ -8,18 +8,21 @@ inline SVGs. Criteria per SVG:
 - **ASPECT** — rendered ratio ≈ viewBox (aspect-correct, no distortion)
 - **BALANCE** — rendered `<text>` label wall ≤ 1.5× shape markup length (a figure with
   more text than 1.5× its shapes is flagged and redesigned); never an empty shell.
+- **PAINT** — first-paint visibility: the page reports a first paint and every visible
+  svg is painted (opaque, non-zero box, laid out).
+- **CONSOLE** — the page loads console-clean: no console error or page exception.
 
 Intentionally hidden SVGs are reported SKIP. Exit 0 = PASS.
 
 Run (from `apps/website/`, viewports 1440x900 and 390x844):
 
 ```bash
-python3 verify_svg_rendering.py --mobile
+python3 verify_svg_rendering.py --mobile --pages index,framework,question,evidence,methodology,story,accelerator,databricks,glossary
 ```
 
-Result: **20/20 PASS, 0 FAIL, exit 0** on framework/question/evidence/methodology at
-both viewports; **11/11 PASS** on the full site at 1440x900. Screenshots + gate data live
-in `apps/website/verification/`.
+Result: **22/22 PASS, 0 FAIL, exit 0** — all 9 pages at both viewports, console clean,
+first paint present on every page. Screenshots + gate data + approval template live in
+`apps/website/verification/`.
 
 ## Per-SVG table (rows 1–10 desktop, 11–20 mobile)
 
