@@ -976,18 +976,35 @@ def _commit_subject_matches(subject: str, phase_name: str, goal_prefix: str) -> 
     return bool(m and m.group(1) == phase_name and m.group(2).startswith(goal_prefix))
 
 
-def _git_log_subjects(workdir: Path, rev_range: str) -> list[str]:
-    """Commit subjects in ``rev_range`` (e.g. ``abc123..HEAD``), or [] on any git problem."""
+def _git_log_subjects(workdir: Path, rev_range: str) -> list[tuple[str, str]]:
+    """``(subject, author_email)`` pairs for commits in ``rev_range``, or [] on any git problem.
+
+    Author email rides along so the enforcement can exempt the runner's OWN execution-layer
+    commits (the adapter's fresh-worktree ``Initial`` commit) from the pattern check — it is
+    not a manual agent commit, exactly like ``_git_commit``'s message (exempt by matching).
+    """
     try:
         log = subprocess.run(
-            ["git", "log", "--format=%s", rev_range],
+            ["git", "log", "--format=%s|%ae", rev_range],
             cwd=workdir, capture_output=True, text=True, timeout=30,
         )
     except Exception:  # noqa: BLE001 — a git problem degrades to "no commits to check"
         return []
     if log.returncode != 0:
         return []
-    return [s.strip() for s in log.stdout.splitlines() if s.strip()]
+    out: list[tuple[str, str]] = []
+    for line in log.stdout.splitlines():
+        if not line.strip():
+            continue
+        subject, _, email = line.partition("|")
+        out.append((subject.strip(), email.strip()))
+    return out
+
+
+#: The adapter's worktree-initialization identity (``opencode._init_git_workdir``): the
+#: ``Initial`` commit it creates in a genuinely-new worktree is the runner's own execution-layer
+#: artifact, not a manual agent commit — the commit-prefix enforcement exempts it by author.
+RUNNER_INIT_AUTHOR_EMAIL = "experiment@instrument.local"
 
 
 def _enforce_commit_prefix(
@@ -1000,13 +1017,24 @@ def _enforce_commit_prefix(
     ``[workflow] <phase-name> — <goal prefix>``. A commit that does not fails the phase with
     reason ``COMMIT_PREFIX`` + the offending subjects as evidence, even if the phase otherwise
     succeeded — the phase flips to failed and ``stop_on_error`` stops the campaign for the
-    operator. Agent phases only. The runner's own ``_git_commit`` writes the correct message
-    (and runs AFTER this check) — the enforcement catches MANUAL agent commits. Best-effort:
+    operator. Agent phases only. The runner's OWN commits are exempt by construction: the
+    runner's ``_git_commit`` message matches the pattern (and runs AFTER this check), and the
+    adapter's fresh-worktree ``Initial`` commit is exempted by its author identity
+    (``RUNNER_INIT_AUTHOR_EMAIL``) — the enforcement catches MANUAL agent commits. Best-effort:
     an unreadable git state degrades to "no commits to check".
     """
     goal_prefix = goal[:40]
-    subjects = _git_log_subjects(wd, f"{pre_head}..HEAD") if pre_head else _git_log_subjects(wd, "HEAD")
-    bad = [s for s in subjects if not _commit_subject_matches(s, phase_name, goal_prefix)]
+    commits = (
+        _git_log_subjects(wd, f"{pre_head}..HEAD")
+        if pre_head
+        else _git_log_subjects(wd, "HEAD")
+    )
+    bad = [
+        s
+        for s, author in commits
+        if not (author == RUNNER_INIT_AUTHOR_EMAIL and s == "Initial")
+        and not _commit_subject_matches(s, phase_name, goal_prefix)
+    ]
     if not bad:
         return
     expected = f"[workflow] {phase_name} — {goal_prefix}"

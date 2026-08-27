@@ -1479,4 +1479,43 @@ def test_commit_prefix_replay_rejects_revamp2_plain_commits(tmp_path):
     assert result.ok is False
 
 
+def test_commit_prefix_exempts_the_adapters_initial_commit(tmp_path):
+    """The runner's own execution-layer commits are exempt: the adapter's fresh-worktree
+    ``Initial`` commit (subject ``Initial`` + the runner's init author) never trips the gate,
+    while a plain-message commit under the SAME forged identity still does — the enforcement
+    targets MANUAL agent commits (the p4 integration fix the live smoke found)."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+    # the worktree starts EMPTY of commits; the fake simulates the adapter's _init_git_workdir
+    # creating its "Initial" commit DURING the phase under the runner's init identity
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        subprocess.run(["git", "config", "user.email", wr.RUNNER_INIT_AUTHOR_EMAIL], cwd=workdir, check=True)
+        subprocess.run(["git", "config", "user.name", "Experiment Runner"], cwd=workdir, check=True)
+        (Path(workdir) / "seed.txt").write_text("seed")
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "Initial"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    assert result.phases[0].status == "ok"
+    assert result.phases[0].commit_gate is None
+
+    # same forged identity, but a plain-message commit — NOT exempt (subject != "Initial")
+    def agent_bad(prompt, *, model, backend, workdir, **kwargs):
+        subprocess.run(["git", "config", "user.email", wr.RUNNER_INIT_AUTHOR_EMAIL], cwd=workdir, check=True)
+        subprocess.run(["git", "config", "user.name", "Experiment Runner"], cwd=workdir, check=True)
+        (Path(workdir) / "seed2.txt").write_text("changed")  # a NEW change → a real commit
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    spec2 = load_spec(SPEC)
+    result2 = run_workflow(spec2, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent_bad)
+    assert result2.phases[0].status == "failed"
+    assert result2.phases[0].commit_gate["reason"] == "COMMIT_PREFIX"
+    assert result2.phases[0].commit_gate["subjects"] == ["site: add things"]
+
+
 
