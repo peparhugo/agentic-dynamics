@@ -1,0 +1,318 @@
+name: cap_adaptive_2d
+question: >-
+  The informational-abstention campaign: does the adaptive controller know when NOT to
+  intervene? 2c (merged) decided NON-INFERIOR under proposal heterogeneity (cpvo ratio
+  0.6537) and found the boundary is INFORMATIONAL, not confidence-based: the harm is paid
+  exactly where the seam has no information (absent-defective $0.046109/escape @11.47;
+  unseen-family $0.092218/arm @11.47), and no confidence threshold improves value. The
+  accepted design (docs/designs/current/cap_adaptive_2d_design.md) proposes the
+  informational-abstention application policy: DECLINE (shadow, operator review) when the
+  seam cannot measure risk, when the analysis does not match the change, or when the risk is
+  exactly the Option A fingerprint (impacted-term-only). THIS campaign runs the
+  abstention-vs-status-quo grid (28 cells, 8 blocks, both arms re-run, within-campaign
+  comparison): the abstention arm shadow-evaluates the rule per cell; the status-quo arm
+  reproduces the 2c adaptive behavior. The verdict question: does informational abstention
+  capture the low-information escapes at a lower (cost + harm) than the status quo, without
+  flagging the value-neutral classes at a cost that exceeds the saved harm? Design
+  authority: docs/designs/current/cap_adaptive_2d_design.md (accepted 2026-08-28, leg-3
+  Option A) + docs/designs/current/cap_adaptive_2d_preregistration.md (committed BEFORE any
+  cell runs, 9dc0b4a63) + the 2c verdict + the 2c cell machinery.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / CAP adaptive control
+        boundary. canonical_sources: [docs/designs/current/cap_adaptive_2d_design.md (the
+        accepted design — the abstention rule + the exposure set + the falsifiability
+        contract), docs/designs/current/cap_adaptive_2d_preregistration.md (the committed
+        pre-registration — the 28-cell assignment table + the decision rule),
+        docs/designs/current/cap_adaptive_2c.md (the verdict: NON-INFERIOR ratio 0.6537;
+        the informational boundary; the confidence-null), the 2c pre-registration (the
+        machinery pins), workflows/operations/cap_2a_cell_clean.yaml +
+        cap_2a_cell_critical.yaml + cap_2a_cell_style.yaml (the stimulus family to extend),
+        src/agentic_dynamics/control/verify_proposal.py (the treatment — code-unchanged),
+        src/agentic_dynamics/control/reducers/code_change_facts.py (the measured facts the
+        abstention rule consumes), the measured E_x (cap_escalation_measurement:
+        11.47 sol / 12.51 sonnet — the harm multiplier)].
+        policies: [preregister_before_data, abstention_is_the_treatment,
+        harm_measured_not_inferred, abstain_only_via_the_pinned_rule, shadow_flag_only]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research (the informational-abstention
+        boundary). deliberation: [verify preregistration, measure one cell, run the grid
+        4-wide, score the four decision-rule legs, verdict, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        2c decided the boundary is informational: decline when the gate has NO information
+        (the absent-defective + unseen-family escapes), NOT when it is uncertain about what
+        it sees (no confidence threshold improves value; the signal is inverse to where
+        adaptive adds value). The design is accepted (2026-08-28) with leg-3 pinned at
+        Option A: risk measurable, < 0.2, zero severity terms, zero tests term, risk ==
+        0.20·min(1, impacted/10) EXACTLY. The pre-registration is committed (9dc0b4a63)
+        BEFORE any cell runs: 28 cells (14/arm), seed 617e6763…, capture floor ≥ 2/3 of the
+        low-information cells, flag-cost ceiling, the reused NI margin, the
+        within-campaign status-quo baseline. The 2c incorrect class failed to instantiate
+        (impacted=0); the 2d rebuild guarantees impacted ≥ 1 via the widgets-call-add
+        dependant edge and pre-verifies it in p1. The treatment (build_verify_proposal /
+        _risk_depth / weights / severity filter) stays code-unchanged; the abstention rule
+        is shadow-evaluated by the p2 harness (campaign-side orchestration, as 2c's
+        static/adaptive arm assignment was). The hardened runner (watchdog/deploy-gate/
+        commit/checkpoint) is live on main.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' with green checks (the hardened
+        runner enforces it). (2) PREREGISTRATION BEFORE DATA: the committed
+        cap_adaptive_2d_preregistration.md (9dc0b4a63) fixes the margin, outcome metric,
+        capture floor, flag-cost ceiling, class constructions, seed + 28-cell assignment
+        table, harm model, confidence-recording, and the decision rule — a deviation is a
+        FAILED finding. (3) ARMS ARE THE POLICIES: status_quo = the 2c adaptive behavior
+        (proposals applied exactly: rework = ONE bounded pass, verify = one pass,
+        continue = null); abstention = the same cells with the §0 decision table shadow
+        evaluated by the p2 harness — DECLINE (leg 1 stale-analysis / leg 2
+        unmeasurable-risk / leg 3 Option A fingerprint) skips the apply pass and records
+        the leg; APPLY and APPLY-NULL proceed exactly as status_quo. Nothing else.
+        (4) THE CLASSES ARE THE GRID: correct / incorrect_rebuilt / harmful_partial /
+        irrelevant / competing / absent (clean + defective variants) / unseen_family, per
+        the pre-registration's constructions (2c-verbatim except the two rebuilds);
+        absent = designed degraded seam cells (flagged, never dropped). (4b) PINNED
+        SEMANTICS: (a) one-of-two (competing + harmful_partial): both defects must be
+        absent for acceptance; one-of-two fixed = partial_rework with the unfixed defect's
+        E_x-scaled harm; (b) the incorrect_rebuilt class MUST instantiate `verify`
+        (pre-verified in p1 — impacted ≥ 1 by the widgets-call-add edge); a second
+        construction failure refutes the design; (c) CONFIDENCE — every proposal record
+        carries the measured confidence at emission (BEFORE the outcome); the confidence
+        curve is EXPLORATORY (the rule stays confidence-free); (d) SCALE — 28 cells, 14
+        per arm, 9 defect-bearing per arm, ~$0.3-0.7 total, inside the $30 stop.
+        (5) HARM IS MEASURED, NOT INFERRED: wrong-apply = the within-campaign verify-pass
+        delta (mean incorrect_rebuilt cost minus mean irrelevant cost, per arm);
+        wrong-continue = E_x x $0.004021 per escaped defect (E_x 11.47/12.51 cited,
+        n=1 per model, sensitivity at 28 reported). (6) THE ABSTENTION ANALYSIS IS THE
+        PRIMARY OUTCOME — the four pre-registered legs: (a) cpvo_harm(abstention) <
+        cpvo_harm(status_quo) at E_x=11.47; (b) capture ≥ 2/3 of the low-information
+        cells in the abstention arm; (c) flag cost on clean cells < the saved escape
+        harm; (d) the NI guard (cpvo ratio ≤ 1.10 AND success gap ≤ 5pts). All four must
+        hold for SUPPORT. (7) Outcomes INDEPENDENT: test_runner + the post-hoc evaluator
+        over the immutable commits; never the proposing agent's narrative. (8)
+        Graph-down/analyzer-down cells FLAGGED, never dropped. (9) Every verdict number
+        cites a produced JSON + SHA256. (10) The treatment is CODE-UNCHANGED (the
+        abstention rule is shadow-only). (11) No generated-surface edits, no secrets, no
+        external actuation. (12) p5 adversarial mandatory: findings re-verified +
+        known-safe, no bare PASS. (13) Resumable only when spec version, goal hash,
+        source revision, and candidate-manifest hash match.
+      read_first: >-
+        docs/designs/current/cap_adaptive_2d_design.md (the accepted design),
+        docs/designs/current/cap_adaptive_2d_preregistration.md (the committed
+        pre-registration — THE assignment table + decision rule),
+        docs/designs/current/cap_adaptive_2c.md (the verdict + the informational boundary),
+        workflows/operations/cap_2a_cell_clean.yaml + cap_2a_cell_critical.yaml +
+        cap_2a_cell_style.yaml (the stimulus machinery to extend),
+        src/agentic_dynamics/control/verify_proposal.py (the treatment),
+        src/agentic_dynamics/control/reducers/code_change_facts.py (the facts),
+        experiments/results/cap_escalation_measurement/cap_escalation_measurement_score_20260826T125726Z.json
+        (the measured E_x), experiments/results/cap_adaptive_2c/cap_adaptive_2c_score_20260827T180241Z.json
+        (the 2c per-class baseline + the confidence prior)
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-flash (orchestration). Cells:
+        deepseek/deepseek-v4-pro (unchanged from 2b/2c). One branch
+        (feature/cap-adaptive-2d); each phase commits [workflow] <phase>; each cell in a
+        fresh disposable worktree with a unique FINOPS_CELL_ID. p2 runs the grid at
+        4-WIDE concurrency (ThreadPoolExecutor max_workers=4 — the sweep precedent):
+        28 cells → 7 batches of 4; cells are worktree-isolated; the score join is
+        order-independent. The data chain stays single-writer: only this campaign's
+        wrapper phases touch experiments/specs or the site data while the grid runs.
+    phases:
+      - name: p0_pin_spec
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the verification phase — the pre-registration is ALREADY committed
+          (docs/designs/current/cap_adaptive_2d_preregistration.md at 9dc0b4a63, BEFORE any
+          cell ran — the registration rule). Your job is to PIN this spec into it: append
+          the campaign-spec SHA256 (`git rev-parse HEAD:workflows/repository/cap_adaptive_2d.yaml`
+          or `sha256sum` of the file) to the pre-registration's header line "Campaign:
+          cap_adaptive_2d (... spec SHA256 ...)" — the ONLY edit allowed. Verify the
+          pre-registration still matches: the 28-cell table (14/arm), the seed
+          617e6763fcd238dc93a59ba1f41e01ba5f281c4748ef3867dbebeeca344c7dfb, the Option A
+          fingerprint, the four decision-rule legs, the $30 stop. A deviation is a FAILED
+          finding — report, do not fix.
+          DELIVER: the pinned header + the verification result; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_measure_one
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: E1 measurement — ONE cell per the pre-registered assignment table:
+          cap2d_correct_abstention_r1 (correct, abstention, r1), fresh worktree, unique
+          FINOPS_CELL_ID, candidate manifest FIRST (cell_id, class, arm, repetition, exact
+          spec + SHA256, goal hash, worktree, forecast cost). RUN with the full seam
+          (--change-analysis [--change-analysis-graph]). The proposal MUST emit and be
+          validated (a refusal here is a seam regression — the absent class is a DIFFERENT
+          cell, constructed to refuse). The abstention decision is evaluated per the §0
+          table (this cell: risk ≥ 0.2 → APPLY — no leg fires; record the decision). Also
+          PRE-VERIFY the incorrect_rebuilt construction (pre-registration §1): build its
+          probe (the 20-symbol change: modified add + 19 widgets CALLING add, no
+          test_widgets.py) in a scratch worktree and measure impacted_symbol_count —
+          the rebuild's guarantee is impacted ≥ 1 (a second impacted=0 refutes the
+          design; report as a FAILED finding if it does). RECORD cost/duration/facts/
+          proposal/confidence/abstention-decision/outcome; compute the FORECAST per-cell
+          budget (measured x 2, labeled FORECAST) for p2.
+          DELIVER: the cell manifest + phase ledger + the incorrect_rebuilt probe result +
+          the forecast; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p2_run_grid
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the remaining 27 cells EXACTLY per the pre-registered assignment
+          table (class/arm/repetition — never any other source). Execution manifest FIRST
+          (every cell_id from the table; no unlisted cells, no deviations). Run the grid at
+          4-WIDE concurrency: 4 cell processes in parallel (ThreadPoolExecutor
+          max_workers=4), fresh worktree + unique FINOPS_CELL_ID per cell, blocks in slot
+          order. Per cell: proposal emitted + validated BEFORE the outcome; the ABSTENTION
+          DECISION evaluated per the §0 table and recorded (status_quo arm: apply exactly
+          as proposed — rework = ONE bounded pass over the proposal scope, verify = one
+          pass, continue = null; abstention arm: DECLINE (leg 1 stale / leg 2 risk absent
+          / leg 3 the Option A fingerprint: risk < 0.2, severity terms zero, tests term
+          zero, risk == 0.20·min(1, impacted/10) exactly) skips the apply pass and records
+          the leg + routes to operator review; APPLY / APPLY-NULL proceed exactly as
+          status_quo). Outcomes INDEPENDENT (test_runner + post-hoc evaluator). The
+          unseen-family cells' defect is VERIFIED by the evaluator (present? family NOT
+          in {boundary-compare, S1244, S3776} — the class's claim). The absent-class cells
+          RECORD the refusal + the facts present (never a hand-authored proposal); the
+          abstention arm records DECLINE (leg 2) for them. Graph-down/analyzer-down:
+          flag, never drop. Budget guard: stop before a cell whose forecast exceeds the
+          envelope or the $30 stop; record stopped cells as not-run.
+          DELIVER: immutable p2 manifest, per-cell ledgers/proposals/abstention-decisions/
+          outcomes/application proofs/flags, forecast-vs-actual, artifact SHA256 index;
+          committed.
+          LOG: per-cell class/arm/cost/outcome/abstention-decision table; PASS/FAIL; commit.
+      - name: p3_score
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: score ONLY immutable p1/p2 artifacts; validate joins first (cell_id,
+          class/arm from the PRE-REGISTERED table — a mismatch is invalid, not
+          corrected). Emit experiments/results/cap_adaptive_2d/cap_adaptive_2d_score_<ts>.json
+          (schema cap_adaptive_2d_score/v1): per-cell rows (class, arm, cost, accepted,
+          cpvo, proposal action/depth/confidence, abstention decision + leg, applied-or-
+          null proof, expected-effect checks, outcome) + per-arm aggregates + per-CLASS
+          breakdown + the HARM table (wrong-apply = the within-campaign verify-pass delta;
+          wrong-continue E_x-scaled at 11.47/28) + the ABSTENTION DECISION-RULE
+          computation — all FOUR pre-registered legs (primary cpvo_harm comparison;
+          capture rate on the 3 low-information cells; flag-cost vs saved harm; the NI
+          guard) + the confidence curve (EXPLORATORY, labeled — the rule stays
+          confidence-free).
+          GUARD: the class labels match the pre-registered table exactly; the abstention
+          legs are applied EXACTLY as pinned (no post-hoc leg widening); the confidence
+          analysis is labeled exploratory.
+          DELIVER: the score JSON + a validation result tracing every verdict number to a
+          field; committed.
+          LOG: per-class table, harm table, the four decision-rule legs; PASS/FAIL; commit.
+      - name: p4_verdict
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/cap_adaptive_2d.md
+          SHAPE: source revision, spec version, manifest hash, SHA256s for the p3 JSON;
+          the per-class table; the harm table; the four decision-rule legs with n + CI.
+          VERDICT per the pre-registered rule + the design's falsifiability contract:
+          SUPPORT ⟺ cpvo_harm(abstention) < cpvo_harm(status_quo) at E_x=11.47 AND
+          capture ≥ 2/3 of the low-information cells AND flag cost < saved escape harm
+          AND the NI guard holds. REFUTE if any leg fails, or if the incorrect_rebuilt
+          class failed to instantiate a SECOND time. Report (1) the primary comparison,
+          (2) the capture leg (per-cell decline decisions + legs — did the rule fire where
+          it must, and NOT on the irrelevant/multi-term states), (3) the flag-cost leg
+          (the declined clean cells' cost vs the saved harm), (4) the NI guard (the
+          apply classes untouched), (5) the operator-review accounting (every DECLINE's
+          routing + the review-phase outcome — flag-only, no activation), (6) the
+          confidence curve (exploratory — the confidence-free constraint restated), (7)
+          the boundary restated: does the controller know when not to intervene?
+          GUARD: every number cites the p3 JSON; no post-hoc redefinition of the rule,
+          the legs, or the margin.
+          LOG: PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — try to falsify the campaign. Attack in order:
+          (1) pre-registration adherence (the committed doc 9dc0b4a63 vs what was
+          analyzed — a deviation is a FAILED finding); (2) class integrity (the
+          incorrect_rebuilt cells REALLY made the verifier propose verify on a CLEAN
+          change — proposal + the evaluator + the p1 probe; the unseen-family cells'
+          defect REALLY outside the calibrated families; the harmful_partial cells'
+          outcome really one-of-two); (3) arm integrity (status_quo applied exactly per
+          proposal; abstention DECLINEs fired ONLY on the pinned legs and skipped the
+          apply — provable in the commit trails; no cell applied under a different policy
+          than its assignment); (4) the abstention rule (shadow-evaluated, no runner
+          wiring, the Option A fingerprint applied exactly — no post-hoc leg widening, no
+          confidence used); (5) the harm model (wrong-apply measured within-campaign;
+          wrong-continue E_x cited + sensitivity; n=1-per-model limitation stated); (6)
+          the four decision-rule legs (each computed from recorded fields, nothing
+          imputed); (7) the usual suite (baselines, denominators, credentials, hashes,
+          guard breaches). Every finding: fix or record as accepted limitation with
+          reasoning + residual risk. Deliver TWO outputs:
+          docs/reviews/cap_adaptive_2d_adversary.md + docs/reviews/cap_adaptive_2d_known_safe.md.
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+  - {name: arm, levels: [status_quo, abstention]}
+design: factorial
+rules:
+  - name: cap_2d_preregistered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [class_definitions_pinned, seed_committed, assignment_table]
+  - name: cap_2d_cells_run
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [assignment_table]
+    produces: [cells_run_4wide, proposals_applied, abstention_decisions]
+  - name: cap_2d_scoring
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [cells_run_4wide, proposals_applied, abstention_decisions]
+    produces: [cpvo_per_class, harm_table, abstention_decision_rule]
+  - name: informational_abstention
+    plane: control
+    evidence_class: "[C]"
+    decision_type: verify_code_change
+    requires_facts:
+      - {fact: analysis_revision_matches, scope: self, value_type: bool,
+         on_missing: classify, on_conflict: halt}
+      - {fact: code_change_risk, scope: self, value_type: float,
+         on_missing: classify, on_conflict: halt}
+      - {fact: new_sonar_critical_count, scope: self, value_type: int,
+         on_missing: classify, on_conflict: halt}
+      - {fact: new_lsp_error_count, scope: self, value_type: int,
+         on_missing: classify, on_conflict: halt}
+      - {fact: impacted_symbol_count, scope: self, value_type: int,
+         on_missing: classify, on_conflict: halt}
+      - {fact: changed_symbols_with_tests_ratio, scope: self, value_type: float,
+         on_missing: classify, on_conflict: halt}
+    produces: [abstention_decision]
+metrics:
+  - {name: cpvo_harm_per_arm, agg: mean, over: cell}
+  - {name: capture_rate, agg: mean, over: cell}
+  - {name: flag_cost, agg: mean, over: cell}
+  - {name: abstention_decision_rule, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: arm, loss: {cost: 1.0, quality: -5.0, value: -10.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_spec, p1_measure_one, p2_run_grid, p3_score, p4_verdict, p5_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

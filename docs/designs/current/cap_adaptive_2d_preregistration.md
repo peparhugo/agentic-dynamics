@@ -5,9 +5,8 @@ status: accepted
 # cap_adaptive_2d — pre-registration (p0): the informational-abstention campaign (does the adaptive controller know when not to intervene?)
 
 **Status: accepted · PRE-REGISTERED — committed BEFORE any cell runs.**
-**Campaign:** `cap_adaptive_2d` (`workflows/repository/cap_adaptive_2d.yaml` — authored as the
-next artifact after this document commits; the spec SHA256 is appended to this header on that
-commit). **Design authority:** `docs/designs/current/cap_adaptive_2d_design.md` — the
+**Campaign:** `cap_adaptive_2d` (`workflows/repository/cap_adaptive_2d.yaml` SHA256
+`1258280d44f608c7fcccf91ef514cc5a39994a9fd352852d96fb35c919f2ea0c`; `cap_adaptive_2d@0.1`). **Design authority:** `docs/designs/current/cap_adaptive_2d_design.md` — the
 informational-abstention design, **accepted 2026-08-28 (operator)**, leg-3 trigger pinned at
 **Option A** (the narrow fingerprint). **Pre-registration pattern:** the 2c pre-registration
 (`cap_adaptive_2c_preregistration.md`, SHA256 `0f3a5de755784a6e9f8a71da3e7706782cddf930095fbc65a685ccc361da5e3d`).
