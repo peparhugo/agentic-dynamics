@@ -555,3 +555,121 @@ body.light{
   .pulse .dot,animate,svg animate{animation:none!important}
   html{scroll-behavior:auto}
 }
+
+/* ==========================================================================
+   DIAGRAM SYSTEM — shared figure / scroll / map containers (site revamp4)
+   The layout guarantee lives here, not in a page-local <style>: the container
+   classes get rules in the shared base so a viewBox-only SVG can never
+   collapse to 0x0 and an inline map can never be lost to overflow.
+   The framework page may re-theme diagram *internals* page-locally; the
+   container layout is this shared block.
+   ========================================================================== */
+
+/* --- Figure block (svg-primary or text-grid primary) --- */
+.system-figure,
+.authority-map{
+  margin:0;border:1px solid var(--ba);border-radius:1.4rem;
+  background:linear-gradient(145deg,var(--bg2),var(--bg));
+  box-shadow:var(--panel-shadow);overflow:hidden;text-align:left;
+  padding:clamp(1rem,3vw,2rem);
+}
+.authority-map{margin:1.5rem 0 0}
+.system-figure figcaption,
+.authority-map figcaption{
+  border-top:1px solid var(--b);margin:1.2rem 0 0;padding:1rem 0 0;
+  color:var(--t2);font-size:.78rem;line-height:1.65;
+}
+
+/* --- Scrollable diagram well — never collapsible --- */
+.diagram-scroll{
+  max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;
+  scrollbar-color:var(--ac) var(--bg4);border-radius:.75rem;
+}
+.diagram-scroll:focus-visible{outline:2px solid var(--ac);outline-offset:3px}
+/* Editorial (figure-edit) figures can use the same well for wide-aspect maps:
+   on narrow screens the diagram keeps a readable width and scrolls instead of
+   crushing to an unreadable strip. */
+.figure-edit .diagram-scroll{overflow-x:auto;border-radius:.75rem}
+
+/* --- Inline diagram maps: explicit sizing so a viewBox-only SVG renders --- */
+.diagram-map,
+.workflow-map{
+  display:block;width:100%;height:auto;min-width:980px;background:var(--bg);
+}
+
+/* --- Collapse-proof floor for ANY viewBox-only inline SVG ---
+     height:auto + a valid viewBox can never resolve to 0 height; width is
+     kept proportional. Explicit widths (.figure-edit svg, .diagram-map)
+     override it where they apply. */
+svg[viewBox]{max-width:100%;height:auto}
+
+/* --- .redesigned figures: the SVG is primary; text fallback grids hide --- */
+.system-figure.redesigned>.mode-entry-grid,
+.system-figure.redesigned>.merge-label,
+.system-figure.redesigned>.process-row,
+.system-figure.redesigned>.system-planes{display:none}
+
+.authority-map.redesigned>.human-plane,
+.authority-map.redesigned>.authority-connector,
+.authority-map.redesigned>.bounded-zone,
+.authority-map.redesigned>.authority-outputs,
+.authority-map.redesigned>.autonomy-levels{display:none}
+
+/* --- The redesigned figure's fallback grids (sane layout when not hidden) --- */
+.mode-entry-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.mode-entry{background:var(--bg3);border:1px solid var(--b);border-top:2px solid var(--ac);padding:1rem;min-width:0}
+.mode-entry.experiment{border-top-color:var(--cy)}
+.mode-entry .micro-label{color:var(--ac)}
+.mode-entry.experiment .micro-label{color:var(--cy)}
+.mode-entry strong{display:block;color:var(--t);font-size:1rem;margin:.5rem 0 .35rem}
+.mode-entry p{font-size:.73rem;line-height:1.6;color:var(--t2);margin:0}
+.merge-label{display:flex;align-items:center;justify-content:center;gap:.75rem;margin:1rem 0;color:var(--ac);font:700 .68rem/1 'JetBrains Mono',monospace;letter-spacing:.11em;text-transform:uppercase}
+.merge-label::before,.merge-label::after{content:'';height:1px;flex:1;background:var(--ba)}
+.process-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1.2rem;list-style:none;margin:0;padding:0}
+.process-step{position:relative;background:var(--bg4);border:1px solid var(--ba);padding:1rem;min-height:7.2rem}
+.process-step:not(:last-child)::after{content:'\2192';position:absolute;right:-1rem;top:50%;transform:translateY(-50%);color:var(--ac);font-size:1.1rem;z-index:2}
+.process-step span{display:block;color:var(--t3);font:700 .58rem/1 'JetBrains Mono',monospace;letter-spacing:.1em}
+.process-step strong{display:block;color:var(--t);font-size:.88rem;margin:.65rem 0 .35rem}
+.process-step p{font-size:.67rem;line-height:1.5;color:var(--t2);margin:0}
+.system-planes{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-top:1.2rem}
+.system-plane{background:var(--bg);border:1px solid var(--b);padding:1rem}
+.system-plane:nth-child(2){border-top:2px solid var(--cy)}
+.system-plane:nth-child(3){border-top:2px solid var(--am)}
+.system-plane strong{display:block;color:var(--t);font:700 .7rem/1.2 'JetBrains Mono',monospace;margin-bottom:.45rem}
+.system-plane p{font-size:.69rem;line-height:1.55;color:var(--t2);margin:0}
+
+/* --- Authority-map fallback grids --- */
+.human-plane{display:grid;grid-template-columns:12rem 1fr;gap:1rem;align-items:center;background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--am);padding:1rem;text-align:left}
+.human-plane strong{color:var(--am);font:700 .72rem/1.3 'JetBrains Mono',monospace;letter-spacing:.08em}
+.human-plane p{font-size:.73rem;line-height:1.6;color:var(--t2);margin:0}
+.authority-connector{text-align:center;color:var(--am);font:700 .65rem/2.4 'JetBrains Mono',monospace;letter-spacing:.08em}
+.bounded-zone{border:1px solid var(--ac);padding:1.25rem;background:rgba(34,211,238,.025)}
+.zone-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;margin-bottom:1rem}
+.zone-head strong{color:var(--ac);font:700 .75rem/1 'JetBrains Mono',monospace;letter-spacing:.08em}
+.zone-head span{color:var(--t3);font-size:.67rem}
+.autonomy-process{display:grid;grid-template-columns:repeat(6,1fr);gap:.5rem;list-style:none;margin:0;padding:0;counter-reset:auto-step}
+.autonomy-process li{counter-increment:auto-step;position:relative;background:var(--bg4);border:1px solid var(--b);padding:.8rem .6rem;text-align:center;color:var(--t);font-size:.7rem;min-width:0}
+.autonomy-process li::before{content:'0' counter(auto-step);display:block;color:var(--t3);font:700 .56rem/1 'JetBrains Mono',monospace;margin-bottom:.45rem}
+.autonomy-process li:not(:last-child)::after{content:'\2192';position:absolute;right:-.48rem;top:50%;transform:translate(50%,-50%);color:var(--ac);z-index:2}
+.constraint-rail{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;border-top:1px solid var(--b);margin-top:1rem;padding-top:1rem}
+.constraint-rail span{border:1px solid var(--b);background:var(--bg);padding:.35rem .65rem;color:var(--t2);font:600 .6rem/1 'JetBrains Mono',monospace;text-transform:uppercase}
+.authority-outputs{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-top:.7rem}
+.authority-output{background:var(--bg3);border:1px solid var(--b);padding:1rem}
+.authority-output strong{display:block;color:var(--ac);font-size:.75rem;margin-bottom:.35rem}
+.authority-output.exception strong{color:var(--am)}
+.authority-output p{font-size:.68rem;line-height:1.5;color:var(--t2);margin:0}
+.autonomy-levels{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-top:1rem}
+.autonomy-level{background:var(--bg3);border:1px solid var(--b);padding:1rem;text-align:left}
+.autonomy-level strong{display:block;color:var(--t);font-size:.78rem;margin-bottom:.4rem}
+.autonomy-level p{font-size:.68rem;line-height:1.55;color:var(--t2);margin:0}
+.autonomy-level.current{border-top:2px solid var(--cy)}
+.authority-caption{margin:1rem 0 0;color:var(--t2);font-size:.76rem;line-height:1.65;text-align:left}
+.authority-caption strong{color:var(--cy)}
+
+/* --- Responsive floors for the shared diagram grids --- */
+@media(max-width:768px){
+  .mode-entry-grid,.process-row,.system-planes,.human-plane,.autonomy-process,
+  .authority-outputs,.autonomy-levels{grid-template-columns:1fr}
+  .diagram-map,.workflow-map{min-width:900px}
+  .figure-edit .diagram-scroll > svg{min-width:520px}
+}
