@@ -67,7 +67,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
     <h1>Systems are constantly evolving. Scaling agents means measuring that evolution.</h1>
     <p class="lead">Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time. This repository is its founding instrument and corpus.</p>
     <blockquote class="pullquote">&ldquo;The system shapes the agent — and the agent reshapes the system. Read that again.&rdquo;</blockquote>
-    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">Examine the Method</a><a href="evidence.html" class="cta-btn ghost">Inspect the Evidence →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
+    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">Examine the Method</a><a href="evidence.html" class="cta-btn ghost">Inspect the Evidence →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a><a href="question.html" class="cta-btn ghost">The Question →</a></div>
   </div>
   <aside class="proof-ledger" aria-label="Key numbers">
     <h3>Evidence behind the discovery</h3>
@@ -75,6 +75,15 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
     <div class="proof-card"><span class="label">Models</span><div class="value"><span data-stat="variants">7</span></div></div>
     <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">215</span></div></div>
     <div class="proof-card success"><span class="label">Total measured cost</span><div class="value">$<span data-stat="story_total_cost">309.17</span></div></div>
+    <div class="field-receipt" style="margin-top:0.9rem">
+      <div class="r-head">Field receipt</div>
+      <dl>
+        <dt>Statement</dt><dd>Agentic Dynamics is the empirical study of how agents behave as tasks, environments, workflows, and time change — starting from what an agentic outcome costs once verification, recovery, inherited context, and downstream consequences are included.</dd>
+        <dt>Evidence class</dt><dd>[P] editorial framing — names the question; the corpus is in <a href="evidence.html" style="color:var(--ac)">The Evidence</a>.</dd>
+        <dt>Corpus / date</dt><dd>1,067 story sessions, 7 models (measured [M]); updated 2026-08-27.</dd>
+        <dt>Limitation</dt><dd>This statement is the field's question, not a claim of a universal best practice.</dd>
+      </dl>
+    </div>
   </aside>
 </div></section>
 
@@ -137,7 +146,27 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
     <div class="pipe-step"><div class="ps-label">Grid — test policy as an arm</div>Compare policy choices across controlled factor combinations</div>
     <div class="pipe-step"><div class="ps-label">Campaign — change one variable and repeat</div>Use the remaining uncertainty to select the next measurement</div>
   </div>
-  <div class="hero-actions"><a href="methodology.html" class="cta-btn">Examine the Method →</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" class="cta-btn ghost">Inspect the Source →</a></div>
+  <!-- ref: svg-marker-flow.html, svg-animated-status.html — the instrument cycle.
+       A returning five-node path: derive is the only route into policy. -->
+  <figure class="figure-edit" aria-labelledby="cycle-title">
+    <span class="kicker" id="cycle-title">The instrument cycle</span>
+    <svg viewBox="0 0 720 320" role="img" aria-labelledby="cycle-title cycle-desc">
+      <title id="cycle-desc">Instrument to derive to write policy to grid to campaign and back to instrument. Derive is the only path into policy; unmeasured requirements block policy.</title>
+      <defs>
+        <marker id="cycleArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
+      </defs>
+      <path class="flow-link" d="M360 40C440 40 470 70 470 120M250 40C170 40 140 70 140 120"/>
+      <path class="flow-link" d="M470 200C470 250 440 280 360 280M140 200C140 250 170 280 250 280"/>
+      <g><rect class="flow-node measured" x="245" y="20" width="230" height="60" rx="10"/><text class="flow-label" x="360" y="58">Instrument</text></g>
+      <g><rect class="flow-node computed" x="25" y="130" width="230" height="60" rx="10"/><text class="flow-label" x="140" y="168">Derive</text><text x="140" y="200" style="font-family:JetBrains Mono,monospace;font-size:11px;text-anchor:middle" fill="currentColor">turns events into information</text></g>
+      <g><rect class="flow-node measured" x="465" y="130" width="230" height="60" rx="10"/><text class="flow-label" x="580" y="168">Write policy</text><text x="580" y="200" style="font-family:JetBrains Mono,monospace;font-size:11px;text-anchor:middle" fill="currentColor">consumes measured information only</text></g>
+      <g><rect class="flow-node computed" x="245" y="240" width="230" height="60" rx="10"/><text class="flow-label" x="360" y="278">Grid → Campaign</text></g>
+      <text x="580" y="250" style="font-family:JetBrains Mono,monospace;font-size:11px;text-anchor:middle" fill="#9b6a28">unmeasured requirements block policy</text>
+    </svg>
+    <figcaption>Figure H1. The instrument cycle — Instrument → Derive → Write policy → Grid → Campaign, returning to Instrument. Derive is the only path into policy, and a control rule whose requirements are not measured cannot be written.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] method structure</span><span>ref: svg-marker-flow.html</span></div>
+  </figure>
+  <div class="hero-actions"><a href="methodology.html" class="cta-btn">Examine the Method →</a><a href="https://github.com/peparhugo/agentic-dynamics" class="cta-btn ghost">Inspect the Source →</a></div>
 </div></section>
 
 <!-- Section 4: WHAT -->
