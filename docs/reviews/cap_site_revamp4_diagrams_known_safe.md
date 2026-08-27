@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Known-safe — cap_site_revamp4_diagrams (p5_adversarial)
 
 What the adversarial verification ATTACKED and could NOT falsify. Each item below was
