@@ -14,6 +14,28 @@ Phase kinds (from ``workflow.params.phases``):
   - ``test`` — run the language's suite independently (via ``test_runner.run_suite``)
     and record ``test_executed_success``. No LLM involved.
 
+Phase watchdog (cap_runner_hardening p1): each agent phase is wrapped in a stall monitor that
+polls the phase's session transcript (``<workdir>/.instrument/session.jsonl``, appended live
+by the adapters while the seam is present). A transcript whose last step is stale past the
+threshold — resolved explicit ``phase_watchdog_min`` arg > ``FINOPS_PHASE_WATCHDOG_MIN`` env >
+default 20 min — is SIGTERM'd and the phase fails with reason ``STALLED`` + the evidence
+(last-step timestamp, stale age, transcript tail). Only step gaps count (the transcript's
+last-step age, never wall time); test phases are never wrapped.
+
+Deploy gate (cap_runner_hardening p2): after each agent phase, the runner scans the phase's
+session transcript for firebase production-deploy commands. A phase not marked
+``deploy_allowed: true`` (an optional per-phase marker, default false) that deployed fails with
+reason ``DEPLOY_GATE`` + the offending command + its transcript line as evidence, recorded on
+``PhaseResult.deploy_gate`` and the ledger — a deploy violation can never be committed.
+
+Commit-prefix enforcement (cap_runner_hardening p3): after each agent phase, the runner lists
+the commits made during the phase (``git log pre-head..HEAD``) and every one must match
+``[workflow] <phase> — <goal prefix>`` — the exact pattern the resume machinery matches. A
+plain-message commit fails the phase with reason ``COMMIT_PREFIX`` + the offending subjects as
+evidence, even if the phase otherwise succeeded (the campaign stops for the operator), recorded
+on ``PhaseResult.commit_gate`` and the ledger. The runner's own ``_git_commit`` writes the
+correct message; the enforcement catches MANUAL agent commits.
+
 The agent works directly in ``workdir``; prior-phase artifacts are committed there, so
 later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
@@ -139,6 +161,19 @@ class PhaseResult:
     tests_total: int = 0
     # phase-boundary evidence (populated only when a change_analyzer is injected; design §5.7)
     change_analysis: dict[str, Any] | None = None
+    #: cap_runner_hardening p1: when the phase watchdog SIGTERM'd a stalled agent, the
+    #: structured evidence (last-step timestamp, stale age, transcript tail). None otherwise.
+    stall_evidence: dict[str, Any] | None = None
+    #: cap_runner_hardening p2: when the deploy gate fired — the phase is not marked
+    #: ``deploy_allowed`` yet its session transcript shows a firebase production-deploy
+    #: command — the structured evidence (reason + offending commands + transcript lines).
+    #: None otherwise.
+    deploy_gate: dict[str, Any] | None = None
+    #: cap_runner_hardening p3: when commit-prefix enforcement fired — a commit the agent made
+    #: during the phase does not match ``[workflow] <phase> — <goal prefix>`` (the exact pattern
+    #: the resume machinery matches) — the structured evidence (reason + offending subjects).
+    #: None otherwise.
+    commit_gate: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -174,6 +209,9 @@ class PhaseResult:
             "tests_passed": self.tests_passed,
             "tests_total": self.tests_total,
             "change_analysis": self.change_analysis,
+            "stall_evidence": self.stall_evidence,
+            "deploy_gate": self.deploy_gate,
+            "commit_gate": self.commit_gate,
         }
 
 
@@ -285,6 +323,24 @@ def _git_full_sha(workdir: Path, rev: str) -> str:
 #: bounded to ~120s internally, well under this envelope. Tests shrink this constant to prove
 #: the deadline.
 ANALYZER_LEG_TIMEOUT_SECONDS = 360.0
+
+# ── Phase watchdog (cap_runner_hardening p1) ──────────────────────────────────────────────
+#
+# The measured execution disease: agents that go silent for 45-65 minutes while staying alive
+# (no session steps, idle CPU) — the stabilization p3 stall, the two terra stalls in both site
+# revamps. The runner previously waited on the opencode process indefinitely. The watchdog is
+# the technical, deterministic fix: it monitors the phase's session transcript (the worktree's
+# ``.instrument/session.jsonl``, appended live by the adapters while the seam is present) and
+# fails the phase once the transcript's LAST STEP is stale past the threshold — not wall time,
+# so a phase that keeps producing steps never fires no matter how long it runs. A stalled agent
+# is SIGTERM'd (exit ``-15``, the measured signature) and the phase fails with reason
+# ``STALLED`` + evidence (last-step timestamp, stale age, transcript tail).
+#
+# Threshold resolution: explicit ``phase_watchdog_min`` argument > ``FINOPS_PHASE_WATCHDOG_MIN``
+# env > ``PHASE_WATCHDOG_DEFAULT_MIN`` (20 — below the observed 45-65-min stalls, above any
+# legit step gap, the longest observed ~10 min). A value <= 0 disables the watchdog for the run.
+PHASE_WATCHDOG_ENV = "FINOPS_PHASE_WATCHDOG_MIN"
+PHASE_WATCHDOG_DEFAULT_MIN = 20.0
 
 
 def _call_with_deadline(fn: Callable[[], Any], *, timeout: float) -> tuple[bool, Any]:
@@ -630,6 +686,515 @@ def _completed_phases_from_index(
         return set()  # never block a resume on an index/ledger problem
 
 
+class PhaseWatchdog:
+    """Stall monitor for one agent phase (cap_runner_hardening p1).
+
+    The agent's steps land in ``<workdir>/.instrument/session.jsonl`` — the adapters append
+    each event line to that file LIVE while the seam is present, so the file's mtime IS the
+    last-step time. The monitor polls that age — NOT wall time — so a phase that keeps
+    producing steps never fires no matter how long it runs, while an agent whose last step
+    is stale past the threshold is SIGTERM'd (via the ``kill`` handle the adapter registered
+    in the seam) and the phase fails with reason ``STALLED`` plus the evidence (last-step
+    timestamp, stale age, transcript tail).
+
+    Threshold: ``FINOPS_PHASE_WATCHDOG_MIN`` env / CLI ``--phase-watchdog-min``, default 20
+    minutes (the measured stalls were 45-65 min; no legit step gap observed beyond ~10 min).
+    A threshold <= 0 disables the watchdog — agent phases then run unwrapped, byte-identical
+    to the pre-hardening runner. Non-agent phases never construct one (test phases run
+    in-process via ``test_runner``).
+
+    The monitor is cheap: each poll reads only the bytes appended to the transcript since the
+    previous poll (a few lines), so it adds no meaningful overhead to a compliant phase.
+
+    Adversarial note (cap_runner_hardening p5): the stall clock advances ONLY on MEANINGFUL
+    step events — a valid session event line whose ``type`` is in :data:`_MEANINGFUL_EVENT_TYPES`
+    (the vocabulary the adapters emit: step_start/step_finish/text/reasoning/tool_use/…). A
+    junk heartbeat — a non-JSON line or a dict without a recognized event type — touches the
+    file but does NOT reset the clock, so an agent that writes keep-alive garbage without real
+    progress is still SIGTERM'd. Accepted limitation: a heartbeat forged to LOOK like a real
+    event (``{"type":"step_start"}``) cannot be distinguished from a genuine one — the
+    transcript is the model's own output channel, and the measured disease was total silence.
+    """
+
+    def __init__(
+        self, workdir: str | Path, threshold_min: float, *, poll_interval_s: float | None = None
+    ) -> None:
+        self.workdir = Path(workdir)
+        self.threshold_min = float(threshold_min)
+        self.threshold_s = self.threshold_min * 60.0
+        if self.threshold_s <= 0:
+            raise ValueError("phase watchdog threshold must be > 0")
+        #: the transcript the phase's agent writes its steps to (run_workflow passes the same
+        #: path as ``transcript_path`` so the adapter writes exactly the file being watched)
+        self.transcript = self.workdir / ".instrument" / "session.jsonl"
+        #: adaptive poll interval: short enough to catch small test thresholds promptly, long
+        #: enough to be negligible in production (<= 10s for the default 20-min threshold)
+        self.poll_interval_s = poll_interval_s or max(0.25, min(self.threshold_s / 8.0, 10.0))
+        #: the shared kill seam — ``stream_subprocess`` populates ``["kill"]`` the moment the
+        #: agent process spawns, so this monitor can SIGTERM a process it never spawned
+        self.seam: dict[str, Any] = {"kill": None, "killed": False}
+        self._start = time.time()
+        #: the stall clock — the last time a MEANINGFUL step event landed (not the file mtime):
+        #: a junk heartbeat must not reset it (adversarial p5). The transcript is re-read only
+        #: from the last offset, so the poll stays cheap as the file grows.
+        self._last_activity = self._start
+        self._last_offset = 0
+        self._last_size = 0
+
+    def _poll_transcript(self) -> None:
+        """Read newly-appended transcript lines and advance the stall clock for meaningful steps.
+
+        Only bytes added since the last poll are read (a cheap incremental tail); a truncated
+        file (the adapter's end-of-phase rewrite) resets the offset so the rescan starts clean.
+        """
+        try:
+            size = self.transcript.stat().st_size
+        except OSError:
+            return
+        if size < self._last_size:  # truncated — the adapter's final write_text; rescan from top
+            self._last_offset = 0
+        self._last_size = size
+        if size <= self._last_offset:
+            return
+        with open(self.transcript, "rb") as fh:
+            fh.seek(self._last_offset)
+            new = fh.read()
+        if new.endswith(b"\n"):
+            complete = new[:-1].split(b"\n") if len(new) > 1 else []
+            self._last_offset = size
+        else:
+            # keep a possibly-partial trailing line for the next poll
+            pieces = new.split(b"\n")
+            complete = pieces[:-1] if len(pieces) > 1 else []
+            self._last_offset = size - len(pieces[-1])
+        for line in complete:
+            if _is_meaningful_step_event(line):
+                self._last_activity = time.time()
+
+    def _last_step_age(self) -> float:
+        """Seconds since the transcript's last MEANINGFUL step event (phase start if none yet)."""
+        return time.time() - self._last_activity
+
+    def _last_step_at_iso(self) -> str:
+        return datetime.fromtimestamp(self._last_activity, timezone.utc).isoformat()
+
+    def _transcript_tail(self, max_lines: int = 5, max_chars: int = 400) -> str:
+        try:
+            lines = self.transcript.read_text().splitlines()
+        except OSError:
+            return ""
+        tail = "\n".join(lines[-max_lines:])
+        if len(tail) > max_chars:
+            tail = tail[-max_chars:]
+        return tail or "(no transcript yet)"
+
+    def check_stall(self) -> dict[str, Any] | None:
+        """Return the STALLED evidence when no MEANINGFUL step has landed past the threshold."""
+        self._poll_transcript()
+        age = self._last_step_age()
+        if age < self.threshold_s:
+            return None
+        return {
+            "reason": "STALLED",
+            "last_step_at": self._last_step_at_iso(),
+            "stale_age_s": round(age, 1),
+            "stale_min": round(age / 60.0, 1),
+            "threshold_min": self.threshold_min,
+            "transcript_tail": self._transcript_tail(),
+        }
+
+    def kill_agent(self) -> None:
+        """SIGTERM the stalled agent via the seam the adapter registered (best-effort)."""
+        self.seam["killed"] = True
+        kill = self.seam.get("kill")
+        if kill is not None:
+            with contextlib.suppress(Exception):  # the agent may have already exited
+                kill()
+
+
+#: The session-event vocabulary the adapters write to the transcript. ONLY a line whose
+#: ``type`` is in this set counts as a meaningful step for the stall clock (adversarial p5):
+#: a real session emits step boundaries + the events of each step, so continuous work keeps
+#: the watchdog alive; a junk heartbeat line does not. Kept generous so a legitimate long tool
+#: call (whose ``tool_use``/``text``/``reasoning`` events keep landing) never looks stalled.
+_MEANINGFUL_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "step_start",
+        "step_finish",
+        "message",
+        "text",
+        "reasoning",
+        "tool_use",
+        "tool",
+        "file",
+        "add",
+        "snapshot",
+    }
+)
+
+
+def _is_meaningful_step_event(line: bytes) -> bool:
+    """True when ``line`` parses as a session event with a recognized ``type``."""
+    try:
+        event = json.loads(line)
+    except (ValueError, TypeError):
+        return False
+    if not isinstance(event, dict):
+        return False
+    kind = event.get("type")
+    return isinstance(kind, str) and kind in _MEANINGFUL_EVENT_TYPES
+
+
+def _resolve_watchdog_min(cli_value: float | None) -> float:
+    """Resolve the phase-watchdog threshold: explicit arg > env > default (cap p1 hard rule 5)."""
+    if cli_value is not None:
+        return float(cli_value)
+    raw = os.environ.get(PHASE_WATCHDOG_ENV, "").strip()
+    if raw:
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+    return PHASE_WATCHDOG_DEFAULT_MIN
+
+
+def _run_agent_phase(
+    run_agent: Callable[..., Any],
+    prompt: str,
+    agent_kwargs: dict[str, Any],
+    watchdog: PhaseWatchdog | None,
+) -> tuple[Any | None, dict[str, Any] | None]:
+    """Run one agent invocation, optionally under the stall watchdog.
+
+    Without a watchdog this is exactly the pre-hardening blocking call. With one, the agent
+    runs in a worker thread while this monitor polls the session transcript's last-step age;
+    a stall past the threshold SIGTERMs the agent and returns ``(None, evidence)`` so the
+    caller fails the phase with ``STALLED`` + the evidence. ``(result, None)`` on a normal
+    completion. The worker is abandoned (not joined) on a stall — the kill is what brings the
+    process down, and the phase must fail deterministically, not wait for the agent's own exit.
+    """
+    if watchdog is None:
+        return run_agent(prompt, **agent_kwargs), None
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(run_agent, prompt, **agent_kwargs)
+    try:
+        while True:
+            try:
+                return future.result(timeout=watchdog.poll_interval_s), None
+            except FuturesTimeout:
+                evidence = watchdog.check_stall()
+                if evidence is not None:
+                    watchdog.kill_agent()
+                    return None, evidence
+    finally:
+        pool.shutdown(wait=False)
+
+
+def _format_stall_evidence(ev: dict[str, Any]) -> str:
+    """Render the structured stall evidence into the phase's error (the ledger carries both)."""
+    return (
+        f"STALLED — no session step for {ev['stale_min']} min "
+        f"(threshold {ev['threshold_min']} min); last step at {ev['last_step_at']}; "
+        f"transcript tail:\n{ev['transcript_tail']}"
+    )
+
+
+# ── Deploy gate (cap_runner_hardening p2) ──────────────────────────────────────────────────
+#
+# The measured disease: terra ran ``firebase deploy`` from a non-deploy phase and silently
+# overwrote the production site (the revamp2 p3 session — the replay evidence is the transcript
+# line whose bash input was ``firebase deploy --only hosting && firebase deploy --only hosting
+# --project agentic-dynamics``). The gate is the technical, deterministic fix: after an agent
+# phase, the runner scans the phase's session transcript for production-deploy commands; a hit
+# in a phase NOT marked ``deploy_allowed: true`` fails the phase with reason ``DEPLOY_GATE`` +
+# the offending command + its transcript line as evidence.
+#
+# Honest detection scope (p5 adversary — what it can and cannot catch):
+#   CAN catch (TWO tiers, both on the bash tool_use event the agent actually ran):
+#     - the COMMAND tier: the tool input contains a firebase production-deploy invocation —
+#       ``firebase deploy`` (any flags), ``firebase --project <production-host>``, ``firebase
+#       hosting deploy``, including chained (``&&``/``;``), with any working directory, and the
+#       ``npx firebase-tools deploy`` form (the ``firebase``-token boundary still matches before
+#       the ``-tools`` suffix). The spec's pattern list verbatim, kept in this tuple.
+#     - the OUTPUT tier: the tool's captured output carries firebase's production-deploy banner
+#       (``Deploy complete!``, ``hosting[ai-finops-rulebook|agentic-dynamics]``, ``Hosting URL:
+#       https://…web.app``). This catches INDIRECTION — a script file (``./deploy.sh``), an
+#       alias, or a variable that reaches ``firebase deploy`` without the literal command in the
+#       tool input: a real firebase deploy prints this banner regardless of how it was invoked.
+#   CANNOT catch (documented limitation): indirection that never surfaces the literal command
+#   NOR the deploy banner in THIS phase's transcript — e.g. an alias/variable defined in an
+#   EARLIER phase or a wrapper that suppresses firebase's output. The gate reads the transcript
+#   deterministically and cannot resolve shell state across phases. Residual risk is bounded:
+#   the measured disease was an agent plainly running ``firebase deploy``, and the deploy_allowed
+#   marker + the failed phase + operator stop give the blast radius the operator gets to see.
+#   The output tier deliberately does NOT scan file contents or non-bash tool events (a skill
+#   document quoting the deploy command is not a deploy).
+#
+# Simpler honest schema rule (spec (d)): ANY phase may declare ``deploy_allowed: true`` — the
+# validator only type-checks it (must be a real boolean) and the post-scan enforces the intent.
+# A phase that carries the marker but never deploys is fine; a phase that deploys without it
+# fails. No naming rule, no "only the deploy phase" special case.
+DEPLOY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\bfirebase\b[^\n]*\bdeploy\b"), "firebase deploy"),
+    (
+        re.compile(r"\bfirebase\b[^\n]*\b--project\s+(?:agentic-dynamics|ai-finops-rulebook)\b"),
+        "firebase --project <production-host>",
+    ),
+    (re.compile(r"\bfirebase\b[^\n]*\bhosting\s+deploy\b"), "firebase hosting deploy"),
+]
+
+#: The OUTPUT tier's signatures — firebase's production-deploy banner, printed regardless of how
+#: the deploy was invoked (direct, script file, alias, variable). Catches command indirection.
+DEPLOY_OUTPUT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"Deploy\s+complete!"), "firebase deploy output (Deploy complete!)"),
+    (
+        re.compile(r"hosting\[(?:ai-finops-rulebook|agentic-dynamics)\]"),
+        "firebase hosting[<production-host>] output",
+    ),
+    (
+        re.compile(r"Hosting URL: https://(?:ai-finops-rulebook|agentic-dynamics)\.web\.app"),
+        "firebase Hosting URL output",
+    ),
+]
+
+
+def _commands_from_event(event: dict[str, Any]) -> list[str]:
+    """Extract the shell commands a tool event actually ran (bash tool_use inputs)."""
+    if event.get("type") != "tool_use":
+        return []
+    part = event.get("part", {})
+    if not isinstance(part, dict) or part.get("tool") != "bash":
+        return []
+    state = part.get("state", {})
+    if not isinstance(state, dict):
+        return []
+    inp = state.get("input", "")
+    command = inp.get("command", "") if isinstance(inp, dict) else str(inp)
+    if not command:
+        return []
+    return [command]
+
+
+def _output_from_event(event: dict[str, Any]) -> str:
+    """Extract the captured stdout of a bash tool_use event ('' when absent)."""
+    if event.get("type") != "tool_use":
+        return ""
+    part = event.get("part", {})
+    if not isinstance(part, dict) or part.get("tool") != "bash":
+        return ""
+    state = part.get("state", {})
+    if not isinstance(state, dict):
+        return ""
+    out = state.get("output", "")
+    if isinstance(out, dict):
+        return str(out.get("output", "") or "")
+    return str(out or "")
+
+
+def _deploy_pattern_match(command: str) -> str | None:
+    """Return the label of the first deploy pattern ``command`` matches, or ``None``."""
+    for pattern, label in DEPLOY_PATTERNS:
+        if pattern.search(command):
+            return label
+    return None
+
+
+def _deploy_output_pattern_match(output: str) -> str | None:
+    """Return the label of the first deploy-OUTPUT signature ``output`` matches, or ``None``."""
+    for pattern, label in DEPLOY_OUTPUT_PATTERNS:
+        if pattern.search(output):
+            return label
+    return None
+
+
+def _scan_transcript_for_deploys(transcript: Path) -> list[dict[str, Any]]:
+    """Scan a session transcript for firebase production-deploy commands (or their output).
+
+    Two detection tiers (see the module block above): the COMMAND tier matches the bash tool
+    input; the OUTPUT tier matches the tool's captured output for a bash event whose command did
+    not itself match (indirection). Returns one entry per offending event:
+    ``{"command": <the bash input>, "pattern": <which pattern matched>, "line": <the raw
+    transcript line>}.`` Empty when the transcript is missing, unreadable, or clean.
+    """
+    try:
+        lines = transcript.read_text().splitlines()
+    except OSError:
+        return []
+    violations: list[dict[str, Any]] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        for command in _commands_from_event(event):
+            matched = _deploy_pattern_match(command)
+            if matched is not None:
+                violations.append(
+                    {"command": command, "pattern": matched, "line": line[:2000]}
+                )
+                continue
+            # OUTPUT tier (indirection — a script/alias/variable that reached firebase deploy):
+            # a real production deploy prints its banner in the tool output no matter how it
+            # was invoked, so catch it there when the literal command did not match.
+            output = _output_from_event(event)
+            matched_out = _deploy_output_pattern_match(output)
+            if matched_out is not None:
+                violations.append(
+                    {
+                        "command": command or "(no command — output-only)",
+                        "pattern": matched_out,
+                        "line": line[:2000],
+                    }
+                )
+    return violations
+
+
+def _enforce_deploy_gate(
+    pr: PhaseResult, wd: Path, phase_def: dict[str, Any], *, transcript: Path | None = None
+) -> None:
+    """Post-phase deploy gate (cap_runner_hardening p2).
+
+    A phase NOT marked ``deploy_allowed: true`` that ran a firebase production-deploy command
+    fails with reason ``DEPLOY_GATE`` + the offending command(s) + the transcript line(s). The
+    evidence lands on ``PhaseResult.deploy_gate`` and the phase error, so the operator sees
+    exactly what fired. Two detection tiers (p5): the COMMAND tier matches the bash tool input
+    against :data:`DEPLOY_PATTERNS`; the OUTPUT tier matches the tool's captured output against
+    :data:`DEPLOY_OUTPUT_PATTERNS` when the command did not match — catching indirection (a
+    script/alias/variable that reached ``firebase deploy`` without the literal command). The
+    marker is the phase's own opt-in (default false) — the gate is about the command the agent
+    issued, never a naming rule. Best-effort: a missing/unreadable transcript is not a violation;
+    a phase already failed for another reason keeps its error and gains the DEPLOY_GATE note
+    appended (both reasons stay visible).
+    """
+    if bool(phase_def.get("deploy_allowed", False)):
+        return
+    violations = _scan_transcript_for_deploys(transcript or (wd / ".instrument" / "session.jsonl"))
+    if not violations:
+        return
+    pr.deploy_gate = {"reason": "DEPLOY_GATE", "violations": violations}
+    offending = "; ".join(f"'{v['command']}'" for v in violations)
+    msg = (
+        f"DEPLOY_GATE — firebase production deploy in phase not marked deploy_allowed: "
+        f"{offending}"
+    )
+    if pr.status == "ok":
+        pr.status = "failed"
+        pr.error = msg
+    else:
+        pr.error = f"{pr.error}\n{msg}"
+
+
+# ── Commit-prefix enforcement (cap_runner_hardening p3) ────────────────────────────────────
+#
+# The measured disease: terra committed 7 plain-message commits during revamp2 (no
+# '[workflow] <phase>' prefix, no goal prefix), silently breaking the resume machinery
+# (_completed_phases matches '[workflow] <phase> — <goal prefix>') and forcing a re-tagging
+# surgery. The enforcement is the technical, deterministic fix: after an agent phase, the
+# runner lists the commits made during the phase (git log pre-phase-head..HEAD) and every one
+# must match the pattern — a plain commit fails the phase with reason COMMIT_PREFIX + the
+# offending subjects as evidence, even if the phase otherwise succeeded.
+#
+# The definition of a valid commit IS the resume machinery's definition of a resumable commit:
+# this regex is kept in lockstep with _completed_phases, and the per-phase checks add the
+# phase's OWN name (a different phase's name must not count) and the run's 40-char goal prefix.
+COMMIT_SUBJECT_RE = re.compile(r"\[workflow\]\s+(\S+)\s+—\s+(.+)")
+COMMIT_SUBJECT_PATTERN = "[workflow] <phase> — <goal prefix>"
+
+
+def _commit_subject_matches(subject: str, phase_name: str, goal_prefix: str) -> bool:
+    """True when ``subject`` is a commit the resume machinery would match for THIS phase.
+
+    Mirrors ``_completed_phases`` exactly — the same regex, plus the phase's own name and the
+    run's 40-char goal prefix. Enforcement ⇔ resumability: a commit that passes here is exactly
+    one ``_completed_phases`` would treat as this phase's completed commit.
+    """
+    m = COMMIT_SUBJECT_RE.search(subject)
+    return bool(m and m.group(1) == phase_name and m.group(2).startswith(goal_prefix))
+
+
+def _git_log_subjects(workdir: Path, rev_range: str) -> list[tuple[str, str]]:
+    """``(subject, author_email)`` pairs for commits in ``rev_range``, or [] on any git problem.
+
+    Author email rides along so the enforcement can exempt the runner's OWN execution-layer
+    commits (the adapter's fresh-worktree ``Initial`` commit) from the pattern check — it is
+    not a manual agent commit, exactly like ``_git_commit``'s message (exempt by matching).
+    """
+    try:
+        log = subprocess.run(
+            ["git", "log", "--format=%s|%ae", rev_range],
+            cwd=workdir, capture_output=True, text=True, timeout=30,
+        )
+    except Exception:  # noqa: BLE001 — a git problem degrades to "no commits to check"
+        return []
+    if log.returncode != 0:
+        return []
+    out: list[tuple[str, str]] = []
+    for line in log.stdout.splitlines():
+        if not line.strip():
+            continue
+        subject, _, email = line.partition("|")
+        out.append((subject.strip(), email.strip()))
+    return out
+
+
+#: The adapter's worktree-initialization identity (``opencode._init_git_workdir``): the
+#: ``Initial`` commit it creates in a genuinely-new worktree is the runner's own execution-layer
+#: artifact, not a manual agent commit — the commit-prefix enforcement exempts it by author.
+RUNNER_INIT_AUTHOR_EMAIL = "experiment@instrument.local"
+
+
+def _enforce_commit_prefix(
+    pr: PhaseResult, wd: Path, phase_name: str, goal: str, pre_head: str
+) -> None:
+    """Post-phase commit-prefix enforcement (cap_runner_hardening p3).
+
+    Every commit the agent made during the phase (``git log pre_head..HEAD``; when there was
+    no pre-phase HEAD — a fresh worktree — all of HEAD's commits) must match
+    ``[workflow] <phase-name> — <goal prefix>``. A commit that does not fails the phase with
+    reason ``COMMIT_PREFIX`` + the offending subjects as evidence, even if the phase otherwise
+    succeeded — the phase flips to failed and ``stop_on_error`` stops the campaign for the
+    operator. Agent phases only. The runner's OWN commits are exempt by construction: the
+    runner's ``_git_commit`` message matches the pattern (and runs AFTER this check), and the
+    adapter's fresh-worktree ``Initial`` commit is exempted by its author identity
+    (``RUNNER_INIT_AUTHOR_EMAIL``) — the enforcement catches MANUAL agent commits. Best-effort:
+    an unreadable git state degrades to "no commits to check".
+    """
+    goal_prefix = goal[:40]
+    commits = (
+        _git_log_subjects(wd, f"{pre_head}..HEAD")
+        if pre_head
+        else _git_log_subjects(wd, "HEAD")
+    )
+    bad = [
+        s
+        for s, author in commits
+        if not (author == RUNNER_INIT_AUTHOR_EMAIL and s == "Initial")
+        and not _commit_subject_matches(s, phase_name, goal_prefix)
+    ]
+    if not bad:
+        return
+    expected = f"[workflow] {phase_name} — {goal_prefix}"
+    pr.commit_gate = {
+        "reason": "COMMIT_PREFIX",
+        "subjects": bad,
+        "expected_prefix": expected,
+    }
+    msg = (
+        f"COMMIT_PREFIX — commits made during phase '{phase_name}' do not match "
+        f"'{expected}': {bad}"
+    )
+    if pr.status == "ok":
+        pr.status = "failed"
+        pr.error = msg
+    else:
+        pr.error = f"{pr.error}\n{msg}"
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -658,6 +1223,7 @@ def run_workflow(
     construct_fn: Callable[..., Any] | None = None,
     rag_params: dict[str, Any] | None = None,
     change_analyzer: ChangeAnalyzer | None = None,
+    phase_watchdog_min: float | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
@@ -706,6 +1272,32 @@ def run_workflow(
     construction: a materialization failure, an unanalyzable commit (e.g. a root commit with
     no parent), or an analyzer error degrades to ``change_analysis=None`` — it can never
     change the phase's outcome. ``None`` (default) leaves the seam inert.
+
+    Phase watchdog (``phase_watchdog_min``, cap_runner_hardening p1): every agent phase
+    is wrapped in a stall monitor that watches the session transcript's last-step age
+    (``.instrument/session.jsonl``, appended live by the adapters while the seam is
+    present). A transcript silent for ``phase_watchdog_min`` minutes — resolved explicit
+    arg > ``FINOPS_PHASE_WATCHDOG_MIN`` env > default 20 — is SIGTERM'd and the phase
+    fails with reason ``STALLED`` + evidence (last-step timestamp, stale age, transcript
+    tail), recorded on ``PhaseResult.stall_evidence`` and the ledger. A value <= 0
+    disables it. Only step gaps count (the transcript's last-step age, never wall time),
+    and non-agent phases are never wrapped (test phases run in-process).
+
+    Deploy gate (``deploy_allowed``, cap_runner_hardening p2): after every agent phase the
+    runner scans the phase's session transcript for firebase production-deploy commands
+    (``firebase deploy``, ``firebase --project <production-host>``, ``firebase hosting
+    deploy``). A phase not marked ``deploy_allowed: true`` (optional per-phase marker,
+    default false) that deployed fails with reason ``DEPLOY_GATE`` + the offending command +
+    its transcript line, recorded on ``PhaseResult.deploy_gate`` and the ledger — the commit
+    gate runs after, so a deploy violation can never be committed.
+
+    Commit-prefix enforcement (cap_runner_hardening p3): after every agent phase the runner
+    lists the commits made during it (``git log pre-head..HEAD``) and requires each to match
+    ``[workflow] <phase> — <goal prefix>`` — the exact pattern the resume machinery matches.
+    A plain-message commit fails the phase with reason ``COMMIT_PREFIX`` + the offending
+    subjects, recorded on ``PhaseResult.commit_gate`` and the ledger, even if the phase
+    otherwise succeeded — the campaign stops for the operator and the bad commit is never
+    propagated by the commit gate (which runs after).
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -830,6 +1422,9 @@ def run_workflow(
                 # fine-grained session events stream into the Control Room.
                 prev_cell = os.environ.get("FINOPS_CELL_ID")
                 os.environ["FINOPS_CELL_ID"] = cell_id
+                ar = None
+                stall: dict[str, Any] | None = None
+                pre_head = ""
                 try:
                     # Select this step's model: pin wins, allowed_models restricts, else the
                     # full pool — scored over measured signals, pricing a model switch's cache
@@ -907,38 +1502,64 @@ def run_workflow(
                     ):
                         agent_kwargs["session_id"] = prev_session_id
                         agent_kwargs["fork"] = True
-                    ar = run_agent(prompt, **agent_kwargs)
+                    pr.model = model_i
+
+                    # Commit-prefix enforcement (cap_runner_hardening p3): record the worktree
+                    # HEAD before the agent runs, so after the phase the runner can list exactly
+                    # the commits the agent made during it (git log pre-head..HEAD).
+                    pre_head = _git_head(wd)
+
+                    # Phase watchdog (cap_runner_hardening p1) — wrap the agent invocation in a
+                    # stall monitor. The monitor polls the session transcript's last-step age
+                    # (``.instrument/session.jsonl``, appended live by the adapters while the seam
+                    # is present) and fails the phase deterministically — SIGTERM + STALLED +
+                    # evidence — when no new step appears for the threshold (explicit arg >
+                    # ``FINOPS_PHASE_WATCHDOG_MIN`` env > default 20 min; a value <= 0 disables
+                    # it). Only agent phases are wrapped; test phases run in-process, never
+                    # through this path.
+                    watchdog_min = _resolve_watchdog_min(phase_watchdog_min)
+                    watchdog = PhaseWatchdog(wd, watchdog_min) if watchdog_min > 0 else None
+                    if watchdog is not None:
+                        agent_kwargs["watchdog"] = watchdog.seam
+                        agent_kwargs["transcript_path"] = str(watchdog.transcript)
+                    ar, stall = _run_agent_phase(run_agent, prompt, agent_kwargs, watchdog)
+                    if stall is not None:
+                        # The stalled agent was SIGTERM'd; the phase fails with the evidence
+                        # (last-step timestamp, stale age, transcript tail) on the ledger.
+                        pr.status = "failed"
+                        pr.error = _format_stall_evidence(stall)
+                        pr.stall_evidence = stall
                 finally:
                     if prev_cell is None:
                         os.environ.pop("FINOPS_CELL_ID", None)
                     else:
                         os.environ["FINOPS_CELL_ID"] = prev_cell
-                pr.model = model_i
-                pr.tokens = {
-                    "in": getattr(ar, "prompt_tokens", 0),
-                    "out": getattr(ar, "completion_tokens", 0),
-                    "reasoning": getattr(ar, "reasoning_tokens", 0),
-                    "answer": getattr(ar, "answer_tokens", 0),
-                    "explanation": getattr(ar, "explanation_tokens", 0),
-                    "total": getattr(ar, "total_tokens", 0),
-                }
-                pr.cost_usd = getattr(ar, "estimated_cost_usd", 0.0)
-                pr.confidence = getattr(ar, "confidence", None)
-                pr.cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
-                pr.cache_write_tokens = getattr(ar, "cache_write_tokens", 0)
-                pr.cache_hit_rate = round(getattr(ar, "cache_hit_rate", 0.0), 4)
-                sid = getattr(ar, "session_id", "")
-                if sid:
-                    pr.session_id = sid
-                    prev_session_id = sid
-                prev_model = model_i
-                prev_cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
-                pr.files_created = list(getattr(ar, "files_created", []) or [])
-                pr.files_modified = list(getattr(ar, "files_modified", []) or [])
-                pr.final_response = getattr(ar, "final_response", "")
-                if not getattr(ar, "ok", True):
-                    pr.status = "failed"
-                    pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"
+                if stall is None and ar is not None:
+                    pr.tokens = {
+                        "in": getattr(ar, "prompt_tokens", 0),
+                        "out": getattr(ar, "completion_tokens", 0),
+                        "reasoning": getattr(ar, "reasoning_tokens", 0),
+                        "answer": getattr(ar, "answer_tokens", 0),
+                        "explanation": getattr(ar, "explanation_tokens", 0),
+                        "total": getattr(ar, "total_tokens", 0),
+                    }
+                    pr.cost_usd = getattr(ar, "estimated_cost_usd", 0.0)
+                    pr.confidence = getattr(ar, "confidence", None)
+                    pr.cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
+                    pr.cache_write_tokens = getattr(ar, "cache_write_tokens", 0)
+                    pr.cache_hit_rate = round(getattr(ar, "cache_hit_rate", 0.0), 4)
+                    sid = getattr(ar, "session_id", "")
+                    if sid:
+                        pr.session_id = sid
+                        prev_session_id = sid
+                    prev_model = model_i
+                    prev_cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
+                    pr.files_created = list(getattr(ar, "files_created", []) or [])
+                    pr.files_modified = list(getattr(ar, "files_modified", []) or [])
+                    pr.final_response = getattr(ar, "final_response", "")
+                    if not getattr(ar, "ok", True):
+                        pr.status = "failed"
+                        pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"
         except Exception as exc:  # one bad phase must not crash the runner
             pr.status = "failed"
             pr.error = repr(exc)
@@ -953,6 +1574,26 @@ def run_workflow(
         # commit below is skipped, exactly like the ``kind == "test"`` branch.
         if kind != "test" and phase_def.get("test_gate") and pr.status == "ok":
             _run_test_gate(pr, wd, language, phase_timeout)
+
+        # Deploy gate (cap_runner_hardening p2) — post-phase, agent phases only. Scan the
+        # phase's session transcript for firebase production-deploy commands; a hit in a phase
+        # not marked ``deploy_allowed: true`` fails the phase with DEPLOY_GATE + the offending
+        # command + its transcript line as evidence (recorded on the ledger). Runs BEFORE the
+        # commit gate so a deploy violation can never be committed. A phase already failed
+        # (e.g. STALLED) keeps its reason and gains the DEPLOY_GATE note.
+        if kind != "test":
+            _enforce_deploy_gate(pr, wd, phase_def)
+
+        # Commit-prefix enforcement (cap_runner_hardening p3) — post-phase, agent phases only.
+        # Every commit made during the phase (git log pre-head..HEAD) must match
+        # '[workflow] <phase> — <goal prefix>' — the exact pattern the resume machinery matches.
+        # A plain-message commit fails the phase with COMMIT_PREFIX + the offending subjects as
+        # evidence, even if the phase otherwise succeeded (the campaign then stops for the
+        # operator). Runs BEFORE the commit gate, so a bad commit can never be propagated as the
+        # phase's own. The runner's own _git_commit writes the correct message (and runs after)
+        # — this catches MANUAL agent commits.
+        if kind != "test":
+            _enforce_commit_prefix(pr, wd, name, goal, pre_head)
 
         pr.duration_s = round(time.time() - t0, 2)
         if commit and pr.status == "ok":
