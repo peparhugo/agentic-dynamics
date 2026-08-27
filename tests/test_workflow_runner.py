@@ -1518,4 +1518,178 @@ def test_commit_prefix_exempts_the_adapters_initial_commit(tmp_path):
     assert result2.phases[0].commit_gate["subjects"] == ["site: add things"]
 
 
+# ── Adversarial verification (cap_runner_hardening p5) ──────────
+
+
+def test_watchdog_sees_through_a_junk_heartbeat(tmp_path):
+    """(p5-1) A stalled agent that touches the session file with junk heartbeats — non-JSON
+    lines AND valid-JSON-but-not-a-step dicts — is STILL caught: the stall clock advances only
+    on MEANINGFUL step events, never on any write."""
+    spec = load_spec(SPEC)
+    killed: list[str] = []
+    release = threading.Event()
+
+    def agent(prompt, *, model, backend, workdir, watchdog=None, **kwargs):
+        transcript = _watchdog_transcript(workdir)
+        transcript.parent.mkdir(parents=True, exist_ok=True)
+        watchdog["kill"] = lambda: (killed.append("SIGTERM"), release.set())
+        transcript.write_text('{"type": "step_start"}\n')  # one real step, then ...
+        n = 0
+        while not release.is_set():  # ... only junk heartbeats (both flavors)
+            with transcript.open("a") as fh:
+                fh.write("heartbeat keep-alive\n" if n % 2 else '{"foo": "bar"}\n')
+            n += 1
+            release.wait(timeout=0.15)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          phase_watchdog_min=0.03, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.stall_evidence and p.stall_evidence["reason"] == "STALLED"
+    assert killed == ["SIGTERM"]
+
+
+def test_watchdog_cannot_distinguish_a_forged_valid_step(tmp_path):
+    """(p5-1, accepted limitation) A heartbeat forged to LOOK like a real step event keeps the
+    watchdog alive — the transcript is the model's own output channel and the two are
+    indistinguishable at the transcript level. The measured disease was total silence; this is
+    documented, not fixed. The test pins the boundary."""
+    spec = load_spec(SPEC)
+    killed: list[str] = []
+    release = threading.Event()
+
+    def agent(prompt, *, model, backend, workdir, watchdog=None, **kwargs):
+        transcript = _watchdog_transcript(workdir)
+        transcript.parent.mkdir(parents=True, exist_ok=True)
+        watchdog["kill"] = lambda: (killed.append("SIGTERM"), release.set())
+        with transcript.open("a") as fh:
+            fh.write('{"type": "step_start"}\n')
+        for _ in range(8):  # keep emitting REAL-looking step boundaries, slowly
+            release.wait(timeout=0.2)
+            if release.is_set():
+                break
+            with transcript.open("a") as fh:
+                fh.write('{"type": "step_finish"}\n')
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          phase_watchdog_min=0.03, run_agentic_fn=agent)
+    assert result.phases[0].status == "ok"
+    assert killed == []
+
+
+# ── Deploy-gate evasion (p5-2) ──────────────────────────────────
+
+DEPLOY_EVASION_COMMANDS = [
+    ("firebase deploy --only hosting", {"workdir": "/somewhere/else"}),  # different cwd
+    ("firebase --help > /dev/null && firebase deploy", {}),              # pre-command obfuscation
+    ("npx firebase-tools deploy --only hosting", {}),                    # npx form
+    ("true; firebase deploy --only hosting", {}),                        # chained
+    ("firebase deploy --only hosting --project agentic-dynamics", {}),   # mirror host explicit
+]
+
+
+def test_deploy_gate_evasion_attempts_that_are_caught(tmp_path):
+    """(p5-2) Evasion attempts that still expose the firebase command are caught: a different
+    working directory, a benign pre-command, the ``npx firebase-tools`` form, chaining, and the
+    explicit mirror-host flag. Each fails a non-deploy phase with DEPLOY_GATE."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    for command, extra in DEPLOY_EVASION_COMMANDS:
+        line = json.dumps({
+            "type": "tool_use", "sessionID": "s",
+            "part": {"type": "tool", "tool": "bash", "state": {
+                "status": "completed",
+                "input": {"command": command, "workdir": extra.get("workdir", "/tmp/w")},
+                "output": "",
+            }},
+        })
+        assert wr._deploy_pattern_match(command) is not None, command
+        spec = load_spec(SPEC)
+        result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                              run_agentic_fn=_deploy_agent(line))
+        p = result.phases[0]
+        assert p.status == "failed", command
+        assert p.deploy_gate and p.deploy_gate["reason"] == "DEPLOY_GATE", command
+        assert any(command == v["command"] for v in p.deploy_gate["violations"]), command
+
+
+def test_deploy_gate_catches_a_deploy_script_by_its_output(tmp_path):
+    """(p5-2) Indirection caught by the OUTPUT tier: a script file (``./deploy.sh``) whose bash
+    input contains no 'firebase' literal but whose captured output shows the production deploy
+    banner is still caught — a real firebase deploy prints the banner however it is invoked."""
+    line = json.dumps({
+        "type": "tool_use", "sessionID": "s",
+        "part": {"type": "tool", "tool": "bash", "state": {
+            "status": "completed",
+            "input": {"command": "./deploy.sh", "workdir": "/tmp/wt_site_revamp2/apps/website"},
+            "output": "\n=== Deploying to 'ai-finops-rulebook'...\n\u2714 Deploy complete!\n"
+                      "Hosting URL: https://ai-finops-rulebook.web.app\n",
+        }},
+    })
+    spec = load_spec(SPEC)
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=_deploy_agent(line))
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.deploy_gate and p.deploy_gate["reason"] == "DEPLOY_GATE"
+    assert p.deploy_gate["violations"][0]["command"] == "./deploy.sh"
+    assert "Deploy complete!" in p.deploy_gate["violations"][0]["pattern"]
+
+
+def test_deploy_gate_variable_indirection_without_a_banner_is_a_limitation(tmp_path):
+    """(p5-2, accepted limitation) Indirection that never surfaces the literal 'firebase'
+    command NOR the deploy banner in this phase's transcript — e.g. an alias/variable defined in
+    an EARLIER phase, or a wrapper that suppresses firebase's output — is not catchable by a
+    deterministic transcript scan (shell state across phases is unresolvable). Documented, not
+    fixed. The test pins the boundary so a future hardening knows where it stands."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    line = json.dumps({
+        "type": "tool_use", "sessionID": "s",
+        "part": {"type": "tool", "tool": "bash", "state": {
+            "status": "completed",
+            "input": {"command": "$DEPLOY --only hosting --project agentic-dynamics",
+                      "workdir": "/tmp/apps/website"},
+            "output": "ok",  # a wrapper that swallows the deploy banner
+        }},
+    })
+    transcript = Path(tmp_path) / "lim.jsonl"
+    transcript.write_text(line + "\n")
+    assert wr._scan_transcript_for_deploys(transcript) == []
+
+
+# ── Commit-enforcement evasion (p5-3) ───────────────────────────
+
+
+def test_commit_prefix_evasion_attempts_that_are_caught(tmp_path):
+    """(p5-3) Commit-message evasion: a DIFFERENT phase's name, a hyphen instead of the literal
+    em-dash, a double em-dash, and a missing space after the em-dash are all rejected — the
+    validator enforces the phase's OWN name + the exact pattern the resume machinery matches."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    goal_prefix = "g"
+    assert wr._commit_subject_matches("[workflow] p3_dom_verification — g", "scope", goal_prefix) is False
+    assert wr._commit_subject_matches("[workflow] scope - g", "scope", goal_prefix) is False
+    assert wr._commit_subject_matches("[workflow] scope -- g", "scope", goal_prefix) is False
+    assert wr._commit_subject_matches("[workflow] scope —— g", "scope", goal_prefix) is False
+    assert wr._commit_subject_matches("[workflow] scope —g", "scope", goal_prefix) is False
+    assert wr._commit_subject_matches("[workflow] scope — g", "scope", goal_prefix) is True
+    # a WRONG goal prefix is rejected (already covered, kept for the attack matrix)
+    assert wr._commit_subject_matches("[workflow] scope — different goal", "scope", goal_prefix) is False
+
+
+def test_commit_prefix_trailing_content_after_a_valid_prefix_matches(tmp_path):
+    """(p5-3, known-safe) Trailing content AFTER a valid '[workflow] <phase> — <goal prefix>'
+    prefix still matches — the SAME startswith leniency the resume machinery has. The
+    enforcement is deliberately not stricter than the pattern it guards: a commit that resumes
+    as this phase's IS this phase's. Not a bypass of the contract; documented."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    assert wr._commit_subject_matches("[workflow] scope — g; rm -rf /", "scope", "g") is True
+    assert wr._commit_subject_matches("[workflow] scope — g (done, extra)", "scope", "g") is True
+
+
+
 

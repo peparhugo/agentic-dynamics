@@ -703,8 +703,17 @@ class PhaseWatchdog:
     to the pre-hardening runner. Non-agent phases never construct one (test phases run
     in-process via ``test_runner``).
 
-    The monitor itself is a cheap mtime poll (one ``os.stat`` per interval, sub-second) — it
-    adds no meaningful overhead to a compliant phase.
+    The monitor is cheap: each poll reads only the bytes appended to the transcript since the
+    previous poll (a few lines), so it adds no meaningful overhead to a compliant phase.
+
+    Adversarial note (cap_runner_hardening p5): the stall clock advances ONLY on MEANINGFUL
+    step events — a valid session event line whose ``type`` is in :data:`_MEANINGFUL_EVENT_TYPES`
+    (the vocabulary the adapters emit: step_start/step_finish/text/reasoning/tool_use/…). A
+    junk heartbeat — a non-JSON line or a dict without a recognized event type — touches the
+    file but does NOT reset the clock, so an agent that writes keep-alive garbage without real
+    progress is still SIGTERM'd. Accepted limitation: a heartbeat forged to LOOK like a real
+    event (``{"type":"step_start"}``) cannot be distinguished from a genuine one — the
+    transcript is the model's own output channel, and the measured disease was total silence.
     """
 
     def __init__(
@@ -725,21 +734,49 @@ class PhaseWatchdog:
         #: agent process spawns, so this monitor can SIGTERM a process it never spawned
         self.seam: dict[str, Any] = {"kill": None, "killed": False}
         self._start = time.time()
+        #: the stall clock — the last time a MEANINGFUL step event landed (not the file mtime):
+        #: a junk heartbeat must not reset it (adversarial p5). The transcript is re-read only
+        #: from the last offset, so the poll stays cheap as the file grows.
+        self._last_activity = self._start
+        self._last_offset = 0
+        self._last_size = 0
+
+    def _poll_transcript(self) -> None:
+        """Read newly-appended transcript lines and advance the stall clock for meaningful steps.
+
+        Only bytes added since the last poll are read (a cheap incremental tail); a truncated
+        file (the adapter's end-of-phase rewrite) resets the offset so the rescan starts clean.
+        """
+        try:
+            size = self.transcript.stat().st_size
+        except OSError:
+            return
+        if size < self._last_size:  # truncated — the adapter's final write_text; rescan from top
+            self._last_offset = 0
+        self._last_size = size
+        if size <= self._last_offset:
+            return
+        with open(self.transcript, "rb") as fh:
+            fh.seek(self._last_offset)
+            new = fh.read()
+        if new.endswith(b"\n"):
+            complete = new[:-1].split(b"\n") if len(new) > 1 else []
+            self._last_offset = size
+        else:
+            # keep a possibly-partial trailing line for the next poll
+            pieces = new.split(b"\n")
+            complete = pieces[:-1] if len(pieces) > 1 else []
+            self._last_offset = size - len(pieces[-1])
+        for line in complete:
+            if _is_meaningful_step_event(line):
+                self._last_activity = time.time()
 
     def _last_step_age(self) -> float:
-        """Seconds since the transcript's last write (or phase start when no file exists yet)."""
-        try:
-            mtime = self.transcript.stat().st_mtime
-        except OSError:
-            mtime = self._start
-        return time.time() - mtime
+        """Seconds since the transcript's last MEANINGFUL step event (phase start if none yet)."""
+        return time.time() - self._last_activity
 
     def _last_step_at_iso(self) -> str:
-        try:
-            mtime = self.transcript.stat().st_mtime
-        except OSError:
-            mtime = self._start
-        return datetime.fromtimestamp(mtime, timezone.utc).isoformat()
+        return datetime.fromtimestamp(self._last_activity, timezone.utc).isoformat()
 
     def _transcript_tail(self, max_lines: int = 5, max_chars: int = 400) -> str:
         try:
@@ -752,7 +789,8 @@ class PhaseWatchdog:
         return tail or "(no transcript yet)"
 
     def check_stall(self) -> dict[str, Any] | None:
-        """Return the STALLED evidence when the transcript has been silent past the threshold."""
+        """Return the STALLED evidence when no MEANINGFUL step has landed past the threshold."""
+        self._poll_transcript()
         age = self._last_step_age()
         if age < self.threshold_s:
             return None
@@ -772,6 +810,39 @@ class PhaseWatchdog:
         if kill is not None:
             with contextlib.suppress(Exception):  # the agent may have already exited
                 kill()
+
+
+#: The session-event vocabulary the adapters write to the transcript. ONLY a line whose
+#: ``type`` is in this set counts as a meaningful step for the stall clock (adversarial p5):
+#: a real session emits step boundaries + the events of each step, so continuous work keeps
+#: the watchdog alive; a junk heartbeat line does not. Kept generous so a legitimate long tool
+#: call (whose ``tool_use``/``text``/``reasoning`` events keep landing) never looks stalled.
+_MEANINGFUL_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "step_start",
+        "step_finish",
+        "message",
+        "text",
+        "reasoning",
+        "tool_use",
+        "tool",
+        "file",
+        "add",
+        "snapshot",
+    }
+)
+
+
+def _is_meaningful_step_event(line: bytes) -> bool:
+    """True when ``line`` parses as a session event with a recognized ``type``."""
+    try:
+        event = json.loads(line)
+    except (ValueError, TypeError):
+        return False
+    if not isinstance(event, dict):
+        return False
+    kind = event.get("type")
+    return isinstance(kind, str) and kind in _MEANINGFUL_EVENT_TYPES
 
 
 def _resolve_watchdog_min(cli_value: float | None) -> float:
@@ -838,14 +909,26 @@ def _format_stall_evidence(ev: dict[str, Any]) -> str:
 # in a phase NOT marked ``deploy_allowed: true`` fails the phase with reason ``DEPLOY_GATE`` +
 # the offending command + its transcript line as evidence.
 #
-# Honest detection scope: the gate's job is catching PRODUCTION DEPLOYS — the commands that
-# publish the site. It matches the bash tool_use input (the command the agent actually issued)
-# against the patterns below. It deliberately does NOT scan tool outputs or file contents, and
-# it does not chase variables/aliases/wrappers that still reach ``firebase deploy`` — the p5
-# adversary phase documents exactly what it can and cannot catch. The pattern set is the spec's
-# list verbatim: ``firebase deploy``, ``firebase --project <production-host>``, and any
-# ``firebase hosting deploy`` form (subsumed by the first but kept explicit for the evidence's
-# pattern label).
+# Honest detection scope (p5 adversary — what it can and cannot catch):
+#   CAN catch (TWO tiers, both on the bash tool_use event the agent actually ran):
+#     - the COMMAND tier: the tool input contains a firebase production-deploy invocation —
+#       ``firebase deploy`` (any flags), ``firebase --project <production-host>``, ``firebase
+#       hosting deploy``, including chained (``&&``/``;``), with any working directory, and the
+#       ``npx firebase-tools deploy`` form (the ``firebase``-token boundary still matches before
+#       the ``-tools`` suffix). The spec's pattern list verbatim, kept in this tuple.
+#     - the OUTPUT tier: the tool's captured output carries firebase's production-deploy banner
+#       (``Deploy complete!``, ``hosting[ai-finops-rulebook|agentic-dynamics]``, ``Hosting URL:
+#       https://…web.app``). This catches INDIRECTION — a script file (``./deploy.sh``), an
+#       alias, or a variable that reaches ``firebase deploy`` without the literal command in the
+#       tool input: a real firebase deploy prints this banner regardless of how it was invoked.
+#   CANNOT catch (documented limitation): indirection that never surfaces the literal command
+#   NOR the deploy banner in THIS phase's transcript — e.g. an alias/variable defined in an
+#   EARLIER phase or a wrapper that suppresses firebase's output. The gate reads the transcript
+#   deterministically and cannot resolve shell state across phases. Residual risk is bounded:
+#   the measured disease was an agent plainly running ``firebase deploy``, and the deploy_allowed
+#   marker + the failed phase + operator stop give the blast radius the operator gets to see.
+#   The output tier deliberately does NOT scan file contents or non-bash tool events (a skill
+#   document quoting the deploy command is not a deploy).
 #
 # Simpler honest schema rule (spec (d)): ANY phase may declare ``deploy_allowed: true`` — the
 # validator only type-checks it (must be a real boolean) and the post-scan enforces the intent.
@@ -858,6 +941,20 @@ DEPLOY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "firebase --project <production-host>",
     ),
     (re.compile(r"\bfirebase\b[^\n]*\bhosting\s+deploy\b"), "firebase hosting deploy"),
+]
+
+#: The OUTPUT tier's signatures — firebase's production-deploy banner, printed regardless of how
+#: the deploy was invoked (direct, script file, alias, variable). Catches command indirection.
+DEPLOY_OUTPUT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"Deploy\s+complete!"), "firebase deploy output (Deploy complete!)"),
+    (
+        re.compile(r"hosting\[(?:ai-finops-rulebook|agentic-dynamics)\]"),
+        "firebase hosting[<production-host>] output",
+    ),
+    (
+        re.compile(r"Hosting URL: https://(?:ai-finops-rulebook|agentic-dynamics)\.web\.app"),
+        "firebase Hosting URL output",
+    ),
 ]
 
 
@@ -878,6 +975,22 @@ def _commands_from_event(event: dict[str, Any]) -> list[str]:
     return [command]
 
 
+def _output_from_event(event: dict[str, Any]) -> str:
+    """Extract the captured stdout of a bash tool_use event ('' when absent)."""
+    if event.get("type") != "tool_use":
+        return ""
+    part = event.get("part", {})
+    if not isinstance(part, dict) or part.get("tool") != "bash":
+        return ""
+    state = part.get("state", {})
+    if not isinstance(state, dict):
+        return ""
+    out = state.get("output", "")
+    if isinstance(out, dict):
+        return str(out.get("output", "") or "")
+    return str(out or "")
+
+
 def _deploy_pattern_match(command: str) -> str | None:
     """Return the label of the first deploy pattern ``command`` matches, or ``None``."""
     for pattern, label in DEPLOY_PATTERNS:
@@ -886,12 +999,22 @@ def _deploy_pattern_match(command: str) -> str | None:
     return None
 
 
-def _scan_transcript_for_deploys(transcript: Path) -> list[dict[str, Any]]:
-    """Scan a session transcript for firebase production-deploy commands.
+def _deploy_output_pattern_match(output: str) -> str | None:
+    """Return the label of the first deploy-OUTPUT signature ``output`` matches, or ``None``."""
+    for pattern, label in DEPLOY_OUTPUT_PATTERNS:
+        if pattern.search(output):
+            return label
+    return None
 
-    Returns one entry per offending command: ``{"command": <the bash input>, "pattern": <which
-    deploy pattern matched>, "line": <the raw transcript line>}.`` Empty when the transcript is
-    missing, unreadable, or clean.
+
+def _scan_transcript_for_deploys(transcript: Path) -> list[dict[str, Any]]:
+    """Scan a session transcript for firebase production-deploy commands (or their output).
+
+    Two detection tiers (see the module block above): the COMMAND tier matches the bash tool
+    input; the OUTPUT tier matches the tool's captured output for a bash event whose command did
+    not itself match (indirection). Returns one entry per offending event:
+    ``{"command": <the bash input>, "pattern": <which pattern matched>, "line": <the raw
+    transcript line>}.`` Empty when the transcript is missing, unreadable, or clean.
     """
     try:
         lines = transcript.read_text().splitlines()
@@ -914,6 +1037,20 @@ def _scan_transcript_for_deploys(transcript: Path) -> list[dict[str, Any]]:
                 violations.append(
                     {"command": command, "pattern": matched, "line": line[:2000]}
                 )
+                continue
+            # OUTPUT tier (indirection — a script/alias/variable that reached firebase deploy):
+            # a real production deploy prints its banner in the tool output no matter how it
+            # was invoked, so catch it there when the literal command did not match.
+            output = _output_from_event(event)
+            matched_out = _deploy_output_pattern_match(output)
+            if matched_out is not None:
+                violations.append(
+                    {
+                        "command": command or "(no command — output-only)",
+                        "pattern": matched_out,
+                        "line": line[:2000],
+                    }
+                )
     return violations
 
 
@@ -925,10 +1062,14 @@ def _enforce_deploy_gate(
     A phase NOT marked ``deploy_allowed: true`` that ran a firebase production-deploy command
     fails with reason ``DEPLOY_GATE`` + the offending command(s) + the transcript line(s). The
     evidence lands on ``PhaseResult.deploy_gate`` and the phase error, so the operator sees
-    exactly what fired. The marker is the phase's own opt-in (default false) — the gate is
-    about the command the agent issued, never a naming rule. Best-effort: a missing/unreadable
-    transcript is not a violation; a phase already failed for another reason keeps its error
-    and gains the DEPLOY_GATE note appended (both reasons stay visible).
+    exactly what fired. Two detection tiers (p5): the COMMAND tier matches the bash tool input
+    against :data:`DEPLOY_PATTERNS`; the OUTPUT tier matches the tool's captured output against
+    :data:`DEPLOY_OUTPUT_PATTERNS` when the command did not match — catching indirection (a
+    script/alias/variable that reached ``firebase deploy`` without the literal command). The
+    marker is the phase's own opt-in (default false) — the gate is about the command the agent
+    issued, never a naming rule. Best-effort: a missing/unreadable transcript is not a violation;
+    a phase already failed for another reason keeps its error and gains the DEPLOY_GATE note
+    appended (both reasons stay visible).
     """
     if bool(phase_def.get("deploy_allowed", False)):
         return
