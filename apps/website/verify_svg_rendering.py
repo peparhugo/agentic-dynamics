@@ -78,7 +78,7 @@ def _serve_website() -> str:
     return f"http://127.0.0.1:{server.server_address[1]}"
 
 
-PROBE = """
+PROBE = r"""
 () => {
   const doc = document.documentElement;
   const scrollCtx = (el, axis) => {
