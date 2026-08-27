@@ -378,3 +378,180 @@ body.light .cta-btn:hover{box-shadow:0 16px 42px rgba(8,145,178,0.28)}
 @media(max-width:550px){
   .stats{grid-template-columns:1fr}
 }
+
+/* ==========================================================================
+   FIELD LAYER — editorial type + evidence system (cap_site_revamp4, approved p2)
+   Adapted from the reused research's local example library:
+     ref: type-editorial-measure.html  (Source Serif 4 / IBM Plex Sans; MDN/Bootstrap study)
+     ref: type-responsive-grid.html    (reading column + quiet receipt)
+     ref: card-details.html            (status visible above the claim)
+     ref: card-tooltip-badge.html      (restrained badge, accessible source disclosure)
+   Augments the preserved instrument — it never replaces a page-local control.
+   ========================================================================== */
+
+/* --- Editorial type tokens (both themes) --- */
+:root{
+  --font-serif: "Source Serif 4","Source Serif Pro",Georgia,"Times New Roman",serif;
+  --font-sans: "IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --font-mono: "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --measure: 44rem;
+  /* Evidence encoding: teal = measured, amber = computed/model; hue survives both themes.
+     A textual class (not color alone) is always present. */
+  --ev-m: #287271;   /* measured */
+  --ev-c: #9b6a28;   /* computed / modeled */
+  --ev-h: #5b6b8c;   /* heuristic */
+  --ev-x: #7a5c8c;   /* external */
+  --ev-p: #8a2f2f;   /* policy / proposal */
+  --ev-ink: #17212b;
+  --ev-paper: #f7f4ed;
+  --ev-graphite: #5e645f;
+}
+body.light{
+  --ev-m:#287271;--ev-c:#9b6a28;--ev-h:#5b6b8c;--ev-x:#7a5c8c;--ev-p:#8a2f2f;
+  --ev-ink:#17212b;--ev-paper:#f7f4ed;--ev-graphite:#5e645f;
+}
+
+/* --- Editorial essay column (prose measure) --- */
+.essay{
+  max-width:min(100% - 2rem,var(--measure));
+  margin:0 auto;
+}
+.essay .lead{
+  font-family:var(--font-serif);
+  font-size:1.28rem;line-height:1.5;color:var(--t);
+}
+.essay p{font-family:var(--font-serif);font-size:1.05rem;line-height:1.7;color:var(--t2)}
+.kicker{
+  display:block;
+  font-family:var(--font-mono);
+  font-size:0.72rem;font-weight:700;letter-spacing:0.12em;
+  text-transform:uppercase;color:var(--ev-m);margin-bottom:0.6rem;
+}
+.kicker.amber{color:var(--ev-c)}
+
+/* --- Evidence-class badge (textual + colored) --- */
+.ev-badge{
+  display:inline-flex;align-items:center;gap:0.4rem;
+  font-family:var(--font-mono);font-size:0.68rem;font-weight:700;
+  letter-spacing:0.04em;line-height:1;
+  padding:0.28em 0.55em;border-radius:4px;
+  border:1px solid currentColor;background:transparent;
+  white-space:nowrap;
+}
+.ev-badge.m{color:var(--ev-m)}.ev-badge.c{color:var(--ev-c)}
+.ev-badge.h{color:var(--ev-h)}.ev-badge.x{color:var(--ev-x)}.ev-badge.p{color:var(--ev-p)}
+.ev-badge.m::before{content:"[M] measured"}
+.ev-badge.c::before{content:"[C] computed"}
+.ev-badge.h::before{content:"[H] heuristic"}
+.ev-badge.x::before{content:"[X] external"}
+.ev-badge.p::before{content:"[P] policy"}
+/* non-color textual fallback: the class name carries the same meaning */
+.ev-badge.m:focus-visible,.ev-badge.c:focus-visible,.ev-badge.h:focus-visible,
+.ev-badge.x:focus-visible,.ev-badge.p:focus-visible{outline:2px solid var(--ev-ink)}
+
+/* --- Provenance receipt (quiet secondary column; repeated on named pages) --- */
+.field-receipt{
+  align-self:start;
+  border-top:4px solid var(--ev-m);
+  background:var(--bg3);
+  border-radius:0 0 12px 12px;
+  padding:1rem 1.1rem;
+  font-size:0.78rem;line-height:1.6;color:var(--t2);
+}
+.field-receipt .r-head{
+  font-family:var(--font-mono);font-size:0.66rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.08em;color:var(--ev-m);margin-bottom:0.5rem;
+}
+.field-receipt dl{margin:0;display:grid;gap:0.35rem}
+.field-receipt dt{
+  font-family:var(--font-mono);font-size:0.64rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.05em;color:var(--ev-graphite);
+}
+.field-receipt dd{margin:0 0 0.45rem;font-size:0.78rem;color:var(--t2)}
+.field-receipt dd:last-child{margin-bottom:0}
+
+/* --- Editorial figure (svg/static; caption names unit + class + source) --- */
+.figure-edit{margin:2rem 0}
+.figure-edit svg{width:100%;height:auto;background:var(--bg3);border:1px solid var(--b);border-radius:12px}
+.figure-edit figcaption{
+  margin-top:0.6rem;
+  font-family:var(--font-sans);font-style:italic;font-size:0.78rem;line-height:1.5;
+  color:var(--ev-graphite);
+}
+.figure-edit .fig-legend{
+  display:flex;flex-wrap:wrap;gap:0.6rem;margin-top:0.6rem;
+  font-family:var(--font-mono);font-size:0.66rem;color:var(--ev-graphite);
+}
+
+/* --- Named-null state (honest null, never 0 / dash / stale fallback) --- */
+.null-state{
+  display:flex;align-items:flex-start;gap:0.6rem;
+  background:var(--bg3);border:1px dashed var(--ev-graphite);
+  border-radius:10px;padding:0.85rem 1rem;margin:1rem 0;
+  font-size:0.8rem;line-height:1.55;color:var(--t2);
+}
+.null-state .ns-tag{
+  font-family:var(--font-mono);font-size:0.62rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.06em;color:var(--ev-graphite);
+  white-space:nowrap;padding-top:0.1rem;
+}
+.null-state strong{color:var(--t)}
+
+/* --- Decision card (status above the claim; source in a <details>) --- */
+.decision-card{
+  background:var(--bg3);border:1px solid var(--b);border-top:4px solid var(--ev-c);
+  border-radius:12px;padding:1.2rem 1.3rem;margin:1.2rem 0;text-align:left;
+}
+.decision-card .dc-status{
+  font-family:var(--font-mono);font-size:0.68rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.08em;color:var(--ev-c);margin-bottom:0.6rem;
+}
+.decision-card h3{font-size:1rem;margin:0 0 0.5rem}
+.decision-card p,.decision-card li{font-size:0.84rem;color:var(--t2);line-height:1.6}
+.decision-card ul{list-style:none;padding:0;margin:0}
+.decision-card li{padding:0.25rem 0}
+.decision-card .dc-bound{
+  margin-top:0.8rem;padding-top:0.7rem;border-top:1px solid var(--b);
+  font-size:0.76rem;color:var(--ev-graphite);
+}
+.decision-card details{margin-top:0.8rem;font-size:0.78rem}
+.decision-card summary{cursor:pointer;font-weight:700;color:var(--ev-c);font-family:var(--font-sans)}
+
+/* --- Instrument cycle + flow figures (marker-flow style) --- */
+.flow-node{fill:var(--bg3);stroke:var(--ev-ink);stroke-width:1.5}
+.flow-node.measured{stroke:var(--ev-m)}.flow-node.computed{stroke:var(--ev-c)}
+.flow-link{fill:none;stroke:var(--ev-m);stroke-width:2.5;marker-end:url(#flowArrow)}
+.flow-label{font-family:var(--font-mono);font-weight:700;text-anchor:middle;fill:var(--t)}
+
+/* --- Rule cards (grouped by instrumented / proposed / decided) --- */
+.rule-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:0.9rem;margin:1.4rem 0}
+.rule-card{
+  display:flex;flex-direction:column;
+  background:var(--bg3);border:1px solid var(--b);border-radius:12px;
+  padding:1rem 1.1rem;text-align:left;
+}
+.rule-card .rc-status{
+  font-family:var(--font-mono);font-size:0.62rem;font-weight:700;
+  letter-spacing:0.06em;text-transform:uppercase;margin-bottom:0.5rem;
+}
+.rule-card.measured .rc-status{color:var(--ev-m)}
+.rule-card.proposed .rc-status{color:var(--ev-c)}
+.rule-card.decided .rc-status{color:var(--ev-p)}
+.rule-card h4{font-size:0.86rem;color:var(--t);margin:0 0 0.35rem}
+.rule-card p{font-size:0.76rem;color:var(--t2);line-height:1.55;margin:0}
+.rule-card footer{margin-top:auto;padding-top:0.6rem;border-top:1px solid var(--b);font-size:0.66rem;color:var(--ev-graphite)}
+.rule-card details{margin-top:0.5rem;font-size:0.72rem}
+.rule-card summary{cursor:pointer;color:var(--ev-m);font-weight:700}
+
+/* --- Two-column editorial figure + receipt --- */
+.edit-split{
+  display:grid;grid-template-columns:minmax(0,2fr) minmax(16rem,1fr);
+  gap:2rem;align-items:start;margin:2rem 0;
+}
+@media(max-width:700px){.edit-split{grid-template-columns:1fr;gap:1.2rem}}
+
+/* --- Reduced motion: information stays in the static frame --- */
+@media(prefers-reduced-motion:reduce){
+  .pulse .dot,animate,svg animate{animation:none!important}
+  html{scroll-behavior:auto}
+}
