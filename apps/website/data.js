@@ -1,12 +1,12 @@
-/* Generated 2026-08-27 16:58:06 UTC by build_data.py */
+/* Generated 2026-08-27 19:17:02 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-27T16:58:03.250536+00:00",
+    "generated_at": "2026-08-27T19:16:59.217415+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
-    "worktrees_total": 1713,
+    "worktrees_total": 1771,
     "sessions_total": 1067,
     "game_reports": 348,
     "total_cost": 309.1685,
@@ -72,13 +72,13 @@ window.DYNAMICS_DATA = {
     "story_sessions": 1067,
     "stories_total": 215,
     "story_total_cost": 309.1685,
-    "db_sessions_total": 5449,
+    "db_sessions_total": 5592,
     "game_reports": 348,
     "model_variants": 7,
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 121,
+    "workflow_specs": 122,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
@@ -3993,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-27T16:58:03.420834+00:00"
+    "generated_at": "2026-08-27T19:16:59.387610+00:00"
   },
   "reviews": {
     "models": [
