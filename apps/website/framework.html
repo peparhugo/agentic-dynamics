@@ -273,6 +273,17 @@
 </div></section>
 <div class="audience-note"><strong style="color:var(--ac)">Who this is for:</strong> Organizations operating AI workflows at scale, from human-assisted engineering sessions to bounded autonomous pipelines. The current evidence is drawn from Python/Flask REST APIs and TypeScript/Node.js; validate the <a href="methodology.html" style="color:var(--ac)">instrument</a> in other domains before adopting its policy candidates.</div>
 
+<!-- ref: type-responsive-grid.html — the quiet provenance receipt beside the hero. -->
+<aside class="field-receipt" style="max-width:900px;margin:1.5rem auto 0">
+  <div class="r-head">Framework receipt</div>
+  <dl>
+    <dt>What is measured [M]</dt><dd>Observed cost, outcome, narration, and cache fields from the corpus (1,067 story sessions, 7 models).</dd>
+    <dt>What is computed [C]</dt><dd>First-pass quality, Grit, cost per accepted outcome, WOC ratio — derived from the measured fields.</dd>
+    <dt>What is modeled [P]/[X]</dt><dd>β context inflation, EPM energy horizon, batch/cascade/SLA extensions — calibrated inputs and assumptions, not measured outcomes.</dd>
+    <dt>Limitation</dt><dd>A rule's premise being measured does not make the rule measured; rules not run as policy arms remain proposals. See <a href="evidence.html" style="color:var(--ac)">The Evidence</a> for verdicts.</dd>
+  </dl>
+</aside>
+
 <!-- ARCHITECTURE: Inline source keeps the system map theme-aware, printable, and dependency-free. -->
 <section class="fsec architecture-section"><div class="inr wide">
   <div class="architecture-intro">
@@ -550,6 +561,125 @@
   </ol>
 </div></section>
 
+<!-- FIELD LAYER: the eight planes, the instrument cycle, and the two-mode / autonomy
+     editorial figures — [P] architecture explanation added AROUND the operating
+     instrument, citing ARCHITECTURE.md and the reused example library. -->
+<section class="fsec" id="field-map"><div class="inr wide">
+  <div class="architecture-intro">
+    <div>
+      <div class="section-kicker">FIELD MAP / EIGHT PLANES</div>
+      <h2>Eight planes, one dependency direction.</h2>
+    </div>
+    <p class="lead">The instrument is modular but not flat: the eight package planes form a dependency chain, and control consumes the information the lower planes produce. A plane's state is either instrumented (built and measured), proposed (designed but not run), or decided (a verdict binds it).</p>
+  </div>
+  <!-- ref: svg-marker-flow.html, svg-filter-focus.html — plane dependency flow. -->
+  <figure class="figure-edit" aria-labelledby="planes-title">
+    <span class="kicker" id="planes-title">The eight planes (source: ARCHITECTURE.md)</span>
+    <svg viewBox="0 0 760 360" role="img" aria-labelledby="planes-title planes-desc">
+      <title id="planes-desc">Core, experiment, measurement, runtime, adapters, knowledge, reporting feed control, which serves the apps layer.</title>
+      <defs>
+        <marker id="planeArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
+        <pattern id="planeHatch" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="12" stroke="#9b6a28" stroke-width="3"/></pattern>
+      </defs>
+      <rect x="30" y="20" width="150" height="44" rx="8" fill="#287271" opacity=".85"/><text x="105" y="48" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">core</text>
+      <rect x="200" y="20" width="150" height="44" rx="8" fill="#287271" opacity=".85"/><text x="275" y="48" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">experiment</text>
+      <rect x="370" y="20" width="150" height="44" rx="8" fill="#287271" opacity=".85"/><text x="445" y="48" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">measurement</text>
+      <rect x="540" y="20" width="190" height="44" rx="8" fill="#287271" opacity=".85"/><text x="635" y="48" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">runtime</text>
+      <path d="M180 42H200M350 42H370M520 42H540" stroke="#287271" stroke-width="2" marker-end="url(#planeArrow)"/>
+      <rect x="30" y="100" width="150" height="44" rx="8" fill="#287271" opacity=".85"/><text x="105" y="128" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">adapters</text>
+      <rect x="200" y="100" width="150" height="44" rx="8" fill="#287271" opacity=".85"/><text x="275" y="128" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">knowledge</text>
+      <rect x="370" y="100" width="150" height="44" rx="8" fill="#287271" opacity=".85"/><text x="445" y="128" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">reporting</text>
+      <path d="M180 122H200M350 122H370" stroke="#287271" stroke-width="2" marker-end="url(#planeArrow)"/>
+      <path d="M105 64V100M275 64V100M445 64V100" stroke="#8b8375" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <rect x="540" y="100" width="190" height="58" rx="8" fill="#17212b" stroke="#8a2f2f" stroke-width="2"/><text x="635" y="128" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">control</text><text x="635" y="146" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="#f7f4ed">consumes information, proposes policy</text>
+      <path d="M520 122H540" stroke="#287271" stroke-width="2" marker-end="url(#planeArrow)"/>
+      <rect x="30" y="200" width="220" height="50" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2"/><text x="140" y="224" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">apps (tier 3)</text><text x="140" y="240" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">portal · website · CLI</text>
+      <path d="M635 158V200" stroke="#287271" stroke-width="2" marker-end="url(#planeArrow)"/>
+      <text x="30" y="290" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">INSTRUMENTED [M] · PROPOSED [P] · DECIDED [C] — status, never a capability claim</text>
+    </svg>
+    <figcaption>Figure F1. The eight planes (core → experiment → measurement → runtime → adapters → knowledge → reporting → control → apps). The diagram explains dependency direction; it makes no performance or capability claim.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] architecture</span><span>source: ARCHITECTURE.md</span><span>ref: svg-marker-flow.html, svg-filter-focus.html</span></div>
+  </figure>
+
+  <!-- ref: svg-marker-flow.html, svg-animated-status.html — the instrument cycle on Framework. -->
+  <figure class="figure-edit" aria-labelledby="fw-cycle-title">
+    <span class="kicker" id="fw-cycle-title">The instrument cycle (Framework)</span>
+    <svg viewBox="0 0 760 190" role="img" aria-labelledby="fw-cycle-title fw-cycle-desc">
+      <title id="fw-cycle-desc">Instrument, derive, write policy, grid, campaign — derive is the only path into policy.</title>
+      <defs>
+        <marker id="fwCycleArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
+      </defs>
+      <path d="M150 80H180M360 80H390M570 80H600" stroke="#287271" stroke-width="2.5" marker-end="url(#fwCycleArrow)"/>
+      <rect x="30" y="55" width="120" height="50" rx="10" fill="var(--bg3)" stroke="#287271" stroke-width="1.5"/><text x="90" y="85" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">Instrument</text>
+      <rect x="180" y="55" width="180" height="50" rx="10" fill="var(--bg3)" stroke="#9b6a28" stroke-width="1.5"/><text x="270" y="85" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">Derive</text>
+      <rect x="390" y="55" width="180" height="50" rx="10" fill="var(--bg3)" stroke="#287271" stroke-width="1.5"/><text x="480" y="85" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">Write policy</text>
+      <rect x="600" y="55" width="130" height="50" rx="10" fill="var(--bg3)" stroke="#9b6a28" stroke-width="1.5"/><text x="665" y="85" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">Grid / Campaign</text>
+      <text x="480" y="140" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="#9b6a28">unmeasured requirements block policy</text>
+    </svg>
+    <figcaption>Figure F2. The instrument cycle — derive is the only path into policy, and a control rule whose requirements are not measured cannot be written.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] method</span><span>ref: svg-marker-flow.html</span></div>
+  </figure>
+</div></section>
+
+<!-- EDITORIAL: one engine / two operating modes and the bounded-autonomy envelope, both
+     distinct from the eight-planes map above. -->
+<section class="fsec"><div class="inr wide">
+  <div class="architecture-intro">
+    <div>
+      <div class="section-kicker">TWO MODES / ONE ENGINE</div>
+      <h2>One engine, two operating modes.</h2>
+    </div>
+    <p class="lead">A fixed factor assignment produces one cell; a factor cross-product produces G cells. Both converge on the same compile → jobs → attempts → ledger path; only the grid branches to compare and adapt.</p>
+  </div>
+  <!-- ref: svg-marker-flow.html — fixed assignment vs factor cross-product convergence. -->
+  <figure class="figure-edit" aria-labelledby="twomodes-title">
+    <span class="kicker" id="twomodes-title">Fixed assignment → one cell; factor cross-product → G cells</span>
+    <svg viewBox="0 0 760 200" role="img" aria-labelledby="twomodes-title twomodes-desc">
+      <title id="twomodes-desc">Two inputs converge at cell, compile, jobs, attempts, ledger; only grid branches to compare and adapt.</title>
+      <defs>
+        <marker id="twomArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
+      </defs>
+      <rect x="20" y="40" width="210" height="46" rx="8" fill="#287271" opacity=".85"/><text x="125" y="60" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="#fff">FIXED ASSIGNMENT</text><text x="125" y="78" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="#fff">→ 1 cell</text>
+      <rect x="20" y="110" width="210" height="46" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2"/><text x="125" y="130" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="currentColor">FACTOR CROSS-PRODUCT</text><text x="125" y="148" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">→ G cells</text>
+      <path d="M230 63H290M230 133H290" stroke="#287271" stroke-width="2" marker-end="url(#twomArrow)"/>
+      <rect x="290" y="82" width="120" height="50" rx="24" fill="var(--bg3)" stroke="#287271" stroke-width="1.5"/><text x="350" y="112" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:13px;font-weight:700" fill="currentColor">CELL</text>
+      <path d="M410 107H450" stroke="#287271" stroke-width="2" marker-end="url(#twomArrow)"/>
+      <rect x="450" y="82" width="270" height="50" rx="8" fill="var(--bg3)" stroke="#287271" stroke-width="1.5"/><text x="585" y="112" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="currentColor">compile → jobs → attempts → ledger</text>
+      <text x="655" y="180" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="#9b6a28">only grid branches to compare / adapt</text>
+    </svg>
+    <figcaption>Figure F3. One execution engine, two operating modes — the written compiler/runtime explained, with no business KPI.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] compiler/runtime</span><span>ref: svg-marker-flow.html</span></div>
+  </figure>
+</div></section>
+
+<!-- EDITORIAL: bounded-autonomy envelope — proposed capability distinguished from a run. -->
+<section class="fsec"><div class="inr wide">
+  <div class="architecture-intro">
+    <div>
+      <div class="section-kicker kicker-what">AUTONOMY / PROPOSED NOT RUN</div>
+      <h2>A bounded-autonomy envelope.</h2>
+    </div>
+    <p class="lead">The human policy boundary sits outside; inside it, declared constraints bound execution and independent verification. Exits are accept, reject/rework, or halt/escalate. Typed checkpoints remain proposed capability, not a run state.</p>
+  </div>
+  <!-- ref: svg-pattern-surface.html, svg-filter-focus.html — proposed vs not-run distinction. -->
+  <figure class="figure-edit" aria-labelledby="envelope-title">
+    <span class="kicker" id="envelope-title">Bounded-autonomy envelope</span>
+    <svg viewBox="0 0 760 260" role="img" aria-labelledby="envelope-title envelope-desc">
+      <title id="envelope-desc">Human policy boundary outside; declared constraints and independent verification inside; exits accept, reject/rework, halt/escalate.</title>
+      <rect x="20" y="20" width="720" height="120" rx="14" fill="none" stroke="#8a2f2f" stroke-width="2.5" stroke-dasharray="8 4"/>
+      <text x="380" y="44" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="#8a2f2f">HUMAN POLICY BOUNDARY</text>
+      <rect x="70" y="60" width="200" height="56" rx="8" fill="#287271" opacity=".85"/><text x="170" y="93" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="#fff">declared constraints</text>
+      <rect x="290" y="60" width="200" height="56" rx="8" fill="#287271" opacity=".85"/><text x="390" y="93" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="#fff">independent verification</text>
+      <rect x="510" y="60" width="200" height="56" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2"/><text x="610" y="86" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="currentColor">typed checkpoints</text><text x="610" y="104" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">PROPOSED — not run</text>
+      <rect x="120" y="170" width="150" height="50" rx="8" fill="var(--bg3)" stroke="#287271" stroke-width="1.5"/><text x="195" y="199" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">ACCEPT</text>
+      <rect x="305" y="170" width="150" height="50" rx="8" fill="var(--bg3)" stroke="#9b6a28" stroke-width="1.5"/><text x="380" y="199" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">REJECT / REWORK</text>
+      <rect x="490" y="170" width="150" height="50" rx="8" fill="var(--bg3)" stroke="#8a2f2f" stroke-width="1.5"/><text x="565" y="199" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">HALT / ESCALATE</text>
+    </svg>
+    <figcaption>Figure F4. The bounded-autonomy envelope — a policy/architecture explanation. The typed-checkpoint cell is explicitly PROPOSED, distinguished from a run state.</figcaption>
+    <div class="fig-legend"><span class="ev-badge p">[P] policy/architecture</span><span>ref: svg-pattern-surface.html, svg-filter-focus.html</span></div>
+  </figure>
+</div></section>
+
 <!-- AUTONOMY: authority is explicit rather than implied by an unsupervised job label. -->
 <section class="fsec autonomy-section" id="autonomy"><div class="inr wide">
   <div class="architecture-intro">
@@ -775,6 +905,89 @@
 <div class="implementation-strip" aria-label="30-day implementation">
   <div class="implementation-step">Classify tasks by complexity.</div><div class="implementation-step">Default-route constrained tasks to silent models.</div><div class="implementation-step">Establish verification gates and escalation paths.</div><div class="implementation-step">Instrument cost metrics. Use CostPerOutcome as your primary KPI.</div>
 </div>
+</div></section>
+
+<!-- FIELD LAYER: the ten rules as status cards — grouped by instrumented / proposed /
+     decided. Never calls a rule "measured" if only its premise is measured. -->
+<section class="fsec" id="rule-cards"><div class="inr wide">
+  <div class="section-kicker kicker-what">POLICY / RULE STATUS</div>
+  <h2>Ten rules, three statuses.</h2>
+  <p class="lead">Each rule is grouped by its current status: <strong style="color:var(--ev-m)">instrumented</strong> (its inputs and premise are measured), <strong style="color:var(--ev-c)">proposed</strong> (modeled or designed but not run as an arm), or <strong style="color:var(--ev-p)">decided</strong> (a verdict binds it). A rule's premise being measured does not make the rule measured — a policy becomes decided only when it is run as an arm and compared.</p>
+  <!-- ref: card-details.html, card-tooltip-badge.html — status and source visible before
+       expansion; details expose method and limits. -->
+  <div class="rule-cards">
+    <article class="rule-card measured">
+      <span class="rc-status">[M] instrumented</span>
+      <h4>1. Grit (Ground-Truth Integrity)</h4>
+      <p>Default to models that keep correctness under degraded input.</p>
+      <details><summary>Source and limits</summary><p>Inputs: test-executed success under 10 perturbation operators ([M]). Evidence class [M]/[C]. Limitation: single-session + story corpus; not a universal trait. Next test: strength-grid live run.</p></details>
+      <footer>inputs [M] · premise measured</footer>
+    </article>
+    <article class="rule-card measured">
+      <span class="rc-status">[M] instrumented</span>
+      <h4>2. Explanation Tax (ε)</h4>
+      <p>Measure what resilience costs — flail rate and narration penalty.</p>
+      <details><summary>Source and limits</summary><p>Inputs: measured flail + narration overhead per model ([M]). Evidence class [M]/[C]. Limitation: descriptive; not matched-task causal evidence. Next test: re-weight by accepted outcome.</p></details>
+      <footer>inputs [M] · premise measured</footer>
+    </article>
+    <article class="rule-card measured">
+      <span class="rc-status">[M] instrumented</span>
+      <h4>5. First-Pass Rule</h4>
+      <p>Price the accepted outcome, not the prompt; derive first-pass from the attempt ledger.</p>
+      <details><summary>Source and limits</summary><p>Inputs: attempt number, acceptance, independent evaluator ([M]). Evidence class [C]. Limitation: needs per-task/per-model coverage. Next test: coverage-corrected routing.</p></details>
+      <footer>inputs [M] · premise measured</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>3. Snowball Rule (N²)</h4>
+      <p>Codebase growth compounds quadratically; β is calibrated, not measured.</p>
+      <details><summary>Source and limits</summary><p>Inputs: β (calibrated, [P]), v ([C]). Evidence class [C]/[P]. Limitation: N² is a modeled extension beyond the measured arc. Next test: canonical lab output for the arc.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>4. EPM Horizon</h4>
+      <p>Energy prices inflate compute; EPM(t) is externally calibrated.</p>
+      <details><summary>Source and limits</summary><p>Inputs: IEA projections ([X]), rate r ([P]). Evidence class [X]/[P]. Limitation: external scenario, not a corpus outcome. Next test: energy-measured campaign.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>6. Batch Discount</h4>
+      <p>Deferred batch work is cheaper (50%) with a 72-hour horizon.</p>
+      <details><summary>Source and limits</summary><p>Inputs: provider batch pricing ([X]), queue model ([P]). Evidence class [X]/[P]. Limitation: modeled; batch experiments not yet executed. Next test: batch-vs-on-demand arm.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>7. Budget Ceiling</h4>
+      <p>Throughput = Budget / (cost per job × (1 + retry)).</p>
+      <details><summary>Source and limits</summary><p>Inputs: measured retry rate r=0.115 ([M]), WFM theory ([P]). Evidence class [C]/[P]. Limitation: capacity formula, not a verified SLA. Next test: budget-policy arm.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>8. Cascade Rule</h4>
+      <p>Failures auto-escalate through model tiers; design for &lt;1% human escalation.</p>
+      <details><summary>Source and limits</summary><p>Inputs: price ratios ([X]), escalation design ([P]). Evidence class [X]/[P]. Limitation: cascade experiments not yet executed. Next test: escalation arm.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>9. SLA Buffer</h4>
+      <p>Completion time = queue × job time + retry buffer; never batch under 2× queue depth.</p>
+      <details><summary>Source and limits</summary><p>Inputs: queue theory ([P]), retry buffer ([P]). Evidence class [P]. Limitation: modeled from WFM, not measured. Next test: live queue-depth validation.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+    <article class="rule-card proposed">
+      <span class="rc-status">[C] proposed</span>
+      <h4>10. Outcome Multiplier</h4>
+      <p>Maximize outcomes per dollar (BVI = outcomes / total cost).</p>
+      <details><summary>Source and limits</summary><p>Inputs: accepted outcomes and total cost ([M]), BVI definition ([P]). Evidence class [C]/[P]. Limitation: business-value framing, not a verified outcome metric. Next test: value-weighted arm comparison.</p></details>
+      <footer>modeled — not run as an arm</footer>
+    </article>
+  </div>
+  <p class="note">Decided status is reserved for a rule whose verdict binds it (see the <a href="evidence.html" style="color:var(--ac)">2b decision on The Evidence</a>). No rule card above over-claims a measured rule when only its premise is measured.</p>
 </div></section>
 
 <!-- SECTION: The Ten Rules -->
