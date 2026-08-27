@@ -22,6 +22,12 @@ default 20 min — is SIGTERM'd and the phase fails with reason ``STALLED`` + th
 (last-step timestamp, stale age, transcript tail). Only step gaps count (the transcript's
 last-step age, never wall time); test phases are never wrapped.
 
+Deploy gate (cap_runner_hardening p2): after each agent phase, the runner scans the phase's
+session transcript for firebase production-deploy commands. A phase not marked
+``deploy_allowed: true`` (an optional per-phase marker, default false) that deployed fails with
+reason ``DEPLOY_GATE`` + the offending command + its transcript line as evidence, recorded on
+``PhaseResult.deploy_gate`` and the ledger — a deploy violation can never be committed.
+
 The agent works directly in ``workdir``; prior-phase artifacts are committed there, so
 later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
@@ -150,6 +156,11 @@ class PhaseResult:
     #: cap_runner_hardening p1: when the phase watchdog SIGTERM'd a stalled agent, the
     #: structured evidence (last-step timestamp, stale age, transcript tail). None otherwise.
     stall_evidence: dict[str, Any] | None = None
+    #: cap_runner_hardening p2: when the deploy gate fired — the phase is not marked
+    #: ``deploy_allowed`` yet its session transcript shows a firebase production-deploy
+    #: command — the structured evidence (reason + offending commands + transcript lines).
+    #: None otherwise.
+    deploy_gate: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -186,6 +197,7 @@ class PhaseResult:
             "tests_total": self.tests_total,
             "change_analysis": self.change_analysis,
             "stall_evidence": self.stall_evidence,
+            "deploy_gate": self.deploy_gate,
         }
 
 
@@ -802,6 +814,126 @@ def _format_stall_evidence(ev: dict[str, Any]) -> str:
     )
 
 
+# ── Deploy gate (cap_runner_hardening p2) ──────────────────────────────────────────────────
+#
+# The measured disease: terra ran ``firebase deploy`` from a non-deploy phase and silently
+# overwrote the production site (the revamp2 p3 session — the replay evidence is the transcript
+# line whose bash input was ``firebase deploy --only hosting && firebase deploy --only hosting
+# --project agentic-dynamics``). The gate is the technical, deterministic fix: after an agent
+# phase, the runner scans the phase's session transcript for production-deploy commands; a hit
+# in a phase NOT marked ``deploy_allowed: true`` fails the phase with reason ``DEPLOY_GATE`` +
+# the offending command + its transcript line as evidence.
+#
+# Honest detection scope: the gate's job is catching PRODUCTION DEPLOYS — the commands that
+# publish the site. It matches the bash tool_use input (the command the agent actually issued)
+# against the patterns below. It deliberately does NOT scan tool outputs or file contents, and
+# it does not chase variables/aliases/wrappers that still reach ``firebase deploy`` — the p5
+# adversary phase documents exactly what it can and cannot catch. The pattern set is the spec's
+# list verbatim: ``firebase deploy``, ``firebase --project <production-host>``, and any
+# ``firebase hosting deploy`` form (subsumed by the first but kept explicit for the evidence's
+# pattern label).
+#
+# Simpler honest schema rule (spec (d)): ANY phase may declare ``deploy_allowed: true`` — the
+# validator only type-checks it (must be a real boolean) and the post-scan enforces the intent.
+# A phase that carries the marker but never deploys is fine; a phase that deploys without it
+# fails. No naming rule, no "only the deploy phase" special case.
+DEPLOY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\bfirebase\b[^\n]*\bdeploy\b"), "firebase deploy"),
+    (
+        re.compile(r"\bfirebase\b[^\n]*\b--project\s+(?:agentic-dynamics|ai-finops-rulebook)\b"),
+        "firebase --project <production-host>",
+    ),
+    (re.compile(r"\bfirebase\b[^\n]*\bhosting\s+deploy\b"), "firebase hosting deploy"),
+]
+
+
+def _commands_from_event(event: dict[str, Any]) -> list[str]:
+    """Extract the shell commands a tool event actually ran (bash tool_use inputs)."""
+    if event.get("type") != "tool_use":
+        return []
+    part = event.get("part", {})
+    if not isinstance(part, dict) or part.get("tool") != "bash":
+        return []
+    state = part.get("state", {})
+    if not isinstance(state, dict):
+        return []
+    inp = state.get("input", "")
+    command = inp.get("command", "") if isinstance(inp, dict) else str(inp)
+    if not command:
+        return []
+    return [command]
+
+
+def _deploy_pattern_match(command: str) -> str | None:
+    """Return the label of the first deploy pattern ``command`` matches, or ``None``."""
+    for pattern, label in DEPLOY_PATTERNS:
+        if pattern.search(command):
+            return label
+    return None
+
+
+def _scan_transcript_for_deploys(transcript: Path) -> list[dict[str, Any]]:
+    """Scan a session transcript for firebase production-deploy commands.
+
+    Returns one entry per offending command: ``{"command": <the bash input>, "pattern": <which
+    deploy pattern matched>, "line": <the raw transcript line>}.`` Empty when the transcript is
+    missing, unreadable, or clean.
+    """
+    try:
+        lines = transcript.read_text().splitlines()
+    except OSError:
+        return []
+    violations: list[dict[str, Any]] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        for command in _commands_from_event(event):
+            matched = _deploy_pattern_match(command)
+            if matched is not None:
+                violations.append(
+                    {"command": command, "pattern": matched, "line": line[:2000]}
+                )
+    return violations
+
+
+def _enforce_deploy_gate(
+    pr: PhaseResult, wd: Path, phase_def: dict[str, Any], *, transcript: Path | None = None
+) -> None:
+    """Post-phase deploy gate (cap_runner_hardening p2).
+
+    A phase NOT marked ``deploy_allowed: true`` that ran a firebase production-deploy command
+    fails with reason ``DEPLOY_GATE`` + the offending command(s) + the transcript line(s). The
+    evidence lands on ``PhaseResult.deploy_gate`` and the phase error, so the operator sees
+    exactly what fired. The marker is the phase's own opt-in (default false) — the gate is
+    about the command the agent issued, never a naming rule. Best-effort: a missing/unreadable
+    transcript is not a violation; a phase already failed for another reason keeps its error
+    and gains the DEPLOY_GATE note appended (both reasons stay visible).
+    """
+    if bool(phase_def.get("deploy_allowed", False)):
+        return
+    violations = _scan_transcript_for_deploys(transcript or (wd / ".instrument" / "session.jsonl"))
+    if not violations:
+        return
+    pr.deploy_gate = {"reason": "DEPLOY_GATE", "violations": violations}
+    offending = "; ".join(f"'{v['command']}'" for v in violations)
+    msg = (
+        f"DEPLOY_GATE — firebase production deploy in phase not marked deploy_allowed: "
+        f"{offending}"
+    )
+    if pr.status == "ok":
+        pr.status = "failed"
+        pr.error = msg
+    else:
+        pr.error = f"{pr.error}\n{msg}"
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -889,6 +1021,14 @@ def run_workflow(
     tail), recorded on ``PhaseResult.stall_evidence`` and the ledger. A value <= 0
     disables it. Only step gaps count (the transcript's last-step age, never wall time),
     and non-agent phases are never wrapped (test phases run in-process).
+
+    Deploy gate (``deploy_allowed``, cap_runner_hardening p2): after every agent phase the
+    runner scans the phase's session transcript for firebase production-deploy commands
+    (``firebase deploy``, ``firebase --project <production-host>``, ``firebase hosting
+    deploy``). A phase not marked ``deploy_allowed: true`` (optional per-phase marker,
+    default false) that deployed fails with reason ``DEPLOY_GATE`` + the offending command +
+    its transcript line, recorded on ``PhaseResult.deploy_gate`` and the ledger — the commit
+    gate runs after, so a deploy violation can never be committed.
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -1159,6 +1299,15 @@ def run_workflow(
         # commit below is skipped, exactly like the ``kind == "test"`` branch.
         if kind != "test" and phase_def.get("test_gate") and pr.status == "ok":
             _run_test_gate(pr, wd, language, phase_timeout)
+
+        # Deploy gate (cap_runner_hardening p2) — post-phase, agent phases only. Scan the
+        # phase's session transcript for firebase production-deploy commands; a hit in a phase
+        # not marked ``deploy_allowed: true`` fails the phase with DEPLOY_GATE + the offending
+        # command + its transcript line as evidence (recorded on the ledger). Runs BEFORE the
+        # commit gate so a deploy violation can never be committed. A phase already failed
+        # (e.g. STALLED) keeps its reason and gains the DEPLOY_GATE note.
+        if kind != "test":
+            _enforce_deploy_gate(pr, wd, phase_def)
 
         pr.duration_s = round(time.time() - t0, 2)
         if commit and pr.status == "ok":

@@ -1185,3 +1185,153 @@ def test_watchdog_only_wraps_agent_phases(tmp_path):
     assert result.phases[-1].kind == "test"
     assert result.phases[-1].stall_evidence is None
 
+
+# ── Deploy gate (cap_runner_hardening p2) ───────────────────────
+
+#: Faithful reconstruction of the revamp2 p3 session's deploy event (the bash tool_use whose
+#: input deployed BOTH production hosts). The command is the one that silently overwrote the
+#: site twice — the replay proof the gate must catch.
+REVAMP2_DEPLOY_LINE = json.dumps({
+    "type": "tool_use",
+    "timestamp": 1787783173755,
+    "sessionID": "ses_fbfd53722ffeHBFPqC3B3fC6Se",
+    "part": {
+        "type": "tool",
+        "tool": "bash",
+        "callID": "call_revamp2_p3",
+        "state": {
+            "status": "completed",
+            "input": {
+                "command": "firebase deploy --only hosting && firebase deploy --only hosting --project agentic-dynamics",
+                "workdir": "/tmp/wt_site_revamp2/apps/website",
+                "timeout": 120000,
+            },
+            "output": "=== Deploying to 'ai-finops-rulebook'...\n\u2714 Deploy complete!\n"
+                      "=== Deploying to 'agentic-dynamics'...\n\u2714 Deploy complete!\n",
+        },
+    },
+})
+
+
+def _deploy_agent(transcript_line, *, deploy_in_all=False):
+    """A fake agent that writes ``transcript_line`` into the phase's session transcript, then
+    succeeds. Models the real adapter's per-phase end-write: each phase REPLACES the transcript
+    (``write_text``), so a later clean phase never inherits an earlier phase's deploy line."""
+    calls = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        n = len(calls)
+        calls.append(n)
+        transcript = _watchdog_transcript(workdir)
+        transcript.parent.mkdir(parents=True, exist_ok=True)
+        if deploy_in_all or n == 0:
+            transcript.write_text(transcript_line + "\n")
+        else:
+            transcript.write_text('{"type": "step_start"}\n')
+        return _fake_agent()
+
+    return agent
+
+
+def test_deploy_gate_fails_a_non_deploy_phase_with_evidence(tmp_path):
+    """(a) A fake agent session containing 'firebase deploy' in a non-deploy phase fails with
+    DEPLOY_GATE + the quoted offending command, and the evidence rides the phase's ledger record."""
+    spec = load_spec(SPEC)
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=_deploy_agent(REVAMP2_DEPLOY_LINE))
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.deploy_gate is not None
+    assert p.deploy_gate["reason"] == "DEPLOY_GATE"
+    assert any("firebase deploy" in v["command"] for v in p.deploy_gate["violations"])
+    assert any("--project agentic-dynamics" in v["command"] for v in p.deploy_gate["violations"])
+    assert p.deploy_gate["violations"][0]["line"].startswith("{")
+    assert "DEPLOY_GATE" in p.error
+    assert "'firebase deploy --only hosting" in p.error  # the offending command is quoted
+    assert result.ok is False
+    assert result.to_dict()["phases"][0]["deploy_gate"]["reason"] == "DEPLOY_GATE"
+
+
+def test_deploy_gate_passes_a_deploy_allowed_phase(tmp_path):
+    """(b) The same deploy command in a phase marked ``deploy_allowed: true`` passes — the gate
+    is about the marker, never a naming rule; later clean phases stay clean (per-phase transcript)."""
+    spec = load_spec(SPEC)
+    spec.workflow.params["phases"][0]["deploy_allowed"] = True  # scope may deploy
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=_deploy_agent(REVAMP2_DEPLOY_LINE))
+    assert result.ok
+    assert result.phases[0].status == "ok"
+    assert result.phases[0].deploy_gate is None
+    assert all(p.deploy_gate is None for p in result.phases)
+
+
+def test_deploy_gate_not_triggered_by_clean_phases_or_test_phases(tmp_path):
+    """A clean agent phase (no deploy command) and the test phase never trip the gate; a bash
+    command that merely mentions firebase in text (not a deploy) is not a violation."""
+    spec = load_spec(SPEC)
+    clean_line = json.dumps({
+        "type": "tool_use", "sessionID": "s",
+        "part": {"type": "tool", "tool": "bash",
+                 "state": {"input": {"command": "python scripts/build_data.py"}}},
+    })
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        _watchdog_transcript(workdir).parent.mkdir(parents=True, exist_ok=True)
+        _watchdog_transcript(workdir).write_text(clean_line + "\n")
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=agent)
+    assert result.ok
+    assert all(p.deploy_gate is None for p in result.phases)
+    assert result.phases[-1].kind == "test"
+    assert result.phases[-1].deploy_gate is None
+
+
+def test_deploy_allowed_marker_is_type_checked(tmp_path):
+    """(c) The validator type-checks the marker: a non-boolean (the typo that would silently
+    disable the gate) is refused; a real boolean validates; specs without the marker (the whole
+    committed corpus) validate unchanged."""
+    spec = load_spec(SPEC)
+    assert validate_spec(spec) == []  # the existing spec has no marker — still valid
+
+    spec.workflow.params["phases"][0]["deploy_allowed"] = "true"  # string typo
+    errors = validate_spec(spec)
+    assert any("deploy_allowed must be a boolean" in e for e in errors)
+
+    spec.workflow.params["phases"][0]["deploy_allowed"] = 1  # int typo
+    errors = validate_spec(spec)
+    assert any("deploy_allowed must be a boolean" in e for e in errors)
+
+    spec.workflow.params["phases"][0]["deploy_allowed"] = True  # honest marker
+    assert validate_spec(spec) == []
+
+
+def test_deploy_gate_replay_revamp2_p3_session(tmp_path):
+    """(d) Replay proof: the revamp2 p3 deploy command (the one that overwrote production) is
+    caught by the gate — against the embedded transcript event AND, when the real worktree still
+    exists on disk, against the actual /tmp/wt_site_revamp2 session transcript."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    # (1) the embedded reconstruction of the exact production-affecting command
+    spec = load_spec(SPEC)
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=_deploy_agent(REVAMP2_DEPLOY_LINE))
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.deploy_gate["reason"] == "DEPLOY_GATE"
+    assert p.deploy_gate["violations"][0]["command"] == (
+        "firebase deploy --only hosting && firebase deploy --only hosting --project agentic-dynamics"
+    )
+    assert p.deploy_gate["violations"][0]["pattern"] == "firebase deploy"
+
+    # (2) against the real revamp2 session transcript when it is still on disk — the gate would
+    # have fired on the exact line the evidence measured
+    real = Path("/tmp/wt_site_revamp2/.instrument/session.jsonl")
+    if real.exists():
+        hits = wr._scan_transcript_for_deploys(real)
+        assert any("firebase deploy" in h["command"] for h in hits), (
+            "the real revamp2 p3 session must be caught by the deploy gate"
+        )
+
+

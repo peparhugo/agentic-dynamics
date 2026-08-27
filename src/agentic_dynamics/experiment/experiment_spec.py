@@ -746,6 +746,21 @@ def validate_spec(
     if spec.name in spec.supersedes:
         errors.append(f"supersedes lists the spec itself ({spec.name!r})")
 
+    # ── Phase-level gate: ``deploy_allowed`` (cap_runner_hardening p2) ────────
+    # Optional per-phase marker, default false. The simpler honest rule: ANY phase may set it —
+    # the runner's post-phase deploy gate enforces the intent (a phase that deploys without the
+    # marker fails DEPLOY_GATE; a phase that carries it but never deploys is fine). The
+    # validator's job here is type-safety only: a typo'd ``deploy_allowed: "true"``/``1`` would
+    # silently disable the gate, so the marker, when present, must be a real boolean.
+    for ph in spec.workflow.params.get("phases") or []:
+        if not isinstance(ph, dict):
+            continue
+        if "deploy_allowed" in ph and not isinstance(ph.get("deploy_allowed"), bool):
+            errors.append(
+                f'phase "{ph.get("name", "?")}": deploy_allowed must be a boolean '
+                f"(got {ph.get('deploy_allowed')!r})"
+            )
+
     # ── Artifact-identity gate (refactor-repair P1-3) ─────────────────────────
     # Identity is declared, not guessed. ``artifact_kind``/``intent`` are validated enums.
     if spec.artifact_kind not in ARTIFACT_KINDS:
