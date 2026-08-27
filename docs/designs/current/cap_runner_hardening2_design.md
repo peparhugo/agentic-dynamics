@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # cap_runner_hardening2 — design: closing the two remaining execution gaps
 
 **Status: accepted** · Predecessor: `cap_runner_hardening` (merged — the phase watchdog,
