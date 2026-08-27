@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # CAP Site Regression Analysis — Known-Safe List
 
 **Reviewer role:** adversarial verifier — attempted non-falsifying attacks.

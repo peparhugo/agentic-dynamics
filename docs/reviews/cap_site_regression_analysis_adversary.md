@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # CAP Site Regression Analysis — Adversarial Verification
 
 **Reviewer role:** adversarial verifier — try to falsify the analysis.

@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-26T23:30:01.070719+00:00",
+  "generated_at": "2026-08-27T00:37:23.394325+00:00",
   "n_specs": 129,
   "specs": [
     {
@@ -148,24 +148,6 @@
       "n_runs": 0
     },
     {
-      "name": "cap_runner_hardening",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/cap_runner_hardening.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
       "name": "cap_session_policy_cell",
       "version": "0.1",
       "status": "runnable",
@@ -229,24 +211,6 @@
       "supersedes": [
         "cap_site_revamp2"
       ],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "cap_terra_postmortem",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/cap_terra_postmortem.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
       "last_run_at": null,
@@ -1058,6 +1022,24 @@
       "n_runs": 1
     },
     {
+      "name": "cap_runner_hardening",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_runner_hardening.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-27T00:37:23.142443+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.247412,
+      "latest_git_sha": "1c08ecc71",
+      "results_pointer": "experiments/results/workflows/cap_runner_hardening/20260827T003723Z.json",
+      "n_runs": 1
+    },
+    {
       "name": "cap_session_routing_prospective",
       "version": "0.1",
       "status": "completed",
@@ -1237,6 +1219,24 @@
       "latest_cost_usd": 0.091705,
       "latest_git_sha": "d68752aee",
       "results_pointer": "experiments/results/workflows/cap_story_bridge/20260825T005329Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "cap_terra_postmortem",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_terra_postmortem.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-27T00:05:59.852171+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.551453,
+      "latest_git_sha": "2d6f8beea",
+      "results_pointer": "experiments/results/workflows/cap_terra_postmortem/20260827T000559Z.json",
       "n_runs": 1
     },
     {
