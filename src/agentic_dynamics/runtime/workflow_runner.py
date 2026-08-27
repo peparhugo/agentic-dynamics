@@ -28,6 +28,14 @@ session transcript for firebase production-deploy commands. A phase not marked
 reason ``DEPLOY_GATE`` + the offending command + its transcript line as evidence, recorded on
 ``PhaseResult.deploy_gate`` and the ledger — a deploy violation can never be committed.
 
+Commit-prefix enforcement (cap_runner_hardening p3): after each agent phase, the runner lists
+the commits made during the phase (``git log pre-head..HEAD``) and every one must match
+``[workflow] <phase> — <goal prefix>`` — the exact pattern the resume machinery matches. A
+plain-message commit fails the phase with reason ``COMMIT_PREFIX`` + the offending subjects as
+evidence, even if the phase otherwise succeeded (the campaign stops for the operator), recorded
+on ``PhaseResult.commit_gate`` and the ledger. The runner's own ``_git_commit`` writes the
+correct message; the enforcement catches MANUAL agent commits.
+
 The agent works directly in ``workdir``; prior-phase artifacts are committed there, so
 later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
@@ -161,6 +169,11 @@ class PhaseResult:
     #: command — the structured evidence (reason + offending commands + transcript lines).
     #: None otherwise.
     deploy_gate: dict[str, Any] | None = None
+    #: cap_runner_hardening p3: when commit-prefix enforcement fired — a commit the agent made
+    #: during the phase does not match ``[workflow] <phase> — <goal prefix>`` (the exact pattern
+    #: the resume machinery matches) — the structured evidence (reason + offending subjects).
+    #: None otherwise.
+    commit_gate: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -198,6 +211,7 @@ class PhaseResult:
             "change_analysis": self.change_analysis,
             "stall_evidence": self.stall_evidence,
             "deploy_gate": self.deploy_gate,
+            "commit_gate": self.commit_gate,
         }
 
 
@@ -934,6 +948,84 @@ def _enforce_deploy_gate(
         pr.error = f"{pr.error}\n{msg}"
 
 
+# ── Commit-prefix enforcement (cap_runner_hardening p3) ────────────────────────────────────
+#
+# The measured disease: terra committed 7 plain-message commits during revamp2 (no
+# '[workflow] <phase>' prefix, no goal prefix), silently breaking the resume machinery
+# (_completed_phases matches '[workflow] <phase> — <goal prefix>') and forcing a re-tagging
+# surgery. The enforcement is the technical, deterministic fix: after an agent phase, the
+# runner lists the commits made during the phase (git log pre-phase-head..HEAD) and every one
+# must match the pattern — a plain commit fails the phase with reason COMMIT_PREFIX + the
+# offending subjects as evidence, even if the phase otherwise succeeded.
+#
+# The definition of a valid commit IS the resume machinery's definition of a resumable commit:
+# this regex is kept in lockstep with _completed_phases, and the per-phase checks add the
+# phase's OWN name (a different phase's name must not count) and the run's 40-char goal prefix.
+COMMIT_SUBJECT_RE = re.compile(r"\[workflow\]\s+(\S+)\s+—\s+(.+)")
+COMMIT_SUBJECT_PATTERN = "[workflow] <phase> — <goal prefix>"
+
+
+def _commit_subject_matches(subject: str, phase_name: str, goal_prefix: str) -> bool:
+    """True when ``subject`` is a commit the resume machinery would match for THIS phase.
+
+    Mirrors ``_completed_phases`` exactly — the same regex, plus the phase's own name and the
+    run's 40-char goal prefix. Enforcement ⇔ resumability: a commit that passes here is exactly
+    one ``_completed_phases`` would treat as this phase's completed commit.
+    """
+    m = COMMIT_SUBJECT_RE.search(subject)
+    return bool(m and m.group(1) == phase_name and m.group(2).startswith(goal_prefix))
+
+
+def _git_log_subjects(workdir: Path, rev_range: str) -> list[str]:
+    """Commit subjects in ``rev_range`` (e.g. ``abc123..HEAD``), or [] on any git problem."""
+    try:
+        log = subprocess.run(
+            ["git", "log", "--format=%s", rev_range],
+            cwd=workdir, capture_output=True, text=True, timeout=30,
+        )
+    except Exception:  # noqa: BLE001 — a git problem degrades to "no commits to check"
+        return []
+    if log.returncode != 0:
+        return []
+    return [s.strip() for s in log.stdout.splitlines() if s.strip()]
+
+
+def _enforce_commit_prefix(
+    pr: PhaseResult, wd: Path, phase_name: str, goal: str, pre_head: str
+) -> None:
+    """Post-phase commit-prefix enforcement (cap_runner_hardening p3).
+
+    Every commit the agent made during the phase (``git log pre_head..HEAD``; when there was
+    no pre-phase HEAD — a fresh worktree — all of HEAD's commits) must match
+    ``[workflow] <phase-name> — <goal prefix>``. A commit that does not fails the phase with
+    reason ``COMMIT_PREFIX`` + the offending subjects as evidence, even if the phase otherwise
+    succeeded — the phase flips to failed and ``stop_on_error`` stops the campaign for the
+    operator. Agent phases only. The runner's own ``_git_commit`` writes the correct message
+    (and runs AFTER this check) — the enforcement catches MANUAL agent commits. Best-effort:
+    an unreadable git state degrades to "no commits to check".
+    """
+    goal_prefix = goal[:40]
+    subjects = _git_log_subjects(wd, f"{pre_head}..HEAD") if pre_head else _git_log_subjects(wd, "HEAD")
+    bad = [s for s in subjects if not _commit_subject_matches(s, phase_name, goal_prefix)]
+    if not bad:
+        return
+    expected = f"[workflow] {phase_name} — {goal_prefix}"
+    pr.commit_gate = {
+        "reason": "COMMIT_PREFIX",
+        "subjects": bad,
+        "expected_prefix": expected,
+    }
+    msg = (
+        f"COMMIT_PREFIX — commits made during phase '{phase_name}' do not match "
+        f"'{expected}': {bad}"
+    )
+    if pr.status == "ok":
+        pr.status = "failed"
+        pr.error = msg
+    else:
+        pr.error = f"{pr.error}\n{msg}"
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -1029,6 +1121,14 @@ def run_workflow(
     default false) that deployed fails with reason ``DEPLOY_GATE`` + the offending command +
     its transcript line, recorded on ``PhaseResult.deploy_gate`` and the ledger — the commit
     gate runs after, so a deploy violation can never be committed.
+
+    Commit-prefix enforcement (cap_runner_hardening p3): after every agent phase the runner
+    lists the commits made during it (``git log pre-head..HEAD``) and requires each to match
+    ``[workflow] <phase> — <goal prefix>`` — the exact pattern the resume machinery matches.
+    A plain-message commit fails the phase with reason ``COMMIT_PREFIX`` + the offending
+    subjects, recorded on ``PhaseResult.commit_gate`` and the ledger, even if the phase
+    otherwise succeeded — the campaign stops for the operator and the bad commit is never
+    propagated by the commit gate (which runs after).
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -1155,6 +1255,7 @@ def run_workflow(
                 os.environ["FINOPS_CELL_ID"] = cell_id
                 ar = None
                 stall: dict[str, Any] | None = None
+                pre_head = ""
                 try:
                     # Select this step's model: pin wins, allowed_models restricts, else the
                     # full pool — scored over measured signals, pricing a model switch's cache
@@ -1234,6 +1335,11 @@ def run_workflow(
                         agent_kwargs["fork"] = True
                     pr.model = model_i
 
+                    # Commit-prefix enforcement (cap_runner_hardening p3): record the worktree
+                    # HEAD before the agent runs, so after the phase the runner can list exactly
+                    # the commits the agent made during it (git log pre-head..HEAD).
+                    pre_head = _git_head(wd)
+
                     # Phase watchdog (cap_runner_hardening p1) — wrap the agent invocation in a
                     # stall monitor. The monitor polls the session transcript's last-step age
                     # (``.instrument/session.jsonl``, appended live by the adapters while the seam
@@ -1308,6 +1414,17 @@ def run_workflow(
         # (e.g. STALLED) keeps its reason and gains the DEPLOY_GATE note.
         if kind != "test":
             _enforce_deploy_gate(pr, wd, phase_def)
+
+        # Commit-prefix enforcement (cap_runner_hardening p3) — post-phase, agent phases only.
+        # Every commit made during the phase (git log pre-head..HEAD) must match
+        # '[workflow] <phase> — <goal prefix>' — the exact pattern the resume machinery matches.
+        # A plain-message commit fails the phase with COMMIT_PREFIX + the offending subjects as
+        # evidence, even if the phase otherwise succeeded (the campaign then stops for the
+        # operator). Runs BEFORE the commit gate, so a bad commit can never be propagated as the
+        # phase's own. The runner's own _git_commit writes the correct message (and runs after)
+        # — this catches MANUAL agent commits.
+        if kind != "test":
+            _enforce_commit_prefix(pr, wd, name, goal, pre_head)
 
         pr.duration_s = round(time.time() - t0, 2)
         if commit and pr.status == "ok":

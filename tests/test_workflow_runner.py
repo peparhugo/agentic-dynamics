@@ -1335,3 +1335,148 @@ def test_deploy_gate_replay_revamp2_p3_session(tmp_path):
         )
 
 
+# ── Commit-prefix enforcement (cap_runner_hardening p3) ──────────
+
+#: The revamp2 branch's 7 plain-message commits (feature/site-revamp2, between the phase's
+#: own [workflow] commit and the pre-phase spec commit) — the exact commits that broke the
+#: resume machinery and forced the re-tagging surgery. The replay proof the validator must
+#: reject.
+REVAMP2_GOAL = "Deliver the site's IMPLEMENTED visual system"
+REVAMP2_PLAIN_COMMITS = [
+    "research: cap_site_revamp editorial audit",
+    "site: add editorial visual system",
+    "site: rewrite public research narrative",
+    "site: wire campaign evidence to data",
+    "site: harden evidence publication",
+    "data: refresh site publication receipt",
+    "docs: record site deploy verification",
+]
+
+
+def _git_init(tmp_path):
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+
+def test_commit_prefix_fails_a_plain_message_commit(tmp_path):
+    """(a) A fake agent that commits a plain message fails with COMMIT_PREFIX + the subject,
+    and the evidence rides the phase's ledger record."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "scope.md").write_text("scope")
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.commit_gate is not None
+    assert p.commit_gate["reason"] == "COMMIT_PREFIX"
+    assert p.commit_gate["subjects"] == ["site: add things"]
+    assert p.commit_gate["expected_prefix"] == "[workflow] scope — g"
+    assert "COMMIT_PREFIX" in p.error
+    assert "site: add things" in p.error
+    assert result.ok is False
+    assert result.to_dict()["phases"][0]["commit_gate"]["reason"] == "COMMIT_PREFIX"
+
+
+def test_commit_prefix_passes_a_matching_commit(tmp_path):
+    """(b) A fake agent whose only commit matches '[workflow] <phase> — <goal prefix>' passes
+    (the enforcement only fires on the violation)."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+    calls = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        n = len(calls)
+        calls.append(n)
+        if n == 0:  # only the scope phase commits — with the correct pattern
+            (Path(workdir) / "docs").mkdir(exist_ok=True)
+            (Path(workdir) / "docs" / "scope.md").write_text("scope")
+            subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    assert result.ok
+    assert result.phases[0].status == "ok"
+    assert result.phases[0].commit_gate is None
+    assert all(p.commit_gate is None for p in result.phases)
+
+
+def test_commit_prefix_fires_even_when_the_phase_already_failed(tmp_path):
+    """The enforcement runs regardless of ok/fail: a phase that failed for another reason but
+    also made a plain commit carries BOTH reasons (its own error + the COMMIT_PREFIX note)."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "scope.md").write_text("scope")
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
+        return _fake_agent(ok=False, error="boom")
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert "boom" in p.error          # the agent's own failure stays visible
+    assert "COMMIT_PREFIX" in p.error  # ... and the commit violation is appended
+    assert p.commit_gate and p.commit_gate["reason"] == "COMMIT_PREFIX"
+
+
+def test_commit_prefix_rejects_a_different_phases_name(tmp_path):
+    """A commit using ANOTHER phase's name (the resume-spoofing shape) does not count for this
+    phase, and the goal prefix is enforced strictly."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    assert wr._commit_subject_matches("[workflow] ux_design — g", "scope", "g") is False
+    assert wr._commit_subject_matches("[workflow] scope — g", "scope", "g") is True
+    assert wr._commit_subject_matches("[workflow] scope — different goal", "scope", "g") is False
+    assert wr._commit_subject_matches("site: add things", "scope", "g") is False
+
+
+def test_commit_prefix_replay_rejects_revamp2_plain_commits(tmp_path):
+    """(c) Replay proof: the revamp2 branch's 7 plain commits would each have failed the phase
+    (COMMIT_PREFIX) — the validator rejects every one, accepts the phase's own [workflow]
+    commit, and an end-to-end phase that made those 7 commits fails with them as evidence."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    goal_prefix = REVAMP2_GOAL[:40]
+
+    # (1) the validator rejects all 7 plain commits ...
+    for subject in REVAMP2_PLAIN_COMMITS:
+        assert wr._commit_subject_matches(subject, "p1_implement_inventory", goal_prefix) is False, subject
+    # ... and accepts the phase's own workflow commit (the runner's _git_commit shape)
+    ok = f"[workflow] p1_implement_inventory — {REVAMP2_GOAL}:"
+    assert wr._commit_subject_matches(ok, "p1_implement_inventory", goal_prefix) is True
+
+    # (2) end-to-end: an agent that made those 7 commits during the phase fails COMMIT_PREFIX
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        for i, subject in enumerate(REVAMP2_PLAIN_COMMITS):
+            (Path(workdir) / "docs" / f"f{i}.md").write_text(subject)
+            subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", subject], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal=REVAMP2_GOAL, model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.commit_gate and p.commit_gate["reason"] == "COMMIT_PREFIX"
+    # git log returns newest-first — compare the subject set, not the order
+    assert set(p.commit_gate["subjects"]) == set(REVAMP2_PLAIN_COMMITS)
+    assert p.commit_gate["expected_prefix"] == f"[workflow] scope — {REVAMP2_GOAL[:40]}"
+    assert not p.commit_hash  # the bad commit is never propagated by the commit gate
+    assert result.ok is False
+
+
+
