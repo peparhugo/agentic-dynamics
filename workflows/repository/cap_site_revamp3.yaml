@@ -214,6 +214,7 @@ workflow:
       - name: p6_deploy
         kind: agent
         requires_deliverable: true
+        deploy_allowed: true
         timeout: 14400
         prompt: |
           GOAL: {goal}
