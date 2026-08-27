@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Deploy gate — cap_site_revamp4_diagrams (p4_deploy)
 
 **Verdict: PASS — the operator's signed visual approval exists and BOTH hosts were

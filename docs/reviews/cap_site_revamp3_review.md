@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # CAP Site Revamp 4 — Independent Review (cap_site_revamp3_review)
 
 **Campaign:** `cap_site_revamp4`

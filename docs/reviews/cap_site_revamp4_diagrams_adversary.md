@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Adversary — cap_site_revamp4_diagrams (p5_adversarial)
 
 **Verdict: PASS.** The adversarial verifier attacked the repair in the spec's order;
