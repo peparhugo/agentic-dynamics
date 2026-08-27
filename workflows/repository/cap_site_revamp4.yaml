@@ -202,7 +202,7 @@ workflow:
       - name: p5_independent_review
         kind: agent
         requires_deliverable: true
-        model: deepseek/deepseek-v4-pro
+        run_model: deepseek/deepseek-v4-pro
         timeout: 14400
         prompt: |
           GOAL: {goal}
