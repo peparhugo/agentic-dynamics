@@ -218,7 +218,10 @@ workflow:
         timeout: 14400
         prompt: |
           GOAL: {goal}
-          SHAPE: THE ONLY PHASE THAT MAY DEPLOY (hard rule 8). Run the data chain fresh
+          SHAPE: THE ONLY PHASE THAT MAY DEPLOY (hard rule 8). THE CENSUS IS COMPLETE —
+          DO NOT re-establish, re-verify, or re-narrate the incumbent census (p1 did it;
+          the transcript pattern of re-running the census and stopping is a FAILED
+          phase). Your ONLY jobs: run the data chain fresh
           (sync -> build -> manifest), then deploy BOTH projects (firebase deploy --only
           hosting + --project agentic-dynamics) from apps/website/. VERIFY the deployed
           pages: re-run the preservation census against the DEPLOYED URLs (the instrument

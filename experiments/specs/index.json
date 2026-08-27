@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-27T15:18:26.769207+00:00",
+  "generated_at": "2026-08-27T15:24:07.961609+00:00",
   "n_specs": 131,
   "specs": [
     {
@@ -1195,13 +1195,13 @@
       ],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-27T15:16:47.199418+00:00",
+      "last_run_at": "2026-08-27T15:24:07.907394+00:00",
       "latest_ok": false,
       "latest_model": "openai/gpt-5.6-terra",
-      "latest_cost_usd": 9.548116,
-      "latest_git_sha": "3c650fdae",
-      "results_pointer": "experiments/results/workflows/cap_site_revamp3/20260827T151647Z.json",
-      "n_runs": 7
+      "latest_cost_usd": 0.037772,
+      "latest_git_sha": "868fc8236",
+      "results_pointer": "experiments/results/workflows/cap_site_revamp3/20260827T152407Z.json",
+      "n_runs": 8
     },
     {
       "name": "cap_sonnet_adversary",
