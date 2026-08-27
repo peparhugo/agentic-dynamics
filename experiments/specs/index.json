@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-27T15:24:07.961609+00:00",
-  "n_specs": 131,
+  "generated_at": "2026-08-27T16:02:11.448289+00:00",
+  "n_specs": 132,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -209,6 +209,26 @@
       "artifact_kind": "experiment",
       "repeatable": true,
       "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "cap_site_revamp4",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_site_revamp4.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [
+        "cap_site_revamp3"
+      ],
       "superseded_by": null,
       "completed_at": null,
       "last_run_at": null,
@@ -1195,13 +1215,13 @@
       ],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-27T15:24:07.907394+00:00",
-      "latest_ok": false,
+      "last_run_at": "2026-08-27T15:44:11.077837+00:00",
+      "latest_ok": true,
       "latest_model": "openai/gpt-5.6-terra",
-      "latest_cost_usd": 0.037772,
-      "latest_git_sha": "868fc8236",
-      "results_pointer": "experiments/results/workflows/cap_site_revamp3/20260827T152407Z.json",
-      "n_runs": 8
+      "latest_cost_usd": 1.426952,
+      "latest_git_sha": "f2d9f35dc",
+      "results_pointer": "experiments/results/workflows/cap_site_revamp3/20260827T154411Z.json",
+      "n_runs": 9
     },
     {
       "name": "cap_sonnet_adversary",
