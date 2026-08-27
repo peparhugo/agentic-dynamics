@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-27T16:52:46.519552+00:00",
-  "n_specs": 132,
+  "generated_at": "2026-08-27T17:38:57.262362+00:00",
+  "n_specs": 133,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -190,6 +190,24 @@
       "spec_path": "experiments/definitions/cap_shadow_comparison.yaml",
       "artifact_kind": "experiment",
       "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "cap_site_revamp4_diagrams",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/cap_site_revamp4_diagrams.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
@@ -506,26 +524,6 @@
       "latest_git_sha": "80f7806fe",
       "results_pointer": "experiments/results/workflows/cap_adaptive_2c/20260827T160805Z.json",
       "n_runs": 1
-    },
-    {
-      "name": "cap_site_revamp4",
-      "version": "0.1",
-      "status": "failed",
-      "spec_path": "workflows/repository/cap_site_revamp4.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [
-        "cap_site_revamp3"
-      ],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-27T16:17:31.955948+00:00",
-      "latest_ok": false,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.017591,
-      "latest_git_sha": "b66f7ca40",
-      "results_pointer": "experiments/results/workflows/cap_site_revamp4/20260827T161731Z.json",
-      "n_runs": 3
     },
     {
       "name": "claude_background_sessions",
@@ -1222,6 +1220,26 @@
       "latest_git_sha": "f2d9f35dc",
       "results_pointer": "experiments/results/workflows/cap_site_revamp3/20260827T154411Z.json",
       "n_runs": 9
+    },
+    {
+      "name": "cap_site_revamp4",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_site_revamp4.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [
+        "cap_site_revamp3"
+      ],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-27T17:02:04.229503+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.032248,
+      "latest_git_sha": "f4de64787",
+      "results_pointer": "experiments/results/workflows/cap_site_revamp4/20260827T170204Z.json",
+      "n_runs": 4
     },
     {
       "name": "cap_sonnet_adversary",
