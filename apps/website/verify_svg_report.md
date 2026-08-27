@@ -1,4 +1,4 @@
-# SVG rendering gate — PASS (site revamp4 diagrams, full verification pass)
+# SVG rendering gate — PASS (site revamp4 diagrams, p3b craft-UX redesign)
 
 Gate: `apps/website/verify_svg_rendering.py` — playwright rendering gate for the site's
 inline SVGs. Criteria per SVG:
@@ -8,6 +8,10 @@ inline SVGs. Criteria per SVG:
 - **ASPECT** — rendered ratio ≈ viewBox (aspect-correct, no distortion)
 - **BALANCE** — rendered `<text>` label wall ≤ 1.5× shape markup length (a figure with
   more text than 1.5× its shapes is flagged and redesigned); never an empty shell.
+- **CONTRAST** — WCAG AA: every text fill vs its computed background ≥ 4.5:1 (the p3b
+  addition; gradient/pattern fills resolve to their stops/paint, a paint-order stroke
+  halo counts as the background, alpha is composited; the site's default dark theme is
+  the review surface).
 - **PAINT** — first-paint visibility: the page reports a first paint and every visible
   svg is painted (opaque, non-zero box, laid out).
 - **CONSOLE** — the page loads console-clean: no console error or page exception.
@@ -21,45 +25,54 @@ python3 verify_svg_rendering.py --mobile --pages index,framework,question,eviden
 ```
 
 Result: **22/22 PASS, 0 FAIL, exit 0** — all 9 pages at both viewports, console clean,
-first paint present on every page. Screenshots + gate data + approval template live in
-`apps/website/verification/`.
+first paint present on every page, every text fill ≥ WCAG AA. Screenshots + gate data +
+the approval template live in `apps/website/verification/`.
 
-## Per-SVG table (rows 1–10 desktop, 11–20 mobile)
+## Per-SVG table (rows 1–11 desktop, 12–22 mobile)
 
-| page | svg | viewBox | rendered | text | shape markup | verdict |
-|---|---|---|---|---|---|---|
-| framework.html | svg#0(diagram-map workflow-map) | 0 0 1440 760 | 1034x546 | 1140 | 2633 | ✔ PASS |
-| framework.html | svg#1 (eight planes) | 0 0 760 360 | 1100x522 | 217 | 1512 | ✔ PASS |
-| framework.html | svg#2 (instrument cycle) | 0 0 760 190 | 1100x277 | 79 | 622 | ✔ PASS |
-| framework.html | svg#3 (two modes) | 0 0 760 200 | 1100x291 | 128 | 676 | ✔ PASS |
-| framework.html | svg#4 (autonomy envelope) | 0 0 760 260 | 1100x378 | 136 | 789 | ✔ PASS |
-| framework.html | svg#5(diagram-map autonomy-map) | 0 0 1440 760 | 1034x546 | 1005 | 2392 | ✔ PASS |
-| question.html | svg#0 (N×M map) | 0 0 720 340 | 549x260 | 247 | 1127 | ✔ PASS |
-| evidence.html | svg#0 (escalation E_x) | 0 0 720 260 | 628x228 | 148 | 551 | ✔ PASS |
-| evidence.html | svg#1 (calibration arc) | 0 0 720 220 | 628x193 | 156 | 566 | ✔ PASS |
-| methodology.html | svg#0:cc-plot (N² curve) | 0 0 720 360 | 668x335 | 36 | 546 | ✔ PASS |
-| framework.html | svg#0(diagram-map workflow-map) | 0 0 1440 760 | 900x475 | 1140 | 2633 | ✔ PASS |
-| framework.html | svg#1 (eight planes) | 0 0 760 360 | 358x171 | 217 | 1512 | ✔ PASS |
-| framework.html | svg#2 (instrument cycle) | 0 0 760 190 | 520x132 | 79 | 622 | ✔ PASS |
-| framework.html | svg#3 (two modes) | 0 0 760 200 | 520x138 | 128 | 676 | ✔ PASS |
-| framework.html | svg#4 (autonomy envelope) | 0 0 760 260 | 358x124 | 136 | 789 | ✔ PASS |
-| framework.html | svg#5(diagram-map autonomy-map) | 0 0 1440 760 | 900x475 | 1005 | 2392 | ✔ PASS |
-| question.html | svg#0 (N×M map) | 0 0 720 340 | 352x167 | 247 | 1127 | ✔ PASS |
-| evidence.html | svg#0 (escalation E_x) | 0 0 720 260 | 356x130 | 148 | 551 | ✔ PASS |
-| evidence.html | svg#1 (calibration arc) | 0 0 720 220 | 356x110 | 156 | 566 | ✔ PASS |
-| methodology.html | svg#0:cc-plot (N² curve) | 0 0 720 360 | 356x179 | 36 | 546 | ✔ PASS |
+| page | svg | viewBox | rendered | text | shape markup | contrast | verdict |
+|---|---|---|---|---|---|---|---|
+| index.html | svg#0(diagram-map) instrument cycle | 0 0 1440 580 | 1120x452 | 499 | 1588 | 9.95:1 | ✔ PASS |
+| framework.html | svg#0(diagram-map workflow-map) | 0 0 1440 760 | 1034x546 | 1140 | 2629 | 10.97:1 | ✔ PASS |
+| framework.html | svg#1(diagram-map) eight planes | 0 0 1440 560 | 1100x429 | 682 | 1931 | 9.95:1 | ✔ PASS |
+| framework.html | svg#2(diagram-map) instrument cycle | 0 0 1440 580 | 1100x444 | 499 | 1588 | 9.95:1 | ✔ PASS |
+| framework.html | svg#3(diagram-map) two modes | 0 0 1440 520 | 1100x399 | 572 | 1164 | 9.95:1 | ✔ PASS |
+| framework.html | svg#4(diagram-map) envelope | 0 0 1440 560 | 1100x429 | 510 | 1301 | 8.37:1 | ✔ PASS |
+| framework.html | svg#5(diagram-map autonomy-map) | 0 0 1440 760 | 1034x546 | 1005 | 2389 | 9.23:1 | ✔ PASS |
+| question.html | svg#0(diagram-map) N×M map | 0 0 1440 520 | 980x355 | 433 | 1556 | 9.95:1 | ✔ PASS |
+| evidence.html | svg#0(diagram-map) escalation E_x | 0 0 1440 420 | 980x287 | 336 | 819 | 9.95:1 | ✔ PASS |
+| evidence.html | svg#1(diagram-map) calibration arc | 0 0 1440 360 | 980x247 | 406 | 820 | 9.95:1 | ✔ PASS |
+| methodology.html | svg#0:cc-plot | 0 0 720 360 | 668x335 | 36 | 546 | 17.19:1 | ✔ PASS |
+| index.html | svg#0(diagram-map) instrument cycle | 0 0 1440 580 | 520x211 | 499 | 1588 | 9.95:1 | ✔ PASS |
+| framework.html | svg#0(diagram-map workflow-map) | 0 0 1440 760 | 900x475 | 1140 | 2629 | 10.97:1 | ✔ PASS |
+| framework.html | svg#1(diagram-map) eight planes | 0 0 1440 560 | 520x203 | 682 | 1931 | 9.95:1 | ✔ PASS |
+| framework.html | svg#2(diagram-map) instrument cycle | 0 0 1440 580 | 520x211 | 499 | 1588 | 9.95:1 | ✔ PASS |
+| framework.html | svg#3(diagram-map) two modes | 0 0 1440 520 | 520x189 | 572 | 1164 | 9.95:1 | ✔ PASS |
+| framework.html | svg#4(diagram-map) envelope | 0 0 1440 560 | 520x203 | 510 | 1301 | 8.37:1 | ✔ PASS |
+| framework.html | svg#5(diagram-map autonomy-map) | 0 0 1440 760 | 900x475 | 1005 | 2389 | 9.23:1 | ✔ PASS |
+| question.html | svg#0(diagram-map) N×M map | 0 0 1440 520 | 520x189 | 433 | 1556 | 9.95:1 | ✔ PASS |
+| evidence.html | svg#0(diagram-map) escalation E_x | 0 0 1440 420 | 520x153 | 336 | 819 | 9.95:1 | ✔ PASS |
+| evidence.html | svg#1(diagram-map) calibration arc | 0 0 1440 360 | 520x132 | 406 | 820 | 9.95:1 | ✔ PASS |
+| methodology.html | svg#0:cc-plot | 0 0 720 360 | 356x179 | 36 | 546 | 17.19:1 | ✔ PASS |
 
-## Before → After (rendering defects + craft)
+All figures sit well under the 1.5× label-wall flag (max 0.433, the workflow-map) and every
+text fill clears WCAG AA (min 8.37:1, the envelope's amber kicker).
 
-| Item (before) | Fix | After |
+## p3b — the operator's figure-by-figure REJECT (2026-08-27), addressed
+
+| Figure (operator finding) | p3b redesign | Contrast before → after |
 |---|---|---|
-| architecture-map rendered 0x0 (dead `<figure hidden aria-hidden="true">`) | removed the dead hidden figure | gone — 0 defects |
-| fw-cycle / twomodes crushed to 358x91 / 358x96 on mobile | wrapped in the shared `.diagram-scroll` well; base.css gives wide figure-edit maps a readable `min-width:520px` | 520x132 / 520x138 |
-| `.system-figure` / `.diagram-scroll` / `.diagram-map` / `.workflow-map` / `.redesigned` had no base.css layout | DIAGRAM SYSTEM wired into `base.css` (+ `svg[viewBox]` collapse-proof floor) | containers can never collapse |
-| OPERATING MODEL header was an 83-char sentence wall | short tagline; full wording kept in `<desc>` + section lead | text 1176 → 1140 |
-| autonomy-map: 78-char title list + 100-char paragraph + 80-char header | short labels; full wording kept in `<desc>` + `.human-plane` fallback | text 1149 → 1005 |
-| eight planes cited `svg-filter-focus` but had no filter | `planeFocus` glow on the control plane — reference genuinely adapted | ratio 0.146 → 0.144 |
-| envelope cited `svg-filter-focus` but had no filter | `envFocus` glow on the PROPOSED cell — reference genuinely adapted | ratio 0.178 → 0.172 |
+| eight planes — "hard to understand, does not match the execution-engine figure" | re-drawn as a ONE-DIRECTION dependency flow in the exact workflow-map grammar: 9 numbered node cards (core → … → control → apps) with flow arrows, CONTROL glowing as the only consumer, APPS amber, a tier rail (0/1/2/3) and the status line. The figcaption's canonical chain is now the figure itself. | text 217→682 · min 4.47→9.95:1 |
+| instrument cycle — "terrible contrast and an unclear message" | the load-bearing rule as a 5-node ring (instrument → derive → write policy → grid → campaign → repeat) with color-coded stages, an animated return tracer, and a red ✕ gate on the derive→policy arrow ("unmeasured requirement blocks policy"). The one message: derive is the only path into policy. | text 79→499 · min 3.84→9.95:1 |
+| one engine, two operating modes — "UI but not UX" | a converge→one-engine→diverge composition: operate (1 cell) and experiment (G cells) inputs feed ONE glowing engine pill (cell → compile → jobs → attempts → ledger), then split to operate-path (record) and experiment-path (compare + adapt); the bottom line names the single difference. | text 128→572 · min 3.84→9.95:1 |
+| ANY other figure with the same disease | the bounded-autonomy envelope (hardcoded `#287271/#9b6a28/#8a2f2f`, pattern-fill text), the index instrument cycle (unstyled flow-node text), the N×M measurement map, the escalation E_x figure and the calibration arc were ALL re-drawn in the shared grammar. The two approved maps (workflow-map, autonomy-map) keep their composition and simply inherit the shared classes. | envelope min 2.17→8.37:1 · all others ≥ 8.37:1 |
 
-All figures sit well under the 1.5× label-wall flag (max 0.433 for the workflow-map).
-Per-figure before/after detail: `apps/website/verification/index.md`.
+Shared figure grammar (the "exact visual language of the good figure") now lives in
+`apps/website/base.css` (DIAGRAM SYSTEM → map internals): `.map-ground/.map-grid/
+.map-kicker/.map-title/.map-copy/.map-node(.cyan/.blue/.amber/.danger)/.node-index/
+.node-title/.node-copy/.flow(.cyan/.blue/.amber)/.flow-note/.mode-surface/.rail/
+.scale-*/.tracer` + `@keyframes diagram-trace`, with standardized defs ids
+(`diagram-grid` / `diagram-ground` / `diagram-core` / `diagram-glow` / `diagram-arrow*`).
+Every page figure reuses these classes — the framework page-local duplicates were removed.
+
+Per-figure before/after + contrast detail: `apps/website/verification/index.md`.

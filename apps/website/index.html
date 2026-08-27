@@ -150,19 +150,47 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
        A returning five-node path: derive is the only route into policy. -->
   <figure class="figure-edit" aria-labelledby="cycle-title">
     <span class="kicker" id="cycle-title">The instrument cycle</span>
-    <svg viewBox="0 0 720 320" role="img" aria-labelledby="cycle-title cycle-desc">
-      <title id="cycle-desc">Instrument to derive to write policy to grid to campaign and back to instrument. Derive is the only path into policy; unmeasured requirements block policy.</title>
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable instrument-cycle diagram">
+    <svg class="diagram-map" viewBox="0 0 1440 580" role="img" aria-labelledby="cycle-title cycle-desc">
+      <title id="cycle-desc">Instrument to derive to write policy to grid to campaign and back to instrument. Derive is the only path into policy; unmeasured requirements block it.</title>
       <defs>
-        <marker id="cycleArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
+        <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+        <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+        <filter id="diagram-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t2)"/></marker>
+        <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ac)"/></marker>
+        <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--cy)"/></marker>
+        <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--am)"/></marker>
       </defs>
-      <path class="flow-link" d="M360 40C440 40 470 70 470 120M250 40C170 40 140 70 140 120"/>
-      <path class="flow-link" d="M470 200C470 250 440 280 360 280M140 200C140 250 170 280 250 280"/>
-      <g><rect class="flow-node measured" x="245" y="20" width="230" height="60" rx="10"/><text class="flow-label" x="360" y="58">Instrument</text></g>
-      <g><rect class="flow-node computed" x="25" y="130" width="230" height="60" rx="10"/><text class="flow-label" x="140" y="168">Derive</text><text x="140" y="200" style="font-family:JetBrains Mono,monospace;font-size:11px;text-anchor:middle" fill="currentColor">turns events into information</text></g>
-      <g><rect class="flow-node measured" x="465" y="130" width="230" height="60" rx="10"/><text class="flow-label" x="580" y="168">Write policy</text><text x="580" y="200" style="font-family:JetBrains Mono,monospace;font-size:11px;text-anchor:middle" fill="currentColor">consumes measured information only</text></g>
-      <g><rect class="flow-node computed" x="245" y="240" width="230" height="60" rx="10"/><text class="flow-label" x="360" y="278">Grid → Campaign</text></g>
-      <text x="580" y="250" style="font-family:JetBrains Mono,monospace;font-size:11px;text-anchor:middle" fill="#9b6a28">unmeasured requirements block policy</text>
+      <rect class="map-ground" x="1" y="1" width="1438" height="578" rx="24" style="fill:url(#diagram-ground)"/>
+      <rect class="map-grid" x="1" y="1" width="1438" height="578" rx="24"/>
+
+      <text class="map-kicker" x="54" y="52">THE LOAD-BEARING RULE</text>
+      <text class="map-title" x="54" y="84">TO MAKE POLICIES, WE NEED INFORMATION</text>
+      <text class="map-copy" x="54" y="108">INSTRUMENT &#x2192; DERIVE &#x2192; WRITE POLICY &#x2192; GRID &#x2192; CAMPAIGN &#x2192; REPEAT</text>
+
+      <g><rect class="map-node cyan" x="120" y="220" width="300" height="100" rx="11"/><text class="node-index" x="138" y="243">01 / INSTRUMENT</text><text class="node-title" x="138" y="271">INSTRUMENT</text><text class="node-copy" x="138" y="291">ledger events: quality &#x00B7; grit &#x00B7; confidence</text></g>
+      <g><rect class="map-node cyan" x="560" y="220" width="300" height="100" rx="11" filter="url(#diagram-glow)"/><text class="node-index" x="578" y="243">02 / DERIVE</text><text class="node-title" x="578" y="271">DERIVE</text><text class="node-copy" x="578" y="291">measurement rules &#x2192; named information</text></g>
+      <g><rect class="map-node blue" x="1000" y="220" width="300" height="100" rx="11"/><text class="node-index" x="1018" y="243">03 / WRITE POLICY</text><text class="node-title" x="1018" y="271">WRITE POLICY</text><text class="node-copy" x="1018" y="291">control rules consume measured fields</text></g>
+
+      <g><rect class="map-node blue" x="1000" y="440" width="300" height="100" rx="11"/><text class="node-index" x="1018" y="463">04 / GRID</text><text class="node-title" x="1018" y="491">GRID</text><text class="node-copy" x="1018" y="511">test policy as an arm</text></g>
+      <g><rect class="map-node amber" x="560" y="440" width="300" height="100" rx="11"/><text class="node-index" x="578" y="463">05 / CAMPAIGN</text><text class="node-title" x="578" y="491">CAMPAIGN</text><text class="node-copy" x="578" y="511">change one factor &#x00B7; emit next spec</text></g>
+
+      <path class="flow cyan" d="M420 270H560"/><text class="flow-note" x="490" y="256" text-anchor="middle">emit fields</text>
+      <path class="flow blue" d="M860 270H1000"/><text class="flow-note" x="930" y="250" text-anchor="middle">produce &#x00B7; the only path</text>
+      <path class="flow blue" d="M1150 320V440"/><text class="flow-note" x="1162" y="384">assign as arm</text>
+      <path class="flow cyan" d="M1000 490H860"/><text class="flow-note" x="930" y="476" text-anchor="middle">compare arms</text>
+      <path class="flow amber" d="M560 490C560 400 270 400 270 320"/><text class="flow-note" x="415" y="402" text-anchor="middle">next spec</text>
+      <path class="tracer return" pathLength="100" d="M560 490C560 400 270 400 270 320"/>
+
+      <g aria-label="Unmeasured requirement blocks policy">
+        <line x1="935" y1="252" x2="935" y2="288" stroke="var(--danger)" stroke-width="2.5" stroke-dasharray="5 4"/>
+        <path d="M928 263L942 277" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M942 263L928 277" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round"/>
+        <text class="flow-note" x="935" y="345" text-anchor="middle">unmeasured requirement blocks policy</text>
+      </g>
     </svg>
+    </div>
     <figcaption>Figure H1. The instrument cycle — Instrument → Derive → Write policy → Grid → Campaign, returning to Instrument. Derive is the only path into policy, and a control rule whose requirements are not measured cannot be written.</figcaption>
     <div class="fig-legend"><span class="ev-badge p">[P] method structure</span><span>ref: svg-marker-flow.html</span></div>
   </figure>

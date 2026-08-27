@@ -1153,19 +1153,32 @@ All cost values measured directly from provider API responses via the openCode d
 <div class="edit-split" style="margin-top:2rem">
   <figure class="figure-edit" aria-labelledby="escalation-title">
     <span class="kicker" id="escalation-title">Escalation E_x — the measured fix multiplier</span>
-    <svg viewBox="0 0 720 260" role="img" aria-labelledby="escalation-title escalation-desc">
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable escalation diagram">
+    <svg class="diagram-map" viewBox="0 0 1440 420" role="img" aria-labelledby="escalation-title escalation-desc">
       <title id="escalation-desc">Cell baseline $0.008949, then the measured Sol and Sonnet escalation-fix costs with their E_x multipliers.</title>
       <defs>
-        <marker id="escArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
+        <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+        <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+        <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t2)"/></marker>
+        <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ac)"/></marker>
+        <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--cy)"/></marker>
+        <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--am)"/></marker>
       </defs>
-      <rect x="30" y="120" width="150" height="52" rx="8" fill="#287271" opacity=".85"/><text x="105" y="143" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="#fff">baseline cell</text><text id="esc-baseline" x="105" y="160" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">$0.008949</text>
-      <path d="M180 146H230" stroke="#287271" stroke-width="2" marker-end="url(#escArrow)"/>
-      <rect x="230" y="40" width="220" height="52" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2"/><text x="340" y="63" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="currentColor">Sol fix · <tspan id="esc-sol-cost">$0.102619</tspan></text><text x="340" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#9b6a28">E_x = <tspan id="esc-sol-ex">11.4671</tspan></text>
-      <rect x="230" y="150" width="220" height="52" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2"/><text x="340" y="173" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="currentColor">Sonnet fix · <tspan id="esc-sonnet-cost">$0.111982</tspan></text><text x="340" y="190" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#9b6a28">E_x = <tspan id="esc-sonnet-ex">12.5134</tspan></text>
-      <path d="M340 92V150" stroke="#8b8375" stroke-width="1.5" stroke-dasharray="4 3"/>
-      <text x="580" y="110" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">n=1 per escalation model</text>
-      <text x="580" y="130" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">descriptive, no CI, no causal claim</text>
+      <rect class="map-ground" x="1" y="1" width="1438" height="418" rx="24" style="fill:url(#diagram-ground)"/>
+      <rect class="map-grid" x="1" y="1" width="1438" height="418" rx="24"/>
+
+      <text class="map-kicker" x="54" y="52">ESCALATION E_x / THE MEASURED FIX MULTIPLIER</text>
+      <text class="map-title" x="54" y="84">THE FIX COSTS 11&#x2013;12&#x00D7; THE CELL</text>
+      <text class="map-copy" x="54" y="108">MEASURED COSTS &#x00B7; COMPUTED RATIOS &#x00B7; N=1 &#x00B7; DESCRIPTIVE &#x2014; NO CAUSAL CLAIM</text>
+
+      <g><rect class="map-node cyan" x="90" y="200" width="380" height="130" rx="11"/><text class="node-index" x="108" y="223">01 / BASELINE CELL</text><text class="node-title" x="108" y="258"><tspan id="esc-baseline">$0.008949</tspan></text><text class="node-copy" x="108" y="282">the cell each fix is divided by</text></g>
+      <g><rect class="map-node blue" x="530" y="200" width="380" height="130" rx="11"/><text class="node-index" x="548" y="223">02 / SOL FIX</text><text class="node-title" x="548" y="258"><tspan id="esc-sol-cost">$0.102619</tspan></text><text class="node-copy" x="548" y="282">E_x = <tspan id="esc-sol-ex">11.4671</tspan></text></g>
+      <g><rect class="map-node blue" x="970" y="200" width="380" height="130" rx="11"/><text class="node-index" x="988" y="223">03 / SONNET FIX</text><text class="node-title" x="988" y="258"><tspan id="esc-sonnet-cost">$0.111982</tspan></text><text class="node-copy" x="988" y="282">E_x = <tspan id="esc-sonnet-ex">12.5134</tspan></text></g>
+
+      <path class="flow cyan" d="M470 265H530"/><path class="flow cyan" d="M910 265H970"/>
+      <text class="map-copy" x="720" y="392" text-anchor="middle">N=1 PER ESCALATION MODEL &#x00B7; DESCRIPTIVE &#x00B7; NO CI &#x00B7; NO CAUSAL CLAIM</text>
     </svg>
+    </div>
     <figcaption>Figure E1. The escalation chain — [M] costs ($0.008949 baseline; $0.102619 Sol; $0.111982 Sonnet) and [C] ratios (E_x = 11.4671; 12.5134), n=1 per model, scoped to the measured escalation path.</figcaption>
     <div class="fig-legend"><span class="ev-badge m">[M] costs</span><span class="ev-badge c">[C] ratios</span><span>ref: svg-marker-flow.html, svg-pattern-surface.html</span></div>
   </figure>
@@ -1183,17 +1196,32 @@ All cost values measured directly from provider API responses via the openCode d
 <div class="edit-split">
   <figure class="figure-edit" aria-labelledby="calibration-title">
     <span class="kicker" id="calibration-title">Calibration arc — 0/3 → 2/3 → 2b</span>
-    <svg viewBox="0 0 720 220" role="img" aria-labelledby="calibration-title calibration-desc">
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable calibration arc diagram">
+    <svg class="diagram-map" viewBox="0 0 1440 360" role="img" aria-labelledby="calibration-title calibration-desc">
       <title id="calibration-desc">Three panels: initial 0/3, rerun 2/3 with Wilson interval, then the 2b non-inferiority decision.</title>
       <defs>
-        <marker id="calArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
+        <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+        <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+        <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t2)"/></marker>
+        <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ac)"/></marker>
+        <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--cy)"/></marker>
+        <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--am)"/></marker>
       </defs>
-      <rect x="20" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#287271" stroke-width="1.5"/><text x="120" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:700" fill="currentColor">0 / 3</text><text x="120" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">initial calibration</text><text x="120" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">n=3</text>
-      <path d="M220 90H260" stroke="#287271" stroke-width="2" marker-end="url(#calArrow)"/>
-      <rect x="260" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#9b6a28" stroke-width="1.5"/><text x="360" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:700" fill="currentColor"><tspan id="cal-rerun">2 / 3</tspan></text><text x="360" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">rerun · Wilson [<tspan id="cal-wilson-lo">0.2077</tspan>, <tspan id="cal-wilson-hi">0.9385</tspan>]</text><text x="360" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">n=3 · descriptive</text>
-      <path d="M460 90H500" stroke="#287271" stroke-width="2" marker-end="url(#calArrow)"/>
-      <rect x="500" y="50" width="200" height="80" rx="8" fill="var(--bg3)" stroke="#8a2f2f" stroke-width="2"/><text x="600" y="80" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:700" fill="currentColor">2b NON-INFERIOR</text><text x="600" y="105" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">CPVO ratio [<tspan id="cal-cpvo-lo">0.6842</tspan>, <tspan id="cal-cpvo-hi">0.9105</tspan>]</text><text x="600" y="120" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:9px" fill="currentColor">authorizes design review only</text>
+      <rect class="map-ground" x="1" y="1" width="1438" height="358" rx="24" style="fill:url(#diagram-ground)"/>
+      <rect class="map-grid" x="1" y="1" width="1438" height="358" rx="24"/>
+
+      <text class="map-kicker" x="54" y="52">CALIBRATION ARC / 0&#x2192;3 &#x00B7; 2&#x00F7;3 &#x00B7; 2b</text>
+      <text class="map-title" x="54" y="84">EACH PANEL NAMES ITS N AND INTERVAL</text>
+      <text class="map-copy" x="54" y="108">0/3 INITIAL &#x00B7; 2/3 RERUN (WILSON) &#x00B7; 2b NON-INFERIOR &#x2014; AUTHORIZES DESIGN REVIEW ONLY</text>
+
+      <g><rect class="map-node cyan" x="90" y="170" width="380" height="120" rx="11"/><text class="node-index" x="108" y="193">01 / INITIAL</text><text class="node-title" x="108" y="228">0 / 3</text><text class="node-copy" x="108" y="252">n=3</text></g>
+      <g><rect class="map-node blue" x="530" y="170" width="380" height="120" rx="11"/><text class="node-index" x="548" y="193">02 / RERUN</text><text class="node-title" x="548" y="228"><tspan id="cal-rerun">2 / 3</tspan></text><text class="node-copy" x="548" y="252">Wilson [<tspan id="cal-wilson-lo">0.2077</tspan>, <tspan id="cal-wilson-hi">0.9385</tspan>] &#x00B7; n=3 &#x00B7; descriptive</text></g>
+      <g><rect class="map-node amber" x="970" y="170" width="380" height="120" rx="11"/><text class="node-index" x="988" y="193">03 / DECISION</text><text class="node-title" x="988" y="228">2b NON-INFERIOR</text><text class="node-copy" x="988" y="252">CPVO ratio [<tspan id="cal-cpvo-lo">0.6842</tspan>, <tspan id="cal-cpvo-hi">0.9105</tspan>]</text><text class="node-copy" x="988" y="270">authorizes design review only</text></g>
+
+      <path class="flow cyan" d="M470 230H530"/><path class="flow cyan" d="M910 230H970"/>
+      <text class="map-copy" x="720" y="330" text-anchor="middle">DESCRIPTIVE, NOT STATISTICAL CLEARANCE &#x00B7; THE FINAL LABEL STATES ITS AUTHORIZATION BOUNDARY</text>
     </svg>
+    </div>
     <figcaption>Figure E2. The calibration arc — 0/3 initial, 2/3 rerun (Wilson [0.2077, 0.9385], n=3), then the 2b decision. Each panel names its n and interval; the final label states its authorization boundary.</figcaption>
     <div class="fig-legend"><span class="ev-badge c">[C] over [M]</span><span>ref: scroll-sticky-overlay.html, d3-line-arc.html</span></div>
   </figure>

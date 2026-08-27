@@ -48,35 +48,58 @@ blockquote.field{font-family:var(--font-serif);font-size:1.25rem;line-height:1.6
 <section class="edit-split">
   <figure class="figure-edit" aria-labelledby="nxm-title">
     <span class="kicker" id="nxm-title">The N × M measurement map</span>
-    <svg viewBox="0 0 720 340" role="img" aria-labelledby="nxm-desc nxm-title">
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable N by M measurement map">
+    <svg class="diagram-map" viewBox="0 0 1440 520" role="img" aria-labelledby="nxm-desc nxm-title">
       <title id="nxm-desc">Two orthogonal rails: N linked sessions and M measurement angles. Their intersection is an evidence surface, with a second analysis pass.</title>
       <defs>
-        <marker id="flowArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
-        <pattern id="hatch" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="12" stroke="#9b6a28" stroke-width="3"/></pattern>
+        <pattern id="diagram-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+        <linearGradient id="diagram-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+        <radialGradient id="diagram-core" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="var(--ac)" stop-opacity=".2"/><stop offset="1" stop-color="var(--ac)" stop-opacity=".025"/></radialGradient>
+        <filter id="diagram-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="diagram-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t2)"/></marker>
+        <marker id="diagram-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--ac)"/></marker>
+        <marker id="diagram-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--cy)"/></marker>
+        <marker id="diagram-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--am)"/></marker>
       </defs>
-      <text x="40" y="40" style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:700" fill="currentColor">N — linked sessions</text>
-      <rect x="40" y="55" width="120" height="26" rx="6" fill="#287271" opacity=".85"/>
-      <rect x="180" y="55" width="120" height="26" rx="6" fill="#287271" opacity=".85"/>
-      <rect x="320" y="55" width="120" height="26" rx="6" fill="#287271" opacity=".85"/>
-      <path d="M160 68H180M300 68H320" stroke="#287271" stroke-width="2" marker-end="url(#flowArrow)"/>
-      <text x="100" y="105" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">session 1</text>
-      <text x="240" y="105" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">session 2</text>
-      <text x="380" y="105" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">… session N</text>
-      <text x="40" y="175" style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:700" fill="currentColor">M — measurement angles</text>
-      <rect x="40" y="190" width="220" height="24" rx="6" fill="none" stroke="#287271" stroke-width="1.5"/>
-      <rect x="280" y="190" width="220" height="24" rx="6" fill="none" stroke="#287271" stroke-width="1.5"/>
-      <rect x="520" y="190" width="160" height="24" rx="6" fill="none" stroke="#287271" stroke-width="1.5"/>
-      <text x="150" y="233" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">verification · recovery · cost</text>
-      <text x="390" y="233" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">maintainability · cache · routing</text>
-      <text x="600" y="233" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">long-horizon</text>
-      <rect x="40" y="258" width="360" height="52" rx="8" fill="#287271" opacity=".85"/>
-      <text x="60" y="280" style="font-family:JetBrains Mono,monospace;font-size:12px" fill="#fff">observed corpus</text>
-      <text x="60" y="297" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="#fff">measure both rails; publish basis and n</text>
-      <rect x="420" y="258" width="260" height="52" rx="8" fill="url(#hatch)" stroke="#9b6a28" stroke-width="2"/>
-      <text x="440" y="280" style="font-family:JetBrains Mono,monospace;font-size:12px" fill="currentColor">modeled extension</text>
-      <text x="440" y="297" style="font-family:JetBrains Mono,monospace;font-size:11px" fill="currentColor">publish assumptions and formula</text>
-      <path d="M120 250V218M360 250V214M220 250V214" stroke="#287271" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <rect class="map-ground" x="1" y="1" width="1438" height="518" rx="24" style="fill:url(#diagram-ground)"/>
+      <rect class="map-grid" x="1" y="1" width="1438" height="518" rx="24"/>
+
+      <text class="map-kicker" x="54" y="52">THE N &#x00D7; M MEASUREMENT MAP</text>
+      <text class="map-title" x="54" y="84">TWO RAILS, ONE EVIDENCE SURFACE</text>
+      <text class="map-copy" x="54" y="108">N LINKED SESSIONS CROSS M MEASUREMENT ANGLES &#x00B7; A SECOND ANALYSIS PASS MULTIPLIES THE BURDEN</text>
+
+      <g aria-label="N rail: linked sessions">
+        <rect class="rail" x="54" y="150" width="200" height="320" rx="14"/>
+        <text class="scale-symbol" x="82" y="182">N</text>
+        <text class="scale-title" x="82" y="206">LINKED SESSIONS</text>
+        <g><rect class="map-node cyan" x="74" y="236" width="160" height="42" rx="8"/><text class="node-title" x="92" y="262">SESSION 1</text></g>
+        <g><rect class="map-node cyan" x="74" y="310" width="160" height="42" rx="8"/><text class="node-title" x="92" y="336">SESSION 2</text></g>
+        <g><rect class="map-node cyan" x="74" y="384" width="160" height="42" rx="8"/><text class="node-title" x="92" y="410">&#x2026; SESSION N</text></g>
+        <path class="flow cyan" d="M154 278V310"/><path class="flow cyan" d="M154 352V384"/>
+      </g>
+
+      <g aria-label="Evidence surface">
+        <rect x="300" y="150" width="1086" height="220" rx="18" fill="url(#diagram-core)" stroke="var(--ac)" stroke-width="1.6" filter="url(#diagram-glow)"/>
+        <text class="node-index" x="330" y="180">THE SURFACE / N &#x00D7; M</text>
+        <text class="node-title" x="330" y="212">EVIDENCE SURFACE</text>
+        <text class="node-copy" x="330" y="240">every session &#x00D7; angle intersection is one observed cell</text>
+        <text class="node-copy" x="330" y="260">a second analysis pass multiplies the burden across models and conditions</text>
+      </g>
+
+      <g aria-label="M rail: measurement angles">
+        <rect class="rail" x="300" y="408" width="1086" height="96" rx="14"/>
+        <text class="scale-symbol" x="330" y="460">M</text>
+        <text class="scale-title" x="370" y="448">MEASUREMENT ANGLES</text>
+        <g><rect class="map-node blue" x="500" y="434" width="240" height="44" rx="8"/><text class="node-copy" x="518" y="460">VERIFY &#x00B7; RECOVER &#x00B7; COST</text></g>
+        <g><rect class="map-node blue" x="770" y="434" width="240" height="44" rx="8"/><text class="node-copy" x="788" y="460">MAINTAIN &#x00B7; CACHE &#x00B7; ROUTE</text></g>
+        <g><rect class="map-node blue" x="1040" y="434" width="240" height="44" rx="8"/><text class="node-copy" x="1058" y="460">LONG-HORIZON</text></g>
+        <path class="flow blue" d="M740 456H770"/><path class="flow blue" d="M1010 456H1040"/>
+      </g>
+
+      <path class="flow cyan" d="M254 310H300"/>
+      <path class="flow blue" d="M650 408V370"/>
     </svg>
+    </div>
     <figcaption>Figure Q1. The N × M measurement map — an explanatory structure, not a numeric claim. N linked sessions cross M measurement angles; their intersection is an evidence surface, and a second analysis pass multiplies the burden again across models, conditions, and tasks.</figcaption>
     <div class="fig-legend"><span class="ev-badge p">[P] explanatory map</span><span>adapted from ref: svg-pattern-surface.html</span></div>
   </figure>

@@ -14,6 +14,10 @@ checks, per SVG:
   BALANCE  text/shape balance — the rendered <text> label wall must stay
            <= 1.5x the shape markup length (label walls are flagged and the
            figure redesigned), and never an empty shell or a pure text wall
+  CONTRAST WCAG AA — every text fill vs its computed background >= 4.5:1
+           (gradient/pattern fills resolve to their stops/paint; a paint-order
+           stroke halo counts as the background; the site's default dark theme
+           is the review surface)
   PAINT    first-paint visibility — the page reports a first paint and every
            visible svg is actually painted (opaque, non-zero box, laid out)
   CONSOLE  the page loads console-clean — no console error or page exception
@@ -58,6 +62,7 @@ DEFAULT_PAGES = ["framework.html", "question.html", "evidence.html", "methodolog
 
 MIN_RENDER = 100.0          # gate: rendered box > 100px on both axes
 ASPECT_TOL = 0.08           # gate: |rendered - viewBox| ratio tolerance (8%)
+CONTRAST_MIN = 4.5          # gate: WCAG AA text fill vs background (every text)
 SHAPE_TAGS = ("path", "rect", "circle", "ellipse", "line", "polygon", "polyline")
 
 
@@ -91,6 +96,181 @@ PROBE = """
     }
     return null;
   };
+  // --- CONTRAST machinery (WCAG AA: text fill vs background >= 4.5:1) ---
+  const parseColor = (str) => {
+    if (!str) return null;
+    str = str.trim().toLowerCase();
+    if (!str || str === 'none') return null;
+    if (str === 'transparent') return [0, 0, 0, 0];
+    let m;
+    if ((m = str.match(/^rgba?\\(\\s*([\\d.]+)[,\\s]+([\\d.]+)[,\\s]+([\\d.]+)(?:[,\\s/]+([\\d.]+))?\\s*\\)$/))) {
+      return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : Math.min(1, +m[4])];
+    }
+    if ((m = str.match(/^#([0-9a-f]{6})$/))) {
+      return [parseInt(m[1].slice(0,2),16), parseInt(m[1].slice(2,4),16), parseInt(m[1].slice(4,6),16), 1];
+    }
+    if ((m = str.match(/^#([0-9a-f]{3})$/))) {
+      return [parseInt(m[1][0]+m[1][0],16), parseInt(m[1][1]+m[1][1],16), parseInt(m[1][2]+m[1][2],16), 1];
+    }
+    return null;
+  };
+  const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  const ratio = (c1, c2) => {
+    const a = lum(c1), b = lum(c2), hi = Math.max(a, b), lo = Math.min(a, b);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const blend = (fg, alpha, bg) => fg.slice(0,3).map((c, i) => alpha * c + (1 - alpha) * bg[i]);
+  const effectiveAlpha = (el) => {
+    let a = 1, cur = el;
+    while (cur && cur.nodeType === 1) {
+      const cs = getComputedStyle(cur);
+      a *= (parseFloat(cs.opacity) || 1);
+      const tag = cur.tagName.toLowerCase();
+      if (tag === 'text' || tag === 'tspan') a *= (parseFloat(cs.fillOpacity) || 1);
+      if (tag === 'svg') break;
+      cur = cur.parentElement;
+    }
+    return Math.min(1, a);
+  };
+    const resolvePaint = (el) => {
+      const cs = getComputedStyle(el);
+      let fill = (cs.fill || (el.getAttribute && el.getAttribute('fill')) || '').trim();
+      let alpha = (parseFloat(cs.fillOpacity) || 1) * (parseFloat(cs.opacity) || 1);
+      if (!fill || fill === 'none') return null;
+      if (fill === 'currentColor') {
+        const c = parseColor(cs.color);
+        return c ? { colors: [c.slice(0, 3)], alphas: [alpha * (c[3] || 1)] } : null;
+      }
+      const m = fill.match(/url\\(\\s*["']?#([^)"']+)/);
+      if (m) {
+        const ref = document.getElementById(m[1]);
+        if (ref) {
+          const tag = ref.tagName.toLowerCase();
+          if (tag === 'lineargradient' || tag === 'radialgradient') {
+            const colors = [], alphas = [];
+            ref.querySelectorAll('stop').forEach(s => {
+              let sc = getComputedStyle(s).stopColor || s.getAttribute('stop-color') || '';
+              if (sc === 'currentColor') sc = cs.color;
+              const c = parseColor(sc);
+              if (!c) return;
+              const stopA = (parseFloat(getComputedStyle(s).stopOpacity) || 1) * (c[3] || 1);
+              colors.push(c.slice(0, 3));
+              alphas.push(alpha * stopA);
+            });
+            if (colors.length) return { colors, alphas };
+            return null;
+          }
+          if (tag === 'pattern') {
+            const ln = ref.querySelector('line,path,rect,circle,ellipse');
+            if (ln) {
+              const lcs = getComputedStyle(ln);
+              const sc = lcs.stroke !== 'none' && lcs.stroke && lcs.stroke !== 'currentColor'
+                ? parseColor(lcs.stroke) : null;
+              const fc = lcs.fill && lcs.fill !== 'none' && lcs.fill !== 'currentColor'
+                ? parseColor(lcs.fill) : null;
+              const c = sc || fc;
+              if (c) {
+                const strokeA = parseFloat(lcs.strokeOpacity) || 1;
+                const fillA = parseFloat(lcs.fillOpacity) || 1;
+                const paintA = (sc ? strokeA : fillA) * (parseFloat(lcs.opacity) || 1);
+                return { colors: [c.slice(0, 3)], alphas: [alpha * paintA] };
+              }
+            }
+            return null;
+          }
+        }
+        return null;
+      }
+      const c = parseColor(fill);
+      return c ? { colors: [c.slice(0, 3)], alphas: [alpha * (c[3] || 1)] } : null;
+    };
+  const svgBg = (svg) => {
+    const bg = getComputedStyle(svg).backgroundColor;
+    let c = parseColor(bg);
+    if (c && c[3] > 0) return c;
+    const pbg = getComputedStyle(document.body).backgroundColor;
+    c = parseColor(pbg);
+    if (c && c[3] > 0) return c;
+    return parseColor('#070A0F');
+  };
+  const bgBehind = (text) => {
+    // paint-order stroke halo: the glyphs sit on the halo colour
+    const cs = getComputedStyle(text);
+    const po = (cs.paintOrder || '');
+    if (po.split(/\\s+/)[0] === 'stroke' && cs.stroke && cs.stroke !== 'none') {
+      const sw = parseFloat(cs.strokeWidth || '0');
+      const sc = parseColor(cs.stroke);
+      if (sc && sw > 0) return { paint: { colors: [sc], alpha: 1 } };
+    }
+    // nearest shape that paints behind the text: previous siblings first,
+    // then ancestors' previous siblings.
+    let cur = text;
+    while (cur) {
+      let sib = cur.previousElementSibling;
+      while (sib) {
+        const tag = sib.tagName && sib.tagName.toLowerCase();
+        const isShape = tag && ['rect','ellipse','circle','path','polygon','polyline'].indexOf(tag) >= 0;
+        if (isShape) {
+          const p = resolvePaint(sib);
+          if (p && p.alpha > 0.1) return { paint: p };
+        }
+        sib = sib.previousElementSibling;
+      }
+      const parent = cur.parentElement;
+      const tag = parent && parent.tagName ? parent.tagName.toLowerCase() : '';
+      const isShape = tag && ['rect','ellipse','circle','path','polygon','polyline'].indexOf(tag) >= 0;
+      if (isShape) {
+        const p = resolvePaint(parent);
+        if (p && p.alpha > 0.1) return { paint: p };
+      }
+      if (!parent || parent.tagName.toLowerCase() === 'svg') break;
+      cur = parent;
+    }
+    return null;
+  };
+  const textColor = (t) => {
+    const cs = getComputedStyle(t);
+    let fill = (cs.fill || t.getAttribute('fill') || '').trim();
+    if (fill === 'currentColor') fill = cs.color;
+    return parseColor(fill);
+  };
+  const contrastFor = (svg) => {
+    const base = svgBg(svg);
+    const fails = [];
+    let min = Infinity, n = 0;
+    const texts = Array.from(svg.querySelectorAll('text'));
+    const extra = Array.from(svg.querySelectorAll('tspan')).filter(s => {
+      const a = (s.getAttribute('fill') || '');
+      const st = (s.getAttribute('style') || '');
+      return a || /fill\\s*:/.test(st);
+    });
+    texts.concat(extra).forEach(t => {
+      const label = t.textContent.trim().slice(0, 32) || '(empty)';
+      if (label === '(empty)') return;
+      const fg = textColor(t);
+      const tAlpha = effectiveAlpha(t);
+      if (!fg || fg[3] < 0.5) { fails.push({ t: label, ratio: 0, fg: 'none', bg: '—' }); return; }
+      const behind = bgBehind(t);
+      const paint = behind ? behind.paint : null;
+      const bgCands = [];
+      if (paint) {
+        (paint.colors || []).forEach((c, i) => {
+          bgCands.push(blend(c, (paint.alphas || [1])[i], base));
+        });
+      } else {
+        bgCands.push(base);
+      }
+      bgCands.forEach(bg => {
+        const eff = blend(fg, tAlpha, bg);
+        const r = ratio(eff, bg);
+        if (r < min) min = r;
+        if (r < %(contrast_min)f) fails.push({ t: label, ratio: r, fg: fg.slice(0,3), bg: bg.map(v => Math.round(v)) });
+        n++;
+      });
+    });
+    return { min: isFinite(min) ? min : null, fails, n };
+  };
   const out = [];
   document.querySelectorAll('svg').forEach((s, i) => {
     const r = s.getBoundingClientRect();
@@ -105,6 +285,7 @@ PROBE = """
       .reduce((a, e) => a + e.outerHTML.length, 0);
     const textEls = Array.from(s.querySelectorAll('text'))
       .reduce((a, e) => a + e.textContent.trim().length, 0);
+    const contrast = contrastFor(s);
     out.push({
       i, id: s.id || '', cls: (s.getAttribute('class') || ''),
       viewBox: s.getAttribute('viewBox'),
@@ -120,11 +301,13 @@ PROBE = """
       opacity: parseFloat(cs.opacity || '1'),
       rects: s.getClientRects().length,
       paint: performance.getEntriesByType('paint').map(e => e.name),
+      contrast: { min: contrast.min ? Math.round(contrast.min * 100) / 100 : null,
+                  fails: contrast.fails.slice(0, 6), checked: contrast.n },
     });
   });
   return out;
 }
-""" % {"shapes": ",".join(SHAPE_TAGS)}
+""" % {"shapes": ",".join(SHAPE_TAGS), "contrast_min": CONTRAST_MIN}
 
 
 def _evaluate(svg, viewport):
@@ -166,6 +349,18 @@ def _evaluate(svg, viewport):
     elif shapes < 3 or text < 10:
         flags.append(f"WARN sparse text={text} shapes={shapes}")
 
+    # CONTRAST — every text fill vs its computed background must clear WCAG AA.
+    contrast = svg.get("contrast") or {}
+    cfails = contrast.get("fails") or []
+    if cfails:
+        parts = []
+        for f in cfails[:4]:
+            parts.append(f"{f['t'][:28]!r}@"
+                         + (f"{f['ratio']:.2f}:1" if f["ratio"] else "invisible"))
+        fails.append(f"CONTRAST " + "; ".join(parts))
+    elif contrast.get("min") is not None and contrast["min"] < CONTRAST_MIN:
+        fails.append(f"CONTRAST min {contrast['min']:.2f}:1 < {CONTRAST_MIN:.1f}:1")
+
     # PAINT — first-paint visibility: the page reported a paint and this svg is
     # actually painted (opaque, non-zero box, laid out — not display:none).
     if "first-paint" not in svg.get("paint", []):
@@ -188,6 +383,8 @@ def _evaluate(svg, viewport):
         "shapes": shapes,
         "paint": svg.get("paint", []),
         "opacity": svg["opacity"],
+        "contrast": contrast.get("min"),
+        "contrastChecked": contrast.get("checked"),
         "flags": flags,
         "fails": fails,
         "verdict": verdict,
@@ -208,6 +405,8 @@ def _console_row(page, viewport, kind, messages):
         "shapes": 0,
         "paint": [],
         "opacity": 1.0,
+        "contrast": None,
+        "contrastChecked": 0,
         "flags": [],
         "fails": [f"CONSOLE {kind}: " + " | ".join(messages[:3])],
         "verdict": "FAIL",
@@ -274,8 +473,8 @@ async def _run_pages(pw, pages, base, viewport, out, screenshots):
 
 def _fmt_table(rows, pages):
     lines = [
-        "| page | svg | viewBox | rendered | aspect | text | shape markup | verdict |",
-        "|---|---|---|---|---|---|---|---|",
+        "| page | svg | viewBox | rendered | aspect | text | shape markup | contrast | verdict |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for r in rows:
         vb = r["viewBox"] or "—"
@@ -287,12 +486,13 @@ def _fmt_table(rows, pages):
                 aspect = f"{abs(r_ratio - vbw / vbh) / (vbw / vbh):.3f}"
             except Exception:
                 aspect = "—"
+        contrast = "—" if r["contrast"] is None else f"{r['contrast']:.2f}:1"
         mark = "✔ PASS" if r["verdict"] == "PASS" else "✘ FAIL"
         if r["fails"]:
             mark += " " + "; ".join(r["fails"])
         lines.append(
             f"| {r['page']} | {r['name']} | {vb} | {r['rect'][0]}x{r['rect'][1]} "
-            f"| {aspect} | {r['textLen']} | {r['shapeMarkupLen']} | {mark} |")
+            f"| {aspect} | {r['textLen']} | {r['shapeMarkupLen']} | {contrast} | {mark} |")
     return "\n".join(lines)
 
 

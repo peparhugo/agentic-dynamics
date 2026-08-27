@@ -673,3 +673,62 @@ svg[viewBox]{max-width:100%;height:auto}
   .diagram-map,.workflow-map{min-width:900px}
   .figure-edit .diagram-scroll > svg{min-width:520px}
 }
+
+/* ==========================================================================
+   DIAGRAM MAP INTERNALS — the shared figure language (site revamp4 p3b)
+   The execution-engine composition, extracted from the operator-approved
+   workflow-map and made reusable across EVERY page figure. One grammar: a
+   ground + grid, a kicker/title/copy header, numbered node cards (cyan =
+   operate/measure, blue = control/decide, amber = the campaign loop), flow
+   arrows with haloed legible notes, and an optional scale rail.
+   CONTRAST RULE: text sits on --bg* surfaces only (--t / --t2 fills);
+   accent colors are reserved for strokes, markers, kickers, and symbols.
+   Every fill/text pair clears WCAG AA (>= 4.5:1) at the default dark theme.
+   Standard defs ids: diagram-grid / diagram-ground / diagram-core /
+   diagram-glow / diagram-arrow[-cyan|-blue|-amber] (define per svg).
+   ========================================================================== */
+
+.diagram-map .map-ground{fill:var(--bg);stroke:var(--ba);stroke-width:1}
+.diagram-map .map-grid{fill:url(#diagram-grid);opacity:.72}
+.diagram-map .map-kicker{fill:var(--ac);font:700 11px 'JetBrains Mono',monospace;letter-spacing:.18em}
+.diagram-map .map-title{fill:var(--t);font:700 23px 'JetBrains Mono',monospace;letter-spacing:.05em}
+.diagram-map .map-copy{fill:var(--t2);font:500 10px 'JetBrains Mono',monospace;letter-spacing:.035em}
+.diagram-map .map-label{fill:var(--t2);font:700 9px 'JetBrains Mono',monospace;letter-spacing:.12em}
+.diagram-map .map-node{fill:var(--bg3);stroke:var(--ba);stroke-width:1.2}
+.diagram-map .map-node.cyan{stroke:var(--ac)}
+.diagram-map .map-node.blue{stroke:var(--cy)}
+.diagram-map .map-node.amber{stroke:var(--am)}
+.diagram-map .map-node.danger{stroke:var(--danger)}
+.diagram-map .node-index{fill:var(--t2);font:700 8px 'JetBrains Mono',monospace;letter-spacing:.1em}
+.diagram-map .node-title{fill:var(--t);font:700 14px 'JetBrains Mono',monospace;letter-spacing:.06em}
+.diagram-map .node-copy{fill:var(--t2);font:500 9px 'JetBrains Mono',monospace}
+.diagram-map .flow{fill:none;stroke:var(--t2);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#diagram-arrow)}
+.diagram-map .flow.cyan{stroke:var(--ac);marker-end:url(#diagram-arrow-cyan)}
+.diagram-map .flow.blue{stroke:var(--cy);marker-end:url(#diagram-arrow-blue)}
+.diagram-map .flow.amber{stroke:var(--am);stroke-dasharray:7 6;marker-end:url(#diagram-arrow-amber)}
+.diagram-map .flow-note{fill:var(--t2);font:500 8px 'JetBrains Mono',monospace;paint-order:stroke;stroke:var(--bg);stroke-width:4px}
+.diagram-map .mode-surface{fill:var(--bg2);stroke:var(--ba);stroke-width:1}
+.diagram-map .mode-surface.operate{stroke:var(--ac)}
+.diagram-map .mode-surface.experiment{stroke:var(--cy)}
+.diagram-map .rail{fill:var(--bg2);stroke:var(--ba);stroke-width:1}
+.diagram-map .rail-divider{stroke:var(--b);stroke-width:1}
+.diagram-map .scale-symbol{fill:var(--ac);font:800 22px 'JetBrains Mono',monospace}
+.diagram-map .scale-op{fill:var(--t2);font:400 20px 'JetBrains Mono',monospace}
+.diagram-map .scale-title{fill:var(--t);font:700 11px 'JetBrains Mono',monospace}
+.diagram-map .scale-copy{fill:var(--t2);font:500 8px 'JetBrains Mono',monospace}
+.diagram-map .tracer{fill:none;stroke:var(--ac);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:1 99;pathLength:100;opacity:.72;animation:diagram-trace 8s linear infinite}
+.diagram-map .tracer.return{stroke:var(--am);animation-duration:11s}
+@keyframes diagram-trace{to{stroke-dashoffset:-100}}
+
+/* Bounded-autonomy map surfaces (the envelope figure's grammar) */
+.diagram-map .boundary{fill:rgba(34,211,238,.025);stroke:var(--ac);stroke-width:1.5;stroke-dasharray:9 6}
+.diagram-map .human-surface{fill:var(--bg2);stroke:var(--am);stroke-width:1.4}
+.diagram-map .limit-pill{fill:var(--bg);stroke:var(--ba);stroke-width:1}
+.diagram-map .limit-text{fill:var(--t2);font:700 8px 'JetBrains Mono',monospace;letter-spacing:.08em;text-anchor:middle}
+.diagram-map .mode-tab{fill:var(--bg2);stroke:var(--ba);stroke-width:1}
+.diagram-map .mode-tab.active{stroke:var(--cy);stroke-width:1.5}
+.diagram-map .outcome-surface{fill:var(--bg2);stroke:var(--ac);stroke-width:1}
+.diagram-map .outcome-surface.exception{stroke:var(--am)}
+
+/* Reduced-motion: kill the tracer sweep, keep the static figure meaning */
+@media(prefers-reduced-motion:reduce){.diagram-map .tracer{display:none;animation:none}}

@@ -1,44 +1,63 @@
-# Operator review pack — site revamp4 diagrams
+# Operator review pack — site revamp4 diagrams (p3b craft-UX redesign)
 
-**STOP: campaign halted — awaiting operator visual approval. No deploy.**
+**STOP: campaign halted — awaiting operator re-review. No deploy.**
 Sign `APPROVAL.md` before any `firebase deploy`.
 
-Gate: `apps/website/verify_svg_rendering.py` — full criteria: SIZE (>100px both axes),
-OVERFLOW (none beyond scroll area), ASPECT (rendered ≈ viewBox), BALANCE (rendered
-`<text>` ≤ 1.5× shape markup), PAINT (first-paint visibility, opaque, laid out),
-CONSOLE (no console error / page exception).
+History: the first repair pack was **REJECTED by operator review on 2026-08-27**
+("it's not really better, it has a lot of visual problems"; figure-by-figure:
+eight-planes unclear, instrument-cycle bad contrast, one-engine-two-modes "UI not UX").
+The REJECT stays on record; this pack is the p3b response. The approval artifact has
+been reset to **awaiting**.
 
-Result: **PASS** — 22/22 SVGs across all 9 pages at 1440x900 and 390x844, exit 0.
+Gate: `apps/website/verify_svg_rendering.py` — SIZE (>100px both axes), OVERFLOW (none
+beyond scroll area), ASPECT (rendered ≈ viewBox), BALANCE (text ≤ 1.5× shape markup),
+**CONTRAST (every text fill vs its computed background ≥ 4.5:1 — the new WCAG AA gate)**,
+PAINT (first-paint visibility, opaque, laid out), CONSOLE (no console error).
 
-## Per-figure rendering table (1440x900; mobile sizes in the full gate report)
+Result: **PASS** — 22/22 SVGs across all 9 pages at 1440x900 and 390x844, exit 0. Minimum
+text contrast across every figure: **8.37:1** (the envelope's amber kicker); every other
+figure ≥ 9.23:1.
 
-| page | figure | viewBox | rendered | text | shape markup | verdict |
-|---|---|---|---|---|---|---|
-| index | instrument cycle | 0 0 720 320 | 1120x499 | 142 | 592 | PASS |
-| framework | OPERATING MODEL map | 0 0 1440 760 | 1034x546 | 1140 | 2633 | PASS |
-| framework | eight planes | 0 0 760 360 | 1100x522 | 217 | 1512 | PASS |
-| framework | instrument cycle | 0 0 760 190 | 1100x277 | 79 | 622 | PASS |
-| framework | ONE ENGINE / TWO MODES | 0 0 760 200 | 1100x291 | 128 | 676 | PASS |
-| framework | bounded-autonomy envelope | 0 0 760 260 | 1100x378 | 136 | 789 | PASS |
-| framework | autonomy map | 0 0 1440 760 | 1034x546 | 1005 | 2392 | PASS |
-| question | N × M measurement map | 0 0 720 340 | 549x260 | 247 | 1127 | PASS |
-| evidence | escalation E_x | 0 0 720 260 | 628x228 | 148 | 551 | PASS |
-| evidence | calibration arc | 0 0 720 220 | 628x193 | 156 | 566 | PASS |
-| methodology | N² cost curve | 0 0 720 360 | 668x335 | 36 | 546 | PASS |
+## The four flagged figures — re-drawn in the template's visual language
 
-All figures sit under the 1.5× label-wall flag (max 0.433, the OPERATING MODEL map).
-Full per-SVG table (both viewports) + JSON: `gate_report_full.md` / `gate_report_full.json`.
+The execution-engine / workflow-map composition (approved, "BEAUTIFUL") is now a **shared
+figure grammar** in `apps/website/base.css`: numbered node cards, color-coded flows
+(cyan = operate/measure, blue = control/decide, amber = campaign/proposed), haloed
+flow-notes, a scale rail, and the glow/tracer accents. Every page figure reuses it.
 
-## Before → After (the 'low brow' complaint vs the repaired figures)
+| Flagged figure | Operator finding | Redesign (one legible message) | Before → After |
+|---|---|---|---|
+| Eight planes | "hard to understand, doesn't match the good figure" | One dependency-direction **flow**: 9 node cards in the canonical chain core → experiment → measurement → runtime → adapters → knowledge → reporting → **control** (glowing, "the only consumer") → **apps** (amber), arrowed left-to-right, with a tier rail (0/1/2/3) and the INSTRUMENTED/PROPOSED/DECIDED status line | text 217→682 · contrast min 4.47→9.95:1 |
+| Instrument cycle | "terrible contrast, unclear message" | The load-bearing rule as a 5-node **ring**: instrument → derive → write policy → grid → campaign → repeat, with a red ✕ gate on the derive→policy arrow — "unmeasured requirement blocks policy". One message: derive is the only path into policy | text 79→499 · contrast min 3.84→9.95:1 |
+| One engine, two modes | "UI but not UX" | **Converge → one engine → diverge**: operate (1 cell) and experiment (G cells) feed one glowing engine pill (cell → compile → jobs → attempts → ledger), then split to record (operate) vs compare+adapt (experiment). One message: the engine never changes, only the grid adds compare+adapt | text 128→572 · contrast min 3.84→9.95:1 |
+| Bounded-autonomy envelope | same disease (hardcoded hex, pattern-fill text, red-on-dark) | Human policy boundary (amber dashed) wraps declared constraints + independent verification, with the PROPOSED typed-checkpoints cell glowing amber ("designed capability — NOT RUN") and the accept / reject·rework / halt·escalate exits; PROPOSED ≠ RUN stated at the foot | text 136→510 · contrast min 2.17→8.37:1 |
 
-| Complaint (before) | Repair (after) |
-|---|---|
-| OPERATING MODEL figure collapsed — its container classes had **no rules in base.css** (page-local only) | DIAGRAM SYSTEM wired into `apps/website/base.css`: `.system-figure`, `.diagram-scroll`, `.diagram-map`/`.workflow-map`, `.redesigned` grids + a `svg[viewBox]{max-width:100%;height:auto}` collapse-proof floor. Layout shared, never page-local |
-| dead 0x0 architecture-map rendered in the DOM | removed (it was `hidden aria-hidden` dead code) |
-| wide-aspect figures crushed to 358x91 / 358x96 on mobile (unreadable strips) | shared `.diagram-scroll` wells + `min-width:520px` floor → 520x132 / 520x138, horizontally scrollable |
-| text walls — OPERATING MODEL header 83 chars, autonomy map had a 78-char title list + 100-char paragraph + 80-char header | trimmed to short labels + color-coded zones + numbered callouts; full wording preserved in `<desc>` + page copy. text 1176→1140 (map), 1149→1005 (autonomy) |
-| example-library reference `svg-filter-focus.html` cited but not applied | planes figure now glows the control plane; envelope now glows the PROPOSED cell — references genuinely adapted |
-| aspect/scaling could distort (viewBox-only SVGs) | `width:100%;height:auto` + min-width floors; gate asserts rendered ≈ viewBox |
+The same disease was also fixed on the **index instrument cycle**, the **question N×M
+measurement map**, the **evidence escalation E_x** figure and the **calibration arc** — all
+re-drawn in the shared grammar (data-driven ids preserved: `esc-*`, `cal-*`). The two
+approved maps (workflow-map, autonomy-map) keep their composition and inherit the shared
+classes untouched. The contrast gate is new in this pass and checks every text fill on
+every figure, resolving gradients/patterns/stroke-halos and compositing alpha.
+
+## Per-figure rendering table (1440x900; mobile sizes in `gate_report_full.md`)
+
+| page | figure | viewBox | rendered | text | shape markup | contrast | verdict |
+|---|---|---|---|---|---|---|---|
+| index | instrument cycle | 0 0 1440 580 | 1120x452 | 499 | 1588 | 9.95:1 | PASS |
+| framework | OPERATING MODEL map | 0 0 1440 760 | 1034x546 | 1140 | 2629 | 10.97:1 | PASS |
+| framework | eight planes | 0 0 1440 560 | 1100x429 | 682 | 1931 | 9.95:1 | PASS |
+| framework | instrument cycle | 0 0 1440 580 | 1100x444 | 499 | 1588 | 9.95:1 | PASS |
+| framework | ONE ENGINE / TWO MODES | 0 0 1440 520 | 1100x399 | 572 | 1164 | 9.95:1 | PASS |
+| framework | bounded-autonomy envelope | 0 0 1440 560 | 1100x429 | 510 | 1301 | 8.37:1 | PASS |
+| framework | autonomy map | 0 0 1440 760 | 1034x546 | 1005 | 2389 | 9.23:1 | PASS |
+| question | N × M measurement map | 0 0 1440 520 | 980x355 | 433 | 1556 | 9.95:1 | PASS |
+| evidence | escalation E_x | 0 0 1440 420 | 980x287 | 336 | 819 | 9.95:1 | PASS |
+| evidence | calibration arc | 0 0 1440 360 | 980x247 | 406 | 820 | 9.95:1 | PASS |
+| methodology | N² cost curve | 0 0 720 360 | 668x335 | 36 | 546 | 17.19:1 | PASS |
+
+Every figure sits under the 1.5× label-wall flag (max 0.433, the OPERATING MODEL map) and
+clears WCAG AA on every text fill. Full per-SVG table (both viewports) + JSON:
+`gate_report_full.md` / `gate_report_full.json`.
 
 ## Screenshots
 
@@ -51,5 +70,6 @@ Index page: `revamp4_index_*.png` · framework: `revamp4_framework_*.png` · que
 
 ## Next action
 
-Operator: review the screenshots + this table, then sign `APPROVAL.md`
-(APPROVE / REJECT). No deploy runs until the signed approval lands.
+Operator: re-review the screenshots + this table, then sign `APPROVAL.md` again
+(APPROVE / REJECT). No deploy runs until the signed approval lands; the previous REJECT
+stays on record until then.
