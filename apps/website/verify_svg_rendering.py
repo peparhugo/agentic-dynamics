@@ -11,7 +11,9 @@ checks, per SVG:
   OFFSCREEN left edge not negative
   ASPECT   rendered aspect ratio matches the viewBox within tolerance
            (aspect-correct at any width; height:auto preserves it)
-  BALANCE  text/shape balance — neither an empty shell nor a text wall
+  BALANCE  text/shape balance — the rendered <text> label wall must stay
+           <= 1.5x the shape markup length (label walls are flagged and the
+           figure redesigned), and never an empty shell or a pure text wall
 
 An svg that is intentionally hidden ([hidden], display:none, visibility:hidden,
 aria-hidden="true") is reported as SKIP and is not a gate failure.
@@ -96,6 +98,10 @@ PROBE = """
       || cs.visibility === 'hidden'
       || cs.width === '0px';
     const shapes = s.querySelectorAll('%(shapes)s').length;
+    const shapeMarkupLen = Array.from(s.querySelectorAll('%(shapes)s'))
+      .reduce((a, e) => a + e.outerHTML.length, 0);
+    const textEls = Array.from(s.querySelectorAll('text'))
+      .reduce((a, e) => a + e.textContent.trim().length, 0);
     out.push({
       i, id: s.id || '', cls: (s.getAttribute('class') || ''),
       viewBox: s.getAttribute('viewBox'),
@@ -106,7 +112,7 @@ PROBE = """
       overflowY: r.bottom > doc.scrollHeight + 4 && !scrollCtx(s, 'y'),
       overflowX: r.right > doc.scrollWidth + 4 && !scrollCtx(s, 'x'),
       docScroll: [doc.scrollWidth, doc.scrollHeight],
-      textLen: s.textContent.trim().length,
+      textEls, shapeMarkupLen, textLen: s.textContent.trim().length,
       shapes, hidden,
     });
   });
@@ -144,11 +150,13 @@ def _evaluate(svg, viewport):
         except (ValueError, IndexError):
             flags.append("WARN viewBox unparsable")
 
-    text, shapes = svg["textLen"], svg["shapes"]
+    text, shapes = svg["textEls"], svg["shapes"]
+    shape_markup = svg["shapeMarkupLen"]
+    if shape_markup and text > 1.5 * shape_markup:
+        fails.append(
+            f"BALANCE label wall text={text} > 1.5x shape markup {shape_markup}")
     if text < 10 and shapes < 3:
         fails.append(f"BALANCE empty shell text={text} shapes={shapes}")
-    elif text > 3000 and shapes < 5:
-        fails.append(f"BALANCE text wall text={text} shapes={shapes}")
     elif shapes < 3 or text < 10:
         flags.append(f"WARN sparse text={text} shapes={shapes}")
 
@@ -161,6 +169,7 @@ def _evaluate(svg, viewport):
         "viewBox": vb,
         "attrs": [svg["wAttr"], svg["hAttr"]],
         "textLen": text,
+        "shapeMarkupLen": shape_markup,
         "shapes": shapes,
         "flags": flags,
         "fails": fails,
@@ -219,7 +228,7 @@ async def _run_pages(pw, pages, base, viewport, out, screenshots):
 
 def _fmt_table(rows, pages):
     lines = [
-        "| page | svg | viewBox | rendered | aspect | text | shapes | verdict |",
+        "| page | svg | viewBox | rendered | aspect | text | shape markup | verdict |",
         "|---|---|---|---|---|---|---|---|",
     ]
     for r in rows:
@@ -237,7 +246,7 @@ def _fmt_table(rows, pages):
             mark += " " + "; ".join(r["fails"])
         lines.append(
             f"| {r['page']} | {r['name']} | {vb} | {r['rect'][0]}x{r['rect'][1]} "
-            f"| {aspect} | {r['textLen']} | {r['shapes']} | {mark} |")
+            f"| {aspect} | {r['textLen']} | {r['shapeMarkupLen']} | {mark} |")
     return "\n".join(lines)
 
 

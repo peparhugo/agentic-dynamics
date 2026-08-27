@@ -1,0 +1,485 @@
+{
+ "gate": "PASS",
+ "pages": [
+  "framework.html",
+  "question.html",
+  "evidence.html",
+  "methodology.html"
+ ],
+ "viewports": [
+  [
+   1440,
+   900
+  ],
+  [
+   390,
+   844
+  ]
+ ],
+ "total": 20,
+ "passed": 20,
+ "skipped": 0,
+ "failed": 0,
+ "results": [
+  {
+   "name": "svg#0(diagram-map workflow-map)",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1034,
+    546
+   ],
+   "viewBox": "0 0 1440 760",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 1140,
+   "shapeMarkupLen": 2633,
+   "shapes": 36,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#1",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1100,
+    522
+   ],
+   "viewBox": "0 0 760 360",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 217,
+   "shapeMarkupLen": 1512,
+   "shapes": 16,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#2",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1100,
+    277
+   ],
+   "viewBox": "0 0 760 190",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 79,
+   "shapeMarkupLen": 622,
+   "shapes": 6,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#3",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1100,
+    291
+   ],
+   "viewBox": "0 0 760 200",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 128,
+   "shapeMarkupLen": 676,
+   "shapes": 7,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#4",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1100,
+    378
+   ],
+   "viewBox": "0 0 760 260",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 136,
+   "shapeMarkupLen": 789,
+   "shapes": 7,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#5(diagram-map autonomy-map)",
+   "page": "framework.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    1034,
+    546
+   ],
+   "viewBox": "0 0 1440 760",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 1005,
+   "shapeMarkupLen": 2392,
+   "shapes": 32,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0",
+   "page": "question.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    549,
+    260
+   ],
+   "viewBox": "0 0 720 340",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 247,
+   "shapeMarkupLen": 1127,
+   "shapes": 12,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0",
+   "page": "evidence.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    628,
+    228
+   ],
+   "viewBox": "0 0 720 260",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 148,
+   "shapeMarkupLen": 551,
+   "shapes": 6,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#1",
+   "page": "evidence.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    628,
+    193
+   ],
+   "viewBox": "0 0 720 220",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 156,
+   "shapeMarkupLen": 566,
+   "shapes": 6,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0:cc-plot",
+   "page": "methodology.html",
+   "viewport": [
+    1440,
+    900
+   ],
+   "rect": [
+    668,
+    335
+   ],
+   "viewBox": "0 0 720 360",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 36,
+   "shapeMarkupLen": 546,
+   "shapes": 3,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0(diagram-map workflow-map)",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    900,
+    475
+   ],
+   "viewBox": "0 0 1440 760",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 1140,
+   "shapeMarkupLen": 2633,
+   "shapes": 36,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#1",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    358,
+    171
+   ],
+   "viewBox": "0 0 760 360",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 217,
+   "shapeMarkupLen": 1512,
+   "shapes": 16,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#2",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    132
+   ],
+   "viewBox": "0 0 760 190",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 79,
+   "shapeMarkupLen": 622,
+   "shapes": 6,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#3",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    520,
+    138
+   ],
+   "viewBox": "0 0 760 200",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 128,
+   "shapeMarkupLen": 676,
+   "shapes": 7,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#4",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    358,
+    124
+   ],
+   "viewBox": "0 0 760 260",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 136,
+   "shapeMarkupLen": 789,
+   "shapes": 7,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#5(diagram-map autonomy-map)",
+   "page": "framework.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    900,
+    475
+   ],
+   "viewBox": "0 0 1440 760",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 1005,
+   "shapeMarkupLen": 2392,
+   "shapes": 32,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0",
+   "page": "question.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    352,
+    167
+   ],
+   "viewBox": "0 0 720 340",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 247,
+   "shapeMarkupLen": 1127,
+   "shapes": 12,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0",
+   "page": "evidence.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    356,
+    130
+   ],
+   "viewBox": "0 0 720 260",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 148,
+   "shapeMarkupLen": 551,
+   "shapes": 6,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#1",
+   "page": "evidence.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    356,
+    110
+   ],
+   "viewBox": "0 0 720 220",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 156,
+   "shapeMarkupLen": 566,
+   "shapes": 6,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  },
+  {
+   "name": "svg#0:cc-plot",
+   "page": "methodology.html",
+   "viewport": [
+    390,
+    844
+   ],
+   "rect": [
+    356,
+    179
+   ],
+   "viewBox": "0 0 720 360",
+   "attrs": [
+    null,
+    null
+   ],
+   "textLen": 36,
+   "shapeMarkupLen": 546,
+   "shapes": 3,
+   "flags": [],
+   "fails": [],
+   "verdict": "PASS"
+  }
+ ]
+}

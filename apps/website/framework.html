@@ -284,7 +284,7 @@
 
         <text class="map-kicker" x="54" y="52">OPERATING MODEL / SHARED EXECUTION</text>
         <text class="map-title" x="54" y="84">ONE ENGINE, FROM CELL TO CAMPAIGN</text>
-        <text class="map-copy" x="54" y="108">FIX THE FACTORS TO OPERATE. VARY THEM TO LEARN. THE EXECUTION PATH DOES NOT CHANGE.</text>
+        <text class="map-copy" x="54" y="108">FIX THE FACTORS TO OPERATE &#x00B7; VARY THEM TO LEARN</text>
 
         <g aria-label="Operate mode: fixed factors produce one cell">
           <rect class="mode-surface operate" x="54" y="158" width="262" height="106" rx="12"/>
@@ -412,6 +412,7 @@
       <defs>
         <marker id="planeArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287271"/></marker>
         <pattern id="planeHatch" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="12" stroke="#9b6a28" stroke-width="3"/></pattern>
+        <filter id="planeFocus" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
       </defs>
       <rect x="30" y="20" width="150" height="44" rx="8" fill="#287271" opacity=".85"/><text x="105" y="48" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">core</text>
       <rect x="200" y="20" width="150" height="44" rx="8" fill="#287271" opacity=".85"/><text x="275" y="48" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">experiment</text>
@@ -423,7 +424,7 @@
       <rect x="370" y="100" width="150" height="44" rx="8" fill="#287271" opacity=".85"/><text x="445" y="128" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">reporting</text>
       <path d="M180 122H200M350 122H370" stroke="#287271" stroke-width="2" marker-end="url(#planeArrow)"/>
       <path d="M105 64V100M275 64V100M445 64V100" stroke="#8b8375" stroke-width="1.5" stroke-dasharray="4 3"/>
-      <rect x="540" y="100" width="190" height="58" rx="8" fill="#17212b" stroke="#8a2f2f" stroke-width="2"/><text x="635" y="128" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">control</text><text x="635" y="146" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="#f7f4ed">consumes information, proposes policy</text>
+      <rect x="540" y="100" width="190" height="58" rx="8" fill="#17212b" stroke="#8a2f2f" stroke-width="2" filter="url(#planeFocus)"/><text x="635" y="128" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="#fff">control</text><text x="635" y="146" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="#f7f4ed">consumes information, proposes policy</text>
       <path d="M520 122H540" stroke="#287271" stroke-width="2" marker-end="url(#planeArrow)"/>
       <rect x="30" y="200" width="220" height="50" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2"/><text x="140" y="224" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">apps (tier 3)</text><text x="140" y="240" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">portal · website · CLI</text>
       <path d="M635 158V200" stroke="#287271" stroke-width="2" marker-end="url(#planeArrow)"/>
@@ -502,11 +503,14 @@
     <span class="kicker" id="envelope-title">Bounded-autonomy envelope</span>
     <svg viewBox="0 0 760 260" role="img" aria-labelledby="envelope-title envelope-desc">
       <title id="envelope-desc">Human policy boundary outside; declared constraints and independent verification inside; exits accept, reject/rework, halt/escalate.</title>
+      <defs>
+        <filter id="envFocus" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
       <rect x="20" y="20" width="720" height="120" rx="14" fill="none" stroke="#8a2f2f" stroke-width="2.5" stroke-dasharray="8 4"/>
       <text x="380" y="44" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="#8a2f2f">HUMAN POLICY BOUNDARY</text>
       <rect x="70" y="60" width="200" height="56" rx="8" fill="#287271" opacity=".85"/><text x="170" y="93" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="#fff">declared constraints</text>
       <rect x="290" y="60" width="200" height="56" rx="8" fill="#287271" opacity=".85"/><text x="390" y="93" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="#fff">independent verification</text>
-      <rect x="510" y="60" width="200" height="56" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2"/><text x="610" y="86" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="currentColor">typed checkpoints</text><text x="610" y="104" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">PROPOSED — not run</text>
+      <rect x="510" y="60" width="200" height="56" rx="8" fill="url(#planeHatch)" stroke="#9b6a28" stroke-width="2" filter="url(#envFocus)"/><text x="610" y="86" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700" fill="currentColor">typed checkpoints</text><text x="610" y="104" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:10px" fill="currentColor">PROPOSED — not run</text>
       <rect x="120" y="170" width="150" height="50" rx="8" fill="var(--bg3)" stroke="#287271" stroke-width="1.5"/><text x="195" y="199" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">ACCEPT</text>
       <rect x="305" y="170" width="150" height="50" rx="8" fill="var(--bg3)" stroke="#9b6a28" stroke-width="1.5"/><text x="380" y="199" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">REJECT / REWORK</text>
       <rect x="490" y="170" width="150" height="50" rx="8" fill="var(--bg3)" stroke="#8a2f2f" stroke-width="1.5"/><text x="565" y="199" text-anchor="middle" style="font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700" fill="currentColor">HALT / ESCALATE</text>
@@ -535,13 +539,13 @@
 
         <text class="map-kicker" x="54" y="52" style="fill:var(--fw-why)">AUTHORITY MAP / HUMAN CONTROL POINTS</text>
         <text class="map-title" x="54" y="84">AUTONOMY IS A BOUNDARY, NOT AN ABSENCE</text>
-        <text class="map-copy" x="54" y="108">PEOPLE GOVERN THE ENVELOPE. POLICY OPERATES THE WORK. EXCEPTIONS CROSS THE LINE.</text>
+        <text class="map-copy" x="54" y="108">PEOPLE GOVERN THE ENVELOPE &#x00B7; POLICY OPERATES INSIDE</text>
 
         <g aria-label="Human control plane">
           <rect class="human-surface" x="96" y="142" width="1248" height="92" rx="46" filter="url(#workflow-glow)"/>
           <text class="node-index" x="132" y="169" style="fill:var(--fw-why)">HUMAN CONTROL PLANE</text>
-          <text class="node-title" x="132" y="197">OBJECTIVE &#x00B7; SPECIFICATION &#x00B7; POLICY APPROVAL &#x00B7; BUDGET &#x00B7; INTERVENTION CONDITIONS</text>
-          <text class="node-copy" x="132" y="216">Humans move from operating every action to governing what the autonomous system is authorized to do.</text>
+          <text class="node-title" x="132" y="197">OBJECTIVE &#x00B7; POLICY &#x00B7; BUDGET &#x00B7; LIMITS</text>
+          <text class="node-copy" x="132" y="216">humans govern authority, not each action</text>
         </g>
 
         <path class="flow amber" d="M330 234V278"/><text class="flow-note" x="342" y="259">authorize</text>
@@ -586,7 +590,7 @@
         </g>
 
         <g aria-label="Workflow outcomes">
-          <rect class="outcome-surface" x="720" y="610" width="304" height="92" rx="10"/><text class="node-index" x="740" y="633" style="fill:var(--fw-how)">ACCEPTED OUTCOME</text><text class="node-title" x="740" y="661">DOWNSTREAM SYSTEM &#x2192;</text><text class="node-copy" x="740" y="682">routine work continues without per-action approval</text>
+          <rect class="outcome-surface" x="720" y="610" width="304" height="92" rx="10"/><text class="node-index" x="740" y="633" style="fill:var(--fw-how)">ACCEPTED OUTCOME</text><text class="node-title" x="740" y="661">DOWNSTREAM SYSTEM &#x2192;</text><text class="node-copy" x="740" y="682">continues without per-action approval</text>
           <rect class="outcome-surface exception" x="1040" y="610" width="346" height="92" rx="10"/><text class="node-index" x="1060" y="633" style="fill:var(--fw-why)">EXCEPTION</text><text class="node-title" x="1060" y="661">HUMAN ADJUDICATION &#x2191;</text><text class="node-copy" x="1060" y="682">uncertainty &#x00B7; failed verification &#x00B7; material risk</text>
         </g>
       </svg>
