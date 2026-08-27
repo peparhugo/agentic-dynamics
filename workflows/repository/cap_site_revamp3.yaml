@@ -130,6 +130,7 @@ workflow:
           LOG: the census counts per feature class; PASS/FAIL; commit.
       - name: p2_design_with_human_checkpoint
         kind: agent
+        checkpoint: true
         timeout: 14400
         prompt: |
           GOAL: {goal}

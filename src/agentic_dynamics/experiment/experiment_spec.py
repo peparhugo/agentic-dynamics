@@ -761,6 +761,20 @@ def validate_spec(
                 f"(got {ph.get('deploy_allowed')!r})"
             )
 
+    # ── Phase-level gate: ``checkpoint`` (cap_runner_hardening2 §Gap 3) ───────
+    # Optional per-phase marker, default false. A ``checkpoint: true`` phase stops the run with
+    # awaiting_operator_approval on success and gates resumes on the operator approval contract.
+    # Same type-safety-only rule as ``deploy_allowed``: a typo'd string would silently make the
+    # mechanical stop inert (the revamp3 violation), so it must be a real boolean.
+    for ph in spec.workflow.params.get("phases") or []:
+        if not isinstance(ph, dict):
+            continue
+        if "checkpoint" in ph and not isinstance(ph.get("checkpoint"), bool):
+            errors.append(
+                f'phase "{ph.get("name", "?")}": checkpoint must be a boolean '
+                f"(got {ph.get('checkpoint')!r})"
+            )
+
     # ── Artifact-identity gate (refactor-repair P1-3) ─────────────────────────
     # Identity is declared, not guessed. ``artifact_kind``/``intent`` are validated enums.
     if spec.artifact_kind not in ARTIFACT_KINDS:

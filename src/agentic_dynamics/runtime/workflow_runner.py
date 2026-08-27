@@ -54,6 +54,22 @@ under an approval-shaped commit. The gate is off for non-agent phases and the ru
 ``_git_commit`` path is exempt by construction (it never consults the ledger; the gate is a
 separate post-phase check on the phase's committed tree).
 
+Mechanical human checkpoint (cap_runner_hardening2 §Gap 3): a phase declaring ``checkpoint: true``
+that completes successfully records the campaign state ``awaiting_operator_approval`` and EXITS
+CLEANLY — the phase status is ``awaiting`` (a designed stop, not an error; the run result carries
+``awaiting: true`` + the phase name, and the ledger writes the awaiting state). The approval
+contract: ``approvals/<spec>/<phase>_approval.md`` must exist in the worktree, carry a REAL
+operator signature (a non-placeholder ``operator:``/``SIGNED-BY-OPERATOR:`` line + a real date),
+and its commit must be a DESCENDANT of the checkpoint phase's commit (the approval was authored
+after the checkpoint's work — a signed-before-the-work artifact does not authorize it). On
+``--resume`` the runner checks the contract for every completed checkpoint phase BEFORE proceeding:
+no artifact / placeholder signature / wrong commit order → the run stops again with
+``awaiting_operator_approval`` (refuses to proceed); a valid contract → proceeds. The revamp3
+violation — p2 committed the delta preview AND the unsigned approval template, then the runner
+moved straight into p3-p6 and recorded ``ok: True`` — is mechanically impossible: the unsigned
+template fails the placeholder check, and an approval committed WITH the checkpoint work fails the
+descendant-order check.
+
 The agent works directly in ``workdir``; prior-phase artifacts are committed there, so
 later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
@@ -255,6 +271,14 @@ class WorkflowRunResult:
     git_sha: str = ""
     started_at: str = ""
     ended_at: str = ""
+    #: cap_runner_hardening2 §Gap 3 — the mechanical human checkpoint. ``awaiting`` is True when
+    #: the run stopped at a checkpoint phase (or a resume refused to proceed past an unsatisfied
+    #: one) with the campaign state ``awaiting_operator_approval`` — a designed stop, never an
+    #: error. ``awaiting_phase`` names the phase; ``awaiting_reason`` is ``"checkpoint"`` (a
+    #: fresh stop) or ``"approval_refused"`` (a resume refused).
+    awaiting: bool = False
+    awaiting_phase: str = ""
+    awaiting_reason: str = ""
 
     @property
     def total_cost_usd(self) -> float:
@@ -274,6 +298,9 @@ class WorkflowRunResult:
             "git_sha": self.git_sha,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
+            "awaiting": self.awaiting,
+            "awaiting_phase": self.awaiting_phase,
+            "awaiting_reason": self.awaiting_reason,
             "total_cost_usd": self.total_cost_usd,
             "ok": self.ok,
             "phases": [p.to_dict() for p in self.phases],
@@ -1464,10 +1491,16 @@ def _operator_is_placeholder(operator: str) -> bool:
     An operator signature is the human identity that signed the approval. A single initial or
     a generic word ("operator", "your name", "sign here", "TODO", "???" ...) is not a
     signature — the revamp3 lesson is that placeholder text must refuse to authorize anything.
+    An angle-bracketed template value (``<name>``, ``<required: ...>``, ``<your signature>``) is
+    a placeholder even when the generic-word list does not name it.
     """
     stripped = operator.strip()
     norm = " ".join(stripped.lower().split())
-    return norm in PLACEHOLDER_OPERATORS or len(stripped) < 2
+    return (
+        norm in PLACEHOLDER_OPERATORS
+        or len(stripped) < 2
+        or (stripped.startswith("<") and stripped.endswith(">"))
+    )
 
 
 def approval_authorizes_tree(
@@ -1596,6 +1629,181 @@ def _enforce_tree_gate(
         pr.error = f"{pr.error}\n{msg}"
 
 
+# ── Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) ──────────────────────────────
+#
+# The revamp3 measured disease: p2 (the design + human checkpoint) committed the delta preview
+# AND the unsigned approval template, then the runner moved straight into p3-p6, ran them
+# (vacuous, no commits), and recorded ``ok: True`` while the approval sat unsigned — "STOP for
+# the operator" was a sentence in the prompt, and prompt rules without mechanics get ignored
+# (measured three times). The mechanical fix: a phase declaring ``checkpoint: true`` that
+# completes successfully records the campaign state ``awaiting_operator_approval`` and EXITS
+# CLEANLY (status ``awaiting`` — a designed stop, not an error). The approval contract is
+# verified on ``--resume`` BEFORE any further phase runs: no artifact / placeholder signature /
+# wrong commit order → the resume refuses to proceed and stops awaiting again.
+#
+# The approval contract (design §Gap 3): ``approvals/<spec>/<phase>_approval.md`` must
+#   (1) exist in the worktree and be COMMITTED (tracked at HEAD);
+#   (2) carry a REAL operator signature — a non-placeholder ``operator:`` (or
+#       ``SIGNED-BY-OPERATOR:``) line + a real date (the revamp3 unsigned template's
+#       ``<required: ...>`` values are placeholders and refuse to authorize);
+#   (3) be a DESCENDANT of the checkpoint phase's commit — the approval file must NOT have
+#       existed at the checkpoint commit AND the checkpoint commit must be an ancestor of HEAD,
+#       so an approval committed WITH the checkpoint's work (or before it) never authorizes.
+
+#: The phase-marker key: ``checkpoint: true`` declares a mechanical human stop.
+CHECKPOINT_MARKER = "checkpoint"
+#: The status value recorded when the run stops at (or refuses past) a checkpoint — a designed
+#: stop, never an error; the operator's tools read "waiting", not "failed".
+AWAITING_STATUS = "awaiting"
+
+
+def _checkpoint_approval_path(wd: Path, spec_name: str, phase_name: str) -> Path:
+    """``approvals/<spec>/<phase>_approval.md`` inside the worktree."""
+    return wd / APPROVALS_DIRNAME / spec_name / f"{phase_name}_approval.md"
+
+
+def _parse_checkpoint_approval(text: str) -> dict[str, str]:
+    """Extract the operator signature + date from a checkpoint approval artifact.
+
+    Accepts both the canonical ``- operator:`` / ``- date:`` lines and the revamp3 template's
+    ``SIGNED-BY-OPERATOR:`` / ``DATE:`` lines (case-insensitive), so the real revamp3 artifact
+    parses. Missing/placeholder fields fail their check downstream (no defaulting).
+    """
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        stripped = line.strip().lstrip("-* ").strip()
+        if ":" not in stripped:
+            continue
+        key, _, value = stripped.partition(":")
+        key = key.strip().lower()
+        if key in ("operator", "signed-by-operator"):
+            out["operator"] = value.strip()
+        elif key in ("date",):
+            out["date"] = value.strip()
+    return out
+
+
+def _phase_commit_sha(workdir: Path, phase_name: str, goal: str) -> str:
+    """The full SHA of the phase's own ``[workflow] <phase> — <goal>`` commit, or ``""``.
+
+    Mirrors ``_completed_phases``' subject matching exactly, so a phase the resume machinery
+    considers completed is exactly one whose commit this finds. ``git log`` is newest-first, so
+    the first match is the phase's LATEST commit — the state the approval must descend from.
+    """
+    try:
+        log = subprocess.run(
+            ["git", "log", "--format=%H %s"], cwd=workdir, capture_output=True, text=True, timeout=30
+        )
+    except Exception:  # noqa: BLE001 — a git problem degrades to "no checkpoint commit"
+        return ""
+    if log.returncode != 0:
+        return ""
+    goal_prefix = goal[:40]
+    for line in log.stdout.splitlines():
+        sha, _, subject = line.partition(" ")
+        m = COMMIT_SUBJECT_RE.search(subject)
+        if m and m.group(1) == phase_name and m.group(2).startswith(goal_prefix):
+            return sha.strip()
+    return ""
+
+
+def _checkpoint_approval_valid(
+    wd: Path,
+    spec_name: str,
+    phase_name: str,
+    checkpoint_commit: str,
+) -> tuple[bool, dict[str, Any]]:
+    """Verify the approval contract for one completed checkpoint phase. ``(valid, evidence)``.
+
+    The contract: the artifact ``approvals/<spec>/<phase>_approval.md`` is committed at HEAD,
+    was NOT present at the checkpoint commit (it was authored AFTER the checkpoint's work), the
+    checkpoint commit is an ancestor of HEAD (the lineage is intact), and the artifact carries a
+    REAL operator signature (non-placeholder) + a date. Any failure → ``(False, evidence)`` with
+    the named reason — the resume refuses to proceed.
+    """
+    evidence: dict[str, Any] = {
+        "valid": False,
+        "path": str(_checkpoint_approval_path(wd, spec_name, phase_name)),
+        "committed_at_head": False,
+        "absent_at_checkpoint_commit": False,
+        "checkpoint_is_ancestor": False,
+    }
+    path = _checkpoint_approval_path(wd, spec_name, phase_name)
+    if not checkpoint_commit:
+        evidence["failed_checks"] = ["no_checkpoint_commit"]
+        return False, evidence
+    if not path.exists():
+        evidence["failed_checks"] = ["no_artifact"]
+        return False, evidence
+    rel = path.relative_to(wd).as_posix()
+    try:
+        at_head = subprocess.run(
+            ["git", "cat-file", "-e", f"HEAD:{rel}"],
+            cwd=wd, capture_output=True, timeout=30,
+        ).returncode == 0
+        at_checkpoint = subprocess.run(
+            ["git", "cat-file", "-e", f"{checkpoint_commit}:{rel}"],
+            cwd=wd, capture_output=True, timeout=30,
+        ).returncode == 0
+        ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", checkpoint_commit, "HEAD"],
+            cwd=wd, capture_output=True, timeout=30,
+        ).returncode == 0
+    except Exception:  # noqa: BLE001 — an unresolvable git state refuses the approval
+        at_head, at_checkpoint, ancestor = False, True, False
+    evidence["committed_at_head"] = at_head
+    evidence["absent_at_checkpoint_commit"] = not at_checkpoint
+    evidence["checkpoint_is_ancestor"] = ancestor
+
+    failed: list[str] = []
+    if not at_head:
+        failed.append("committed_at_head")
+    if at_checkpoint:
+        failed.append("authored_after_checkpoint")
+    if not ancestor:
+        failed.append("checkpoint_lineage_intact")
+    if not failed:
+        parsed = _parse_checkpoint_approval(path.read_text(encoding="utf-8"))
+        evidence["parsed"] = parsed
+        if _operator_is_placeholder(parsed.get("operator", "")):
+            failed.append("operator")
+        if not _date_is_valid(parsed.get("date", "")):
+            failed.append("date")
+        if not failed:
+            evidence["valid"] = True
+            evidence["operator"] = parsed["operator"]
+            evidence["date"] = parsed["date"]
+    evidence["failed_checks"] = failed
+    return evidence["valid"], evidence
+
+
+def _first_unsatisfied_checkpoint(
+    wd: Path,
+    spec: ExperimentSpec,
+    phases: list[dict[str, Any]],
+    completed: set[str],
+    goal: str,
+) -> tuple[str, dict[str, Any]] | None:
+    """The first completed checkpoint phase whose approval contract is unsatisfied, or ``None``.
+
+    Used by the resume gate: every completed ``checkpoint: true`` phase must carry a valid
+    operator approval BEFORE the run proceeds past it. Returns ``(phase_name, evidence)`` for
+    the first violation (in phase order), so a resume stops at the earliest unsatisfied
+    checkpoint — the revamp3 "ran p3-p6 past an unsigned template" shape is refused up front.
+    """
+    for phase_def in phases:
+        if not phase_def.get(CHECKPOINT_MARKER):
+            continue
+        name = str(phase_def.get("name", "?"))
+        if name not in completed:
+            continue
+        commit_sha = _phase_commit_sha(wd, name, goal)
+        valid, evidence = _checkpoint_approval_valid(wd, spec.name, name, commit_sha)
+        if not valid:
+            return (name, evidence)
+    return None
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -1713,6 +1921,16 @@ def run_workflow(
     pre-head) that names the tree + phase + a real operator signature + a date. Off for
     non-agent phases; the runner's own ``_git_commit`` path is exempt (never consults the
     ledger).
+
+    Mechanical human checkpoint (cap_runner_hardening2 p3): a phase declaring ``checkpoint: true``
+    that completes successfully records the campaign state ``awaiting_operator_approval`` and
+    EXITS CLEANLY — the phase status is ``awaiting`` (a designed stop, not an error) and the run
+    result carries ``awaiting: true`` + the phase name + reason ``"checkpoint"``. On ``--resume``
+    the runner verifies every completed checkpoint phase's approval contract
+    (``approvals/<spec>/<phase>_approval.md``, committed at HEAD, authored AFTER the checkpoint
+    commit, with a non-placeholder operator signature + a date) BEFORE proceeding; an
+    unsatisfied checkpoint stops the resume with ``awaiting_operator_approval`` (reason
+    ``"approval_refused"``) and NO further phase runs.
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -1775,6 +1993,7 @@ def run_workflow(
 
     prior: list[str] = []
     start_idx = 0
+    completed: set[str] = set()
     if resume:
         phase_names = [str(p.get("name", "?")) for p in phases]
         # The git-log path stays primary and unchanged: a ``[workflow] <phase>`` commit in
@@ -1791,6 +2010,24 @@ def run_workflow(
                 start_idx = i + 1
             else:
                 break
+
+    # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — resume gating. BEFORE any
+    # further phase runs, every completed checkpoint phase's approval contract must be valid;
+    # an unsatisfied checkpoint stops the resume with ``awaiting_operator_approval`` (refuses
+    # to proceed). The revamp3 violation — p3-p6 ran past an unsigned approval template — is
+    # refused here up front, deterministically.
+    if resume:
+        unsatisfied = _first_unsatisfied_checkpoint(wd, spec, phases, completed, goal)
+        if unsatisfied is not None:
+            phase_name, evidence = unsatisfied
+            result.awaiting = True
+            result.awaiting_phase = phase_name
+            result.awaiting_reason = "approval_refused"
+            result.ended_at = _now()
+            result.git_sha = _git_head(wd)
+            if publisher is not None and publisher.enabled:
+                publisher.set_status("awaiting")
+            return result
 
     fork_enabled = fork if fork is not None else bool(spec.workflow.params.get("fork", False))
 
@@ -2074,8 +2311,25 @@ def run_workflow(
         if pr.status == "failed" and stop_on_error:
             break
 
+        # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — the designed stop. A
+        # phase declaring ``checkpoint: true`` that completes successfully (all gates passed, the
+        # work committed) records the campaign state ``awaiting_operator_approval`` and EXITS
+        # CLEANLY: the phase status flips to ``awaiting`` (a designed stop, not an error), the
+        # run result carries the awaiting state, and the phase loop breaks. The approval
+        # contract is enforced on --resume: the resume refuses to proceed past an unsatisfied
+        # checkpoint. Agent phases only.
+        if kind != "test" and phase_def.get(CHECKPOINT_MARKER) and pr.status == "ok":
+            pr.status = AWAITING_STATUS
+            result.awaiting = True
+            result.awaiting_phase = name
+            result.awaiting_reason = "checkpoint"
+            break
+
     result.ended_at = _now()
     result.git_sha = _git_head(wd)
     if publisher is not None and publisher.enabled:
-        publisher.set_status("done" if result.ok else "failed")
+        if result.awaiting:
+            publisher.set_status("awaiting")
+        else:
+            publisher.set_status("done" if result.ok else "failed")
     return result
