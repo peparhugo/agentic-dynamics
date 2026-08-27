@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-27T18:12:35.553410+00:00",
+  "generated_at": "2026-08-27T18:44:47.624505+00:00",
   "n_specs": 133,
   "specs": [
     {
@@ -490,24 +490,6 @@
       "n_runs": 2
     },
     {
-      "name": "cap_adaptive_2c",
-      "version": "0.1",
-      "status": "failed",
-      "spec_path": "workflows/repository/cap_adaptive_2c.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-27T16:08:05.357051+00:00",
-      "latest_ok": false,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.133417,
-      "latest_git_sha": "80f7806fe",
-      "results_pointer": "experiments/results/workflows/cap_adaptive_2c/20260827T160805Z.json",
-      "n_runs": 1
-    },
-    {
       "name": "cap_site_revamp4_diagrams",
       "version": "0.1",
       "status": "failed",
@@ -517,13 +499,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-27T18:01:57.977778+00:00",
+      "last_run_at": "2026-08-27T18:44:47.526019+00:00",
       "latest_ok": false,
       "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.131312,
-      "latest_git_sha": "abbb1a22c",
-      "results_pointer": "experiments/results/workflows/cap_site_revamp4_diagrams/20260827T180158Z.json",
-      "n_runs": 1
+      "latest_cost_usd": 0.17515,
+      "latest_git_sha": "9b982306f",
+      "results_pointer": "experiments/results/workflows/cap_site_revamp4_diagrams/20260827T184447Z.json",
+      "n_runs": 2
     },
     {
       "name": "claude_background_sessions",
@@ -766,6 +748,24 @@
       "latest_git_sha": "bb1051e3d",
       "results_pointer": "experiments/results/workflows/cap_2b/20260826T160447Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "cap_adaptive_2c",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_adaptive_2c.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-27T18:18:05.160248+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.241951,
+      "latest_git_sha": "2fd537242",
+      "results_pointer": "experiments/results/workflows/cap_adaptive_2c/20260827T181805Z.json",
+      "n_runs": 2
     },
     {
       "name": "cap_addendum_design",
