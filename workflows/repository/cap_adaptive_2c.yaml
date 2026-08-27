@@ -77,6 +77,20 @@ workflow:
         emitted — the seam refuses), unseen-family (a defect type the verifier never
         calibrated on — NOT the boundary-compare family; e.g. a concurrency/ordering
         defect). Each class x both arms x repetitions from p0's coverage analysis.
+        (4b) THE CLASS SEMANTICS ARE PINNED: (a) COMPETING — the evaluator counts BOTH
+        defects; a rework proposal hits only when its scope contains the realized scope
+        AND both defects are fixed; one-of-two fixed = partial_rework with the harm =
+        the unfixed defect's E_x-scaled cost; accepted requires BOTH defects absent.
+        (b) ABSENT — two variants: absent-clean (the seam refuses on a clean change —
+        the refusal's value-preservation recorded) and absent-defective (the seam
+        refuses on a defective change — the abstention-harm case; the defect escapes and
+        its E_x-scaled harm is recorded). (c) CONFIDENCE — every proposal record MUST
+        carry the measured confidence field (the AttemptRecord confidence [H]); the
+        abstention analysis reads it from the proposal records; a proposal record
+        without it is invalid for the abstention analysis (flagged, never imputed).
+        (d) SCALE — the expected grid: 6 classes x 2 arms x ~2 repetitions = ~24 cells
+        (the p0 coverage analysis may adjust; the arithmetic must fit the $30 budget:
+        cells ~$0.01-0.2 each, the campaign's own phases dominate).
         (5) HARM IS MEASURED, NOT INFERRED: a wrong rework's cost is the actual wasted
         pass in the gate arm (measured); a wrong continue's cost is E_x x the base
         defect cost (E_x cited, n=1 per model, sensitivity at 11.47 and 28 reported).
@@ -123,18 +137,26 @@ workflow:
           distribution — descriptive at the campaign's n.
           (3) COVERAGE ANALYSIS: the stimulus classes (correct/incorrect/irrelevant/
           competing/absent/unseen-family) x arms x repetitions — with the class
-          DEFINITIONS precise enough to build (the incorrect class is constructed to
-          make the verifier propose rework on a clean change — its construction is
-          specified in the pre-registration, e.g. 'a change whose only sonar signal is a
-          MAJOR finding, plus a tests-ratio term that pushes risk over the verify
-          threshold'); the unseen-family class is specified as a defect type OUTSIDE the
-          calibrated families (concurrency/ordering — not the boundary-compare family).
+          DEFINITIONS precise enough to build, GROUNDED IN THE PINNED MACHINERY FACTS
+          (current_state rule 4): the incorrect class's false-positive VERIFY is built
+          via the tests-ratio term (a symbol added WITHOUT a test -> the term alone
+          reaches VERIFY_RISK_THRESHOLD 0.2 on a clean change — the construction's
+          arithmetic SHOWN in the pre-registration; a false-positive REWORK is not
+          constructible under the severity filter and that is stated as a filter
+          strength); the unseen-family class is specified OUTSIDE the enumerated
+          calibrated families (boundary-compare / S1244 float / S3776 complex-method —
+          enumerated from workflows/operations/cap_2a_cell_*.yaml + the rerun2/2b
+          cells), with the evaluator's family-verification step defined; the competing
+          class carries the pinned one-of-two semantics; the absent class has the two
+          pinned variants (absent-clean, absent-defective).
           (4) RANDOMIZATION: blocked by stimulus class, 50/50 static/adaptive within
           each block, THE COMMITTED SEED + the full assignment table pre-computed.
           (5) ABSTENTION ANALYSIS PLAN: per-confidence-decile value(apply) vs
-          value(abstain), computed from recorded proposals + outcomes; the threshold
-          search is EXPLORATORY (post-hoc, labeled as such — the pre-registration does
-          not fix a threshold it cannot know).
+          value(abstain), computed from the recorded proposals (which MUST carry the
+          measured confidence field per rule 4b-c) + outcomes; the threshold search is
+          EXPLORATORY (post-hoc, labeled as such — the pre-registration does not fix a
+          threshold it cannot know); the confidence-recording requirement is restated so
+          p2's cell records satisfy it.
           (6) AUTHORIZATION BOUNDARY: a 2c finding authorizes a DESIGN CHANGE to the
           gate's application policy (e.g. confidence-gated abstention) — never an
           immediate activation.
