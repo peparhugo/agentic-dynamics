@@ -355,5 +355,78 @@ the wrong transcript and steering the wrong native session.
     deliberate Steer, the two-step Interrupt door, disabled actions for unmapped flags, safe
     text rendering, and mobile/reduced-motion structure.
 17. [ ] All pre-existing admin route, SSE, replay, telemetry, design-session, frontend, and
-    mutation-boundary tests pass unchanged, all new supervisor tests pass, and the complete
-    repository `pytest` suite passes.
+     mutation-boundary tests pass unchanged, all new supervisor tests pass, and the complete
+     repository `pytest` suite passes.
+
+## 7. The execution-hardening rail (cap_runner_hardening2)
+
+Three mechanisms close the execution gaps the terra post-mortem, the hardening review, and the
+revamp3 checkpoint violation measured. All three share the flag-only discipline (this design's
+hard rule 2): **they record and surface; they never steer.** None of them touches the steer /
+interrupt doors in §3.
+
+### 7.1 Server-level orphan sweep (design §Gap 1) — the supervisor-side monitor
+
+The one verified 43.4-minute stall was an **orphaned delegation**: the authoring session (in the
+opencode server) spawned a task (subagent); the parent session died mid-delegation; the subagent
+**completed** but its result was never reaped. The runner-level watchdog cannot see this case —
+it watches the runner's own agent process's transcript, and a dead parent is a process exit, not
+a stall. The orphan lives in the **opencode server layer**, which only this sweep observes.
+
+- **Observation surface:** the opencode server's session store (the SQLite `session`/`part`
+  tables this Control Room already reads), read-only.
+- **Detection (deterministic on transcript timestamps):** a task is an orphan when (a) the parent
+  session has NO meaningful part strictly after the task's spawn time AND (b) the subagent
+  session/process has terminated (a `step-finish` exists → completed, result produced; or silent
+  past `crash_grace_s` with no step-finish → crashed, no result). `idle_minutes` counts from the
+  subagent's termination.
+- **Action (flag-only):** record the orphan (dated, flagged, queryable — durable
+  `experiments/results/orphans/orphans.jsonl` + the bounded Redis `orphan_events` hot list + the
+  canonical registry `source_type=orphan`), reap the orphaned subagent's process if still alive
+  (SIGTERM of a pid whose cmdline references it — zombie reaping, not steering), and surface the
+  record. No opencode client, no `send_input`/`interrupt`/`resume` (AST-guarded).
+- **Cadence:** configurable (`ORPHAN_SWEEP_INTERVAL`, default 5 min); `--once` for one pass.
+- **Implementation:** `agentic_dynamics/control/orphan_sweep.py` + `scripts/orphan_sweep.py`
+  (CLI `agentic-dynamics supervise orphans`).
+
+### 7.2 Relabel tree-identity gate (design §Gap 2) — the runner-side tree gate
+
+revamp2's attempt A was reset away entirely, then attempt B (the "resume") committed a
+**tree-identical copy** under compliant `[workflow]` messages (`git diff f6fc35edf 20eeb801b` is
+empty). The merged commit enforcement checks the MESSAGE — the relabel's messages matched, so it
+would pass. The tree gate closes that.
+
+- **Discarded-trees ledger:** `experiments/results/workflows/<spec>/discarded_trees.jsonl`,
+  keyed `(spec, branch, tree_hash, discarded_at)`. The reset/rollback path records via
+  `record_discarded_tree` / the CLI `agentic-dynamics workflow discard-tree`
+  (`scripts/record_discarded_tree.py`); idempotent.
+- **Detection (post-phase, agent phases only):** the phase's committed tree (approvals-excluded —
+  scaffolding never changes work identity) compared against the ledger; a match fails the phase
+  `RELABEL` with the identical-tree proof (both hashes + the discarded record). Strict always —
+  never canonicalized.
+- **The operator-approval escape (the legit-reuse path):** an operator-signed
+  `approvals/<spec>/<phase>_tree_reuse.md` committed BEFORE the phase (present at the pre-head),
+  naming the tree + phase + a real operator signature + a date, authorizes the reuse.
+- **Implementation:** `src/agentic_dynamics/runtime/workflow_runner.py` (`_enforce_tree_gate`).
+
+### 7.3 Mechanical human checkpoint (design §Gap 3) — the designed stop
+
+revamp3's p2 committed the delta preview AND the unsigned approval template, then the runner
+moved straight into p3-p6 and recorded `ok: True` while the approval sat unsigned — "STOP for
+the operator" was a sentence in a prompt, and prompt rules without mechanics get ignored.
+
+- **The checkpoint phase kind:** a phase declaring `checkpoint: true` that completes successfully
+  records the campaign state `awaiting_operator_approval` and EXITS CLEANLY — phase status
+  `awaiting` (a designed stop, never an error; the operator's tools read "waiting", not
+  "failed"), run result `awaiting: true` + `awaiting_phase` + `awaiting_reason`; exit code 0.
+- **The approval contract:** `approvals/<spec>/<phase>_approval.md` must be committed at HEAD,
+  authored AFTER the checkpoint commit (absent at the checkpoint commit AND the checkpoint
+  commit an ancestor of HEAD), and carry a real operator signature (non-placeholder `operator:` /
+  `SIGNED-BY-OPERATOR:` line + a real date). An unsigned template or a signed-before-the-work
+  artifact never authorizes.
+- **Resume gating:** `--resume` verifies every completed checkpoint phase's contract BEFORE any
+  further phase runs; unsatisfied → the resume stops again with `awaiting_operator_approval`
+  (`awaiting_reason="approval_refused"`) and runs nothing; valid → proceeds.
+- **Implementation:** `src/agentic_dynamics/runtime/workflow_runner.py`
+  (`_checkpoint_approval_valid` / the phase-loop stop / the resume gate); the measured violator
+  `workflows/repository/cap_site_revamp3.yaml` declares `checkpoint: true` on its p2.

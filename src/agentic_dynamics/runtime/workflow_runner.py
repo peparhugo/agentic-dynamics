@@ -70,6 +70,13 @@ moved straight into p3-p6 and recorded ``ok: True`` — is mechanically impossib
 template fails the placeholder check, and an approval committed WITH the checkpoint work fails the
 descendant-order check.
 
+The third hardening-2 mechanism — the server-level ORPHAN sweep — does not live in this runner:
+an orphaned delegation (a parent session that died mid-task, its completed subagent never reaped)
+lives in the opencode SERVER layer, which the runner never observes (it watches its own agent
+process). It is implemented in ``agentic_dynamics/control/orphan_sweep.py`` + ``scripts/orphan_sweep.py``
+(flag-only, default 5-min cadence, CLI ``agentic-dynamics supervise orphans``) — see
+``docs/designs/current/cap_runner_hardening2_design.md`` §Gap 1.
+
 The agent works directly in ``workdir``; prior-phase artifacts are committed there, so
 later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
