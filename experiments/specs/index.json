@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-27T19:25:44.934599+00:00",
+  "generated_at": "2026-08-27T19:57:07.925035+00:00",
   "n_specs": 137,
   "specs": [
     {
@@ -571,13 +571,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-27T18:44:47.526019+00:00",
+      "last_run_at": "2026-08-27T19:57:07.871067+00:00",
       "latest_ok": false,
       "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.17515,
-      "latest_git_sha": "9b982306f",
-      "results_pointer": "experiments/results/workflows/cap_site_revamp4_diagrams/20260827T184447Z.json",
-      "n_runs": 2
+      "latest_cost_usd": 0.089742,
+      "latest_git_sha": "5eaac84ab",
+      "results_pointer": "experiments/results/workflows/cap_site_revamp4_diagrams/20260827T195707Z.json",
+      "n_runs": 3
     },
     {
       "name": "claude_background_sessions",
